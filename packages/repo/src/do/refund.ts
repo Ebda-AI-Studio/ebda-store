@@ -1,4 +1,5 @@
 import { settleFiscalOnReversal } from './fiscal';
+import { postWalletMovementJournal } from './ledger';
 import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
 import { recordMovement, restock } from './stock';
 import { MoneyError, type SyncSql } from './sync-sql';
@@ -80,6 +81,7 @@ export function applyWalletEntry(
     idempotencyKey: string;
     orderId?: string | null;
     returnId?: string | null;
+    actorId?: string | null;
     note?: string | null;
     now?: number;
   }
@@ -143,11 +145,12 @@ export function applyWalletEntry(
         'the wallet balance is not enough for this amount',
         409
       );
+    const entryId = crypto.randomUUID();
     db.run(
-      `INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, return_id, idempotency_key, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, return_id, idempotency_key, actor_id, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        crypto.randomUUID(),
+        entryId,
         a.storeId,
         w.id,
         a.customerId,
@@ -157,10 +160,19 @@ export function applyWalletEntry(
         a.orderId ?? null,
         a.returnId ?? null,
         a.idempotencyKey,
+        a.actorId ?? null,
         a.note ?? null,
         now,
       ]
     );
+    // Ruling WALLET-GL-1: the GL row commits with the wallet row it mirrors, never on a replay
+    postWalletMovementJournal(db, {
+      storeId: a.storeId,
+      entryId,
+      type: a.type,
+      amount: a.amount,
+      now,
+    });
     return { balance: w.balance as number, replayed: false };
   });
 }

@@ -16,6 +16,43 @@ declare module '@ebda-src/prisma-meta' {
   export default meta;
 }
 declare module '@ebda-src/repo' {
+  export interface InstapayReceiptRow {
+    id: string;
+    storeId: string;
+    orderId: string;
+    paymentId: string | null;
+    storageKey: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    status: string;
+    extractionStatus: string;
+    extractionError: string | null;
+    extracted: unknown;
+    confidence: number | null;
+    amountMinor: number | null;
+    reference: string | null;
+    referenceKey: string | null;
+    transferredAt: number | null;
+    payerName: string | null;
+    payerAddress: string | null;
+    payerMobile: string | null;
+    payerBank: string | null;
+    receiverName: string | null;
+    receiverHandle: string | null;
+    receiverMobile: string | null;
+    note: string | null;
+    expectedAmountMinor: number | null;
+    expectedReceiver: string | null;
+    flags: string[];
+    reviewNote: string | null;
+    reviewedBy: string | null;
+    reviewedAt: number | null;
+    submittedAt: number | null;
+    imageDeletedAt: number | null;
+    personalScrubbedAt: number | null;
+    createdAt: number;
+  }
   /** Opaque model metadata (packages/cf-schema/generated/prisma-meta.json). */
   export interface Meta {
     models: Record<string, unknown>;
@@ -53,6 +90,10 @@ declare module '@ebda-src/repo' {
   ): unknown;
   export function ensureSearchIndex(db: SyncSql): void;
   export function ensurePaymentSchema(db: SyncSql): void;
+  export function scrubReceiptsForOrders(
+    db: SyncSql,
+    a: { orderIds: string[]; now?: number }
+  ): number;
   export function routePaymentWebhook(
     d1: unknown,
     provider: string,

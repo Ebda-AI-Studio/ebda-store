@@ -32,7 +32,9 @@ import {
   type InstapayReceiptView,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
-import { storeMoney } from '../../lib/repo-factory';
+import { storeDb, storeMoney, type DoReceipt, type MoneyClient } from '../../lib/repo-factory';
+import { claimInstapayReference, releaseInstapayReference } from '../../lib/instapay-ref-claim';
+import { enabledStoreIds } from '../../lib/store-backend';
 import { sniffImage } from '../../lib/upload-sniff';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
@@ -164,6 +166,50 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
   return flags;
 }
 
+/** A DO order receipt (epoch ms) in the shape the Postgres row has (`Date`), so every consumer stays one code path. */
+export function receiptFromDo(r: DoReceipt): ReceiptRow {
+  const d = (v: number | null): Date | null => (v === null ? null : new Date(v));
+  return {
+    id: r.id,
+    storeId: r.storeId,
+    kind: 'order',
+    status: r.status,
+    orderId: r.orderId,
+    paymentId: r.paymentId,
+    claimId: null,
+    storageKey: r.storageKey,
+    mimeType: r.mimeType,
+    sizeBytes: r.sizeBytes,
+    sha256: r.sha256,
+    extractionStatus: r.extractionStatus,
+    extractionError: r.extractionError,
+    extracted: r.extracted as ReceiptRow['extracted'],
+    confidence: r.confidence,
+    amountMinor: r.amountMinor,
+    reference: r.reference,
+    referenceKey: r.referenceKey,
+    transferredAt: d(r.transferredAt),
+    payerName: r.payerName,
+    payerAddress: r.payerAddress,
+    payerMobile: r.payerMobile,
+    payerBank: r.payerBank,
+    receiverName: r.receiverName,
+    receiverHandle: r.receiverHandle,
+    receiverMobile: r.receiverMobile,
+    note: r.note,
+    expectedAmountMinor: r.expectedAmountMinor,
+    expectedReceiver: r.expectedReceiver,
+    flags: r.flags,
+    reviewNote: r.reviewNote,
+    reviewedBy: r.reviewedBy,
+    reviewedAt: d(r.reviewedAt),
+    submittedAt: d(r.submittedAt),
+    imageDeletedAt: d(r.imageDeletedAt),
+    personalScrubbedAt: d(r.personalScrubbedAt),
+    createdAt: new Date(r.createdAt),
+  } as unknown as ReceiptRow;
+}
+
 export function toReceiptView(r: ReceiptRow): InstapayReceiptView {
   return {
     id: r.id,
@@ -196,18 +242,9 @@ export function toReceiptView(r: ReceiptRow): InstapayReceiptView {
 }
 
 export class InstapayReceiptService {
-  /**
-   * An ORDER receipt of a store on its Durable Object is refused loudly (Ruling CF-PAY-1): the receipts table, the
-   * cross-store `reference_key` uniqueness (needs a D1 entity-index kind) and the screenshot lifecycle have not moved, and a
-   * Postgres receipt for an order that lives only on the DO would never be read by the confirm/expiry money operations.
-   */
-  private static async refuseOrderReceiptOnDo(storeId: string, kind: string): Promise<void> {
-    if (kind === 'order' && (await storeMoney(storeId)))
-      throw new AppError(
-        501,
-        'INSTAPAY_RECEIPTS_NOT_ON_DO',
-        'InstaPay receipts for a Durable Object store are not ported yet'
-      );
+  /** The money client when this is an ORDER receipt of a store on its Durable Object (Ruling INSTAPAY-DO-1), else null. */
+  private static async onDo(storeId: string, kind: string): Promise<MoneyClient | null> {
+    return kind === 'order' ? await storeMoney(storeId) : null;
   }
 
   /**
@@ -224,7 +261,7 @@ export class InstapayReceiptService {
     now?: Date;
   }): Promise<InstapayReceiptView> {
     const { storeId, kind } = args;
-    await InstapayReceiptService.refuseOrderReceiptOnDo(storeId, kind);
+    const doMoney = await InstapayReceiptService.onDo(storeId, kind);
     const now = args.now ?? new Date();
     if (args.file.length === 0 || args.file.length > INSTAPAY_RECEIPT_MAX_BYTES) {
       throw new AppError(400, 'FILE_TOO_LARGE', 'The screenshot must be smaller than 8 MB');
@@ -237,6 +274,7 @@ export class InstapayReceiptService {
         'Upload the receipt screenshot (JPG, PNG or WebP)'
       );
     }
+    if (doMoney) return InstapayReceiptService.uploadOnDo(doMoney, args, mime);
     const count = await withStore(storeId, () =>
       prisma.instapayReceipt.count({
         where:
@@ -295,6 +333,54 @@ export class InstapayReceiptService {
     return toReceiptView(row);
   }
 
+  /** The DO twin of `upload`: the draft row is born in the same database as the order, capped there in one section. */
+  private static async uploadOnDo(
+    money: MoneyClient,
+    args: { storeId: string; orderId?: string | null; paymentId?: string | null; file: Buffer },
+    mime: InstapayReceiptMime
+  ): Promise<InstapayReceiptView> {
+    const { storeId } = args;
+    const sha256 = crypto.createHash('sha256').update(args.file).digest('hex');
+    const { key } = await StorageService.putPrivate(args.file, {
+      storeId,
+      folder: 'instapay-receipts',
+      ext: EXT[mime],
+      contentType: mime,
+    });
+    let row: DoReceipt;
+    try {
+      row = await money.receiptCreate({
+        orderId: args.orderId ?? '',
+        paymentId: args.paymentId ?? null,
+        storageKey: key,
+        mimeType: mime,
+        sizeBytes: args.file.length,
+        sha256,
+      });
+    } catch (err) {
+      // Compensate: never leave an unreferenced object in the private bucket.
+      await StorageService.deletePrivate(key).catch(e =>
+        logger.error({ err: e, storeId }, '[instapay-receipt] orphaned private object')
+      );
+      throw err;
+    }
+    try {
+      await inngest.send({
+        name: 'instapay/receipt-extract',
+        data: { storeId, receiptId: row.id },
+      });
+    } catch (err) {
+      logger.error({ err, storeId, receiptId: row.id }, '[instapay-receipt] AI read not queued');
+      await money.receiptExtraction({
+        receiptId: row.id,
+        status: 'failed',
+        error: 'queue_unavailable',
+      });
+      row = await money.receiptGet({ receiptId: row.id });
+    }
+    return toReceiptView(receiptFromDo(row));
+  }
+
   private static async markExtractionFailed(
     storeId: string,
     receiptId: string,
@@ -320,6 +406,18 @@ export class InstapayReceiptService {
     storeId: string,
     receiptId: string
   ): Promise<'done' | 'failed' | 'skipped'> {
+    // an ORDER receipt of a DO store lives in the DO; anything else (subscription receipts) is platform-owned
+    const money = await storeMoney(storeId);
+    if (money) {
+      const mine = await money.receiptGet({ receiptId }).then(
+        r => r,
+        (e: { code?: string }) => {
+          if (e?.code === 'RECEIPT_NOT_FOUND') return null;
+          throw e;
+        }
+      );
+      if (mine) return InstapayReceiptService.runExtractionOnDo(money, storeId, mine);
+    }
     const row = await withStore(storeId, () =>
       prisma.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
     );
@@ -359,6 +457,39 @@ export class InstapayReceiptService {
     }
   }
 
+  private static async runExtractionOnDo(
+    money: MoneyClient,
+    storeId: string,
+    row: DoReceipt
+  ): Promise<'done' | 'failed' | 'skipped'> {
+    if (row.extractionStatus !== 'pending') return 'skipped';
+    try {
+      const { body } = await StorageService.getPrivate(row.storageKey);
+      const expectedReceivers = await this.expectedReceiversFor(storeId, receiptFromDo(row));
+      const extraction = await readInstapayReceipt({
+        storeId,
+        image: body,
+        mimeType: row.mimeType,
+        expectedReceivers,
+      });
+      await money.receiptExtraction({
+        receiptId: row.id,
+        status: 'done',
+        extracted: extraction,
+        confidence: extraction.confidence,
+      });
+      return 'done';
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? 'ai_failed';
+      logger.warn(
+        { err, storeId, receiptId: row.id },
+        '[instapay-receipt] AI read failed, manual entry'
+      );
+      await money.receiptExtraction({ receiptId: row.id, status: 'failed', error: String(code) });
+      return 'failed';
+    }
+  }
+
   /**
    * The account(s) this receipt's money must have gone to: the order's InstaPay handle and mobile (frozen on its payment),
    * or Ebda's own handle for a subscription receipt. The MERCHANT's details, normalised; empty = no receiver check.
@@ -369,16 +500,17 @@ export class InstapayReceiptService {
   ): Promise<string[]> {
     const raw: unknown[] = [];
     if (row.kind === 'order' && row.orderId) {
-      const payment = await withStore(storeId, () =>
-        prisma.payment.findFirst({
-          // the payment the receipt was filed against (the account the approver is shown), else the newest pending one
-          where: row.paymentId
-            ? { id: row.paymentId, orderId: row.orderId!, provider: 'instapay' }
-            : { orderId: row.orderId!, provider: 'instapay', status: 'pending' },
-          orderBy: { createdAt: 'desc' },
-          select: { metadata: true },
-        })
-      );
+      const query: Prisma.PaymentFindFirstArgs = {
+        // the payment the receipt was filed against (the account the approver is shown), else the newest pending one
+        where: row.paymentId
+          ? { id: row.paymentId, orderId: row.orderId!, provider: 'instapay' }
+          : { orderId: row.orderId!, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true },
+      };
+      const payment = (await storeMoney(storeId))
+        ? await (await storeDb(storeId)).payment.findFirst(query)
+        : await withStore(storeId, () => prisma.payment.findFirst(query));
       const m = (
         payment?.metadata && typeof payment.metadata === 'object' ? payment.metadata : {}
       ) as Record<string, unknown>;
@@ -400,6 +532,14 @@ export class InstapayReceiptService {
     receiptId: string,
     scope: { kind: 'subscription' } | { kind: 'order'; orderId: string }
   ): Promise<ReceiptRow> {
+    const doMoney = await InstapayReceiptService.onDo(storeId, scope.kind);
+    if (doMoney)
+      return receiptFromDo(
+        await doMoney.receiptGet({
+          receiptId,
+          orderId: scope.kind === 'order' ? scope.orderId : undefined,
+        })
+      );
     const row = await withStore(storeId, () =>
       prisma.instapayReceipt.findFirst({
         where: {
@@ -415,6 +555,9 @@ export class InstapayReceiptService {
   }
 
   static async listForOrder(storeId: string, orderId: string): Promise<InstapayReceiptView[]> {
+    const doMoney = await InstapayReceiptService.onDo(storeId, 'order');
+    if (doMoney)
+      return (await doMoney.receiptList({ orderId })).map(r => toReceiptView(receiptFromDo(r)));
     const rows = await withStore(storeId, () =>
       prisma.instapayReceipt.findMany({
         where: { storeId, kind: 'order', orderId, status: { not: 'draft' } },
@@ -456,8 +599,9 @@ export class InstapayReceiptService {
     notBefore: Date | null;
     now?: Date;
   }): Promise<ReceiptRow> {
-    await InstapayReceiptService.refuseOrderReceiptOnDo(args.storeId, args.scope.kind);
     const now = args.now ?? new Date();
+    const doMoney = await InstapayReceiptService.onDo(args.storeId, args.scope.kind);
+    if (doMoney) return InstapayReceiptService.submitOnDo(doMoney, args, now);
     const row = await this.get(args.storeId, args.receiptId, args.scope);
     if (row.status !== 'draft') {
       throw new AppError(409, 'RECEIPT_NOT_DRAFT', 'This receipt was already submitted');
@@ -519,6 +663,122 @@ export class InstapayReceiptService {
     }
   }
 
+  /**
+   * The DO twin of `submit` (Ruling INSTAPAY-DO-1): the receipt, the hold freeze, the payment metadata and the payment event
+   * are ONE DO section. The cross-store reference claim is made first and freed again if the section refuses.
+   */
+  private static async submitOnDo(
+    money: MoneyClient,
+    args: {
+      storeId: string;
+      receiptId: string;
+      scope: { kind: 'subscription' } | { kind: 'order'; orderId: string };
+      fields: InstapayReceiptFields;
+      expectedAmountMinor: number | null;
+      expectedReceivers: string[];
+      notBefore: Date | null;
+    },
+    now: Date
+  ): Promise<ReceiptRow> {
+    if (args.scope.kind !== 'order') throw new AppError(400, 'BAD_SCOPE', 'not an order receipt');
+    const { storeId, receiptId } = args;
+    const orderId = args.scope.orderId;
+    const referenceKey = normalizeInstapayReference(args.fields.reference);
+    if (!referenceKey) {
+      throw new AppError(400, 'INVALID_REFERENCE', 'The transfer reference is 8 to 20 digits');
+    }
+    const transferredAt = transferInstant(args.fields);
+    for (let attempt = 0; ; attempt++) {
+      // the DO section decides every refusal (waiting receipt, not a draft), in the Postgres service's order
+      const row = await money.receiptGet({ receiptId, orderId });
+      const { sameImage } = await money.receiptProof({
+        orderId,
+        sha256: row.sha256,
+        exceptId: row.id,
+      });
+      const flags = computeReceiptFlags({
+        fields: args.fields,
+        transferredAt,
+        extraction: (row.extracted as InstapayReceiptExtraction | null) ?? null,
+        extractionStatus: row.extractionStatus,
+        expectedAmountMinor: args.expectedAmountMinor,
+        expectedReceivers: args.expectedReceivers,
+        notBefore: args.notBefore,
+        notBeforeFlag: 'DATE_BEFORE_ORDER',
+        sameImageSeenBefore: sameImage > 0,
+        now,
+      });
+      const claim = await claimInstapayReference(referenceKey, storeId, receiptId);
+      if (claim === 'taken') {
+        throw new AppError(
+          409,
+          'DUPLICATE_REFERENCE',
+          'This transfer reference was already used. Each transfer can pay only once.'
+        );
+      }
+      try {
+        const out = await money.receiptSubmit({
+          orderId,
+          receiptId,
+          fields: {
+            amountMinor: args.fields.amountMinor,
+            reference: args.fields.reference,
+            transferredAt: transferredAt.getTime(),
+            payerName: args.fields.payerName ?? null,
+            payerAddress: args.fields.payerAddress ?? null,
+            payerMobile: args.fields.payerMobile ?? null,
+            payerBank: args.fields.payerBank ?? null,
+            receiverName: args.fields.receiverName ?? null,
+            receiverHandle: args.fields.receiverHandle ?? null,
+            receiverMobile: args.fields.receiverMobile ?? null,
+            note: args.fields.note ?? null,
+          },
+          referenceKey,
+          flags,
+          extractionStatus: row.extractionStatus,
+          expectedAmountMinor: args.expectedAmountMinor,
+          expectedReceiver: args.expectedReceivers.filter(Boolean).join(' / ') || null,
+        });
+        return receiptFromDo(out);
+      } catch (err) {
+        // The claim this call made is freed only when the DO ANSWERED with a refusal (its section rolled back, so this receipt
+        // is not submitted) and the refusal is not DUPLICATE_REFERENCE (another receipt holds the key). A transport error
+        // leaves the outcome unknown (the section may have committed): the claim stays, fail closed.
+        const code = (err as { code?: string }).code;
+        if (claim === 'claimed' && err instanceof AppError && code !== 'DUPLICATE_REFERENCE')
+          await releaseInstapayReference(referenceKey, storeId, receiptId);
+        // the AI read landed between the read and the submit: recompute the flags once
+        if ((err as { code?: string }).code === 'RECEIPT_CHANGED' && attempt === 0) continue;
+        throw err;
+      }
+    }
+  }
+
+  /** The merchant rejects a submitted ORDER receipt of a DO store: the reference is freed, the hold restarts (one DO section). */
+  static async rejectOnDo(args: {
+    storeId: string;
+    orderId: string;
+    receiptId: string;
+    note: string;
+    actorUserId: string;
+  }): Promise<{ receiptId: string; status: 'rejected'; expiresAt: string } | null> {
+    const money = await storeMoney(args.storeId);
+    if (!money) return null;
+    const r = await money.receiptReject({
+      orderId: args.orderId,
+      receiptId: args.receiptId,
+      note: args.note,
+      actorId: args.actorUserId,
+    });
+    if (r.referenceKey)
+      await releaseInstapayReference(r.referenceKey, args.storeId, args.receiptId);
+    return {
+      receiptId: r.receiptId,
+      status: 'rejected',
+      expiresAt: new Date(r.expiresAt).toISOString(),
+    };
+  }
+
   /** Approver decision on a submitted receipt (called from the money paths, same transaction). */
   static async markReviewed(
     storeId: string,
@@ -577,6 +837,23 @@ export class InstapayReceiptService {
   /** Delete the stored screenshot (idempotent) and record it. Never throws: the retention sweep retries a miss. */
   static async deleteImage(storeId: string, receiptId: string): Promise<boolean> {
     try {
+      // an order receipt of a DO store: the object goes, then the row records it (both idempotent)
+      const money = await storeMoney(storeId);
+      if (money) {
+        const mine = await money.receiptGet({ receiptId }).then(
+          r => r,
+          (e: { code?: string }) => {
+            if (e?.code === 'RECEIPT_NOT_FOUND') return null;
+            throw e;
+          }
+        );
+        if (mine) {
+          if (mine.imageDeletedAt) return false;
+          await StorageService.deletePrivate(mine.storageKey);
+          await money.receiptImageDeleted({ receiptId });
+          return true;
+        }
+      }
       const row = await withStore(storeId, () =>
         prisma.instapayReceipt.findUnique({
           where: { id: receiptId, storeId },
@@ -658,10 +935,23 @@ export class InstapayReceiptService {
           logger.error({ err, storeId }, '[instapay-receipt] retention failed'),
       }
     );
-    return parts.reduce(
+    const total = parts.reduce(
       (a, p) => ({ images: a.images + p.value.images, scrubbed: a.scrubbed + p.value.scrubbed }),
       { images: 0, scrubbed: 0 }
     );
+    // stores on their Durable Object: `acrossStores` skips them, their receipts are swept in the DO (Ruling INSTAPAY-DO-1)
+    for (const storeId of enabledStoreIds()) {
+      try {
+        const money = await storeMoney(storeId);
+        if (!money) continue;
+        const r = await money.receiptSweep();
+        total.scrubbed += r.scrubbed;
+        for (const d of r.dueImages) if (await this.deleteImage(storeId, d.id)) total.images++;
+      } catch (err) {
+        logger.error({ err, storeId }, '[instapay-receipt] retention failed (durable object)');
+      }
+    }
+    return total;
   }
 
   /**

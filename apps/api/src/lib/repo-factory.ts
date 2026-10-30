@@ -179,6 +179,9 @@ export interface StockClient {
   ): Promise<{ newQuantity: number }>;
 }
 
+/** An InstaPay order receipt as the DO returns it (`ReceiptRow` of `do/instapay-receipts.ts`). */
+export type DoReceipt = import('@ebda-src/repo').InstapayReceiptRow;
+
 /** Money operations of the StoreDO (Ruling CF-MONEY-1); each takes an optional idempotency key. */
 export interface MoneyClient {
   loyaltyEarn(
@@ -193,6 +196,20 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+  /** WalletService.applyEntry on the DO (Ruling WALLET-GL-1): ledger row + balance + GL in one section. */
+  walletEntry(
+    a: {
+      customerId: string;
+      amount: number;
+      type: string;
+      idempotencyKey: string;
+      orderId?: string | null;
+      returnId?: string | null;
+      actorId?: string | null;
+      note?: string | null;
+    },
+    key?: string
+  ): Promise<{ balance: number; replayed: boolean; entry: Record<string, unknown> }>;
   /** OrderService.create on the DO (Ruling CF-ORDERS-1): ONE section = stock, hold cap, coupon, loyalty redeem, wallet, rows. */
   createOrder(a: CreateOrderArgs, key?: string): Promise<PlacedOrderResult>;
   /** OrderService.quote (dryRun): totals and per-line prices; nothing reserved, nothing written (Ruling CF-FINAL-1). */
@@ -200,7 +217,65 @@ export interface MoneyClient {
   confirmPayment(
     a: { orderId: string; actorUserId?: string | null; proofSubmitted?: boolean },
     key?: string
-  ): Promise<{ changed: boolean; orderId: string; status: string }>;
+  ): Promise<{ changed: boolean; orderId: string; status: string; approvedReceiptIds?: string[] }>;
+  /** InstaPay ORDER receipts on the DO (Ruling INSTAPAY-DO-1). Rows are the engine's camelCase `ReceiptRow` (dates are epoch ms). */
+  receiptCreate(a: {
+    orderId: string;
+    paymentId?: string | null;
+    storageKey: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+  }): Promise<DoReceipt>;
+  receiptExtraction(a: {
+    receiptId: string;
+    status: 'done' | 'failed';
+    extracted?: unknown;
+    confidence?: number | null;
+    error?: string | null;
+  }): Promise<{ updated: boolean }>;
+  receiptGet(a: { receiptId: string; orderId?: string }): Promise<DoReceipt>;
+  receiptList(a: { orderId: string }): Promise<DoReceipt[]>;
+  receiptProof(a: {
+    orderId: string;
+    sha256?: string;
+    exceptId?: string;
+  }): Promise<{ submitted: number; sameImage: number }>;
+  receiptSubmit(a: {
+    orderId: string;
+    receiptId: string;
+    fields: Record<string, unknown>;
+    referenceKey: string;
+    flags: string[];
+    extractionStatus: string;
+    expectedAmountMinor: number | null;
+    expectedReceiver: string | null;
+  }): Promise<DoReceipt>;
+  receiptReject(a: {
+    orderId: string;
+    receiptId: string;
+    note: string;
+    actorId: string | null;
+  }): Promise<{ receiptId: string; expiresAt: number; referenceKey: string | null }>;
+  receiptImageDeleted(a: {
+    receiptId: string;
+  }): Promise<{ storageKey: string | null; alreadyDeleted: boolean }>;
+  receiptSweep(a?: object): Promise<{
+    dueImages: Array<{ id: string; storageKey: string }>;
+    scrubbed: number;
+  }>;
+  /** One batch of the CSV import (Ruling IMPORT-DO-1): products, stock, links and variants in ONE section. */
+  importBatch(a: { rows: unknown[]; aiFields: string[]; userId?: string | null }): Promise<{
+    created: number;
+    updated: number;
+    variantsCreated: number;
+    products: Array<{ rowIndex: number; productId: string }>;
+    renames: Array<{ from: string; to: string }>;
+  }>;
+  importVariants(a: {
+    productId: string;
+    variants: unknown[];
+  }): Promise<{ variantsCreated: number }>;
   cancel(
     a: { orderId: string; restoreInventory?: boolean; note?: string },
     key?: string
@@ -634,6 +709,18 @@ export function makeMoneyClient(
     loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+    walletEntry: (a, key) => call('walletEntry', a, key),
+    receiptCreate: a => call('receiptCreate', a),
+    receiptExtraction: a => call('receiptExtraction', a),
+    receiptGet: a => call('receiptGet', a),
+    receiptList: a => call('receiptList', a),
+    receiptProof: a => call('receiptProof', a),
+    receiptSubmit: a => call('receiptSubmit', a),
+    receiptReject: a => call('receiptReject', a),
+    receiptImageDeleted: a => call('receiptImageDeleted', a),
+    receiptSweep: a => call('receiptSweep', a ?? {}),
+    importBatch: a => call('importBatch', a),
+    importVariants: a => call('importVariants', a),
     createOrder: (a, key) => call('createOrder', a, key),
     quoteOrder: a => call('quoteOrder', a),
     confirmPayment: (a, key) => call('confirmPayment', a, key),

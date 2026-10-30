@@ -4,6 +4,9 @@
 import type { TableClass } from './registry';
 
 export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
+  _cart_claims: {
+    kind: 'no-pii',
+  },
   abandoned_cart_configs: {
     kind: 'no-pii',
   },
@@ -226,6 +229,26 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
   },
   gold_rates_current: {
     kind: 'no-pii',
+  },
+  instapay_order_receipts: {
+    kind: 'customer-pii',
+    match: {},
+    via: {
+      column: 'order_id',
+      table: 'orders',
+    },
+    action: 'scrub',
+    scrub: {
+      payer_name: null,
+      payer_address: null,
+      payer_mobile: null,
+      payer_bank: null,
+      receiver_name: null,
+      receiver_handle: null,
+      receiver_mobile: null,
+      note: null,
+      extracted: null,
+    },
   },
   inventory_history: {
     kind: 'store-owned',

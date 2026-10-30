@@ -21,6 +21,7 @@ import {
 import { cancelSaleDocument, issueRefundDocument } from './fiscal';
 import { changeOrderStatus } from './order-status';
 import { postOrderSaleJournal, postRefundJournal } from './ledger';
+import { applyWalletEntry, type WalletEntryType } from './refund';
 import {
   applyGoldRates,
   decidePendingGoldRate,
@@ -49,6 +50,25 @@ import {
   setReturnStatus,
   setReturnTracking,
 } from './returns';
+import {
+  INSTAPAY_RECEIPT_DDL,
+  createReceipt,
+  getReceipt,
+  listReceipts,
+  markImageDeleted,
+  proofState,
+  recordExtraction,
+  rejectReceipt,
+  submitReceipt,
+  sweepRetention,
+  type SubmitFields,
+} from './instapay-receipts';
+import {
+  importProductsBatch,
+  importVariantsForProduct,
+  type ImportRowPlan,
+  type ImportVariantRow,
+} from './catalog-import';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -103,7 +123,19 @@ export type MoneyOpName =
   | 'returnFinish'
   | 'returnRelease'
   | 'journalPartialReturn'
-  | 'journalAmountOnlyRefund';
+  | 'journalAmountOnlyRefund'
+  | 'walletEntry'
+  | 'receiptCreate'
+  | 'receiptExtraction'
+  | 'receiptGet'
+  | 'receiptList'
+  | 'receiptProof'
+  | 'receiptSubmit'
+  | 'receiptReject'
+  | 'receiptImageDeleted'
+  | 'receiptSweep'
+  | 'importBatch'
+  | 'importVariants';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -144,11 +176,25 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'returnRelease',
   'journalPartialReturn',
   'journalAmountOnlyRefund',
+  'walletEntry',
+  'receiptCreate',
+  'receiptExtraction',
+  'receiptGet',
+  'receiptList',
+  'receiptProof',
+  'receiptSubmit',
+  'receiptReject',
+  'receiptImageDeleted',
+  'receiptSweep',
+  'importBatch',
+  'importVariants',
 ];
 
 const TABLE = '_money_ops';
 export const ensureMoneyOpsSchema = (db: SyncSql): void => {
   ensureKeyedSchema(db, TABLE);
+  db.run(CART_CLAIMS_DDL, []);
+  for (const s of INSTAPAY_RECEIPT_DDL) db.run(s, []);
 };
 
 const id = (v: unknown, what: string): string =>
@@ -307,6 +353,97 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       walletCredit: typeof a.walletCredit === 'number' ? a.walletCredit : undefined,
       external: a.external === true,
       keepPaymentStatus: a.keepPaymentStatus === true,
+    }),
+  /** WalletService.applyEntry for a DO store (WALLET-GL-1): the ledger row, the balance and its GL half in one section. */
+  walletEntry: (db, storeId, a) => {
+    const r = applyWalletEntry(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      amount: typeof a.amount === 'number' ? a.amount : NaN,
+      type: a.type as WalletEntryType,
+      idempotencyKey: typeof a.idempotencyKey === 'string' ? a.idempotencyKey : '',
+      orderId: typeof a.orderId === 'string' ? a.orderId : null,
+      returnId: typeof a.returnId === 'string' ? a.returnId : null,
+      actorId: typeof a.actorId === 'string' ? a.actorId : null,
+      note: typeof a.note === 'string' ? a.note : null,
+    });
+    const e = db.all(
+      `SELECT id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, return_id, idempotency_key, actor_id, note, created_at
+         FROM wallet_transactions WHERE store_id = ? AND idempotency_key = ?`,
+      [storeId, a.idempotencyKey]
+    )[0];
+    return { ...r, entry: e };
+  },
+  /** InstaPay order receipts (Ruling INSTAPAY-DO-1): `do/instapay-receipts.ts`. */
+  receiptCreate: (db, storeId, a) =>
+    createReceipt(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      paymentId: typeof a.paymentId === 'string' ? a.paymentId : null,
+      storageKey: a.storageKey as string,
+      mimeType: a.mimeType as string,
+      sizeBytes: a.sizeBytes as number,
+      sha256: a.sha256 as string,
+    }),
+  receiptExtraction: (db, storeId, a) =>
+    recordExtraction(db, {
+      storeId,
+      receiptId: id(a.receiptId, 'receiptId'),
+      status: a.status === 'done' ? 'done' : 'failed',
+      extracted: a.extracted,
+      confidence: typeof a.confidence === 'number' ? a.confidence : null,
+      error: typeof a.error === 'string' ? a.error : null,
+    }),
+  receiptGet: (db, storeId, a) =>
+    getReceipt(db, {
+      storeId,
+      receiptId: id(a.receiptId, 'receiptId'),
+      orderId: typeof a.orderId === 'string' ? a.orderId : undefined,
+    }),
+  receiptList: (db, storeId, a) => listReceipts(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  receiptProof: (db, storeId, a) =>
+    proofState(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      sha256: typeof a.sha256 === 'string' ? a.sha256 : undefined,
+      exceptId: typeof a.exceptId === 'string' ? a.exceptId : undefined,
+    }),
+  receiptSubmit: (db, storeId, a) =>
+    submitReceipt(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      receiptId: id(a.receiptId, 'receiptId'),
+      fields: a.fields as SubmitFields,
+      referenceKey: id(a.referenceKey, 'referenceKey'),
+      flags: Array.isArray(a.flags) ? (a.flags as string[]) : [],
+      extractionStatus: String(a.extractionStatus ?? ''),
+      expectedAmountMinor: typeof a.expectedAmountMinor === 'number' ? a.expectedAmountMinor : null,
+      expectedReceiver: typeof a.expectedReceiver === 'string' ? a.expectedReceiver : null,
+    }),
+  receiptReject: (db, storeId, a) =>
+    rejectReceipt(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      receiptId: id(a.receiptId, 'receiptId'),
+      note: String(a.note ?? ''),
+      actorId: typeof a.actorId === 'string' ? a.actorId : null,
+    }),
+  receiptImageDeleted: (db, storeId, a) =>
+    markImageDeleted(db, { storeId, receiptId: id(a.receiptId, 'receiptId') }),
+  receiptSweep: (db, storeId) => sweepRetention(db, { storeId }),
+  /** One batch of the CSV import (Ruling IMPORT-DO-1): products, stock, links and variants in ONE section. */
+  importBatch: (db, storeId, a) =>
+    importProductsBatch(db, {
+      storeId,
+      rows: (a.rows as ImportRowPlan[]) ?? [],
+      aiFields: (a.aiFields as string[]) ?? [],
+      userId: typeof a.userId === 'string' ? a.userId : null,
+    }),
+  importVariants: (db, storeId, a) =>
+    importVariantsForProduct(db, {
+      storeId,
+      productId: id(a.productId, 'productId'),
+      variants: (a.variants as ImportVariantRow[]) ?? [],
     }),
   journalSale: (db, storeId, a) =>
     postOrderSaleJournal(db, { storeId, orderId: id(a.orderId, 'orderId') }),

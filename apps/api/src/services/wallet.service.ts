@@ -1,18 +1,20 @@
 import crypto from 'crypto';
 import {
   currentStoreId,
+  currentTenantGucs,
   prisma,
   Prisma,
   withMoneyTx,
   hasTenantContext,
   type WalletTransactionType,
-  withStore,
 } from '@ebda/database';
+import { storeMoney } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { insertAuditLog } from '../lib/definer';
 import { RETURN_WALLET_SHARE_KEY_PREFIX, returnWalletShareKey } from '../lib/refund-methods';
+import { postWalletMovementJournal } from './accounting/posting/wallet-posting';
 
 /**
  * Customer wallet (store credit) — the ONLY writer of `customer_wallets` and
@@ -150,6 +152,53 @@ export class WalletService {
     assertValidInput(input);
     const { storeId, customerId, amount, idempotencyKey } = input;
 
+    // Store on its Durable Object (Ruling WALLET-GL-1 / CF-MONEY-1): ledger row, balance and GL half in one section.
+    // NEVER inside an open Postgres transaction (Ruling WALLET-DO-TX-1): a DO write cannot roll back with it, so a later
+    // failure of that transaction would leave the credit applied and its retry would credit again. A caller that holds a
+    // client or an ambient tenant transaction (return completion, erasure, order create) on a DO store is refused loudly
+    // until its whole operation is one DO section.
+    {
+      const money = await storeMoney(storeId);
+      if (money) {
+        if (client || currentTenantGucs() !== undefined)
+          throw new AppError(
+            501,
+            'WALLET_IN_TRANSACTION_NOT_ON_DO',
+            'A wallet movement inside a database transaction is not available for a Durable Object store yet'
+          );
+        const r = await money.walletEntry({
+          customerId,
+          amount,
+          type: input.type,
+          idempotencyKey,
+          orderId: input.orderId ?? null,
+          returnId: input.returnId ?? null,
+          actorId: input.actorId ?? null,
+          note: input.note ?? null,
+        });
+        const e = r.entry as Record<string, any>;
+        return {
+          entry: {
+            id: e.id,
+            storeId: e.store_id,
+            walletId: e.wallet_id,
+            customerId: e.customer_id,
+            amount: e.amount,
+            balanceAfter: e.balance_after,
+            type: e.type,
+            orderId: e.order_id ?? null,
+            returnId: e.return_id ?? null,
+            idempotencyKey: e.idempotency_key,
+            actorId: input.actorId ?? e.actor_id ?? null,
+            note: e.note ?? null,
+            createdAt: new Date(e.created_at),
+          } as WalletEntry,
+          balance: r.balance,
+          replayed: r.replayed,
+        };
+      }
+    }
+
     return onClient(client, async c => {
       if (amount > 0) {
         const existing = await c.customerWallet.findUnique({
@@ -238,6 +287,10 @@ export class WalletService {
         where: { id: wallet.id, storeId },
         data: { balance: newBalance },
       });
+      // Ruling WALLET-GL-1: the GL movement commits or rolls back with the wallet row it
+      // mirrors (same transaction), so 2150 cannot drift from the balances. Replays returned
+      // above and never reach here.
+      await postWalletMovementJournal({ entry, tx: c });
 
       return { entry, balance: newBalance, replayed: false };
     });
@@ -326,25 +379,20 @@ export class WalletService {
 
   /**
    * Whether customers of this store can spend their wallet at checkout, and
-   * if not, why. Both feature keys must be on, and accounting must be OFF:
-   * the GL does not model the store-credit liability yet (Ruling W-3), so a
-   * wallet-paid order would be journaled as if the whole total arrived in cash.
+   * if not, why. Both feature keys must be on. Accounting no longer matters:
+   * every movement is journaled on 2150 (Ruling WALLET-GL-1, which retired the
+   * W-3 refusal).
    */
   static async getCheckoutAvailability(storeId: string): Promise<{
     available: boolean;
-    reason: 'feature_off' | 'checkout_feature_off' | 'accounting_enabled' | null;
+    reason: 'feature_off' | 'checkout_feature_off' | null;
   }> {
-    const [walletOn, checkoutOn, store] = await Promise.all([
+    const [walletOn, checkoutOn] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'customer_wallet'),
       featureService.isFeatureEnabled(storeId, 'customer_wallet_checkout'),
-      withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { accountingEnabled: true } })
-      ),
     ]);
     if (!walletOn) return { available: false, reason: 'feature_off' };
     if (!checkoutOn) return { available: false, reason: 'checkout_feature_off' };
-    if (!store || store.accountingEnabled)
-      return { available: false, reason: 'accounting_enabled' };
     return { available: true, reason: null };
   }
 

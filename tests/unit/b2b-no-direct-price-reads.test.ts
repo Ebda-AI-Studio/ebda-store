@@ -291,7 +291,12 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/bulk.service.ts': {
     category: 'writer',
     reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',
-    reads: { createVariantsForProductTx: 1, exportProducts: 2, importProducts: 7 },
+    reads: {
+      buildProductFields: 1,
+      createVariantsForProductTx: 1,
+      exportProducts: 2,
+      importProducts: 6,
+    },
   },
   'routes/bulk.routes.ts': {
     category: 'writer',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 import { storeTables } from '../src/cf/store-do/tables';
+import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import {
   STORE_DO_REGISTRY,
   unclassifiedTables,
@@ -120,6 +121,67 @@ describe('registry contract with the phase-1 schema', () => {
       if (c.kind !== 'customer-pii' || c.action !== 'scrub') continue;
       for (const col of Object.values(c.match)) expect(Object.keys(c.scrub ?? {})).toContain(col);
     }
+  });
+});
+
+describe('InstaPay order receipts in a customer erasure (Ruling INSTAPAY-DO-1)', () => {
+  it("the subject's receipts lose their personal fields and are marked for screenshot deletion; another buyer's are untouched", async () => {
+    const store = 'er-receipts';
+    const stub = e.STORE_DO.get(e.STORE_DO.idFromName(store));
+    await stub.moneyOp(store, 'cancel', encodeRpc({ orderId: 'nope' })); // binds the store
+    await runInDurableObject(stub, async (_i, state) => {
+      const sql = state.storage.sql;
+      sql.exec(
+        "INSERT INTO customers (id, store_id, first_name, last_name, email) VALUES ('c-mine', ?, 'A', 'B', 'buyer@example.com'), ('c-other', ?, 'C', 'D', 'o@x.eg')",
+        store,
+        store
+      );
+      for (const [o, c, bk] of [
+        ['o-mine', 'c-mine', BK],
+        ['o-other', 'c-other', OTHER],
+      ])
+        sql.exec(
+          `INSERT INTO orders (id, store_id, customer_id, buyer_key, order_number, status, payment_status, subtotal, total, shipping_address, billing_address)
+           VALUES (?, ?, ?, ?, ?, 'awaiting_payment_confirmation', 'unpaid', 1, 1, '{}', '{}')`,
+          o,
+          store,
+          c,
+          bk,
+          o
+        );
+      for (const o of ['o-mine', 'o-other'])
+        sql.exec(
+          `INSERT INTO instapay_order_receipts (id, store_id, order_id, storage_key, mime_type, size_bytes, sha256, status, payer_name, payer_mobile, note, extracted, created_at)
+           VALUES (?, ?, ?, ?, 'image/png', 1, ?, 'submitted', 'Payer Name', '01000000000', 'hello', '{"a":1}', 1)`,
+          `r-${o}`,
+          store,
+          o,
+          `key-${o}`,
+          `sha-${o}`
+        );
+    });
+    await stub.eraseSubject(customer());
+    await runInDurableObject(stub, async (_i, state) => {
+      const row = (id: string) =>
+        state.storage.sql.exec('SELECT * FROM instapay_order_receipts WHERE id = ?', id).one();
+      const mine = row('r-o-mine');
+      expect(mine.payer_name).toBeNull();
+      expect(mine.payer_mobile).toBeNull();
+      expect(mine.note).toBeNull();
+      expect(mine.extracted).toBeNull();
+      expect(mine.personal_scrubbed_at).not.toBeNull(); // the sweep now lists its screenshot for deletion
+      expect(mine.status).toBe('submitted'); // the money evidence stays
+      const other = row('r-o-other');
+      expect(other.payer_name).toBe('Payer Name');
+      expect(other.personal_scrubbed_at).toBeNull();
+    });
+    const swept = (await stub.moneyOp(store, 'receiptSweep', encodeRpc({}))) as {
+      ok: true;
+      json: string;
+    };
+    expect(decodeRpc<any>(swept.json).dueImages.map((d: any) => d.storageKey)).toEqual([
+      'key-o-mine',
+    ]);
   });
 });
 

@@ -183,7 +183,8 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
         slug: `${TAG}-store`,
         ownerId,
         status: 'active',
-        // Wallet checkout is refused while accounting is on (Ruling W-3).
+        // The fixture store keeps accounting OFF; accounting-on wallet checkout is covered below
+        // and in tests/integration/accounting/wallet-gl.test.ts (Ruling WALLET-GL-1).
         accountingEnabled: false,
       },
     });
@@ -501,18 +502,18 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     }
   });
 
-  it('accounting ON: wallet checkout is unavailable (Ruling W-3)', async () => {
+  it('accounting ON: wallet checkout is available and spends the balance (Ruling WALLET-GL-1)', async () => {
     await prisma.store.update({ where: { id: storeId }, data: { accountingEnabled: true } });
     try {
       expect(await WalletService.getCheckoutAvailability(storeId)).toEqual({
-        available: false,
-        reason: 'accounting_enabled',
+        available: true,
+        reason: null,
       });
       const c = await newCustomer();
       await fund(c, 3000);
       const { order } = await checkout(c, [[productA, 1]], true);
-      expect(order.walletAmount).toBe(0);
-      expect(await balanceOf(c)).toBe(3000);
+      expect(order.walletAmount).toBe(3000);
+      expect(await balanceOf(c)).toBe(0);
     } finally {
       await prisma.store.update({ where: { id: storeId }, data: { accountingEnabled: false } });
     }
