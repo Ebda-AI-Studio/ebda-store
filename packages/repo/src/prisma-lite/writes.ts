@@ -3,7 +3,7 @@ import { Engine, MAX_PARAMS } from './engine';
 import { encode } from './codec';
 import { expandUnique } from './unique';
 import { enumRankSql } from './enum-order';
-import type { ModelMeta, RelationField, ScalarField } from './types';
+import type { ModelMeta, RelationField, ScalarField, WriteGuard } from './types';
 
 type Args = Record<string, any>;
 type Row = Record<string, unknown>;
@@ -55,13 +55,35 @@ export function mapDbError(e: unknown): unknown {
 export class WriteEngine extends Engine {
   /** The StoreDO's own store id: when set, no row may be written with any other `storeId` (no RLS inside a DO). */
   private readonly ownStoreId: string | undefined;
+  private readonly guard: WriteGuard | undefined;
   constructor(
     meta: ConstructorParameters<typeof Engine>[0],
     sql: ConstructorParameters<typeof Engine>[1],
-    opts: { storeId?: string } = {}
+    opts: { storeId?: string; guard?: WriteGuard } = {}
   ) {
     super(meta, sql);
     this.ownStoreId = opts.storeId;
+    this.guard = opts.guard;
+  }
+
+  /**
+   * RPC write guard (Ruling CF-R7-4): called wherever a row of `model` is written, linked or deleted, whatever path
+   * reached it. Fails closed: a model that is not writable, or a stock column in `data`, throws before the statement runs.
+   */
+  private allow(model: string, data?: Row): void {
+    const g = this.guard;
+    if (!g) return;
+    if (!g.writable.has(model))
+      throw Object.assign(new Error(`${model} is not ported to the StoreDO write path`), {
+        code: 'MODEL_NOT_WRITABLE',
+      });
+    const cols = g.stock[model];
+    if (cols && data)
+      for (const c of cols)
+        if (data[c] !== undefined)
+          throw Object.assign(new Error(`${model}: stock columns are not written here`), {
+            code: 'STOCK_WRITE_REFUSED',
+          });
   }
 
   private assertStore(m: ModelMeta, values: Row): void {
@@ -172,6 +194,7 @@ export class WriteEngine extends Engine {
 
   /** Insert one row (and its nested creates). `parentFk` pre-fills the foreign key of a nested child. */
   private insert(model: string, m: ModelMeta, data: Row, parentFk: Row | undefined): Row {
+    this.allow(model, data);
     if (parentFk) this.assertNoFkInData(m, data, Object.keys(parentFk));
     const now = new Date();
     const values: Row = {};
@@ -199,11 +222,14 @@ export class WriteEngine extends Engine {
         // this row holds the FK: resolve (or create) the target first
         const op = v as Row;
         let target: Row | undefined;
-        if (op.connect) target = this.requireUnique(f.type, op.connect as Row);
-        else if (op.create)
+        if (op.connect) {
+          this.allow(f.type); // linking to a row of a model the DO does not own is a write path too
+          target = this.requireUnique(f.type, op.connect as Row);
+        } else if (op.create)
           target = this.insert(f.type, this.model(f.type), op.create as Row, undefined);
         else if (op.connectOrCreate) {
           const coc = op.connectOrCreate as Row;
+          this.allow(f.type); // the FOUND branch links without inserting, so the insert hook alone would not see it
           target =
             this.findUnique(f.type, coc.where as Row) ??
             this.insert(f.type, this.model(f.type), coc.create as Row, undefined);
@@ -380,6 +406,7 @@ export class WriteEngine extends Engine {
 
   /** `where` here is a full primary-key selector of one row; the SET list is built from `data`. */
   private applyUpdate(model: string, m: ModelMeta, pkSel: Row, data: Row): void {
+    this.allow(model, data);
     if (
       this.ownStoreId !== undefined &&
       data.storeId !== undefined &&
@@ -648,18 +675,19 @@ export class WriteEngine extends Engine {
         { cause: 'Record to delete does not exist.' }
       );
     const out = this.reread(model, hit, args); // read BEFORE the delete (FK cascades may remove children)
-    this.deleteByPk(m, hit);
+    this.deleteByPk(model, m, hit);
     return out;
   }
 
   deleteMany(model: string, args: Args = {}): { count: number } {
     const m = this.model(model);
     const rows = this.pkRows(model, args.where ?? {});
-    for (const r of rows) this.deleteByPk(m, r);
+    for (const r of rows) this.deleteByPk(model, m, r);
     return { count: rows.length };
   }
 
-  private deleteByPk(m: ModelMeta, pk: Row): void {
+  private deleteByPk(model: string, m: ModelMeta, pk: Row): void {
+    this.allow(model);
     const where = m.pk.map(p => `${q(this.scalar(m, p).column)} = ?`).join(' AND ');
     this.run(
       `DELETE FROM ${q(m.table)} WHERE ${where}`,

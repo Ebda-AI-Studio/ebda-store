@@ -1,6 +1,6 @@
 import { encodeRpc } from './codec';
 import { READ_OPS, type DoQuery, type DoQueryResult } from './reads';
-import type { SqlRunner } from '../prisma-lite/types';
+import type { SqlRunner, WriteGuard } from '../prisma-lite/types';
 
 /**
  * The WRITE half of the StoreDO RPC (INFRA-CF-1 PR D1, Ruling CF-WRITES-1).
@@ -92,6 +92,8 @@ const STOCK_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   Product: ['inventory'],
   ProductVariant: ['inventory'],
 };
+
+const WRITE_GUARD: WriteGuard = { writable: DO_WRITABLE_MODELS, stock: STOCK_COLUMNS };
 
 /**
  * Named in-DO procedures for the few writes that are one SQL statement Prisma cannot express (the Postgres twin is a raw
@@ -229,7 +231,9 @@ function fingerprint(s: string): string {
 /** Does any data object under `value` (top level, or inside create/update/set of an upsert/nested write) name a stock column? */
 function touchesStock(model: string, value: unknown, depth = 0): boolean {
   const cols = STOCK_COLUMNS[model];
-  if (!cols || value === null || typeof value !== 'object' || depth > 6) return false;
+  if (!cols || value === null || typeof value !== 'object') return false;
+  // fail CLOSED on a structure nested deeper than any real write (a deep value must not slip past a depth cut-off)
+  if (depth > 6) return true;
   if (Array.isArray(value)) return value.some(v => touchesStock(model, v, depth + 1));
   const o = value as Record<string, unknown>;
   return Object.entries(o).some(
@@ -284,6 +288,13 @@ export async function runWrites(
 ): Promise<DoQueryResult> {
   const bad = checkMutation(m);
   if (bad) return bad;
+  // The EXECUTOR enforces the same rules at every write/link it makes (Ruling CF-R7-4): the static check above cannot see
+  // which model a nested relation reaches, and a second parser of the same args is a parser differential. A client that
+  // cannot bind the guard is refused (fail closed) rather than run unguarded.
+  const bind = (lite as { $guarded?: (g: WriteGuard) => Record<string, unknown> }).$guarded;
+  if (typeof bind !== 'function')
+    return refuse('NO_WRITE_GUARD', 'client cannot enforce the write guard');
+  lite = bind(WRITE_GUARD);
   if (!sql.transaction) return refuse('NO_TRANSACTION', 'runner has no transaction');
   const fp = fingerprint(encodeRpc(m.ops));
   try {

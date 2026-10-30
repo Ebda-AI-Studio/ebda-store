@@ -1,5 +1,5 @@
 import { WriteEngine, mapDbError, knownError } from './writes';
-import type { Meta, SqlRunner } from './types';
+import type { Meta, SqlRunner, WriteGuard } from './types';
 import { expandUnique } from './unique';
 
 const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
@@ -40,7 +40,7 @@ export function createPrismaLite(
   meta: Meta,
   sql: SqlRunner,
   db: 'store-do' | 'd1' = 'store-do',
-  opts: { storeId?: string; unscoped?: boolean } = {}
+  opts: { storeId?: string; unscoped?: boolean; guard?: WriteGuard } = {}
 ) {
   // No RLS inside a DO: a client that is not told which store it serves would let a write carry any store id.
   if (db === 'store-do' && opts.storeId === undefined && opts.unscoped !== true)
@@ -52,7 +52,7 @@ export function createPrismaLite(
     ...meta,
     models: Object.fromEntries(Object.entries(meta.models).filter(([, m]) => m.db === db)),
   };
-  const engine = new WriteEngine(scoped, sql, { storeId: opts.storeId });
+  const engine = new WriteEngine(scoped, sql, { storeId: opts.storeId, guard: opts.guard });
   const byDelegate = new Map(
     Object.keys(scoped.models).map(m => [m[0].toLowerCase() + m.slice(1), m])
   );
@@ -147,6 +147,9 @@ export function createPrismaLite(
       get(_t, prop: string | symbol) {
         if (typeof prop === 'symbol') return undefined;
         if (prop === '$transaction') return $transaction;
+        // the same database and store, with the RPC write guard on (Ruling CF-R7-4)
+        if (prop === '$guarded')
+          return (guard: WriteGuard) => createPrismaLite(meta, sql, db, { ...opts, guard });
         if (prop === '$connect' || prop === '$disconnect') return async () => undefined;
         if (prop === 'then') return undefined; // never look like a thenable
         const model = own(Object.fromEntries(byDelegate), prop) ? byDelegate.get(prop) : undefined;
