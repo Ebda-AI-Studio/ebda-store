@@ -20,6 +20,7 @@ import {
   deleteUserTokens,
   findUserIdByEmail,
   getUserState,
+  insertAuditLog,
   purgeRefreshTokens,
   refreshTokenUser,
   revokeUserSessionsRow,
@@ -60,6 +61,7 @@ import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { sendAlert } from './alerts.service';
 import { SEND_CAP_WINDOW_MS } from './campaign.service';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
 import { emitEbdaConversion } from './ebda-ads-emit';
@@ -1971,6 +1973,57 @@ export class AuthService {
       throw new AppError(404, 'NOT_FOUND', 'Customer not found');
     }
 
+    // A shopper of a store on its Durable Object: the store-owned rows (orders, reviews, wallet, carts, consents, campaign mail,
+    // CRM copy) live there, so they are erased there, in ONE section, BEFORE the Postgres transaction below (Ruling CF-R6A-3).
+    // The Postgres transaction still runs for the platform rows and for the pre-cutover copy of the same data, which is erased
+    // too; a retry after a failure in either half converges because both are idempotent.
+    const doMoney = user.storeId ? ((await storeRepo(user.storeId)).money ?? null) : null;
+    let doErase: Awaited<ReturnType<NonNullable<typeof doMoney>['eraseShopper']>> | undefined;
+    let doProvenBuyerKey: string | undefined;
+    if (doMoney && user.storeId) {
+      const proofStore = opts.scopeStoreId ?? user.storeId;
+      const key = await buyerKeyForErasure(user.phone);
+      doProvenBuyerKey =
+        key &&
+        user.phone &&
+        (await phoneOnOwnOrder(
+          proofStore,
+          userId,
+          user.phone,
+          (await storeDb(user.storeId)) as never
+        ))
+          ? key
+          : undefined;
+      doErase = await doMoney.eraseShopper({
+        userId,
+        role: user.role,
+        email: user.email,
+        phone: user.phone,
+        smsPhoneKey: smsConsentPhoneKey(user.phone),
+        provenBuyerKey: doProvenBuyerKey ?? null,
+        actorId,
+        capWindowMs: SEND_CAP_WINDOW_MS,
+      });
+      // the wallet audit row Postgres writes for a self-service / cron erasure (a merchant-scoped one writes none)
+      if (
+        opts.scopeStoreId === undefined &&
+        (doErase.walletForfeited > 0 || doErase.walletNotesScrubbed)
+      )
+        await insertAuditLog({
+          action: 'customer.wallet.erased',
+          userId: actorId !== 'system' ? actorId : null,
+          storeId: user.storeId,
+          resourceType: 'user',
+          resourceId: userId,
+          details: {
+            actor: actorId,
+            reason: 'account_erasure',
+            forfeitedFils: doErase.walletForfeited,
+            notesScrubbed: doErase.walletNotesScrubbed,
+          },
+        });
+    }
+
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
     const anonymizedAddressJson = { anonymized: true } as const;
 
@@ -2032,8 +2085,9 @@ export class AuthService {
       const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
       if (!consentStoreId)
         throw new Error('[auth.eraseAccount] no store id for the consent erasure');
-      eraseProvenBuyerKey =
-        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
+      eraseProvenBuyerKey = doMoney
+        ? doProvenBuyerKey
+        : buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
           ? buyerKey
           : undefined;
 
@@ -2055,12 +2109,20 @@ export class AuthService {
         where: { customerId: userId, storeId: eraseStoreId },
         select: { id: true, buyerKey: true, createdAt: true },
       });
+      // a DO store's orders are the DO's (the Postgres rows are only the pre-cutover copy)
+      const ciOrders = doErase
+        ? doErase.orders.map(o => ({
+            id: o.id,
+            buyerKey: o.buyerKey,
+            createdAt: new Date(o.createdAt),
+          }))
+        : ownOrders;
       ciScope = {
         storeId: eraseStoreId,
-        orderIds: ownOrders.map(o => o.id),
-        buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+        orderIds: ciOrders.map(o => o.id),
+        buyerKeys: [...new Set(ciOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
         // The prefix pass starts at the sink's partition day of the first order minus a margin (lib/ci/layout.ts).
-        sinceDay: ciSinceDay(ownOrders.map(o => o.createdAt)),
+        sinceDay: ciSinceDay(ciOrders.map(o => o.createdAt)),
       };
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
@@ -2142,10 +2204,12 @@ export class AuthService {
       // the anonymized account can no longer sign in to spend it, and leaving
       // it would overstate the merchant's outstanding store-credit liability
       // forever. Runs on this erasure transaction, so it is atomic with it.
-      await WalletService.forfeitOnErasure(userId, tx, {
-        storeId: opts.scopeStoreId ?? null,
-        actorId,
-      });
+      // (a DO store's wallet was forfeited in the DO section above; the Postgres copy of it is not a live balance)
+      if (!doErase)
+        await WalletService.forfeitOnErasure(userId, tx, {
+          storeId: opts.scopeStoreId ?? null,
+          actorId,
+        });
 
       // Merchant-CRM copy of the same identity (`customers` +
       // `customer_addresses`). Without this the shopper's name, email,
@@ -2402,6 +2466,24 @@ export class AuthService {
         () => anonymize(prisma as unknown as Prisma.TransactionClient),
         userId
       );
+    }
+
+    // The merchant-CRM result of a DO store is the DO's (the Postgres pass above only erased the pre-cutover copy).
+    if (doErase) {
+      outcome.crmChecked = doErase.crmChecked;
+      outcome.crmRowsScrubbed = doErase.crmRowsScrubbed;
+      outcome.crmAmbiguous = doErase.crmAmbiguous;
+      // The receipt screenshots (private R2) go after the commits: an object delete before the erasure is final would lose
+      // the evidence of a rolled-back one. Each miss is retried by the retention sweep (the rows are marked scrubbed).
+      if (user.storeId && doErase.receiptIds.length > 0) {
+        const receiptStore = user.storeId;
+        const receiptIds = doErase.receiptIds;
+        void deferAfterTenantCommit('auth.eraseAccount.receipt-images', () =>
+          InstapayReceiptService.deleteImages(receiptStore, receiptIds)
+        ).catch(err =>
+          logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')
+        );
+      }
     }
 
     // Push the bumped token version into the tv cache the authenticate

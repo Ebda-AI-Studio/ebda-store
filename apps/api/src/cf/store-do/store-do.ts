@@ -40,7 +40,6 @@ import {
   ensurePaymentSchema,
   scrubReceiptsForOrders,
   ensureSearchIndex,
-  ensureReceiptSchema,
   MoneyError,
   runReads,
   runWrites,
@@ -112,8 +111,6 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureIdempotencySchema(doSqlRunner(ctx.storage));
       ensureStockOpsSchema(this.sync);
       ensureMoneyOpsSchema(this.sync);
-      // the cutover imports InstaPay order receipts into this table, so it must exist before the first __import
-      ensureReceiptSchema(this.sync);
     });
   }
 

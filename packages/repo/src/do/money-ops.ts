@@ -41,6 +41,7 @@ import {
 import { placeAdminOrder, type AdminOrderInput } from './admin-order';
 import { searchOrderIds } from './order-search';
 import { searchProductIdSet } from './search';
+import { eraseShopper, type EraseShopperInput } from './erase-shopper';
 import { matchingCustomers } from './search-customers';
 import {
   claimReturn,
@@ -118,6 +119,7 @@ export type MoneyOpName =
   | 'fiscalCancelSale'
   | 'searchOrders'
   | 'searchProducts'
+  | 'eraseShopper'
   | 'searchCustomers'
   | 'createAdminOrder'
   | 'recoveryCoupon'
@@ -174,6 +176,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fiscalCancelSale',
   'searchOrders',
   'searchProducts',
+  'eraseShopper',
   'searchCustomers',
   'createAdminOrder',
   'recoveryCoupon',
@@ -556,6 +559,11 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       typeof a.search === 'string' ? a.search : '',
       typeof a.numberLimit === 'number' && a.numberLimit > 0 ? a.numberLimit : undefined
     ),
+  /** The store-owned half of a shopper's account erasure (Ruling CF-R6A-3), one section; idempotent by construction. */
+  eraseShopper: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a as Partial<EraseShopperInput>;
+    return eraseShopper(db, { ...(rest as EraseShopperInput), storeId });
+  },
   /** Product lexical search (admin palette, lists, storefront; Ruling CF-R6A-1): the ids, best name match first. A read. */
   searchProducts: (db, storeId, a) => {
     const o = (a.opts ?? {}) as Record<string, unknown>;

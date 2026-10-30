@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { withStore } from '@ebda/database';
+import { runInTenantContext, withStore } from '@ebda/database';
 import { storeRepo } from '../lib/repo-factory';
 import { inCampaignStore } from '../services/campaign.service';
 import { publicLimiter } from '../middleware/security';

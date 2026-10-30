@@ -371,6 +371,25 @@ export interface MoneyClient {
     guestOrderIds: string[];
     truncated: boolean;
   }>;
+  /** The store-owned half of a shopper's account erasure, one section (Ruling CF-R6A-3). */
+  eraseShopper(a: {
+    userId: string;
+    role: string;
+    email: string | null;
+    phone: string | null;
+    smsPhoneKey: string | null;
+    provenBuyerKey: string | null;
+    actorId: string;
+    capWindowMs: number;
+  }): Promise<{
+    orders: Array<{ id: string; buyerKey: string | null; createdAt: number }>;
+    receiptIds: string[];
+    crmChecked: boolean;
+    crmRowsScrubbed: number;
+    crmAmbiguous: boolean;
+    walletForfeited: number;
+    walletNotesScrubbed: boolean;
+  }>;
   /** Product lexical search on the DO's own index (Ruling CF-R6A-1). A read. */
   searchProducts(a: {
     raw: string;
@@ -777,6 +796,7 @@ export function makeMoneyClient(
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
     searchOrders: a => call('searchOrders', a),
     searchProducts: a => call('searchProducts', a),
+    eraseShopper: a => call('eraseShopper', a),
     searchCustomers: a => call('searchCustomers', a),
     createAdminOrder: (a, key) => call('createAdminOrder', a, key),
     recoveryCoupon: (a, key) => call('recoveryCoupon', a, key),

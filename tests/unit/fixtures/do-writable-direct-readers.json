@@ -148,7 +148,8 @@
     "product": 1
   },
   "apps/api/src/services/auth.service.ts": {
-    "abandonedCart": 1
+    "abandonedCart": 1,
+    "campaignRecipient": 1
   },
   "apps/api/src/services/barcode-scan.service.ts": {
     "product": 3,
