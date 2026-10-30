@@ -69,6 +69,7 @@ import {
   toReceiptView,
 } from './instapay-receipt.service';
 import { StorageService } from '../storage.service';
+import { withClaimReleases } from '../../lib/instapay-ref-claim';
 
 const HOUR_MS = 3_600_000;
 
@@ -922,6 +923,15 @@ export class InstapayService {
     // Store on its Durable Object (Ruling INSTAPAY-DO-1): the decision, the new deadline, the payment metadata and the event are one section
     const onDo = await InstapayReceiptService.rejectOnDo({ ...args, note });
     if (onDo) return onDo;
+    return withClaimReleases(() => InstapayService.rejectReceiptPg(args, note, now));
+  }
+
+  private static async rejectReceiptPg(
+    args: { storeId: string; orderId: string; receiptId: string; actorUserId: string },
+    note: string,
+    now: Date
+  ) {
+    const { storeId, orderId } = args;
     return withStoreAfterCommit(storeId, async () => {
       const locked = await lockOrder(
         prisma as unknown as Prisma.TransactionClient,

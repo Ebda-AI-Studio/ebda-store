@@ -33,8 +33,11 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import { storeDb, storeMoney, type DoReceipt, type MoneyClient } from '../../lib/repo-factory';
-import { claimInstapayReference, releaseInstapayReference } from '../../lib/instapay-ref-claim';
-import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
+import {
+  claimInstapayReference,
+  releaseInstapayReference,
+  scheduleClaimRelease,
+} from '../../lib/instapay-ref-claim';
 import { enabledStoreIds } from '../../lib/store-backend';
 import { sniffImage } from '../../lib/upload-sniff';
 import logger from '../../lib/logger';
@@ -249,18 +252,19 @@ const duplicateReference = () =>
   );
 
 /**
- * Free the D1 claims of Postgres receipts whose `referenceKey` was just nulled (rejected, voided). Deferred until the
- * request transaction COMMITS (dropped on rollback): the claim must outlive a rollback that keeps the reference in Postgres.
+ * Free the D1 claims of Postgres receipts whose `referenceKey` was just nulled (rejected, voided). Queued, never immediate:
+ * the release runs after the transaction COMMITS and is dropped on rollback (`withClaimReleases`, lib/instapay-ref-claim.ts),
+ * and is refused outside such a scope.
  */
 function freeClaimsAfterCommit(
   storeId: string,
   rows: Array<{ id: string; referenceKey: string | null }>
-) {
-  const held = rows.filter((r): r is { id: string; referenceKey: string } => !!r.referenceKey);
-  if (held.length === 0) return Promise.resolve(null);
-  return deferAfterTenantCommit('instapay-ref-release', async () => {
-    for (const r of held) await releaseInstapayReference(r.referenceKey, storeId, r.id);
-  });
+): void {
+  scheduleClaimRelease(
+    rows
+      .filter((r): r is { id: string; referenceKey: string } => !!r.referenceKey)
+      .map(r => ({ referenceKey: r.referenceKey, storeId, receiptId: r.id }))
+  );
 }
 
 export class InstapayReceiptService {
@@ -830,7 +834,7 @@ export class InstapayReceiptService {
               reviewedAt: now,
             },
     });
-    if (count > 0) await freeClaimsAfterCommit(storeId, freed);
+    if (count > 0) freeClaimsAfterCommit(storeId, freed);
     return count;
   }
 
@@ -1026,7 +1030,7 @@ export class InstapayReceiptService {
         reviewedAt: new Date(),
       },
     });
-    await freeClaimsAfterCommit(storeId, freed);
+    freeClaimsAfterCommit(storeId, freed);
     return res;
   }
 }

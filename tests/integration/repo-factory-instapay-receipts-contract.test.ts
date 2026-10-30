@@ -10,7 +10,10 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setCfBindings } from '../../apps/api/src/cf/bindings';
-import { claimInstapayReference } from '../../apps/api/src/lib/instapay-ref-claim';
+import {
+  claimInstapayReference,
+  withClaimReleases,
+} from '../../apps/api/src/lib/instapay-ref-claim';
 import { prisma } from '@ebda/database';
 import {
   answerMoneyOp,
@@ -437,6 +440,55 @@ describe.skipIf(!hasDb)(
       });
       await new Promise(r => setTimeout(r, 50));
       expect(claims()).toHaveLength(0);
+    });
+
+    it('a rollback after the receipt was rejected leaves the claim HELD; a commit frees it; no scope refuses', async () => {
+      const w = await world(false);
+      const id = await uploaded(w);
+      await submit(w, id, freshReference());
+      expect(claims()).toHaveLength(1);
+      const reject = () =>
+        InstapayReceiptService.markReviewed(
+          STORE,
+          id,
+          { status: 'rejected', note: 'wrong receiver' },
+          ownerId
+        );
+      // the transaction that freed the reference fails after the write: nothing is released
+      await expect(
+        withClaimReleases(async () => {
+          await reject();
+          throw new Error('postgres transaction fails after the write');
+        })
+      ).rejects.toThrow('postgres transaction fails');
+      expect(claims()).toHaveLength(1);
+      // outside any release scope the free is refused (and the receipt is not even rejected twice: it is already rejected)
+      await submit(w, await uploaded(w), freshReference()).catch(() => undefined);
+      // a committed scope releases
+      const w2 = await world(false);
+      const id2 = await uploaded(w2);
+      await submit(w2, id2, freshReference());
+      const before = claims().length;
+      await withClaimReleases(() =>
+        InstapayReceiptService.markReviewed(
+          STORE,
+          id2,
+          { status: 'rejected', note: 'wrong receiver' },
+          ownerId
+        )
+      );
+      expect(claims().length).toBe(before - 1);
+      const w3 = await world(false);
+      const id3 = await uploaded(w3);
+      await submit(w3, id3, freshReference());
+      await expect(
+        InstapayReceiptService.markReviewed(
+          STORE,
+          id3,
+          { status: 'rejected', note: 'wrong receiver' },
+          ownerId
+        )
+      ).rejects.toThrow(/release refused/);
     });
   }
 );

@@ -1,4 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { hasTenantContext } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
+import { deferAfterTenantCommit, hasDeferralScope } from './after-tenant-commit';
 import logger from './logger';
 
 /**
@@ -73,4 +76,57 @@ export async function releaseInstapayReference(
       '[P1][instapay-ref] could not free a reference claim; it stays taken (fail closed) until cleared'
     );
   }
+}
+
+/**
+ * Releasing a claim is only safe AFTER the Postgres write that freed the reference has COMMITTED: if that transaction rolls
+ * back the reference is still held in Postgres, and a claim freed early lets the same bank reference be filed again.
+ * `scheduleClaimRelease` therefore never releases on its own: it queues into the nearest `withClaimReleases` scope and REFUSES
+ * without one (throws outside production; in production it logs a P1 and releases nothing, so the claim stays held: fail closed).
+ */
+export interface ClaimRef {
+  referenceKey: string;
+  storeId: string;
+  receiptId: string;
+}
+const releaseScope = new AsyncLocalStorage<{ pending: ClaimRef[] }>();
+
+/**
+ * Run `fn` (which owns or joins the transaction that frees references) and release the queued claims once it has committed:
+ * after the enclosing request transaction commits (deferred, dropped on rollback), or right after `fn` resolves when `fn` opened
+ * and closed its own transaction. A throw from `fn` drops the queue. Inside an open transaction that has NO deferral scope the
+ * commit point is unknowable, so the release is refused instead of guessed.
+ */
+export async function withClaimReleases<T>(fn: () => Promise<T>): Promise<T> {
+  const scope = { pending: [] as ClaimRef[] };
+  const out = await releaseScope.run(scope, fn);
+  if (scope.pending.length === 0) return out;
+  const release = async () => {
+    for (const c of scope.pending)
+      await releaseInstapayReference(c.referenceKey, c.storeId, c.receiptId);
+  };
+  if (hasDeferralScope()) await deferAfterTenantCommit('instapay-ref-release', release);
+  else if (hasTenantContext())
+    refuseRelease(scope.pending, 'inside a transaction with no deferral scope');
+  else await release();
+  return out;
+}
+
+function refuseRelease(refs: ClaimRef[], why: string): void {
+  logger.error(
+    { stores: [...new Set(refs.map(r => r.storeId))], count: refs.length, why },
+    '[P1][instapay-ref] claim release refused: the commit point is unknown; the claims stay held'
+  );
+  if (process.env.NODE_ENV !== 'production')
+    throw new Error(
+      `instapay reference release refused (${why}): wrap the caller in withClaimReleases`
+    );
+}
+
+/** Queue claims to free after the surrounding transaction commits. Refuses (see above) outside `withClaimReleases`. */
+export function scheduleClaimRelease(refs: ClaimRef[]): void {
+  if (refs.length === 0) return;
+  const scope = releaseScope.getStore();
+  if (!scope) return refuseRelease(refs, 'no withClaimReleases scope');
+  scope.pending.push(...refs);
 }

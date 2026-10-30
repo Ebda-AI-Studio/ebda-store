@@ -11,6 +11,8 @@ import { setCfBindings } from '../../apps/api/src/cf/bindings';
 import {
   claimInstapayReference,
   releaseInstapayReference,
+  scheduleClaimRelease,
+  withClaimReleases,
 } from '../../apps/api/src/lib/instapay-ref-claim';
 
 const mig = fs.readFileSync(
@@ -148,5 +150,36 @@ describe('InstapayReceiptService.submit on a DO store: when a claim may be freed
     expect(money.client.receiptSubmit).not.toHaveBeenCalled();
     expect(D.rows()).toHaveLength(1);
     expect(D.rows()[0].claim_ref).toBe('holder');
+  });
+});
+
+describe('release is queued, never immediate (a rolled-back void must leave the claim held)', () => {
+  const ref = { referenceKey: REF, storeId: 's1', receiptId: 'r1' };
+  it('without a withClaimReleases scope the release is refused outside production and the claim stays', async () => {
+    await claimInstapayReference(REF, 's1', 'r1');
+    expect(() => scheduleClaimRelease([ref])).toThrow(/release refused/);
+    expect(D.rows()).toHaveLength(1);
+  });
+  it('in production the refusal is a P1 log and no release (fail closed), not a throw', async () => {
+    await claimInstapayReference(REF, 's1', 'r1');
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      expect(() => scheduleClaimRelease([ref])).not.toThrow();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(D.rows()).toHaveLength(1);
+  });
+  it('a throw inside the scope drops the queue; a clean exit releases', async () => {
+    await claimInstapayReference(REF, 's1', 'r1');
+    await expect(
+      withClaimReleases(async () => {
+        scheduleClaimRelease([ref]);
+        throw new Error('rollback');
+      })
+    ).rejects.toThrow('rollback');
+    expect(D.rows()).toHaveLength(1);
+    await withClaimReleases(async () => scheduleClaimRelease([ref]));
+    expect(D.rows()).toHaveLength(0);
   });
 });

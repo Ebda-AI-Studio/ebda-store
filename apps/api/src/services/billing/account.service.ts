@@ -54,8 +54,7 @@ import {
   type LedgerVat,
 } from './charge-amount';
 import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
-import { releaseInstapayReference } from '../../lib/instapay-ref-claim';
-import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
+import { scheduleClaimRelease, withClaimReleases } from '../../lib/instapay-ref-claim';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -588,7 +587,7 @@ export async function suggestManualPeriod(
  * the super-admin reviews. NEVER activates anything (only the super-admin's recorded
  * payment does).
  */
-export async function submitSubscriptionReceipt(args: {
+async function submitSubscriptionReceiptInner(args: {
   storeId: string;
   receiptId: string;
   fields: InstapayReceiptFields;
@@ -654,11 +653,10 @@ export async function submitSubscriptionReceipt(args: {
         data: { status: 'draft', referenceKey: null, submittedAt: null },
       });
       // The receipt is a draft again: free its D1 reference claim (Ruling INSTAPAY-DO-1) once this transaction commits.
-      const heldKey = receipt.referenceKey;
-      if (heldKey)
-        await deferAfterTenantCommit('instapay-ref-release', () =>
-          releaseInstapayReference(heldKey, args.storeId, receipt.id)
-        );
+      if (receipt.referenceKey)
+        scheduleClaimRelease([
+          { referenceKey: receipt.referenceKey, storeId: args.storeId, receiptId: receipt.id },
+        ]);
       throw new AppError(
         409,
         'DUPLICATE_REFERENCE',
@@ -770,7 +768,7 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
 const freedReference = (ref: string, claimId: string, tag: 'rejected' | 'voided') =>
   `${ref}#${tag}-${claimId.slice(0, 8)}`.slice(0, 120);
 
-export async function rejectClaim(args: {
+async function rejectClaimInner(args: {
   storeId: string;
   claimId: string;
   note: string;
@@ -1098,7 +1096,7 @@ export interface ManualRefundInput {
  * RECORDS it, idempotent on the refund reference (void: one per payment), and adjusts
  * the paid period. Audit-logged by the route.
  */
-export async function recordManualRefund(input: ManualRefundInput) {
+async function recordManualRefundInner(input: ManualRefundInput) {
   const now = input.now ?? new Date();
   const note = input.note.trim();
   if (note.length < 3) throw new AppError(400, 'REASON_REQUIRED', 'Write why');
@@ -1284,3 +1282,12 @@ export async function recordManualRefund(input: ManualRefundInput) {
   }
   return { ...out, storeId };
 }
+
+// The D1 reference claims these free (Ruling INSTAPAY-DO-1) are released only after the transaction commits.
+export const rejectClaim = (args: Parameters<typeof rejectClaimInner>[0]) =>
+  withClaimReleases(() => rejectClaimInner(args));
+export const recordManualRefund = (input: Parameters<typeof recordManualRefundInner>[0]) =>
+  withClaimReleases(() => recordManualRefundInner(input));
+export const submitSubscriptionReceipt = (
+  args: Parameters<typeof submitSubscriptionReceiptInner>[0]
+) => withClaimReleases(() => submitSubscriptionReceiptInner(args));
