@@ -88,3 +88,88 @@ export function periodGlCreditsOp(
   )[0];
   return { total: Number(r?.total ?? 0) };
 }
+
+/**
+ * Per-account debit / credit totals of the counted journal entries (posted or reversed, never draft) inside the optional
+ * `[fromMs, toMs]` posted-at window, every account of the store listed (zero totals for an account with no lines): the
+ * twin of `accountTotals` in `reports.service.ts`, which the profit & loss, the trial balance and the profit-anomaly scan
+ * read (Ruling CF-JOBS-4).
+ */
+export function accountTotalsOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): {
+  rows: Array<{
+    id: string;
+    code: string;
+    nameEn: string;
+    nameAr: string | null;
+    type: string;
+    debit: number;
+    credit: number;
+  }>;
+} {
+  const bound = (v: unknown, what: string): number | undefined => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== 'number' || !Number.isFinite(v)) throw new MoneyError('BAD_ARGS', what, 400);
+    return v;
+  };
+  const from = bound(a.fromMs, 'fromMs');
+  const to = bound(a.toMs, 'toMs');
+  const filters = ["e.status IN ('posted', 'reversed')"];
+  const params: unknown[] = [storeId];
+  if (from !== undefined) {
+    filters.push('e.posted_at >= ?');
+    params.push(from);
+  }
+  if (to !== undefined) {
+    filters.push('e.posted_at <= ?');
+    params.push(to);
+  }
+  const rows = db.all(
+    `SELECT a.id AS id, a.code AS code, a.name_en AS name_en, a.name_ar AS name_ar, a.type AS type,
+            COALESCE(t.d, 0) AS d, COALESCE(t.c, 0) AS c
+       FROM accounts a
+       LEFT JOIN (
+         SELECT l.account_id AS account_id, SUM(l.debit) AS d, SUM(l.credit) AS c
+           FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id
+          WHERE e.store_id = ? AND ${filters.join(' AND ')}
+          GROUP BY l.account_id
+       ) t ON t.account_id = a.id
+      WHERE a.store_id = ?
+      ORDER BY a.code ASC`,
+    [storeId, ...params.slice(1), storeId]
+  );
+  return {
+    rows: rows.map(r => ({
+      id: r.id as string,
+      code: r.code as string,
+      nameEn: r.name_en as string,
+      nameAr: (r.name_ar as string | null) ?? null,
+      type: r.type as string,
+      debit: Number(r.d ?? 0),
+      credit: Number(r.c ?? 0),
+    })),
+  };
+}
+
+/**
+ * Customer Intelligence stamp of an order's delivery area and buyer key (the DO twin of `prismaCiSource.stampOrder`): sets
+ * each only where BOTH are still null, so a second delivery of the capture job stamps nothing (Ruling CF-JOBS-4).
+ */
+export function ciOrderStampOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { stamped: boolean } {
+  const orderId = str(a.orderId, 'orderId');
+  const area = a.areaKey === null || a.areaKey === undefined ? null : str(a.areaKey, 'areaKey');
+  const buyer =
+    a.buyerKey === null || a.buyerKey === undefined ? null : str(a.buyerKey, 'buyerKey');
+  const r = db.run(
+    'UPDATE orders SET area_key = ?1, buyer_key = ?2 WHERE id = ?3 AND store_id = ?4 AND area_key IS NULL AND buyer_key IS NULL',
+    [area, buyer, orderId, storeId]
+  );
+  return { stamped: r.changes > 0 };
+}

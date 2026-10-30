@@ -78,7 +78,14 @@ import {
   type ImportVariantRow,
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
-import { abandonStampOp, periodGlCreditsOp, recordPaymentEventOp, trialBalanceOp } from './job-ops';
+import {
+  abandonStampOp,
+  accountTotalsOp,
+  ciOrderStampOp,
+  periodGlCreditsOp,
+  recordPaymentEventOp,
+  trialBalanceOp,
+} from './job-ops';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -123,6 +130,8 @@ export type MoneyOpName =
   | 'abandonStamp'
   | 'trialBalance'
   | 'periodGlCredits'
+  | 'accountTotals'
+  | 'ciOrderStamp'
   | 'orderStatus'
   | 'quoteOrder'
   | 'fiscalRefund'
@@ -185,6 +194,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'abandonStamp',
   'trialBalance',
   'periodGlCredits',
+  'accountTotals',
+  'ciOrderStamp',
   'orderStatus',
   'quoteOrder',
   'fiscalRefund',
@@ -536,6 +547,8 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   abandonStamp: (db, storeId, a) => abandonStampOp(db, storeId, a),
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),
   periodGlCredits: (db, storeId, a) => periodGlCreditsOp(db, storeId, a),
+  accountTotals: (db, storeId, a) => accountTotalsOp(db, storeId, a),
+  ciOrderStamp: (db, storeId, a) => ciOrderStampOp(db, storeId, a),
   /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */
   quoteOrder: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a as Partial<CheckoutInput>;

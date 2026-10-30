@@ -92,7 +92,18 @@ export type WritableModel =
   | 'campaign'
   | 'campaignRecipient'
   | 'notificationConfig'
-  | 'notificationEventConfig';
+  | 'notificationEventConfig'
+  | 'bulkAiJob'
+  | 'bulkImportJob'
+  | 'storeFaq'
+  | 'storeHowto'
+  | 'aiRecommendation'
+  | 'frequentlyBoughtTogether'
+  | 'profitAnomaly'
+  | 'customerCohortSnapshot'
+  | 'funnelSnapshot'
+  | 'customerRfmSnapshot'
+  | 'answerEngineCheck';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -464,6 +475,24 @@ export interface MoneyClient {
   trialBalance(): Promise<{ debit: number; credit: number }>;
   /** Revenue-side GL credits posted since `sinceMs` (accounting period reconciliation). */
   periodGlCredits(a: { sinceMs: number }): Promise<{ total: number }>;
+  /** Per-account totals of the counted journal entries in an optional posted-at window (reports, profit-anomaly scan). */
+  accountTotals(a: { fromMs?: number; toMs?: number }): Promise<{
+    rows: Array<{
+      id: string;
+      code: string;
+      nameEn: string;
+      nameAr: string | null;
+      type: string;
+      debit: number;
+      credit: number;
+    }>;
+  }>;
+  /** Customer Intelligence area / buyer stamp of an order, only where both are still null. */
+  ciOrderStamp(a: {
+    orderId: string;
+    areaKey: string | null;
+    buyerKey: string | null;
+  }): Promise<{ stamped: boolean }>;
   /** confirmed / processing / shipped / delivered (Ruling CF-FINAL-1): state machine, fanout arming, COD settlement, event. */
   orderStatus(
     a: {
@@ -817,6 +846,8 @@ export function makeMoneyClient(
     abandonStamp: a => call('abandonStamp', a),
     trialBalance: () => call('trialBalance', {}),
     periodGlCredits: a => call('periodGlCredits', a),
+    accountTotals: a => call('accountTotals', a),
+    ciOrderStamp: a => call('ciOrderStamp', a),
     orderStatus: (a, key) => call('orderStatus', a, key),
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),

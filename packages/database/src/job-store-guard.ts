@@ -21,6 +21,15 @@ export function withHiddenStores<T>(scope: HiddenStoresScope, fn: () => T): T {
   return hiddenStorage.run(scope, fn);
 }
 
+/**
+ * Runs `fn` OUTSIDE any hidden-stores scope, so `storeDirectory` / `acrossStores` list every store again. For a job that
+ * covers the DO stores ITSELF (a store-by-store cron that reaches each DO store through its Durable Object, Ruling
+ * CF-JOBS-4): it must be able to LIST them, and it never touches their Postgres rows.
+ */
+export function withoutHiddenStores<T>(fn: () => T): T {
+  return hiddenStorage.exit(fn);
+}
+
 /** Drops hidden stores from a list of store ids / directory entries, reporting what it dropped. */
 export function dropHiddenStores<T>(items: T[], idOf: (t: T) => string, via: string): T[] {
   const g = hiddenStorage.getStore();
