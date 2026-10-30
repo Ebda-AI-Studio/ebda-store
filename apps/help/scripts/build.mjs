@@ -1,7 +1,7 @@
 // Static build for help.ebda.app: in-repo MDX articles, Arabic-first (/) + English (/en/),
 // with a build-time MiniSearch index searched client-side. Every article may link back to
 // store.ebda.app via `appPath` frontmatter.
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
@@ -89,12 +89,37 @@ const articleUrl = (lang, slug) => `${L[lang].prefix}/${slug}/`;
 resetOut(out, path.join(root, 'public'));
 writeSiteCss(out);
 
-const content = {
-  ar: loadContent(path.join(root, 'content', 'ar')),
-  en: loadContent(path.join(root, 'content', 'en')),
+// Product folders (BRAND-ARCH-1, LAUNCH-SUITE-1): content/<lang>/<folder>/<slug>.mdx builds to /<folder>/<slug>/
+// (and /en/<folder>/<slug>/). Ebda Store's own articles stay at the root; each further product is one folder.
+const PRODUCT_FOLDERS = [
+  {
+    id: 'whatsapp',
+    name: { ar: 'ابدأ واتساب', en: 'Ebda WhatsApp' },
+  },
+];
+const PRODUCT_NAME = {
+  store: { ar: BRAND.product.nameAr, en: BRAND.product.nameEn },
+  ...Object.fromEntries(PRODUCT_FOLDERS.map(f => [f.id, f.name])),
 };
+const loadLang = lang => [
+  ...loadContent(path.join(root, 'content', lang)).map(a => ({
+    ...a,
+    product: 'store',
+    path: a.slug,
+  })),
+  ...PRODUCT_FOLDERS.flatMap(f =>
+    existsSync(path.join(root, 'content', lang, f.id))
+      ? loadContent(path.join(root, 'content', lang, f.id)).map(a => ({
+          ...a,
+          product: f.id,
+          path: `${f.id}/${a.slug}`,
+        }))
+      : []
+  ),
+];
+const content = { ar: loadLang('ar'), en: loadLang('en') };
 // Both languages must carry the same article set (parity is part of "Arabic-first + English").
-const slugs = a => a.map(x => x.slug).join(',');
+const slugs = a => a.map(x => x.path).join(',');
 if (slugs(content.ar) !== slugs(content.en)) {
   throw new Error(
     `Article sets differ between ar and en:\n ar: ${slugs(content.ar)}\n en: ${slugs(content.en)}`
@@ -110,9 +135,9 @@ const sidebarFor = (lang, current) => {
     const g = a.data.section ?? '';
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push({
-      href: articleUrl(lang, a.slug),
+      href: articleUrl(lang, a.path),
       label: a.data.title + (a.data.status === 'soon' ? ` (${L[lang].soon})` : ''),
-      current: a.slug === current,
+      current: a.path === current,
     });
   }
   return renderSidebar(
@@ -157,15 +182,25 @@ for (const lang of ['ar', 'en']) {
   const other = lang === 'ar' ? 'en' : 'ar';
 
   // Home
-  const cards = content[lang]
-    .map(
-      a =>
-        `<li><a href="${articleUrl(lang, a.slug)}">${esc(a.data.title)}</a>${a.data.status === 'soon' ? ` <span class="badge">${esc(c.soon)}</span>` : ''}<p class="muted">${esc(a.data.description)}</p></li>`
-    )
-    .join('');
+  const cardsFor = product =>
+    content[lang]
+      .filter(a => a.product === product)
+      .map(
+        a =>
+          `<li><a href="${articleUrl(lang, a.path)}">${esc(a.data.title)}</a>${a.data.status === 'soon' ? ` <span class="badge">${esc(c.soon)}</span>` : ''}<p class="muted">${esc(a.data.description)}</p></li>`
+      )
+      .join('');
   // One section per product (BRAND-ARCH-1). Ebda Store is the only live product; the others get their own
   // section the day they ship, never a "coming soon" card.
-  const homeMain = `<div class="prose"><h1>${esc(c.homeTitle)}</h1><p>${esc(c.homeIntro)}</p><p><a class="btn" href="${BRAND_STORE_APP_URL}/signup">${esc(c.homeCta)}</a></p><section aria-labelledby="p-store"><h2 id="p-store">${esc(lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn)}</h2><ul class="cards">${cards}</ul></section></div>`;
+  const homeMain = `<div class="prose"><h1>${esc(c.homeTitle)}</h1><p>${esc(c.homeIntro)}</p><p><a class="btn" href="${BRAND_STORE_APP_URL}/signup">${esc(c.homeCta)}</a></p>${Object.keys(
+    PRODUCT_NAME
+  )
+    .filter(id => content[lang].some(a => a.product === id))
+    .map(
+      id =>
+        `<section aria-labelledby="p-${id}"><h2 id="p-${id}">${esc(PRODUCT_NAME[id][lang])}</h2><ul class="cards">${cardsFor(id)}</ul></section>`
+    )
+    .join('')}</div>`;
   writePage(
     out,
     homeUrl(lang),
@@ -188,24 +223,24 @@ for (const lang of ['ar', 'en']) {
     const appLink = a.data.appPath
       ? `<p><a class="btn btn-ghost" href="${esc(BRAND_STORE_APP_URL + a.data.appPath)}">${esc(c.openApp)}</a></p>`
       : '';
-    const main = `<article class="prose"><p class="muted small">${esc(lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn)}</p><h1>${esc(a.data.title)}</h1>${soon}${renderToc(headings, c.tocLabel)}${html}${appLink}</article>`;
+    const main = `<article class="prose"><p class="muted small">${esc(PRODUCT_NAME[a.product][lang])}</p><h1>${esc(a.data.title)}</h1>${soon}${renderToc(headings, c.tocLabel)}${html}${appLink}</article>`;
     writePage(
       out,
-      articleUrl(lang, a.slug),
+      articleUrl(lang, a.path),
       renderPage({
         ...base(lang),
         title: `${a.data.title} | ${c.site}`,
         description: a.data.description,
-        canonical: ORIGIN + articleUrl(lang, a.slug),
-        alternates: alternates(articleUrl('ar', a.slug), articleUrl('en', a.slug)),
-        langSwitch: { ...base(lang).langSwitch, href: articleUrl(other, a.slug) },
-        sidebar: sidebarFor(lang, a.slug),
+        canonical: ORIGIN + articleUrl(lang, a.path),
+        alternates: alternates(articleUrl('ar', a.path), articleUrl('en', a.path)),
+        langSwitch: { ...base(lang).langSwitch, href: articleUrl(other, a.path) },
+        sidebar: sidebarFor(lang, a.path),
         main,
       })
     );
-    urls.push(articleUrl(lang, a.slug));
+    urls.push(articleUrl(lang, a.path));
     searchDocs.push({
-      url: articleUrl(lang, a.slug),
+      url: articleUrl(lang, a.path),
       title: a.data.title,
       section: a.data.section ?? c.site,
       lang,
@@ -304,7 +339,7 @@ for (const lang of ['ar', 'en']) {
 writeFileSync(
   path.join(out, 'llms.txt'),
   `# ${BRAND.company.shortNameEn} Help\n\n> Merchant help for ${BRAND.product.nameEn}, in Arabic and English. Products are added here as they ship.\n\n${content.en
-    .map(a => `- [${a.data.title}](${ORIGIN}${articleUrl('en', a.slug)}): ${a.data.description}`)
+    .map(a => `- [${a.data.title}](${ORIGIN}${articleUrl('en', a.path)}): ${a.data.description}`)
     .join('\n')}\n`
 );
 console.log(
