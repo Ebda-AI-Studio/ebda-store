@@ -624,7 +624,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
-  vectorStale: (db, storeId, a) => vectorStaleOp(db, storeId, a),
+  vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorCommit: (db, storeId, a) => vectorCommitOp(db, storeId, a),
   vectorPlan: (db, storeId, a) => vectorPlanOp(db, storeId, a),
   webhookEndpointCreate: (db, storeId, a) => webhookEndpointCreateOp(db, storeId, a),
