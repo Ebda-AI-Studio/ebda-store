@@ -29,9 +29,15 @@ export function check(files, labels) {
  * event's (possibly stale) base sha pulls main's later commits into the list. For a merge commit diff its parents
  * (HEAD^1...HEAD^2 = merge-base..PR head); otherwise (push/local) fall back to base...HEAD.
  */
+// A git hook exports GIT_DIR, which would point these calls at the wrong repo.
+const cleanEnv = () =>
+  Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
 export function changedFiles(cwd, base) {
   const git = args =>
-    execFileSync('git', args, { cwd, encoding: 'utf8' }).split('\n').filter(Boolean);
+    execFileSync('git', args, { cwd, encoding: 'utf8', env: cleanEnv() })
+      .split('\n')
+      .filter(Boolean);
   const parents = git(['rev-list', '--parents', '-n', '1', 'HEAD'])[0]?.split(' ').slice(1) ?? [];
   const range = parents.length === 2 ? 'HEAD^1...HEAD^2' : `${base}...HEAD`;
   return git(['diff', '--name-only', range]);
