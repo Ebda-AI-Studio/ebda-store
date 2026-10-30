@@ -184,7 +184,7 @@ describe('job data classification', () => {
       ),
       'utf8'
     );
-    expect(src).toMatch(/storeDb\(/);
+    expect(src).toMatch(/sweepStoresDb\(/); // reads through the store's backend (CF-JOBS-3: the DO store's alarm)
     expect(src).toMatch(/fanoutDisarm\(/);
     expect(src).not.toMatch(/\bprisma\b/);
     // the one Postgres write left is the pg branch of the disarm, reached only when storeMoney() is null
