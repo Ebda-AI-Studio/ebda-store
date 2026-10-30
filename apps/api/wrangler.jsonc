@@ -49,6 +49,20 @@
     },
   ],
 
+  // D1 `ebda-platform` (INFRA-CF-1 task 2.4): `stores.storage_backend` is the per-store backend switch read by
+  // lib/store-backend.ts, and /health reports its counts. The zero id is a placeholder (like the zero ids above): the
+  // real id is the repo variable EBDA_PLATFORM_D1_ID, substituted by scripts/ebda-cf-api-config.mjs. Create it with
+  // `npx wrangler d1 create ebda-platform` on the personal/Whisky 11 account. Schema = packages/cf-schema/migrations/platform,
+  // applied by cf-api-deploy.yml before the Worker deploys.
+  "d1_databases": [
+    {
+      "binding": "PLATFORM_DB",
+      "database_name": "ebda-platform",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/cf-schema/migrations/platform",
+    },
+  ],
+
   // Public caches (store / product payloads). Placeholder ids: `wrangler kv namespace create`.
   "kv_namespaces": [{ "binding": "KV_CACHE", "id": "00000000000000000000000000000000" }],
 

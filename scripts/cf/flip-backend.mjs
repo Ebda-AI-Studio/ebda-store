@@ -14,7 +14,7 @@
 //           (docs/runbooks/cutover-cf.md section 9). --accept-data-loss <all|slug,...> is the explicit,
 //           named override. --reset-do wipes the StoreDOs afterwards so a cutover can be retried.
 // Without --yes it only prints the plan. The flag is a NEVER-stale read: the script polls --health-url until
-// the /health storage_backend counts match, and fails if they do not within 60 s.
+// the storage_backend counts match (super_admin only: --health-url is <api>/api/v1/health and the bearer is $OPS_HEALTH_TOKEN), and fails if they do not within 60 s.
 import fs from 'node:fs';
 import { cli } from './lib/cli.mjs';
 import { d1Query, d1QueryMany, lit } from './lib/d1.mjs';
@@ -71,9 +71,14 @@ async function waitHealth(want) {
     return console.log('no --health-url: confirm /health storage_backend by hand before smoke');
   const t0 = Date.now();
   for (;;) {
-    const h = await fetch(args['health-url'])
+    const j = await fetch(args['health-url'], {
+      headers: process.env.OPS_HEALTH_TOKEN
+        ? { authorization: `Bearer ${process.env.OPS_HEALTH_TOKEN}` }
+        : {},
+    })
       .then(r => r.json())
       .catch(() => ({}));
+    const h = j.data ?? j;
     if (
       JSON.stringify(Object.entries(h.storage_backend ?? {}).sort()) ===
       JSON.stringify(Object.entries(want).sort())

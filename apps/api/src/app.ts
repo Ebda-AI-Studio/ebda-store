@@ -59,6 +59,8 @@ import {
   isPlatformOrigin,
 } from './lib/cors-cache';
 import { healthPayload } from './lib/health-payload';
+import { storageBackendCounts } from './lib/store-backend';
+import { cfBindings } from './cf/bindings';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 import { repoScope } from './lib/repo-factory';
@@ -525,6 +527,8 @@ app.get(
           {} as Record<string, string>
         ),
         emailQueue: emailStats,
+        // Per-backend store counts (runbook cutover-cf s4 row 1); super_admin only, they disclose the store count.
+        storage_backend: await storageBackendCounts(cfBindings()?.PLATFORM_DB),
       },
     });
   }

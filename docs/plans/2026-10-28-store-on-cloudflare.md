@@ -526,9 +526,10 @@ Paths: new package `packages/cf-schema/` (`src/platform/*.ts` for D1, `src/store
 #### Task 2.4: Backend selector
 
 - **Files:** `apps/api/src/lib/store-backend.ts` (from 0.4), `apps/api/src/lib/repo-factory.ts`.
-- [ ] Steps: `getStoreRepo(storeId, env)` returns the pg or DO implementation per store flag stored in D1 `stores.storage_backend` (cached 5 s at the edge, NEVER-stale class: invalidated on flag write, TTL is not the control; document at the cache site). `/health` reports `storage_backend` counts.
+- [ ] Steps: `getStoreRepo(storeId, env)` returns the pg or DO implementation per store flag stored in D1 `stores.storage_backend` (cached 5 s at the edge, NEVER-stale class: invalidated on flag write, TTL is not the control; document at the cache site). `/api/v1/health` (super_admin) reports `storage_backend` counts; public `/health` reports `platform_db`.
 - **Verify:** `npx vitest run apps/api/test/repo-factory.test.ts`; `curl -s $API/health | jq .storage_backend`.
 - **Done:** switching one store in staging changes the backend without a deploy.
+- **Status (PR A, Ruling CF-PLATFORM-1):** D1 binding `PLATFORM_DB`, deploy-time migrations, D1-backed `backendFor` (no cache: NEVER-stale) and super_admin `/api/v1/health` `storage_backend` counts (public `/health`: `platform_db` only) are in. `repo-factory.ts` moves to PR C (it needs the prisma-lite wiring).
 
 #### Task 2.5: DO implementation skeleton
 

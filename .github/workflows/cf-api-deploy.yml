@@ -51,6 +51,8 @@ jobs:
       # Cloudflare Images binding for PWA icon resizing (Ruling D1016-ICONS-1); unset = no binding.
       EBDA_IMAGES_BINDING: ${{ vars.EBDA_IMAGES_BINDING }}
       EBDA_KV_CACHE_ID: ${{ vars.EBDA_KV_CACHE_ID }}
+      # D1 ebda-platform (task 2.4): the per-store backend switch; the deploy config refuses to build without it.
+      EBDA_PLATFORM_D1_ID: ${{ vars.EBDA_PLATFORM_D1_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -97,6 +99,11 @@ jobs:
         run: |
           test -n "$DATABASE_URL" || { echo "::error::EBDA_MIGRATE_DATABASE_URL is not set in the production environment"; exit 1; }
           npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+      # Same pattern as cf-accounts-deploy.yml (CF-MIGRATE-1): additive, idempotent (d1_migrations ledger), schema
+      # first. The Worker reads stores.storage_backend, so the column must exist before the new code serves.
+      - name: Apply D1 migrations (ebda-platform)
+        working-directory: apps/api
+        run: npx wrangler d1 migrations apply ebda-platform --remote --config .wrangler.deploy.jsonc
       - name: Record the version serving production (rollback target)
         id: previous
         run: node scripts/ci/deploy-guard.mjs previous --name ebda-api --cwd apps/api --config .wrangler.deploy.jsonc

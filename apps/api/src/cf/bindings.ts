@@ -157,6 +157,8 @@ export interface CfBindings {
    * skips loudly and the storefront search falls back to the keyword leg.
    */
   PRODUCT_VECTORS?: import('@ebda-src/repo').VectorizeLike;
+  /** D1 `ebda-platform` (task 2.4): `stores.storage_backend`, the per-store backend switch (lib/store-backend.ts). */
+  PLATFORM_DB?: import('../lib/store-backend').PlatformD1Like;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
   /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */

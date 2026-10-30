@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { createConnection } from 'node:net';
 import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -65,90 +65,102 @@ const apiVars = {
 // worker, which reaches it through the `API` service binding and shares its Durable Objects / KV by
 // binding them with `scriptName: 'api'`. The bundle is never sent through Vite (an 11 MB module cannot
 // travel over the pool's websocket, and 143k lines of Express / Prisma CJS should not be re-transformed).
-export default defineConfig(async () => ({
-  plugins: [
-    cloudflareTest({
-      main: here('./workers-test/entry.ts'),
-      miniflare: {
-        compatibilityDate: '2026-08-01',
-        compatibilityFlags: ['nodejs_compat'],
-        bindings: { E2E_DB: (await dbReachable()) ? '1' : '0', ...apiVars },
-        serviceBindings: { API: 'api' },
-        durableObjects: {
-          // Defined in the test worker itself (workers-test/entry.ts): runDurableObjectAlarm needs that.
-          TEST_SCHEDULE: { className: 'TestSchedule', useSQLite: true },
-          AUTH_STATE: { className: 'AuthState', scriptName: 'api', useSQLite: true },
-          STORE_REALTIME: { className: 'StoreRealtime', scriptName: 'api', useSQLite: true },
-          STORE_DO: { className: 'StoreDO', scriptName: 'api', useSQLite: true },
-          JOB_GATE: { className: 'JobGate', scriptName: 'api', useSQLite: true },
-          STORE_SCHEDULE: { className: 'StoreSchedule', scriptName: 'api', useSQLite: true },
-        },
-        kvNamespaces: { KV_CACHE: 'kv-cache' },
-        // Background jobs (G5): the Workflow class and the gate DO live in the built `api` Worker.
-        workflows: {
-          JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow', scriptName: 'api' },
-        },
-        queueProducers: {
-          EMAIL_QUEUE: { queueName: 'ebda-email' },
-          EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
-        },
-        workers: [
-          {
-            name: 'api',
-            modulesRoot: here('./dist-cf'),
-            modules: [
-              { type: 'ESModule', path: BUNDLE },
-              ...readdirSync(here('./dist-cf'))
-                .filter(f => f.endsWith('.wasm'))
-                .map(f => ({ type: 'CompiledWasm' as const, path: here(`./dist-cf/${f}`) })),
-            ],
-            compatibilityDate: '2026-08-01',
-            compatibilityFlags: ['nodejs_compat'],
-            bindings: apiVars,
-            kvNamespaces: { KV_CACHE: 'kv-cache' },
-            durableObjects: {
-              AUTH_STATE: { className: 'AuthState', useSQLite: true },
-              STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
-              STORE_DO: { className: 'StoreDO', useSQLite: true },
-              JOB_GATE: { className: 'JobGate', useSQLite: true },
-              STORE_SCHEDULE: { className: 'StoreSchedule', useSQLite: true },
-            },
-            workflows: {
-              JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow' },
-            },
-            hyperdrives: {
-              HYPERDRIVE: LOCAL_DB,
-            },
-            queueProducers: {
-              EMAIL_QUEUE: { queueName: 'ebda-email' },
-              SMS_QUEUE: { queueName: 'ebda-sms' },
-              JOBS_QUEUE: { queueName: 'ebda-jobs' },
-            },
-            // The consumers of wrangler.jsonc, with the retry delay shortened so a test can watch a
-            // message travel main queue -> retry -> dead-letter queue -> the replay list in seconds.
-            queueConsumers: {
-              'ebda-email': {
-                maxBatchSize: 1,
-                maxBatchTimeout: 0,
-                maxRetries: 1,
-                retryDelay: 1,
-                deadLetterQueue: 'ebda-email-dlq',
-              },
-              'ebda-email-dlq': { maxBatchSize: 1, maxBatchTimeout: 0, maxRetries: 1 },
-            },
+export default defineConfig(async () => {
+  // D1 `ebda-platform` (task 2.4): the REAL cf-schema platform migrations, applied by the test, shared by both workers.
+  const platformMigrations = await readD1Migrations(
+    here('../../packages/cf-schema/migrations/platform')
+  );
+  return {
+    plugins: [
+      cloudflareTest({
+        main: here('./workers-test/entry.ts'),
+        miniflare: {
+          compatibilityDate: '2026-08-01',
+          compatibilityFlags: ['nodejs_compat'],
+          bindings: {
+            E2E_DB: (await dbReachable()) ? '1' : '0',
+            TEST_PLATFORM_MIGRATIONS: platformMigrations,
+            ...apiVars,
           },
-        ],
-      },
-    }),
-  ],
-  resolve: {
-    // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
-    // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
-    alias: { '@ebda/shared': here('../../packages/shared/src/index.ts') },
-  },
-  test: {
-    include: ['workers-test/**/*.test.ts'],
-    testTimeout: 60_000,
-    hookTimeout: 60_000,
-  },
-}));
+          d1Databases: { PLATFORM_DB: 'platform-db' },
+          serviceBindings: { API: 'api' },
+          durableObjects: {
+            // Defined in the test worker itself (workers-test/entry.ts): runDurableObjectAlarm needs that.
+            TEST_SCHEDULE: { className: 'TestSchedule', useSQLite: true },
+            AUTH_STATE: { className: 'AuthState', scriptName: 'api', useSQLite: true },
+            STORE_REALTIME: { className: 'StoreRealtime', scriptName: 'api', useSQLite: true },
+            STORE_DO: { className: 'StoreDO', scriptName: 'api', useSQLite: true },
+            JOB_GATE: { className: 'JobGate', scriptName: 'api', useSQLite: true },
+            STORE_SCHEDULE: { className: 'StoreSchedule', scriptName: 'api', useSQLite: true },
+          },
+          kvNamespaces: { KV_CACHE: 'kv-cache' },
+          // Background jobs (G5): the Workflow class and the gate DO live in the built `api` Worker.
+          workflows: {
+            JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow', scriptName: 'api' },
+          },
+          queueProducers: {
+            EMAIL_QUEUE: { queueName: 'ebda-email' },
+            EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
+          },
+          workers: [
+            {
+              name: 'api',
+              modulesRoot: here('./dist-cf'),
+              modules: [
+                { type: 'ESModule', path: BUNDLE },
+                ...readdirSync(here('./dist-cf'))
+                  .filter(f => f.endsWith('.wasm'))
+                  .map(f => ({ type: 'CompiledWasm' as const, path: here(`./dist-cf/${f}`) })),
+              ],
+              compatibilityDate: '2026-08-01',
+              compatibilityFlags: ['nodejs_compat'],
+              bindings: apiVars,
+              kvNamespaces: { KV_CACHE: 'kv-cache' },
+              d1Databases: { PLATFORM_DB: 'platform-db' },
+              durableObjects: {
+                AUTH_STATE: { className: 'AuthState', useSQLite: true },
+                STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
+                STORE_DO: { className: 'StoreDO', useSQLite: true },
+                JOB_GATE: { className: 'JobGate', useSQLite: true },
+                STORE_SCHEDULE: { className: 'StoreSchedule', useSQLite: true },
+              },
+              workflows: {
+                JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow' },
+              },
+              hyperdrives: {
+                HYPERDRIVE: LOCAL_DB,
+              },
+              queueProducers: {
+                EMAIL_QUEUE: { queueName: 'ebda-email' },
+                SMS_QUEUE: { queueName: 'ebda-sms' },
+                JOBS_QUEUE: { queueName: 'ebda-jobs' },
+              },
+              // The consumers of wrangler.jsonc, with the retry delay shortened so a test can watch a
+              // message travel main queue -> retry -> dead-letter queue -> the replay list in seconds.
+              queueConsumers: {
+                'ebda-email': {
+                  maxBatchSize: 1,
+                  maxBatchTimeout: 0,
+                  maxRetries: 1,
+                  retryDelay: 1,
+                  deadLetterQueue: 'ebda-email-dlq',
+                },
+                'ebda-email-dlq': { maxBatchSize: 1, maxBatchTimeout: 0, maxRetries: 1 },
+              },
+            },
+          ],
+        },
+      }),
+    ],
+    resolve: {
+      // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
+      // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
+      alias: { '@ebda/shared': here('../../packages/shared/src/index.ts') },
+    },
+    test: {
+      include: ['workers-test/**/*.test.ts'],
+      testTimeout: 60_000,
+      hookTimeout: 60_000,
+    },
+  };
+});

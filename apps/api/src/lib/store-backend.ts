@@ -18,6 +18,32 @@ import { AppError } from '../middleware/error-handler';
 
 export type StoreBackend = 'do' | 'pg';
 
+/** The slice of a D1 database `storageBackendCounts` uses (structural: the API does not compile against workers-types). */
+export interface PlatformD1Like {
+  prepare(sql: string): {
+    bind(...values: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> };
+    all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
+  };
+}
+
+/**
+ * `/health` `storage_backend`: store counts per backend, read live from D1. `undefined` = no binding (local, field
+ * omitted); `null` = D1 present but unreadable (reported as null, never as zero counts: unknown is not empty).
+ */
+export async function storageBackendCounts(
+  db: PlatformD1Like | undefined
+): Promise<Record<string, number> | null | undefined> {
+  if (!db) return undefined;
+  try {
+    const { results } = await db
+      .prepare('SELECT storage_backend, COUNT(*) AS n FROM stores GROUP BY storage_backend')
+      .all<{ storage_backend: string; n: number }>();
+    return Object.fromEntries(results.map(r => [r.storage_backend, Number(r.n)]));
+  } catch {
+    return null;
+  }
+}
+
 /** Parse an env list. The ONLY production read of `STORE_DO_ENABLED_IDS` lives here (guard: tests/unit/backend-flag-single-source.test.ts). */
 export function enabledStoreIds(
   raw: string | undefined = process.env.STORE_DO_ENABLED_IDS

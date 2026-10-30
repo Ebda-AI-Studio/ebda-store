@@ -5,7 +5,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
-import { backendFor, enabledStoreIds } from '../../apps/api/src/lib/store-backend';
+import {
+  backendFor,
+  enabledStoreIds,
+  storageBackendCounts,
+} from '../../apps/api/src/lib/store-backend';
 
 const DEMO = '09b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
 
@@ -112,5 +116,30 @@ describe('store backend flag', () => {
     const { readFileSync } = await import('node:fs');
     const w = readFileSync('apps/api/wrangler.jsonc', 'utf8');
     expect(w).not.toMatch(/"STORE_DO_ENABLED_IDS"\s*:/);
+  });
+});
+
+describe('storageBackendCounts (super_admin /api/v1/health)', () => {
+  const db = (fn: () => Promise<{ results: unknown[] }>) =>
+    ({ prepare: () => ({ bind: () => ({ first: async () => null }), all: fn }) }) as never;
+  it('is undefined with no binding, null when D1 is unreadable, counts otherwise', async () => {
+    expect(await storageBackendCounts(undefined)).toBeUndefined();
+    expect(
+      await storageBackendCounts(
+        db(async () => {
+          throw new Error('d1 down');
+        })
+      )
+    ).toBeNull();
+    expect(
+      await storageBackendCounts(
+        db(async () => ({
+          results: [
+            { storage_backend: 'pg', n: 3 },
+            { storage_backend: 'do', n: 1 },
+          ],
+        }))
+      )
+    ).toEqual({ pg: 3, do: 1 });
   });
 });
