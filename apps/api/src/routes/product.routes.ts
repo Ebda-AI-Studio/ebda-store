@@ -926,7 +926,9 @@ router.get(
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
-      const faqs = await prisma.productFaq.findMany({
+      const faqs = await (
+        await storeDb(req.params.storeId)
+      ).productFaq.findMany({
         where: { productId: req.params.id },
         orderBy: { createdAt: 'asc' },
       });
@@ -998,7 +1000,9 @@ router.put(
       if (result.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
-      const updated = await prisma.productFaq.findUnique({ where: { id: req.params.faqId } });
+      const updated = await (
+        await storeDb(req.params.storeId)
+      ).productFaq.findUnique({ where: { id: req.params.faqId } });
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);

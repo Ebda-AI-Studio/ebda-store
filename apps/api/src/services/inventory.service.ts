@@ -6,7 +6,7 @@ import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { storefrontOrigin } from '@ebda/shared';
-import { storeDb, storeStock } from '../lib/repo-factory';
+import { storeDb, storeStock, storeWriter } from '../lib/repo-factory';
 import { notifyCatalogChanged } from '../lib/wa/catalog-state';
 
 interface InventoryAdjustment {
@@ -733,7 +733,10 @@ export class InventoryService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    const updated = await prisma.product.update({
+    // The threshold is a plain product column: the write follows the store's backend like the read above (CF-R6B-1).
+    const updated = await (
+      await storeWriter(storeId)
+    ).product.update({
       where: { id: productId, storeId },
       data: { lowStockThreshold: threshold },
       select: {

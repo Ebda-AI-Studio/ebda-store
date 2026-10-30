@@ -215,9 +215,10 @@ async function countStoreRows(
   opts: { orders?: boolean } = {}
 ): Promise<{ products: number; categories: number; orders?: number }> {
   return withStore(storeId, async tx => {
+    const db = await storeDb(storeId); // products + categories follow the store's backend; orders stay on the tx
     const [products, categories, orders] = await Promise.all([
-      tx.product.count({ where: { storeId } }),
-      tx.category.count({ where: { storeId } }),
+      db.product.count({ where: { storeId } }),
+      db.category.count({ where: { storeId } }),
       opts.orders ? tx.order.count({ where: { storeId } }) : Promise.resolve(undefined),
     ]);
     return opts.orders

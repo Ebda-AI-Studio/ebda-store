@@ -2234,7 +2234,9 @@ router.post(
 
       await fillProductFields(storeId, productId, { op: 'create', onlyFields: [field] });
 
-      const updated = await prisma.product.findFirst({ where: { id: productId, storeId } });
+      const updated = await (
+        await storeDb(storeId)
+      ).product.findFirst({ where: { id: productId, storeId } });
       res.json({
         success: true,
         data: {

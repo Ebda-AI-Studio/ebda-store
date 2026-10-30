@@ -540,6 +540,7 @@ export class CartService {
       // deleted product keeps `status: 'active'`. This is the PRIMARY
       // add-to-cart path — the bulk `addItems` sibling below had the same hole.
       const product = await tx.product.findFirst({
+        // repo-tx: tx is the store repo client (doTx) on a DO store
         where: { id: productId, storeId, status: 'active', deletedAt: null },
         // Variant count for the VARIANT_REQUIRED gate below. Every variant row,
         // disabled ones included: a product whose variants are all disabled is
@@ -590,6 +591,7 @@ export class CartService {
       let variant: { id: string; inventory: number; allowBackorder: boolean } | null = null;
       if (variantId) {
         variant = await tx.productVariant.findFirst({
+          // repo-tx: tx is the store repo client (doTx) on a DO store
           where: { id: variantId, productId, isActive: true },
           select: { id: true, inventory: true, allowBackorder: true },
         });
@@ -611,6 +613,7 @@ export class CartService {
       // matches IS NULL, which agrees with the COALESCE(note,'') unique index
       // because cleanNote never stores an empty string).
       const existingItem = await tx.cartItem.findFirst({
+        // repo-tx: tx is the store repo client (doTx) on a DO store
         where: { cartId: cart.id, productId, variantId: variantId ?? null, note },
       });
 
@@ -839,7 +842,7 @@ export class CartService {
     const writeBundleLine = async (
       tx: Prisma.TransactionClient
     ): Promise<{ ok: true } | { ok: false; error: 'insufficient_stock' }> => {
-      const existing = await tx.cartBundle.findFirst({ where: { cartId: cart.id, bundleId } });
+      const existing = await tx.cartBundle.findFirst({ where: { cartId: cart.id, bundleId } }); // repo-tx: tx is the store repo client (doTx) on a DO store
       const targetQuantity = (existing?.quantity ?? 0) + quantity;
 
       if (targetQuantity > resolved.available) {
@@ -1076,6 +1079,7 @@ export class CartService {
     // were both fixed for.
     const writeItems = async (tx: Prisma.TransactionClient, lines = aggregatedItems) => {
       const existingItems = await tx.cartItem.findMany({
+        // repo-tx: tx is the store repo client (doTx) on a DO store
         where: { cartId: cart.id, productId: { in: productIds } },
       });
       const existingByLine = new Map(
