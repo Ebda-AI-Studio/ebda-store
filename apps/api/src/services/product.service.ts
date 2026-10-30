@@ -2281,7 +2281,9 @@ export class ProductService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    const ratingAggregate = await prisma.review.aggregate({
+    const ratingAggregate = await (
+      await storeDb(storeId)
+    ).review.aggregate({
       where: { productId: product.id, storeId, status: 'published', verifiedPurchase: true },
       _avg: { rating: true },
       _count: { rating: true },
@@ -2314,7 +2316,9 @@ export class ProductService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    const ratingAggregate = await prisma.review.aggregate({
+    const ratingAggregate = await (
+      await storeDb(storeId)
+    ).review.aggregate({
       where: { productId: product.id, storeId, status: 'published', verifiedPurchase: true },
       _avg: { rating: true },
       _count: { rating: true },

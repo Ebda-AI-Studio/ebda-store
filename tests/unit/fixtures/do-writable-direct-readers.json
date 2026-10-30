@@ -1,7 +1,4 @@
 {
-  "apps/api/src/lib/ai/review-tools.ts": {
-    "review": 2
-  },
   "apps/api/src/lib/savepoint.ts": {
     "cart": 1
   },
@@ -42,14 +39,10 @@
   "apps/api/src/routes/promotion.routes.ts": {
     "product": 1
   },
-  "apps/api/src/routes/public-store-layout.routes.ts": {
-    "review": 1
-  },
   "apps/api/src/routes/public.routes.ts": {
     "product": 3,
     "storeLocation": 1,
-    "storePage": 1,
-    "review": 1
+    "storePage": 1
   },
   "apps/api/src/routes/smart-layer.routes.ts": {
     "deadStockFlag": 3
@@ -169,7 +162,6 @@
     "productCategory": 2,
     "category": 4,
     "productPriceTier": 1,
-    "review": 2,
     "tag": 1
   },
   "apps/api/src/services/provisioning.service.ts": {
@@ -178,10 +170,6 @@
   "apps/api/src/services/qr.service.ts": {
     "product": 2,
     "category": 2
-  },
-  "apps/api/src/services/review.service.ts": {
-    "review": 13,
-    "product": 1
   },
   "apps/api/src/services/store-category-suggest.service.ts": {
     "category": 1,

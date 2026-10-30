@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { GeminiFailoverClient } from './gemini-keys';
-import { prisma, currentStoreId } from '@ebda/database';
+import { currentStoreId } from '@ebda/database';
 import { storeDb, storeWriter } from '../repo-factory';
 import { config } from '../../config';
 import logger from '../logger';
@@ -179,7 +179,9 @@ export async function summarizeProductReviews(
   // summarise a competitor's reviews and read their exact verified-purchase
   // count. ReviewService's own CRUD is store-scoped; only these AI helpers
   // were not.
-  const reviews = await prisma.review.findMany({
+  const reviews = await (
+    await storeDb(storeId)
+  ).review.findMany({
     // storeId in the WHERE is the cross-tenant fix (a product id is public, so
     // without it any store_admin could summarise a competitor's reviews);
     // storeId in the SELECT is what main added for per-store AI accounting.
@@ -239,7 +241,9 @@ export async function draftOwnerResponse(
   storeId: string,
   reviewId: string
 ): Promise<OwnerResponseDraft> {
-  const review = await prisma.review.findFirst({
+  const review = await (
+    await storeDb(storeId)
+  ).review.findFirst({
     where: { id: reviewId, storeId },
     select: {
       id: true,

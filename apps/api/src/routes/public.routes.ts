@@ -2707,7 +2707,9 @@ router.get(
       }
 
       // Check no existing review for this (orderId, productId) pair
-      const existing = await prisma.review.findUnique({
+      const existing = await (
+        await storeDb(storeId)
+      ).review.findUnique({
         where: { orderId_productId: { orderId, productId }, storeId },
         select: { id: true },
       });
