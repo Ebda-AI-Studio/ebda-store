@@ -234,6 +234,32 @@ describe('refunds', () => {
     expect(r.q('SELECT refunded_amount FROM payments')[0].refunded_amount).toBe(400);
   });
 
+  it('EXTERNAL FACT (Opus I3): a capture on a CANCELLED order is recorded in full, the order is flagged and alerted, nothing rolls back', () => {
+    const r = rig();
+    const p = r.paid(2);
+    r.op('cancel', { orderId: p.o.orderId });
+    expect(r.q('SELECT status FROM orders')[0].status).toBe('cancelled');
+    const out = p.hook('evt-late');
+    expect(out.outcome).toBe('applied');
+    expect(out.postCommit ?? []).not.toContain('order_paid');
+    expect(out.alerts.map((a: { kind: string }) => a.kind)).toContain(
+      'captured_on_unconfirmable_order'
+    );
+    expect(r.q('SELECT status FROM payments')[0].status).toBe('completed');
+    expect(r.q("SELECT count(*) n FROM payment_event_log WHERE event_id = 'evt-late'")[0].n).toBe(
+      1
+    );
+    const o = r.q('SELECT status, payment_status FROM orders')[0];
+    expect(o).toEqual({ status: 'cancelled', payment_status: 'paid' });
+    expect(
+      r.q(
+        "SELECT metadata FROM order_events WHERE metadata LIKE '%captured_on_unconfirmable_order%'"
+      )
+    ).toHaveLength(1);
+    // the gateway retrying the same delivery is a replay, not a second record
+    expect(p.hook('evt-late').outcome).toBe('replayed');
+  });
+
   it('wallet store credit goes back once under return-credit:<key>', () => {
     const r = rig();
     r.raw.exec(
