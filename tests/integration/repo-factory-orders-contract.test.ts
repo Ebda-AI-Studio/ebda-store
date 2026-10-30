@@ -739,7 +739,7 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       for (const r of regs) {
         const user = await prisma.user.create({
           data: {
-            email: `${Math.random().toString(36).slice(2)}-${r.mail}`,
+            email: `${Date.now()}${i}${Math.floor(Math.random() * 1e9)}-${r.mail}`, // digits only: no Latin letters to collide with a search term
             passwordHash: 'x'.repeat(60),
             firstName: r.first,
             lastName: r.last,
@@ -837,7 +837,10 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
         '%', // literal
         '_',
         'zzzzzz', // no match
-        'ab', // shorter than a trigram
+        // Shorter than a trigram. NOT a Latin pair such as 'ab': the Postgres world and the DO world each mint their own RANDOM
+        // order numbers and e-mails, and a pair that one random number happens to contain (and the other not) read as a parity
+        // break (the flake this replaces: ~1 run in 3). Arabic never occurs in a random id, and still finds 'سعيد'.
+        'سع',
       ];
       const out: Record<string, unknown> = {};
       for (const q of terms)

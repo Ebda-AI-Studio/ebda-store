@@ -234,6 +234,49 @@ describe('refunds', () => {
     expect(r.q('SELECT refunded_amount FROM payments')[0].refunded_amount).toBe(400);
   });
 
+  it('FULL-REFUND WEBHOOK on a wallet-paid order whose CRM id differs from the user id: the wallet share goes back and the external fact is recorded (Ruling CF-FIX-2)', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO customers (id, store_id, email, first_name, last_name, user_id) VALUES ('crm-u7', 's1', 'u7@b.c', 'A', 'B', 'u7'); INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w7','s1','u7',2000)`
+    );
+    const o = r.op('createOrder', {
+      lines: [{ productId: 'sku', quantity: 2 }],
+      shippingAddress: { phone: '01099999999' },
+      customerId: 'u7', // the platform users.id, NOT the CRM row id
+      walletAmount: 500,
+    });
+    expect(r.q('SELECT balance FROM customer_wallets')[0].balance).toBe(1500);
+    const gateway = o.total;
+    r.op('paymentCreate', {
+      orderId: o.orderId,
+      provider: 'paymob',
+      amount: gateway,
+      transactionId: 'tx-w7',
+    });
+    const hook = (eventId: string, extra: Record<string, unknown>) =>
+      r.op('paymentWebhook', {
+        input: {
+          provider: 'paymob',
+          eventId,
+          providerRef: 'tx-w7',
+          kind: 'payment',
+          amount: gateway,
+          ...extra,
+        },
+        confirmed: null,
+      });
+    hook('evt-pay', { status: 'completed' });
+    const out = hook('evt-full-refund', {
+      kind: 'refund',
+      status: undefined,
+      refund: { refundId: 'gw-w7', status: 'completed', amount: gateway },
+    });
+    expect(out.outcome).toBe('applied'); // not rolled back by a missing CRM row
+    expect(r.q('SELECT refunded_amount FROM payments')[0].refunded_amount).toBe(gateway);
+    expect(r.q('SELECT status FROM orders')[0].status).toBe('refunded'); // the full refund reversed the order
+    expect(r.q('SELECT balance FROM customer_wallets')[0].balance).toBe(2000); // the wallet share is back
+  });
+
   it('wallet store credit goes back once under return-credit:<key>', () => {
     const r = rig();
     r.raw.exec(
