@@ -45,7 +45,7 @@ export type RunDecision = { run: true } | { run: false; storeId: string; money: 
 /**
  * Events that carry NO `storeId` of their own name the store through a reference the job's data holds. The resolver reads
  * it (a platform lookup, never the store's tables) so a DO store's event is refused/served like any other. EMPTY since
- * `payment-webhook-process` was ported (Ruling CF-JOBS-3): it reads its inbox row's store itself and serves a DO store. A run for which NO store can be named stays on
+ * `payment-webhook-process` was ported (Ruling CF-JOBS-4): it reads its inbox row's store itself and serves a DO store. A run for which NO store can be named stays on
  * Postgres exactly as before: nothing of a DO store can be reached from it (a DO store's payment reference does not
  * resolve there until the D1 entity index, plan task 3.5, lands - recorded in Ruling CF-MONEY-1).
  */
@@ -130,7 +130,7 @@ export async function guardedRun<T>(
   } finally {
     // A PORTED sweep that ran from its cron hides the DO stores because their alarm owns them. When that alarm is not
     // enabled (`JOBS_CF_ALARMS` does not list the job) nobody owns them: the sweep silently skipped a DO store, which for a
-    // money job is the failure this guard exists to make loud (Ruling CF-JOBS-3).
+    // money job is the failure this guard exists to make loud (Ruling CF-JOBS-4).
     if (excluded.size > 0 && cls === 'ported' && !only && !jobRunsOnAlarm(def.id)) {
       const ids = [...excluded];
       logger.error(

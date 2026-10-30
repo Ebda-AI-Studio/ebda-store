@@ -37,7 +37,7 @@ export const instapayExpiry: JobDef = inngest.createFunction(
     const due = await stepRunUnlessEmpty(step, 'find-due', () => {
       // Read inside the step: the cutoff is part of the memoised read, not re-derived on replay.
       const now = new Date();
-      // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object;
+      // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object;
       // `expireOne` then takes the DO path (`expireHold`) for it.
       return sweepStoresDb(event, {
         fetch: (storeId, db) =>

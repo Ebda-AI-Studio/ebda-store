@@ -3,7 +3,7 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 
-// Ruling CF-JOBS-3: the job operations on real workerd. A job delivered twice (an at-least-once queue, an alarm re-fire, a
+// Ruling CF-JOBS-4: the job operations on real workerd. A job delivered twice (an at-least-once queue, an alarm re-fire, a
 // cron tick that overlaps) runs ONCE: the abandonment stamp lands once, a cancel-if-unpaid restocks once, and a payment that
 // landed first beats the auto-cancel sweep.
 const e = env as unknown as { STORE_DO: DurableObjectNamespace<StoreDO> };

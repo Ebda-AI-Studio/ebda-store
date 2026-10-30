@@ -99,7 +99,7 @@ export async function handleRefundReversalStuckSweep(
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckReversal[] = await stepRunUnlessEmpty(step, 'find-stuck-reversals', async () =>
-    // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
+    // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
     sweepStoresDb(event, {
       fetch: (storeId, db) =>
         db.order.findMany({

@@ -93,7 +93,7 @@ const qmsg = (fn: string, data: Record<string, unknown>) => {
 const DO_STORE = '09b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
 const PG_STORE = '11111111-1111-4111-8111-111111111111';
 
-// payment-webhook-process (the only production resolver) is ported (Ruling CF-JOBS-3), so the resolver mechanism is exercised
+// payment-webhook-process (the only production resolver) is ported (Ruling CF-JOBS-4), so the resolver mechanism is exercised
 // with a still-unported money job: its event names the store through an inbox-like row.
 EVENT_STORE_RESOLVERS['shipment-create'] = async event => {
   const id = event.data?.webhookEventId;
@@ -184,7 +184,7 @@ describe('job data classification', () => {
       ),
       'utf8'
     );
-    expect(src).toMatch(/sweepStoresDb\(/); // reads through the store's backend (CF-JOBS-3: the DO store's alarm)
+    expect(src).toMatch(/sweepStoresDb\(/); // reads through the store's backend (CF-JOBS-4: the DO store's alarm)
     expect(src).toMatch(/fanoutDisarm\(/);
     expect(src).not.toMatch(/\bprisma\b/);
     // the one Postgres write left is the pg branch of the disarm, reached only when storeMoney() is null

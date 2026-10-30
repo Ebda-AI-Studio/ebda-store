@@ -40,7 +40,7 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
 
     let drifts = 0;
     for (const store of stores) {
-      // PORTED (Ruling CF-JOBS-3): the operational total and the GL credits both follow the store's backend.
+      // PORTED (Ruling CF-JOBS-4): the operational total and the GL credits both follow the store's backend.
       const ops = await step.run(`ops-${store.id}`, async () => {
         const where = {
           storeId: store.id,

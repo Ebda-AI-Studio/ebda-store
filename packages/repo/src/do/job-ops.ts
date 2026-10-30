@@ -1,4 +1,4 @@
-// Small store-side statements the background jobs need (INFRA-CF-1, Ruling CF-JOBS-3): a job on a store that lives on its
+// Small store-side statements the background jobs need (INFRA-CF-1, Ruling CF-JOBS-4): a job on a store that lives on its
 // Durable Object cannot reach `payment_events`, `orders` stamps or the ledger totals through the read client, so each is one
 // named money operation. Every statement is scoped by `store_id` taken from the DO (never from the caller).
 import { MoneyError, type SyncSql } from './sync-sql';

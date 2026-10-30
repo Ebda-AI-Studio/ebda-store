@@ -1,5 +1,5 @@
 /**
- * Ruling CF-JOBS-3: the money jobs that serve a store on its Durable Object. Each job here is proved on the DO path:
+ * Ruling CF-JOBS-4: the money jobs that serve a store on its Durable Object. Each job here is proved on the DO path:
  * it is not refused, it reads and writes the store ONLY through the DO (the Postgres `prisma` mock is never touched), and
  * what it records goes through the DO op. The double-fire (a job delivered twice runs once) is proved on real workerd in
  * apps/api/workers-do/jobs-money.test.ts; the DO ops themselves in packages/repo/test/do-job-ops.test.ts.

@@ -448,7 +448,7 @@ export interface MoneyClient {
     a: { orderId: string; requestedAt: number },
     key?: string
   ): Promise<{ disarmed: boolean }>;
-  /** A payment-timeline audit row (`recordPaymentEvent`) written on the DO (Ruling CF-JOBS-3). */
+  /** A payment-timeline audit row (`recordPaymentEvent`) written on the DO (Ruling CF-JOBS-4). */
   paymentEventRecord(a: {
     paymentId: string;
     orderId: string;

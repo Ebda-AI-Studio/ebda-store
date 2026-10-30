@@ -48,7 +48,7 @@ export async function handlePaymentReconcileSweep(
   const floor = new Date(Date.now() - RECENCY_HOURS * 3_600_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
-  // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
+  // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
   const mismatches = await stepRunUnlessEmpty(step, 'find-captured-on-cancelled', () =>
     // `payments` is scoped through its order, so the scan runs store by store and is cut to the same global ceiling.
     sweepStoresDb(event, {

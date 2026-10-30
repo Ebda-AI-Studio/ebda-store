@@ -55,7 +55,7 @@ export const accountingPostOrderJournal: JobDef = inngest.createFunction(
       );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
-    // PORTED (Ruling CF-JOBS-3): a store on its Durable Object posts through `journalSale` (no Postgres transaction).
+    // PORTED (Ruling CF-JOBS-4): a store on its Durable Object posts through `journalSale` (no Postgres transaction).
     // FORCE RLS: postOrderPaymentJournal reads the order via prisma — it
     // must run inside runInTenantContext(storeId) so the GUC is set.
     // The accounting services (journal.service, account.service) already

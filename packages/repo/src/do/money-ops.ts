@@ -295,7 +295,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** updateStatus -> cancelled: status plus the whole reversal (stock, coupon, loyalty, wallet, backorders). */
   cancel: (db, storeId, a) => {
     const orderId = id(a.orderId, 'orderId');
-    // The auto-cancel sweep (Ruling CF-JOBS-3): cancel only while the order is still unpaid, checked in the SAME section
+    // The auto-cancel sweep (Ruling CF-JOBS-4): cancel only while the order is still unpaid, checked in the SAME section
     // as the cancel (Postgres: `SELECT ... FOR UPDATE` then the status change), so a payment that lands first wins.
     if (a.unpaidOnly === true) {
       const cur = db.all('SELECT payment_status FROM orders WHERE id = ? AND store_id = ?', [
@@ -531,7 +531,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
         [id(a.orderId, 'orderId'), storeId, a.requestedAt as number]
       ).changes > 0,
   }),
-  /** Background jobs (Ruling CF-JOBS-3): see `job-ops.ts`. */
+  /** Background jobs (Ruling CF-JOBS-4): see `job-ops.ts`. */
   paymentEventRecord: (db, storeId, a) => recordPaymentEventOp(db, storeId, a),
   abandonStamp: (db, storeId, a) => abandonStampOp(db, storeId, a),
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),

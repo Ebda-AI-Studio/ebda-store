@@ -175,7 +175,7 @@ class PaymentFactory {
       // There are no platform-level (storeId NULL) configs for the app role: strict RLS
       // hides NULL-store rows and the code-level tenant guard refuses an unscoped read
       // (R-EBDA-007), so the old "fall back to global" read could only ever return nothing.
-      // A store on its Durable Object keeps its provider rows THERE (Ruling CF-JOBS-3): a job or webhook for it must read
+      // A store on its Durable Object keeps its provider rows THERE (Ruling CF-JOBS-4): a job or webhook for it must read
       // that copy, not the sealed Postgres rows. `storeRepo` is the pg proxy for a Postgres store, so that path is unchanged.
       const repo = storeId === null ? null : await storeRepo(storeId);
       const dbConfigs =
@@ -2657,7 +2657,7 @@ export class PaymentService {
 
   /**
    * A payment the gateway itself reports CAPTURED, found by a poll rather than a webhook (the auto-cancel sweep), applied to a
-   * store on its Durable Object through the same `paymentWebhook` section a delivered webhook uses (Ruling CF-JOBS-3). The
+   * store on its Durable Object through the same `paymentWebhook` section a delivered webhook uses (Ruling CF-JOBS-4). The
    * status came from a server-to-server call, so it is the confirmed gateway record; a replay of the same capture applies once.
    * Throws the engine's refusal (for example `INVALID_STATUS_TRANSITION` when the order already left pending) for the caller.
    */

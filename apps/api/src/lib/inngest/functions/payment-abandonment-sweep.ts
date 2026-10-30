@@ -69,7 +69,7 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     triggers: [{ cron: '7 * * * *' }], // hourly
   },
   async ({ step, event }) => {
-    // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object and
+    // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object and
     // stamps through the `abandonStamp` op.
     // Cross-tenant sweep — bypass RLS (no HTTP tenant GUC on a cron).
     const candidates = (await stepRunUnlessEmpty(step, 'find-gateway-abandoners', () => {

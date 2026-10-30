@@ -122,7 +122,7 @@ export const paymentWebhookProcess: JobDef = inngest.createFunction(
           status?: string;
           orderId?: string;
         }> => {
-          // A store on its Durable Object (Ruling CF-JOBS-3): the order row, the payment row and the
+          // A store on its Durable Object (Ruling CF-JOBS-4): the order row, the payment row and the
           // event log live there, and the DO dedupes the signed event inside the same section that applies it
           // (`payment_event_log (provider, event_id)`, outcome `replayed`). So there is no Postgres
           // `webhookProcessedAt` to read or stamp: `handleWebhook` is the whole apply, and a retry of this

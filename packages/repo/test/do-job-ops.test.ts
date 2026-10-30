@@ -1,4 +1,4 @@
-// Ruling CF-JOBS-3: the store-side statements background jobs need on a store that lives on its Durable Object, run on the
+// Ruling CF-JOBS-4: the store-side statements background jobs need on a store that lives on its Durable Object, run on the
 // real DO schema (node:sqlite): payment-timeline rows, the abandonment stamp once, the ledger totals, cancel-only-if-unpaid.
 import { describe, expect, it } from 'vitest';
 import { openSqlite } from './diff-harness';
@@ -60,7 +60,7 @@ function rig() {
   return { raw, db, q, op, code, order };
 }
 
-describe('job operations on the DO (Ruling CF-JOBS-3)', () => {
+describe('job operations on the DO (Ruling CF-JOBS-4)', () => {
   it('are registered', () => {
     expect(MONEY_OP_NAMES).toEqual(
       expect.arrayContaining([
