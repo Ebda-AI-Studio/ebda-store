@@ -186,7 +186,7 @@ export async function receiveByBarcode(
       // Durable Object path (Ruling CF-R7-1): the variant stock and its history row are ONE section.
       const r = await stock.receiveVariant({
         productId: lookup.productId,
-        variantId: lookup.variantId,
+        variantId: lookup.variantId as string, // type "variant" always carries it
         quantity: qtyReceived,
         reason: 'barcode_receive',
         reference: reference ?? `barcode:${barcode}`,
