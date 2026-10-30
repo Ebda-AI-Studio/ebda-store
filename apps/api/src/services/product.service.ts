@@ -460,6 +460,36 @@ const PUBLIC_LISTING_SELECT = {
   },
 } as const satisfies Prisma.ProductSelect;
 
+/**
+ * A store on its Durable Object (Ruling CF-R6B-1): prisma-lite joins no Postgres / D1 model, so a storefront read drops the
+ * `store` relation (the D1 Store row) and `reviews` (Review is not a DO model: reviews stay on Postgres) from its select and
+ * puts them back from their own source after the DO read. On Postgres the select is untouched.
+ */
+const { store: _listingStore, ...PUBLIC_LISTING_SELECT_DO } = PUBLIC_LISTING_SELECT;
+void _listingStore;
+
+async function storeRefFor(storeId: string) {
+  return readInStoreContext(storeId, () =>
+    prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, name: true, slug: true },
+    })
+  );
+}
+
+/** The listing select for this store's backend, and the Store ref to put back on each row when it is a DO store. */
+async function listingFor(storeId: string) {
+  const onDo = (await storeRepo(storeId)).backend === 'do';
+  return {
+    select: (onDo
+      ? PUBLIC_LISTING_SELECT_DO
+      : PUBLIC_LISTING_SELECT) as typeof PUBLIC_LISTING_SELECT,
+    storeRef: onDo ? await storeRefFor(storeId) : null,
+  };
+}
+const withStoreRef = <T extends object>(rows: T[], storeRef: unknown): T[] =>
+  storeRef ? rows.map(r => ({ ...r, store: storeRef }) as T) : rows;
+
 /** Json column write: `null` must become SQL NULL (Prisma.DbNull), `undefined` leaves it alone. */
 function personalisationWrite(v: PersonalisationConfig | null | undefined) {
   if (v === undefined) return {};
@@ -1680,7 +1710,8 @@ export class ProductService {
       } else {
         pageIdList = ordered.slice(skip, skip + limit);
       }
-      const [rows, facets] = await Promise.all([
+      const listing = await listingFor(storeId);
+      const [rawRows, facets] = await Promise.all([
         (await storeDb(storeId)).product.findMany({
           where: {
             storeId,
@@ -1688,10 +1719,11 @@ export class ProductService {
             deletedAt: null,
             id: { in: pageIdList },
           },
-          select: PUBLIC_LISTING_SELECT,
+          select: listing.select,
         }),
         computeFacets(storeId, whereForFacets),
       ]);
+      const rows = withStoreRef(rawRows, listing.storeRef);
       const byId = new Map(rows.map(r => [r.id, r]));
       const pageRows = pageIdList.flatMap(id => {
         const row = byId.get(id);
@@ -1840,16 +1872,18 @@ export class ProductService {
         // Explicit select (not include) — storefront-safe scalars only, plus
         // lowStockThreshold which enrichStockFlags needs for its lowStock
         // computation but strips before the row is returned. See T-H1.
-        select: PUBLIC_LISTING_SELECT,
+        select: (await listingFor(storeId)).select,
         orderBy: { createdAt: 'desc' as const },
       };
+      const positionStoreRef = (await listingFor(storeId)).storeRef;
 
-      const [allMatchingRaw, total, facets] = await Promise.all([
+      const [allMatchingFetched, total, facets] = await Promise.all([
         (await storeDb(storeId)).product.findMany(positionFindArgs),
         (await storeDb(storeId)).product.count({ where }),
         computeFacets(storeId, whereForFacets),
       ]);
 
+      const allMatchingRaw = withStoreRef(allMatchingFetched, positionStoreRef);
       // Re-sort by the orderedIds position array so the DB result order is
       // irrelevant. Products not in orderedIds (new, added after the sort was
       // set) fall to the end.
@@ -1926,22 +1960,24 @@ export class ProductService {
       // Explicit select (not include) — storefront-safe scalars only, plus
       // lowStockThreshold which enrichStockFlags needs for its lowStock
       // computation but strips before the row is returned. See T-H1.
-      select: PUBLIC_LISTING_SELECT,
+      select: (await listingFor(storeId)).select,
       orderBy,
     };
+    const listStoreRef = (await listingFor(storeId)).storeRef;
 
     const findManyArgs = cursor
       ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1 }
       : { ...baseFindManyArgs, skip, take: limit };
 
     // The deals strip has no filter sidebar: skip the facet query on this hot homepage path.
-    const [productsRaw, total, facets] = await Promise.all([
+    const [productsFetched, total, facets] = await Promise.all([
       (await storeDb(storeId)).product.findMany(findManyArgs),
       (await storeDb(storeId)).product.count({ where }),
       sort === 'on_sale'
         ? Promise.resolve([] as ProductFacet[])
         : computeFacets(storeId, whereForFacets),
     ]);
+    const productsRaw = withStoreRef(productsFetched, listStoreRef);
 
     // When using cursor we fetched limit+1; slice to limit + extract next cursor.
     // The next cursor is the LAST row returned, because the next request skips
@@ -2273,6 +2309,33 @@ export class ProductService {
     };
   }
 
+  /**
+   * The storefront detail row. A DO store cannot join the D1 `store` or the Postgres `reviews` (Ruling CF-R6B-1): both are
+   * dropped from the DO select and read from their own source, so the row has the same shape on either backend.
+   */
+  private static async readPublicDetail(storeId: string, where: Prisma.ProductWhereInput) {
+    const full = this.PUBLIC_PRODUCT_DETAIL_SELECT;
+    if ((await storeRepo(storeId)).backend !== 'do')
+      return (await storeDb(storeId)).product.findFirst({ where, select: full });
+    const { store: _s, reviews: _r, ...doSelect } = full;
+    void _s;
+    void _r;
+    const row = await (
+      await storeDb(storeId)
+    ).product.findFirst({ where, select: doSelect as unknown as typeof full });
+    if (!row) return row;
+    const [store, reviews] = await Promise.all([
+      storeRefFor(storeId),
+      prisma.review.findMany({
+        where: { ...full.reviews.where, productId: row.id, storeId },
+        orderBy: full.reviews.orderBy,
+        take: full.reviews.take,
+        select: full.reviews.select,
+      }),
+    ]);
+    return { ...row, store, reviews } as typeof row;
+  }
+
   static async getPublicBySlug(
     storeId: string,
     slug: string,
@@ -2280,17 +2343,12 @@ export class ProductService {
   ) {
     // B2B-7b: the public catalogue is anonymous and NEVER returns a wholesale-only product (404, no existence oracle). The
     // approved-buyer route asks for audience 'wholesale_only' explicitly after checking membership.
-    const product = await (
-      await storeDb(storeId)
-    ).product.findFirst({
-      where: {
-        storeId,
-        slug,
-        status: 'active',
-        deletedAt: null,
-        audience: opts.audience ?? 'public',
-      },
-      select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
+    const product = await this.readPublicDetail(storeId, {
+      storeId,
+      slug,
+      status: 'active',
+      deletedAt: null,
+      audience: opts.audience ?? 'public',
     });
 
     if (!product) {
@@ -2323,11 +2381,12 @@ export class ProductService {
   }
 
   static async getPublicById(storeId: string, productId: string) {
-    const product = await (
-      await storeDb(storeId)
-    ).product.findFirst({
-      where: { storeId, id: productId, status: 'active', deletedAt: null, audience: 'public' },
-      select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
+    const product = await this.readPublicDetail(storeId, {
+      storeId,
+      id: productId,
+      status: 'active',
+      deletedAt: null,
+      audience: 'public',
     });
 
     if (!product) {
@@ -2686,7 +2745,8 @@ export class ProductService {
     })();
 
     // Execute query
-    const [products, total, priceRange] = await Promise.all([
+    const searchOnDo = (await storeRepo(storeId)).backend === 'do';
+    const [fetched, total, priceRange] = await Promise.all([
       (await storeDb(storeId)).product.findMany({
         where,
         skip,
@@ -2695,10 +2755,9 @@ export class ProductService {
           images: { orderBy: { position: 'asc' }, take: 2 },
           categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
           options: LISTING_SWATCH_OPTIONS_SELECT,
-          reviews: {
-            where: { status: 'published' },
-            select: { rating: true },
-          },
+          ...(searchOnDo
+            ? {}
+            : { reviews: { where: { status: 'published' as const }, select: { rating: true } } }),
           // See listPublic note above — variants are needed for the
           // dual-CTA (View vs Add to Cart) + "From <min>" pricing on
           // the storefront card components.
@@ -2716,6 +2775,22 @@ export class ProductService {
         _max: { price: true },
       }),
     ]);
+
+    // Reviews are a Postgres model: a DO store's ratings come from there in one read (Ruling CF-R6B-1).
+    const ratingRows = searchOnDo
+      ? await prisma.review.findMany({
+          where: { storeId, status: 'published', productId: { in: fetched.map(p => p.id) } },
+          select: { productId: true, rating: true },
+        })
+      : [];
+    const products = fetched.map(p =>
+      searchOnDo
+        ? ({
+            ...p,
+            reviews: ratingRows.filter(r => r.productId === p.id).map(r => ({ rating: r.rating })),
+          } as typeof p)
+        : p
+    );
 
     // Calculate average ratings
     const productsWithRatings = products.map(product => {
