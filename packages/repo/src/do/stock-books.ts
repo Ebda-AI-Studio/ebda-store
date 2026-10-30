@@ -167,25 +167,18 @@ function createAdjustmentIn(
     items: AdjItem[];
     sessionId?: string | null;
   }
-): { id: string; adjustmentNumber: string; status: string; itemCount: number; replayed: boolean } {
+): { id: string; adjustmentNumber: string; status: string; itemCount: number } {
   if (!(a.type in INVENTORY_TYPE)) fail('BAD_ARGS', 'type');
   if (a.importKey) {
-    // the CSV-import idempotency key is unique per store: a retried import finds the first one
-    const have = db.all(
-      'SELECT id, adjustment_number, status FROM stock_adjustments WHERE store_id = ? AND import_key = ?',
-      [storeId, a.importKey]
-    )[0];
-    if (have)
-      return {
-        id: have.id as string,
-        adjustmentNumber: have.adjustment_number as string,
-        status: have.status as string,
-        itemCount: db.all(
-          'SELECT count(*) AS n FROM stock_adjustment_items WHERE adjustment_id = ?',
-          [have.id]
-        )[0].n as number,
-        replayed: true,
-      };
+    // the CSV-import key is unique per store, like the Postgres index: a second create is REFUSED (the route then replays the
+    // first adjustment with findAdjustmentByImportKey), it does not hand the first one back as if it were new
+    if (
+      db.all('SELECT 1 AS x FROM stock_adjustments WHERE store_id = ? AND import_key = ?', [
+        storeId,
+        a.importKey,
+      ]).length > 0
+    )
+      fail('IMPORT_KEY_EXISTS', 'import key already used for this store', 409);
   }
   assertOwns(db, storeId, {
     productIds: a.items.map(i => i.productId),
@@ -242,7 +235,7 @@ function createAdjustmentIn(
         now,
       ]
     );
-  return { id, adjustmentNumber, status: 'draft', itemCount: snapshots.length, replayed: false };
+  return { id, adjustmentNumber, status: 'draft', itemCount: snapshots.length };
 }
 
 /** postAdjustment: claim the draft, write each line's absolute quantity, the history rows and the warehouse shadow. */

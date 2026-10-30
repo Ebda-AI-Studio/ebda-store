@@ -222,7 +222,6 @@ export interface StockClient {
     adjustmentNumber: string;
     status: string;
     itemCount: number;
-    replayed: boolean;
   }>;
   postStockAdjustment(
     a: { id: string; postedBy?: string | null },

@@ -94,20 +94,23 @@ describe('stock adjustments', () => {
     expect(r.code('postStockAdjustment', { id: 'nope' })).toBe('NOT_FOUND/404');
   });
 
-  it('a CSV import key finds the first adjustment instead of creating a second', () => {
+  it('a CSV import key is unique per store: the second create is refused and nothing is written', () => {
     const r = rig();
-    const a = r.op('createStockAdjustment', {
+    r.op('createStockAdjustment', {
       type: 'cycle_count',
       importKey: 'imp-1',
       items: [{ productId: 'p1', newQty: 4 }],
     });
-    const b = r.op('createStockAdjustment', {
-      type: 'cycle_count',
-      importKey: 'imp-1',
-      items: [{ productId: 'p1', newQty: 4 }],
-    });
-    expect(b).toMatchObject({ id: a.id, replayed: true });
+    expect(
+      r.code('createStockAdjustment', {
+        type: 'cycle_count',
+        importKey: 'imp-1',
+        items: [{ productId: 'p1', newQty: 4 }],
+      })
+    ).toBe('IMPORT_KEY_EXISTS/409');
     expect(r.q('SELECT count(*) AS n FROM stock_adjustments')[0].n).toBe(1);
+    // the number sequence did not move for the refused create
+    expect(r.q("SELECT next FROM sequences WHERE kind = 'adjustment'")[0].next).toBe(2);
   });
 
   it('a post that fails midway rolls the claim back (a product that left the store)', () => {

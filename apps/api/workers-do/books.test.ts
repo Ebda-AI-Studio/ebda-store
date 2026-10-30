@@ -143,7 +143,7 @@ describe('accounting flows on the DO, no row lock', () => {
 
   it('10 concurrent CSV imports with ONE import key create one adjustment', async () => {
     const stub = await seed('books-import');
-    await Promise.all(
+    const answers = await Promise.all(
       Array.from({ length: 10 }, () =>
         op(stub, 'books-import', 'createStockAdjustment', {
           type: 'cycle_count',
@@ -152,6 +152,10 @@ describe('accounting flows on the DO, no row lock', () => {
         })
       )
     );
+    expect(answers.filter(a => a.ok)).toHaveLength(1);
+    expect(
+      new Set((answers.filter(a => !a.ok) as Array<{ code: string }>).map(a => a.code))
+    ).toEqual(new Set(['IMPORT_KEY_EXISTS']));
     expect((await sql(stub, `SELECT count(*) AS n FROM stock_adjustments`))[0]).toEqual({ n: 1 });
   });
 

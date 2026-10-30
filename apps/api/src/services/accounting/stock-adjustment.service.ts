@@ -55,15 +55,29 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
   const stock = await storeStock(input.storeId);
   if (stock) {
     // Durable Object path (Ruling CF-R7-1): ownership, the snapshot, the number and the rows are ONE section.
-    const r = await stock.createStockAdjustment({
-      type: input.type,
-      reason: input.reason,
-      reasonAr: input.reasonAr,
-      evidenceUrl: input.evidenceUrl,
-      createdBy: input.createdBy,
-      importKey: input.importKey,
-      items: input.items,
-    });
+    let r: Awaited<ReturnType<typeof stock.createStockAdjustment>>;
+    try {
+      r = await stock.createStockAdjustment({
+        type: input.type,
+        reason: input.reason,
+        reasonAr: input.reasonAr,
+        evidenceUrl: input.evidenceUrl,
+        createdBy: input.createdBy,
+        importKey: input.importKey,
+        items: input.items,
+      });
+    } catch (err) {
+      // the same shape Prisma gives a unique violation, so the CSV route's `isImportKeyConflict` replays the first import
+      if ((err as { code?: unknown } | null)?.code === 'IMPORT_KEY_EXISTS')
+        throw Object.assign(
+          new Error('Unique constraint failed on the fields: (store_id, import_key)'),
+          {
+            code: 'P2002',
+            meta: { target: ['store_id', 'import_key'] },
+          }
+        );
+      throw err;
+    }
     return getAdjustmentOrThrow(input.storeId, r.id);
   }
   // Every product/variant id here comes from the request body. requireStoreAccess
