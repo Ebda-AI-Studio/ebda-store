@@ -12,11 +12,12 @@
  */
 
 import { prisma, runInTenantContext, Prisma } from '@ebda/database';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeStock } from '../lib/repo-factory';
 import { InventoryService } from './inventory.service';
 import { createAdjustment, postAdjustment } from './accounting/stock-adjustment.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { AppError } from '../middleware/error-handler';
+import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,6 +181,26 @@ export async function receiveByBarcode(
   // (mirrors the product path's manual_add semantics). Product barcodes still
   // flow through the shared InventoryService path.
   if (lookup.type === 'variant') {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-R7-1): the variant stock and its history row are ONE section.
+      const r = await stock.receiveVariant({
+        productId: lookup.productId,
+        variantId: lookup.variantId,
+        quantity: qtyReceived,
+        reason: 'barcode_receive',
+        reference: reference ?? `barcode:${barcode}`,
+        userId,
+      });
+      await invalidateStoreProductCaches(storeId);
+      return {
+        productId: r.productId,
+        variantId: r.variantId,
+        previousInventory: r.previousInventory,
+        newInventory: r.newInventory,
+        qtyReceived: r.qtyReceived,
+      };
+    }
     const variant = await prisma.productVariant.findFirst({
       where: { id: lookup.variantId },
       select: { inventory: true },
@@ -223,7 +244,9 @@ export async function receiveByBarcode(
 
   const previousInventory =
     (
-      await prisma.product.findFirst({
+      await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: lookup.productId, storeId },
         select: { inventory: true },
       })
@@ -374,6 +397,8 @@ export async function openCountSession(
   createdBy: string,
   note?: string
 ): Promise<{ id: string; storeId: string; status: string; note: string | null; createdAt: Date }> {
+  const stock = await storeStock(storeId);
+  if (stock) return stock.openCountSession({ createdBy, note: note ?? null });
   const session = await prisma.countSession.create({
     data: { storeId, createdBy, note: note ?? null, status: 'open' },
     select: { id: true, storeId: true, status: true, note: true, createdAt: true },
@@ -396,6 +421,14 @@ export async function submitCountLine(
   systemQty: number;
   variance: number;
 }> {
+  const stock = await storeStock(storeId);
+  if (stock)
+    return stock.submitCountLine({
+      sessionId,
+      productId: line.productId,
+      variantId: line.variantId ?? null,
+      countedQty: line.countedQty,
+    });
   // Verify session belongs to this store and is open
   const session = await prisma.countSession.findFirst({
     where: { id: sessionId, storeId, status: 'open' },
@@ -477,6 +510,8 @@ export async function closeCountSession(
   storeId: string,
   sessionId: string
 ): Promise<{ id: string; status: string; closedAt: Date | null }> {
+  const stock = await storeStock(storeId);
+  if (stock) return stock.closeCountSession({ sessionId });
   const session = await prisma.countSession.findFirst({
     where: { id: sessionId, storeId },
     select: { status: true },
@@ -505,6 +540,27 @@ export async function reconcileCountSession(
   sessionId: string,
   reconciledBy: string
 ): Promise<{ adjustmentId: string | null; linesReconciled: number; zeroVarianceLines: number }> {
+  const stock = await storeStock(storeId);
+  if (stock) {
+    // Durable Object path (Ruling CF-R7-1): the adjustment, its posting and the session mark are ONE section.
+    const r = await stock.reconcileCountSession({ sessionId, reconciledBy });
+    await invalidateStoreProductCaches(storeId);
+    if (r.adjustmentId) {
+      try {
+        await inngest.send({
+          name: 'stock/adjustment-posted',
+          data: { storeId, adjustmentId: r.adjustmentId },
+        });
+      } catch (err) {
+        logger.error(
+          { err, adjustmentId: r.adjustmentId, storeId },
+          'reconcileCountSession: failed to fire inngest event'
+        );
+      }
+    }
+    logger.info({ storeId, sessionId, ...r }, 'barcode-scan: reconcile (do)');
+    return r;
+  }
   const session = await prisma.countSession.findFirst({
     where: { id: sessionId, storeId, status: 'closed' },
     include: {
@@ -580,7 +636,9 @@ export async function listCountSessions(
     lineCount: number;
   }[]
 > {
-  const sessions = await prisma.countSession.findMany({
+  const sessions = await (
+    await storeDb(storeId)
+  ).countSession.findMany({
     where: { storeId, ...(opts.status ? { status: opts.status } : {}) },
     orderBy: { createdAt: 'desc' },
     take: opts.limit ?? 50,
@@ -623,7 +681,9 @@ export async function getCountSession(
     scannedAt: Date;
   }[];
 } | null> {
-  const session = await prisma.countSession.findFirst({
+  const session = await (
+    await storeDb(storeId)
+  ).countSession.findFirst({
     where: { id: sessionId, storeId },
     select: {
       id: true,

@@ -205,6 +205,121 @@ export interface StockClient {
     variantId?: string | null;
   }): Promise<{ reconciled: boolean; diff: number }>;
   /** A page of the reconcile sweep: every SKU with a warehouse row after `afterKey`, up to `limit`. */
+  /** R7 (Ruling CF-R7-1): the accounting + scan stock flows, each ONE section in the DO. */
+  createStockAdjustment(
+    a: {
+      type: string;
+      reason?: string | null;
+      reasonAr?: string | null;
+      evidenceUrl?: string | null;
+      createdBy?: string | null;
+      importKey?: string | null;
+      items: Array<{ productId: string; variantId?: string | null; newQty: number }>;
+    },
+    key?: string
+  ): Promise<{
+    id: string;
+    adjustmentNumber: string;
+    status: string;
+    itemCount: number;
+    replayed: boolean;
+  }>;
+  postStockAdjustment(
+    a: { id: string; postedBy?: string | null },
+    key?: string
+  ): Promise<{ id: string; status: string }>;
+  createPurchaseOrder(
+    a: {
+      supplierId: string;
+      expectedDate?: Date | null;
+      notes?: string | null;
+      notesAr?: string | null;
+      createdBy?: string | null;
+      suggestionId?: string | null;
+      items: Array<{
+        productId: string;
+        variantId?: string | null;
+        qty: number;
+        unitCost: number;
+        notes?: string | null;
+      }>;
+    },
+    key?: string
+  ): Promise<{ id: string; poNumber: string }>;
+  cancelPurchaseOrder(a: { id: string }): Promise<{ id: string; status: string }>;
+  receivePurchaseOrder(
+    a: {
+      poId: string;
+      receivedBy?: string | null;
+      receipts: Array<{ poItemId: string; qtyReceived: number }>;
+    },
+    key?: string
+  ): Promise<{
+    poId: string;
+    status: string;
+    clearedBackorders: Array<{
+      backorderLineId: string;
+      orderItemId: string;
+      qty: number;
+      actualUnitCost: number;
+      estimateUnitCost: number;
+      variance: number;
+    }>;
+  }>;
+  seedCoa(a: {
+    accounts: Array<{ code: string; nameEn: string; nameAr?: string | null; type: string }>;
+  }): Promise<{ created: number; opening: { posted: boolean; total: number; skus: number } }>;
+  openingBalance(): Promise<{ posted: boolean; total: number; skus: number }>;
+  receiveVariant(
+    a: {
+      productId: string;
+      variantId: string;
+      quantity: number;
+      reason?: string;
+      reference?: string | null;
+      userId?: string | null;
+    },
+    key?: string
+  ): Promise<{
+    productId: string;
+    variantId: string;
+    previousInventory: number;
+    newInventory: number;
+    qtyReceived: number;
+  }>;
+  openCountSession(a: { createdBy?: string | null; note?: string | null }): Promise<{
+    id: string;
+    storeId: string;
+    status: string;
+    note: string | null;
+    createdAt: Date;
+  }>;
+  submitCountLine(a: {
+    sessionId: string;
+    productId: string;
+    variantId?: string | null;
+    countedQty: number;
+  }): Promise<{
+    id: string;
+    sessionId: string;
+    productId: string;
+    variantId: string | null;
+    countedQty: number;
+    systemQty: number;
+    variance: number;
+  }>;
+  closeCountSession(a: {
+    sessionId: string;
+  }): Promise<{ id: string; status: string; closedAt: Date }>;
+  reconcileCountSession(
+    a: { sessionId: string; reconciledBy?: string | null },
+    key?: string
+  ): Promise<{ adjustmentId: string | null; linesReconciled: number; zeroVarianceLines: number }>;
+  bulkSetInventory(a: {
+    productIds: string[];
+    mode: 'set' | 'adjust';
+    value: number;
+  }): Promise<{ updated: number }>;
   reconcileWarehouseAll(a: { limit?: number; afterKey?: string | null }): Promise<{
     skusReconciled: number;
     skusFailed: number;
@@ -906,6 +1021,19 @@ export function makeStockClient(
     setVariantInventory: (a, key) => call('setVariantInventory', a, key),
     setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
     adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
+    createStockAdjustment: (a, key) => call('createStockAdjustment', a, key),
+    postStockAdjustment: (a, key) => call('postStockAdjustment', a, key),
+    createPurchaseOrder: (a, key) => call('createPurchaseOrder', a, key),
+    cancelPurchaseOrder: a => call('cancelPurchaseOrder', a),
+    receivePurchaseOrder: (a, key) => call('receivePurchaseOrder', a, key),
+    seedCoa: a => call('seedCoa', a),
+    openingBalance: () => call('openingBalance', {}),
+    receiveVariant: (a, key) => call('receiveVariant', a, key),
+    openCountSession: a => call('openCountSession', a),
+    submitCountLine: a => call('submitCountLine', a),
+    closeCountSession: a => call('closeCountSession', a),
+    reconcileCountSession: (a, key) => call('reconcileCountSession', a, key),
+    bulkSetInventory: a => call('bulkSetInventory', a),
     reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
     reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
   };

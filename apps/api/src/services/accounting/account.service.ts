@@ -2,7 +2,7 @@ import { prisma, withStore, DbClient } from '@ebda/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
-import { storeRepo } from '../../lib/repo-factory';
+import { storeRepo, storeStock } from '../../lib/repo-factory';
 
 /**
  * Seed the Egypt-retail Chart of Accounts for a store. Idempotent — existing
@@ -47,6 +47,19 @@ export async function seedCoaForStore(
     return toCreate.length;
   };
   if (tx) return run(tx);
+  // A store on its Durable Object seeds its chart and posts the opening balance there, in one section (Ruling CF-R7-1).
+  const stock = await storeStock(storeId);
+  if (stock) {
+    const r = await stock.seedCoa({
+      accounts: COA_TEMPLATE.map(row => ({
+        code: row.code,
+        nameEn: row.nameEn,
+        nameAr: row.nameAr ?? null,
+        type: row.type,
+      })),
+    });
+    return r.created;
+  }
   // No caller tx → run in the store's scope. seedCoaForStore is called by
   // StoreService.create (super-admin) and by the accounting-enable
   // toggle path; neither sets app.current_store_id in their outer

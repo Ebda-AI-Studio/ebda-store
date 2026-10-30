@@ -46,7 +46,7 @@ import {
   searchProductIds,
 } from './product-search.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
-import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeStock, storeWriter } from '../lib/repo-factory';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -1471,7 +1471,11 @@ export class ProductService {
     // --- 4. Inventory (simple products only) ---
     if (fields.inventory && simpleIds.length > 0) {
       const { mode, value } = fields.inventory;
-      if (mode === 'set') {
+      const doStock = await storeStock(storeId);
+      if (doStock) {
+        // Durable Object path (Ruling CF-R7-1): set / adjust, floored at 0, ONE section (no history row, like Postgres).
+        await doStock.bulkSetInventory({ productIds: simpleIds, mode, value });
+      } else if (mode === 'set') {
         const qty = Math.max(0, Math.round(value));
         await prisma.product.updateMany({
           where: { storeId, id: { in: simpleIds }, deletedAt: null },
