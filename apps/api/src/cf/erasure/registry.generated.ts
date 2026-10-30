@@ -123,7 +123,22 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
       session_id: '[erased]',
     },
   },
+  catalog_import_files: {
+    kind: 'no-pii',
+  },
+  catalog_import_items: {
+    kind: 'no-pii',
+  },
+  catalog_import_jobs: {
+    kind: 'store-owned',
+  },
   categories: {
+    kind: 'no-pii',
+  },
+  ci_hint_logs: {
+    kind: 'no-pii',
+  },
+  ci_store_gates: {
     kind: 'no-pii',
   },
   cod_remittances: {

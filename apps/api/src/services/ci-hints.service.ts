@@ -7,6 +7,7 @@
  * scoped to the store; a store id that does not resolve throws instead of defaulting.
  */
 import { prisma } from '@ebda/database';
+import { storeUpdateMany } from '../lib/repo-factory';
 import { featureService } from './feature.service';
 import { loadHintData } from '../lib/ci/hints/data';
 import { codRiskHint, type BuyerHistory, type CodRiskHint } from '../lib/ci/hints/cod-risk';
@@ -135,7 +136,7 @@ export async function ciOverview(storeId: string): Promise<CiOverview> {
 }
 
 export async function setCiSharing(storeId: string, ciSharing: boolean): Promise<void> {
-  const r = await prisma.store.updateMany({
+  const r = await storeUpdateMany(prisma, {
     where: { id: storeId },
     data: { ciSharing, ciSharingChangedAt: new Date() },
   });

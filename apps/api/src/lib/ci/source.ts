@@ -277,8 +277,8 @@ export const prismaCiSource: CiSource = {
   },
 
   async abandonedCart(storeId, abandonedCartId) {
-    return runInTenantContext(storeId, async () => {
-      const a = await prisma.abandonedCart.findFirst({
+    return inStore(storeId, async db => {
+      const a = await db.abandonedCart.findFirst({
         where: { id: abandonedCartId, storeId },
         select: {
           id: true,

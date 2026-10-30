@@ -9,6 +9,23 @@
     }
   },
   "baseline": {
+    "apps/api/src/lib/catalogue/process-file.ts": {
+      "kind": "job-unported",
+      "reason": "Catalogue import (PR #329) reads and writes products and categories with prisma in the staging and draft-creation jobs; these jobs are unported (refused for a DO store, listed in docs/cf/not-on-do.json jobsAccepted) until the import is routed through storeDb (Ruling INTEG-1).",
+      "models": {
+        "category": 1,
+        "product": 1
+      },
+      "jobs": ["catalog-import-run", "catalog-import-create-drafts"]
+    },
+    "apps/api/src/lib/inngest/functions/catalog-import-run.ts": {
+      "kind": "job-unported",
+      "reason": "Catalogue import (PR #329) reads and writes products and categories with prisma in the staging and draft-creation jobs; these jobs are unported (refused for a DO store, listed in docs/cf/not-on-do.json jobsAccepted) until the import is routed through storeDb (Ruling INTEG-1).",
+      "models": {
+        "category": 1
+      },
+      "jobs": ["catalog-import-run"]
+    },
     "apps/api/src/routes/admin.routes.ts": {
       "kind": "platform",
       "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
@@ -24,6 +41,14 @@
         "cart": 1
       }
     },
+    "apps/api/src/services/accounting/account.service.ts": {
+      "kind": "pg-branch",
+      "reason": "seedCoaForStore / postOpeningBalanceIfNeeded: after the `storeStock()` early return (CF-R7-1: seedCoa runs the chart seed and the opening-balance journal in the DO); the tx body is the Postgres branch.",
+      "models": {
+        "product": 1,
+        "productVariant": 1
+      }
+    },
     "apps/api/src/services/accounting/assert-store-owns.ts": {
       "kind": "pg-branch",
       "reason": "assertStoreOwns takes the client it checks against: assertStoreOwnsInTenantScope hands it the DO read client for a store on its Durable Object (CF-R7-1), so the prisma default is the Postgres branch.",
@@ -33,11 +58,35 @@
         "category": 1
       }
     },
+    "apps/api/src/services/accounting/purchase-order.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createPurchaseOrder / receivePurchaseOrder: after the `storeStock()` early return (CF-R7-1: createPurchaseOrder / receivePurchaseOrder run in the DO); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 4,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/accounting/stock-adjustment.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createAdjustment / postAdjustment: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 1,
+        "product": 1
+      }
+    },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
       "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
       "models": {
         "campaignRecipient": 1
+      }
+    },
+    "apps/api/src/services/barcode-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "receiveByBarcode (variant) / submitCountLine / reconcileCountSession: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 2,
+        "product": 1
       }
     },
     "apps/api/src/services/barcode.service.ts": {
@@ -55,6 +104,29 @@
         "productOption": 1,
         "productVariant": 1,
         "product": 1
+      }
+    },
+    "apps/api/src/services/catalog-import.service.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Catalogue import (PR #329) request path: category and product reads and writes use prisma (the store scope is entered with runInStoreScope, but the data calls are not yet routed through storeDb). Named in docs/cf/not-on-do.json postgresOnly (Ruling INTEG-1).",
+      "models": {
+        "category": 4,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/ci-calibration.service.ts": {
+      "kind": "job-unported",
+      "reason": "The weekly hint calibration (PR #336) resolves open hint logs against shipments with prisma across all stores; the job is unported (refused for a DO store, listed in docs/cf/not-on-do.json jobsAccepted) until it is routed through storeDb (Ruling INTEG-1).",
+      "models": {
+        "shipment": 1
+      },
+      "jobs": ["ci-hint-calibration-weekly"]
+    },
+    "apps/api/src/services/ci-hints.service.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Customer Intelligence hints (PR #336) read shipments with prisma to build the courier ranking and the fee hint. Named in docs/cf/not-on-do.json postgresOnly (Ruling INTEG-1).",
+      "models": {
+        "shipment": 2
       }
     },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {
@@ -128,38 +200,6 @@
       "models": {
         "product": 2,
         "productVariant": 1
-      }
-    },
-    "apps/api/src/services/accounting/account.service.ts": {
-      "kind": "pg-branch",
-      "reason": "seedCoaForStore / postOpeningBalanceIfNeeded: after the `storeStock()` early return (CF-R7-1: seedCoa runs the chart seed and the opening-balance journal in the DO); the tx body is the Postgres branch.",
-      "models": {
-        "product": 1,
-        "productVariant": 1
-      }
-    },
-    "apps/api/src/services/accounting/purchase-order.service.ts": {
-      "kind": "pg-branch",
-      "reason": "createPurchaseOrder / receivePurchaseOrder: after the `storeStock()` early return (CF-R7-1: createPurchaseOrder / receivePurchaseOrder run in the DO); the remaining reads are the Postgres branch.",
-      "models": {
-        "productVariant": 4,
-        "product": 1
-      }
-    },
-    "apps/api/src/services/accounting/stock-adjustment.service.ts": {
-      "kind": "pg-branch",
-      "reason": "createAdjustment / postAdjustment: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
-      "models": {
-        "productVariant": 1,
-        "product": 1
-      }
-    },
-    "apps/api/src/services/barcode-scan.service.ts": {
-      "kind": "pg-branch",
-      "reason": "receiveByBarcode (variant) / submitCountLine / reconcileCountSession: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
-      "models": {
-        "productVariant": 2,
-        "product": 1
       }
     }
   }

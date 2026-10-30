@@ -3,7 +3,7 @@
  *  - the token-gated draft preview API (mint behind admin auth, read by token,
  *    store-scoped Redis key, never cacheable, 404 on unknown/malformed token);
  *  - the canvas only trusts the admin origins the storefront may be framed by
- *    (same list as next.config.js frame-ancestors);
+ *    (same list as the frame-ancestors in apps/web/src/lib/csp.ts);
  *  - overlay logic (section lookup, exact-match inline setting, union boxes);
  *  - PageRenderer renders the document-only sections, and emits editor
  *    markers ONLY in editor mode (public markup unchanged);
@@ -152,7 +152,7 @@ describe('draft preview token API', () => {
 
 describe('canvas origins', () => {
   it('match the storefront frame-ancestors (same env var, same defaults)', () => {
-    const cfg = readFileSync(join(__dirname, '../../apps/web/next.config.js'), 'utf8');
+    const cfg = readFileSync(join(__dirname, '../../apps/web/src/lib/csp.ts'), 'utf8');
     expect(cfg).toContain("'https://store.ebda.app'");
     expect(cfg).toContain("'https://store.ebda.app http://localhost:3001 http://localhost:3000'");
     expect(allowedParentOrigins({ NODE_ENV: 'production' })).toEqual(['https://store.ebda.app']);
