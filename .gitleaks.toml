@@ -19,6 +19,8 @@ useDefault = true
 description = "CI-only test secrets (not real credentials)"
 regexTarget = "line"
 regexes = [
+  # foundation.lock.json: sha256 file pins for the vendored ebda-foundation tree (public hashes, not credentials).
+  '''"packages/shared/src/foundation/[^"]+": "[0-9a-f]{64}"''',
   # Paymob OFFICIAL DOCS example values (public, test-mode) used verbatim in
   # tests/contracts/paymob/*.official.json contract fixtures — not credentials.
   '''egy_csk_test_94042f793419c5a0f14a4cadfda9d626''',

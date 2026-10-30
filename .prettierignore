@@ -61,3 +61,8 @@ apps/docs/wa-source
 
 # vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/support-wa-help-drift.test.ts)
 apps/help/wa-source
+
+# Vendored from ebda-foundation (foundation.lock.json): byte-pinned by tests/unit/foundation-parity.test.ts, never reformatted.
+packages/shared/src/foundation
+foundation.lock.json
+tests/unit/foundation-parity.test.ts

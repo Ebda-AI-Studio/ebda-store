@@ -31,7 +31,10 @@ const ALL = [...walk(path.join(ROOT, 'apps')), ...walk(path.join(ROOT, 'packages
 );
 const isTest = (f: string) => /\.test\.|\/__tests__\/|\/test\/|\.spec\./.test(f);
 const SOURCE = ALL.filter(f => /\.(ts|tsx|mjs|js)$/.test(f) && !isTest(f));
-const COPY = ALL.filter(f => /\.(json|mdx|md|html|hbs)$/.test(f) && !isTest(f));
+// foundation/vectors = vendored cross-product test vectors that deliberately contain Arabic-Indic input
+const COPY = ALL.filter(
+  f => /\.(json|mdx|md|html|hbs)$/.test(f) && !isTest(f) && !/\/foundation\/vectors\//.test(f)
+);
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
@@ -39,6 +42,7 @@ const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const NORMALISERS = [
   /packages\/shared\/src\/search\//, // search folding + its vectors
   /packages\/shared\/src\/region\/index\.ts$/, // normaliseDigits / phone parsing
+  /packages\/shared\/src\/foundation\/(phone|text)\.ts$/, // vendored foundation v0.1.0: phone + Arabic fold input normalisers
   /packages\/shared\/src\/barcode\/ean\.ts$/, // scanner/typed barcode input normaliser
   /packages\/shared\/src\/tax-profile\.ts$/,
   /packages\/shared\/src\/instapay-receipt\.ts$/,
