@@ -2539,10 +2539,8 @@ export class AuthService {
           ciScope,
         },
       });
-      // The Postgres half has committed and the downstream erase is queued: the DO's saved erasure scope (ids and hashes
-      // kept only so a failed attempt can be finished) is no longer needed. If the enqueue above threw we never get here and
-      // the row stays for a retry; the nightly alarm purges it after the TTL (Ruling CF-R6A-3).
-      if (doMoney) await doMoney.finalizeErasure({ userId });
+      // The DO's saved erasure scope is NOT finalized here: enqueue is not execution. The job's last step does it once
+      // every propagation succeeded (Ruling CF-OPUS-1); the nightly alarm purges it after the TTL if the job never does.
     }).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );

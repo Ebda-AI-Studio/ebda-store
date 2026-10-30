@@ -13,6 +13,7 @@ import {
   type EraseMode,
 } from '../../ci/erase';
 import { inngest } from '../client';
+import { storeRepo } from '../../repo-factory';
 
 /**
  * Third-party Right-to-Erasure propagation (GDPR Art. 17 and applicable
@@ -39,7 +40,7 @@ export const accountErasedPropagation: JobDef = inngest.createFunction(
     triggers: [{ event: 'account/erased' }],
   },
   async ({ event, step }) => {
-    const { userId, oneSignalPlayerIds, ciProven, ciScope } = event.data;
+    const { userId, oneSignalPlayerIds, ciProven, ciScope, storeId } = event.data;
     // (the CI second pass is its own function, ci-erasure-second-pass.ts: a failing sibling step here must never skip it)
 
     if (!userId) {
@@ -76,6 +77,9 @@ export const accountErasedPropagation: JobDef = inngest.createFunction(
         `account-erased-propagation: ${rejected.length}/${results.length} step(s) failed (${summary})`
       );
     }
+    // Only now, with every propagation done, may a DO store drop the saved erasure scope a re-run would need.
+    if (typeof storeId === 'string' && storeId)
+      await step.run('finalize-do-erasure', () => finalizeDoErasure(storeId, userId));
   }
 );
 
@@ -120,4 +124,10 @@ export async function eraseCiOutcomes(
     erased += r.erased;
   }
   return { erased };
+}
+
+/** Drops the DO's saved erasure scope (ids and hashes kept only so a failed attempt can be finished). No-op off the DO. */
+export async function finalizeDoErasure(storeId: string, userId: string): Promise<void> {
+  const money = (await storeRepo(storeId)).money;
+  if (money) await money.finalizeErasure({ userId });
 }

@@ -20,6 +20,9 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'alerts-failure-watch',
   'audit-log-archive-weekly',
   'billing-renewal-daily',
+  // OneSignal, PostHog and the R2 CI bucket only; the DO erasure scope is finalized by its last step (Ruling CF-OPUS-1)
+  'account-erased-propagation',
+  'ci-erasure-second-pass',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
