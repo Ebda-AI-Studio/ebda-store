@@ -14,7 +14,12 @@ import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
 import { dropHiddenStores } from './job-store-guard';
 
-export { withHiddenStores, dropHiddenStores, type HiddenStoresScope } from './job-store-guard';
+export {
+  withHiddenStores,
+  withoutHiddenStores,
+  dropHiddenStores,
+  type HiddenStoresScope,
+} from './job-store-guard';
 
 // The client factory, the per-request client binding and the process singleton
 // live in ./client and ./request-db. Everything below resolves its client

@@ -37,7 +37,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `abandoned-cart-purge-weekly`              | 2-housekeeping  | queue    | cron    | yes         |
 | `account-erased-propagation`               | 2-housekeeping  | workflow | event   |             |
 | `audit-log-archive-weekly`                 | 2-housekeeping  | queue    | cron    | yes         |
-| `bulk-import-orphan-cleanup`               | 2-housekeeping  | queue    | cron    |             |
+| `bulk-import-orphan-cleanup`               | 2-housekeeping  | queue    | cron    | yes         |
 | `domain-claim-sweep`                       | 2-housekeeping  | queue    | cron    |             |
 | `instapay-receipt-retention-daily`         | 2-housekeeping  | queue    | cron    |             |
 | `order-anonymize-5y-monthly`               | 2-housekeeping  | queue    | cron    |             |
@@ -134,7 +134,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 
 `JOBS_CF_ALARMS` (wrangler var, comma list of function ids or `all`, empty = all cron) moves a per-store schedule from one global Cron Trigger run to one Durable Object alarm per store (`apps/api/src/cf/store-schedule.ts`).
 
-- Alarm-ready (handler sweeps only `event.data.storeId` for an alarm run): `abandoned-cart-purge-weekly`, `store-usage-snapshot`, `accounting-daily-close`, `accounting-period-reconciliation`, `accounting-profit-anomaly-cron`, `analytics-daily-rollup`, `stock-deadstock-scan-cron`, `stock-low-stock-alert-cron`, `stock-reorder-scan-cron`, `warehouse-reconcile-sweep-cron`, `wholesale-pending-nudge-cron`.
+- Alarm-ready (handler sweeps only `event.data.storeId` for an alarm run): `abandoned-cart-purge-weekly`, `bulk-import-orphan-cleanup`, `store-usage-snapshot`, `accounting-daily-close`, `accounting-period-reconciliation`, `accounting-profit-anomaly-cron`, `analytics-daily-rollup`, `stock-deadstock-scan-cron`, `stock-low-stock-alert-cron`, `stock-reorder-scan-cron`, `warehouse-reconcile-sweep-cron`, `wholesale-pending-nudge-cron`.
 - Stay crons on purpose: `audit-log-archive-weekly` (one cross-tenant table), `ai-autofill-sweep` (platform-wide leader lock + shared Gemini quota).
 - Arming (Ruling CF-JOBS-1): the hourly Cron Trigger `0 * * * *` runs `syncStoreSchedules` for the stores served by their Durable Object only (`JOBS_ON_DO=1` + the store flag); it also removes entries for jobs switched back to cron. A Postgres store is never armed: it keeps the global cron run, and the cron hides DO stores from its sweep. See `docs/cf/jobs-on-do.md`.
 - Exactly-once-ish: event id `alarm-<job>-<store>-<scheduledFor>` is the Workflow instance id (a re-fire is a no-op); the concurrency gate is `<job>|<store>`.

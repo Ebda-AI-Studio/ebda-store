@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -91,8 +92,13 @@ const bulkAiCategorizeFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
@@ -111,19 +117,19 @@ const bulkAiCategorizeFn = inngest.createFunction(
             select: { name: true },
           });
 
-          const cats = await prisma.category.findMany({
+          const cats = await sdb.category.findMany({
             where: { storeId, isActive: true },
             select: { id: true, name: true, nameAr: true },
           });
 
           // Only uncategorized products are candidates — categorized products
           // are never touched by this sweep.
-          const products = await prisma.product.findMany({
+          const products = await sdb.product.findMany({
             where: { storeId, status: 'active', deletedAt: null, categories: { none: {} } },
             select: { id: true },
           });
 
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { total: products.length },
           });
@@ -154,7 +160,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
           const batchIds = batches[i];
 
           const result: BatchResult = await step.run(`batch-${i}`, async () => {
-            const currentJob = await prisma.bulkAiJob.findUnique({
+            const currentJob = await sdb.bulkAiJob.findUnique({
               where: { id: jobId, storeId },
               select: { status: true },
             });
@@ -174,7 +180,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
             // product that got categorized by a prior partial attempt (or
             // concurrently via the per-product suggest endpoint) no longer
             // matches `categories: { none: {} }` and is skipped here.
-            const items = await prisma.product.findMany({
+            const items = await sdb.product.findMany({
               where: { id: { in: batchIds }, storeId, categories: { none: {} } },
               select: { id: true, name: true, description: true },
             });
@@ -272,7 +278,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
           }
 
           await step.run(`progress-${i}`, () =>
-            prisma.bulkAiJob.update({
+            sw.bulkAiJob.update({
               where: { id: jobId, storeId },
               data: { processed, filled, skipped, failed, errors: errors as object },
             })
@@ -309,12 +315,12 @@ const bulkAiCategorizeFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await step.run('finalize', async () => {
-        const finalRow = await prisma.bulkAiJob.findUnique({
+        const finalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',

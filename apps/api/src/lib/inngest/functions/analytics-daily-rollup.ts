@@ -27,7 +27,8 @@
  */
 
 import type { JobDef } from '../../jobs/types';
-import { runInTenantContext, storeDirectory } from '@ebda/database';
+import { storeDirectory } from '@ebda/database';
+import { runInStoreCtx } from '../../jobs/store-db';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -58,13 +59,13 @@ export async function runStoreRollupSteps(
   prefix: string
 ): Promise<RollupResult> {
   const cohortRows = await step.run(`${prefix}-cohort`, () =>
-    runInTenantContext(storeId, () => runCohortRollup(storeId))
+    runInStoreCtx(storeId, () => runCohortRollup(storeId))
   );
   const funnelDays = await step.run(`${prefix}-funnel`, () =>
-    runInTenantContext(storeId, () => runFunnelRollup(storeId))
+    runInStoreCtx(storeId, () => runFunnelRollup(storeId))
   );
   const rfmCustomers = await step.run(`${prefix}-rfm`, () =>
-    runInTenantContext(storeId, () => runRfmRollup(storeId))
+    runInStoreCtx(storeId, () => runRfmRollup(storeId))
   );
   return { cohortRows, funnelDays, rfmCustomers };
 }

@@ -2,60 +2,6 @@
   "apps/api/src/lib/ai/review-tools.ts": {
     "review": 2
   },
-  "apps/api/src/lib/inngest/functions/bulk-ai-aeo.ts": {
-    "category": 4,
-    "product": 4,
-    "bulkAiJob": 4
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-balance-descriptions.ts": {
-    "product": 2,
-    "bulkAiJob": 1
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-categorize.ts": {
-    "category": 1,
-    "product": 2,
-    "bulkAiJob": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-excerpt.ts": {
-    "product": 2,
-    "bulkAiJob": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-geo.ts": {
-    "category": 2,
-    "product": 3,
-    "bulkAiJob": 4
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-image-alt.ts": {
-    "product": 2,
-    "bulkAiJob": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-product-faqs.ts": {
-    "product": 2,
-    "bulkAiJob": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-recommendations.ts": {
-    "product": 2,
-    "bulkAiJob": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-revert-balance.ts": {
-    "product": 2,
-    "bulkAiJob": 1
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-seo.ts": {
-    "category": 2,
-    "product": 2,
-    "bulkAiJob": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-tags.ts": {
-    "product": 2,
-    "bulkAiJob": 2,
-    "tag": 1
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-translate.ts": {
-    "product": 2,
-    "category": 2,
-    "bulkAiJob": 1
-  },
   "apps/api/src/lib/savepoint.ts": {
     "cart": 1
   },
@@ -68,7 +14,6 @@
   "apps/api/src/routes/ai.routes.ts": {
     "category": 9,
     "product": 27,
-    "bulkAiJob": 2,
     "productImage": 2,
     "tag": 1
   },
@@ -127,11 +72,6 @@
     "product": 1,
     "productVariant": 1
   },
-  "apps/api/src/services/accounting/analytics-rollup.service.ts": {
-    "cart": 1,
-    "cartItem": 1,
-    "abandonedCart": 2
-  },
   "apps/api/src/services/accounting/assert-store-owns.ts": {
     "product": 1,
     "productVariant": 1,
@@ -152,18 +92,9 @@
     "productVariant": 1,
     "product": 1
   },
-  "apps/api/src/services/ai-autofill.service.ts": {
-    "product": 5,
-    "category": 2,
-    "bulkAiJob": 1
-  },
   "apps/api/src/services/analytics.service.ts": {
     "product": 2,
     "productCategory": 1
-  },
-  "apps/api/src/services/answer-engine/prompts.ts": {
-    "category": 1,
-    "product": 1
   },
   "apps/api/src/services/auth.service.ts": {
     "campaignRecipient": 1,

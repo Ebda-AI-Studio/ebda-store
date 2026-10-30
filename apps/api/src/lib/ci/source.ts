@@ -3,7 +3,8 @@
  * today `prismaCiSource` (Postgres, one row per call, by id, under the store's tenant scope); after the
  * StoreDO cutover the repo layer supplies a StoreDO-backed one. No method scans a table.
  */
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInStoreScope, runInTenantContext } from '@ebda/database';
+import { storeMoney, storeRepo, type StoreRepo, type StoreReads } from '../repo-factory';
 import { toE164 } from '@ebda/shared';
 import { areaKeyFor, type AreaKeyResult } from './area-key';
 
@@ -73,11 +74,32 @@ export interface CiSource {
 
 const toNum = (d: unknown): number | null => (d == null ? null : Number(d));
 
+/**
+ * Run `fn` for a store on its backend (Ruling CF-JOBS-4): a store on its Durable Object reads through its DO client in the
+ * store's scope, a Postgres store keeps `runInTenantContext` and `prisma` exactly as before (`repo.db` IS `prisma` there).
+ */
+async function inStore<T>(
+  storeId: string,
+  fn: (db: StoreReads, repo: StoreRepo) => Promise<T>
+): Promise<T> {
+  const repo = await storeRepo(storeId);
+  return repo.backend === 'do'
+    ? runInStoreScope(storeId, () => fn(repo.db, repo))
+    : runInTenantContext(storeId, () => fn(repo.db, repo));
+}
+
+/** The store's CI-sharing switch: a platform (`stores`) row, read in a short Postgres scope for either backend. */
+async function readCiSharing(storeId: string): Promise<{ ciSharing: boolean } | null> {
+  return runInTenantContext(storeId, () =>
+    prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } })
+  );
+}
+
 export const prismaCiSource: CiSource = {
   async order(storeId, orderId) {
-    return runInTenantContext(storeId, async () => {
+    return inStore(storeId, async (db, repo) => {
       const [o, store] = await Promise.all([
-        prisma.order.findFirst({
+        db.order.findFirst({
           where: { id: orderId, storeId },
           select: {
             id: true,
@@ -106,7 +128,7 @@ export const prismaCiSource: CiSource = {
             shipment: { select: { pickedUpAt: true, returnedAt: true } },
           },
         }),
-        prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } }),
+        readCiSharing(storeId),
       ]);
       if (!o) return null;
       const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
@@ -142,8 +164,8 @@ export const prismaCiSource: CiSource = {
   },
 
   async shipment(storeId, shipmentId) {
-    return runInTenantContext(storeId, async () => {
-      const s = await prisma.shipment.findFirst({
+    return inStore(storeId, async (db, repo) => {
+      const s = await db.shipment.findFirst({
         where: { id: shipmentId, storeId },
         select: {
           id: true,
@@ -184,8 +206,17 @@ export const prismaCiSource: CiSource = {
   },
 
   async hasWhatsAppCodOutcome(storeId, orderId) {
-    return runInTenantContext(storeId, async () => {
-      const row = await prisma.auditLog.findFirst({
+    return inStore(storeId, async (db, repo) => {
+      // the DO read client has no JSON-path filter: read the order's COD outcome rows and test `details.source` here
+      if (repo.backend === 'do') {
+        const rows = await db.auditLog.findMany({
+          where: { storeId, action: 'order.cod_outcome', resourceId: orderId },
+          select: { details: true },
+          take: 50,
+        });
+        return rows.some(r => (r.details as { source?: unknown } | null)?.source === 'whatsapp');
+      }
+      const row = await db.auditLog.findFirst({
         where: {
           storeId,
           action: 'order.cod_outcome',
@@ -199,14 +230,20 @@ export const prismaCiSource: CiSource = {
   },
 
   async priorOrdersByBuyer(storeId, buyerKey, before, excludeOrderId) {
-    return runInTenantContext(storeId, () =>
-      prisma.order.count({
+    return inStore(storeId, db =>
+      db.order.count({
         where: { storeId, buyerKey, id: { not: excludeOrderId }, createdAt: { lt: before } },
       })
     );
   },
 
   async stampOrder(storeId, orderId, v) {
+    const money = await storeMoney(storeId);
+    if (money) {
+      // an order is a money row on the DO: its CI stamp is a named op (only while both are still null)
+      await money.ciOrderStamp({ orderId, areaKey: v.areaKey, buyerKey: v.buyerKey });
+      return;
+    }
     await runInTenantContext(storeId, async () => {
       await prisma.order.updateMany({
         where: { id: orderId, storeId, areaKey: null, buyerKey: null },

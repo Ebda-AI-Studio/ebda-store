@@ -69,6 +69,17 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'BulkAiJob',
   // dead-stock flags: the weekly scan writes them (Ruling CF-JOBS-4B)
   'DeadStockFlag',
+  // the bulk AI / import job rows and the AI-written store content the jobs persist (Ruling CF-JOBS-4)
+  'BulkImportJob',
+  'StoreFaq',
+  'StoreHowto',
+  'AiRecommendation',
+  'FrequentlyBoughtTogether',
+  'ProfitAnomaly',
+  'CustomerCohortSnapshot',
+  'FunnelSnapshot',
+  'CustomerRfmSnapshot',
+  'AnswerEngineCheck',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */
@@ -115,6 +126,72 @@ export const DO_PROCS: Record<string, Proc> = {
     ]);
     const row = sql.all('SELECT ai_field_sources AS v FROM products WHERE id = ?', [productId])[0];
     return row ? JSON.parse((row.v as string) ?? '{}') : null;
+  },
+  /**
+   * The guarded AI write of one product (Ruling CF-JOBS-4), the in-DO twin of `writeAiFieldsGuarded`'s Postgres section
+   * (row lock, fresh re-read, per-field compare-and-set). One procedure = one atomic section, so no merchant save can land
+   * between the re-read and the write. A field is written only when its stored value still equals `baseline[field]` AND its
+   * owner is not 'human'; each written field is stamped 'ai' on the FRESH provenance map. `extra.aiBalanceBackup` is stored
+   * with the write. Returns the written / stale field names and the product's category count at write time.
+   */
+  guardedAiWrite(sql, a) {
+    const { productId, baseline, writes, extra } = a as {
+      productId: unknown;
+      baseline: unknown;
+      writes: unknown;
+      extra: unknown;
+    };
+    if (typeof productId !== 'string' || !productId) throw procErr('productId');
+    const obj = (v: unknown, what: string): Record<string, unknown> => {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) throw procErr(what);
+      return v as Record<string, unknown>;
+    };
+    const base = obj(baseline, 'baseline');
+    const wr = obj(writes, 'writes');
+    const col = (f: string): string => {
+      if (!KEY.test(f)) throw procErr(`field ${f}`);
+      return f.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
+    };
+    const row = sql.all('SELECT * FROM products WHERE id = ? AND deleted_at IS NULL', [
+      productId,
+    ])[0];
+    if (!row) return { found: false, written: [], stale: Object.keys(wr), categoryCount: 0 };
+    const sources = JSON.parse((row.ai_field_sources as string) ?? '{}') as Record<string, unknown>;
+    const next: Record<string, unknown> = { ...sources };
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    const written: string[] = [];
+    const stale: string[] = [];
+    for (const [field, value] of Object.entries(wr)) {
+      if (value !== null && typeof value !== 'string') throw procErr(`value ${field}`);
+      const c = col(field);
+      const changed =
+        String((row[c] as string | null) ?? '') !== String((base[field] as string | null) ?? '');
+      if (sources[field] === 'human' || changed) {
+        stale.push(field);
+        continue;
+      }
+      sets.push(`${c} = ?`);
+      vals.push(value);
+      next[field] = 'ai';
+      written.push(field);
+    }
+    if (written.length > 0) {
+      sets.push('ai_field_sources = ?');
+      vals.push(JSON.stringify(next));
+      const ex = extra && typeof extra === 'object' ? (extra as Record<string, unknown>) : {};
+      if (ex.aiBalanceBackup !== undefined) {
+        sets.push('ai_balance_backup = ?');
+        vals.push(JSON.stringify(ex.aiBalanceBackup));
+      }
+      sets.push('updated_at = ?');
+      vals.push(Date.now());
+      sql.run(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`, [...vals, productId]);
+    }
+    const n = sql.all('SELECT COUNT(*) AS n FROM product_categories WHERE product_id = ?', [
+      productId,
+    ])[0];
+    return { found: true, written, stale, categoryCount: Number(n?.n ?? 0) };
   },
 };
 function procErr(what: string): Error {

@@ -8,9 +8,18 @@ import {
   prisma,
   runInStoreScope,
   runInTenantContext,
+  storeDirectory,
+  withoutHiddenStores,
   withStore,
+  type StoreDirectoryEntry,
 } from '@ebda/database';
-import { storeRepo, type StoreReads } from '../repo-factory';
+import {
+  storeDb,
+  storeRepo,
+  storeWriter,
+  type StoreReads,
+  type StoreWrites,
+} from '../repo-factory';
 import { sweepAcrossStores } from '../cross-store';
 import { alarmStoreId } from './store-scope';
 
@@ -185,4 +194,99 @@ export async function withStoreRw<T>(storeId: string, fn: (db: StoreTx) => Promi
     }
   );
   return fn(merged as unknown as StoreTx);
+}
+
+/**
+ * Every store, DO stores included (Ruling CF-JOBS-4). A job's run hides the DO stores from `storeDirectory` so a sweep that
+ * is not ported cannot reach their sealed Postgres rows; a job that covers each store through `storeRepo` itself lists
+ * them with this. The alarm run of a store lists that store only.
+ */
+export function allStoresDirectory(
+  event: { data?: unknown } | undefined,
+  filter?: (s: StoreDirectoryEntry) => boolean
+): Promise<StoreDirectoryEntry[]> {
+  const only = alarmStoreId(event);
+  return withoutHiddenStores(() =>
+    storeDirectory(s => (only === undefined || s.id === only) && (filter ? filter(s) : true))
+  );
+}
+
+/**
+ * Run `fn` once per store for a job that covers EVERY store from its one cron run, Postgres and DO alike (Ruling CF-JOBS-4):
+ * for a DO store its Durable Object read client in the store's scope, for a Postgres store `prisma` in its tenant
+ * transaction, exactly as `acrossStores`. A cross-store aggregate (a watcher ranking stores, a leader-locked sweep with one
+ * shared quota) cannot be split into per-store alarms without losing the aggregate, so it lists the DO stores itself.
+ */
+export async function acrossAllStoresDb<T>(
+  event: { data?: unknown } | undefined,
+  fn: (storeId: string, db: StoreReads) => Promise<T>,
+  opts: {
+    concurrency?: number;
+    filter?: (s: StoreDirectoryEntry) => boolean;
+    storeIds?: string[];
+  } = {}
+): Promise<Array<{ storeId: string; value: T }>> {
+  const ids = opts.storeIds ?? (await allStoresDirectory(event, opts.filter)).map(s => s.id);
+  const out: Array<{ storeId: string; value: T } | undefined> = new Array(ids.length);
+  let next = 0;
+  let failure: { err: unknown } | undefined;
+  const worker = async (): Promise<void> => {
+    while (!failure) {
+      const i = next++;
+      if (i >= ids.length) return;
+      const storeId = ids[i];
+      try {
+        const repo = await storeRepo(storeId);
+        out[i] = {
+          storeId,
+          value:
+            repo.backend === 'do'
+              ? await runInStoreScope(storeId, () => fn(storeId, repo.db))
+              : await runInTenantContext(storeId, () => fn(storeId, repo.db)),
+        };
+      } catch (err) {
+        failure = { err };
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(opts.concurrency ?? 4, ids.length || 1)) }, worker)
+  );
+  if (failure) throw failure.err;
+  return out.filter((r): r is { storeId: string; value: T } => r !== undefined);
+}
+
+/**
+ * A store client that is resolved on EACH call, for a Workflow handler (Ruling CF-JOBS-4): outside `step.run` a Workflow
+ * holds no database connection and is re-executed on every replay, so the backend flag must not be read at the top of the
+ * handler. `db.product.findMany(...)` here is `(await storeDb(storeId)).product.findMany(...)`, resolved inside whatever step
+ * makes the call. NOT for `$transaction([...])` (its operations would already be running): take a real client inside the step.
+ */
+function lazyClient<T>(resolve: () => Promise<unknown>): T {
+  return new Proxy(
+    {},
+    {
+      get: (_t, model: string) =>
+        new Proxy(
+          {},
+          {
+            get:
+              (_m, op: string) =>
+              async (...args: unknown[]) => {
+                const c = (await resolve()) as Record<
+                  string,
+                  Record<string, (...a: unknown[]) => unknown>
+                >;
+                return c[model][op](...args);
+              },
+          }
+        ),
+    }
+  ) as T;
+}
+export function lazyStoreDb(storeId: string): StoreReads {
+  return lazyClient<StoreReads>(() => storeDb(storeId));
+}
+export function lazyStoreWriter(storeId: string): Omit<StoreWrites, '$transaction' | '$proc'> {
+  return lazyClient<Omit<StoreWrites, '$transaction' | '$proc'>>(() => storeWriter(storeId));
 }

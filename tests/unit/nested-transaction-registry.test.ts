@@ -120,9 +120,9 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   // `withMoneyTx(` — which calls `$transaction` on the caller's behalf, so the
   // literal never appears in the caller (#1787). Not yet reviewed for the
   // write-then-reference shape; listed so they are counted, not hidden.
-  'lib/inngest/functions/ai-autofill-cleanup.ts',
   'lib/inngest/functions/bulk-ai-product-faqs.ts',
-  'lib/inngest/functions/bulk-ai-recommendations.ts',
+  // `w.$transaction([$proc])` is ONE Durable Object RPC (the DO twin of the guarded AI write), not a Postgres transaction
+  'services/ai-autofill.service.ts',
   'lib/inngest/functions/order-refunded.ts',
   'services/accounting/purchase-order.service.ts',
   'services/accounting/stock-adjustment.service.ts',

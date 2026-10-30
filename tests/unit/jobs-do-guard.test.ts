@@ -301,15 +301,15 @@ describe('refusal of unported jobs for a DO store', () => {
   it('queue runner: a non-money unported job pages P1; the same job for a Postgres store runs normally', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'bulk-ai-seo' }, handler);
+    registerJob({ id: 'accounting-expense-ocr-process' }, handler);
     await handleJobsBatch({
       queue: 'ebda-jobs',
-      messages: [qmsg('bulk-ai-seo', { storeId: DO_STORE })],
+      messages: [qmsg('accounting-expense-ocr-process', { storeId: DO_STORE })],
     });
     expect(handler).not.toHaveBeenCalled();
     expect(sendAlert).toHaveBeenCalledWith(expect.objectContaining({ level: 'p1' }));
     sendAlert.mockClear();
-    const m = qmsg('bulk-ai-seo', { storeId: PG_STORE });
+    const m = qmsg('accounting-expense-ocr-process', { storeId: PG_STORE });
     await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
     expect(handler).toHaveBeenCalledTimes(1);
     expect(sendAlert).not.toHaveBeenCalled();

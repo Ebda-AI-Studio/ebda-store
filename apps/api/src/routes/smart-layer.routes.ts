@@ -21,6 +21,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma, runInTenantContext } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -290,15 +291,16 @@ router.get(
       if (acknowledged === 'true') where.acknowledged = true;
       if (acknowledged === 'false') where.acknowledged = false;
 
+      const anomalyDb = await storeDb(req.params.storeId);
       const [items, total] = await runInTenantContext(req.params.storeId, () =>
         Promise.all([
-          prisma.profitAnomaly.findMany({
+          anomalyDb.profitAnomaly.findMany({
             where,
             orderBy: [{ severity: 'desc' }, { detectedAt: 'desc' }],
             skip: (page - 1) * perPage,
             take: perPage,
           }),
-          prisma.profitAnomaly.count({ where }),
+          anomalyDb.profitAnomaly.count({ where }),
         ])
       );
 
@@ -320,8 +322,9 @@ router.post(
   requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const anomalyWriter = await storeWriter(req.params.storeId);
       await runInTenantContext(req.params.storeId, () =>
-        prisma.profitAnomaly.updateMany({
+        anomalyWriter.profitAnomaly.updateMany({
           where: { id: req.params.id, storeId: req.params.storeId, acknowledged: false },
           data: {
             acknowledged: true,
