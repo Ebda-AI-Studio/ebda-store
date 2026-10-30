@@ -31,7 +31,12 @@ export interface JobMapEntry {
 export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'agent-write-denied-watch': { group: '1-observability', kind: 'queue', trigger: 'cron' },
   'gmail-alert-poller': { group: '1-observability', kind: 'queue', trigger: 'cron' },
-  'gold-rate-staleness-watch': { group: '1-observability', kind: 'workflow', trigger: 'cron' },
+  'gold-rate-staleness-watch': {
+    group: '1-observability',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   heartbeat: { group: '1-observability', kind: 'queue', trigger: 'cron' },
   'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron' },
   'abandoned-cart-purge-weekly': {
@@ -100,7 +105,12 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   'analytics-rollup-on-demand': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
-  'gold-rate-feed-fetch': { group: '3-books-stock', kind: 'workflow', trigger: 'cron' },
+  'gold-rate-feed-fetch': {
+    group: '3-books-stock',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'stock-deadstock-scan-cron': {
     group: '3-books-stock',
     kind: 'workflow',

@@ -36,6 +36,9 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'order-status-fanout-stuck-sweep',
   // non-money sweeps (Ruling CF-JOBS-4)
   'wa-plan-sync',
+  // Ruling CF-JOBS-4B (gold rate): alarm per DO store
+  'gold-rate-feed-fetch',
+  'gold-rate-staleness-watch',
 ]);
 
 function tokens(): string[] {

@@ -62,6 +62,9 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'order-capi-conversion',
   'lifecycle-emails',
   'lifecycle-first-order',
+  // Ruling CF-JOBS-4B (gold rate): alarm per DO store
+  'gold-rate-feed-fetch',
+  'gold-rate-staleness-watch',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

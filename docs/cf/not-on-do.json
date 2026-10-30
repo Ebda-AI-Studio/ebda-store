@@ -52,8 +52,6 @@
     "eta-receipt-enqueue",
     "eta-receipt-redrive",
     "eta-receipt-submit",
-    "gold-rate-feed-fetch",
-    "gold-rate-staleness-watch",
     "gsc-ingest-cron",
     "gsc-ingest-on-demand",
     "instapay-receipt-retention-daily",
