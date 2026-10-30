@@ -56,5 +56,8 @@ apps/marketing/legal-source
 # tests/unit/ops/api-bundle-slimming.test.ts; formatting it would make that comparison fail.
 apps/api/src/cf/stubs/mime-db.json
 
+# vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/support-wa-docs-drift.test.ts)
+apps/docs/wa-source
+
 # vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/support-wa-help-drift.test.ts)
 apps/help/wa-source

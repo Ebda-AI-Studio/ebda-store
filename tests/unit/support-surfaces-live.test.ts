@@ -80,6 +80,30 @@ describe('deploy workflows (production only, verified after deploy)', () => {
   }
 });
 
+describe('docs.ebda.app Ebda WhatsApp section (LAUNCH-SUITE-1)', () => {
+  it('four pages build in English at /whatsapp/<slug>/ and Arabic at /ar/whatsapp/<slug>/, linked and listed', () => {
+    const slugs = ['overview', 'connect-your-number', 'api', 'webhooks'];
+    const out = (...p: string[]) => path.join(ROOT, 'apps/docs/out', ...p);
+    for (const s of slugs) {
+      expect(existsSync(out('whatsapp', s, 'index.html')), `en ${s}`).toBe(true);
+      expect(existsSync(out('ar', 'whatsapp', s, 'index.html')), `ar ${s}`).toBe(true);
+    }
+    const ar = readFileSync(out('ar', 'whatsapp', 'api', 'index.html'), 'utf8');
+    expect(ar).toContain('dir="rtl"');
+    expect(ar).toContain('hreflang="en" href="https://docs.ebda.app/whatsapp/api/"');
+    expect(readFileSync(out('whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
+      'Ebda WhatsApp'
+    );
+    const map = readFileSync(out('sitemap.xml'), 'utf8');
+    expect(map).toContain('https://docs.ebda.app/whatsapp/webhooks/');
+    expect(map).toContain('https://docs.ebda.app/ar/whatsapp/webhooks/');
+    // Arabic pages link to Arabic pages, never to the English twin by accident
+    expect(readFileSync(out('ar', 'whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
+      'href="/ar/whatsapp/api/"'
+    );
+  });
+});
+
 describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
   it('Ebda WhatsApp guides build at /whatsapp/<slug>/ in both locales, with a sidebar group and a home section', () => {
     const ar = readdirSync(path.join(ROOT, 'apps/help/content/ar/whatsapp')).filter(f =>
