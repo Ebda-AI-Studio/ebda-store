@@ -44,6 +44,7 @@ import {
   type GatedLimitKey,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
+import { storeRepo } from '../lib/repo-factory';
 import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlements';
 import { socketService } from './socket.service';
 import { EmailService } from './email.service';
@@ -58,6 +59,19 @@ export async function countUsage(
   limitKey: GatedLimitKey,
   tx?: Tx
 ): Promise<number | null> {
+  // The products and orders of a store on its Durable Object live there: the Postgres copy is sealed and stale, so counting it
+  // would let a DO store sit under its cap for ever (Ruling CF-CAP-1). Staff, domain and billing rows are platform rows.
+  if (limitKey === 'maxProducts' || limitKey === 'maxOrdersPerMonth') {
+    const repo = await storeRepo(storeId);
+    if (repo.backend === 'do') {
+      if (limitKey === 'maxProducts')
+        return repo.db.product.count({ where: { storeId, deletedAt: null } });
+      const since = regionMonthStart(regionYearMonth(new Date()));
+      return repo.db.order.count({
+        where: { storeId, createdAt: { gte: since }, status: { not: 'cancelled' } },
+      });
+    }
+  }
   const run = async (db: Tx): Promise<number | null> => {
     switch (limitKey) {
       case 'maxProducts':

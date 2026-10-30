@@ -162,6 +162,13 @@ export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Prom
 /** A sample event for the admin "send test". Never counts toward auto-disable. */
 export async function createTestDelivery(storeId: string, endpointId: string): Promise<string> {
   const { db } = await storeRwClient(storeId);
+  // Ownership is checked HERE, on the SAME client the delivery is written with (Ruling CF-WEBHOOK-2): a store on its Durable Object
+  // owns its endpoints there, so a check on Postgres (or by the caller on another client) would pass or fail on the wrong rows.
+  const owned = await db.webhookEndpoint.findFirst({
+    where: { id: endpointId, storeId },
+    select: { id: true },
+  });
+  if (!owned) throw new Error('WEBHOOK_ENDPOINT_NOT_FOUND');
   const eventId = `evt_${randomUUID()}`;
   const row = await db.webhookDelivery.create({
     data: {

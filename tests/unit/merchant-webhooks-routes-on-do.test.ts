@@ -193,3 +193,25 @@ describe('merchant webhook routes on a DO store', () => {
     expect(res.body.code ?? res.body.error?.code).toBe('WEBHOOK_LIMIT');
   });
 });
+
+describe('createTestDelivery checks ownership on the SAME client it writes with (Ruling CF-WEBHOOK-2)', () => {
+  it('an endpoint that is not on the DO is refused by the service itself, whatever the caller checked', async () => {
+    h.endpoints.length = 0;
+    const { createTestDelivery } = await import('@api/services/webhook.service');
+    await expect(createTestDelivery(S1, E1)).rejects.toThrow('WEBHOOK_ENDPOINT_NOT_FOUND');
+    expect(h.deliveries).toHaveLength(0);
+  });
+
+  it("another store's endpoint id is refused (the check names the store)", async () => {
+    h.endpoints.push({ id: E2, storeId: '99999999-9999-4999-8999-999999999999' });
+    const { createTestDelivery } = await import('@api/services/webhook.service');
+    await expect(createTestDelivery(S1, E2)).rejects.toThrow('WEBHOOK_ENDPOINT_NOT_FOUND');
+    expect(h.deliveries).toHaveLength(0);
+  });
+
+  it('an owned endpoint gets its delivery on the DO', async () => {
+    const { createTestDelivery } = await import('@api/services/webhook.service');
+    const id = await createTestDelivery(S1, E1);
+    expect(h.deliveries[0]).toMatchObject({ id, endpointId: E1, isTest: true });
+  });
+});
