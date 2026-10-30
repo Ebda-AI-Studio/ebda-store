@@ -184,8 +184,15 @@ export default function NotificationsPage() {
     setTestingChannel(channel);
     setTestStatus(prev => ({ ...prev, [channel]: 'testing' }));
     try {
-      const { error } = await apiPost(`/api/v1/stores/${storeId}/notifications/test/${channel}`);
-      if (!error) {
+      const { data, error } = await apiPost<{ success?: boolean; message?: string }>(
+        `/api/v1/stores/${storeId}/notifications/test/${channel}`
+      );
+      // The route answers HTTP 200 with { success:false, message } when the channel was tested (or is not
+      // testable) and failed: that is a failure, not a green tick (Ruling TESTCONN-1).
+      if (!error && data?.success === false) {
+        setTestStatus(prev => ({ ...prev, [channel]: 'error' }));
+        showError(tToast('connectionFailedTitle'), data.message || tToast('testFailed'));
+      } else if (!error) {
         setTestStatus(prev => ({ ...prev, [channel]: 'success' }));
         toastSuccess(
           tToast('connectionOkTitle'),
