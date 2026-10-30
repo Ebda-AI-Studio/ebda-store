@@ -6,41 +6,13 @@
  * exploitable on its own, but dev scope has no business in a production CSP
  * header, and it must not silently reappear.
  *
- * Evaluates the actual `headers()` function from `apps/web/next.config.js`
- * (same technique as `admin-page-builder-preview-csp.test.ts`) rather than
- * grepping the source text, so this is provably testing the emitted header,
- * not a comment near it.
+ * Calls the real policy builder (`apps/web/src/lib/csp.ts`, run per request by
+ * middleware.ts) rather than grepping the source text, so this is provably
+ * testing the emitted header, not a comment near it.
  */
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
 
-const CONFIG = fs.readFileSync(path.resolve(process.cwd(), 'apps/web/next.config.js'), 'utf-8');
-
-/** Extract and evaluate the `headers()` method as a standalone async function. */
-function makeHeadersFn(): () => Promise<
-  { source: string; headers: { key: string; value: string }[] }[]
-> {
-  const marker = 'async headers() {';
-  const start = CONFIG.indexOf(marker);
-  expect(start, 'could not find `async headers() {` in apps/web/next.config.js').toBeGreaterThan(
-    -1
-  );
-  const bodyStart = start + marker.length;
-  // The nextConfig object's own closing brace is the only line-anchored `};`
-  // in the file — everything after it (module.exports = withSentryConfig(...))
-  // is a separate statement.
-  const objectEnd = CONFIG.indexOf('\n};', bodyStart);
-  expect(objectEnd, 'could not find the end of the headers() method').toBeGreaterThan(bodyStart);
-  // Walk back to the method's own closing `\n  },` (one indent level), not
-  // the enclosing object's `\n};`.
-  const methodEnd = CONFIG.lastIndexOf('\n  },', objectEnd);
-  const body = CONFIG.slice(bodyStart, methodEnd);
-  // eslint-disable-next-line no-new-func
-  return new Function(`return (async function headers() {${body}})`)() as () => Promise<
-    { source: string; headers: { key: string; value: string }[] }[]
-  >;
-}
+import { buildStorefrontCsp } from '../../apps/web/src/lib/csp';
 
 async function frameAncestors(env: Record<string, string | undefined>): Promise<string> {
   const prevEnv = { ...process.env };
@@ -52,9 +24,7 @@ async function frameAncestors(env: Record<string, string | undefined>): Promise<
     if (v === undefined) delete process.env[k];
   }
   try {
-    const headersFn = makeHeadersFn();
-    const rules = await headersFn();
-    const csp = rules[0].headers.find(h => h.key === 'Content-Security-Policy')!.value;
+    const csp = buildStorefrontCsp('AAAAAAAAAAAAAAAAAAAAAA==');
     return (csp.match(/frame-ancestors[^;]*/) ?? [''])[0];
   } finally {
     // Restore exactly what was there before (including deletions).
