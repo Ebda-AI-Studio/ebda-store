@@ -30,6 +30,7 @@ import { META, canon, insertSqlite, openSqlite } from '../../packages/repo/test/
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
 import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { GoldRateService } from '../../apps/api/src/services/gold-rate/gold-rate.service';
 import { featureService } from '../../apps/api/src/services/feature.service';
 import { BulkService } from '../../apps/api/src/services/bulk.service';
 
@@ -303,5 +304,121 @@ describe.skipIf(!hasDb)('CSV import on Postgres vs the DO', () => {
     expect(t.state.redirects).toHaveLength(1);
     expect(t.state.history).toContainEqual({ p: 'TEE', type: 'initial', quantity: 5, newStock: 5 });
     expect(t.state.variants).toHaveLength(4);
+  });
+});
+
+/**
+ * Gold specs through the import (Ruling IMPORT-DO-1 + CF-LAST-1): the batch commits as one DO section, then each gold row is
+ * applied through `GoldRateService.setProductPricing` (its own money section). The same CSV must leave the same pricing on both.
+ */
+describe.skipIf(!hasDb)('CSV import with gold specs on Postgres vs the DO', () => {
+  let goldN = 0;
+  async function goldWorld(mirror: boolean) {
+    const k = `g${sfx}${++goldN}`;
+    await GoldRateService.applyRates(
+      STORE,
+      { rates: [{ karat: 21, ratePerGram: 576_000 }], confirm: true },
+      { userId: ownerId }
+    );
+    // a fixed-price product the file switches to gold, and a gold one the file switches back to fixed
+    const toGold = await prisma.product.create({
+      data: {
+        storeId: STORE,
+        name: 'Ring',
+        slug: `ring-${k}`,
+        sku: `RING-${k}`,
+        price: 1_000,
+        status: 'active',
+      },
+    });
+    const chain = await prisma.product.create({
+      data: {
+        storeId: STORE,
+        name: 'Chain',
+        slug: `chain-${k}`,
+        sku: `CHAIN-${k}`,
+        price: 2_000,
+        status: 'active',
+      },
+    });
+    await GoldRateService.setProductPricing(
+      STORE,
+      chain.id,
+      {
+        product: {
+          pricingMode: 'gold_rate',
+          karat: 21,
+          weightMg: 3250,
+          makingChargeType: 'per_gram',
+          makingChargeValue: 15_000,
+          marginBps: 0,
+        },
+      },
+      { userId: ownerId }
+    );
+    const toFixed = await prisma.product.findUniqueOrThrow({ where: { id: chain.id } });
+    if (mirror) {
+      sqlite.exec('DELETE FROM gold_rates_current; DELETE FROM gold_rates');
+      insertSqlite(
+        sqlite,
+        'GoldRate',
+        (await prisma.goldRate.findMany({ where: { storeId: STORE } })) as never
+      );
+      insertSqlite(
+        sqlite,
+        'GoldRateCurrent',
+        (await prisma.goldRateCurrent.findMany({ where: { storeId: STORE } })) as never
+      );
+      insertSqlite(sqlite, 'Product', [toGold, toFixed] as never);
+    }
+    return { k, toGold: toGold.id, toFixed: toFixed.id };
+  }
+  const goldCsv = (w: { k: string }) =>
+    [
+      'name,slug,sku,price,inventory,status,pricing_mode,gold_karat,gold_weight_g',
+      `Ring,ring-${w.k},RING-${w.k},1000,0,active,gold_rate,21,3.25`,
+      `Chain,chain-${w.k},CHAIN-${w.k},2000,0,active,fixed,,`,
+      `New Bangle,bangle-${w.k},BANGLE-${w.k},1,0,active,gold_rate,21,5`,
+      `Bad Karat,badk-${w.k},BADK-${w.k},1,0,active,gold_rate,19,5`,
+    ].join('\n');
+  async function goldState(k: string) {
+    const db = (await storeDb(STORE)) as any;
+    return db.product.findMany({
+      where: { storeId: STORE, sku: { endsWith: k } },
+      select: {
+        sku: true,
+        price: true,
+        compareAtPrice: true,
+        pricingMode: true,
+        goldKarat: true,
+        goldWeightMg: true,
+        makingChargeType: true,
+        makingChargeValue: true,
+        goldMarginBps: true,
+      },
+      orderBy: { sku: 'asc' },
+    });
+  }
+  it('gold specs are applied through the import, a gold product price edit and a bad karat fail alone: equal on both backends', async () => {
+    const run = async (on: typeof onPg, mirror: boolean) => {
+      const w = await goldWorld(mirror);
+      const out = await settle(() =>
+        on(() => BulkService.importProducts(STORE, goldCsv(w), { updateExisting: true }, ownerId))
+      );
+      return scrub({ out, state: await on(() => goldState(w.k)) }, {}, w.k);
+    };
+    const pg = (await run(onPg, false)) as any;
+    const dobj = await run(onDo, true);
+    expect(dobj).toEqual(pg);
+    const by = (sku: string) => pg.state.find((p: any) => p.sku === `${sku}-<k>`);
+    expect(by('RING').pricingMode).toBe('gold_rate');
+    expect(by('RING').goldWeightMg).toBe(3250);
+    expect(by('RING').price).toBeGreaterThan(1_000); // repriced from the 21k rate
+    // Ruling B5-13: a file may not change the price of a gold product, so its row is refused whole, on both backends
+    expect(by('CHAIN').pricingMode).toBe('gold_rate');
+    expect(pg.out.ok.errors.some((e: any) => /priced by the gold rate/.test(e.error))).toBe(true);
+    expect(by('BANGLE').pricingMode).toBe('gold_rate');
+    expect(pg.out.ok.failed).toBe(2);
+    expect(pg.state.find((p: any) => p.sku === 'BADK-<k>')).toBeUndefined();
   });
 });
