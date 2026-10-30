@@ -334,7 +334,7 @@ export default function MinimalHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className={`relative ${tabBarShown ? 'hidden md:inline-flex' : 'inline-flex'} h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
               aria-label={t(
                 `Cart (${countText('en', cartItemCount, ITEMS)})`,
                 `سلة التسوق (${cartItemCount})`

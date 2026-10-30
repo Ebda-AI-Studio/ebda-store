@@ -160,6 +160,7 @@ export function FeaturedCollectionSection({
           editLink={edit('buttonText')}
         />
         <div
+          data-part="product-grid"
           className={[
             'grid gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10',
             centred

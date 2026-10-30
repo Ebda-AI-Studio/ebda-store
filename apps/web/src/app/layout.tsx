@@ -39,7 +39,7 @@ import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
-import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@ebda/shared';
+import { type MarketingPixels, BRAND, lookTraitAttrs, resolveDefaultLanguage } from '@ebda/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { lookHead } from '../lib/look-head';
 import { DemoLookBar } from '../components/demo/DemoLookBar';
@@ -603,6 +603,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         }
         // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
         data-look={look?.dataLook}
+        // TEMPLATES-MOCK-2/-6: the merchant's (else the look's) mock traits, read by globals.css; none for a legacy store.
+        {...lookTraitAttrs(effectiveTheme, store.look)}
       >
         {/* Reset scroll to top on every route change — the body is the scroll
             container on browsers without `overflow: clip` (see globals.css, #124), so

@@ -344,7 +344,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         >
           {/* announcement slot: reserves its row so the bar arriving later does not push the page down */}
           {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
-            store.announcementBar?.text && (
+            store.announcementBar?.text &&
+            !store.isDemo && (
               <aside
                 data-zone="beforeHeader"
                 aria-hidden
@@ -397,7 +398,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           of content). bgColor falls back: layout.announcement.bgColor wins
           over the legacy store.announcementBar.bgColor. */}
         {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
-          store.announcementBar?.text && (
+          store.announcementBar?.text &&
+          !store.isDemo && (
             <aside
               data-zone="beforeHeader"
               aria-label={isRtl ? 'إعلان المتجر' : 'Store announcement'}
@@ -519,6 +521,18 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         {/* afterFooter — empty placeholder so any merchant-injected text
           below the footer (cookie disclaimer, copyright, etc) inherits
           the typography zone. Kept zero-height when there's no content. */}
+        {/* TEMPLATES-MOCK-5: the showroom's notice (e.g. "photos are illustrative") is a quiet footer line, not a
+          41 px strip above every page. Only the demo store: a merchant's own announcement bar is untouched. */}
+        {store.isDemo && store.announcementBar?.text && (
+          <p
+            data-demo-notice
+            className="border-t border-border/60 px-4 py-3 text-center text-xs text-muted-foreground"
+          >
+            {isRtl && store.announcementBar.textAr
+              ? store.announcementBar.textAr
+              : store.announcementBar.text}
+          </p>
+        )}
         <div data-zone="afterFooter" />
         {/* Sprint 3 (2026-05-17): mobile sticky bottom tab bar. Hides
           itself on PDP / checkout / auth routes via usePathname inside

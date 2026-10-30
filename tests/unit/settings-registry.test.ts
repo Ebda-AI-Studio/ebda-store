@@ -199,6 +199,15 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
   const EDITOR_CONTROLS = [
     'builder.header-logo',
     'builder.header-search',
+    'builder.header-wordmark',
+    'builder.hero-ratio',
+    'builder.tab-bar',
+    'builder.card-heart',
+    'builder.card-swatches',
+    'builder.card-tags',
+    'builder.grid-gutter',
+    'builder.heading-weight',
+    'builder.price-colour',
     'builder.card-brand-badge',
     'builder.card-new-badge',
     'builder.card-quick-add',
@@ -227,7 +236,19 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
       /^(select=(theme|history|[a-z][a-z0-9-]*)(&block=[a-z][a-z0-9-]*)?|page=(product|collection|cart))$/;
     for (const s of builder) if (s.query) expect(s.query, s.id).toMatch(OK);
     // the two header chrome controls live in the theme tab: they must open it, not just /builder
-    for (const id of ['builder.header-logo', 'builder.header-search'])
+    for (const id of [
+      'builder.header-logo',
+      'builder.header-search',
+      'builder.header-wordmark',
+      'builder.hero-ratio',
+      'builder.tab-bar',
+      'builder.card-heart',
+      'builder.card-swatches',
+      'builder.card-tags',
+      'builder.grid-gutter',
+      'builder.heading-weight',
+      'builder.price-colour',
+    ])
       expect(builder.find(s => s.id === id)?.query).toBe('select=theme');
   });
 
