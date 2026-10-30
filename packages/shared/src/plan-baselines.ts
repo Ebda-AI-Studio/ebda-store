@@ -96,6 +96,12 @@ const PROFESSIONAL_ADDITIONS: FeatureKey[] = [
   // not Basic (starter). Consent is the newsletter opt-in; per-plan daily send caps live in
   // `campaignDailyCap` (apps/api campaign.service). A StoreFeature override still wins.
   'email_campaigns',
+  // Customer wallet (2026-10-29, Ruling W-8, Ahmad via the close-all program): Growth + Business, not Basic. Both keys,
+  // so a Growth store gets store credit AND spending it at checkout (checkout stays inert while accounting is on,
+  // the feature's own rule). Supersedes D1's "no baseline"; a StoreFeature override still wins both ways, and
+  // the explicit OFF row W-1 left on demo-boutique keeps it OFF until removed.
+  'customer_wallet',
+  'customer_wallet_checkout',
   // 'upsell_crosssell' moved to STARTER_CORE (AI-first policy, 2026-07-21).
 ];
 

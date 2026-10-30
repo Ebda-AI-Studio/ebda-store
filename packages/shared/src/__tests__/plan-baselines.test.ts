@@ -214,24 +214,15 @@ describe('lowestPlanForFeature', () => {
     expect(lowestPlanForFeature('abandoned_cart')).toBe('starter');
   });
 
-  // A feature not in any baseline — customer_wallet is intentionally absent
-  // from every plan baseline (sold per store via a super-admin override).
-  it('returns null for a feature not in any plan baseline (customer_wallet)', () => {
-    expect(lowestPlanForFeature('customer_wallet')).toBe(null);
-  });
-
-  // The customer wallet ships DEFAULT OFF for every store (D1, 2026-09-25):
-  // feature resolution is baseline-then-override, so a key that is in no
-  // baseline resolves false until a StoreFeature override row turns it on.
-  // Adding either key to a baseline would switch the wallet (or wallet
-  // spending at checkout) on for every store on that plan at deploy time.
+  // Customer wallet (Ruling W-8, 2026-10-29): Growth (professional) and Business (enterprise), never Basic or free.
   it.each(['customer_wallet', 'customer_wallet_checkout'] as const)(
-    '%s is in NO plan baseline (default OFF for every store)',
+    '%s is in the Growth and Business baselines only',
     key => {
-      for (const plan of STORE_PLANS) {
-        expect(isInBaseline(plan, key)).toBe(false);
-      }
-      expect(lowestPlanForFeature(key)).toBe(null);
+      expect(isInBaseline('free', key)).toBe(false);
+      expect(isInBaseline('starter', key)).toBe(false);
+      expect(isInBaseline('professional', key)).toBe(true);
+      expect(isInBaseline('enterprise', key)).toBe(true);
+      expect(lowestPlanForFeature(key)).toBe('professional');
     }
   );
 });
@@ -283,6 +274,6 @@ describe('upgradeTargetForDisabledFeature', () => {
   it('is null for hidden or unknown plans and for features no sold plan unlocks', () => {
     expect(upgradeTargetForDisabledFeature('comped', 'loyalty')).toBeNull();
     expect(upgradeTargetForDisabledFeature('nope', 'loyalty')).toBeNull();
-    expect(upgradeTargetForDisabledFeature('basic', 'customer_wallet')).toBeNull();
+    expect(upgradeTargetForDisabledFeature('basic', 'nonexistent_feature' as never)).toBeNull();
   });
 });

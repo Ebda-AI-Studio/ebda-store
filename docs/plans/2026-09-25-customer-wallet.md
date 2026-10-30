@@ -220,3 +220,5 @@ Storefront (copy through `LanguageContext` `t(en, ar)`):
 ## Rulings
 
 Recorded in `docs/RULINGS.md` under 2026-09-25 (W-1 … W-6).
+
+**Update 2026-10-29 (Ruling W-8):** both keys are now in the Growth and Business baselines; the "no baseline" statements above describe the original D1 release.
