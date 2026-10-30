@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
     payment: { findMany: vi.fn() },
     paymentEvent: { findMany: vi.fn() },
     storeWhatsAppLink: { findUnique: vi.fn() },
+    storeWhatsAppConsent: { findMany: vi.fn() },
   } as Record<string, Record<string, ReturnType<typeof vi.fn>>>,
   money: {
     paymentEventRecord: vi.fn(async () => ({ recorded: true })),
@@ -92,6 +93,10 @@ vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: async () => true },
 }));
 vi.mock('@api/services/sentry.service', () => ({ SentryService: { captureException: vi.fn() } }));
+vi.mock('@api/lib/wa/plan-state', () => ({
+  PLAN_CHANGED_EVENT: 'store/plan-changed',
+  planChangedInput: async () => ({ input: { type: 'plan.changed' }, seed: 'plan:x' }),
+}));
 vi.mock('@api/services/redis.service', () => ({ redis: { exists: vi.fn(), set: vi.fn() } }));
 
 import { MONEY_JOBS, PORTED_JOBS, PORTED_MONEY_JOBS } from '@api/lib/jobs/job-data';
@@ -103,7 +108,7 @@ import { paymentWebhookProcess } from '@api/lib/inngest/functions/payment-webhoo
 import { accountingPostOrderJournal } from '@api/lib/inngest/functions/accounting-post-order-journal';
 import { accountingPostRefundJournal } from '@api/lib/inngest/functions/accounting-post-refund-journal';
 import { accountingDailyClose } from '@api/lib/inngest/functions/accounting-daily-close';
-import { emitStoreEventsFor } from '@api/lib/inngest/functions/wa-store-events';
+import { emitStoreEventsFor, waPlanSync } from '@api/lib/inngest/functions/wa-store-events';
 
 const alarm = { data: { alarm: true, storeId: DO_STORE } };
 const step = {
@@ -309,6 +314,24 @@ describe('wa-store-events: the erasure step runs for a DO store', () => {
       })
     ).toBe(0);
     expect(h.sendStoreEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('wa-plan-sync on a DO store', () => {
+  it('its alarm finds the linked DO store and sends the plan state, with no Postgres', async () => {
+    h.doDb.storeWhatsAppLink.findUnique.mockResolvedValue({ storeId: DO_STORE });
+    h.doDb.storeWhatsAppConsent.findMany.mockResolvedValue([]);
+    const r = (await (waPlanSync as unknown as Handler).handler({ event: alarm, step })) as {
+      sent: number;
+    };
+    expect(r.sent).toBe(1);
+    expect(h.sendStoreEvents).toHaveBeenCalledTimes(1);
+  });
+  it('a store with no link row is idle', async () => {
+    h.doDb.storeWhatsAppLink.findUnique.mockResolvedValue(null);
+    expect(await (waPlanSync as unknown as Handler).handler({ event: alarm, step })).toEqual({
+      sent: 0,
+    });
   });
 });
 

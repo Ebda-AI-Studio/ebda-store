@@ -33,6 +33,7 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'order-created-stuck-sweep',
   'order-auto-cancel-unpaid',
   'instapay-expiry',
+  'wa-plan-sync',
   'order-status-fanout-stuck-sweep',
 ]);
 

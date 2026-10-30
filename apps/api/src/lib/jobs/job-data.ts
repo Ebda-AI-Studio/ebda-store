@@ -49,6 +49,7 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'accounting-period-reconciliation',
   // the WhatsApp store events (incl. `customer.erased`): link, consent and order/cart/catalog reads follow the backend
   'wa-store-events',
+  'wa-plan-sync',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

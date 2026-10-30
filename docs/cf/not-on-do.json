@@ -77,7 +77,6 @@
     "stock-low-stock-alert-cron",
     "stock-low-stock-alert-on-demand",
     "store-usage-snapshot",
-    "wa-plan-sync",
     "webhook-deliver",
     "webhook-delivery-purge-daily",
     "webhook-fanout"
