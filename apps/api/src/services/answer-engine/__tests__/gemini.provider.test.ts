@@ -306,6 +306,44 @@ describe('GeminiAnswerEngineProvider', () => {
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
+  it('every key 429s on the grounded call: tries each key, then answers ungrounded (GEM-4)', async () => {
+    vi.stubEnv('GEMINI_API_KEY_2', 'second-key');
+    const keysByCall: Array<{ key: string; grounded: boolean }> = [];
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      const key = (init.headers as Record<string, string>)['x-goog-api-key'];
+      keysByCall.push({ key, grounded: Boolean(body.tools) });
+      if (body.tools) return jsonResponse(429, { error: { message: 'quota' } });
+      return jsonResponse(200, { candidates: [{ content: { parts: [{ text: 'plain' }] } }] });
+    }) as unknown as typeof fetch;
+
+    const answer = await new GeminiAnswerEngineProvider().query('store-1', 'prompt');
+
+    expect(answer.text).toBe('plain');
+    expect(answer.grounded).toBe(false);
+    expect(answer.groundingUnavailableReason).toBe('http_429');
+    expect(keysByCall.filter(c => c.grounded).map(c => c.key)).toEqual([
+      'test-gemini-key',
+      'second-key',
+    ]);
+    expect(keysByCall.filter(c => !c.grounded)).toHaveLength(1);
+  });
+
+  it('every key 429s on the plain call too: fails with 502 GEMINI_API_ERROR, no further degrade (GEM-4)', async () => {
+    vi.stubEnv('GEMINI_API_KEY_2', 'second-key');
+    const mockFetch = vi
+      .fn()
+      .mockImplementation(async () => jsonResponse(429, { error: { message: 'quota' } }));
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    await expect(new GeminiAnswerEngineProvider().query('store-1', 'prompt')).rejects.toMatchObject(
+      { statusCode: 502, code: 'GEMINI_API_ERROR' }
+    );
+    // 2 grounded attempts + 2 plain attempts; nothing recorded as usage.
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockRecordUsage).not.toHaveBeenCalled();
+  });
+
   it('propagates a real error (non-grounding-unavailable status) rather than silently degrading', async () => {
     global.fetch = vi
       .fn()
