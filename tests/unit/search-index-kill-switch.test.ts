@@ -87,7 +87,7 @@ describe('SEARCH_EMBED_STORE_DAILY_CAP=0 kill switch (SEARCH-T11-8)', () => {
     };
     const r = await handleSearchProductIndex({ event: { data: { storeId: STORE } }, step });
     expect(r).toMatchObject({ capped: true });
-    expect(steps).toEqual(['plan-0']);
+    expect(steps).toEqual(['is-do-store', 'plan-0']); // the D1 backend flag read is its own step; still ONE plan step
     expect(embed).not.toHaveBeenCalled();
   });
 
