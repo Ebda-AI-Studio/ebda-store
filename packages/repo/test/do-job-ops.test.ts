@@ -180,3 +180,54 @@ describe('job operations on the DO (Ruling CF-JOBS-4)', () => {
     );
   });
 });
+
+describe('reorder scan ops (Ruling CF-JOBS-4)', () => {
+  it('reorderExpire expires stale and unit-gone suggestions only', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO product_variants (id, product_id, title, price, inventory, is_active) VALUES ('v1', 'sku', 'M', 1, 1, 1)`
+    );
+    const ins = (id: string, vid: string | null, at: number) =>
+      r.raw.exec(
+        `INSERT INTO reorder_suggestions (id, store_id, product_id, variant_id, suggested_qty, velocity_7d, velocity_28d, on_hand, on_order, open_backlog, urgency_days, reasoning_en, status, scanned_at) VALUES ('${id}', 's1', 'sku', ${vid ? `'${vid}'` : 'NULL'}, 1, 0, 0, 0, 0, 0, 1, 'x', 'open', ${at})`
+      );
+    const now = Date.now();
+    ins('old', 'v1', now - 40 * 86400_000); // stale
+    ins('legacy', null, now); // product-level row of a product that has variants
+    ins('fresh', 'v1', now - 1000 + 1); // kept
+    r.raw.exec(`UPDATE reorder_suggestions SET scanned_at = ${now - 500} WHERE id = 'fresh'`);
+    const out = r.op('reorderExpire', { thresholdMs: now - 30 * 86400_000 });
+    expect(out.expired).toBe(2);
+    expect(r.q(`SELECT id FROM reorder_suggestions WHERE status = 'open'`).map(x => x.id)).toEqual([
+      'fresh',
+    ]);
+  });
+
+  it('reorderUpsert keeps one open row per unit: update the latest, else insert; a bad unit is skipped', () => {
+    const r = rig();
+    const item = (qty: number, productId = 'sku') => ({
+      productId,
+      variantId: null,
+      suggestedQty: qty,
+      velocity7d: 1,
+      velocity28d: 1,
+      onHand: 0,
+      onOrder: 0,
+      openBacklog: 0,
+      urgencyDays: 1,
+      supplierId: null,
+      reasoningEn: 'why',
+      reasoningAr: null,
+    });
+    expect(r.op('reorderUpsert', { scannedAtMs: 1000, items: [item(5)] })).toEqual({ upserted: 1 });
+    expect(r.op('reorderUpsert', { scannedAtMs: 2000, items: [item(9)] })).toEqual({ upserted: 1 });
+    const rows = r.q(`SELECT suggested_qty q, scanned_at a FROM reorder_suggestions`);
+    expect(rows).toEqual([{ q: 9, a: 2000 }]);
+    // a product that does not exist violates the FK: skipped, nothing thrown, the others still land
+    expect(r.op('reorderUpsert', { scannedAtMs: 3000, items: [item(1, 'nope'), item(4)] })).toEqual(
+      {
+        upserted: 1,
+      }
+    );
+  });
+});

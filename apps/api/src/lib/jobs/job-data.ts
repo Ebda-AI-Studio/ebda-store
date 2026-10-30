@@ -50,6 +50,10 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   // the WhatsApp store events (incl. `customer.erased`): link, consent and order/cart/catalog reads follow the backend
   'wa-store-events',
   'wa-plan-sync',
+  'warehouse-reconcile-sweep-cron',
+  'warehouse-reconcile-on-demand',
+  'stock-reorder-scan-cron',
+  'stock-reorder-scan-on-demand',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([
@@ -60,10 +64,6 @@ export const MONEY_JOBS: ReadonlySet<string> = new Set([
   'accounting-post-expense-journal',
   'accounting-post-po-receive-journal',
   'accounting-post-stock-adjustment-journal',
-  'stock-reorder-scan-cron',
-  'stock-reorder-scan-on-demand',
-  'warehouse-reconcile-sweep-cron',
-  'warehouse-reconcile-on-demand',
 ]);
 
 /**
@@ -71,6 +71,10 @@ export const MONEY_JOBS: ReadonlySet<string> = new Set([
  * lists only the money jobs still refused, so together they are every job that moves money or stock.
  */
 export const PORTED_MONEY_JOBS: ReadonlySet<string> = new Set([
+  'stock-reorder-scan-cron',
+  'stock-reorder-scan-on-demand',
+  'warehouse-reconcile-sweep-cron',
+  'warehouse-reconcile-on-demand',
   'order-status-fanout-stuck-sweep',
   'payment-webhook-process',
   'payment-reconcile-sweep',

@@ -9,11 +9,7 @@
     "order-created-fanout",
     "order-refunded-fanout",
     "order-status-changed-fanout",
-    "shipment-create",
-    "stock-reorder-scan-cron",
-    "stock-reorder-scan-on-demand",
-    "warehouse-reconcile-on-demand",
-    "warehouse-reconcile-sweep-cron"
+    "shipment-create"
   ],
   "jobsAccepted": [
     "account-erased-propagation",

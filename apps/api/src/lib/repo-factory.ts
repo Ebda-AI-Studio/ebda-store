@@ -181,6 +181,18 @@ export interface StockClient {
     },
     key?: string
   ): Promise<{ newQuantity: number }>;
+  /** One SKU's warehouse shadow back to its aggregate (Ruling CF-JOBS-4). */
+  reconcileWarehouseSku(a: {
+    productId: string;
+    variantId?: string | null;
+  }): Promise<{ reconciled: boolean; diff: number }>;
+  /** A page of the reconcile sweep: every SKU with a warehouse row after `afterKey`, up to `limit`. */
+  reconcileWarehouseAll(a: { limit?: number; afterKey?: string | null }): Promise<{
+    skusReconciled: number;
+    skusFailed: number;
+    more: boolean;
+    nextKey: string | null;
+  }>;
 }
 
 /** An InstaPay order receipt as the DO returns it (`ReceiptRow` of `do/instapay-receipts.ts`). */
@@ -464,6 +476,14 @@ export interface MoneyClient {
   trialBalance(): Promise<{ debit: number; credit: number }>;
   /** Revenue-side GL credits posted since `sinceMs` (accounting period reconciliation). */
   periodGlCredits(a: { sinceMs: number }): Promise<{ total: number }>;
+  /** Reorder scan phase 1: expire stale / unit-gone suggestions (Ruling CF-JOBS-4). */
+  reorderExpire(a: {
+    thresholdMs: number;
+  }): Promise<{ expired: number; variantlessOpenPoLines: number }>;
+  /** Reorder scan phase 3: upsert one open suggestion per unit. */
+  reorderUpsert(a: { scannedAtMs: number; items: Array<Record<string, unknown>> }): Promise<{
+    upserted: number;
+  }>;
   /** confirmed / processing / shipped / delivered (Ruling CF-FINAL-1): state machine, fanout arming, COD settlement, event. */
   orderStatus(
     a: {
@@ -768,6 +788,8 @@ export function makeStockClient(
     setVariantInventory: (a, key) => call('setVariantInventory', a, key),
     setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
     adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
+    reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
+    reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
   };
 }
 
@@ -817,6 +839,8 @@ export function makeMoneyClient(
     abandonStamp: a => call('abandonStamp', a),
     trialBalance: () => call('trialBalance', {}),
     periodGlCredits: a => call('periodGlCredits', a),
+    reorderExpire: a => call('reorderExpire', a),
+    reorderUpsert: a => call('reorderUpsert', a),
     orderStatus: (a, key) => call('orderStatus', a, key),
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),

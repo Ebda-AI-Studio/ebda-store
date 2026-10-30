@@ -34,6 +34,7 @@
  */
 
 import { prisma, withStore } from '@ebda/database';
+import { storeDb, storeMoney } from '../../lib/repo-factory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
@@ -144,6 +145,19 @@ async function sumOrderQty(
 ): Promise<number> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+  // A store on its Durable Object (Ruling CF-JOBS-4): the read client has no raw SQL, so the same sum is an aggregate.
+  if (typeof tx.$queryRaw !== 'function') {
+    const agg = await tx.orderItem.aggregate({
+      where: {
+        productId,
+        ...(variantId ? { variantId } : {}),
+        order: { storeId, paymentStatus: 'paid', createdAt: { gte: since } },
+      },
+      _sum: { quantity: true },
+    });
+    return Number(agg._sum.quantity ?? 0);
+  }
+
   // A variant unit's velocity is that variant's own sales — summing the whole
   // product would give every variant the product's total demand.
   const result = variantId
@@ -211,6 +225,13 @@ const EXPIRE_AFTER_DAYS = 30;
 
 export async function runReorderScan(storeId: string): Promise<ReorderScanResult> {
   const scanStartedAt = new Date();
+  // A store on its Durable Object (Ruling CF-JOBS-4) reads through its read client and writes the suggestions through the
+  // `reorderExpire` / `reorderUpsert` ops; a Postgres store keeps its short `withStore` transactions exactly.
+  const money = await storeMoney(storeId);
+  const doDb = money ? await storeDb(storeId) : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scoped = <T>(fn: (tx: any) => Promise<T>): Promise<T> =>
+    doDb ? fn(doDb) : withStore(storeId, fn);
 
   // --- Phase 1: expire stale suggestions + load the product list -------------
   // The bypass GUC is SET LOCAL (transaction-scoped) so all RLS-protected reads
@@ -223,65 +244,77 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // connection-pool starvation the prior single-tx-around-everything design hit
   // (~112s on stores with many candidates + the 2.5s per-chunk throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { expiredCount, products } = await withStore(storeId, async (tx: any) => {
+  const { expiredCount, products } = await scoped(async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Mark stale open suggestions as expired
     // -------------------------------------------------------------------------
     const expireThreshold = new Date(Date.now() - EXPIRE_AFTER_DAYS * 24 * 60 * 60 * 1000);
 
-    const expiredResult = await tx.$executeRaw`
-      UPDATE public.reorder_suggestions
-      SET status = 'expired'
-      WHERE store_id = ${storeId}
-        AND status = 'open'
-        AND scanned_at < ${expireThreshold}
-    `;
+    let expired: number;
+    if (money) {
+      const r = await money.reorderExpire({ thresholdMs: expireThreshold.getTime() });
+      expired = r.expired;
+      if (r.variantlessOpenPoLines > 0) {
+        logger.warn(
+          { storeId, variantlessOpenPoLines: r.variantlessOpenPoLines },
+          'reorder-scan: open PO lines with no variant on variant products — their quantity is on order for no variant (issue 2345)'
+        );
+      }
+    } else {
+      const expiredResult = await tx.$executeRaw`
+        UPDATE public.reorder_suggestions
+        SET status = 'expired'
+        WHERE store_id = ${storeId}
+          AND status = 'open'
+          AND scanned_at < ${expireThreshold}
+      `;
 
-    // Step 1b: expire open suggestions whose unit no longer exists in the
-    // per-variant model — a product-level row (variant_id NULL) for a product
-    // that HAS variants (the pre-2026-10-01 shape: drafting a PO from it wrote
-    // the parent column), and a row for a variant that is now disabled (a
-    // disabled variant is not stock — inventory-model.md). The scan below then
-    // creates the correct per-variant rows. Runs before the per-unit upsert so
-    // the dedupe lookup can never pick a legacy row back up.
-    const unitGoneResult = await tx.$executeRaw`
-      UPDATE public.reorder_suggestions rs
-      SET status = 'expired'
-      WHERE rs.store_id = ${storeId}
-        AND rs.status = 'open'
-        AND (
-          (rs.variant_id IS NULL AND EXISTS (
-            SELECT 1 FROM public.product_variants pv WHERE pv.product_id = rs.product_id
-          ))
-          OR (rs.variant_id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM public.product_variants pv
-            WHERE pv.id = rs.variant_id AND pv.is_active = false
-          ))
-        )
-    `;
-    const expired = Number(expiredResult) + Number(unitGoneResult);
+      // Step 1b: expire open suggestions whose unit no longer exists in the
+      // per-variant model — a product-level row (variant_id NULL) for a product
+      // that HAS variants (the pre-2026-10-01 shape: drafting a PO from it wrote
+      // the parent column), and a row for a variant that is now disabled (a
+      // disabled variant is not stock — inventory-model.md). The scan below then
+      // creates the correct per-variant rows. Runs before the per-unit upsert so
+      // the dedupe lookup can never pick a legacy row back up.
+      const unitGoneResult = await tx.$executeRaw`
+        UPDATE public.reorder_suggestions rs
+        SET status = 'expired'
+        WHERE rs.store_id = ${storeId}
+          AND rs.status = 'open'
+          AND (
+            (rs.variant_id IS NULL AND EXISTS (
+              SELECT 1 FROM public.product_variants pv WHERE pv.product_id = rs.product_id
+            ))
+            OR (rs.variant_id IS NOT NULL AND EXISTS (
+              SELECT 1 FROM public.product_variants pv
+              WHERE pv.id = rs.variant_id AND pv.is_active = false
+            ))
+          )
+      `;
+      expired = Number(expiredResult) + Number(unitGoneResult);
 
-    // Issue 2345: open old-shape PO lines (no variant, on a variant product)
-    // match NO scan unit, so their open quantity counts as on order for no
-    // variant and the scan can over-suggest. How to count them is an owner
-    // decision; until then the transition is made observable, never silent.
-    // `scripts/list-variantless-po-lines.ts` lists them.
-    const [variantless] = await tx.$queryRaw<Array<{ n: bigint | null }>>`
-      SELECT COUNT(*)::bigint AS n
-      FROM public.purchase_order_items i
-      JOIN public.purchase_orders p ON p.id = i.po_id
-      WHERE p.store_id = ${storeId}
-        AND p.status IN ('sent', 'partial')
-        AND i.variant_id IS NULL
-        AND i.qty > i.qty_received
-        AND EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = i.product_id)
-    `;
-    const variantlessOpen = Number(variantless?.n ?? 0);
-    if (variantlessOpen > 0) {
-      logger.warn(
-        { storeId, variantlessOpenPoLines: variantlessOpen },
-        'reorder-scan: open PO lines with no variant on variant products — their quantity is on order for no variant (issue 2345)'
-      );
+      // Issue 2345: open old-shape PO lines (no variant, on a variant product)
+      // match NO scan unit, so their open quantity counts as on order for no
+      // variant and the scan can over-suggest. How to count them is an owner
+      // decision; until then the transition is made observable, never silent.
+      // `scripts/list-variantless-po-lines.ts` lists them.
+      const [variantless] = await tx.$queryRaw<Array<{ n: bigint | null }>>`
+        SELECT COUNT(*)::bigint AS n
+        FROM public.purchase_order_items i
+        JOIN public.purchase_orders p ON p.id = i.po_id
+        WHERE p.store_id = ${storeId}
+          AND p.status IN ('sent', 'partial')
+          AND i.variant_id IS NULL
+          AND i.qty > i.qty_received
+          AND EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = i.product_id)
+      `;
+      const variantlessOpen = Number(variantless?.n ?? 0);
+      if (variantlessOpen > 0) {
+        logger.warn(
+          { storeId, variantlessOpenPoLines: variantlessOpen },
+          'reorder-scan: open PO lines with no variant on variant products — their quantity is on order for no variant (issue 2345)'
+        );
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -416,7 +449,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   for (let chunkStart = 0; chunkStart < units.length; chunkStart += SCAN_CHUNK_SIZE) {
     const unitSlice = units.slice(chunkStart, chunkStart + SCAN_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chunkCandidates = await withStore(storeId, async (tx: any) => {
+    const chunkCandidates = await scoped(async (tx: any) => {
       const collected: ReorderCandidate[] = [];
 
       for (const unit of unitSlice) {
@@ -592,8 +625,35 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
     const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rowsUpserted += await withStore(storeId, async (tx: any) => {
+    rowsUpserted += await scoped(async (tx: any) => {
       let upserted = 0;
+
+      if (money) {
+        const r = await money.reorderUpsert({
+          scannedAtMs: scanStartedAt.getTime(),
+          items: slice.map(candidate => {
+            const reasoning = reasoningMap.get(candidate.key) ?? {
+              reasoningEn: 'AI reasoning unavailable — manual review suggested',
+              reasoningAr: null,
+            };
+            return {
+              productId: candidate.productId,
+              variantId: candidate.variantId,
+              suggestedQty: candidate.suggestedQty,
+              velocity7d: candidate.velocity7d,
+              velocity28d: candidate.velocity28d,
+              onHand: candidate.onHand,
+              onOrder: candidate.onOrder,
+              openBacklog: candidate.openBacklog,
+              urgencyDays: candidate.urgencyDays,
+              supplierId: candidate.supplierId,
+              reasoningEn: reasoning.reasoningEn,
+              reasoningAr: reasoning.reasoningAr,
+            };
+          }),
+        });
+        return r.upserted;
+      }
 
       for (const candidate of slice) {
         const reasoning = reasoningMap.get(candidate.key) ?? {

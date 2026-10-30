@@ -24,6 +24,7 @@ const h = vi.hoisted(() => ({
     paymentEvent: { findMany: vi.fn() },
     storeWhatsAppLink: { findUnique: vi.fn() },
     storeWhatsAppConsent: { findMany: vi.fn() },
+    warehouse: { findFirst: vi.fn() },
   } as Record<string, Record<string, ReturnType<typeof vi.fn>>>,
   money: {
     paymentEventRecord: vi.fn(async () => ({ recorded: true })),
@@ -32,6 +33,15 @@ const h = vi.hoisted(() => ({
     periodGlCredits: vi.fn(async () => ({ total: 50 })),
     journalSale: vi.fn(async () => ({ posted: true, entries: 2 })),
     journalRefund: vi.fn(async () => ({ reversed: 2 })),
+  },
+  stock: {
+    reconcileWarehouseAll: vi.fn(async () => ({
+      skusReconciled: 3,
+      skusFailed: 0,
+      more: false,
+      nextKey: null,
+    })),
+    reconcileWarehouseSku: vi.fn(async () => ({ reconciled: true, diff: 0 })),
   },
   send: vi.fn(async () => undefined),
   sendAlert: vi.fn(async () => 'sent'),
@@ -68,6 +78,7 @@ vi.mock('@api/lib/repo-factory', () => ({
     money: h.money,
   }),
   storeMoney: async () => h.money,
+  storeStock: async () => h.stock,
   storeDb: async () => h.doDb,
   runInJobRepoScope: <T>(fn: () => T) => fn(),
 }));
@@ -108,6 +119,7 @@ import { paymentWebhookProcess } from '@api/lib/inngest/functions/payment-webhoo
 import { accountingPostOrderJournal } from '@api/lib/inngest/functions/accounting-post-order-journal';
 import { accountingPostRefundJournal } from '@api/lib/inngest/functions/accounting-post-refund-journal';
 import { accountingDailyClose } from '@api/lib/inngest/functions/accounting-daily-close';
+import { sweepAllWarehouseStores } from '@api/lib/inngest/functions/warehouse-reconcile-sweep';
 import { emitStoreEventsFor, waPlanSync } from '@api/lib/inngest/functions/wa-store-events';
 
 const alarm = { data: { alarm: true, storeId: DO_STORE } };
@@ -314,6 +326,20 @@ describe('wa-store-events: the erasure step runs for a DO store', () => {
       })
     ).toBe(0);
     expect(h.sendStoreEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('warehouse reconcile on a DO store', () => {
+  it("the sweep's alarm finds the store with warehouses in its DO and reconciles through the DO stock op", async () => {
+    h.doDb.warehouse.findFirst.mockResolvedValue({ storeId: DO_STORE });
+    const r = await sweepAllWarehouseStores(step, alarm);
+    expect(r).toMatchObject({ storesTotal: 1, storesSwept: 1, totalSkusReconciled: 3 });
+    expect(h.stock.reconcileWarehouseAll).toHaveBeenCalledWith({ limit: 500, afterKey: null });
+  });
+  it('a store with no warehouse is not swept', async () => {
+    h.doDb.warehouse.findFirst.mockResolvedValue(null);
+    expect(await sweepAllWarehouseStores(step, alarm)).toMatchObject({ storesTotal: 0 });
+    expect(h.stock.reconcileWarehouseAll).not.toHaveBeenCalled();
   });
 });
 

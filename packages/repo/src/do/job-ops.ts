@@ -88,3 +88,109 @@ export function periodGlCreditsOp(
   )[0];
   return { total: Number(r?.total ?? 0) };
 }
+
+/**
+ * The reorder scan's first transaction (Postgres: two UPDATEs and a COUNT): expire open suggestions older than `thresholdMs`
+ * and those whose unit no longer exists (a product-level row for a product that has variants, a row of a disabled variant).
+ * Returns the number expired and the count of open PO lines with no variant on a variant product (logged, issue 2345).
+ */
+export function reorderExpireOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { expired: number; variantlessOpenPoLines: number } {
+  if (typeof a.thresholdMs !== 'number' || !Number.isFinite(a.thresholdMs))
+    throw new MoneyError('BAD_ARGS', 'thresholdMs', 400);
+  return db.transactionSync(() => {
+    const stale = db.run(
+      "UPDATE reorder_suggestions SET status = 'expired' WHERE store_id = ? AND status = 'open' AND scanned_at < ?",
+      [storeId, a.thresholdMs]
+    ).changes;
+    const gone = db.run(
+      `UPDATE reorder_suggestions SET status = 'expired'
+        WHERE store_id = ? AND status = 'open' AND (
+          (variant_id IS NULL AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = reorder_suggestions.product_id))
+          OR (variant_id IS NOT NULL AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.id = reorder_suggestions.variant_id AND pv.is_active = 0))
+        )`,
+      [storeId]
+    ).changes;
+    const v = db.all(
+      `SELECT COUNT(*) AS n FROM purchase_order_items i JOIN purchase_orders p ON p.id = i.po_id
+        WHERE p.store_id = ? AND p.status IN ('sent', 'partial') AND i.variant_id IS NULL AND i.qty > i.qty_received
+          AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = i.product_id)`,
+      [storeId]
+    )[0];
+    return { expired: stale + gone, variantlessOpenPoLines: Number(v?.n ?? 0) };
+  });
+}
+
+interface ReorderRow {
+  productId: string;
+  variantId: string | null;
+  suggestedQty: number;
+  velocity7d: number;
+  velocity28d: number;
+  onHand: number;
+  onOrder: number;
+  openBacklog: number;
+  urgencyDays: number;
+  supplierId: string | null;
+  reasoningEn: string;
+  reasoningAr: string | null;
+}
+
+/**
+ * The reorder scan's third phase: ONE open suggestion per unit. The latest open row of the unit is updated (and re-stamped
+ * with this scan's time), else a row is created. Returns how many units were written; a unit that cannot be written (a
+ * deleted product) is skipped, like the Postgres savepoint.
+ */
+export function reorderUpsertOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { upserted: number } {
+  if (typeof a.scannedAtMs !== 'number' || !Array.isArray(a.items) || a.items.length > 200)
+    throw new MoneyError('BAD_ARGS', 'items', 400);
+  const scannedAt = a.scannedAtMs;
+  let upserted = 0;
+  for (const raw of a.items as ReorderRow[]) {
+    try {
+      db.transactionSync(() => {
+        const vid = raw.variantId ?? null;
+        const existing = db.all(
+          `SELECT id FROM reorder_suggestions WHERE store_id = ? AND product_id = ? AND ${vid === null ? 'variant_id IS NULL' : 'variant_id = ?'} AND status = 'open' ORDER BY scanned_at DESC LIMIT 1`,
+          vid === null ? [storeId, raw.productId] : [storeId, raw.productId, vid]
+        )[0];
+        const vals = [
+          raw.suggestedQty,
+          raw.velocity7d,
+          raw.velocity28d,
+          raw.onHand,
+          raw.onOrder,
+          raw.openBacklog,
+          raw.urgencyDays,
+          raw.supplierId ?? null,
+          raw.reasoningEn,
+          raw.reasoningAr ?? null,
+          scannedAt,
+        ];
+        if (existing) {
+          db.run(
+            `UPDATE reorder_suggestions SET suggested_qty = ?, velocity_7d = ?, velocity_28d = ?, on_hand = ?, on_order = ?, open_backlog = ?, urgency_days = ?, supplier_id = ?, reasoning_en = ?, reasoning_ar = ?, status = 'open', scanned_at = ? WHERE id = ? AND store_id = ?`,
+            [...vals, existing.id as string, storeId]
+          );
+        } else {
+          db.run(
+            `INSERT INTO reorder_suggestions (id, store_id, product_id, variant_id, suggested_qty, velocity_7d, velocity_28d, on_hand, on_order, open_backlog, urgency_days, supplier_id, reasoning_en, reasoning_ar, status, scanned_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+            [crypto.randomUUID(), storeId, raw.productId, vid, ...vals]
+          );
+        }
+      });
+      upserted += 1;
+    } catch {
+      // a unit whose product or supplier is gone: skipped, as the Postgres savepoint does
+    }
+  }
+  return { upserted };
+}

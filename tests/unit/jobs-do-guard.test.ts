@@ -329,10 +329,8 @@ describe('refusal of unported jobs for a DO store', () => {
   it('an alarm run for a DO store is refused the same way; a platform ("none") job is never refused', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'warehouse-reconcile-sweep-cron' }, handler);
-    await runJobWorkflow(
-      wfArgs('warehouse-reconcile-sweep-cron', { alarm: true, storeId: DO_STORE })
-    );
+    registerJob({ id: 'order-status-changed-fanout' }, handler);
+    await runJobWorkflow(wfArgs('order-status-changed-fanout', { alarm: true, storeId: DO_STORE }));
     expect(handler).not.toHaveBeenCalled();
     const none = vi.fn(async () => 1);
     registerJob({ id: 'billing-renewal-daily' }, none);
