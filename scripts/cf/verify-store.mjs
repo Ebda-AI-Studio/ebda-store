@@ -35,7 +35,8 @@ const { args } = cli({
 });
 
 async function verifyDoStore(client, bound, plan, store) {
-  const tables = bound.store.tables;
+  // plan tables plus the DO tables sourced from part of a Postgres table (instapay_order_receipts, Ruling CF-R6A-4)
+  const tables = [...bound.store.tables, ...bound.extra];
   const src = {};
   const aggSrc = {};
   for (const bt of tables) {

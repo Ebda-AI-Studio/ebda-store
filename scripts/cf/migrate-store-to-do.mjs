@@ -56,7 +56,7 @@ async function migrateStore(client, bound, plan, store) {
       `Postgres holds data in columns the Cloudflare schema drops: ${JSON.stringify(loss)}. Fix the schema or pass --accept-dropped after a ruling.`
     );
 
-  for (const bt of bound.store.tables) {
+  for (const bt of [...bound.store.tables, ...bound.extra]) {
     const t1 = performance.now();
     const names = bt.columns.map(c => c.col);
     const digest = new TableDigest();

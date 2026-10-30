@@ -60,12 +60,81 @@ export const DO_RUNTIME_TABLES = {
   },
   instapay_order_receipts: {
     erasure: 'ttl',
-    why: 'InstaPay order receipts of a DO store (Ruling INSTAPAY-DO-1): payer fields scrubbed 180 days after a decision and on the shopper erasure, screenshots deleted by the retention sweep; NOT imported - an order awaiting payment confirmation at the flip keeps its receipt on the platform table',
+    why: 'InstaPay order receipts of a DO store (Ruling INSTAPAY-DO-1): payer fields scrubbed 180 days after a decision and on the shopper erasure, screenshots deleted by the retention sweep; imported from the platform table at cutover (PG_SOURCED_DO_TABLES, Ruling CF-R6A-4)',
   },
   search_dirty: { erasure: 'derived', why: 'queue of rows to re-index' },
   product_vector_state: { erasure: 'derived', why: 'embedding bookkeeping, rebuilt from products' },
   vector_usage: { erasure: 'no-pii', why: 'Workers AI spend counter per day' },
 };
+/**
+ * DO runtime tables that DO carry data across the cutover: they have no generated plan table, but a Postgres source.
+ * Key = DO table. `origin` = the Postgres table, `filter(alias)` = the rows of it that belong to this table, `columns` =
+ * [DO column, kind] in DO order (the Postgres column has the same name), `ignored` = Postgres columns deliberately not
+ * carried (checked: any other Postgres column the table gains stops the run, like a dropped plan column does).
+ * Ruling CF-R6A-4: a store with orders awaiting payment confirmation can be flipped, because the receipt that proves the
+ * transfer moves with the order.
+ */
+export const PG_SOURCED_DO_TABLES = {
+  instapay_order_receipts: {
+    origin: 'instapay_receipts',
+    filter: a => `${a}.kind = 'order'`,
+    pk: ['id'],
+    ignored: ['kind', 'claim_id', 'updated_at'],
+    columns: [
+      ['id', 'text'],
+      ['store_id', 'text'],
+      ['order_id', 'text'],
+      ['payment_id', 'text'],
+      ['storage_key', 'text'],
+      ['mime_type', 'text'],
+      ['size_bytes', 'int'],
+      ['sha256', 'text'],
+      ['status', 'text'],
+      ['extraction_status', 'text'],
+      ['extraction_error', 'text'],
+      ['extracted', 'json'],
+      ['confidence', 'float'],
+      ['amount_minor', 'int'],
+      ['reference', 'text'],
+      ['reference_key', 'text'],
+      ['transferred_at', 'date'],
+      ['payer_name', 'text'],
+      ['payer_address', 'text'],
+      ['payer_mobile', 'text'],
+      ['payer_bank', 'text'],
+      ['receiver_name', 'text'],
+      ['receiver_handle', 'text'],
+      ['receiver_mobile', 'text'],
+      ['note', 'text'],
+      ['expected_amount_minor', 'int'],
+      ['expected_receiver', 'text'],
+      ['flags', 'list'],
+      ['review_note', 'text'],
+      ['reviewed_by', 'text'],
+      ['reviewed_at', 'date'],
+      ['submitted_at', 'date'],
+      ['image_deleted_at', 'date'],
+      ['personal_scrubbed_at', 'date'],
+      ['created_at', 'date'],
+    ],
+  },
+};
+
+/** The plan-shaped table objects of PG_SOURCED_DO_TABLES (what bindTable / tableQuery / sourceDigest take). */
+export function pgSourcedTables() {
+  return Object.entries(PG_SOURCED_DO_TABLES).map(([name, r]) => ({
+    db: 'store-do',
+    name,
+    origin: r.origin,
+    pk: r.pk,
+    fks: [],
+    inPg: true,
+    filter: r.filter,
+    ignored: r.ignored,
+    columns: r.columns.map(([col, kind]) => ({ col, src: col, kind, extra: false })),
+  }));
+}
+
 /** FTS virtual tables and their shadow tables: derived search state, re-marked dirty by triggers on restore */
 export const DO_DERIVED_TABLE = /^(product_search_fts|customer_search_fts)/;
 

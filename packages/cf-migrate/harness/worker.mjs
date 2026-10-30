@@ -5,6 +5,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import init0001 from '../../cf-schema/migrations/store/0001_init.sql';
 import inv0002 from '../../cf-schema/migrations/store/0002_invariants.sql';
+import { INSTAPAY_RECEIPT_DDL } from '../../repo/src/do/instapay-receipts';
 import { handleStoreAdmin, authorizeCutover } from '../src/store-admin.mjs';
 
 /** Split a generated migration into statements (a DO accepts <= 100 KB per exec); triggers end at a line `END;`. */
@@ -56,6 +57,8 @@ export class StoreDO extends DurableObject {
         for (const stmt of splitSql(text)) sql.exec(fixLongGlob(stmt));
         sql.exec('INSERT INTO cf_schema_applied (name) VALUES (?)', name);
       }
+      // the runtime table the cutover imports InstaPay order receipts into (the real StoreDO creates it at boot)
+      for (const stmt of INSTAPAY_RECEIPT_DDL) sql.exec(stmt);
     });
   }
   async fetch(request) {
