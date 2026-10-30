@@ -32,6 +32,10 @@
       "types": "./src/brand/index.ts",
       "default": "./src/brand/index.ts"
     },
+    "./wa-me-messages": {
+      "types": "./src/whatsapp/wa-me-messages.ts",
+      "default": "./src/whatsapp/wa-me-messages.ts"
+    },
     "./legal": {
       "types": "./src/legal/index.ts",
       "default": "./src/legal/index.ts"

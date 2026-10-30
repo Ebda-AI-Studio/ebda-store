@@ -331,7 +331,8 @@ html[lang='en'] .wm-name {
   --np-inset: 2px;
 }
 .nav-menu .menu-login,
-.nav-menu .menu-lang {
+.nav-menu .menu-lang,
+.nav-menu .menu-start {
   display: none;
 }
 .header-actions {
@@ -422,10 +423,26 @@ html[lang='en'] .wm-name {
   }
 }
 @media (max-width: 520px) {
+  /* impeccable critique: the wordmark was 12-13px. The WhatsApp shortcut is already in the menu, so it gives the room up
+     and the full studio name stays on one line at 15px+ (never wraps, never shortened). */
   .wm-name {
     white-space: nowrap;
-    font-size: 0.8rem;
+    font-size: 0.9375rem;
     line-height: 1.25;
+  }
+  .header-actions .wa-compact {
+    display: none;
+  }
+  .nav-menu a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .footer-links a,
+  .footer-links .link-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
   .link-login,
   .header-actions .lang-toggle {
@@ -463,25 +480,30 @@ html[lang='en'] .wm-name {
 /* The open mobile menu hangs from the 46px menu button, so its 220px panel ran off the left edge in Arabic (x -40)
    and off the right in English: on a phone it spans the viewport instead. */
 @media (max-width: 520px) {
-  .nav-menu ul {
+  .nav-menu > ul {
     position: fixed;
     inset-inline: 16px;
     top: 72px;
+    width: auto;
     min-width: 0;
     max-height: calc(100dvh - 88px);
     overflow-y: auto;
   }
 }
 
-@media (max-width: 400px) {
-  /* 360px: wordmark + menu + WhatsApp + start must fit one row (the start button overflowed the viewport by 21px in Arabic) */
-  .wm-name {
-    font-size: 0.8125rem;
-  }
-  /* the full studio name stays on one line; the mark gives its room up (it is decorative, the name is the link label) */
-  .wordmark img {
+@media (max-width: 440px) {
+  /* The studio wordmark + search + menu leave no room for the start button (clipped 43px off-screen at 390, 25px at 360,
+     Ruling MKT-IMPECCABLE-3): on a phone it lives in the menu, and the page's own hero button is on the first screen. */
+  .header-actions .header-start {
     display: none;
   }
+  .nav-menu .menu-start {
+    display: list-item;
+  }
+}
+
+@media (max-width: 400px) {
+  /* 360px: wordmark + menu + WhatsApp + start must fit one row (the start button overflowed the viewport by 21px in Arabic) */
   .header-actions .btn {
     padding: 0 10px;
   }
@@ -491,8 +513,12 @@ html[lang='en'] .wm-name {
 }
 
 @media (max-width: 374px) {
+  /* the mark (decorative; the name is the link label) gives its room up only on the narrowest phones */
+  .wordmark img {
+    display: none;
+  }
   .wm-name {
-    font-size: 0.75rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -939,7 +965,8 @@ html[lang='ar'] .story h2 {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: calc(var(--w) * 0.04);
+  /* 12px floor (Ruling MKT-IMPECCABLE-3): the phone scales, the notification text must stay legible (sub-line 11px) */
+  font-size: max(12px, calc(var(--w) * 0.04));
 }
 .story-toast {
   --tt: clamp(0, calc((var(--p) - (0.78 + var(--i) * 0.045)) / 0.06), 1);
@@ -972,7 +999,7 @@ html[lang='ar'] .story h2 {
 }
 .story-toast span span {
   opacity: 0.8;
-  font-size: 0.9em;
+  font-size: 0.92em;
 }
 @media (min-width: 900px) {
   .story-grid {
@@ -3196,4 +3223,78 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   .hs-form button {
     display: none;
   }
+}
+
+/* ---------- /whatsapp hero visual (Ruling MKT-IMPECCABLE-3) ---------- */
+.wa-head {
+  display: grid;
+  gap: clamp(28px, 5vw, 48px);
+}
+.wa-visual {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+.wa-visual figcaption {
+  max-width: 34ch;
+  text-align: center;
+  text-wrap: pretty;
+}
+.wa-phone {
+  --w: min(280px, 78vw);
+}
+.wa-chat {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--raise);
+  color: var(--fg);
+}
+.wa-chat-head {
+  margin: 0;
+  padding: calc(var(--w) * 0.15) 16px 12px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.wa-chat-body {
+  padding: 16px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+.wa-bubble {
+  margin: 0;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  font-size: 0.8125rem; /* 13px: real text, never a scaled-down screenshot */
+  line-height: 1.7;
+  white-space: pre-line;
+  text-wrap: pretty;
+}
+@media (min-width: 900px) {
+  .wa-head {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    align-items: center;
+  }
+  .wa-phone {
+    --w: 300px;
+  }
+}
+
+/* Arabic widows and line length (Ruling MKT-IMPECCABLE-3): body copy wraps with `pretty` (no single-word last line),
+   headings balance, and running text is capped near 60-66 characters per line. */
+html[lang='ar'] :is(p, li, dd, figcaption, summary) {
+  text-wrap: pretty;
+}
+html[lang='ar'] :is(h1, h2, h3, .lead) {
+  text-wrap: balance;
+}
+html[lang='ar'] :is(.lead, .wa-prose, .hero-sub, .hero-saving, .page-sec p, .faq p) {
+  max-width: min(100%, 62ch);
 }

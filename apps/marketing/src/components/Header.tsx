@@ -175,6 +175,11 @@ export function Header({
                   {c.nav.switchTo}
                 </Link>
               </li>
+              <li className="menu-start">
+                <SiteLink href={SIGNUP_URL} locale={locale}>
+                  {c.nav.start}
+                </SiteLink>
+              </li>
               <li className="menu-login">
                 <SiteLink href={LOGIN_URL} locale={locale}>
                   {c.nav.login}
@@ -198,7 +203,7 @@ export function Header({
             {c.nav.login}
           </SiteLink>
           <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} compact />
-          <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary">
+          <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary header-start">
             {c.nav.start}
           </SiteLink>
         </div>

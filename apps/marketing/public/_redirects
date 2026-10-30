@@ -17,3 +17,9 @@
 /compare/ /#pricing 301
 /en/compare /en/#pricing 301
 /en/compare/ /en/#pricing 301
+
+# Signup lives on the store app. Workers Static Assets keeps the query string on a redirect whose target has none.
+/signup https://store.ebda.app/signup 302
+/signup/ https://store.ebda.app/signup 302
+/en/signup https://store.ebda.app/signup 302
+/en/signup/ https://store.ebda.app/signup 302
