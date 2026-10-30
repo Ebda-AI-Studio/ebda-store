@@ -20,6 +20,7 @@ vi.mock('@ebda/database', () => {
   const client = {
     notificationConfig: {
       findUnique: (...a: unknown[]) => findUnique(...a),
+      findFirst: (...a: unknown[]) => findUnique(...a), // the repo read (storeRepo) is a findFirst on the same row
       upsert: (...a: unknown[]) => upsert(...a),
       findMany: (...a: unknown[]) => findMany(...a),
     },
@@ -27,6 +28,14 @@ vi.mock('@ebda/database', () => {
   return {
     prisma: client,
     withStore: (_id: string, fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
+  };
+});
+
+vi.mock('@api/lib/repo-factory', async () => {
+  const { prisma } = await import('@ebda/database');
+  return {
+    storeRepo: async () => ({ backend: 'pg', db: prisma }),
+    storeWriter: async () => prisma,
   };
 });
 
