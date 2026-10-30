@@ -15,6 +15,6 @@
     "warehouse-reconcile-on-demand",
     "warehouse-reconcile-sweep-cron"
   ],
-  "jobsAccepted": ["r2-orphan-sweep", "search-index-backstop", "search-product-index"],
+  "jobsAccepted": ["search-index-backstop", "search-product-index"],
   "sweepSkips": []
 }

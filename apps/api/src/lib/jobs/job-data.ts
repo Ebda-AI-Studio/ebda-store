@@ -134,6 +134,8 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'webhook-fanout',
   'webhook-deliver',
   'webhook-delivery-purge-daily',
+  // Ruling CF-JOBS-4B (r2-orphan-sweep): a DO store's references are read from its DO; any unreadable store ends the run before a delete
+  'r2-orphan-sweep',
 ]);
 
 /**
@@ -143,6 +145,8 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
  * provider budget cannot be split into per-store alarms without losing the aggregate, so they are not "skipped sweeps".
  */
 export const ALL_STORES_JOBS: ReadonlySet<string> = new Set([
+  // lists every store itself and reads each DO store's references from its DO (it deletes, so it needs ALL of them)
+  'r2-orphan-sweep',
   'agent-write-denied-watch',
   'ai-autofill-sweep',
   'answer-engine-citation-scan-cron',

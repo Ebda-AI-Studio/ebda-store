@@ -585,6 +585,17 @@ export async function assertStrictTablesVisible(
 }
 
 /** Registered columns grouped by table, in registry order. */
+/**
+ * Registry tables that are platform rows (Postgres / D1 for every store, whatever backend serves it). Every other registry table
+ * is store data: for a store on its Durable Object it is read from the DO (`r2References`), and `tests` prove the DO schema has it.
+ */
+export const PLATFORM_R2_TABLES: readonly string[] = [
+  'stores',
+  'users',
+  'system_settings',
+  'manual_payment_claims',
+];
+
 export function columnsByTable(
   columns: readonly R2ReferenceColumn[] = R2_REFERENCE_COLUMNS
 ): Map<string, R2ReferenceColumn[]> {

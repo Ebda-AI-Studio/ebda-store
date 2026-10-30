@@ -240,3 +240,21 @@ describe('webhookEndpointCreate and r2References (Ruling CF-JOBS-4B)', () => {
     ).toThrow();
   });
 });
+
+describe('the R2 reference registry against the DO schema (Ruling CF-JOBS-4B)', () => {
+  it('every registered table that is store data exists in the DO with all its registered columns', async () => {
+    const { R2_REFERENCE_COLUMNS, PLATFORM_R2_TABLES } =
+      await import('../../../apps/api/src/lib/r2-references');
+    const { op } = rig();
+    const byTable = new Map<string, string[]>();
+    for (const c of R2_REFERENCE_COLUMNS)
+      if (!PLATFORM_R2_TABLES.includes(c.table))
+        byTable.set(c.table, [...(byTable.get(c.table) ?? []), c.column]);
+    expect(byTable.size).toBeGreaterThan(10);
+    for (const [table, columns] of byTable)
+      expect({ table, missing: op('r2References', { table, columns, limit: 1 }).missing }).toEqual({
+        table,
+        missing: false,
+      });
+  });
+});

@@ -1,7 +1,14 @@
 import type { JobDef } from '../../jobs/types';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { loadS3 } from '../../lazy-modules';
-import { prisma, isOwnerRole, withOwnerTx } from '@ebda/database';
+import {
+  prisma,
+  isOwnerRole,
+  withOwnerTx,
+  storeDirectory,
+  withoutHiddenStores,
+} from '@ebda/database';
+import { storeRepo } from '../../repo-factory';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -10,6 +17,10 @@ import { urlToR2Key } from '../../../services/r2-cleanup.service';
 import {
   assertStrictTablesVisible,
   collectReferencedR2Keys,
+  columnsByTable,
+  urlsInColumnValue,
+  urlsInString,
+  PLATFORM_R2_TABLES,
   isDerivedR2Key,
   isExpiredDerivedKey,
 } from '../../r2-references';
@@ -112,6 +123,65 @@ async function collectReferencedKeys(): Promise<Set<string>> {
   });
 }
 
+/**
+ * The keys referenced from the tables of every store that lives on its Durable Object (Ruling CF-JOBS-4B). Their Postgres rows
+ * are sealed and stale, so the reference set must come from the DO: one `r2References` page at a time per registered column set.
+ * ANY failure (a store whose DO cannot be read, a registry table the DO schema does not have) throws: with a partial reference
+ * set live images would be called orphans, so the run ends here and nothing is deleted.
+ */
+export async function collectDoReferencedKeys(): Promise<string[]> {
+  const stores = await withoutHiddenStores(() =>
+    storeDirectory(undefined, { includeDeleted: true })
+  );
+  const keys = new Set<string>();
+  const tables = [...columnsByTable()].filter(([t]) => !PLATFORM_R2_TABLES.includes(t));
+  for (const { id } of stores) {
+    const repo = await storeRepo(id);
+    if (repo.backend !== 'do') continue;
+    const money = repo.money;
+    if (!money) throw new Error(`r2-orphan-sweep: no DO client for store ${id}`);
+    for (const [table, cols] of tables) {
+      let after: string | undefined;
+      do {
+        const page = await money.r2References({
+          table,
+          columns: cols.map(c => c.column),
+          after,
+          limit: 1000,
+        });
+        if (page.missing)
+          throw new Error(
+            `r2-orphan-sweep: store ${id} has no ${table} with the registered columns`
+          );
+        for (const row of page.rows)
+          for (const c of cols) {
+            const v = row[c.column];
+            if (v == null) continue;
+            let value: unknown = v;
+            if (c.kind === 'json') {
+              try {
+                value = JSON.parse(v);
+              } catch {
+                // unparseable JSON text: scan it as text (over-inclusive, which only keeps a file alive)
+                for (const url of urlsInString(v)) {
+                  const key = urlToR2Key(url);
+                  if (key) keys.add(key);
+                }
+                continue;
+              }
+            }
+            for (const url of urlsInColumnValue(c.kind, value)) {
+              const key = urlToR2Key(url);
+              if (key) keys.add(key);
+            }
+          }
+        after = page.last ?? undefined;
+      } while (after);
+    }
+  }
+  return [...keys];
+}
+
 export const r2OrphanSweep: JobDef = inngest.createFunction(
   {
     id: 'r2-orphan-sweep',
@@ -196,7 +266,11 @@ export const r2OrphanSweep: JobDef = inngest.createFunction(
     const referencedList = await step.run('collect-referenced-keys', async () =>
       Array.from(await collectReferencedKeys())
     );
-    const referenced = new Set(referencedList);
+    // + the references held on the Durable Object of every DO store (their Postgres rows are not the truth any more)
+    const doReferenced = await step.run('collect-do-referenced-keys', () =>
+      collectDoReferencedKeys()
+    );
+    const referenced = new Set([...referencedList, ...doReferenced]);
     logger.info({ count: referenced.size }, 'r2-orphan-sweep: collected referenced keys from DB');
 
     // ── Step 3: compute orphans ───────────────────────────────────────────
