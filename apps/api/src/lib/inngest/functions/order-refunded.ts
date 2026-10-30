@@ -1,6 +1,8 @@
 import { NonRetriableError } from '../../jobs/errors';
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@ebda/database';
+import { prisma, runInTenantContext, withMoneyTx, withStore, type Prisma } from '@ebda/database';
+import { runInStoreCtx } from '../../jobs/store-db';
+import { storeDb, storeMoney } from '../../repo-factory';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -186,8 +188,28 @@ export async function handleOrderRefunded(
 
   // FORCE RLS: Inngest jobs run outside HTTP — no tenant context middleware.
   // Wrap every prisma call in runInTenantContext(storeId) so RLS filters correctly.
-  const order = await step.run('load-order', () =>
-    runInTenantContext(storeId, async () => {
+  // PORTED (Ruling CF-JOBS-4). A store on its Durable Object has already reversed stock, coupon, loyalty, wallet and
+  // backorders in the SAME section as the cancel / refund / return (`do/refund.ts`, `do/returns.ts`), so those steps are
+  // skipped for it; what is left here is the work the DO does not own: the fiscal document, the affiliate commission, the
+  // notifications (their claims are DO ops), the warehouse shadow, the caches and the completion stamp.
+  const money = await storeMoney(storeId);
+
+  const order = await step.run('load-order', async () => {
+    if (money) {
+      const row = await (
+        await storeDb(storeId)
+      ).order.findUnique({
+        where: { id: orderId, storeId },
+        include: { items: true, payments: { orderBy: { createdAt: 'desc' } } },
+      });
+      if (!row) throw new Error(`Order ${orderId} not found`);
+      // the customer is an identity row (not in the DO): read from the platform
+      const customer = row.customerId
+        ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
+        : null;
+      return { ...row, customer };
+    }
+    return runInTenantContext(storeId, async () => {
       const row = await prisma.order.findUnique({
         where: { id: orderId, storeId },
         include: {
@@ -198,19 +220,49 @@ export async function handleOrderRefunded(
       });
       if (!row) throw new Error(`Order ${orderId} not found`);
       return row;
-    })
-  );
+    });
+  });
 
-  // Fiscal documents (ruling MONEYB-1). A refund of a sale that took money gets
-  // its own CREDIT NOTE (tax invoice) / REFUND RECEIPT (receipt) with its own
-  // gap-free serial, naming the original number and date — full and partial
-  // alike. A sale cancelled before any money was taken keeps its number and is
-  // marked cancelled instead. Idempotent: keyed per refund event
-  // (`partial.refundKey`, or `order:<id>:full` for the whole order), so a
-  // retried or re-delivered event never issues a second document. Runs before
-  // the notifications so a failed send never skips it.
-  await step.run('fiscal-document', () =>
-    runInTenantContext(storeId, () =>
+  await step.run('fiscal-document', async () => {
+    if (money) {
+      const reason =
+        typeof (order.payments[0]?.metadata as Record<string, unknown> | null)?.refundReason ===
+        'string'
+          ? ((order.payments[0]!.metadata as Record<string, unknown>).refundReason as string)
+          : null;
+      if (isPartial) {
+        const amount = partial?.refundAmount;
+        if (typeof amount !== 'number' || amount <= 0) return { skipped: 'no-amount' };
+        const r = await money.fiscalRefund({
+          orderId,
+          refundRef: partial!.refundKey,
+          amount,
+          reason,
+        });
+        return { issued: r.document?.number ?? null };
+      }
+      const moneyTaken =
+        hasCapturedPayment(order) ||
+        order.paymentStatus === 'refunded' ||
+        order.payments.some(
+          p =>
+            (p.refundedAmount ?? 0) > 0 ||
+            p.status === 'refunded' ||
+            p.status === 'partially_refunded'
+        );
+      if (!moneyTaken) {
+        const r = await money.fiscalCancelSale({ orderId });
+        return { cancelled: r.document?.number ?? null };
+      }
+      const r = await money.fiscalRefund({
+        orderId,
+        refundRef: `order:${orderId}:full`,
+        amount: 'remaining',
+        reason,
+      });
+      return { issued: r.document?.number ?? null };
+    }
+    return runInTenantContext(storeId, () =>
       withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
         const reason =
           typeof (order.payments[0]?.metadata as Record<string, unknown> | null)?.refundReason ===
@@ -247,15 +299,22 @@ export async function handleOrderRefunded(
         });
         return { issued: doc?.number ?? null };
       })
-    )
-  );
+    );
+  });
 
   // Restore physical stock reserved by this order. Guarded by the
   // `return_stock` InventoryHistory marker (per-order) so a retried or
   // re-delivered event never double-increments inventory. Moved verbatim
   // from the old `applyRefundEffects` inner tx — throws on failure so
   // Inngest retries instead of leaving stock un-restored.
+  if (money && !isPartial && order.status === 'cancelled') {
+    // Safety net: a cancel whose reversal never completed (the DO section failed after the status flip, or the stuck sweep
+    // re-sent this event) is finished by the idempotent DO cancel - a completed one replays and moves nothing.
+    await step.run('do-finish-reversal', () => money.cancel({ orderId, restoreInventory }));
+  }
+
   await step.run('restore-inventory', (): Promise<{ skipped: boolean }> => {
+    if (money) return Promise.resolve({ skipped: true }); // done in the DO's cancel / refund / return section
     // An amount-only refund returned no goods, whatever the flag says.
     if (!restoreInventory || partial?.amountOnly) return Promise.resolve({ skipped: true });
 
@@ -512,7 +571,10 @@ export async function handleOrderRefunded(
   // (assert-store-owns.ts). The row is immutable history, so reading it
   // outside the transaction loses nothing.
   const adminOrderNeverReserved =
-    !isPartial && !!order.couponCode && new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER
+    !money &&
+    !isPartial &&
+    !!order.couponCode &&
+    new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER
       ? await step.run('admin-created-lookup', async () => {
           // The row carries NO store (an actor row), so a store-scoped read cannot
           // see it: a definer answers the existence question.
@@ -529,6 +591,7 @@ export async function handleOrderRefunded(
   // retried/redelivered event never double-decrements. Order-level lock
   // matches restore-inventory above — same reasoning.
   await step.run('reverse-coupon', (): Promise<{ skipped: boolean }> => {
+    if (money) return Promise.resolve({ skipped: true });
     // Partial return: the customer kept the rest of the order, so the coupon
     // stays legitimately consumed. Reversing it here erased OTHER customers'
     // live redemptions once floored at 0 (adversarial audit P1-2).
@@ -601,13 +664,14 @@ export async function handleOrderRefunded(
     // earned — clawing back the whole-order commission on a trivial partial
     // return underpaid affiliates (adversarial audit P1-2).
     if (isPartial) return { skipped: true };
-    return runInTenantContext(storeId, () => affiliateService.reverseCommission(storeId, orderId));
+    return runInStoreCtx(storeId, () => affiliateService.reverseCommission(storeId, orderId));
   });
 
   // Reverse loyalty points credited at delivery + re-credit points spent at
   // checkout. No-op for guest checkout (no customerId). Both calls are
   // already idempotent via tagged adjust rows — throw on failure.
   await step.run('reverse-loyalty', async () => {
+    if (money) return { skipped: true };
     // Partial return: the customer keeps the points earned/spent on the kept
     // items — the loyalty reversal helpers are whole-order, so running them
     // here stripped legitimately-earned points (adversarial audit P1-2).
@@ -628,6 +692,7 @@ export async function handleOrderRefunded(
   // all queue on the wallet row lock and the loser replays. No-op for an order
   // that never spent from a wallet (walletAmount 0 — every order before D1).
   await step.run('reverse-wallet-payment', async () => {
+    if (money) return { skipped: true };
     // Partial return: the customer kept the rest of the order; the wallet
     // spend on it stays spent (store credit for the returned lines is issued
     // by ReturnService, not here).
@@ -646,6 +711,7 @@ export async function handleOrderRefunded(
   // purchase-order demand planning stays accurate. Idempotent via the
   // fulfilledAt/cancelledAt null guards.
   await step.run('cancel-backorders', async () => {
+    if (money) return { count: 0 };
     // Backorder single-line cancel: its line is already cancelled; releasing
     // the item's OTHER open lines would cancel demand still owed.
     if (partial?.backorderLineId) return { count: 0 };
@@ -846,27 +912,29 @@ export async function handleOrderRefunded(
   let cancelNoticeFailed = false;
   if (cancelNoticeOnly) {
     const claimedCancel = await step.run('claim-cancel-notification', () =>
-      runInTenantContext(storeId, () =>
-        withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-          await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
-          const sent = await tx.orderEvent.findFirst({
-            where: { storeId, orderId, toStatus: CANCEL_NOTIFIED_MARKER },
-            select: { id: true },
-          });
-          if (sent) return false;
-          await tx.orderEvent.create({
-            data: {
-              storeId,
-              orderId,
-              fromStatus: null,
-              toStatus: CANCEL_NOTIFIED_MARKER,
-              actorId: null,
-              metadata: {},
-            },
-          });
-          return true;
-        })
-      )
+      money
+        ? money.markerClaim({ orderId, marker: CANCEL_NOTIFIED_MARKER }).then(r => r.claimed)
+        : runInTenantContext(storeId, () =>
+            withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+              await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+              const sent = await tx.orderEvent.findFirst({
+                where: { storeId, orderId, toStatus: CANCEL_NOTIFIED_MARKER },
+                select: { id: true },
+              });
+              if (sent) return false;
+              await tx.orderEvent.create({
+                data: {
+                  storeId,
+                  orderId,
+                  fromStatus: null,
+                  toStatus: CANCEL_NOTIFIED_MARKER,
+                  actorId: null,
+                  metadata: {},
+                },
+              });
+              return true;
+            })
+          )
     );
     if (claimedCancel) {
       await step
@@ -909,37 +977,39 @@ export async function handleOrderRefunded(
           ? [...REFUND_NOTIFY_CHANNELS]
           : []
         : await step.run('claim-refund-notification', () =>
-            runInTenantContext(storeId, () =>
-              withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-                await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
-                const sent = await tx.orderEvent.findFirst({
-                  where: { storeId, orderId, toStatus: 'refund_notified' },
-                  select: { id: true, metadata: true },
-                });
-                if (!sent) {
-                  await tx.orderEvent.create({
-                    data: {
-                      storeId,
-                      orderId,
-                      fromStatus: null,
-                      toStatus: 'refund_notified',
-                      actorId: null,
-                      metadata: {},
-                    },
-                  });
-                  return [...REFUND_NOTIFY_CHANNELS];
-                }
-                const meta = (sent.metadata ?? {}) as Record<string, unknown>;
-                const released = releasedChannels(meta);
-                if (released.length === 0) return [];
-                // Re-claim exactly the released channels.
-                await tx.orderEvent.update({
-                  where: { id: sent.id, storeId },
-                  data: { metadata: { ...meta, released: [] } as Prisma.InputJsonValue },
-                });
-                return released;
-              })
-            )
+            money
+              ? money.refundNotifyClaim({ orderId }).then(r => r.channels as RefundNotifyChannel[])
+              : runInTenantContext(storeId, () =>
+                  withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+                    await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+                    const sent = await tx.orderEvent.findFirst({
+                      where: { storeId, orderId, toStatus: 'refund_notified' },
+                      select: { id: true, metadata: true },
+                    });
+                    if (!sent) {
+                      await tx.orderEvent.create({
+                        data: {
+                          storeId,
+                          orderId,
+                          fromStatus: null,
+                          toStatus: 'refund_notified',
+                          actorId: null,
+                          metadata: {},
+                        },
+                      });
+                      return [...REFUND_NOTIFY_CHANNELS];
+                    }
+                    const meta = (sent.metadata ?? {}) as Record<string, unknown>;
+                    const released = releasedChannels(meta);
+                    if (released.length === 0) return [];
+                    // Re-claim exactly the released channels.
+                    await tx.orderEvent.update({
+                      where: { id: sent.id, storeId },
+                      data: { metadata: { ...meta, released: [] } as Prisma.InputJsonValue },
+                    });
+                    return released;
+                  })
+                )
           );
   // A run that started before this change replays the memoized claim step's
   // old boolean answer: true meant "send the whole set".
@@ -958,10 +1028,8 @@ export async function handleOrderRefunded(
 
   if (shouldNotify) {
     const store = await step.run('load-store', () =>
-      runInTenantContext(storeId, () =>
-        prisma.store
-          .findUnique({ where: { id: storeId }, select: { name: true } })
-          .catch(() => null)
+      withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { name: true } }).catch(() => null)
       )
     );
 
@@ -1057,7 +1125,7 @@ export async function handleOrderRefunded(
   // `backfillReconcileAll`'s per-SKU guard in `warehouse.service.ts`) so one
   // bad SKU can't abort reconcile for the rest of the order's items either.
   await step.run('reconcile-warehouse-stock', () =>
-    runInTenantContext(storeId, async () => {
+    runInStoreCtx(storeId, async () => {
       for (const item of order.items) {
         try {
           await WarehouseService.reconcileWarehouseStockToAggregate(
@@ -1119,6 +1187,14 @@ export async function handleOrderRefunded(
   // updateMany + `refundReversedAt: null` keeps it idempotent: a re-delivered or
   // swept re-fire matches 0 rows and leaves the original timestamp intact.
   await step.run('claim-reversed', async () => {
+    if (money) {
+      const r = await money.reversalClaim({
+        orderId,
+        restoreInventory,
+        ...(isPartial ? { returnId: partial!.refundKey } : {}),
+      });
+      return isPartial ? { skipped: true } : { count: r.claimed ? 1 : 0 };
+    }
     // Partial return: refundReversedAt is the WHOLE-order reversal claim.
     // Stamping it here would hide a later cancel/refund of this order from
     // refund-reversal-stuck-sweep (which keys on refundReversedAt IS NULL),
@@ -1166,13 +1242,15 @@ export async function handleOrderRefunded(
   // run so a replay sends it (the reversals above are idempotent).
   if (cancelNoticeFailed) {
     await step.run('release-cancel-notification-claim', () =>
-      runInTenantContext(storeId, () =>
-        withMoneyTx(prisma, (tx: Prisma.TransactionClient) =>
-          tx.orderEvent.deleteMany({
-            where: { storeId, orderId, toStatus: CANCEL_NOTIFIED_MARKER },
-          })
-        )
-      )
+      money
+        ? money.markerRelease({ orderId, marker: CANCEL_NOTIFIED_MARKER }).then(() => undefined)
+        : runInTenantContext(storeId, () =>
+            withMoneyTx(prisma, (tx: Prisma.TransactionClient) =>
+              tx.orderEvent.deleteMany({
+                where: { storeId, orderId, toStatus: CANCEL_NOTIFIED_MARKER },
+              })
+            )
+          )
     );
     throw new NonRetriableError(
       `order/refunded: the customer cancellation email for order ${orderId} was not sent. ` +
@@ -1186,23 +1264,25 @@ export async function handleOrderRefunded(
       // dispatcher and the admin push already delivered, and a replay must
       // not send them twice.
       await step.run('release-refund-notification-claim', () =>
-        runInTenantContext(storeId, () =>
-          withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-            await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
-            const claim = await tx.orderEvent.findFirst({
-              where: { storeId, orderId, toStatus: 'refund_notified' },
-              select: { id: true, metadata: true },
-            });
-            if (!claim) return { released: [] };
-            const meta = (claim.metadata ?? {}) as Record<string, unknown>;
-            const released = [...new Set([...releasedChannels(meta), 'email' as const])];
-            await tx.orderEvent.update({
-              where: { id: claim.id, storeId },
-              data: { metadata: { ...meta, released } as Prisma.InputJsonValue },
-            });
-            return { released };
-          })
-        )
+        money
+          ? money.refundNotifyRelease({ orderId, channel: 'email' })
+          : runInTenantContext(storeId, () =>
+              withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+                await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+                const claim = await tx.orderEvent.findFirst({
+                  where: { storeId, orderId, toStatus: 'refund_notified' },
+                  select: { id: true, metadata: true },
+                });
+                if (!claim) return { released: [] };
+                const meta = (claim.metadata ?? {}) as Record<string, unknown>;
+                const released = [...new Set([...releasedChannels(meta), 'email' as const])];
+                await tx.orderEvent.update({
+                  where: { id: claim.id, storeId },
+                  data: { metadata: { ...meta, released } as Prisma.InputJsonValue },
+                });
+                return { released };
+              })
+            )
       );
     }
     throw new NonRetriableError(

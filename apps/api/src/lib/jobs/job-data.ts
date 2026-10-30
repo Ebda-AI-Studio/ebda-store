@@ -59,18 +59,19 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'accounting-post-stock-adjustment-journal',
   'shipment-create',
   'order-created-fanout',
+  'order-status-changed-fanout',
+  'order-refunded-fanout',
 ]);
 
-export const MONEY_JOBS: ReadonlySet<string> = new Set([
-  'order-refunded-fanout',
-  'order-status-changed-fanout',
-]);
+export const MONEY_JOBS: ReadonlySet<string> = new Set([]);
 
 /**
  * The money jobs that ARE ported (Ruling CF-JOBS-4): a skip of a DO store by one of them still pages P0. `MONEY_JOBS` above
  * lists only the money jobs still refused, so together they are every job that moves money or stock.
  */
 export const PORTED_MONEY_JOBS: ReadonlySet<string> = new Set([
+  'order-status-changed-fanout',
+  'order-refunded-fanout',
   'order-created-fanout',
   'shipment-create',
   'accounting-post-expense-journal',

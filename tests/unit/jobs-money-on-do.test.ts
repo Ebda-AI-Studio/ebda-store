@@ -34,6 +34,17 @@ const h = vi.hoisted(() => ({
     journalSale: vi.fn(async () => ({ posted: true, entries: 2 })),
     journalRefund: vi.fn(async () => ({ reversed: 2 })),
     orderNotifyClaim: vi.fn(async () => ({ claimed: true })),
+    statusFanoutClaim: vi.fn(async () => ({ claimed: true })),
+    statusFanoutComplete: vi.fn(async () => ({ completed: true })),
+    cancel: vi.fn(async () => ({ replayed: true })),
+    fiscalRefund: vi.fn(async () => ({ document: { number: 'CN-1' } })),
+    fiscalCancelSale: vi.fn(async () => ({ document: null })),
+    markerClaim: vi.fn(async () => ({ claimed: true })),
+    markerRelease: vi.fn(async () => ({ released: 1 })),
+    refundNotifyClaim: vi.fn(async () => ({ channels: ['email', 'dispatch', 'push'] })),
+    refundNotifyRelease: vi.fn(async () => ({ released: ['email'] })),
+    reversalClaim: vi.fn(async () => ({ claimed: true })),
+    affiliateReverse: vi.fn(async () => ({ amount: null })),
     journalExpense: vi.fn(async () => ({ posted: true })),
     journalStockAdjustment: vi.fn(async () => ({ posted: true })),
     journalPoReceive: vi.fn(async () => ({ posted: true, entries: 1 })),
@@ -47,7 +58,10 @@ const h = vi.hoisted(() => ({
     })),
     reconcileWarehouseSku: vi.fn(async () => ({ reconciled: true, diff: 0 })),
   },
+  reconcileSku: vi.fn(async () => ({ reconciled: false, diff: 0 })),
   sendConfirmation: vi.fn(async () => undefined),
+  sendShipped: vi.fn(async () => undefined),
+  sendRefunded: vi.fn(async () => undefined),
   createShipment: vi.fn(async () => ({ id: 'sh1', status: 'created' })),
   send: vi.fn(async () => undefined),
   sendAlert: vi.fn(async () => 'sent'),
@@ -125,13 +139,35 @@ vi.mock('@api/services/onesignal.service', () => ({
     notifyAdminsOfShipmentFailure: vi.fn(),
     notifyAdminsOfOrder: vi.fn(async () => undefined),
     notifyOrdersAppOfOrder: vi.fn(async () => undefined),
+    notifyAdminsOfRefund: vi.fn(async () => undefined),
   },
 }));
 vi.mock('@api/services/email.service', () => ({
-  EmailService: { sendOrderConfirmation: h.sendConfirmation },
+  EmailService: {
+    sendOrderConfirmation: h.sendConfirmation,
+    sendOrderShipped: h.sendShipped,
+    sendOrderRefunded: h.sendRefunded,
+    sendOrderCancelledNotCharged: vi.fn(async () => undefined),
+  },
 }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({
   notificationDispatcher: { dispatch: vi.fn(async () => undefined) },
+}));
+vi.mock('@api/services/affiliate.service', () => ({
+  affiliateService: { reverseCommission: vi.fn(async () => null), processCommission: vi.fn() },
+}));
+vi.mock('@api/services/warehouse.service', () => ({
+  WarehouseService: {
+    reconcileWarehouseStockToAggregate: h.reconcileSku,
+    // the real service pages the DO op; this stand-in does the same single call so the sweep test stays about the job
+    backfillReconcileAll: async () => {
+      const r = await h.stock.reconcileWarehouseAll({ limit: 500, afterKey: null });
+      return { skusReconciled: r.skusReconciled, skusFailed: r.skusFailed };
+    },
+  },
+}));
+vi.mock('@api/lib/public-cache', () => ({
+  invalidateStoreProductCaches: vi.fn(async () => undefined),
 }));
 vi.mock('@api/services/redis.service', () => ({ redis: { exists: vi.fn(), set: vi.fn() } }));
 
@@ -146,6 +182,8 @@ import { accountingPostRefundJournal } from '@api/lib/inngest/functions/accounti
 import { accountingPostExpenseJournal } from '@api/lib/inngest/functions/accounting-post-expense-journal';
 import { accountingPostPoReceiveJournal } from '@api/lib/inngest/functions/accounting-post-po-receive-journal';
 import { accountingPostStockAdjustmentJournal } from '@api/lib/inngest/functions/accounting-post-stock-adjustment-journal';
+import { handleOrderStatusChanged } from '@api/lib/inngest/functions/order-status-changed';
+import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { orderCreated } from '@api/lib/inngest/functions/order-created';
 import { bookShipment } from '@api/lib/inngest/functions/shipment-create';
 import { accountingDailyClose } from '@api/lib/inngest/functions/accounting-daily-close';
@@ -404,6 +442,76 @@ describe('order-created-fanout on a DO store', () => {
     h.money.orderNotifyClaim.mockResolvedValueOnce({ claimed: false });
     await fire();
     expect(h.sendConfirmation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('order-status-changed-fanout on a DO store', () => {
+  const row = {
+    id: 'o1',
+    orderNumber: '1001',
+    customerId: null,
+    locale: 'ar',
+    total: 1000,
+    currency: 'EGP',
+    shippingAddress: { firstName: 'A', lastName: 'B', phone: '0100' },
+    items: [],
+  };
+  it('claims and completes the transition in the DO, sends the shipped mail once; a second delivery does nothing', async () => {
+    h.doDb.order.findUnique.mockResolvedValue(row);
+    h.money.statusFanoutClaim.mockResolvedValueOnce({ claimed: true });
+    await handleOrderStatusChanged('o1', DO_STORE, 'shipped', false, step);
+    expect(h.sendShipped).toHaveBeenCalledTimes(1);
+    expect(h.money.statusFanoutComplete).toHaveBeenCalledWith({ orderId: 'o1', status: 'shipped' });
+    h.money.statusFanoutClaim.mockResolvedValueOnce({ claimed: false });
+    const r = await handleOrderStatusChanged('o1', DO_STORE, 'shipped', false, step);
+    expect(r).toMatchObject({ skipped: 'already-claimed' });
+    expect(h.sendShipped).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('order-refunded-fanout on a DO store', () => {
+  const row = {
+    id: 'o1',
+    orderNumber: '1001',
+    customerId: null,
+    status: 'refunded',
+    paymentStatus: 'refunded',
+    locale: 'ar',
+    total: 1000,
+    currency: 'EGP',
+    couponCode: null,
+    walletAmount: 0,
+    createdAt: new Date(),
+    shippingAddress: { firstName: 'A', lastName: 'B', phone: '0100', email: 'a@example.test' },
+    items: [{ productId: 'p1', variantId: null }],
+    payments: [{ provider: 'paymob', status: 'refunded', refundedAmount: 1000, metadata: {} }],
+  };
+  it('does the fiscal credit, notifies once through the DO claim, reconciles the warehouse and stamps completion - and touches no stock itself', async () => {
+    h.doDb.order.findUnique.mockResolvedValue(row);
+    await handleOrderRefunded('o1', DO_STORE, true, true, step);
+    expect(h.money.fiscalRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 'o1', refundRef: 'order:o1:full', amount: 'remaining' })
+    );
+    expect(h.money.refundNotifyClaim).toHaveBeenCalledWith({ orderId: 'o1' });
+    expect(h.sendRefunded).toHaveBeenCalledTimes(1);
+    expect(h.reconcileSku).toHaveBeenCalledWith(DO_STORE, 'p1', null);
+    expect(h.money.reversalClaim).toHaveBeenCalledWith(expect.objectContaining({ orderId: 'o1' }));
+  });
+  it('a second delivery: the DO claim hands out no channel, so nothing is sent twice', async () => {
+    h.doDb.order.findUnique.mockResolvedValue(row);
+    h.money.refundNotifyClaim.mockResolvedValueOnce({ channels: [] });
+    await handleOrderRefunded('o1', DO_STORE, true, true, step);
+    expect(h.sendRefunded).not.toHaveBeenCalled();
+  });
+  it('a cancelled order whose reversal never finished is finished by the idempotent DO cancel', async () => {
+    h.doDb.order.findUnique.mockResolvedValue({
+      ...row,
+      status: 'cancelled',
+      paymentStatus: 'unpaid',
+      payments: [],
+    });
+    await handleOrderRefunded('o1', DO_STORE, true, false, step);
+    expect(h.money.cancel).toHaveBeenCalledWith({ orderId: 'o1', restoreInventory: true });
   });
 });
 

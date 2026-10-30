@@ -1,5 +1,7 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext, type OrderStatus } from '@ebda/database';
+import { prisma, runInTenantContext, withStore, type OrderStatus } from '@ebda/database';
+import { runInStoreCtx } from '../../jobs/store-db';
+import { storeDb, storeMoney } from '../../repo-factory';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { EmailService } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
@@ -56,13 +58,23 @@ export async function handleOrderStatusChanged(
   // Memoized as a step, so Inngest retries of the claimant still re-run its
   // failed side effects. The UPDATE also waits on the order row lock, so it
   // cannot claim before the request that changed the status has committed.
-  const claim = await step.run('claim-status-fanout', () =>
-    runInTenantContext(storeId, () =>
-      prisma.order.updateMany({
-        where: { id: orderId, storeId, status: status as OrderStatus, statusFanoutClaimedAt: null },
-        data: { statusFanoutClaimedAt: new Date() },
-      })
-    )
+  // PORTED (Ruling CF-JOBS-4): a store on its Durable Object claims and completes the transition in one section there, and
+  // reads its order from the DO (its customer is an identity row, read from the platform).
+  const money = await storeMoney(storeId);
+  const claim = await step.run('claim-status-fanout', async () =>
+    money
+      ? { count: (await money.statusFanoutClaim({ orderId, status })).claimed ? 1 : 0 }
+      : runInTenantContext(storeId, () =>
+          prisma.order.updateMany({
+            where: {
+              id: orderId,
+              storeId,
+              status: status as OrderStatus,
+              statusFanoutClaimedAt: null,
+            },
+            data: { statusFanoutClaimedAt: new Date() },
+          })
+        )
   );
   if (claim.count === 0) {
     logger.info(
@@ -72,14 +84,24 @@ export async function handleOrderStatusChanged(
     return { skipped: 'already-claimed', ran: [] };
   }
 
-  const order = await step.run('load-order', () =>
-    runInTenantContext(storeId, () =>
+  const order = await step.run('load-order', async () => {
+    if (money) {
+      const row = await (
+        await storeDb(storeId)
+      ).order.findUnique({ where: { id: orderId, storeId }, include: { items: true } });
+      if (!row) return null;
+      const customer = row.customerId
+        ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
+        : null;
+      return { ...row, customer };
+    }
+    return runInTenantContext(storeId, () =>
       prisma.order.findUnique({
         where: { id: orderId, storeId },
         include: { customer: true, items: true },
       })
-    )
-  );
+    );
+  });
   if (!order) {
     logger.warn({ orderId, storeId }, 'order/status-changed: order not found — skipping');
     return { skipped: 'order-not-found', ran: [] };
@@ -105,8 +127,8 @@ export async function handleOrderStatusChanged(
   const customerPhone = shippingAddrFull?.phone ?? undefined;
 
   const store = await step.run('load-store', () =>
-    runInTenantContext(storeId, () =>
-      prisma.store
+    withStore(storeId, tx =>
+      tx.store
         .findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
         .catch(() => null)
     )
@@ -129,11 +151,11 @@ export async function handleOrderStatusChanged(
     // 0 rows and the WITH CHECK insert is rejected (commissions silently lost,
     // loyalty inserts dead-letter every delivered order).
     add('affiliate-commission', () =>
-      runInTenantContext(storeId, () => affiliateService.processCommission(storeId, orderId))
+      runInStoreCtx(storeId, () => affiliateService.processCommission(storeId, orderId))
     );
     if (order.customerId) {
       add('loyalty-earn', () =>
-        runInTenantContext(storeId, () =>
+        runInStoreCtx(storeId, () =>
           LoyaltyService.earnPointsFromPurchase(storeId, order.customerId!, orderId, order.total)
         )
       );
@@ -298,19 +320,21 @@ export async function handleOrderStatusChanged(
   // "failed after claim" P1 for a fanout whose every step succeeded. A newer
   // `updateStatus` re-arm nulls `statusFanoutClaimedAt`, so that case still
   // matches 0 rows, correctly.
-  await step.run('complete-status-fanout', () =>
-    runInTenantContext(storeId, () =>
-      prisma.order.updateMany({
-        where: {
-          id: orderId,
-          storeId,
-          statusFanoutRequestedStatus: status,
-          statusFanoutClaimedAt: { not: null },
-          statusFanoutCompletedAt: null,
-        },
-        data: { statusFanoutCompletedAt: new Date() },
-      })
-    )
+  await step.run('complete-status-fanout', async () =>
+    money
+      ? money.statusFanoutComplete({ orderId, status })
+      : runInTenantContext(storeId, () =>
+          prisma.order.updateMany({
+            where: {
+              id: orderId,
+              storeId,
+              statusFanoutRequestedStatus: status,
+              statusFanoutClaimedAt: { not: null },
+              statusFanoutCompletedAt: null,
+            },
+            data: { statusFanoutCompletedAt: new Date() },
+          })
+        )
   );
 
   return { ran };
