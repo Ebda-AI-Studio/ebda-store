@@ -23,6 +23,7 @@ import { connectWritable } from './lib/pg.mjs';
 import { loadPlan } from './lib/plan.mjs';
 import { pgTypes, replayTable } from './lib/replay.mjs';
 import { bindPlan, sourceDigest } from './lib/source.mjs';
+import { unreplayedLoss } from './lib/rollback-coverage.mjs';
 import { TableDigest } from '../../packages/cf-migrate/src/canon.mjs';
 
 const { args } = cli({
@@ -48,7 +49,6 @@ const d = {
 };
 const FORWARD_FIX =
   'docs/runbooks/cutover-cf.md section 9 (forward-fix): fix the problem on the Cloudflare side and keep serving from it';
-const NOT_IN_PG = new Set(['entity_index', 'platform_audit_log']);
 // The backend selector is the switch this script itself throws, not live data: it has no Postgres column by design and
 // a rollback sets it back to 'pg', so a changed D1 stores row must not be refused for carrying it (Ruling CUTOVER-5).
 const SELECTOR_COLUMNS = new Set(['stores.storage_backend']);
@@ -150,13 +150,7 @@ async function replayAndVerify(stores, plan, changes) {
           const x = diffTables[name];
           if (!x) continue;
           const bt = by.get(name);
-          if (!bt) {
-            if (!NOT_IN_PG.has(name))
-              report.push(
-                `${tag}.${name}: Cloudflare-only table, ${count(x)} change(s) not replayed`
-              );
-            continue;
-          }
+          if (!bt) continue; // refused or discarded by unreplayedLoss below, never silently dropped
           if (name === 'stores' && (x.added.length || x.deleted.length))
             throw new Error(
               'a store was created or deleted on the live side after the flip: not replayable'
@@ -181,6 +175,10 @@ async function replayAndVerify(stores, plan, changes) {
         }
       }
     };
+    // every changed table the replay does not carry must be explicitly discardable, else the rollback refuses (Opus I2)
+    lossy.push(...unreplayedLoss('D1', changes.platform, new Set(platBy.keys())));
+    for (const s of stores)
+      lossy.push(...unreplayedLoss(s.slug, changes.perStore[s.slug], new Set(storeBy.keys())));
     await run(
       platBy,
       changes.platform,
