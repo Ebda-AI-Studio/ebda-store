@@ -15,6 +15,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { currentStoreId, prisma, runInTenantContext, RfmSegment } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
@@ -228,8 +229,8 @@ router.get(
       // Enrich top SKUs with product info
       const productIds = topSkus.map(s => s.productId);
       const products = productIds.length
-        ? await runInTenantContext(storeId, () =>
-            prisma.product.findMany({
+        ? await runInTenantContext(storeId, async () =>
+            (await storeDb(storeId)).product.findMany({
               where: { storeId, id: { in: productIds } },
               select: { id: true, name: true, nameAr: true, sku: true },
             })
@@ -522,7 +523,7 @@ router.get(
 
       const productIds = top30d.map(s => s.productId);
       const [sold7dRows, products] = productIds.length
-        ? await runInTenantContext(storeId, () =>
+        ? await runInTenantContext(storeId, async () =>
             Promise.all([
               prisma.orderItem.groupBy({
                 by: ['productId'],
@@ -532,7 +533,7 @@ router.get(
                 },
                 _sum: { quantity: true },
               }),
-              prisma.product.findMany({
+              (await storeDb(storeId)).product.findMany({
                 where: { id: { in: productIds }, storeId },
                 select: {
                   id: true,

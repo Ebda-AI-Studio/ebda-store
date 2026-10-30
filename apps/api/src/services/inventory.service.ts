@@ -723,7 +723,9 @@ export class InventoryService {
     productId: string,
     threshold: number
   ): Promise<ProductInventory> {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
     });
 

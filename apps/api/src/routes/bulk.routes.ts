@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { storeDb } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -131,7 +132,9 @@ router.get(
         };
       }
 
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where,
         include: {
           images: { orderBy: { position: 'asc' } },
@@ -308,7 +311,9 @@ router.post(
       }
 
       // The store's current prices feed the "looks like piastres" warning.
-      const existing = await prisma.product.findMany({
+      const existing = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, deletedAt: null },
         select: { price: true },
         take: 5000,

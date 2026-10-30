@@ -7,6 +7,7 @@
  * call without one reads nothing and writes nothing.
  */
 import { prisma, Prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import type {
   Model3dBindingInput,
   Model3dMaterial,
@@ -92,7 +93,9 @@ export const ADMIN_MODEL3D_SELECT = {
 
 /** The live (not soft-deleted) product, or a 404. */
 export async function assertProductInStore(storeId: string, productId: string) {
-  const product = await prisma.product.findFirst({
+  const product = await (
+    await storeDb(storeId)
+  ).product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: { id: true },
   });
@@ -107,7 +110,7 @@ export async function getAdminModel(storeId: string, productId: string) {
       where: { storeId, productId },
       select: ADMIN_MODEL3D_SELECT,
     }),
-    prisma.productOption.findMany({
+    (await storeDb(storeId)).productOption.findMany({
       where: { productId },
       orderBy: { position: 'asc' },
       select: {
@@ -240,7 +243,9 @@ export async function replaceBindings(
   bindings: Model3dBindingInput[]
 ): Promise<number> {
   const model = await getModelRow(storeId, productId);
-  const values = await prisma.productOptionValue.findMany({
+  const values = await (
+    await storeDb(storeId)
+  ).productOptionValue.findMany({
     where: { option: { productId } },
     select: { id: true },
   });

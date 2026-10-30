@@ -10,6 +10,7 @@
  * COD payment config, subscription).
  */
 import { recordReferral } from './billing/grants.service';
+import { storeDb, storeUpdate } from '../lib/repo-factory';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
   getLook,
@@ -39,7 +40,6 @@ import {
 } from './billing/subscription-billing.service';
 import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
 import { emitEbdaConversion } from './ebda-ads-emit';
-import { storeUpdate } from '../lib/repo-factory';
 
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
@@ -122,7 +122,9 @@ export class OnboardingService {
     if (store) {
       // products, payment_configs and store_subscriptions are all store-scoped.
       const counts = await readInStoreContext(store.id, async () => ({
-        products: await prisma.product.count({ where: { storeId: store.id, deletedAt: null } }),
+        products: await (
+          await storeDb(store.id)
+        ).product.count({ where: { storeId: store.id, deletedAt: null } }),
         cod: await prisma.paymentConfig.count({
           where: { storeId: store.id, provider: 'cod', isEnabled: true },
         }),

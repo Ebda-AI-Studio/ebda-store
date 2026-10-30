@@ -9,8 +9,8 @@
  * Every id the model returns is checked against the products we actually showed it.
  */
 import { randomUUID } from 'node:crypto';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
-import { storeWriter } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { AIService } from './ai.service';
 import { invalidateCached } from '../lib/public-cache';
@@ -40,7 +40,9 @@ const norm = (s: string) => s.trim().replace(/\s+/g, ' ');
 export async function proposeStoreCategories(
   storeId: string
 ): Promise<Result<StoreCategoryProposal>> {
-  const existing = await prisma.category.count({ where: { storeId, deletedAt: null } });
+  const existing = await (
+    await storeDb(storeId)
+  ).category.count({ where: { storeId, deletedAt: null } });
   if (existing > 0)
     return {
       ok: false,
@@ -48,7 +50,9 @@ export async function proposeStoreCategories(
       code: 'CATEGORIES_EXIST',
       message: 'Suggestions are only offered while the store has no categories.',
     };
-  const products = await prisma.product.findMany({
+  const products = await (
+    await storeDb(storeId)
+  ).product.findMany({
     where: { storeId, deletedAt: null, status: { not: 'archived' } },
     select: { id: true, name: true, nameAr: true, description: true },
     orderBy: { createdAt: 'desc' },

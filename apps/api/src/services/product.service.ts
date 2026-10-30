@@ -288,7 +288,9 @@ async function computeFacets(
   baseWhere: Prisma.ProductWhereInput
 ): Promise<ProductFacet[]> {
   // Fetch all (optionName, nameAr, value, valueAr) tuples for in-scope products.
-  const rows = await prisma.productOption.findMany({
+  const rows = await (
+    await storeDb(storeId)
+  ).productOption.findMany({
     where: {
       product: { ...baseWhere, storeId },
     },
@@ -512,7 +514,7 @@ export class ProductService {
     }
 
     const [products, total] = await Promise.all([
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where,
         skip,
         take: limit,
@@ -526,7 +528,7 @@ export class ProductService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.product.count({ where }),
+      (await storeDb(storeId)).product.count({ where }),
     ]);
 
     // Variant-aware stock total. For variant products the live stock lives on the
@@ -538,7 +540,9 @@ export class ProductService {
     const variantSumByProduct = new Map<string, number>();
     if (products.length > 0) {
       const productIds = products.map(p => p.id);
-      const variantGrouped = await prisma.productVariant.groupBy({
+      const variantGrouped = await (
+        await storeDb(storeId)
+      ).productVariant.groupBy({
         by: ['productId'],
         where: { productId: { in: productIds }, isActive: true },
         _sum: { inventory: true },
@@ -649,7 +653,9 @@ export class ProductService {
   }
 
   static async getBySlug(storeId: string, slug: string) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: { slug, storeId },
       include: {
         images: { orderBy: { position: 'asc' } },
@@ -1598,7 +1604,9 @@ export class ProductService {
     // the ID in both the where clause and the position-ordered path below.
     let resolvedCategoryId: string | undefined;
     if (category) {
-      const cat = await prisma.category.findFirst({
+      const cat = await (
+        await storeDb(storeId)
+      ).category.findFirst({
         where: { storeId, slug: category, deletedAt: null },
         select: { id: true },
       });
@@ -1657,7 +1665,9 @@ export class ProductService {
       // has an id tie-break), so page N and a cursor walk see the same list. The cursor is the id of
       // the last row the client has; an id no longer in the list yields an empty page.
       const allowed = new Set(
-        (await prisma.product.findMany({ where, select: { id: true } })).map(r => r.id)
+        (await (await storeDb(storeId)).product.findMany({ where, select: { id: true } })).map(
+          r => r.id
+        )
       );
       const ordered = rankedIds.filter(id => allowed.has(id));
       let pageIdList: string[];
@@ -1671,7 +1681,7 @@ export class ProductService {
         pageIdList = ordered.slice(skip, skip + limit);
       }
       const [rows, facets] = await Promise.all([
-        prisma.product.findMany({
+        (await storeDb(storeId)).product.findMany({
           where: {
             storeId,
             status: status as ProductStatus,
@@ -1807,7 +1817,9 @@ export class ProductService {
     // already cached for 120 s, so the extra query is cold-path only.
     else if (!sort && resolvedCategoryId) {
       // Fast path: fetch only the ordered IDs from the tiny join table.
-      const orderedLinks = await prisma.productCategory.findMany({
+      const orderedLinks = await (
+        await storeDb(storeId)
+      ).productCategory.findMany({
         where: { categoryId: resolvedCategoryId },
         orderBy: [{ position: 'asc' }, { product: { createdAt: 'desc' } }],
         select: { productId: true },
@@ -1833,8 +1845,8 @@ export class ProductService {
       };
 
       const [allMatchingRaw, total, facets] = await Promise.all([
-        prisma.product.findMany(positionFindArgs),
-        prisma.product.count({ where }),
+        (await storeDb(storeId)).product.findMany(positionFindArgs),
+        (await storeDb(storeId)).product.count({ where }),
         computeFacets(storeId, whereForFacets),
       ]);
 
@@ -1924,8 +1936,8 @@ export class ProductService {
 
     // The deals strip has no filter sidebar: skip the facet query on this hot homepage path.
     const [productsRaw, total, facets] = await Promise.all([
-      prisma.product.findMany(findManyArgs),
-      prisma.product.count({ where }),
+      (await storeDb(storeId)).product.findMany(findManyArgs),
+      (await storeDb(storeId)).product.count({ where }),
       sort === 'on_sale'
         ? Promise.resolve([] as ProductFacet[])
         : computeFacets(storeId, whereForFacets),
@@ -2237,7 +2249,9 @@ export class ProductService {
   ) {
     const entitled = await featureService.isFeatureEnabled(storeId, 'b2b.wholesale');
     const rows = entitled
-      ? await prisma.productPriceTier.findMany({
+      ? await (
+          await storeDb(storeId)
+        ).productPriceTier.findMany({
           where: { storeId, productId: product.id, groupId: null },
           select: { variantId: true, minQty: true, priceMinor: true },
           orderBy: [{ variantId: 'asc' }, { minQty: 'asc' }],
@@ -2266,7 +2280,9 @@ export class ProductService {
   ) {
     // B2B-7b: the public catalogue is anonymous and NEVER returns a wholesale-only product (404, no existence oracle). The
     // approved-buyer route asks for audience 'wholesale_only' explicitly after checking membership.
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: {
         storeId,
         slug,
@@ -2307,7 +2323,9 @@ export class ProductService {
   }
 
   static async getPublicById(storeId: string, productId: string) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: { storeId, id: productId, status: 'active', deletedAt: null, audience: 'public' },
       select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
@@ -2431,7 +2449,7 @@ export class ProductService {
     // ProductsClient special-cases that slug into `sort=best_seller`
     // when fetching products.
     const [categories, bestSellerCount, store] = await Promise.all([
-      prisma.category.findMany({
+      (await storeDb(storeId)).category.findMany({
         where: {
           storeId,
           deletedAt: null,
@@ -2460,7 +2478,7 @@ export class ProductService {
           },
         },
       }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
         where: {
           storeId,
           isBestSeller: true,
@@ -2669,7 +2687,7 @@ export class ProductService {
 
     // Execute query
     const [products, total, priceRange] = await Promise.all([
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where,
         skip,
         take: limit,
@@ -2690,9 +2708,9 @@ export class ProductService {
         },
         orderBy,
       }),
-      prisma.product.count({ where }),
+      (await storeDb(storeId)).product.count({ where }),
       // Get price range for filters
-      prisma.product.aggregate({
+      (await storeDb(storeId)).product.aggregate({
         where: { storeId, status: 'active', audience: 'public' },
         _min: { price: true },
         _max: { price: true },
@@ -2764,7 +2782,9 @@ export class ProductService {
       })
     );
     if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
-    const products = await prisma.product.findMany({
+    const products = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where: {
         storeId,
         status: 'active',
@@ -2804,7 +2824,9 @@ export class ProductService {
       return { suggestions: [] };
     }
 
-    const products = await prisma.product.findMany({
+    const products = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where: {
         storeId,
         status: 'active',
@@ -2832,7 +2854,9 @@ export class ProductService {
 
     // Same Arabic folding as the products above; soft-deleted categories never suggest.
     const categoryIds = await searchNameIds('categories', storeId, query);
-    const categories = await prisma.category.findMany({
+    const categories = await (
+      await storeDb(storeId)
+    ).category.findMany({
       where: { storeId, deletedAt: null, id: { in: categoryIds } },
       select: {
         id: true,
@@ -2856,7 +2880,7 @@ export class ProductService {
    */
   static async getFilterOptions(storeId: string) {
     const [categories, tags, priceRange] = await Promise.all([
-      prisma.category.findMany({
+      (await storeDb(storeId)).category.findMany({
         where: { storeId },
         select: {
           id: true,
@@ -2873,7 +2897,7 @@ export class ProductService {
         },
         orderBy: { name: 'asc' },
       }),
-      prisma.tag.findMany({
+      (await storeDb(storeId)).tag.findMany({
         where: {
           storeId,
           products: {
@@ -2895,7 +2919,7 @@ export class ProductService {
         },
         orderBy: { name: 'asc' },
       }),
-      prisma.product.aggregate({
+      (await storeDb(storeId)).product.aggregate({
         where: { storeId, status: 'active', audience: 'public' },
         _min: { price: true },
         _max: { price: true },

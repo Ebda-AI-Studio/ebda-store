@@ -12,6 +12,7 @@
  */
 
 import { prisma, runInTenantContext, Prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { InventoryService } from './inventory.service';
 import { createAdjustment, postAdjustment } from './accounting/stock-adjustment.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
@@ -82,7 +83,7 @@ export async function lookupBarcode(
 ): Promise<BarcodeLookupResult | null> {
   const [productMatch, variantMatch] = await Promise.all([
     // Product-level barcode
-    prisma.product.findFirst({
+    (await storeDb(storeId)).product.findFirst({
       where: { storeId, barcode, deletedAt: null },
       select: {
         id: true,
@@ -94,7 +95,7 @@ export async function lookupBarcode(
       },
     }),
     // Variant-level barcode (join through product to enforce store scope)
-    prisma.productVariant.findFirst({
+    (await storeDb(storeId)).productVariant.findFirst({
       where: {
         barcode,
         product: { storeId, deletedAt: null },

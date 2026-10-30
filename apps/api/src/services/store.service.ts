@@ -9,7 +9,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
-import { copyStoreSettings, syncStoreFields } from '../lib/repo-factory';
+import { copyStoreSettings, storeDb, syncStoreFields } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -275,7 +275,7 @@ export class StoreService {
       (
         await acrossStores(
           async storeId => ({
-            products: await prisma.product.count({ where: { storeId } }),
+            products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
           { storeIds: stores.map(st => st.id) }
@@ -981,7 +981,7 @@ export class StoreService {
     // Ahmad 2026-05-21 — Demo Shop had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
-        prisma.product.count({ where: { storeId, status: 'active' } }),
+        (await storeDb(storeId)).product.count({ where: { storeId, status: 'active' } }),
         prisma.order.count({ where: { storeId } }),
         prisma.customer.count({ where: { storeId } }),
         prisma.order.aggregate({

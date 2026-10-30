@@ -42,7 +42,7 @@
  * the storefront Next data cache via the `layout:<storeId>` tag, and the
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
-import { storeRepo, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeUpdate, storeWriter } from '../lib/repo-factory';
 import { isDeepStrictEqual } from 'node:util';
 import { prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
@@ -91,7 +91,6 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { bustStoreCaches } from './store.service';
 import { cleanupRemovedJsonUrls, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import logger from '../lib/logger';
-import { storeUpdate } from '../lib/repo-factory';
 
 export const HOME_PAGE_KEY = 'home';
 /** The page documents the builder edits (home plus the product / collection / cart section pages). */
@@ -201,7 +200,9 @@ function fallbackDefinition(
 async function maxRev(storeId: string, pageKey: string): Promise<number> {
   const repo = await storeRepo(storeId);
   if (repo.backend === 'pg') {
-    const a = await prisma.storePageRevision.aggregate({
+    const a = await (
+      await storeDb(storeId)
+    ).storePageRevision.aggregate({
       where: { storeId, pageKey },
       _max: { rev: true },
     });

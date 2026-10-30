@@ -8,6 +8,7 @@
  * caches are purged by the IMMEDIATE invalidator (never the order-coalesced one): price is NEVER-stale.
  */
 import { prisma, Prisma, withMoneyTx } from '@ebda/database';
+import { storeDb, storeMoney } from '../../lib/repo-factory';
 import {
   GOLD_KARATS,
   goldRateInputSchema,
@@ -24,7 +25,6 @@ import {
 import { z } from 'zod/v3';
 import { AppError } from '../../middleware/error-handler';
 import { auditLog } from '../../middleware/security';
-import { storeMoney } from '../../lib/repo-factory';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import {
@@ -94,7 +94,9 @@ export class GoldRateService {
           feedReference: true,
         },
       }),
-      prisma.product.count({ where: { storeId, pricingMode: 'gold_rate', deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
+        where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
+      }),
     ]);
     return {
       settings,

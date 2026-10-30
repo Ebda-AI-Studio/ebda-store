@@ -654,7 +654,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
       // Ruling B5-21 (item 9): does this store sell gold-rate products? Cached WITH the feed inputs (same
       // key, same purge), so a rate write that clears this key also re-reads the flag.
       const hasGold =
-        (await prisma.product.count({
+        (await (
+          await storeDb(storeId)
+        ).product.count({
           where: {
             storeId,
             status: 'active',
@@ -1964,7 +1966,9 @@ router.post(
 
       // Verify the product belongs to this store (ownership guard).
       // Explicit select to avoid fetching unnecessary columns.
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId, deletedAt: null, audience: 'public' },
         select: { id: true },
       });
@@ -2147,8 +2151,8 @@ async function fetchFooterLocations(store: {
       ? (store.theme as Record<string, unknown>)
       : null;
   if (!store.locationsEnabled || theme?.showBranchesInFooter !== true) return undefined;
-  return readInStoreContext(store.id, () =>
-    prisma.storeLocation.findMany({
+  return readInStoreContext(store.id, async () =>
+    (await storeDb(store.id)).storeLocation.findMany({
       where: { storeId: store.id, isPublished: true },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2301,8 +2305,8 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // Mirror the /store/resolve endpoint: surface explicitly-disabled
       // CMS pages so the storefront footer can hide their links rather
       // than rendering a "Page unavailable" landing on click.
-      const disabledPages = await readInStoreContext(store.id, () =>
-        prisma.storePage.findMany({
+      const disabledPages = await readInStoreContext(store.id, async () =>
+        (await storeDb(store.id)).storePage.findMany({
           where: { storeId: store.id, isPublished: false },
           select: { slug: true },
         })
@@ -2719,7 +2723,9 @@ router.get(
       }
 
       // Load product + store info for the form
-      const product = await prisma.product.findUnique({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findUnique({
         where: { id: productId, storeId },
         select: { id: true, name: true, nameAr: true, images: true, storeId: true },
       });

@@ -433,7 +433,9 @@ export class BulkService {
 
     // Hard ceiling to prevent OOM on very large stores.
     // Most stores have well under 10,000 products.
-    const products = await prisma.product.findMany({
+    const products = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where,
       include: {
         images: { orderBy: { position: 'asc' } },

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { storeWriter } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { ProductService } from '../services/product.service';
@@ -412,7 +412,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isNew: true, deletedAt: null },
         orderBy: [{ newArrivalPosition: 'asc' }, { createdAt: 'desc' }],
         select: {
@@ -447,7 +449,9 @@ router.put(
       const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
 
       // Validate every supplied ID is a product in this store with isNew=true.
-      const existing = await prisma.product.findMany({
+      const existing = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isNew: true, id: { in: orderedProductIds }, deletedAt: null },
         select: { id: true },
       });
@@ -497,7 +501,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isBestSeller: true, deletedAt: null },
         orderBy: [{ bestSellerPosition: 'asc' }, { createdAt: 'desc' }],
         select: {
@@ -532,7 +538,9 @@ router.put(
       const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
 
       // Validate every supplied ID is a product in this store with isBestSeller=true.
-      const existing = await prisma.product.findMany({
+      const existing = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isBestSeller: true, id: { in: orderedProductIds }, deletedAt: null },
         select: { id: true },
       });
