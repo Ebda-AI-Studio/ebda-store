@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -101,5 +101,41 @@ describe('docs.ebda.app Ebda WhatsApp section (LAUNCH-SUITE-1)', () => {
     expect(readFileSync(out('ar', 'whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
       'href="/ar/whatsapp/api/"'
     );
+  });
+});
+
+describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
+  it('Ebda WhatsApp guides build at /whatsapp/<slug>/ in both locales, with a sidebar group and a home section', () => {
+    const ar = readdirSync(path.join(ROOT, 'apps/help/content/ar/whatsapp')).filter(f =>
+      f.endsWith('.mdx')
+    );
+    const en = readdirSync(path.join(ROOT, 'apps/help/content/en/whatsapp')).filter(f =>
+      f.endsWith('.mdx')
+    );
+    expect(ar.length).toBe(13);
+    expect(ar).toEqual(en); // parity: same slugs in both locales
+    const out = (...p: string[]) => path.join(ROOT, 'apps/help/out', ...p);
+    for (const f of ar) {
+      const slug = f.replace(/\.mdx$/, '');
+      expect(existsSync(out('whatsapp', slug, 'index.html')), `ar ${slug}`).toBe(true);
+      expect(existsSync(out('en', 'whatsapp', slug, 'index.html')), `en ${slug}`).toBe(true);
+    }
+    const page = readFileSync(out('en', 'whatsapp', 'ai-agent', 'index.html'), 'utf8');
+    expect(page).toContain('Ebda WhatsApp'); // eyebrow + sidebar group
+    expect(readFileSync(out('index.html'), 'utf8')).toContain('id="p-whatsapp"');
+    expect(readFileSync(out('sitemap.xml'), 'utf8')).toContain(
+      'https://help.ebda.app/whatsapp/ai-agent/'
+    );
+    expect(readFileSync(out('sitemap.xml'), 'utf8')).toContain(
+      'https://help.ebda.app/en/whatsapp/ai-agent/'
+    );
+  });
+  it('guides keep no relative .md links and name no provider', () => {
+    for (const lang of ['ar', 'en'])
+      for (const f of readdirSync(path.join(ROOT, 'apps/help/content', lang, 'whatsapp'))) {
+        const t = readFileSync(path.join(ROOT, 'apps/help/content', lang, 'whatsapp', f), 'utf8');
+        expect(t, f).not.toMatch(/\]\([^)]*\.md[)#]/);
+        expect(t, f).not.toMatch(/Cloudflare|Gemini|Neon|Railway|Inngest/i);
+      }
   });
 });

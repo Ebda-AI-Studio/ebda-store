@@ -54,3 +54,6 @@ apps/marketing/legal-source
 
 # vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/support-wa-docs-drift.test.ts)
 apps/docs/wa-source
+
+# vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/support-wa-help-drift.test.ts)
+apps/help/wa-source
