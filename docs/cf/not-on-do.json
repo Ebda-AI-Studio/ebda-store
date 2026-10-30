@@ -2,7 +2,7 @@
   "note": "Ruling CF-FINAL-1. tests/unit/do-not-on-do-guard.test.ts keeps `refusals` EQUAL to what the code refuses (a new 501 or *_NOT_ON_DO fails the build until it is listed here or removed). `postgresOnly` lists flows a Durable Object store still runs against Postgres (no 501, so the scan cannot see them). A store may be flipped to `do` only when `node scripts/cf/not-on-do.mjs` exits 0. R4 (Ruling CF-R4-1) removed ORDER_SEARCH_NOT_ON_DO; manual orders, cart pricing, newsletter_subscribers and the abandoned-cart jobs were never refusals (CF-R2-1 section 5 named them as still on Postgres) and now run on the DO (CF-R4-2..5). R6a (Rulings CF-R6A-1 .. CF-R6A-3) moved the last three Postgres-only flows onto the DO: the admin command-palette search, the e-mail campaign send and the shopper account erasure; the list is empty. JOBS (Ruling CF-JOBS-4): `jobsRefused` are the MONEY jobs still refused for a DO store (they close the gate), `jobsAccepted` the non-money jobs also refused (P1 alert; they ALSO close the gate, CF-JOBS-4), `sweepSkips` the ported cron sweeps with no alarm. tests/unit/do-not-on-do-guard.test.ts keeps all three EQUAL to job-data.ts / jobs-map.ts / alarm-flag.ts.",
   "refusals": [],
   "postgresOnly": [],
-  "jobsRefused": ["order-created-fanout", "order-refunded-fanout", "order-status-changed-fanout"],
+  "jobsRefused": ["order-refunded-fanout", "order-status-changed-fanout"],
   "jobsAccepted": [
     "account-erased-propagation",
     "accounting-expense-ocr-process",

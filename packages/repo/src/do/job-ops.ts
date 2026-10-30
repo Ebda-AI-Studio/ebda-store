@@ -194,3 +194,261 @@ export function reorderUpsertOp(
   }
   return { upserted };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The order fan-out jobs (order-created, order-status-changed, order-refunded; Ruling CF-JOBS-4). Each takes a CLAIM that
+// the Postgres version took with an `updateMany` / an `order_events` marker under `FOR UPDATE`; on the DO a claim is one
+// conditional statement in one section, so two deliveries of the same event claim once.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** order-created fan-out: claim the customer notification exactly once (`order_created_notified_at` was NULL). */
+export function orderNotifyClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const r = db.run(
+    'UPDATE orders SET order_created_notified_at = ? WHERE id = ? AND store_id = ? AND order_created_notified_at IS NULL',
+    [Date.now(), str(a.orderId, 'orderId'), storeId]
+  );
+  return { claimed: r.changes > 0 };
+}
+
+/** order-status-changed fan-out: claim the transition that is still the order's current status. */
+export function statusFanoutClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const r = db.run(
+    'UPDATE orders SET status_fanout_claimed_at = ? WHERE id = ? AND store_id = ? AND status = ? AND status_fanout_claimed_at IS NULL',
+    [Date.now(), str(a.orderId, 'orderId'), storeId, str(a.status, 'status')]
+  );
+  return { claimed: r.changes > 0 };
+}
+
+/** ... and mark it complete (only the claimed, requested transition, once). */
+export function statusFanoutCompleteOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { completed: boolean } {
+  const r = db.run(
+    'UPDATE orders SET status_fanout_completed_at = ? WHERE id = ? AND store_id = ? AND status_fanout_requested_status = ? AND status_fanout_claimed_at IS NOT NULL AND status_fanout_completed_at IS NULL',
+    [Date.now(), str(a.orderId, 'orderId'), storeId, str(a.status, 'status')]
+  );
+  return { completed: r.changes > 0 };
+}
+
+const MARKER_RE = /^[a-z_]{3,40}$/;
+/** An `order_events` marker taken at most once (the cancel-notice claim): true when THIS call took it. */
+export function markerClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const orderId = str(a.orderId, 'orderId');
+  const marker = str(a.marker, 'marker');
+  if (!MARKER_RE.test(marker)) throw new MoneyError('BAD_ARGS', 'marker', 400);
+  return db.transactionSync(() => {
+    const have = db.all(
+      'SELECT id FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = ?',
+      [storeId, orderId, marker]
+    )[0];
+    if (have) return { claimed: false };
+    db.run(
+      "INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES (?, ?, ?, NULL, ?, NULL, '{}', ?)",
+      [crypto.randomUUID(), storeId, orderId, marker, Date.now()]
+    );
+    return { claimed: true };
+  });
+}
+
+/** Give a marker back (the notice could not be sent, so a replay may send it). */
+export function markerReleaseOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { released: number } {
+  const marker = str(a.marker, 'marker');
+  if (!MARKER_RE.test(marker)) throw new MoneyError('BAD_ARGS', 'marker', 400);
+  return {
+    released: db.run(
+      'DELETE FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = ?',
+      [storeId, str(a.orderId, 'orderId'), marker]
+    ).changes,
+  };
+}
+
+const NOTIFY_CHANNELS = ['email', 'dispatch', 'push'];
+const releasedOf = (meta: Record<string, unknown>): string[] =>
+  NOTIFY_CHANNELS.filter(c => (Array.isArray(meta.released) ? meta.released : []).includes(c));
+
+/**
+ * The refund notification claim (`refund_notified` marker, per-channel release): the first call takes every channel; a
+ * later call hands out only the channels a failed run released, once.
+ */
+export function refundNotifyClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { channels: string[] } {
+  const orderId = str(a.orderId, 'orderId');
+  return db.transactionSync(() => {
+    const sent = db.all(
+      "SELECT id, metadata FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = 'refund_notified'",
+      [storeId, orderId]
+    )[0];
+    if (!sent) {
+      db.run(
+        "INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES (?, ?, ?, NULL, 'refund_notified', NULL, '{}', ?)",
+        [crypto.randomUUID(), storeId, orderId, Date.now()]
+      );
+      return { channels: [...NOTIFY_CHANNELS] };
+    }
+    const meta = JSON.parse(sent.metadata as string) as Record<string, unknown>;
+    const released = releasedOf(meta);
+    if (released.length === 0) return { channels: [] };
+    db.run('UPDATE order_events SET metadata = ? WHERE id = ? AND store_id = ?', [
+      JSON.stringify({ ...meta, released: [] }),
+      sent.id as string,
+      storeId,
+    ]);
+    return { channels: released };
+  });
+}
+
+/** The customer e-mail of a refund failed: release that channel so a replay sends it. */
+export function refundNotifyReleaseOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { released: string[] } {
+  const orderId = str(a.orderId, 'orderId');
+  const channel = str(a.channel ?? 'email', 'channel');
+  if (!NOTIFY_CHANNELS.includes(channel)) throw new MoneyError('BAD_ARGS', 'channel', 400);
+  return db.transactionSync(() => {
+    const claim = db.all(
+      "SELECT id, metadata FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = 'refund_notified'",
+      [storeId, orderId]
+    )[0];
+    if (!claim) return { released: [] };
+    const meta = JSON.parse(claim.metadata as string) as Record<string, unknown>;
+    const released = [...new Set([...releasedOf(meta), channel])];
+    db.run('UPDATE order_events SET metadata = ? WHERE id = ? AND store_id = ?', [
+      JSON.stringify({ ...meta, released }),
+      claim.id as string,
+      storeId,
+    ]);
+    return { released };
+  });
+}
+
+/**
+ * The refund fan-out's completion stamp: a partial refund stamps its Return's `reversal_applied_at`, a whole-order one
+ * stamps `refund_reversed_at` (only when armed, unless stock is restored), each at most once.
+ */
+export function reversalClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const now = Date.now();
+  if (typeof a.returnId === 'string' && a.returnId) {
+    const r = db.run(
+      'UPDATE returns SET reversal_applied_at = ? WHERE id = ? AND store_id = ? AND reversal_applied_at IS NULL',
+      [now, a.returnId, storeId]
+    );
+    return { claimed: r.changes > 0 };
+  }
+  const r = db.run(
+    `UPDATE orders SET refund_reversed_at = ? WHERE id = ? AND store_id = ? AND refund_reversed_at IS NULL${
+      a.restoreInventory === false ? ' AND refund_reversal_requested_at IS NULL' : ''
+    }`,
+    [now, str(a.orderId, 'orderId'), storeId]
+  );
+  return { claimed: r.changes > 0 };
+}
+
+/**
+ * AffiliateService.processCommission's write half, in one section: the referral is claimed (`converted` with no
+ * commission yet -> `commission_paid`), the affiliate's balances move and the event row is written. The Worker computed
+ * `commissionAmount` from the order total and the rate. Returns false when another run claimed it first.
+ */
+export function affiliateCommissionOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const referralId = str(a.referralId, 'referralId');
+  const amount = a.commissionAmount;
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount < 0)
+    throw new MoneyError('BAD_ARGS', 'commissionAmount', 400);
+  return db.transactionSync(() => {
+    const ref = db.all(
+      "SELECT affiliate_id, order_id FROM affiliate_referrals WHERE id = ? AND store_id = ? AND status = 'converted' AND commission_amount IS NULL",
+      [referralId, storeId]
+    )[0];
+    if (!ref) return { claimed: false };
+    db.run(
+      "UPDATE affiliate_referrals SET commission_amount = ?, status = 'commission_paid' WHERE id = ? AND store_id = ?",
+      [amount, referralId, storeId]
+    );
+    db.run(
+      'UPDATE affiliates SET total_earned = total_earned + ?1, pending_balance = pending_balance + ?1 WHERE id = ?2 AND store_id = ?3',
+      [amount, ref.affiliate_id as string, storeId]
+    );
+    addAffiliateEvent(db, storeId, ref.affiliate_id as string, 'commission_recorded', {
+      orderId: ref.order_id,
+      commissionAmount: amount,
+      rate: a.rate ?? null,
+      referralId,
+    });
+    return { claimed: true };
+  });
+}
+
+/** AffiliateService.reverseCommission's write half (a refunded order): `commission_paid` -> `refunded`, balances back. */
+export function affiliateReverseOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { amount: number | null } {
+  const orderId = str(a.orderId, 'orderId');
+  return db.transactionSync(() => {
+    const ref = db.all(
+      "SELECT id, affiliate_id, commission_amount FROM affiliate_referrals WHERE store_id = ? AND order_id = ? AND status = 'commission_paid'",
+      [storeId, orderId]
+    )[0];
+    const amount = (ref?.commission_amount as number | null) ?? 0;
+    if (!ref || !amount) return { amount: null };
+    db.run(
+      "UPDATE affiliate_referrals SET status = 'refunded' WHERE id = ? AND store_id = ? AND status = 'commission_paid'",
+      [ref.id as string, storeId]
+    );
+    db.run(
+      'UPDATE affiliates SET total_earned = total_earned - ?1, pending_balance = pending_balance - ?1 WHERE id = ?2 AND store_id = ?3',
+      [amount, ref.affiliate_id as string, storeId]
+    );
+    addAffiliateEvent(db, storeId, ref.affiliate_id as string, 'commission_reversed', {
+      orderId,
+      amount,
+      referralId: ref.id,
+    });
+    return { amount };
+  });
+}
+
+function addAffiliateEvent(
+  db: SyncSql,
+  storeId: string,
+  affiliateId: string,
+  eventType: string,
+  details: Record<string, unknown>
+): void {
+  const now = Date.now();
+  db.run(
+    'INSERT INTO affiliate_events (id, affiliate_id, store_id, event_type, details, occurred_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [crypto.randomUUID(), affiliateId, storeId, eventType, JSON.stringify(details), now, now]
+  );
+}

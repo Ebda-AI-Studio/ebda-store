@@ -322,3 +322,114 @@ describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', 
     expect(r2.q('SELECT count(*) n FROM journal_entries')[0].n).toBe(0);
   });
 });
+
+describe('fan-out claims, markers and affiliate writes (Ruling CF-JOBS-4)', () => {
+  function placed() {
+    const r = rig();
+    const o = r.order('cod');
+    return { r, o };
+  }
+
+  it('orderNotifyClaim claims once', () => {
+    const { r, o } = placed();
+    expect(r.op('orderNotifyClaim', { orderId: o.orderId })).toEqual({ claimed: true });
+    expect(r.op('orderNotifyClaim', { orderId: o.orderId })).toEqual({ claimed: false });
+  });
+
+  it('statusFanoutClaim / Complete: only the current status, only once, complete only after a claim', () => {
+    const { r, o } = placed();
+    r.raw.exec(
+      `UPDATE orders SET status_fanout_requested_status = 'pending', status_fanout_requested_at = 5 WHERE id = '${o.orderId}'`
+    );
+    expect(r.op('statusFanoutComplete', { orderId: o.orderId, status: 'pending' })).toEqual({
+      completed: false,
+    });
+    expect(r.op('statusFanoutClaim', { orderId: o.orderId, status: 'shipped' })).toEqual({
+      claimed: false,
+    });
+    expect(r.op('statusFanoutClaim', { orderId: o.orderId, status: 'pending' })).toEqual({
+      claimed: true,
+    });
+    expect(r.op('statusFanoutClaim', { orderId: o.orderId, status: 'pending' })).toEqual({
+      claimed: false,
+    });
+    expect(r.op('statusFanoutComplete', { orderId: o.orderId, status: 'pending' })).toEqual({
+      completed: true,
+    });
+    expect(r.op('statusFanoutComplete', { orderId: o.orderId, status: 'pending' })).toEqual({
+      completed: false,
+    });
+  });
+
+  it('markerClaim takes a marker once, markerRelease gives it back, a bad marker is refused', () => {
+    const { r, o } = placed();
+    expect(r.op('markerClaim', { orderId: o.orderId, marker: 'cancel_notified' })).toEqual({
+      claimed: true,
+    });
+    expect(r.op('markerClaim', { orderId: o.orderId, marker: 'cancel_notified' })).toEqual({
+      claimed: false,
+    });
+    expect(r.op('markerRelease', { orderId: o.orderId, marker: 'cancel_notified' })).toEqual({
+      released: 1,
+    });
+    expect(r.op('markerClaim', { orderId: o.orderId, marker: 'cancel_notified' })).toEqual({
+      claimed: true,
+    });
+    expect(r.code('markerClaim', { orderId: o.orderId, marker: "x'; DROP" })).toBe('BAD_ARGS/400');
+  });
+
+  it('refund notification: the first call takes every channel, a repeat none, a released e-mail comes back once', () => {
+    const { r, o } = placed();
+    expect(r.op('refundNotifyClaim', { orderId: o.orderId }).channels).toEqual([
+      'email',
+      'dispatch',
+      'push',
+    ]);
+    expect(r.op('refundNotifyClaim', { orderId: o.orderId }).channels).toEqual([]);
+    expect(r.op('refundNotifyRelease', { orderId: o.orderId, channel: 'email' }).released).toEqual([
+      'email',
+    ]);
+    expect(r.op('refundNotifyClaim', { orderId: o.orderId }).channels).toEqual(['email']);
+    expect(r.op('refundNotifyClaim', { orderId: o.orderId }).channels).toEqual([]);
+  });
+
+  it('reversalClaim stamps the order once (armed unless stock is restored); a return stamps its own row once', () => {
+    const { r, o } = placed();
+    expect(r.op('reversalClaim', { orderId: o.orderId, restoreInventory: false })).toEqual({
+      claimed: true,
+    });
+    expect(r.op('reversalClaim', { orderId: o.orderId, restoreInventory: false })).toEqual({
+      claimed: false,
+    });
+    expect(r.op('reversalClaim', { orderId: 'nope' })).toEqual({ claimed: false });
+  });
+
+  it('affiliate commission is claimed once, moves the balances, and its reversal puts them back once', () => {
+    const { r, o } = placed();
+    r.raw.exec(
+      `INSERT INTO affiliates (id, store_id, name, email, referral_code, status) VALUES ('af1', 's1', 'Aff', 'a@example.test', 'CODE', 'active')`
+    );
+    r.raw.exec(
+      `INSERT INTO affiliate_referrals (id, store_id, affiliate_id, order_id, referral_code, status, cookie_expires_at) VALUES ('rf1', 's1', 'af1', '${o.orderId}', 'CODE', 'converted', 9999999999999)`
+    );
+    expect(
+      r.op('affiliateCommission', { referralId: 'rf1', commissionAmount: 250, rate: 10 })
+    ).toEqual({ claimed: true });
+    expect(
+      r.op('affiliateCommission', { referralId: 'rf1', commissionAmount: 250, rate: 10 })
+    ).toEqual({ claimed: false });
+    expect(r.q('SELECT total_earned t, pending_balance p FROM affiliates')[0]).toEqual({
+      t: 250,
+      p: 250,
+    });
+    expect(r.op('affiliateReverse', { orderId: o.orderId })).toEqual({ amount: 250 });
+    expect(r.op('affiliateReverse', { orderId: o.orderId })).toEqual({ amount: null });
+    expect(r.q('SELECT total_earned t, pending_balance p FROM affiliates')[0]).toEqual({
+      t: 0,
+      p: 0,
+    });
+    expect(
+      r.q('SELECT event_type e FROM affiliate_events ORDER BY occurred_at').map(x => x.e)
+    ).toEqual(['commission_recorded', 'commission_reversed']);
+  });
+});

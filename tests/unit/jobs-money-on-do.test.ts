@@ -19,7 +19,7 @@ const h = vi.hoisted(() => ({
     }
   ),
   doDb: {
-    order: { findMany: vi.fn() },
+    order: { findMany: vi.fn(), findUnique: vi.fn() },
     payment: { findMany: vi.fn() },
     paymentEvent: { findMany: vi.fn() },
     storeWhatsAppLink: { findUnique: vi.fn() },
@@ -33,6 +33,7 @@ const h = vi.hoisted(() => ({
     periodGlCredits: vi.fn(async () => ({ total: 50 })),
     journalSale: vi.fn(async () => ({ posted: true, entries: 2 })),
     journalRefund: vi.fn(async () => ({ reversed: 2 })),
+    orderNotifyClaim: vi.fn(async () => ({ claimed: true })),
     journalExpense: vi.fn(async () => ({ posted: true })),
     journalStockAdjustment: vi.fn(async () => ({ posted: true })),
     journalPoReceive: vi.fn(async () => ({ posted: true, entries: 1 })),
@@ -46,6 +47,7 @@ const h = vi.hoisted(() => ({
     })),
     reconcileWarehouseSku: vi.fn(async () => ({ reconciled: true, diff: 0 })),
   },
+  sendConfirmation: vi.fn(async () => undefined),
   createShipment: vi.fn(async () => ({ id: 'sh1', status: 'created' })),
   send: vi.fn(async () => undefined),
   sendAlert: vi.fn(async () => 'sent'),
@@ -68,9 +70,12 @@ vi.mock('@ebda/database', async () =>
       runInTenantContext: async () => {
         throw new Error('Postgres touched: runInTenantContext');
       },
-      withStore: async () => {
-        throw new Error('Postgres touched: withStore');
-      },
+      // `Store` / `User` are platform rows, still read from Postgres: only those two models may be asked of withStore
+      withStore: async (_s: string, fn: (tx: unknown) => unknown) =>
+        fn({
+          store: { findUnique: async () => ({ name: 'Demo', settings: {} }) },
+          user: { findFirst: async () => null },
+        }),
     },
   })
 );
@@ -116,7 +121,17 @@ vi.mock('@api/services/shipping-carrier.service', () => ({
   shippingCarrierService: { createShipmentForOrder: h.createShipment },
 }));
 vi.mock('@api/services/onesignal.service', () => ({
-  OneSignalService: { notifyAdminsOfShipmentFailure: vi.fn() },
+  OneSignalService: {
+    notifyAdminsOfShipmentFailure: vi.fn(),
+    notifyAdminsOfOrder: vi.fn(async () => undefined),
+    notifyOrdersAppOfOrder: vi.fn(async () => undefined),
+  },
+}));
+vi.mock('@api/services/email.service', () => ({
+  EmailService: { sendOrderConfirmation: h.sendConfirmation },
+}));
+vi.mock('@api/services/notification-dispatcher.service', () => ({
+  notificationDispatcher: { dispatch: vi.fn(async () => undefined) },
 }));
 vi.mock('@api/services/redis.service', () => ({ redis: { exists: vi.fn(), set: vi.fn() } }));
 
@@ -131,6 +146,7 @@ import { accountingPostRefundJournal } from '@api/lib/inngest/functions/accounti
 import { accountingPostExpenseJournal } from '@api/lib/inngest/functions/accounting-post-expense-journal';
 import { accountingPostPoReceiveJournal } from '@api/lib/inngest/functions/accounting-post-po-receive-journal';
 import { accountingPostStockAdjustmentJournal } from '@api/lib/inngest/functions/accounting-post-stock-adjustment-journal';
+import { orderCreated } from '@api/lib/inngest/functions/order-created';
 import { bookShipment } from '@api/lib/inngest/functions/shipment-create';
 import { accountingDailyClose } from '@api/lib/inngest/functions/accounting-daily-close';
 import { sweepAllWarehouseStores } from '@api/lib/inngest/functions/warehouse-reconcile-sweep';
@@ -355,6 +371,39 @@ describe('wa-store-events: the erasure step runs for a DO store', () => {
       })
     ).toBe(0);
     expect(h.sendStoreEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('order-created-fanout on a DO store', () => {
+  const orderRow = {
+    id: 'o1',
+    orderNumber: '1001',
+    customerId: null,
+    locale: 'ar',
+    paymentStatus: 'unpaid',
+    currency: 'EGP',
+    total: 1000,
+    subtotal: 1000,
+    shippingAddress: { firstName: 'A', lastName: 'B', email: 'a@example.test', phone: '0100' },
+    items: [],
+    appliedPromotion: null,
+  };
+  const fire = () =>
+    (orderCreated as unknown as Handler).handler({
+      event: {
+        name: 'order/created',
+        data: { orderId: 'o1', storeId: DO_STORE, paymentMethod: 'cod' },
+      },
+      step,
+    });
+  it('claims in the DO and sends the confirmation once; a second delivery sends nothing (double-fire)', async () => {
+    h.doDb.order.findUnique.mockResolvedValue(orderRow);
+    h.money.orderNotifyClaim.mockResolvedValueOnce({ claimed: true });
+    await fire();
+    expect(h.sendConfirmation).toHaveBeenCalledTimes(1);
+    h.money.orderNotifyClaim.mockResolvedValueOnce({ claimed: false });
+    await fire();
+    expect(h.sendConfirmation).toHaveBeenCalledTimes(1);
   });
 });
 

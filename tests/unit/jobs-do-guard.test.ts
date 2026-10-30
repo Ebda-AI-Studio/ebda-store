@@ -95,7 +95,7 @@ const PG_STORE = '11111111-1111-4111-8111-111111111111';
 
 // payment-webhook-process (the only production resolver) is ported (Ruling CF-JOBS-4), so the resolver mechanism is exercised
 // with a still-unported money job: its event names the store through an inbox-like row.
-EVENT_STORE_RESOLVERS['order-created-fanout'] = async event => {
+EVENT_STORE_RESOLVERS['order-refunded-fanout'] = async event => {
   const id = event.data?.webhookEventId;
   if (typeof id !== 'string' || !id) return undefined;
   return ((await inbox.get(id)) as { storeId?: string | null } | undefined)?.storeId ?? undefined;
@@ -197,8 +197,8 @@ describe('with JOBS_ON_DO off (today) nothing changes', () => {
   it('no store is a DO store, every decision is "run", guardedRun is a pass-through', async () => {
     vi.stubEnv('STORE_DO_ENABLED_IDS', DO_STORE); // the Phase 0 spike flag alone must not touch jobs
     expect(doStoreIds().size).toBe(0);
-    registerJob({ id: 'order-created-fanout' }, async () => 1);
-    const def = { id: 'order-created-fanout', options: { id: 'x' }, handler: async () => 1 };
+    registerJob({ id: 'order-refunded-fanout' }, async () => 1);
+    const def = { id: 'order-refunded-fanout', options: { id: 'x' }, handler: async () => 1 };
     expect(decideRun(def, { name: 'a', data: { storeId: DO_STORE } })).toEqual({ run: true });
     expect(await guardedRun(def, { name: 'a' }, async () => 42)).toBe(42);
   });
@@ -223,9 +223,9 @@ describe('events that carry no storeId (PR E residual)', () => {
   it('payment-webhook-process resolves its store from the inbox row: a DO store is refused (P0), a Postgres store runs', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'order-created-fanout' }, handler);
+    registerJob({ id: 'order-refunded-fanout' }, handler);
     inbox.get.mockResolvedValueOnce({ storeId: DO_STORE });
-    const m = qmsg('order-created-fanout', { webhookEventId: 'wh1', provider: 'paymob' });
+    const m = qmsg('order-refunded-fanout', { webhookEventId: 'wh1', provider: 'paymob' });
     await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
     expect(handler).not.toHaveBeenCalled();
     expect(m.ack).toHaveBeenCalled();
@@ -235,14 +235,14 @@ describe('events that carry no storeId (PR E residual)', () => {
     inbox.get.mockResolvedValueOnce({ storeId: 'some-postgres-store' });
     await handleJobsBatch({
       queue: 'ebda-jobs',
-      messages: [qmsg('order-created-fanout', { webhookEventId: 'wh2', provider: 'paymob' })],
+      messages: [qmsg('order-refunded-fanout', { webhookEventId: 'wh2', provider: 'paymob' })],
     });
     expect(handler).toHaveBeenCalledTimes(1);
     expect(sendAlert).not.toHaveBeenCalled();
   });
   it('a row with no store, a missing id or a failed lookup runs as the platform-only path (no DO store reachable)', async () => {
     flagOn();
-    const def = { id: 'order-created-fanout', options: { id: 'x' }, handler: async () => 1 };
+    const def = { id: 'order-refunded-fanout', options: { id: 'x' }, handler: async () => 1 };
     inbox.get.mockResolvedValueOnce({ storeId: null });
     expect(
       await resolveRunStore(def, { name: 'a', data: { webhookEventId: 'w' } })
@@ -254,7 +254,7 @@ describe('events that carry no storeId (PR E residual)', () => {
     ).toBeUndefined();
   });
   it('with JOBS_ON_DO off the inbox is never read', async () => {
-    const def = { id: 'order-created-fanout', options: { id: 'x' }, handler: async () => 1 };
+    const def = { id: 'order-refunded-fanout', options: { id: 'x' }, handler: async () => 1 };
     inbox.get.mockClear();
     expect(needsStoreLookup(def, { name: 'a', data: { webhookEventId: 'w' } })).toBe(false);
     expect(
@@ -265,10 +265,10 @@ describe('events that carry no storeId (PR E residual)', () => {
   it('the Workflow runner looks the store up in its own step and refuses a DO store', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'order-created-fanout' }, handler);
+    registerJob({ id: 'order-refunded-fanout' }, handler);
     inbox.get.mockResolvedValueOnce({ storeId: DO_STORE });
     wfCalls.length = 0;
-    await runJobWorkflow(wfArgs('order-created-fanout', { webhookEventId: 'w' }));
+    await runJobWorkflow(wfArgs('order-refunded-fanout', { webhookEventId: 'w' }));
     expect(handler).not.toHaveBeenCalled();
     expect(wfCalls).toContain('do:resolve-run-store');
   });
@@ -286,8 +286,8 @@ describe('refusal of unported jobs for a DO store', () => {
     flagOn();
     const handler = vi.fn(async () => 1);
     const onFailure = vi.fn();
-    registerJob({ id: 'order-created-fanout', onFailure }, handler);
-    const m = qmsg('order-created-fanout', { storeId: DO_STORE });
+    registerJob({ id: 'order-refunded-fanout', onFailure }, handler);
+    const m = qmsg('order-refunded-fanout', { storeId: DO_STORE });
     await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
     expect(handler).not.toHaveBeenCalled();
     expect(onFailure).not.toHaveBeenCalled();
@@ -319,8 +319,8 @@ describe('refusal of unported jobs for a DO store', () => {
   it('workflow runner: refused before any step body, alert sent in its own step', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'order-created-fanout' }, handler);
-    await runJobWorkflow(wfArgs('order-created-fanout', { storeId: DO_STORE }));
+    registerJob({ id: 'order-refunded-fanout' }, handler);
+    await runJobWorkflow(wfArgs('order-refunded-fanout', { storeId: DO_STORE }));
     expect(handler).not.toHaveBeenCalled();
     expect(wfCalls).toEqual(['do:do-guard-refusal']);
     expect(sendAlert).toHaveBeenCalledWith(expect.objectContaining({ level: 'p0' }));

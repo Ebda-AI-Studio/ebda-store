@@ -80,6 +80,16 @@ import {
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import { journalExpenseOp, journalPoReceiveOp, journalStockAdjustmentOp } from './books-journals';
 import {
+  orderNotifyClaimOp,
+  statusFanoutClaimOp,
+  statusFanoutCompleteOp,
+  markerClaimOp,
+  markerReleaseOp,
+  refundNotifyClaimOp,
+  refundNotifyReleaseOp,
+  reversalClaimOp,
+  affiliateCommissionOp,
+  affiliateReverseOp,
   abandonStampOp,
   periodGlCreditsOp,
   recordPaymentEventOp,
@@ -131,6 +141,16 @@ export type MoneyOpName =
   | 'abandonStamp'
   | 'trialBalance'
   | 'periodGlCredits'
+  | 'orderNotifyClaim'
+  | 'statusFanoutClaim'
+  | 'statusFanoutComplete'
+  | 'markerClaim'
+  | 'markerRelease'
+  | 'refundNotifyClaim'
+  | 'refundNotifyRelease'
+  | 'reversalClaim'
+  | 'affiliateCommission'
+  | 'affiliateReverse'
   | 'journalExpense'
   | 'journalStockAdjustment'
   | 'journalPoReceive'
@@ -198,6 +218,16 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'abandonStamp',
   'trialBalance',
   'periodGlCredits',
+  'orderNotifyClaim',
+  'statusFanoutClaim',
+  'statusFanoutComplete',
+  'markerClaim',
+  'markerRelease',
+  'refundNotifyClaim',
+  'refundNotifyRelease',
+  'reversalClaim',
+  'affiliateCommission',
+  'affiliateReverse',
   'journalExpense',
   'journalStockAdjustment',
   'journalPoReceive',
@@ -557,6 +587,16 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   journalExpense: (db, storeId, a) => journalExpenseOp(db, storeId, a),
   journalStockAdjustment: (db, storeId, a) => journalStockAdjustmentOp(db, storeId, a),
   journalPoReceive: (db, storeId, a) => journalPoReceiveOp(db, storeId, a),
+  orderNotifyClaim: (db, storeId, a) => orderNotifyClaimOp(db, storeId, a),
+  statusFanoutClaim: (db, storeId, a) => statusFanoutClaimOp(db, storeId, a),
+  statusFanoutComplete: (db, storeId, a) => statusFanoutCompleteOp(db, storeId, a),
+  markerClaim: (db, storeId, a) => markerClaimOp(db, storeId, a),
+  markerRelease: (db, storeId, a) => markerReleaseOp(db, storeId, a),
+  refundNotifyClaim: (db, storeId, a) => refundNotifyClaimOp(db, storeId, a),
+  refundNotifyRelease: (db, storeId, a) => refundNotifyReleaseOp(db, storeId, a),
+  reversalClaim: (db, storeId, a) => reversalClaimOp(db, storeId, a),
+  affiliateCommission: (db, storeId, a) => affiliateCommissionOp(db, storeId, a),
+  affiliateReverse: (db, storeId, a) => affiliateReverseOp(db, storeId, a),
   reorderExpire: (db, storeId, a) => reorderExpireOp(db, storeId, a),
   reorderUpsert: (db, storeId, a) => reorderUpsertOp(db, storeId, a),
   /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */

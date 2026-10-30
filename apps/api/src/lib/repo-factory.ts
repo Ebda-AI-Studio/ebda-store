@@ -486,6 +486,25 @@ export interface MoneyClient {
     poId: string;
     clearedBackorders: Array<Record<string, unknown>>;
   }): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  /** Order fan-out claims, refund notification markers and affiliate commission writes (Ruling CF-JOBS-4). */
+  orderNotifyClaim(a: { orderId: string }): Promise<{ claimed: boolean }>;
+  statusFanoutClaim(a: { orderId: string; status: string }): Promise<{ claimed: boolean }>;
+  statusFanoutComplete(a: { orderId: string; status: string }): Promise<{ completed: boolean }>;
+  markerClaim(a: { orderId: string; marker: string }): Promise<{ claimed: boolean }>;
+  markerRelease(a: { orderId: string; marker: string }): Promise<{ released: number }>;
+  refundNotifyClaim(a: { orderId: string }): Promise<{ channels: string[] }>;
+  refundNotifyRelease(a: { orderId: string; channel?: string }): Promise<{ released: string[] }>;
+  reversalClaim(a: {
+    orderId: string;
+    restoreInventory?: boolean;
+    returnId?: string;
+  }): Promise<{ claimed: boolean }>;
+  affiliateCommission(a: {
+    referralId: string;
+    commissionAmount: number;
+    rate?: number;
+  }): Promise<{ claimed: boolean }>;
+  affiliateReverse(a: { orderId: string }): Promise<{ amount: number | null }>;
   /** Reorder scan phase 1: expire stale / unit-gone suggestions (Ruling CF-JOBS-4). */
   reorderExpire(a: {
     thresholdMs: number;
@@ -852,6 +871,16 @@ export function makeMoneyClient(
     journalExpense: a => call('journalExpense', a),
     journalStockAdjustment: a => call('journalStockAdjustment', a),
     journalPoReceive: a => call('journalPoReceive', a),
+    orderNotifyClaim: a => call('orderNotifyClaim', a),
+    statusFanoutClaim: a => call('statusFanoutClaim', a),
+    statusFanoutComplete: a => call('statusFanoutComplete', a),
+    markerClaim: a => call('markerClaim', a),
+    markerRelease: a => call('markerRelease', a),
+    refundNotifyClaim: a => call('refundNotifyClaim', a),
+    refundNotifyRelease: a => call('refundNotifyRelease', a),
+    reversalClaim: a => call('reversalClaim', a),
+    affiliateCommission: a => call('affiliateCommission', a),
+    affiliateReverse: a => call('affiliateReverse', a),
     reorderExpire: a => call('reorderExpire', a),
     reorderUpsert: a => call('reorderUpsert', a),
     orderStatus: (a, key) => call('orderStatus', a, key),

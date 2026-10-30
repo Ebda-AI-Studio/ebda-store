@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { storeDb, storeMoney } from '../../repo-factory';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { EmailService, type OrderEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
@@ -57,13 +58,18 @@ export const orderCreated: JobDef = inngest.createFunction(
     // whole fanout, so the new-order email + admin OneSignal push fire exactly
     // once. Memoized as its own step, so a retry of a LATER step re-uses the
     // claim (count=1) and still re-runs only the failed sends.
-    const claim = await step.run('claim-order-created', () =>
-      runInTenantContext(storeId, () =>
-        prisma.order.updateMany({
-          where: { id: orderId, storeId, orderCreatedNotifiedAt: null },
-          data: { orderCreatedNotifiedAt: new Date() },
-        })
-      )
+    // PORTED (Ruling CF-JOBS-4): a store on its Durable Object claims in one section there and reads its order from the DO;
+    // its customer is an identity row, read from the platform.
+    const money = await storeMoney(storeId);
+    const claim = await step.run('claim-order-created', async () =>
+      money
+        ? { count: (await money.orderNotifyClaim({ orderId })).claimed ? 1 : 0 }
+        : runInTenantContext(storeId, () =>
+            prisma.order.updateMany({
+              where: { id: orderId, storeId, orderCreatedNotifiedAt: null },
+              data: { orderCreatedNotifiedAt: new Date() },
+            })
+          )
     );
     if (claim.count === 0) {
       logger.info(
@@ -73,32 +79,37 @@ export const orderCreated: JobDef = inngest.createFunction(
       return;
     }
 
-    // FORCE RLS (migration complete_force_rls_coverage) filters orders to 0 rows
-    // unless the tenant GUC is set. Inngest jobs run OUTSIDE the HTTP request, so
-    // there is no tenant-context middleware here — set it explicitly from the
-    // event's storeId, or this findUnique returns null and the fanout dies.
-    const order = await step.run('load-order', async () =>
-      runInTenantContext(storeId, async () => {
+    const order = await step.run('load-order', async () => {
+      if (money) {
+        const row = await (
+          await storeDb(storeId)
+        ).order.findUnique({
+          where: { id: orderId, storeId },
+          include: {
+            items: { include: { product: { select: { nameAr: true } } } },
+            appliedPromotion: { select: { name: true, nameAr: true } },
+          },
+        });
+        if (!row) throw new Error(`Order ${orderId} not found`);
+        const customer = row.customerId
+          ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
+          : null;
+        return { ...row, customer };
+      }
+      return runInTenantContext(storeId, async () => {
         const row = await prisma.order.findUnique({
           where: { id: orderId, storeId },
           include: {
             customer: true,
-            // Pull the live product's Arabic name so the Arabic confirmation
-            // email can localize line items (order_items only snapshots the
-            // English productName). Falls back to productName when absent.
             items: { include: { product: { select: { nameAr: true } } } },
-            // Names the promotion behind the discount line when an automatic
-            // promotion (not a coupon code) was the applied lever.
             appliedPromotion: { select: { name: true, nameAr: true } },
           },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
         return row;
-      })
-    );
+      });
+    });
 
-    // Buyer's locale: prefer event payload (set at enqueue time), then
-    // the persisted Order.locale, then fall through to store default.
     const emailLocale = (locale ?? order.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     const shippingAddress = order.shippingAddress as Record<string, unknown>;
@@ -173,9 +184,10 @@ export const orderCreated: JobDef = inngest.createFunction(
       isCod: (paymentMethod || '').toLowerCase() === 'cod',
     };
 
+    // `Store` is a platform row for either backend
     const store = await step.run('load-store', () =>
-      runInTenantContext(storeId, () =>
-        prisma.store
+      withStore(storeId, tx =>
+        tx.store
           .findUnique({
             where: { id: storeId },
             select: { name: true, settings: true },
