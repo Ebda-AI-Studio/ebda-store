@@ -49,8 +49,6 @@
     "ci-outcomes",
     "contact-form-send",
     "domain-claim-sweep",
-    "gsc-ingest-cron",
-    "gsc-ingest-on-demand",
     "instapay-receipt-retention-daily",
     "order-anonymize-5y-monthly",
     "queue-depth-watch",

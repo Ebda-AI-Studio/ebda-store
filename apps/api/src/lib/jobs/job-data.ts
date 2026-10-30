@@ -26,6 +26,9 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   // notice fan-out reads `User` / `LegalNotice*`), so there is no store data to move
   'ebda-ads-conversion',
   'legal-notice-send',
+  // Ruling CF-JOBS-4B: GSC ingest reads the platform Store row and writes GscDailyMetric (analytics target, Postgres): no DO table is opened, so one cron serves every store
+  'gsc-ingest-cron',
+  'gsc-ingest-on-demand',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
