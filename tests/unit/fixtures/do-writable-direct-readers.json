@@ -16,14 +16,6 @@
         "product": 3
       }
     },
-    "apps/api/src/routes/stock-adjustments.routes.ts": {
-      "kind": "pg-only-flow",
-      "reason": "CSV stock-adjustment import: snapshots and writes Postgres inventory (postgresOnly: accounting flows).",
-      "models": {
-        "productVariant": 2,
-        "product": 2
-      }
-    },
     "apps/api/src/services/abandoned-cart.service.ts": {
       "kind": "pg-branch",
       "reason": "processReminders / getStats / candidate load: each Postgres read sits in the `backend !== 'do'` / `onDo` else-branch next to the DO read (CF-R4-5).",
@@ -32,37 +24,13 @@
         "cart": 1
       }
     },
-    "apps/api/src/services/accounting/account.service.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Accounting opening-balance journal: the stock valuation it reads and the journal it writes are Postgres (postgresOnly: accounting flows).",
-      "models": {
-        "product": 1,
-        "productVariant": 1
-      }
-    },
     "apps/api/src/services/accounting/assert-store-owns.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Ownership check for accounting writes (purchase orders, stock adjustments, expenses) that write Postgres rows (postgresOnly: accounting flows).",
+      "kind": "pg-branch",
+      "reason": "assertStoreOwns takes the client it checks against: assertStoreOwnsInTenantScope hands it the DO read client for a store on its Durable Object (CF-R7-1), so the prisma default is the Postgres branch.",
       "models": {
         "product": 1,
         "productVariant": 1,
         "category": 1
-      }
-    },
-    "apps/api/src/services/accounting/purchase-order.service.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Purchase-order receive writes inventory + ledger on Postgres; the read stays beside the write (postgresOnly: accounting flows).",
-      "models": {
-        "productVariant": 4,
-        "product": 1
-      }
-    },
-    "apps/api/src/services/accounting/stock-adjustment.service.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Stock adjustment writes inventory + ledger on Postgres; the read stays beside the write (postgresOnly: accounting flows).",
-      "models": {
-        "productVariant": 1,
-        "product": 1
       }
     },
     "apps/api/src/services/auth.service.ts": {
@@ -70,14 +38,6 @@
       "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
       "models": {
         "campaignRecipient": 1
-      }
-    },
-    "apps/api/src/services/barcode-scan.service.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Scan-to-adjust (variant) and count-session lines write Postgres inventory inline; the lookup read is already routed (postgresOnly: barcode scan stock flows).",
-      "models": {
-        "productVariant": 2,
-        "product": 2
       }
     },
     "apps/api/src/services/barcode.service.ts": {
@@ -168,6 +128,38 @@
       "models": {
         "product": 2,
         "productVariant": 1
+      }
+    },
+    "apps/api/src/services/accounting/account.service.ts": {
+      "kind": "pg-branch",
+      "reason": "seedCoaForStore / postOpeningBalanceIfNeeded: after the `storeStock()` early return (CF-R7-1: seedCoa runs the chart seed and the opening-balance journal in the DO); the tx body is the Postgres branch.",
+      "models": {
+        "product": 1,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/accounting/purchase-order.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createPurchaseOrder / receivePurchaseOrder: after the `storeStock()` early return (CF-R7-1: createPurchaseOrder / receivePurchaseOrder run in the DO); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 4,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/accounting/stock-adjustment.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createAdjustment / postAdjustment: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 1,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/barcode-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "receiveByBarcode (variant) / submitCountLine / reconcileCountSession: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 2,
+        "product": 1
       }
     }
   }
