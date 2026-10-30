@@ -98,6 +98,8 @@ export type WritableModel =
   | 'etaReceipt'
   | 'bulkAiJob'
   | 'deadStockFlag'
+  | 'webhookEndpoint'
+  | 'webhookDelivery'
   | 'bulkImportJob'
   | 'storeFaq'
   | 'storeHowto'

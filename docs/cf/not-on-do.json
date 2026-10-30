@@ -15,13 +15,6 @@
     "warehouse-reconcile-on-demand",
     "warehouse-reconcile-sweep-cron"
   ],
-  "jobsAccepted": [
-    "r2-orphan-sweep",
-    "search-index-backstop",
-    "search-product-index",
-    "webhook-deliver",
-    "webhook-delivery-purge-daily",
-    "webhook-fanout"
-  ],
+  "jobsAccepted": ["r2-orphan-sweep", "search-index-backstop", "search-product-index"],
   "sweepSkips": []
 }

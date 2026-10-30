@@ -130,6 +130,10 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'answer-engine-citation-scan-cron',
   // Ruling CF-JOBS-4B (expense OCR): the draft is one DO op; accounts are read from the store's own chart
   'accounting-expense-ocr-process',
+  // Ruling CF-JOBS-4B (webhooks): endpoints and the delivery log follow the store's backend; the log purge runs on a DO store's alarm
+  'webhook-fanout',
+  'webhook-deliver',
+  'webhook-delivery-purge-daily',
 ]);
 
 /**

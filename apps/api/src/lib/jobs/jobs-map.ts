@@ -84,7 +84,12 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     trigger: 'cron',
     alarm: true,
   },
-  'webhook-delivery-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'webhook-delivery-purge-daily': {
+    group: '2-housekeeping',
+    kind: 'queue',
+    trigger: 'cron',
+    alarm: true,
+  },
   'accounting-daily-close': {
     group: '3-books-stock',
     kind: 'workflow',

@@ -4,7 +4,7 @@
  * (`runInTenantContext` / a request) and carries `storeId` at the top level of every where/data.
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { Prisma, prisma, runInTenantContext } from '@ebda/database';
+import { Prisma } from '@ebda/database';
 import {
   WEBHOOK_CONSECUTIVE_FAILURE_LIMIT,
   WEBHOOK_LOG_KEEP_PER_ENDPOINT,
@@ -20,6 +20,7 @@ import {
 import { encryption } from './encryption.service';
 import { postWebhook } from '../lib/webhook-http';
 import { withSavepoint } from '../lib/savepoint';
+import { runInStoreCtx, storeRwClient, type StoreTx } from '../lib/jobs/store-db';
 import { getEntitlements } from './plan-entitlements';
 import type { FanoutEvent } from './webhook-payload';
 
@@ -85,15 +86,15 @@ export async function webhookStoreEntitled(storeId: string): Promise<boolean> {
 // Fan-out
 // ---------------------------------------------------------------------------
 
-async function pruneLog(storeId: string, endpointId: string): Promise<void> {
-  const stale = await prisma.webhookDelivery.findMany({
+async function pruneLog(db: StoreTx, storeId: string, endpointId: string): Promise<void> {
+  const stale = await db.webhookDelivery.findMany({
     where: { storeId, endpointId },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     skip: WEBHOOK_LOG_KEEP_PER_ENDPOINT,
     select: { id: true },
   });
   if (stale.length > 0) {
-    await prisma.webhookDelivery.deleteMany({
+    await db.webhookDelivery.deleteMany({
       where: { storeId, endpointId, id: { in: stale.map(s => s.id) } },
     });
   }
@@ -101,16 +102,20 @@ async function pruneLog(storeId: string, endpointId: string): Promise<void> {
 
 /** Create one delivery row per active, subscribed endpoint. Returns the NEW delivery ids. */
 export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Promise<string[]> {
-  const endpoints = await prisma.webhookEndpoint.findMany({
-    where: { storeId, active: true, events: { has: ev.type } },
-    select: { id: true, includeCustomer: true },
-  });
+  const { db, onDo } = await storeRwClient(storeId);
+  // The subscription test is done here, not in the query: a scalar-list filter is Postgres-only, and a store has a handful of endpoints.
+  const endpoints = (
+    await db.webhookEndpoint.findMany({
+      where: { storeId, active: true },
+      select: { id: true, includeCustomer: true, events: true },
+    })
+  ).filter(e => e.events.includes(ev.type));
   // Skip what already exists up front (a replay, or an endpoint that was already served), then
   // create the rest inside a SAVEPOINT: a lost unique race must never abort the surrounding tenant
   // transaction (Postgres 25P02 would fail every later insert and roll the whole fan-out back).
   const existing = new Set(
     (
-      await prisma.webhookDelivery.findMany({
+      await db.webhookDelivery.findMany({
         where: { storeId, dedupeKey: ev.dedupeKey, endpointId: { in: endpoints.map(e => e.id) } },
         select: { endpointId: true },
       })
@@ -123,8 +128,8 @@ export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Prom
     const data =
       ep.includeCustomer && ev.customer ? { ...ev.data, customer: ev.customer } : ev.data;
     try {
-      const row = await withSavepoint(() =>
-        prisma.webhookDelivery.create({
+      const make = () =>
+        db.webhookDelivery.create({
           data: {
             storeId,
             endpointId: ep.id,
@@ -139,14 +144,15 @@ export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Prom
             }) as unknown as Prisma.InputJsonValue,
           },
           select: { id: true },
-        })
-      );
+        });
+      // Postgres: a SAVEPOINT, so a lost unique race rolls back only itself. On the DO each write is its own atomic call.
+      const row = await (onDo ? make() : withSavepoint(make));
       created.push(row.id);
-      await pruneLog(storeId, ep.id);
+      await pruneLog(db, storeId, ep.id);
     } catch (err) {
       // P2002 on (endpoint, dedupeKey): a concurrent run queued this event first. The savepoint
       // has already rolled the failed insert back, so the transaction is still usable.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
+      if ((err as { code?: string } | null)?.code === 'P2002') continue;
       throw err;
     }
   }
@@ -155,8 +161,9 @@ export async function fanoutWebhookEvent(storeId: string, ev: FanoutEvent): Prom
 
 /** A sample event for the admin "send test". Never counts toward auto-disable. */
 export async function createTestDelivery(storeId: string, endpointId: string): Promise<string> {
+  const { db } = await storeRwClient(storeId);
   const eventId = `evt_${randomUUID()}`;
-  const row = await prisma.webhookDelivery.create({
+  const row = await db.webhookDelivery.create({
     data: {
       storeId,
       endpointId,
@@ -172,18 +179,19 @@ export async function createTestDelivery(storeId: string, endpointId: string): P
     },
     select: { id: true },
   });
-  await pruneLog(storeId, endpointId);
+  await pruneLog(db, storeId, endpointId);
   return row.id;
 }
 
 /** Same bytes, same event id, new delivery. null when the delivery is not this store's. */
 export async function createResend(storeId: string, deliveryId: string): Promise<string | null> {
-  const orig = await prisma.webhookDelivery.findFirst({
+  const { db } = await storeRwClient(storeId);
+  const orig = await db.webhookDelivery.findFirst({
     where: { id: deliveryId, storeId },
     select: { endpointId: true, eventId: true, eventType: true, payload: true, isTest: true },
   });
   if (!orig) return null;
-  const row = await prisma.webhookDelivery.create({
+  const row = await db.webhookDelivery.create({
     data: {
       storeId,
       endpointId: orig.endpointId,
@@ -194,7 +202,7 @@ export async function createResend(storeId: string, deliveryId: string): Promise
     },
     select: { id: true },
   });
-  await pruneLog(storeId, orig.endpointId);
+  await pruneLog(db, storeId, orig.endpointId);
   return row.id;
 }
 
@@ -207,12 +215,13 @@ export async function markDeliveryFailed(
   deliveryId: string,
   reason: string
 ): Promise<void> {
-  await runInTenantContext(storeId, () =>
-    prisma.webhookDelivery.updateMany({
+  await runInStoreCtx(storeId, async () => {
+    const { db } = await storeRwClient(storeId);
+    return db.webhookDelivery.updateMany({
       where: { id: deliveryId, storeId, status: { in: ['pending', 'retrying'] } },
       data: { status: 'failed', error: reason.slice(0, 200), nextAttemptAt: null },
-    })
-  );
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -231,8 +240,9 @@ export async function runDeliveryAttempt(
   deliveryId: string,
   attempt: number
 ): Promise<AttemptOutcome> {
-  const loaded = await runInTenantContext(storeId, () =>
-    prisma.webhookDelivery.findFirst({
+  const { db } = await storeRwClient(storeId);
+  const loaded = await runInStoreCtx(storeId, () =>
+    db.webhookDelivery.findFirst({
       where: { id: deliveryId, storeId },
       select: {
         id: true,
@@ -254,8 +264,8 @@ export async function runDeliveryAttempt(
   }
   const ep = loaded.endpoint;
   if (!ep.active && !loaded.isTest) {
-    await runInTenantContext(storeId, () =>
-      prisma.webhookDelivery.updateMany({
+    await runInStoreCtx(storeId, () =>
+      db.webhookDelivery.updateMany({
         where: { id: deliveryId, storeId },
         data: { status: 'failed', error: 'endpoint_disabled', nextAttemptAt: null },
       })
@@ -265,8 +275,8 @@ export async function runDeliveryAttempt(
 
   // A store that dropped below Growth stops sending, including deliveries already queued (I3).
   if (!loaded.isTest && !(await webhookStoreEntitled(storeId))) {
-    await runInTenantContext(storeId, () =>
-      prisma.webhookDelivery.updateMany({
+    await runInStoreCtx(storeId, () =>
+      db.webhookDelivery.updateMany({
         where: { id: deliveryId, storeId },
         data: { status: 'failed', error: 'plan_lapsed', nextAttemptAt: null },
       })
@@ -292,9 +302,9 @@ export async function runDeliveryAttempt(
   }
   const decision = decideAfterAttempt({ ok: res.ok, attempt, isTest: loaded.isTest });
 
-  return runInTenantContext(storeId, async () => {
+  return runInStoreCtx(storeId, async () => {
     const nextDelay = decision === 'retry' ? delayBeforeAttempt(attempt + 1) : 0;
-    await prisma.webhookDelivery.updateMany({
+    await db.webhookDelivery.updateMany({
       where: { id: deliveryId, storeId },
       data: {
         status: decision === 'success' ? 'success' : decision === 'retry' ? 'retrying' : 'failed',
@@ -309,7 +319,7 @@ export async function runDeliveryAttempt(
     });
     if (loaded.isTest) return { decision, endpointDisabled: false, endpointId: ep.id };
     if (decision === 'success') {
-      await prisma.webhookEndpoint.updateMany({
+      await db.webhookEndpoint.updateMany({
         where: { id: ep.id, storeId },
         data: { consecutiveFailures: 0, lastSuccessAt: new Date() },
       });
@@ -318,17 +328,17 @@ export async function runDeliveryAttempt(
     if (decision === 'retry') return { decision, endpointDisabled: false, endpointId: ep.id };
 
     // The delivery exhausted every attempt: it counts once against the endpoint.
-    await prisma.webhookEndpoint.updateMany({
+    await db.webhookEndpoint.updateMany({
       where: { id: ep.id, storeId },
       data: { consecutiveFailures: { increment: 1 }, lastFailureAt: new Date() },
     });
-    const health = await prisma.webhookEndpoint.findFirst({
+    const health = await db.webhookEndpoint.findFirst({
       where: { id: ep.id, storeId },
       select: { consecutiveFailures: true },
     });
     let endpointDisabled = false;
     if (health && shouldDisableEndpoint(health.consecutiveFailures)) {
-      const r = await prisma.webhookEndpoint.updateMany({
+      const r = await db.webhookEndpoint.updateMany({
         where: { id: ep.id, storeId, active: true },
         data: { active: false, disabledReason: 'consecutive_failures', disabledAt: new Date() },
       });

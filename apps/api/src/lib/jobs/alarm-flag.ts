@@ -46,6 +46,8 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'order-anonymize-5y-monthly',
   // Ruling CF-JOBS-4B (queue-depth-watch): BulkAiJob follows the store's backend; a DO store is watched on its alarm
   'queue-depth-watch',
+  // Ruling CF-JOBS-4B (webhooks): endpoints and the delivery log follow the store's backend; the log purge runs on a DO store's alarm
+  'webhook-delivery-purge-daily',
 ]);
 
 function tokens(): string[] {

@@ -290,3 +290,22 @@ export function lazyStoreDb(storeId: string): StoreReads {
 export function lazyStoreWriter(storeId: string): Omit<StoreWrites, '$transaction' | '$proc'> {
   return lazyClient<Omit<StoreWrites, '$transaction' | '$proc'>>(() => storeWriter(storeId));
 }
+
+/**
+ * A read-write client for a service that runs inside its caller's store scope (`runInStoreCtx`): the `prisma` proxy for a
+ * Postgres store (the ambient tenant transaction, unchanged), the DO read client merged with the DO writer for a store on its
+ * Durable Object (see `withStoreRw`). `onDo` lets a caller skip what only Postgres needs (a savepoint).
+ */
+export async function storeRwClient(storeId: string): Promise<{ db: StoreTx; onDo: boolean }> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return { db: prisma as unknown as StoreTx, onDo: false };
+  const reads = repo.db as unknown as Record<string, object>;
+  const writes = repo.writer as unknown as Record<string, object>;
+  const merged = new Proxy(
+    {},
+    {
+      get: (_t, model: string) => ({ ...(reads[model] ?? {}), ...(writes[model] ?? {}) }),
+    }
+  );
+  return { db: merged as unknown as StoreTx, onDo: true };
+}

@@ -69,6 +69,9 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'BulkAiJob',
   // dead-stock flags: the weekly scan writes them (Ruling CF-JOBS-4B)
   'DeadStockFlag',
+  // merchant webhooks: endpoints and the delivery log (Ruling CF-JOBS-4B)
+  'WebhookEndpoint',
+  'WebhookDelivery',
   // the bulk AI / import job rows and the AI-written store content the jobs persist (Ruling CF-JOBS-4)
   'BulkImportJob',
   'StoreFaq',
