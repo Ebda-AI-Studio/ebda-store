@@ -58,6 +58,10 @@ export const DO_RUNTIME_TABLES = {
     erasure: 'no-pii',
     why: 'provider event ids already applied; also a generated table',
   },
+  instapay_order_receipts: {
+    erasure: 'ttl',
+    why: 'InstaPay order receipts of a DO store (Ruling INSTAPAY-DO-1): payer fields scrubbed 180 days after a decision and on the shopper erasure, screenshots deleted by the retention sweep; NOT imported - an order awaiting payment confirmation at the flip keeps its receipt on the platform table',
+  },
   search_dirty: { erasure: 'derived', why: 'queue of rows to re-index' },
   product_vector_state: { erasure: 'derived', why: 'embedding bookkeeping, rebuilt from products' },
   vector_usage: { erasure: 'no-pii', why: 'Workers AI spend counter per day' },

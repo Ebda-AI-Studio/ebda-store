@@ -31,6 +31,9 @@ import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import { hasDb } from '../helpers/bundle-fixtures';
 import { featureService } from '../../apps/api/src/services/feature.service';
 import { notificationConfigService } from '../../apps/api/src/services/notification-config.service';
+import { notificationDispatcher } from '../../apps/api/src/services/notification-dispatcher.service';
+import { smsQueue } from '../../apps/api/src/services/sms-queue.service';
+import { pushService } from '../../apps/api/src/services/push.service';
 import { redis } from '../../apps/api/src/services/redis.service';
 
 const sfx = Date.now().toString(36);
@@ -231,5 +234,49 @@ describe.skipIf(!hasDb)('notification config on Postgres vs the DO', () => {
     expect(t.out.ok.channels).toEqual(['push']);
     expect(t.out.ok.all.order_created).toEqual({ whatsapp: false, sms: false, push: true });
     expect(t.state.ev).toHaveLength(1);
+  });
+
+  it('an OFF switch written on the store suppresses the send on both backends (the dispatcher reads where the admin writes)', async () => {
+    vi.spyOn(featureService, 'isFeatureEnabled').mockResolvedValue(true);
+    const sms = vi.spyOn(smsQueue, 'enqueue').mockResolvedValue(undefined as never);
+    const push = vi.spyOn(pushService, 'sendToStore').mockResolvedValue(undefined as never);
+    const send = () =>
+      notificationDispatcher.dispatch(
+        STORE,
+        'order_confirmed' as never,
+        {
+          orderNumber: 'ORD-1',
+          customerPhone: '+201001234567',
+          locale: 'en',
+          storeName: 'S',
+        } as never
+      );
+    const t = await parity(async () => {
+      await notificationConfigService.upsertConfig(STORE, 'sms', SMS);
+      await notificationConfigService.upsertConfig(STORE, 'push', {
+        provider: 'onesignal',
+        enabled: true,
+        credentials: { appId: 'a', apiKey: 'k' },
+      });
+      sms.mockClear();
+      push.mockClear();
+      await send();
+      const on = { sms: sms.mock.calls.length, push: push.mock.calls.length };
+      await notificationConfigService.upsertEventConfig(STORE, 'order_confirmed', {
+        whatsapp: true,
+        sms: false,
+        push: false,
+      });
+      sms.mockClear();
+      push.mockClear();
+      await send();
+      const off = { sms: sms.mock.calls.length, push: push.mock.calls.length };
+      const cfg = await notificationDispatcher.getEventConfig(STORE, 'order_confirmed' as never);
+      return { on, off, cfg };
+    });
+    expect(t.out.ok.on).toEqual({ sms: 1, push: 1 });
+    expect(t.out.ok.off).toEqual({ sms: 0, push: 0 });
+    expect(t.out.ok.cfg).toEqual({ sms: false, push: false });
+    vi.restoreAllMocks();
   });
 });

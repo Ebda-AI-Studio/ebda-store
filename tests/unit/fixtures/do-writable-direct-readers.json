@@ -1,0 +1,262 @@
+{
+  "apps/api/src/lib/inngest/functions/bulk-ai-aeo.ts": {
+    "category": 4,
+    "product": 4
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-balance-descriptions.ts": {
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-categorize.ts": {
+    "category": 1,
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-excerpt.ts": {
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-geo.ts": {
+    "category": 2,
+    "product": 3
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-image-alt.ts": {
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-product-faqs.ts": {
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-recommendations.ts": {
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-revert-balance.ts": {
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-seo.ts": {
+    "category": 2,
+    "product": 2
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-tags.ts": {
+    "product": 2,
+    "tag": 1
+  },
+  "apps/api/src/lib/inngest/functions/bulk-ai-translate.ts": {
+    "product": 2,
+    "category": 2
+  },
+  "apps/api/src/lib/inngest/functions/wa-store-events.ts": {
+    "abandonedCart": 1,
+    "product": 2
+  },
+  "apps/api/src/lib/savepoint.ts": {
+    "cart": 1
+  },
+  "apps/api/src/lib/wa/consent.ts": {
+    "cart": 1
+  },
+  "apps/api/src/routes/admin-search.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/admin.routes.ts": {
+    "product": 3
+  },
+  "apps/api/src/routes/ai.routes.ts": {
+    "category": 9,
+    "product": 27,
+    "productImage": 2,
+    "tag": 1
+  },
+  "apps/api/src/routes/analytics.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/barcode-labels.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/bulk.routes.ts": {
+    "product": 2
+  },
+  "apps/api/src/routes/bundle.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/coupon.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/insights.routes.ts": {
+    "product": 2
+  },
+  "apps/api/src/routes/product.routes.ts": {
+    "product": 4,
+    "productFaq": 2
+  },
+  "apps/api/src/routes/promotion.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/public.routes.ts": {
+    "product": 3,
+    "storeLocation": 1,
+    "storePage": 1
+  },
+  "apps/api/src/routes/stock-adjustments.routes.ts": {
+    "productVariant": 2,
+    "product": 2
+  },
+  "apps/api/src/routes/wholesale.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/routes/wishlist.routes.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/abandoned-cart.service.ts": {
+    "abandonedCart": 2,
+    "cart": 1
+  },
+  "apps/api/src/services/accounting/account.service.ts": {
+    "product": 1,
+    "productVariant": 1
+  },
+  "apps/api/src/services/accounting/analytics-rollup.service.ts": {
+    "cart": 1,
+    "cartItem": 1,
+    "abandonedCart": 2
+  },
+  "apps/api/src/services/accounting/assert-store-owns.ts": {
+    "product": 1,
+    "productVariant": 1,
+    "category": 1
+  },
+  "apps/api/src/services/accounting/deadstock-scan.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/accounting/purchase-order.service.ts": {
+    "productVariant": 4,
+    "product": 1
+  },
+  "apps/api/src/services/accounting/reorder-scan.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/accounting/stock-adjustment.service.ts": {
+    "productVariant": 1,
+    "product": 1
+  },
+  "apps/api/src/services/ai-autofill.service.ts": {
+    "product": 5,
+    "category": 2
+  },
+  "apps/api/src/services/analytics.service.ts": {
+    "product": 2,
+    "productCategory": 1
+  },
+  "apps/api/src/services/answer-engine/prompts.ts": {
+    "category": 1,
+    "product": 1
+  },
+  "apps/api/src/services/auth.service.ts": {
+    "abandonedCart": 1
+  },
+  "apps/api/src/services/barcode-scan.service.ts": {
+    "product": 3,
+    "productVariant": 3
+  },
+  "apps/api/src/services/barcode.service.ts": {
+    "product": 2,
+    "productVariant": 2
+  },
+  "apps/api/src/services/bulk.service.ts": {
+    "productOption": 1,
+    "productVariant": 1,
+    "product": 2
+  },
+  "apps/api/src/services/campaign.service.ts": {
+    "abandonedCart": 1,
+    "newsletterSubscriber": 1
+  },
+  "apps/api/src/services/cart.service.ts": {
+    "product": 1,
+    "productVariant": 1,
+    "cartItem": 2,
+    "cartBundle": 1
+  },
+  "apps/api/src/services/customer-reorder.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/gold-rate/gold-rate.service.ts": {
+    "product": 5,
+    "productPriceTier": 1
+  },
+  "apps/api/src/services/gold-rate/repricer.ts": {
+    "product": 2
+  },
+  "apps/api/src/services/inventory.service.ts": {
+    "product": 6,
+    "productVariant": 1
+  },
+  "apps/api/src/services/inventory/low-stock-scan.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/lifecycle-emails.service.ts": {
+    "abandonedCart": 1
+  },
+  "apps/api/src/services/notification-config.service.ts": {
+    "notificationConfig": 1
+  },
+  "apps/api/src/services/notification-dispatcher.service.ts": {
+    "notificationEventConfig": 1
+  },
+  "apps/api/src/services/onboarding.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/order.service.ts": {
+    "product": 4,
+    "cartItem": 1,
+    "cartBundle": 1,
+    "productVariant": 1,
+    "abandonedCart": 1,
+    "cart": 1
+  },
+  "apps/api/src/services/page-builder.service.ts": {
+    "storePageRevision": 1
+  },
+  "apps/api/src/services/product-model.service.ts": {
+    "product": 1,
+    "productOption": 1,
+    "productOptionValue": 1
+  },
+  "apps/api/src/services/product.service.ts": {
+    "productOption": 1,
+    "product": 18,
+    "productVariant": 1,
+    "productCategory": 2,
+    "category": 4,
+    "productPriceTier": 1,
+    "tag": 1
+  },
+  "apps/api/src/services/provisioning.service.ts": {
+    "product": 2
+  },
+  "apps/api/src/services/qr.service.ts": {
+    "product": 2,
+    "category": 2
+  },
+  "apps/api/src/services/review.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/setup-guide.service.ts": {
+    "product": 1
+  },
+  "apps/api/src/services/store-category-suggest.service.ts": {
+    "category": 1,
+    "product": 1
+  },
+  "apps/api/src/services/store.service.ts": {
+    "product": 3,
+    "category": 1
+  },
+  "apps/api/src/services/variant.service.ts": {
+    "product": 1,
+    "productVariant": 1
+  },
+  "apps/api/src/services/warehouse.service.ts": {
+    "product": 2,
+    "productVariant": 1
+  },
+  "apps/api/src/services/webhook-payload.ts": {
+    "product": 1
+  }
+}

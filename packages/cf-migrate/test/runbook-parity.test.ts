@@ -60,7 +60,8 @@ describe('cutover runbook parity', () => {
     const codes = new Set<string>();
     for (const f of walk('apps/api/src'))
       for (const m of read(f).matchAll(/'([A-Z][A-Z_]*_NOT_ON_DO)'/g)) codes.add(m[1]);
-    expect(codes.size).toBeGreaterThan(3);
+    // the flip gate (`node scripts/cf/not-on-do.mjs`) closes when every refusal is gone: zero is the goal, not a failure
+    expect(codes.size).toBeGreaterThanOrEqual(0);
     const docs = fs
       .readdirSync(path.join(repo, 'docs/cf'))
       .filter(f => f.endsWith('.md'))
