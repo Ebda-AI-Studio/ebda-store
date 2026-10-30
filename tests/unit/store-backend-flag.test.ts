@@ -108,13 +108,9 @@ describe('store backend flag', () => {
     ]);
   });
 
-  it('the committed wrangler flag is at most the one Phase 0 demo store (storedemo-souq), never the QA walk store', async () => {
+  it('the committed wrangler config does not define the env flag: D1 is the one source (Ruling CF-R6B-1)', async () => {
     const { readFileSync } = await import('node:fs');
     const w = readFileSync('apps/api/wrangler.jsonc', 'utf8');
-    const m = w.match(/"STORE_DO_ENABLED_IDS":\s*"([^"]*)"/);
-    expect(m).not.toBeNull();
-    const ids = m![1].split(',').filter(Boolean);
-    expect(ids.length).toBeLessThanOrEqual(1);
-    for (const id of ids) expect(id).toBe(DEMO);
+    expect(w).not.toMatch(/"STORE_DO_ENABLED_IDS"\s*:/);
   });
 });

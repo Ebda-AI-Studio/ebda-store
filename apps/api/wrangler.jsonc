@@ -280,17 +280,13 @@
     "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
-    // MERGE POINT feat/cf-r6b (Opus C3 + M3, docs/cf/opus-review-closure.md): NOT fixed on this branch. This list is STILL read by the jobs
-    // guard (do-guard.ts), alarm arming (store-schedule.ts), the DO webhook resolver (definer.ts), the unresolved-webhook 503 lane and the
-    // InstaPay receipt retention sweep, not only the "legacy consumers" below; r6b derives all of them from the D1 `storage_backend` column
-    // and deletes this variable. Until r6b merges, the cutover MUST set it to exactly the flipped set in the 8.3 deploy (runbook 8.3).
-    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010). With the D1 PLATFORM_DB bound this list is NOT consulted by backendFor (the D1 column is); it only feeds the legacy consumers (backup sweep, webhook resolver, jobs guard).
-    "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
+    // STORE_DO_ENABLED_IDS is deliberately NOT set (Ruling CF-R6B-1): which stores are on the Durable Object is the D1 `stores.storage_backend`
+    // column, read live by every consumer (lib/store-backend.ts backendFor / doStoreIdList). The env list is only the local / test fallback.
     // Which alarm-ready jobs fire as StoreSchedule alarms (src/lib/jobs/alarm-flag.ts): comma list or "all". Alarms are armed ONLY for
     // stores served by their Durable Object (src/lib/jobs/store-schedule.ts, Ruling CF-JOBS-1); every Postgres store keeps the global
     // cron. With JOBS_ON_DO unset no store is a DO store, so "all" arms nothing today.
     "JOBS_CF_ALARMS": "all",
-    // "1" = background jobs follow each store's backend flag (STORE_DO_ENABLED_IDS): DO stores get alarms, their unported jobs are
+    // "1" = background jobs follow each store's D1 backend flag (stores.storage_backend): DO stores get alarms, their unported jobs are
     // refused with an alert, sweeps skip them (src/lib/jobs/do-guard.ts). Flipped together with the flag at the cutover; "" = every store on Postgres.
     "JOBS_ON_DO": "",
     // "1" = cutover write freeze (docs/runbooks/cutover-cf.md 5.1): HTTP writes answer 503 AND crons, queue consumers, Workflows and

@@ -149,7 +149,9 @@ router.post(
       // inventing generic "fashion / accessories / lifestyle" lines.
       let categoryNames: string[] | undefined;
       if (section === 'categories') {
-        const cats = await prisma.category.findMany({
+        const cats = await (
+          await storeDb(storeId)
+        ).category.findMany({
           where: { storeId },
           select: { name: true },
           take: 8,
@@ -301,7 +303,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
         });
         return;
       }
-      const cat = await prisma.category.findFirst({
+      const cat = await (
+        await storeDb(storeId)
+      ).category.findFirst({
         where: { id, storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -323,7 +327,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
         });
         return;
       }
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id, storeId },
         select: {
           name: true,
@@ -385,7 +391,9 @@ router.post(
       const { storeId } = req.params;
       const { productId } = productMetaAeoSchema.parse(req.body);
 
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: { id: true, name: true, description: true },
       });
@@ -448,7 +456,9 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = categorizeSchema.parse(req.body);
-      const cats = await prisma.category.findMany({
+      const cats = await (
+        await storeDb(storeId)
+      ).category.findMany({
         where: { storeId, isActive: true },
         select: { id: true, name: true, nameAr: true },
       });
@@ -700,7 +710,9 @@ router.post(
       const { productId, count } = draftProductFaqsSchema.parse(req.body);
 
       // Verify the product belongs to this store.
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: {
           id: true,
@@ -1718,8 +1730,8 @@ router.get('/results/geo', async (req: Request, res: Response, next: NextFunctio
         where: { id: storeId },
         select: { llmsTxt: true, aboutJson: true },
       }),
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, deletedAt: null, citationCopy: { not: null } },
       }),
     ]);
@@ -1827,7 +1839,7 @@ router.get(
       const storeId = (req.params as { storeId: string }).storeId;
 
       const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
-        prisma.product.count({ where: { storeId, deletedAt: null } }),
+        (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
         (await storeDb(currentStoreId())).aiRecommendation
           .findMany({
             where: { storeId },
@@ -1872,16 +1884,16 @@ router.get('/results/translate', async (req: Request, res: Response, next: NextF
 
     const [totalProducts, productsWithAr, totalCategories, categoriesWithAr, recentlyTranslated] =
       await Promise.all([
-        prisma.product.count({ where: { storeId, deletedAt: null } }),
-        prisma.product.count({
+        (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+        (await storeDb(storeId)).product.count({
           where: { storeId, deletedAt: null, nameAr: { not: null } },
         }),
-        prisma.category.count({ where: { storeId } }),
-        prisma.category.count({
+        (await storeDb(storeId)).category.count({ where: { storeId } }),
+        (await storeDb(storeId)).category.count({
           where: { storeId, nameAr: { not: null } },
         }),
         // Products that got an Arabic name in the last 30 days
-        prisma.product.findMany({
+        (await storeDb(storeId)).product.findMany({
           where: {
             storeId,
             deletedAt: null,
@@ -1945,8 +1957,8 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
         where: { id: storeId },
         select: { metaTitle: true, metaDescription: true },
       }),
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
         where: {
           storeId,
           deletedAt: null,
@@ -1954,15 +1966,15 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
           metaDescription: { not: null },
         },
       }),
-      prisma.category.count({ where: { storeId } }),
-      prisma.category.count({
+      (await storeDb(storeId)).category.count({ where: { storeId } }),
+      (await storeDb(storeId)).category.count({
         where: {
           storeId,
           metaTitle: { not: null },
           metaDescription: { not: null },
         },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: {
           storeId,
           deletedAt: null,
@@ -2140,15 +2152,15 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
         where: { id: storeId },
         select: { metaDescriptionAeo: true },
       }),
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, deletedAt: null, metaDescriptionAeo: { not: null } },
       }),
-      prisma.category.count({ where: { storeId } }),
-      prisma.category.count({
+      (await storeDb(storeId)).category.count({ where: { storeId } }),
+      (await storeDb(storeId)).category.count({
         where: { storeId, metaDescriptionAeo: { not: null } },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: { storeId, deletedAt: null, metaDescriptionAeo: { not: null } },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -2213,7 +2225,9 @@ router.post(
         return;
       }
 
-      const product = await prisma.product.findFirst({ where: { id: productId, storeId } });
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({ where: { id: productId, storeId } });
       if (!product) {
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
         return;
@@ -2349,7 +2363,9 @@ router.post(
 
       const result = await balanceProductLanguages(storeId, productId, { force });
 
-      const updated = await prisma.product.findFirst({
+      const updated = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -2383,7 +2399,9 @@ router.post(
 
       const result = await revertProductBalance(storeId, productId);
 
-      const updated = await prisma.product.findFirst({
+      const updated = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -2419,11 +2437,13 @@ router.get('/results/categorize', async (req: Request, res: Response, next: Next
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalProducts, categorizedProducts, recentProducts] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
+        where: { storeId, status: 'active', deletedAt: null },
+      }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, status: 'active', deletedAt: null, categories: { some: {} } },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: { storeId, status: 'active', deletedAt: null, categories: { some: {} } },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -2466,10 +2486,10 @@ router.get('/results/image-alt', async (req: Request, res: Response, next: NextF
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalImages, imagesWithAlt] = await Promise.all([
-      prisma.productImage.count({
+      (await storeDb(storeId)).productImage.count({
         where: { product: { storeId, status: 'active', deletedAt: null } },
       }),
-      prisma.productImage.count({
+      (await storeDb(storeId)).productImage.count({
         where: {
           product: { storeId, status: 'active', deletedAt: null },
           alt: { not: null },
@@ -2501,11 +2521,13 @@ router.get('/results/excerpt', async (req: Request, res: Response, next: NextFun
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalProducts, productsWithExcerpt, recentProducts] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
+        where: { storeId, status: 'active', deletedAt: null },
+      }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, status: 'active', deletedAt: null, excerpt: { not: null } },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: { storeId, status: 'active', deletedAt: null, excerpt: { not: null } },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -2538,11 +2560,13 @@ router.get('/results/tags', async (req: Request, res: Response, next: NextFuncti
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalProducts, taggedProducts, totalTags] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
+        where: { storeId, status: 'active', deletedAt: null },
+      }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, status: 'active', deletedAt: null, tags: { some: {} } },
       }),
-      prisma.tag.count({ where: { storeId } }),
+      (await storeDb(storeId)).tag.count({ where: { storeId } }),
     ]);
 
     res.json({

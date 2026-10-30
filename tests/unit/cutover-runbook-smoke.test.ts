@@ -20,9 +20,9 @@ describe('cutover runbook smoke (8.4)', () => {
     expect(rb).toMatch(/no job is refused/);
     expect(rb).toMatch(/refused for DO store/);
   });
-  it('8.3 pins STORE_DO_ENABLED_IDS to the flipped set until r6b removes the list (Opus C3 interim)', () => {
+  it('8.3 flips D1 only: STORE_DO_ENABLED_IDS is not part of the deploy (Ruling CF-R6B-1)', () => {
     const s83 = rb.slice(rb.indexOf('### 8.3'), rb.indexOf('### 8.4'));
-    expect(s83).toMatch(/STORE_DO_ENABLED_IDS/);
-    expect(s83).toMatch(/EXACTLY the flipped store ids/);
+    expect(s83).toMatch(/do NOT set `STORE_DO_ENABLED_IDS`/);
+    expect(s83).not.toMatch(/EXACTLY the flipped store ids/);
   });
 });

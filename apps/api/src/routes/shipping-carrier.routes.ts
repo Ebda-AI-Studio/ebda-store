@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { shippingCarrierRouteContext } from '../middleware/tenant-context';
@@ -454,7 +455,9 @@ router.post(
 
       // Find the shipment for this order
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { orderId, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { orderId, storeId } });
 
       if (!existing) {
         res.status(404).json({
@@ -506,7 +509,9 @@ router.get(
     try {
       const { storeId, id } = req.params;
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -604,7 +609,9 @@ router.post(
       const { storeId, id } = req.params;
       const { status, restock } = manualStatusSchema.parse(req.body);
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -731,7 +738,13 @@ router.get(
       const { storeId, id } = req.params;
       const { prisma } = await import('@ebda/database');
 
-      const shipment = await prisma.shipment.findFirst({
+      // A DO store cannot join the platform `customer` (a User): the order's customerId is read and the customer attached
+      // from Postgres, so the response has the same shape on either backend (Ruling CF-R6B-1).
+      const onDo = (await storeRepo(storeId)).backend === 'do';
+      const customerSelect = { email: true, firstName: true, lastName: true } as const;
+      const shipment = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({
         where: { id, storeId },
         include: {
           order: {
@@ -739,11 +752,21 @@ router.get(
               orderNumber: true,
               status: true,
               total: true,
-              customer: { select: { email: true, firstName: true, lastName: true } },
+              ...(onDo ? { customerId: true } : { customer: { select: customerSelect } }),
             },
           },
         },
       });
+      if (shipment && onDo) {
+        const o = shipment.order as unknown as Record<string, unknown> | null;
+        const customerId = o?.customerId as string | null | undefined;
+        if (o) {
+          o.customer = customerId
+            ? await prisma.user.findFirst({ where: { id: customerId }, select: customerSelect })
+            : null;
+          delete o.customerId;
+        }
+      }
 
       if (!shipment) {
         res.status(404).json({
@@ -774,7 +797,9 @@ router.post(
 
       // Verify the shipment belongs to this store
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { id, storeId } });
 
       if (!existing) {
         res.status(404).json({
@@ -854,7 +879,9 @@ router.get(
         return;
       }
 
-      const shipment = await prisma.shipment.findFirst({
+      const shipment = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({
         // a booking that failed or is in flight is the merchant's business, not the customer's
         where: { orderId, storeId, status: { notIn: ['creation_failed', 'creating'] } },
         select: {

@@ -1,5 +1,6 @@
 import { z } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { storeDb } from '../../lib/repo-factory';
 import { prisma, runInTenantContext } from '@ebda/database';
 import type { McpStore } from '../resolve-store';
 import { ProductService } from '../../services/product.service';
@@ -298,8 +299,8 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       const orderIds: string[] = (result.orders ?? []).map((o: any) => o.id);
       const shipments =
         orderIds.length > 0
-          ? await runInTenantContext(store.id, () =>
-              prisma.shipment.findMany({
+          ? await runInTenantContext(store.id, async () =>
+              (await storeDb(store.id)).shipment.findMany({
                 where: { storeId: store.id, orderId: { in: orderIds } },
                 select: SHIPMENT_SUMMARY_SELECT,
               })
@@ -342,7 +343,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
         // Store-scoped: throws 404 for another store's order id.
         const o: any = await OrderService.getById(store.id, orderId);
         const [shipment, events] = await Promise.all([
-          prisma.shipment.findFirst({
+          (await storeDb(store.id)).shipment.findFirst({
             where: { storeId: store.id, orderId: o.id },
             select: SHIPMENT_SUMMARY_SELECT,
           }),

@@ -321,6 +321,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
     // Step 2: List active trackInventory products
     // -------------------------------------------------------------------------
     const products = await tx.product.findMany({
+      // repo-tx: tx is the DO read client on a DO store (scoped)
       where: {
         storeId,
         trackInventory: true,

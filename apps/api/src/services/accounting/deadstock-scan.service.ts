@@ -33,7 +33,7 @@ import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { AppError } from '../../middleware/error-handler';
 import { withSavepointOn } from '../../lib/savepoint';
-import { storeRepo } from '../../lib/repo-factory';
+import { storeDb, storeRepo } from '../../lib/repo-factory';
 import { withStoreRw } from '../../lib/jobs/store-db';
 
 // ---------------------------------------------------------------------------
@@ -262,6 +262,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     // No costPrice filter: a product without a cost is valued as unknown below.
     // -------------------------------------------------------------------------
     const products = await tx.product.findMany({
+      // repo-tx: tx is repo.db on a DO store (phase1)
       where: {
         storeId,
         trackInventory: true,
@@ -432,6 +433,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
             : withSavepointOn;
           await savepoint(tx, async () => {
             const existing = await tx.deadStockFlag.findFirst({
+              // repo-tx: tx is the store writer on a DO store (withStoreRw)
               where: {
                 storeId,
                 productId: candidate.productId,
@@ -506,7 +508,9 @@ export async function createClearanceCouponFromFlag(
   flagId: string,
   storeId: string
 ): Promise<{ couponCode: string }> {
-  const flag = await prisma.deadStockFlag.findFirst({
+  const flag = await (
+    await storeDb(storeId)
+  ).deadStockFlag.findFirst({
     where: { id: flagId, storeId },
     include: { product: { select: { sku: true, id: true } } },
   });

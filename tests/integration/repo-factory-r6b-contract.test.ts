@@ -25,6 +25,7 @@ import { hasDb } from '../helpers/bundle-fixtures';
 import { InventoryService } from '../../apps/api/src/services/inventory.service';
 import { ProductService } from '../../apps/api/src/services/product.service';
 import { redis } from '../../apps/api/src/services/redis.service';
+import { CodReconciliationService } from '../../apps/api/src/services/cod-reconciliation.service';
 
 const sfx = Date.now().toString(36);
 let STORE = '';
@@ -110,9 +111,58 @@ beforeAll(async () => {
     data: { storeId: STORE, name: 'Rings', slug: `rings-${sfx}` },
   });
   insertSqlite(sqlite, 'Category', [cat as Record<string, unknown>]);
+  // a COD shipment (booked on the DO by the money jobs) with its order, and a prepaid one that has a remittance line only
+  for (const [n, cod, trk] of [
+    ['1', 5000, 'TRK-COD'],
+    ['2', 0, 'TRK-PRE'],
+  ] as const) {
+    const order = await prisma.order.create({
+      data: {
+        storeId: STORE,
+        orderNumber: `R6B-${sfx}-${n}`,
+        subtotal: 5000,
+        total: 5000,
+        status: 'confirmed',
+        shippingAddress: {},
+        billingAddress: {},
+      } as never,
+    });
+    insertSqlite(sqlite, 'Order', [order as Record<string, unknown>]);
+    const sh = await prisma.shipment.create({
+      data: {
+        storeId: STORE,
+        orderId: order.id,
+        carrier: 'bosta',
+        trackingNumber: trk,
+        status: 'in_transit',
+        codAmount: cod,
+        pickupAddress: {},
+        deliveryAddress: {},
+      } as never,
+    });
+    insertSqlite(sqlite, 'Shipment', [sh as Record<string, unknown>]);
+    ids[`ship${n}`] = sh.id;
+  }
+  await prisma.codRemittance.create({
+    data: {
+      storeId: STORE,
+      shipmentId: ids.ship2,
+      carrier: 'bosta',
+      trackingNumber: 'TRK-PRE',
+      lineRef: `L-${sfx}`,
+      grossAmount: 1,
+      feeAmount: 0,
+      netAmount: 1,
+      remittedAt: new Date('2026-01-02'),
+      source: 'csv',
+    } as never,
+  });
 });
 afterAll(async () => {
   if (!hasDb) return;
+  await prisma.codRemittance.deleteMany({ where: { storeId: STORE } });
+  await prisma.shipment.deleteMany({ where: { storeId: STORE } });
+  await prisma.order.deleteMany({ where: { storeId: STORE } });
   await prisma.store.deleteMany({ where: { id: STORE } });
   await prisma.user.deleteMany({ where: { id: ownerId } });
   await prisma.$disconnect();
@@ -154,6 +204,19 @@ describe.skipIf(!hasDb)('R6b routed readers: Postgres vs the Durable Object', ()
       (pg as any).ok.products[0].store,
       'the store ref is part of the row on both backends'
     ).toBeTruthy();
+  });
+
+  it('COD reconciliation report lists the COD shipment AND the remitted one on both backends (shipments follow the store backend)', async () => {
+    const run = (on: typeof onPg) =>
+      on(() => settle(() => new CodReconciliationService().getReport(STORE)));
+    const pg = scrub(await run(onPg)) as any;
+    const dobj = scrub(await run(onDo));
+    expect(dobj).toEqual(pg);
+    expect(JSON.stringify(pg)).toContain('TRK-COD');
+    expect(
+      JSON.stringify(pg),
+      'the prepaid shipment appears because it has a remittance line'
+    ).toContain('TRK-PRE');
   });
 
   it('a low-stock threshold WRITTEN on the DO is honoured when read, and Postgres answers the same', async () => {

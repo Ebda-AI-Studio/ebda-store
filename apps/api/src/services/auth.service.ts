@@ -2628,9 +2628,11 @@ export class AuthService {
         where: { customerId: userId, storeId },
         include: { items: true, payments: true },
       }),
-      prisma.abandonedCart.findMany({ where: { customerId: userId, storeId } }),
+      storeDb(storeId).then(db =>
+        db.abandonedCart.findMany({ where: { customerId: userId, storeId } })
+      ),
       prisma.wishlist.findMany({ where: { userId, storeId } }),
-      prisma.review.findMany({ where: { customerId: userId, storeId } }),
+      storeDb(storeId).then(db => db.review.findMany({ where: { customerId: userId, storeId } })),
       prisma.return.findMany({ where: { customerId: userId, storeId } }),
       prisma.loyaltyPoints.findMany({ where: { customerId: userId, storeId } }),
       prisma.loyaltyTransaction.findMany({ where: { customerId: userId, storeId } }),

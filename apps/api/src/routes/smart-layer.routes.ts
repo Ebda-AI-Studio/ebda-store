@@ -175,23 +175,27 @@ router.get(
       const where: any = { storeId: req.params.storeId };
       if (status === 'open') where.status = 'open';
 
-      const [items, total, valueUnknownCount] = await runInTenantContext(req.params.storeId, () =>
-        Promise.all([
-          prisma.deadStockFlag.findMany({
-            where,
-            include: {
-              product: { select: { id: true, name: true, sku: true } },
-            },
-            // Known values first, largest first; flags whose product has no
-            // cost price (value unknown = NULL) after them. `id` keeps the
-            // page boundaries stable across ties.
-            orderBy: [{ stockValueFils: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
-            skip: (page - 1) * perPage,
-            take: perPage,
-          }),
-          prisma.deadStockFlag.count({ where }),
-          prisma.deadStockFlag.count({ where: { ...where, stockValueFils: null } }),
-        ])
+      const [items, total, valueUnknownCount] = await runInTenantContext(
+        req.params.storeId,
+        async () =>
+          Promise.all([
+            (await storeDb(req.params.storeId)).deadStockFlag.findMany({
+              where,
+              include: {
+                product: { select: { id: true, name: true, sku: true } },
+              },
+              // Known values first, largest first; flags whose product has no
+              // cost price (value unknown = NULL) after them. `id` keeps the
+              // page boundaries stable across ties.
+              orderBy: [{ stockValueFils: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+              skip: (page - 1) * perPage,
+              take: perPage,
+            }),
+            (await storeDb(req.params.storeId)).deadStockFlag.count({ where }),
+            (await storeDb(req.params.storeId)).deadStockFlag.count({
+              where: { ...where, stockValueFils: null },
+            }),
+          ])
       );
 
       res.json({

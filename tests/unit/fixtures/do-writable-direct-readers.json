@@ -1,202 +1,174 @@
 {
-  "apps/api/src/lib/savepoint.ts": {
-    "cart": 1
+  "dead": {
+    "apps/api/src/services/inventory.service.ts": {
+      "models": {
+        "product": 2
+      },
+      "methods": ["reduceOnSale", "returnToStock"],
+      "reason": "no caller anywhere in apps/ or packages/ (verified by the test); left in place per CF-R6B-1"
+    }
   },
-  "apps/api/src/lib/wa/consent.ts": {
-    "cart": 1
-  },
-  "apps/api/src/mcp/tools/admin-read.tools.ts": {
-    "shipment": 2
-  },
-  "apps/api/src/routes/admin.routes.ts": {
-    "product": 3
-  },
-  "apps/api/src/routes/ai.routes.ts": {
-    "category": 9,
-    "product": 27,
-    "productImage": 2,
-    "tag": 1
-  },
-  "apps/api/src/routes/analytics.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/routes/barcode-labels.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/routes/bulk.routes.ts": {
-    "product": 2
-  },
-  "apps/api/src/routes/bundle.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/routes/coupon.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/routes/insights.routes.ts": {
-    "product": 2
-  },
-  "apps/api/src/routes/product.routes.ts": {
-    "product": 4,
-    "productFaq": 2
-  },
-  "apps/api/src/routes/promotion.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/routes/public.routes.ts": {
-    "product": 3,
-    "storeLocation": 1,
-    "storePage": 1
-  },
-  "apps/api/src/routes/shipping-carrier.routes.ts": {
-    "shipment": 6
-  },
-  "apps/api/src/routes/smart-layer.routes.ts": {
-    "deadStockFlag": 3
-  },
-  "apps/api/src/routes/stock-adjustments.routes.ts": {
-    "productVariant": 2,
-    "product": 2
-  },
-  "apps/api/src/routes/wholesale.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/routes/wishlist.routes.ts": {
-    "product": 1
-  },
-  "apps/api/src/services/abandoned-cart.service.ts": {
-    "abandonedCart": 2,
-    "cart": 1
-  },
-  "apps/api/src/services/accounting/account.service.ts": {
-    "product": 1,
-    "productVariant": 1
-  },
-  "apps/api/src/services/accounting/assert-store-owns.ts": {
-    "product": 1,
-    "productVariant": 1,
-    "category": 1
-  },
-  "apps/api/src/services/accounting/deadstock-scan.service.ts": {
-    "product": 1,
-    "deadStockFlag": 2
-  },
-  "apps/api/src/services/accounting/purchase-order.service.ts": {
-    "productVariant": 4,
-    "product": 1
-  },
-  "apps/api/src/services/accounting/reorder-scan.service.ts": {
-    "product": 1
-  },
-  "apps/api/src/services/accounting/stock-adjustment.service.ts": {
-    "productVariant": 1,
-    "product": 1
-  },
-  "apps/api/src/services/analytics.service.ts": {
-    "product": 2,
-    "productCategory": 1
-  },
-  "apps/api/src/services/auth.service.ts": {
-    "campaignRecipient": 1,
-    "abandonedCart": 1,
-    "review": 1
-  },
-  "apps/api/src/services/barcode-scan.service.ts": {
-    "product": 3,
-    "productVariant": 3
-  },
-  "apps/api/src/services/barcode.service.ts": {
-    "product": 2,
-    "productVariant": 2
-  },
-  "apps/api/src/services/bulk.service.ts": {
-    "productOption": 1,
-    "productVariant": 1,
-    "product": 2
-  },
-  "apps/api/src/services/campaign.service.ts": {
-    "newsletterSubscriber": 1
-  },
-  "apps/api/src/services/cart.service.ts": {
-    "product": 1,
-    "productVariant": 1,
-    "cartItem": 2,
-    "cartBundle": 1
-  },
-  "apps/api/src/services/cod-reconciliation.service.ts": {
-    "shipment": 2
-  },
-  "apps/api/src/services/customer-reorder.service.ts": {
-    "product": 1
-  },
-  "apps/api/src/services/gold-rate/gold-rate.service.ts": {
-    "product": 5,
-    "productPriceTier": 1
-  },
-  "apps/api/src/services/gold-rate/repricer.ts": {
-    "product": 2
-  },
-  "apps/api/src/services/inventory.service.ts": {
-    "product": 6,
-    "productVariant": 1
-  },
-  "apps/api/src/services/notification-config.service.ts": {
-    "notificationConfig": 1
-  },
-  "apps/api/src/services/notification-dispatcher.service.ts": {
-    "notificationEventConfig": 1
-  },
-  "apps/api/src/services/onboarding.service.ts": {
-    "product": 1
-  },
-  "apps/api/src/services/order.service.ts": {
-    "product": 4,
-    "cartItem": 1,
-    "cartBundle": 1,
-    "productVariant": 1,
-    "abandonedCart": 1,
-    "cart": 1
-  },
-  "apps/api/src/services/page-builder.service.ts": {
-    "storePageRevision": 1
-  },
-  "apps/api/src/services/product-model.service.ts": {
-    "product": 1,
-    "productOption": 1,
-    "productOptionValue": 1
-  },
-  "apps/api/src/services/product.service.ts": {
-    "productOption": 1,
-    "product": 18,
-    "productVariant": 1,
-    "productCategory": 2,
-    "category": 4,
-    "productPriceTier": 1,
-    "tag": 1
-  },
-  "apps/api/src/services/provisioning.service.ts": {
-    "product": 2
-  },
-  "apps/api/src/services/qr.service.ts": {
-    "product": 2,
-    "category": 2
-  },
-  "apps/api/src/services/shipment-pickup.service.ts": {
-    "shipment": 1
-  },
-  "apps/api/src/services/store-category-suggest.service.ts": {
-    "category": 1,
-    "product": 1
-  },
-  "apps/api/src/services/store.service.ts": {
-    "product": 3,
-    "category": 1
-  },
-  "apps/api/src/services/variant.service.ts": {
-    "product": 1,
-    "productVariant": 1
-  },
-  "apps/api/src/services/warehouse.service.ts": {
-    "product": 2,
-    "productVariant": 1
+  "baseline": {
+    "apps/api/src/routes/admin.routes.ts": {
+      "kind": "platform",
+      "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
+      "models": {
+        "product": 3
+      }
+    },
+    "apps/api/src/routes/stock-adjustments.routes.ts": {
+      "kind": "pg-only-flow",
+      "reason": "CSV stock-adjustment import: snapshots and writes Postgres inventory (postgresOnly: accounting flows).",
+      "models": {
+        "productVariant": 2,
+        "product": 2
+      }
+    },
+    "apps/api/src/services/abandoned-cart.service.ts": {
+      "kind": "pg-branch",
+      "reason": "processReminders / getStats / candidate load: each Postgres read sits in the `backend !== 'do'` / `onDo` else-branch next to the DO read (CF-R4-5).",
+      "models": {
+        "abandonedCart": 2,
+        "cart": 1
+      }
+    },
+    "apps/api/src/services/accounting/account.service.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Accounting opening-balance journal: the stock valuation it reads and the journal it writes are Postgres (postgresOnly: accounting flows).",
+      "models": {
+        "product": 1,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/accounting/assert-store-owns.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Ownership check for accounting writes (purchase orders, stock adjustments, expenses) that write Postgres rows (postgresOnly: accounting flows).",
+      "models": {
+        "product": 1,
+        "productVariant": 1,
+        "category": 1
+      }
+    },
+    "apps/api/src/services/accounting/purchase-order.service.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Purchase-order receive writes inventory + ledger on Postgres; the read stays beside the write (postgresOnly: accounting flows).",
+      "models": {
+        "productVariant": 4,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/accounting/stock-adjustment.service.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Stock adjustment writes inventory + ledger on Postgres; the read stays beside the write (postgresOnly: accounting flows).",
+      "models": {
+        "productVariant": 1,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/auth.service.ts": {
+      "kind": "platform",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
+      "models": {
+        "campaignRecipient": 1
+      }
+    },
+    "apps/api/src/services/barcode-scan.service.ts": {
+      "kind": "pg-only-flow",
+      "reason": "Scan-to-adjust (variant) and count-session lines write Postgres inventory inline; the lookup read is already routed (postgresOnly: barcode scan stock flows).",
+      "models": {
+        "productVariant": 2,
+        "product": 2
+      }
+    },
+    "apps/api/src/services/barcode.service.ts": {
+      "kind": "pg-branch",
+      "reason": "generateMissingBarcodes: after `if (money) return money.barcodeFill` (BARCODE-DO-1); the withStore body is the Postgres branch.",
+      "models": {
+        "product": 2,
+        "productVariant": 2
+      }
+    },
+    "apps/api/src/services/bulk.service.ts": {
+      "kind": "pg-branch",
+      "reason": "importProducts / importVariants: inside the `else` of `if (money)` (IMPORT-DO-1: a DO store runs money.importBatch / importVariants); the interactive-transaction body is the Postgres branch.",
+      "models": {
+        "productOption": 1,
+        "productVariant": 1,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/gold-rate/gold-rate.service.ts": {
+      "kind": "pg-branch",
+      "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
+      "models": {
+        "product": 4,
+        "productPriceTier": 1
+      }
+    },
+    "apps/api/src/services/gold-rate/repricer.ts": {
+      "kind": "pg-branch",
+      "reason": "repriceStore / repriceProduct are called only from the Postgres branches of gold-rate.service (a DO store reprices inside goldApplyRates).",
+      "guardFile": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "models": {
+        "product": 2
+      }
+    },
+    "apps/api/src/services/inventory.service.ts": {
+      "kind": "pg-branch",
+      "reason": "adjustInventory / bulkAdjustInventory / setInventory: after `if (stock)` early return (CF-STOCK-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "product": 3,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/notification-config.service.ts": {
+      "kind": "pg-branch",
+      "reason": "readFromDb: Postgres arm next to `repo.backend === 'do'` (CF-NOTIFY-1); a DO store reads storeDb.",
+      "models": {
+        "notificationConfig": 1
+      }
+    },
+    "apps/api/src/services/notification-dispatcher.service.ts": {
+      "kind": "pg-branch",
+      "reason": "getEventConfig: Postgres arm next to `repo.backend === 'do'` (CF-NOTIFY-1); a DO store reads storeDb.",
+      "models": {
+        "notificationEventConfig": 1
+      }
+    },
+    "apps/api/src/services/order.service.ts": {
+      "kind": "pg-branch",
+      "reason": "create / rollbackForPaymentFailure / createAdminOrder: after `storeMoney()` early return (CF-ORDERS-1, CF-R4-2); the interactive-transaction body is the Postgres branch.",
+      "models": {
+        "product": 4,
+        "cartItem": 1,
+        "cartBundle": 1,
+        "productVariant": 1,
+        "abandonedCart": 1,
+        "cart": 1
+      }
+    },
+    "apps/api/src/services/product.service.ts": {
+      "kind": "pg-branch",
+      "reason": "update(): the `tx` body is the Postgres transaction path; a DO store takes updateOnDo (CF-WRITES-2).",
+      "models": {
+        "productCategory": 1
+      }
+    },
+    "apps/api/src/services/variant.service.ts": {
+      "kind": "pg-branch",
+      "reason": "bulkUpdateInventory: after `if (stock)` early return (CF-STOCK-1).",
+      "models": {
+        "product": 1,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/warehouse.service.ts": {
+      "kind": "pg-branch",
+      "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1).",
+      "models": {
+        "product": 2,
+        "productVariant": 1
+      }
+    }
   }
 }

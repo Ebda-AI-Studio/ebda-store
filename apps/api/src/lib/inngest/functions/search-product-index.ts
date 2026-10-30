@@ -112,7 +112,7 @@ export async function handleSearchProductIndex({
   // and be lost. The hash is the source of truth.
   const counts = { permanent: 0, temporary: 0 };
   // A store on its Durable Object (Ruling CF-JOBS-4B): its products and index state are in the DO, its vectors in Vectorize
-  const result = doStoreIds().has(storeId)
+  const result = (await doStoreIds()).has(storeId)
     ? await indexRoundsDo(storeId, step, attempt, INDEX_RETRIES, counts)
     : await indexRounds(storeId, step, attempt, counts);
   // Review N-I1 (c): ONE P1 per run that quarantined anything, with the counts — never per product.
@@ -287,7 +287,7 @@ export async function handleSearchIndexBackstop({
   if (!getEmbeddingProvider()) return { skipped: 'no-provider' };
   // The alarm of a store on its Durable Object probes that store's own index state (Ruling CF-JOBS-4B)
   const only = alarmStoreId(event);
-  if (only && doStoreIds().has(only)) {
+  if (only && (await doStoreIds()).has(only)) {
     if (!productVectorIndex()) return { skipped: 'no-vector-index' };
     const stale = (await step.run('find-stale-do-store', async () =>
       Boolean((await (await storeMoney(only))?.vectorStale({}))?.stale)

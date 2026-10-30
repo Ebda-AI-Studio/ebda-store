@@ -461,9 +461,9 @@ const PUBLIC_LISTING_SELECT = {
 } as const satisfies Prisma.ProductSelect;
 
 /**
- * A store on its Durable Object (Ruling CF-R6B-1): prisma-lite joins no Postgres / D1 model, so a storefront read drops the
- * `store` relation (the D1 Store row) and `reviews` (Review is not a DO model: reviews stay on Postgres) from its select and
- * puts them back from their own source after the DO read. On Postgres the select is untouched.
+ * A store on its Durable Object (Ruling CF-R6B-1): prisma-lite joins no D1 / platform model, so a storefront read drops the
+ * `store` relation (the D1 Store row) from its select and puts it back from its own source after the DO read. On Postgres the
+ * select is untouched.
  */
 const { store: _listingStore, ...PUBLIC_LISTING_SELECT_DO } = PUBLIC_LISTING_SELECT;
 void _listingStore;
@@ -2317,23 +2317,35 @@ export class ProductService {
     const full = this.PUBLIC_PRODUCT_DETAIL_SELECT;
     if ((await storeRepo(storeId)).backend !== 'do')
       return (await storeDb(storeId)).product.findFirst({ where, select: full });
-    const { store: _s, reviews: _r, ...doSelect } = full;
+    // `store` (D1) and the reviewer's `customer` (a User) are the two relations prisma-lite cannot join.
+    const { store: _s, reviews, ...rest } = full;
     void _s;
-    void _r;
+    const { customer: _c, ...reviewSelect } = reviews.select;
+    void _c;
+    const doSelect = {
+      ...rest,
+      reviews: { ...reviews, select: { ...reviewSelect, customerId: true } },
+    };
     const row = await (
       await storeDb(storeId)
     ).product.findFirst({ where, select: doSelect as unknown as typeof full });
     if (!row) return row;
-    const [store, reviews] = await Promise.all([
-      storeRefFor(storeId),
-      prisma.review.findMany({
-        where: { ...full.reviews.where, productId: row.id, storeId },
-        orderBy: full.reviews.orderBy,
-        take: full.reviews.take,
-        select: full.reviews.select,
-      }),
-    ]);
-    return { ...row, store, reviews } as typeof row;
+    const rows = row.reviews as unknown as Array<
+      Record<string, unknown> & { customerId?: string | null }
+    >;
+    const ids = [...new Set(rows.map(r => r.customerId).filter((v): v is string => !!v))];
+    const users = ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+    const byId = new Map(users.map(u => [u.id, { firstName: u.firstName, lastName: u.lastName }]));
+    const withCustomer = rows.map(({ customerId, ...r }) => ({
+      ...r,
+      customer: customerId ? (byId.get(customerId) ?? null) : null,
+    }));
+    return { ...row, store: await storeRefFor(storeId), reviews: withCustomer } as typeof row;
   }
 
   static async getPublicBySlug(
@@ -2745,7 +2757,6 @@ export class ProductService {
     })();
 
     // Execute query
-    const searchOnDo = (await storeRepo(storeId)).backend === 'do';
     const [fetched, total, priceRange] = await Promise.all([
       (await storeDb(storeId)).product.findMany({
         where,
@@ -2755,9 +2766,7 @@ export class ProductService {
           images: { orderBy: { position: 'asc' }, take: 2 },
           categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
           options: LISTING_SWATCH_OPTIONS_SELECT,
-          ...(searchOnDo
-            ? {}
-            : { reviews: { where: { status: 'published' as const }, select: { rating: true } } }),
+          reviews: { where: { status: 'published' }, select: { rating: true } },
           // See listPublic note above — variants are needed for the
           // dual-CTA (View vs Add to Cart) + "From <min>" pricing on
           // the storefront card components.
@@ -2776,21 +2785,7 @@ export class ProductService {
       }),
     ]);
 
-    // Reviews are a Postgres model: a DO store's ratings come from there in one read (Ruling CF-R6B-1).
-    const ratingRows = searchOnDo
-      ? await prisma.review.findMany({
-          where: { storeId, status: 'published', productId: { in: fetched.map(p => p.id) } },
-          select: { productId: true, rating: true },
-        })
-      : [];
-    const products = fetched.map(p =>
-      searchOnDo
-        ? ({
-            ...p,
-            reviews: ratingRows.filter(r => r.productId === p.id).map(r => ({ rating: r.rating })),
-          } as typeof p)
-        : p
-    );
+    const products = fetched;
 
     // Calculate average ratings
     const productsWithRatings = products.map(product => {

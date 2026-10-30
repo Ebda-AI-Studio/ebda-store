@@ -7,6 +7,7 @@
  * store scope (the admin routes' tenant context).
  */
 import { prisma } from '@ebda/database';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import {
   parseSettlementCsv,
@@ -91,7 +92,9 @@ export class CodReconciliationService {
     }
 
     const trackings = [...new Set(parsed.rows.map(r => r.trackingNumber))];
-    const shipments = await prisma.shipment.findMany({
+    const shipments = await (
+      await storeDb(storeId)
+    ).shipment.findMany({
       where: { storeId, carrier, trackingNumber: { in: trackings } },
       select: { id: true, trackingNumber: true },
     });
@@ -129,12 +132,27 @@ export class CodReconciliationService {
     const page = Math.max(1, opts.page ?? 1);
     const limit = Math.min(100, Math.max(1, opts.limit ?? 25));
 
+    // A DO store's remittance lines are written to Postgres (CodRemittance is not a DO-written model), so the "has a remittance"
+    // filter cannot be a relation filter on the DO's own (empty) table: resolve the shipment ids from Postgres (Ruling CF-R6B-1).
+    const onDo = (await storeRepo(storeId)).backend === 'do';
+    const remittedShipmentIds = onDo
+      ? (
+          await prisma.codRemittance.findMany({
+            where: { storeId, shipmentId: { not: null } },
+            select: { shipmentId: true },
+            distinct: ['shipmentId'],
+          })
+        ).flatMap(r => (r.shipmentId ? [r.shipmentId] : []))
+      : [];
     const [shipmentsRead, linesRead] = await Promise.all([
-      prisma.shipment.findMany({
+      (await storeDb(storeId)).shipment.findMany({
         where: {
           storeId,
           status: { notIn: ['creation_failed', 'creating'] },
-          OR: [{ codAmount: { gt: 0 } }, { codRemittances: { some: {} } }],
+          OR: [
+            { codAmount: { gt: 0 } },
+            onDo ? { id: { in: remittedShipmentIds } } : { codRemittances: { some: {} } },
+          ],
           ...(opts.carrier ? { carrier: opts.carrier } : {}),
         },
         select: {
