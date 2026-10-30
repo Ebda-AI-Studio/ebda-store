@@ -173,7 +173,7 @@ export class ReviewService {
     if (status !== 'all') where.status = status;
     if (productId) where.productId = productId;
 
-    let [reviews, total] = await Promise.all([
+    const [firstPage, total] = await Promise.all([
       db.review.findMany({
         where,
         skip,
@@ -192,6 +192,7 @@ export class ReviewService {
       db.review.count({ where }),
     ]);
 
+    let reviews = firstPage;
     if (onDo) {
       const buyers = await customersById(
         storeId,
