@@ -3603,12 +3603,22 @@ export class OrderService {
     const notify = options.fireRefundNotification ?? true;
     // A store on its Durable Object: the credit note / refund receipt / cancelled sale document is issued here, through the
     // DO (the `order/refunded` fanout's `fiscal-document` step reads Postgres and is refused for a DO store, Ruling CF-JOBS-1).
-    const fiscalMoney = await storeMoney(storeId);
-    if (fiscalMoney) await OrderService.fiscalOnDo(fiscalMoney, storeId, orderId, options.partial);
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId },
-      select: { id: true },
-    });
+    // A DO store's order is not in Postgres: its existence is read from the DO, and the arming stamps below (order and
+    // return) were written inside the DO section that completed the money step (Ruling CF-RETURNS-1).
+    const doMoney = await storeMoney(storeId);
+    // The credit note / refund receipt / cancelled sale document is issued through the DO (the fanout step reads Postgres, refused for a DO store, Ruling CF-JOBS-1).
+    if (doMoney) await OrderService.fiscalOnDo(doMoney, storeId, orderId, options.partial);
+    const order = doMoney
+      ? await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: { id: orderId, storeId },
+          select: { id: true },
+        })
+      : await prisma.order.findFirst({
+          where: { id: orderId, storeId },
+          select: { id: true },
+        });
     if (!order) return;
 
     // Arm the stuck-reversal sweep for a WHOLE-order, stock-restoring event,

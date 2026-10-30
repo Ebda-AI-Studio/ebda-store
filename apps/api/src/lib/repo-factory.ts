@@ -327,6 +327,96 @@ export interface MoneyClient {
     },
     key?: string
   ): Promise<OrderStatusResult>;
+  /** The Return row lifecycle and the partial-return journal (Ruling CF-RETURNS-1): see `packages/repo/src/do/returns.ts`. */
+  returnCreate(
+    a: {
+      orderId: string;
+      customerId: string;
+      type: string;
+      reason: string;
+      reasonDetail?: string;
+      customerNotes?: string;
+      items?: Array<{
+        orderItemId: string;
+        productId: string;
+        productName: string;
+        quantity: number;
+        reason?: string;
+        condition?: string;
+      }>;
+      bundleGroupIds?: string[];
+    },
+    key?: string
+  ): Promise<{ returnId: string }>;
+  returnStatus(
+    a: { returnId: string; status: string; userId: string; notes?: string },
+    key?: string
+  ): Promise<{ returnId: string; status: string }>;
+  returnTracking(
+    a: { returnId: string; trackingNumber: string },
+    key?: string
+  ): Promise<{ returnId: string }>;
+  /** Start of ReturnService.complete: status gate, atomic claim, the plan for the gateway call. */
+  returnClaim(a: ReturnCompleteArgs, key?: string): Promise<DoReturnPlan>;
+  /** End of ReturnService.complete: the completion row AND the wallet credit AND the stock effects in ONE section. */
+  returnFinish(
+    a: ReturnCompleteArgs & {
+      userId: string;
+      gatewayAmount?: number;
+      gatewayRanFullEffects?: boolean;
+    },
+    key?: string
+  ): Promise<{
+    returnId: string;
+    replayed: boolean;
+    refundAmount: number;
+    tierCarryWaived: number;
+    walletCredited: number;
+    walletShareCredited: number;
+  }>;
+  returnRelease(a: { returnId: string }, key?: string): Promise<{ released: boolean }>;
+  journalPartialReturn(
+    a: {
+      orderId: string;
+      refundKey: string;
+      items: Array<{ orderItemId: string; quantity: number }>;
+    },
+    key?: string
+  ): Promise<{ posted: number; skipped?: string }>;
+  journalAmountOnlyRefund(
+    a: { orderId: string; refundKey: string; amount: number },
+    key?: string
+  ): Promise<{ posted: number; skipped?: string }>;
+}
+
+export interface ReturnCompleteArgs {
+  returnId: string;
+  refundMethod: string;
+  refundOverrides?: Record<string, { amountMinor: number; reason: string }>;
+  walletFeature?: boolean;
+}
+export interface DoReturnPlan {
+  returnId: string;
+  orderId: string | null;
+  customerId: string;
+  type: string;
+  isInventoryRestoring: boolean;
+  isFullReturn: boolean;
+  isGatewayRefund: boolean;
+  partial: {
+    cashCredit: number;
+    returnedLineCount: number;
+    allLinesNowReturned: boolean;
+    walletShare: number;
+    gatewayShare: number;
+  } | null;
+  tierTotal: number;
+  allocatedAmount: number | null;
+  walletCreditAmount: number | null;
+  walletShare: number;
+  skipProvider: boolean;
+  items: Array<{ orderItemId: string; quantity: number }>;
+  outstandingClaims: string[];
 }
 
 export interface OrderQuoteAnswer {
@@ -511,7 +601,8 @@ interface QueryStub {
     argsJson: string,
     key?: string
   ): Promise<
-    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
+    | { ok: true; json: string }
+    | { ok: false; code: string; status: number; message: string; meta?: Record<string, unknown> }
   >;
   query(
     storeId: string,
@@ -571,6 +662,14 @@ export function makeMoneyClient(
     searchOrders: a => call('searchOrders', a),
     createAdminOrder: (a, key) => call('createAdminOrder', a, key),
     recoveryCoupon: (a, key) => call('recoveryCoupon', a, key),
+    returnCreate: (a, key) => call('returnCreate', a, key),
+    returnStatus: (a, key) => call('returnStatus', a, key),
+    returnTracking: (a, key) => call('returnTracking', a, key),
+    returnClaim: (a, key) => call('returnClaim', a, key),
+    returnFinish: (a, key) => call('returnFinish', a, key),
+    returnRelease: (a, key) => call('returnRelease', a, key),
+    journalPartialReturn: (a, key) => call('journalPartialReturn', a, key),
+    journalAmountOnlyRefund: (a, key) => call('journalAmountOnlyRefund', a, key),
   };
 }
 
@@ -588,7 +687,7 @@ async function doClients(
   };
   const callMoney = async (op: string, args: unknown, key?: string) => {
     const r = await stub.moneyOp(storeId, op, encodeRpc(args), key);
-    if (!r.ok) throw new AppError(r.status, r.code, r.message);
+    if (!r.ok) throw new AppError(r.status, r.code, r.message, r.meta);
     return decodeRpc<any>(r.json);
   };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);

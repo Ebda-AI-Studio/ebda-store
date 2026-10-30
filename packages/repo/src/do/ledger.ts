@@ -14,7 +14,7 @@ import { MoneyError, type SyncSql } from './sync-sql';
  *   - a missing system account is `ACCOUNT_NOT_FOUND` (409), not self-healed from `COA_TEMPLATE` (the template lives in the
  *     API package; the import carries the store's accounts across);
  *   - the wallet tender is journaled as in Ruling WALLET-GL-1: DR 2150 for `wallet_amount`, DR cash for the rest;
- *   - partial-return adjustments (`postPartialReturnJournal`) are NOT ported: the Worker refuses them for a DO store (501).
+ *   - partial-return adjustments (`postPartialReturnJournal`) live in `do/returns.ts` (Ruling CF-RETURNS-1).
  */
 
 export const PROVIDER_TO_CASH_CODE: Record<string, string> = {

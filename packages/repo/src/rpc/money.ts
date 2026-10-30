@@ -8,7 +8,7 @@ import { decodeRpc, encodeRpc } from './codec';
  */
 export type MoneyAnswer =
   | { ok: true; json: string }
-  | { ok: false; code: string; status: number; message: string };
+  | { ok: false; code: string; status: number; message: string; meta?: Record<string, unknown> };
 
 /** Run one operation and turn a refusal into an ANSWER (the DO never throws a refusal across the RPC boundary). */
 export function answerMoneyOp(
@@ -23,7 +23,13 @@ export function answerMoneyOp(
     return { ok: true, json: encodeRpc(runMoneyOp(db, storeId, op, args, key)) };
   } catch (e) {
     if (e instanceof MoneyError)
-      return { ok: false, code: e.code, status: e.status, message: e.message };
+      return {
+        ok: false,
+        code: e.code,
+        status: e.status,
+        message: e.message,
+        ...(e.meta ? { meta: e.meta } : {}),
+      };
     const err = e as { code?: unknown; message?: unknown };
     // a SQLite constraint failure, a decode error: reported, rolled back (transactionSync), never swallowed
     return {

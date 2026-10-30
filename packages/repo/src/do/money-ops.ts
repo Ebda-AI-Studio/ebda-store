@@ -39,6 +39,16 @@ import {
 } from './gold-pricing';
 import { placeAdminOrder, type AdminOrderInput } from './admin-order';
 import { searchOrderIds } from './order-search';
+import {
+  claimReturn,
+  createReturn,
+  finishReturn,
+  postAmountOnlyRefundJournal,
+  postPartialReturnJournal,
+  releaseReturn,
+  setReturnStatus,
+  setReturnTracking,
+} from './returns';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -85,7 +95,15 @@ export type MoneyOpName =
   | 'fiscalCancelSale'
   | 'searchOrders'
   | 'createAdminOrder'
-  | 'recoveryCoupon';
+  | 'recoveryCoupon'
+  | 'returnCreate'
+  | 'returnStatus'
+  | 'returnTracking'
+  | 'returnClaim'
+  | 'returnFinish'
+  | 'returnRelease'
+  | 'journalPartialReturn'
+  | 'journalAmountOnlyRefund';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -118,6 +136,14 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'searchOrders',
   'createAdminOrder',
   'recoveryCoupon',
+  'returnCreate',
+  'returnStatus',
+  'returnTracking',
+  'returnClaim',
+  'returnFinish',
+  'returnRelease',
+  'journalPartialReturn',
+  'journalAmountOnlyRefund',
 ];
 
 const TABLE = '_money_ops';
@@ -428,6 +454,55 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       return { couponId, created: !existing };
     });
   },
+  /** The Return row lifecycle and the partial-return journal (Ruling CF-RETURNS-1): see `do/returns.ts`. */
+  returnCreate: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a;
+    return createReturn(db, {
+      ...(rest as unknown as Parameters<typeof createReturn>[1]),
+      storeId,
+    });
+  },
+  returnStatus: (db, storeId, a) =>
+    setReturnStatus(db, {
+      storeId,
+      returnId: id(a.returnId, 'returnId'),
+      status: typeof a.status === 'string' ? a.status : '',
+      userId: typeof a.userId === 'string' ? a.userId : '',
+      notes: typeof a.notes === 'string' ? a.notes : undefined,
+    }),
+  returnTracking: (db, storeId, a) =>
+    setReturnTracking(db, {
+      storeId,
+      returnId: id(a.returnId, 'returnId'),
+      trackingNumber: typeof a.trackingNumber === 'string' ? a.trackingNumber : '',
+    }),
+  returnClaim: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a;
+    return claimReturn(db, { ...(rest as unknown as Parameters<typeof claimReturn>[1]), storeId });
+  },
+  returnFinish: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a;
+    return finishReturn(db, {
+      ...(rest as unknown as Parameters<typeof finishReturn>[1]),
+      storeId,
+    });
+  },
+  returnRelease: (db, storeId, a) =>
+    releaseReturn(db, { storeId, returnId: id(a.returnId, 'returnId') }),
+  journalPartialReturn: (db, storeId, a) =>
+    postPartialReturnJournal(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      refundKey: id(a.refundKey, 'refundKey'),
+      items: Array.isArray(a.items) ? (a.items as { orderItemId: string; quantity: number }[]) : [],
+    }),
+  journalAmountOnlyRefund: (db, storeId, a) =>
+    postAmountOnlyRefundJournal(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      refundKey: id(a.refundKey, 'refundKey'),
+      amount: a.amount as number,
+    }),
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),
