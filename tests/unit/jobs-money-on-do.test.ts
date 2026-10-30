@@ -206,12 +206,12 @@ beforeEach(() => {
 });
 
 describe('the ported money jobs are not refused for a DO store; the unported ones still are', () => {
-  it('every ported job runs; every job still in MONEY_JOBS is refused with a P0 class', () => {
-    expect(doStoreIds().has(DO_STORE)).toBe(true);
+  it('every ported job runs; every job still in MONEY_JOBS is refused with a P0 class', async () => {
+    expect((await doStoreIds()).has(DO_STORE)).toBe(true);
     for (const id of [...PORTED_MONEY_JOBS, 'wa-store-events', ...PORTED_JOBS])
-      expect(decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
+      expect(await decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
     for (const id of MONEY_JOBS)
-      expect(decideRunForStore({ id } as never, DO_STORE), id).toMatchObject({
+      expect(await decideRunForStore({ id } as never, DO_STORE), id).toMatchObject({
         run: false,
         money: true,
       });

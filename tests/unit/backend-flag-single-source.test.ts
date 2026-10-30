@@ -101,7 +101,7 @@ describe('consumers see a store flipped only in D1', () => {
     vi.stubEnv('JOBS_ON_DO', '1');
     setCfBindings({ PLATFORM_DB: d1([A]) } as never);
     expect((await doStoreIds()).has(A)).toBe(true);
-    const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
+    const def = { id: 'fixture-unported-job', options: { id: 'x' }, handler: async () => 1 };
     expect(await decideRunForStore(def, A)).toMatchObject({ run: false, storeId: A });
     expect(await decideRunForStore(def, B)).toEqual({ run: true });
   });

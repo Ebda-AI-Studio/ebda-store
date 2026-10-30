@@ -206,9 +206,9 @@ beforeEach(() => {
 });
 
 describe('the webhook jobs are ported', () => {
-  it.each(['webhook-fanout', 'webhook-deliver', 'webhook-delivery-purge-daily'])('%s', id => {
+  it.each(['webhook-fanout', 'webhook-deliver', 'webhook-delivery-purge-daily'])('%s', async id => {
     expect(PORTED_JOBS.has(id)).toBe(true);
-    expect(decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+    expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
   });
   it('the purge is alarm-armed', () =>
     expect(ALARM_READY.has('webhook-delivery-purge-daily')).toBe(true));

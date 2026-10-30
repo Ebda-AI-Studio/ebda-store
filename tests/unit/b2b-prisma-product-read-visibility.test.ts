@@ -72,9 +72,9 @@ const ALLOW: Record<string, { count: number; reason: string }> = {
     reason: 'the counts paired with the four findMany reads above (same `where`)',
   },
   'services/product.service.ts :: product.findFirst': {
-    count: 4,
+    count: 6,
     reason:
-      'getById / getBySlug / create / update: merchant surface (public detail reads are getPublicBySlug / getPublicById, filtered)',
+      'getById / getBySlug / create / update: merchant surface; plus the two reads in readPublicDetail, whose `where` is built by getPublicBySlug / getPublicById WITH the audience filter',
   },
 };
 

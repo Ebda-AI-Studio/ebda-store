@@ -121,17 +121,17 @@ beforeEach(() => {
 describe('classification', () => {
   it.each(['instapay-receipt-retention-daily', 'order-anonymize-5y-monthly'])(
     '%s is ported and alarm-armed',
-    id => {
+    async id => {
       expect(PORTED_JOBS.has(id)).toBe(true);
       expect(ALARM_READY.has(id)).toBe(true);
-      expect(decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+      expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
     }
   );
   it.each(['search-log-purge-daily', 'soft-deleted-user-anonymize-monthly'])(
     '%s opens no store table',
-    id => {
+    async id => {
       expect(NO_STORE_DATA_JOBS.has(id)).toBe(true);
-      expect(decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+      expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
     }
   );
 });

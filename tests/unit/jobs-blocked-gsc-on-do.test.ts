@@ -82,9 +82,9 @@ beforeEach(() => {
 describe('gsc ingest for a DO store', () => {
   it.each(['gsc-ingest-cron', 'gsc-ingest-on-demand'])(
     '%s is classified store-data-free and runs',
-    id => {
+    async id => {
       expect(NO_STORE_DATA_JOBS.has(id)).toBe(true);
-      expect(decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+      expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
     }
   );
 

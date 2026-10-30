@@ -9,7 +9,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
-import { copyStoreSettings, storeDb, syncStoreFields } from '../lib/repo-factory';
+import { copyStoreSettings, storeDb, storeRepo, syncStoreFields } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -215,7 +215,8 @@ async function countStoreRows(
   opts: { orders?: boolean } = {}
 ): Promise<{ products: number; categories: number; orders?: number }> {
   return withStore(storeId, async tx => {
-    const db = await storeDb(storeId); // products + categories follow the store's backend; orders stay on the tx
+    // products + categories follow the store's backend (a Postgres store keeps this very tx); orders stay on the tx
+    const db = (await storeRepo(storeId)).backend === 'do' ? await storeDb(storeId) : tx;
     const [products, categories, orders] = await Promise.all([
       db.product.count({ where: { storeId } }),
       db.category.count({ where: { storeId } }),

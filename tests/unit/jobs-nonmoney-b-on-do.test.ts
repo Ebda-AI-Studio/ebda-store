@@ -174,9 +174,9 @@ beforeEach(() => {
 });
 
 describe('the guard lets the ported non-money jobs run for a DO store', () => {
-  it.each(PORTED_B)('%s is classified and not refused', id => {
+  it.each(PORTED_B)('%s is classified and not refused', async id => {
     expect(NO_STORE_DATA_JOBS.has(id) || PORTED_JOBS.has(id), id).toBe(true);
-    expect(decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
+    expect(await decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
   });
 });
 

@@ -107,10 +107,10 @@ beforeEach(() => {
 });
 
 describe('store-usage-snapshot on a DO store', () => {
-  it('is ported, alarm-armed and not refused', () => {
+  it('is ported, alarm-armed and not refused', async () => {
     expect(PORTED_JOBS.has('store-usage-snapshot')).toBe(true);
     expect(ALARM_READY.has('store-usage-snapshot')).toBe(true);
-    expect(decideRunForStore({ id: 'store-usage-snapshot' } as never, DO_STORE)).toEqual({
+    expect(await decideRunForStore({ id: 'store-usage-snapshot' } as never, DO_STORE)).toEqual({
       run: true,
     });
   });

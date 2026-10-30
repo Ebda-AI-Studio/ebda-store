@@ -104,10 +104,10 @@ beforeEach(() => {
 });
 
 describe('queue-depth-watch on a DO store', () => {
-  it('is ported, alarm-armed and not refused', () => {
+  it('is ported, alarm-armed and not refused', async () => {
     expect(PORTED_JOBS.has('queue-depth-watch')).toBe(true);
     expect(ALARM_READY.has('queue-depth-watch')).toBe(true);
-    expect(decideRunForStore({ id: 'queue-depth-watch' } as never, DO_STORE)).toEqual({
+    expect(await decideRunForStore({ id: 'queue-depth-watch' } as never, DO_STORE)).toEqual({
       run: true,
     });
   });

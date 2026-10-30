@@ -116,9 +116,9 @@ beforeEach(() => {
 });
 
 describe('the ETA jobs are ported', () => {
-  it.each(['eta-receipt-enqueue', 'eta-receipt-submit', 'eta-receipt-redrive'])('%s', id => {
+  it.each(['eta-receipt-enqueue', 'eta-receipt-submit', 'eta-receipt-redrive'])('%s', async id => {
     expect(PORTED_JOBS.has(id)).toBe(true);
-    expect(decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+    expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
   });
 });
 

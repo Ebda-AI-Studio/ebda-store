@@ -206,11 +206,11 @@ describe('the guard serves a DO store for every job of the first half', () => {
     }
   });
 
-  it('does not refuse any of them for a DO store (all served; none is blocked any more)', () => {
+  it('does not refuse any of them for a DO store (all served; none is blocked any more)', async () => {
     for (const id of SERVED)
-      expect(decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
+      expect(await decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
     for (const id of BLOCKED)
-      expect(decideRunForStore({ id } as never, DO_STORE), id).toMatchObject({ run: false });
+      expect(await decideRunForStore({ id } as never, DO_STORE), id).toMatchObject({ run: false });
   });
 
   it('a sweep that has a store alarm is alarm-ready (the DO store is served by its own alarm)', () => {

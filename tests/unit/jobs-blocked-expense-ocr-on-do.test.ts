@@ -121,9 +121,11 @@ beforeEach(() => {
 });
 
 describe('accounting-expense-ocr-process on a DO store', () => {
-  it('is ported and not refused', () => {
+  it('is ported and not refused', async () => {
     expect(PORTED_JOBS.has('accounting-expense-ocr-process')).toBe(true);
-    expect(decideRunForStore({ id: 'accounting-expense-ocr-process' } as never, DO_STORE)).toEqual({
+    expect(
+      await decideRunForStore({ id: 'accounting-expense-ocr-process' } as never, DO_STORE)
+    ).toEqual({
       run: true,
     });
   });

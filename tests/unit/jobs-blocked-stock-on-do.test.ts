@@ -163,9 +163,9 @@ describe('the four stock jobs are ported', () => {
     'stock-deadstock-scan-on-demand',
     'stock-low-stock-alert-cron',
     'stock-low-stock-alert-on-demand',
-  ])('%s', id => {
+  ])('%s', async id => {
     expect(PORTED_JOBS.has(id)).toBe(true);
-    expect(decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+    expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
   });
 });
 

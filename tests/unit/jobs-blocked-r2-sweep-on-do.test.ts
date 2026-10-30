@@ -110,9 +110,11 @@ beforeEach(() => {
 });
 
 describe('r2-orphan-sweep with a DO store', () => {
-  it('is ported and not refused', () => {
+  it('is ported and not refused', async () => {
     expect(PORTED_JOBS.has('r2-orphan-sweep')).toBe(true);
-    expect(decideRunForStore({ id: 'r2-orphan-sweep' } as never, DO_STORE)).toEqual({ run: true });
+    expect(await decideRunForStore({ id: 'r2-orphan-sweep' } as never, DO_STORE)).toEqual({
+      run: true,
+    });
   });
 
   it('keeps what the DO store references (url and json columns) and deletes only the real orphan; a second run deletes nothing', async () => {
