@@ -36,7 +36,7 @@ export async function withStoreDb<T>(
  * The ambient store of a ported job body: `runInTenantContext` (one Postgres transaction, RLS GUCs) for a store on
  * Postgres, only the ambient store id (`runInStoreScope`, no transaction, no connection) for a store on its Durable
  * Object, whose rows are not in Postgres. Code inside (`currentStoreId()`, platform reads such as `featureService`)
- * works unchanged for both. (Ruling CF-JOBS-3.)
+ * works unchanged for both. (Ruling CF-JOBS-4.)
  */
 export async function runInStoreCtx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
   const repo = await storeRepo(storeId);
@@ -45,7 +45,7 @@ export async function runInStoreCtx<T>(storeId: string, fn: () => Promise<T>): P
 }
 
 /**
- * A store-by-store sweep for a PORTED job (Ruling CF-JOBS-3). The cron run lists the Postgres stores exactly as before
+ * A store-by-store sweep for a PORTED job (Ruling CF-JOBS-4). The cron run lists the Postgres stores exactly as before
  * (`sweepAcrossStores`, one tenant transaction per store; the runner hides the DO stores from it). The alarm run of a DO
  * store (`alarmStoreId`) reads that one store through its Durable Object. `fetch` gets the store's read client, so one body
  * serves both backends and never touches `prisma` itself.
@@ -95,7 +95,7 @@ export async function storeNameOf(storeId: string): Promise<string> {
 }
 
 /**
- * Run `fn` once per store for a PORTED job (Ruling CF-JOBS-3), like `acrossStores`: the cron run visits the Postgres stores
+ * Run `fn` once per store for a PORTED job (Ruling CF-JOBS-4), like `acrossStores`: the cron run visits the Postgres stores
  * (each in its tenant scope; the runner hides the DO stores), the alarm run of a DO store visits that one store through its
  * Durable Object. `fn` gets the store's read client.
  */
@@ -117,7 +117,7 @@ export async function acrossStoresDb(
 }
 
 /**
- * A read for a store, by its backend (Ruling CF-JOBS-3): a store on its Durable Object reads its DO; a Postgres store keeps
+ * A read for a store, by its backend (Ruling CF-JOBS-4): a store on its Durable Object reads its DO; a Postgres store keeps
  * today's `runInTenantContext` + `prisma` exactly. For shared code (the WhatsApp link and consent reads) used by requests
  * and jobs alike, where `withStoreDb` would change the Postgres scope.
  */

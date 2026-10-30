@@ -74,6 +74,7 @@ describe('the refusal inventory equals the manifest', () => {
       manifest.refusals.length === 0 &&
         manifest.postgresOnly.length === 0 &&
         manifest.jobsRefused.length === 0 &&
+        manifest.jobsAccepted.length === 0 &&
         manifest.sweepSkips.length === 0
     );
     expect(gateState({ refusals: [], postgresOnly: [] }).open).toBe(true);
@@ -82,7 +83,7 @@ describe('the refusal inventory equals the manifest', () => {
   });
 });
 
-describe('job refusals and sweep skips are part of the gate (Ruling CF-JOBS-3)', () => {
+describe('job refusals and sweep skips are part of the gate (Ruling CF-JOBS-4)', () => {
   const manifest = readManifest();
   const live = jobRefusals();
 
@@ -104,9 +105,9 @@ describe('job refusals and sweep skips are part of the gate (Ruling CF-JOBS-3)',
     expect(gateState(base).open).toBe(true);
     expect(gateState({ ...base, jobsRefused: ['shipment-create'] }).open).toBe(false);
     expect(gateState({ ...base, sweepSkips: ['x'] }).open).toBe(false);
-    // an accepted non-money job is counted but does not close the gate
+    // CF-JOBS-4: a refused non-money job closes the gate too
     const g = gateState({ ...base, jobsAccepted: ['review-request'] });
-    expect(g.open).toBe(true);
+    expect(g.open).toBe(false);
     expect(g.jobsAccepted).toBe(1);
     // a manifest from before this ruling (no job fields) cannot silently open the gate over a refused job
     expect(live.jobsRefused.length === 0 || gateState(manifest).open === false).toBe(true);

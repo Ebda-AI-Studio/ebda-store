@@ -1,4 +1,4 @@
-// Small store-side statements the background jobs need (INFRA-CF-1, Ruling CF-JOBS-3): a job on a store that lives on its
+// Small store-side statements the background jobs need (INFRA-CF-1, Ruling CF-JOBS-4): a job on a store that lives on its
 // Durable Object cannot reach `payment_events`, `orders` stamps or the ledger totals through the read client, so each is one
 // named money operation. Every statement is scoped by `store_id` taken from the DO (never from the caller).
 import { MoneyError, type SyncSql } from './sync-sql';
@@ -172,4 +172,368 @@ export function ciOrderStampOp(
     [area, buyer, orderId, storeId]
   );
   return { stamped: r.changes > 0 };
+}
+
+/**
+ * The reorder scan's first transaction (Postgres: two UPDATEs and a COUNT): expire open suggestions older than `thresholdMs`
+ * and those whose unit no longer exists (a product-level row for a product that has variants, a row of a disabled variant).
+ * Returns the number expired and the count of open PO lines with no variant on a variant product (logged, issue 2345).
+ */
+export function reorderExpireOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { expired: number; variantlessOpenPoLines: number } {
+  if (typeof a.thresholdMs !== 'number' || !Number.isFinite(a.thresholdMs))
+    throw new MoneyError('BAD_ARGS', 'thresholdMs', 400);
+  return db.transactionSync(() => {
+    const stale = db.run(
+      "UPDATE reorder_suggestions SET status = 'expired' WHERE store_id = ? AND status = 'open' AND scanned_at < ?",
+      [storeId, a.thresholdMs]
+    ).changes;
+    const gone = db.run(
+      `UPDATE reorder_suggestions SET status = 'expired'
+        WHERE store_id = ? AND status = 'open' AND (
+          (variant_id IS NULL AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = reorder_suggestions.product_id))
+          OR (variant_id IS NOT NULL AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.id = reorder_suggestions.variant_id AND pv.is_active = 0))
+        )`,
+      [storeId]
+    ).changes;
+    const v = db.all(
+      `SELECT COUNT(*) AS n FROM purchase_order_items i JOIN purchase_orders p ON p.id = i.po_id
+        WHERE p.store_id = ? AND p.status IN ('sent', 'partial') AND i.variant_id IS NULL AND i.qty > i.qty_received
+          AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = i.product_id)`,
+      [storeId]
+    )[0];
+    return { expired: stale + gone, variantlessOpenPoLines: Number(v?.n ?? 0) };
+  });
+}
+
+interface ReorderRow {
+  productId: string;
+  variantId: string | null;
+  suggestedQty: number;
+  velocity7d: number;
+  velocity28d: number;
+  onHand: number;
+  onOrder: number;
+  openBacklog: number;
+  urgencyDays: number;
+  supplierId: string | null;
+  reasoningEn: string;
+  reasoningAr: string | null;
+}
+
+/**
+ * The reorder scan's third phase: ONE open suggestion per unit. The latest open row of the unit is updated (and re-stamped
+ * with this scan's time), else a row is created. Returns how many units were written; a unit that cannot be written (a
+ * deleted product) is skipped, like the Postgres savepoint.
+ */
+export function reorderUpsertOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { upserted: number } {
+  if (typeof a.scannedAtMs !== 'number' || !Array.isArray(a.items) || a.items.length > 200)
+    throw new MoneyError('BAD_ARGS', 'items', 400);
+  const scannedAt = a.scannedAtMs;
+  let upserted = 0;
+  for (const raw of a.items as ReorderRow[]) {
+    try {
+      db.transactionSync(() => {
+        const vid = raw.variantId ?? null;
+        const existing = db.all(
+          `SELECT id FROM reorder_suggestions WHERE store_id = ? AND product_id = ? AND ${vid === null ? 'variant_id IS NULL' : 'variant_id = ?'} AND status = 'open' ORDER BY scanned_at DESC LIMIT 1`,
+          vid === null ? [storeId, raw.productId] : [storeId, raw.productId, vid]
+        )[0];
+        const vals = [
+          raw.suggestedQty,
+          raw.velocity7d,
+          raw.velocity28d,
+          raw.onHand,
+          raw.onOrder,
+          raw.openBacklog,
+          raw.urgencyDays,
+          raw.supplierId ?? null,
+          raw.reasoningEn,
+          raw.reasoningAr ?? null,
+          scannedAt,
+        ];
+        if (existing) {
+          db.run(
+            `UPDATE reorder_suggestions SET suggested_qty = ?, velocity_7d = ?, velocity_28d = ?, on_hand = ?, on_order = ?, open_backlog = ?, urgency_days = ?, supplier_id = ?, reasoning_en = ?, reasoning_ar = ?, status = 'open', scanned_at = ? WHERE id = ? AND store_id = ?`,
+            [...vals, existing.id as string, storeId]
+          );
+        } else {
+          db.run(
+            `INSERT INTO reorder_suggestions (id, store_id, product_id, variant_id, suggested_qty, velocity_7d, velocity_28d, on_hand, on_order, open_backlog, urgency_days, supplier_id, reasoning_en, reasoning_ar, status, scanned_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+            [crypto.randomUUID(), storeId, raw.productId, vid, ...vals]
+          );
+        }
+      });
+      upserted += 1;
+    } catch {
+      // a unit whose product or supplier is gone: skipped, as the Postgres savepoint does
+    }
+  }
+  return { upserted };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The order fan-out jobs (order-created, order-status-changed, order-refunded; Ruling CF-JOBS-4). Each takes a CLAIM that
+// the Postgres version took with an `updateMany` / an `order_events` marker under `FOR UPDATE`; on the DO a claim is one
+// conditional statement in one section, so two deliveries of the same event claim once.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** order-created fan-out: claim the customer notification exactly once (`order_created_notified_at` was NULL). */
+export function orderNotifyClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const r = db.run(
+    'UPDATE orders SET order_created_notified_at = ? WHERE id = ? AND store_id = ? AND order_created_notified_at IS NULL',
+    [Date.now(), str(a.orderId, 'orderId'), storeId]
+  );
+  return { claimed: r.changes > 0 };
+}
+
+/** order-status-changed fan-out: claim the transition that is still the order's current status. */
+export function statusFanoutClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const r = db.run(
+    'UPDATE orders SET status_fanout_claimed_at = ? WHERE id = ? AND store_id = ? AND status = ? AND status_fanout_claimed_at IS NULL',
+    [Date.now(), str(a.orderId, 'orderId'), storeId, str(a.status, 'status')]
+  );
+  return { claimed: r.changes > 0 };
+}
+
+/** ... and mark it complete (only the claimed, requested transition, once). */
+export function statusFanoutCompleteOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { completed: boolean } {
+  const r = db.run(
+    'UPDATE orders SET status_fanout_completed_at = ? WHERE id = ? AND store_id = ? AND status_fanout_requested_status = ? AND status_fanout_claimed_at IS NOT NULL AND status_fanout_completed_at IS NULL',
+    [Date.now(), str(a.orderId, 'orderId'), storeId, str(a.status, 'status')]
+  );
+  return { completed: r.changes > 0 };
+}
+
+const MARKER_RE = /^[a-z_]{3,40}$/;
+/** An `order_events` marker taken at most once (the cancel-notice claim): true when THIS call took it. */
+export function markerClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const orderId = str(a.orderId, 'orderId');
+  const marker = str(a.marker, 'marker');
+  if (!MARKER_RE.test(marker)) throw new MoneyError('BAD_ARGS', 'marker', 400);
+  return db.transactionSync(() => {
+    const have = db.all(
+      'SELECT id FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = ?',
+      [storeId, orderId, marker]
+    )[0];
+    if (have) return { claimed: false };
+    db.run(
+      "INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES (?, ?, ?, NULL, ?, NULL, '{}', ?)",
+      [crypto.randomUUID(), storeId, orderId, marker, Date.now()]
+    );
+    return { claimed: true };
+  });
+}
+
+/** Give a marker back (the notice could not be sent, so a replay may send it). */
+export function markerReleaseOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { released: number } {
+  const marker = str(a.marker, 'marker');
+  if (!MARKER_RE.test(marker)) throw new MoneyError('BAD_ARGS', 'marker', 400);
+  return {
+    released: db.run(
+      'DELETE FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = ?',
+      [storeId, str(a.orderId, 'orderId'), marker]
+    ).changes,
+  };
+}
+
+const NOTIFY_CHANNELS = ['email', 'dispatch', 'push'];
+const releasedOf = (meta: Record<string, unknown>): string[] =>
+  NOTIFY_CHANNELS.filter(c => (Array.isArray(meta.released) ? meta.released : []).includes(c));
+
+/**
+ * The refund notification claim (`refund_notified` marker, per-channel release): the first call takes every channel; a
+ * later call hands out only the channels a failed run released, once.
+ */
+export function refundNotifyClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { channels: string[] } {
+  const orderId = str(a.orderId, 'orderId');
+  return db.transactionSync(() => {
+    const sent = db.all(
+      "SELECT id, metadata FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = 'refund_notified'",
+      [storeId, orderId]
+    )[0];
+    if (!sent) {
+      db.run(
+        "INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES (?, ?, ?, NULL, 'refund_notified', NULL, '{}', ?)",
+        [crypto.randomUUID(), storeId, orderId, Date.now()]
+      );
+      return { channels: [...NOTIFY_CHANNELS] };
+    }
+    const meta = JSON.parse(sent.metadata as string) as Record<string, unknown>;
+    const released = releasedOf(meta);
+    if (released.length === 0) return { channels: [] };
+    db.run('UPDATE order_events SET metadata = ? WHERE id = ? AND store_id = ?', [
+      JSON.stringify({ ...meta, released: [] }),
+      sent.id as string,
+      storeId,
+    ]);
+    return { channels: released };
+  });
+}
+
+/** The customer e-mail of a refund failed: release that channel so a replay sends it. */
+export function refundNotifyReleaseOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { released: string[] } {
+  const orderId = str(a.orderId, 'orderId');
+  const channel = str(a.channel ?? 'email', 'channel');
+  if (!NOTIFY_CHANNELS.includes(channel)) throw new MoneyError('BAD_ARGS', 'channel', 400);
+  return db.transactionSync(() => {
+    const claim = db.all(
+      "SELECT id, metadata FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = 'refund_notified'",
+      [storeId, orderId]
+    )[0];
+    if (!claim) return { released: [] };
+    const meta = JSON.parse(claim.metadata as string) as Record<string, unknown>;
+    const released = [...new Set([...releasedOf(meta), channel])];
+    db.run('UPDATE order_events SET metadata = ? WHERE id = ? AND store_id = ?', [
+      JSON.stringify({ ...meta, released }),
+      claim.id as string,
+      storeId,
+    ]);
+    return { released };
+  });
+}
+
+/**
+ * The refund fan-out's completion stamp: a partial refund stamps its Return's `reversal_applied_at`, a whole-order one
+ * stamps `refund_reversed_at` (only when armed, unless stock is restored), each at most once.
+ */
+export function reversalClaimOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const now = Date.now();
+  if (typeof a.returnId === 'string' && a.returnId) {
+    const r = db.run(
+      'UPDATE returns SET reversal_applied_at = ? WHERE id = ? AND store_id = ? AND reversal_applied_at IS NULL',
+      [now, a.returnId, storeId]
+    );
+    return { claimed: r.changes > 0 };
+  }
+  const r = db.run(
+    `UPDATE orders SET refund_reversed_at = ? WHERE id = ? AND store_id = ? AND refund_reversed_at IS NULL${
+      a.restoreInventory === false ? ' AND refund_reversal_requested_at IS NULL' : ''
+    }`,
+    [now, str(a.orderId, 'orderId'), storeId]
+  );
+  return { claimed: r.changes > 0 };
+}
+
+/**
+ * AffiliateService.processCommission's write half, in one section: the referral is claimed (`converted` with no
+ * commission yet -> `commission_paid`), the affiliate's balances move and the event row is written. The Worker computed
+ * `commissionAmount` from the order total and the rate. Returns false when another run claimed it first.
+ */
+export function affiliateCommissionOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { claimed: boolean } {
+  const referralId = str(a.referralId, 'referralId');
+  const amount = a.commissionAmount;
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount < 0)
+    throw new MoneyError('BAD_ARGS', 'commissionAmount', 400);
+  return db.transactionSync(() => {
+    const ref = db.all(
+      "SELECT affiliate_id, order_id FROM affiliate_referrals WHERE id = ? AND store_id = ? AND status = 'converted' AND commission_amount IS NULL",
+      [referralId, storeId]
+    )[0];
+    if (!ref) return { claimed: false };
+    db.run(
+      "UPDATE affiliate_referrals SET commission_amount = ?, status = 'commission_paid' WHERE id = ? AND store_id = ?",
+      [amount, referralId, storeId]
+    );
+    db.run(
+      'UPDATE affiliates SET total_earned = total_earned + ?1, pending_balance = pending_balance + ?1 WHERE id = ?2 AND store_id = ?3',
+      [amount, ref.affiliate_id as string, storeId]
+    );
+    addAffiliateEvent(db, storeId, ref.affiliate_id as string, 'commission_recorded', {
+      orderId: ref.order_id,
+      commissionAmount: amount,
+      rate: a.rate ?? null,
+      referralId,
+    });
+    return { claimed: true };
+  });
+}
+
+/** AffiliateService.reverseCommission's write half (a refunded order): `commission_paid` -> `refunded`, balances back. */
+export function affiliateReverseOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { amount: number | null } {
+  const orderId = str(a.orderId, 'orderId');
+  return db.transactionSync(() => {
+    const ref = db.all(
+      "SELECT id, affiliate_id, commission_amount FROM affiliate_referrals WHERE store_id = ? AND order_id = ? AND status = 'commission_paid'",
+      [storeId, orderId]
+    )[0];
+    const amount = (ref?.commission_amount as number | null) ?? 0;
+    if (!ref || !amount) return { amount: null };
+    db.run(
+      "UPDATE affiliate_referrals SET status = 'refunded' WHERE id = ? AND store_id = ? AND status = 'commission_paid'",
+      [ref.id as string, storeId]
+    );
+    db.run(
+      'UPDATE affiliates SET total_earned = total_earned - ?1, pending_balance = pending_balance - ?1 WHERE id = ?2 AND store_id = ?3',
+      [amount, ref.affiliate_id as string, storeId]
+    );
+    addAffiliateEvent(db, storeId, ref.affiliate_id as string, 'commission_reversed', {
+      orderId,
+      amount,
+      referralId: ref.id,
+    });
+    return { amount };
+  });
+}
+
+function addAffiliateEvent(
+  db: SyncSql,
+  storeId: string,
+  affiliateId: string,
+  eventType: string,
+  details: Record<string, unknown>
+): void {
+  const now = Date.now();
+  db.run(
+    'INSERT INTO affiliate_events (id, affiliate_id, store_id, event_type, details, occurred_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [crypto.randomUUID(), affiliateId, storeId, eventType, JSON.stringify(details), now, now]
+  );
 }

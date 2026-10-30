@@ -39,7 +39,7 @@ Armed for DO stores only (`syncStoreSchedules`, hourly). A Postgres store keeps 
 
 Limits: a step already executing when the flag lands finishes; a freeze over 24 h aborts a parked Workflow loudly and lets the platform retry/DLQ path alert; an alarm frozen over 24 h skips the stale occurrence.
 
-## Flip gate and Ruling CF-JOBS-3
+## Flip gate and Ruling CF-JOBS-4
 
 `node scripts/cf/not-on-do.mjs` also counts jobs: `jobsRefused` (MONEY_JOBS still unported) and `sweepSkips` (a ported cron sweep with no alarm: `alarm: true` in JOBS_MAP + `ALARM_READY`) CLOSE the gate; `jobsAccepted` (non-money unported jobs, P1 alert) is counted and listed. `tests/unit/do-not-on-do-guard.test.ts` keeps the manifest equal to the source. A ported cron sweep that runs from its cron with DO stores hidden and no alarm enabled pages (P0 for money). `jobsAccepted` after Ruling CF-JOBS-4: the second half (alphabetical `ebda-ads-conversion` .. `webhook-fanout`, another track) and `accounting-expense-ocr-process` (BLOCKER: it needs the expense / account / journal services on the DO; same unblock as `accounting-post-expense-journal`). Still unported money jobs (no DO engine yet): `shipment-create`, `order-created-fanout`, `order-status-changed-fanout`, `order-refunded-fanout`, `accounting-post-expense-journal`, `accounting-post-po-receive-journal`, `accounting-post-stock-adjustment-journal`, `stock-reorder-scan-*`, `warehouse-reconcile-*`.
 
@@ -50,3 +50,7 @@ Ported: `review-request`, `review-moderation`, `invoice-email`, `order-capi-conv
 ## Every job serves a DO store (Ruling CF-JOBS-4C)
 
 `docs/cf/not-on-do.json` `jobsAccepted` is empty. Platform-only jobs (`gsc-ingest-*`, `search-log-purge-daily`, `soft-deleted-user-anonymize-monthly`) are class `none`. Sweeps over store data run on the store's alarm (`gold-rate-*`, `instapay-receipt-retention-daily`, `order-anonymize-5y-monthly`, `queue-depth-watch`, `store-usage-snapshot`, `webhook-delivery-purge-daily`, `search-index-backstop`, the stock scans); the event jobs run on the store's event. `r2-orphan-sweep` is one global cron that reads each DO store's references from its DO and aborts before any delete if one cannot be read. Open items (Vectorize index for DO product search, the request-time R2 reference check, plan-limit counts) are listed in `docs/rulings/CF-JOBS-4C.md`.
+
+## Money jobs, shipment and order fan-outs (Ruling CF-JOBS-4, money half)
+
+`shipment-create`, `order-created-fanout`, `order-status-changed-fanout`, `order-refunded-fanout`, `accounting-post-{expense,po-receive,stock-adjustment}-journal`, `warehouse-reconcile-{sweep-cron,on-demand}` and `stock-reorder-scan-{cron,on-demand}` serve a DO store through the DO ops in `packages/repo/src/do/{job-ops,books-journals}.ts` (claims are one conditional statement in one section). `MONEY_JOBS` is empty and `PORTED_MONEY_JOBS` lists every money job.

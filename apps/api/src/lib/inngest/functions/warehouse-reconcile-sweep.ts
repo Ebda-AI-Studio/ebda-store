@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInStoreScope, acrossStores } from '@ebda/database';
-import { acrossOpts } from '../../jobs/store-scope';
+import { runInStoreScope } from '@ebda/database';
+import { acrossStoresDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
@@ -81,16 +81,16 @@ export async function sweepAllWarehouseStores(
 ): Promise<WarehouseSweepResult> {
   // FORCE RLS: cron has no storeId — visit every store and keep the ones that
   // have at least one warehouse row.
-  const stores = await step.run('list-stores-with-warehouses', async () =>
-    (
-      await acrossStores(
-        storeId => prisma.warehouse.findFirst({ where: { storeId }, select: { storeId: true } }),
-        acrossOpts(event)
-      )
-    )
-      .filter(r => r.value !== null)
-      .map(r => ({ storeId: r.storeId }))
-  );
+  // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object, and
+  // `backfillReconcileAll` then reconciles through the DO stock op.
+  const stores = await step.run('list-stores-with-warehouses', async () => {
+    const found: Array<{ storeId: string }> = [];
+    await acrossStoresDb(event, async (storeId, db) => {
+      if (await db.warehouse.findFirst({ where: { storeId }, select: { storeId: true } }))
+        found.push({ storeId });
+    });
+    return found;
+  });
 
   let storesSwept = 0;
   let storesFailed = 0;

@@ -117,7 +117,7 @@ export async function handleStuckRefundClaimSweep(
       // at a time, so the page/limit/budget ceilings stay GLOBAL), each store's
       // paging inside its own tenant scope. A cursor id only exists in one store,
       // so cursors never cross stores.
-      // PORTED (Ruling CF-JOBS-3): a DO store's alarm scans its own Durable Object's payment timeline.
+      // PORTED (Ruling CF-JOBS-4): a DO store's alarm scans its own Durable Object's payment timeline.
       await acrossStoresDb(
         event,
         async (storeId, db) => {

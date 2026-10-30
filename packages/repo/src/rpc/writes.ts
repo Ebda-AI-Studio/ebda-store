@@ -83,6 +83,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'FunnelSnapshot',
   'CustomerRfmSnapshot',
   'AnswerEngineCheck',
+  // the carrier booking job claims and updates the shipment row (INFRA-CF-1, Ruling CF-JOBS-4)
+  'Shipment',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

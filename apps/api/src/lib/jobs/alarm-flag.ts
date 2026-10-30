@@ -28,13 +28,14 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'wholesale-pending-nudge-cron',
   // Ruling CF-JOBS-4
   'bulk-import-orphan-cleanup',
-  // money sweeps (Ruling CF-JOBS-3)
+  // money sweeps (Ruling CF-JOBS-4)
   'payment-reconcile-sweep',
   'payment-abandonment-sweep',
   'refund-reversal-stuck-sweep',
   'order-created-stuck-sweep',
   'order-auto-cancel-unpaid',
   'instapay-expiry',
+  'wa-plan-sync',
   'order-status-fanout-stuck-sweep',
   // non-money sweeps (Ruling CF-JOBS-4)
   'wa-plan-sync',

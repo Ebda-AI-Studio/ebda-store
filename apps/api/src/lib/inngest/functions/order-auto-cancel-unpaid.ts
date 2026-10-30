@@ -142,7 +142,7 @@ export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
     triggers: [{ cron: '0 3 * * *' }], // daily 03:00 UTC
   },
   async ({ step, event }) => {
-    // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object, rescues a
+    // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object, rescues a
     // captured payment through the DO webhook section and cancels through the DO `cancel` (unpaid-only, one section).
     // Cross-tenant — withRlsBypass so FORCE RLS doesn't hide other tenants'
     // rows (no HTTP tenant GUC on a cron).

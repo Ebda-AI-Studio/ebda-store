@@ -109,7 +109,8 @@ export type WritableModel =
   | 'customerCohortSnapshot'
   | 'funnelSnapshot'
   | 'customerRfmSnapshot'
-  | 'answerEngineCheck';
+  | 'answerEngineCheck'
+  | 'shipment';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -198,6 +199,18 @@ export interface StockClient {
     },
     key?: string
   ): Promise<{ newQuantity: number }>;
+  /** One SKU's warehouse shadow back to its aggregate (Ruling CF-JOBS-4). */
+  reconcileWarehouseSku(a: {
+    productId: string;
+    variantId?: string | null;
+  }): Promise<{ reconciled: boolean; diff: number }>;
+  /** A page of the reconcile sweep: every SKU with a warehouse row after `afterKey`, up to `limit`. */
+  reconcileWarehouseAll(a: { limit?: number; afterKey?: string | null }): Promise<{
+    skusReconciled: number;
+    skusFailed: number;
+    more: boolean;
+    nextKey: string | null;
+  }>;
 }
 
 /** An InstaPay order receipt as the DO returns it (`ReceiptRow` of `do/instapay-receipts.ts`). */
@@ -465,7 +478,7 @@ export interface MoneyClient {
     a: { orderId: string; requestedAt: number },
     key?: string
   ): Promise<{ disarmed: boolean }>;
-  /** A payment-timeline audit row (`recordPaymentEvent`) written on the DO (Ruling CF-JOBS-3). */
+  /** A payment-timeline audit row (`recordPaymentEvent`) written on the DO (Ruling CF-JOBS-4). */
   paymentEventRecord(a: {
     paymentId: string;
     orderId: string;
@@ -544,6 +557,42 @@ export interface MoneyClient {
     areaKey: string | null;
     buyerKey: string | null;
   }): Promise<{ stamped: boolean }>;
+  /** Expense / stock-adjustment / PO-receive journals on the DO (Ruling CF-JOBS-4); idempotent per source row. */
+  journalExpense(a: { expenseId: string }): Promise<{ posted: boolean; skipped?: string }>;
+  journalStockAdjustment(a: {
+    adjustmentId: string;
+  }): Promise<{ posted: boolean; skipped?: string }>;
+  journalPoReceive(a: {
+    poId: string;
+    clearedBackorders: Array<Record<string, unknown>>;
+  }): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  /** Order fan-out claims, refund notification markers and affiliate commission writes (Ruling CF-JOBS-4). */
+  orderNotifyClaim(a: { orderId: string }): Promise<{ claimed: boolean }>;
+  statusFanoutClaim(a: { orderId: string; status: string }): Promise<{ claimed: boolean }>;
+  statusFanoutComplete(a: { orderId: string; status: string }): Promise<{ completed: boolean }>;
+  markerClaim(a: { orderId: string; marker: string }): Promise<{ claimed: boolean }>;
+  markerRelease(a: { orderId: string; marker: string }): Promise<{ released: number }>;
+  refundNotifyClaim(a: { orderId: string }): Promise<{ channels: string[] }>;
+  refundNotifyRelease(a: { orderId: string; channel?: string }): Promise<{ released: string[] }>;
+  reversalClaim(a: {
+    orderId: string;
+    restoreInventory?: boolean;
+    returnId?: string;
+  }): Promise<{ claimed: boolean }>;
+  affiliateCommission(a: {
+    referralId: string;
+    commissionAmount: number;
+    rate?: number;
+  }): Promise<{ claimed: boolean }>;
+  affiliateReverse(a: { orderId: string }): Promise<{ amount: number | null }>;
+  /** Reorder scan phase 1: expire stale / unit-gone suggestions (Ruling CF-JOBS-4). */
+  reorderExpire(a: {
+    thresholdMs: number;
+  }): Promise<{ expired: number; variantlessOpenPoLines: number }>;
+  /** Reorder scan phase 3: upsert one open suggestion per unit. */
+  reorderUpsert(a: { scannedAtMs: number; items: Array<Record<string, unknown>> }): Promise<{
+    upserted: number;
+  }>;
   /** confirmed / processing / shipped / delivered (Ruling CF-FINAL-1): state machine, fanout arming, COD settlement, event. */
   orderStatus(
     a: {
@@ -848,6 +897,8 @@ export function makeStockClient(
     setVariantInventory: (a, key) => call('setVariantInventory', a, key),
     setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
     adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
+    reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
+    reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
   };
 }
 
@@ -909,6 +960,21 @@ export function makeMoneyClient(
     periodGlCredits: a => call('periodGlCredits', a),
     accountTotals: a => call('accountTotals', a),
     ciOrderStamp: a => call('ciOrderStamp', a),
+    journalExpense: a => call('journalExpense', a),
+    journalStockAdjustment: a => call('journalStockAdjustment', a),
+    journalPoReceive: a => call('journalPoReceive', a),
+    orderNotifyClaim: a => call('orderNotifyClaim', a),
+    statusFanoutClaim: a => call('statusFanoutClaim', a),
+    statusFanoutComplete: a => call('statusFanoutComplete', a),
+    markerClaim: a => call('markerClaim', a),
+    markerRelease: a => call('markerRelease', a),
+    refundNotifyClaim: a => call('refundNotifyClaim', a),
+    refundNotifyRelease: a => call('refundNotifyRelease', a),
+    reversalClaim: a => call('reversalClaim', a),
+    affiliateCommission: a => call('affiliateCommission', a),
+    affiliateReverse: a => call('affiliateReverse', a),
+    reorderExpire: a => call('reorderExpire', a),
+    reorderUpsert: a => call('reorderUpsert', a),
     orderStatus: (a, key) => call('orderStatus', a, key),
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),

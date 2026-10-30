@@ -87,7 +87,7 @@ export async function recordPaymentEvent(input: RecordPaymentEventInput): Promis
 }
 
 /**
- * `recordPaymentEvent` for a BACKGROUND JOB that knows only the store (Ruling CF-JOBS-3): a store on its Durable Object
+ * `recordPaymentEvent` for a BACKGROUND JOB that knows only the store (Ruling CF-JOBS-4): a store on its Durable Object
  * appends the row there (`paymentEventRecord`, in the DO's own timeline), a Postgres store inside its tenant scope as before.
  * Same contract: never throws.
  */

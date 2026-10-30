@@ -21,7 +21,9 @@ export type StockOpName =
   | 'bulkAdjustProducts'
   | 'setVariantInventory'
   | 'setWarehouseStock'
-  | 'adjustWarehouseStock';
+  | 'adjustWarehouseStock'
+  | 'reconcileWarehouseSku'
+  | 'reconcileWarehouseAll';
 
 export const STOCK_OP_NAMES: readonly StockOpName[] = [
   'adjustProduct',
@@ -30,6 +32,8 @@ export const STOCK_OP_NAMES: readonly StockOpName[] = [
   'setVariantInventory',
   'setWarehouseStock',
   'adjustWarehouseStock',
+  'reconcileWarehouseSku',
+  'reconcileWarehouseAll',
 ];
 
 type HistoryType =
@@ -208,9 +212,9 @@ function reconcileToAggregate(
   storeId: string,
   productId: string,
   variantId: string | null
-): void {
+): boolean {
   const wh = defaultWarehouse(db, storeId);
-  if (!wh) return;
+  if (!wh) return false;
   const authoritative = (
     variantId
       ? db.all('SELECT inventory FROM product_variants WHERE id = ?', [variantId])
@@ -229,7 +233,7 @@ function reconcileToAggregate(
     variantId ? [storeId, productId, variantId] : [storeId, productId]
   )[0].s as number;
   const diff = (authoritative as number) - sum;
-  if (diff === 0) return;
+  if (diff === 0) return false;
   if (diff > 0) {
     upsertWarehouseStock(db, {
       storeId,
@@ -239,7 +243,7 @@ function reconcileToAggregate(
       mode: 'shift',
       value: diff,
     });
-    return;
+    return true;
   }
   // Deficit (Ruling WAREHOUSE-NEG-1): spread over the SKU's rows, default first, so no row goes negative.
   const rows = db.all(
@@ -271,6 +275,7 @@ function reconcileToAggregate(
         shortfall,
       })
     );
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -517,6 +522,50 @@ function adjustWarehouseStock(db: SyncSql, storeId: string, a: Record<string, un
   return { newQuantity: newQty };
 }
 
+/**
+ * `WarehouseService.reconcileWarehouseStockToAggregate` for one SKU (the order-refunded fanout): shadow back to the
+ * aggregate, in one section. A store with no warehouse is a no-op, like Postgres.
+ */
+function reconcileWarehouseSku(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const productId = str(a.productId, 'productId');
+  const variantId =
+    a.variantId === undefined || a.variantId === null ? null : str(a.variantId, 'variantId');
+  return { reconciled: reconcileToAggregate(db, storeId, productId, variantId), diff: 0 };
+}
+
+/**
+ * `WarehouseService.backfillReconcileAll` (the daily and on-demand sweeps): every SKU that has a warehouse row, reconciled
+ * to its aggregate. One section per CALL, bounded by `limit` (default 500) so a huge store is finished by the next tick
+ * rather than holding the DO; `more` says whether SKUs remain after the cursor. A SKU that fails is counted, not fatal.
+ */
+function reconcileWarehouseAll(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const limit = a.limit === undefined ? 500 : int(a.limit, 'limit');
+  const after = typeof a.afterKey === 'string' ? a.afterKey : '';
+  const skus = db.all(
+    `SELECT DISTINCT product_id AS p, variant_id AS v, product_id || '|' || COALESCE(variant_id, '') AS k
+       FROM warehouse_stock WHERE store_id = ? AND (product_id || '|' || COALESCE(variant_id, '')) > ?
+      ORDER BY k ASC LIMIT ?`,
+    [storeId, after, limit + 1]
+  );
+  const page = skus.slice(0, limit);
+  let skusReconciled = 0;
+  let skusFailed = 0;
+  for (const r of page) {
+    try {
+      if (reconcileToAggregate(db, storeId, r.p as string, (r.v as string | null) ?? null))
+        skusReconciled++;
+    } catch {
+      skusFailed++;
+    }
+  }
+  return {
+    skusReconciled,
+    skusFailed,
+    more: skus.length > limit,
+    nextKey: page.length ? (page[page.length - 1].k as string) : null,
+  };
+}
+
 const OPS: Record<
   StockOpName,
   (db: SyncSql, storeId: string, a: Record<string, unknown>) => unknown
@@ -527,6 +576,8 @@ const OPS: Record<
   setVariantInventory,
   setWarehouseStock,
   adjustWarehouseStock,
+  reconcileWarehouseSku,
+  reconcileWarehouseAll,
 };
 
 /**

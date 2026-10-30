@@ -37,7 +37,7 @@ export const accountingDailyClose: JobDef = inngest.createFunction(
         // Cross-tenant cron — no tenant context on this connection.
         // RLS on journal_entries/journal_lines would filter every read
         // to 0 rows. Read each store in its own scope for accurate sums.
-        // PORTED (Ruling CF-JOBS-3): a store on its Durable Object sums its own posted ledger there.
+        // PORTED (Ruling CF-JOBS-4): a store on its Durable Object sums its own posted ledger there.
         const money = await storeMoney(store.id);
         if (money) {
           const t = await money.trialBalance();

@@ -96,8 +96,21 @@ import {
   ciOrderStampOp,
   periodGlCreditsOp,
   recordPaymentEventOp,
+  reorderExpireOp,
+  reorderUpsertOp,
+  orderNotifyClaimOp,
+  statusFanoutClaimOp,
+  statusFanoutCompleteOp,
+  markerClaimOp,
+  markerReleaseOp,
+  refundNotifyClaimOp,
+  refundNotifyReleaseOp,
+  reversalClaimOp,
+  affiliateCommissionOp,
+  affiliateReverseOp,
   trialBalanceOp,
 } from './job-ops';
+import { journalExpenseOp, journalPoReceiveOp, journalStockAdjustmentOp } from './books-journals';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -144,6 +157,21 @@ export type MoneyOpName =
   | 'periodGlCredits'
   | 'accountTotals'
   | 'ciOrderStamp'
+  | 'orderNotifyClaim'
+  | 'statusFanoutClaim'
+  | 'statusFanoutComplete'
+  | 'markerClaim'
+  | 'markerRelease'
+  | 'refundNotifyClaim'
+  | 'refundNotifyRelease'
+  | 'reversalClaim'
+  | 'affiliateCommission'
+  | 'affiliateReverse'
+  | 'journalExpense'
+  | 'journalStockAdjustment'
+  | 'journalPoReceive'
+  | 'reorderExpire'
+  | 'reorderUpsert'
   | 'orderStatus'
   | 'quoteOrder'
   | 'fiscalRefund'
@@ -218,6 +246,21 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'periodGlCredits',
   'accountTotals',
   'ciOrderStamp',
+  'orderNotifyClaim',
+  'statusFanoutClaim',
+  'statusFanoutComplete',
+  'markerClaim',
+  'markerRelease',
+  'refundNotifyClaim',
+  'refundNotifyRelease',
+  'reversalClaim',
+  'affiliateCommission',
+  'affiliateReverse',
+  'journalExpense',
+  'journalStockAdjustment',
+  'journalPoReceive',
+  'reorderExpire',
+  'reorderUpsert',
   'orderStatus',
   'quoteOrder',
   'fiscalRefund',
@@ -338,7 +381,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** updateStatus -> cancelled: status plus the whole reversal (stock, coupon, loyalty, wallet, backorders). */
   cancel: (db, storeId, a) => {
     const orderId = id(a.orderId, 'orderId');
-    // The auto-cancel sweep (Ruling CF-JOBS-3): cancel only while the order is still unpaid, checked in the SAME section
+    // The auto-cancel sweep (Ruling CF-JOBS-4): cancel only while the order is still unpaid, checked in the SAME section
     // as the cancel (Postgres: `SELECT ... FOR UPDATE` then the status change), so a payment that lands first wins.
     if (a.unpaidOnly === true) {
       const cur = db.all('SELECT payment_status FROM orders WHERE id = ? AND store_id = ?', [
@@ -574,7 +617,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
         [id(a.orderId, 'orderId'), storeId, a.requestedAt as number]
       ).changes > 0,
   }),
-  /** Background jobs (Ruling CF-JOBS-3): see `job-ops.ts`. */
+  /** Background jobs (Ruling CF-JOBS-4): see `job-ops.ts`. */
   paymentEventRecord: (db, storeId, a) => recordPaymentEventOp(db, storeId, a),
   abandonStamp: (db, storeId, a) => abandonStampOp(db, storeId, a),
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),
@@ -592,6 +635,21 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   periodGlCredits: (db, storeId, a) => periodGlCreditsOp(db, storeId, a),
   accountTotals: (db, storeId, a) => accountTotalsOp(db, storeId, a),
   ciOrderStamp: (db, storeId, a) => ciOrderStampOp(db, storeId, a),
+  journalExpense: (db, storeId, a) => journalExpenseOp(db, storeId, a),
+  journalStockAdjustment: (db, storeId, a) => journalStockAdjustmentOp(db, storeId, a),
+  journalPoReceive: (db, storeId, a) => journalPoReceiveOp(db, storeId, a),
+  orderNotifyClaim: (db, storeId, a) => orderNotifyClaimOp(db, storeId, a),
+  statusFanoutClaim: (db, storeId, a) => statusFanoutClaimOp(db, storeId, a),
+  statusFanoutComplete: (db, storeId, a) => statusFanoutCompleteOp(db, storeId, a),
+  markerClaim: (db, storeId, a) => markerClaimOp(db, storeId, a),
+  markerRelease: (db, storeId, a) => markerReleaseOp(db, storeId, a),
+  refundNotifyClaim: (db, storeId, a) => refundNotifyClaimOp(db, storeId, a),
+  refundNotifyRelease: (db, storeId, a) => refundNotifyReleaseOp(db, storeId, a),
+  reversalClaim: (db, storeId, a) => reversalClaimOp(db, storeId, a),
+  affiliateCommission: (db, storeId, a) => affiliateCommissionOp(db, storeId, a),
+  affiliateReverse: (db, storeId, a) => affiliateReverseOp(db, storeId, a),
+  reorderExpire: (db, storeId, a) => reorderExpireOp(db, storeId, a),
+  reorderUpsert: (db, storeId, a) => reorderUpsertOp(db, storeId, a),
   /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */
   quoteOrder: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a as Partial<CheckoutInput>;

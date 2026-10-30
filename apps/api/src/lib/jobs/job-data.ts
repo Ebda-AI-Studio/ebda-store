@@ -20,7 +20,7 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'alerts-failure-watch',
   'audit-log-archive-weekly',
   'billing-renewal-daily',
-  // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-3)
+  // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-4)
   'payment-webhook-stuck-sweep',
   // Ruling CF-JOBS-4: platform tables only (the ad-attribution ledger `BillingEvent` and the identity `User`; the legal
   // notice fan-out reads `User` / `LegalNotice*`), so there is no store data to move
@@ -51,7 +51,7 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'cart-recovery-email',
   // campaigns, recipients and the consent list follow the store's backend (Ruling CF-R6A-2)
   'campaign-send',
-  // Ruling CF-JOBS-3 (money jobs): each one reaches its store only through `storeDb` / `sweepStoresDb` / the DO money ops
+  // Ruling CF-JOBS-4 (money jobs): each one reaches its store only through `storeDb` / `sweepStoresDb` / the DO money ops
   // (`storeMoney`), and runs on the store's alarm (sweeps) or its event (the rest) - tests/unit/jobs-money-on-do.test.ts
   'payment-webhook-process',
   'payment-reconcile-sweep',
@@ -139,6 +139,17 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   // Ruling CF-JOBS-4B (search): a DO store is indexed from its DO into Vectorize, probed on its own alarm
   'search-product-index',
   'search-index-backstop',
+  'warehouse-reconcile-sweep-cron',
+  'warehouse-reconcile-on-demand',
+  'stock-reorder-scan-cron',
+  'stock-reorder-scan-on-demand',
+  'accounting-post-expense-journal',
+  'accounting-post-po-receive-journal',
+  'accounting-post-stock-adjustment-journal',
+  'shipment-create',
+  'order-created-fanout',
+  'order-status-changed-fanout',
+  'order-refunded-fanout',
 ]);
 
 /**
@@ -155,11 +166,17 @@ export const ALL_STORES_JOBS: ReadonlySet<string> = new Set([
   'answer-engine-citation-scan-cron',
 ]);
 
-export const MONEY_JOBS: ReadonlySet<string> = new Set([
-  'shipment-create',
+export const MONEY_JOBS: ReadonlySet<string> = new Set([]);
+
+/**
+ * The money jobs that ARE ported (Ruling CF-JOBS-4): a skip of a DO store by one of them still pages P0. `MONEY_JOBS` above
+ * lists only the money jobs still refused, so together they are every job that moves money or stock.
+ */
+export const PORTED_MONEY_JOBS: ReadonlySet<string> = new Set([
+  'order-status-changed-fanout',
   'order-refunded-fanout',
   'order-created-fanout',
-  'order-status-changed-fanout',
+  'shipment-create',
   'accounting-post-expense-journal',
   'accounting-post-po-receive-journal',
   'accounting-post-stock-adjustment-journal',
@@ -167,13 +184,6 @@ export const MONEY_JOBS: ReadonlySet<string> = new Set([
   'stock-reorder-scan-on-demand',
   'warehouse-reconcile-sweep-cron',
   'warehouse-reconcile-on-demand',
-]);
-
-/**
- * The money jobs that ARE ported (Ruling CF-JOBS-3): a skip of a DO store by one of them still pages P0. `MONEY_JOBS` above
- * lists only the money jobs still refused, so together they are every job that moves money or stock.
- */
-export const PORTED_MONEY_JOBS: ReadonlySet<string> = new Set([
   'order-status-fanout-stuck-sweep',
   'payment-webhook-process',
   'payment-reconcile-sweep',

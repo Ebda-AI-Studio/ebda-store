@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'crypto';
 import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import { storeDb, storeMoney } from '../lib/repo-factory';
 import logger from '../lib/logger';
 import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';
 
@@ -110,7 +111,9 @@ class AffiliateService {
   // ---- Config ----
 
   async getConfig(storeId: string) {
-    const config = await prisma.affiliateConfig.findUnique({
+    const config = await (
+      await storeDb(storeId)
+    ).affiliateConfig.findUnique({
       where: { storeId },
     });
 
@@ -488,7 +491,10 @@ class AffiliateService {
   // ---- Process Commission ----
 
   async processCommission(storeId: string, orderId: string) {
-    const referral = await prisma.affiliateReferral.findFirst({
+    // A store on its Durable Object (Ruling CF-JOBS-4): reads follow the backend, the claim + balances + event are ONE section.
+    const money = await storeMoney(storeId);
+    const rdb = await storeDb(storeId);
+    const referral = await rdb.affiliateReferral.findFirst({
       where: { storeId, orderId, status: 'converted', commissionAmount: null },
       include: { affiliate: true },
     });
@@ -501,7 +507,7 @@ class AffiliateService {
       return null;
     }
 
-    const order = await prisma.order.findUnique({ where: { id: orderId, storeId } });
+    const order = await rdb.order.findUnique({ where: { id: orderId, storeId } });
     if (!order) {
       logger.warn(
         { storeId, orderId },
@@ -529,32 +535,35 @@ class AffiliateService {
     // winner's committed row, so the loser matches 0 rows and never reaches
     // the balance increment. Both writes share one transaction, so a failed
     // credit also un-claims the referral.
-    const claimed = await inAffiliateMoneyTx(async db => {
-      const claim = await db.affiliateReferral.updateMany({
-        where: { id: referral.id, storeId, status: 'converted', commissionAmount: null },
-        data: { commissionAmount, status: 'commission_paid' },
-      });
-      if (claim.count !== 1) return false;
-      await db.affiliate.update({
-        where: { id: referral.affiliateId, storeId },
-        data: {
-          totalEarned: { increment: commissionAmount },
-          pendingBalance: { increment: commissionAmount },
-        },
-      });
-      // The audit row rides the same transaction as the credit (#1590), and
-      // only the claim winner writes it — a skipped duplicate moved no money.
-      await affiliateEventCreate(
-        {
-          affiliateId: referral.affiliateId,
-          storeId,
-          eventType: 'commission_recorded',
-          details: { orderId, commissionAmount, rate, referralId: referral.id },
-        },
-        db
-      );
-      return true;
-    });
+    const claimed = money
+      ? (await money.affiliateCommission({ referralId: referral.id, commissionAmount, rate }))
+          .claimed
+      : await inAffiliateMoneyTx(async db => {
+          const claim = await db.affiliateReferral.updateMany({
+            where: { id: referral.id, storeId, status: 'converted', commissionAmount: null },
+            data: { commissionAmount, status: 'commission_paid' },
+          });
+          if (claim.count !== 1) return false;
+          await db.affiliate.update({
+            where: { id: referral.affiliateId, storeId },
+            data: {
+              totalEarned: { increment: commissionAmount },
+              pendingBalance: { increment: commissionAmount },
+            },
+          });
+          // The audit row rides the same transaction as the credit (#1590), and
+          // only the claim winner writes it — a skipped duplicate moved no money.
+          await affiliateEventCreate(
+            {
+              affiliateId: referral.affiliateId,
+              storeId,
+              eventType: 'commission_recorded',
+              details: { orderId, commissionAmount, rate, referralId: referral.id },
+            },
+            db
+          );
+          return true;
+        });
 
     if (!claimed) {
       logger.info(
@@ -585,6 +594,12 @@ class AffiliateService {
    * decremented (mirrors the increment in processCommission).
    */
   async reverseCommission(storeId: string, orderId: string) {
+    const money = await storeMoney(storeId);
+    if (money) {
+      // one section on the Durable Object: referral -> refunded, balances back, event row
+      const r = await money.affiliateReverse({ orderId });
+      return r.amount === null ? null : { amount: r.amount };
+    }
     const referral = await prisma.affiliateReferral.findFirst({
       where: { storeId, orderId, status: 'commission_paid' },
     });

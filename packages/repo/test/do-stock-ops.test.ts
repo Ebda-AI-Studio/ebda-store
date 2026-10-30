@@ -271,3 +271,40 @@ describe('idempotency and atomicity', () => {
     ).toThrow(/key/);
   });
 });
+
+describe('reconcileWarehouseSku / reconcileWarehouseAll (Ruling CF-JOBS-4)', () => {
+  function drifted() {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO warehouses (id, store_id, name, code, is_default) VALUES ('w1', 's1', 'Main', 'MAIN', 1), ('w2', 's1', 'Second', 'SEC', 0)`
+    );
+    r.op('setWarehouseStock', { warehouseId: 'w1', productId: 'p1', quantity: 6 });
+    r.op('setWarehouseStock', { warehouseId: 'w2', productId: 'p1', quantity: 4 });
+    // the aggregate moved without the shadow (order placement does this): 10 -> 7
+    r.raw.exec(`UPDATE products SET inventory = 7 WHERE id = 'p1'`);
+    return r;
+  }
+  const sum = (r: ReturnType<typeof rig>) =>
+    r.q(`SELECT COALESCE(SUM(quantity),0) s FROM warehouse_stock WHERE product_id = 'p1'`)[0].s;
+
+  it('one SKU: the shadow returns to the aggregate, and a second call is a no-op', () => {
+    const r = drifted();
+    expect(r.op('reconcileWarehouseSku', { productId: 'p1' })).toMatchObject({ reconciled: true });
+    expect(sum(r)).toBe(7);
+    expect(r.op('reconcileWarehouseSku', { productId: 'p1' })).toMatchObject({ reconciled: false });
+  });
+
+  it('the sweep reconciles every drifted SKU in pages and reports the rest', () => {
+    const r = drifted();
+    const a = r.op('reconcileWarehouseAll', { limit: 500 });
+    expect(a).toMatchObject({ skusReconciled: 1, skusFailed: 0, more: false });
+    expect(sum(r)).toBe(7);
+    expect(r.op('reconcileWarehouseAll', {})).toMatchObject({ skusReconciled: 0 });
+  });
+
+  it('a store with no warehouse is a no-op', () => {
+    const r = rig();
+    expect(r.op('reconcileWarehouseSku', { productId: 'p1' })).toMatchObject({ reconciled: false });
+    expect(r.op('reconcileWarehouseAll', {})).toMatchObject({ skusReconciled: 0, more: false });
+  });
+});

@@ -935,6 +935,9 @@ export class WarehouseService {
     productId: string,
     variantId: string | null = null
   ): Promise<{ reconciled: boolean; diff: number }> {
+    // A store on its Durable Object (Ruling CF-JOBS-4): the aggregate, the shadow sum and the writes are ONE section there.
+    const doStock = await storeStock(storeId);
+    if (doStock) return doStock.reconcileWarehouseSku({ productId, variantId });
     // Fast path: single-/no-warehouse stores (the majority of merchants)
     // have no WarehouseStock rows to drift — nothing to reconcile.
     const warehouseCount = await prisma.warehouse.count({ where: { storeId } });
@@ -1087,6 +1090,22 @@ export class WarehouseService {
   static async backfillReconcileAll(
     storeId: string
   ): Promise<{ skusReconciled: number; skusFailed: number }> {
+    // A store on its Durable Object (Ruling CF-JOBS-4): paged sections there, each reconciling up to 500 SKUs.
+    const doStock = await storeStock(storeId);
+    if (doStock) {
+      let skusReconciled = 0;
+      let skusFailed = 0;
+      let afterKey: string | null = null;
+      for (;;) {
+        const page: Awaited<ReturnType<typeof doStock.reconcileWarehouseAll>> =
+          await doStock.reconcileWarehouseAll({ limit: 500, afterKey });
+        skusReconciled += page.skusReconciled;
+        skusFailed += page.skusFailed;
+        if (!page.more || !page.nextKey) break;
+        afterKey = page.nextKey;
+      }
+      return { skusReconciled, skusFailed };
+    }
     const warehouseCount = await prisma.warehouse.count({ where: { storeId } });
     if (warehouseCount === 0) {
       return { skusReconciled: 0, skusFailed: 0 };

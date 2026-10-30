@@ -3,10 +3,10 @@
 // store to `do` opens only when BOTH lists in that file are empty. `node scripts/cf/not-on-do.mjs` prints the state and exits
 // 1 while the gate is closed.
 //
-// JOBS (Ruling CF-JOBS-3): a background job that is still `unported` (apps/api/src/lib/jobs/job-data.ts) is REFUSED for a DO
+// JOBS (Ruling CF-JOBS-4): a background job that is still `unported` (apps/api/src/lib/jobs/job-data.ts) is REFUSED for a DO
 // store, and a ported cron sweep with no alarm is SKIPPED for one. Neither is a `501`, so the AST scan cannot see them; this
-// script reads the same source files the runtime reads and counts them. A refused MONEY job (MONEY_JOBS) or a skipped sweep
-// closes the gate; a refused non-money job is COUNTED and must be listed in the manifest's `jobsAccepted` (P1 alert).
+// script reads the same source files the runtime reads and counts them. Ruling CF-JOBS-4: EVERY refused job
+// (money or not) and every skipped sweep closes the gate, because Ebda launches fully on Cloudflare and a refused job is a broken feature.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -124,21 +124,23 @@ export function readManifest() {
   return JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 }
 
-/** The gate is open only when no code path refuses, no flow is Postgres-only, no money job is refused and no sweep is skipped. */
+/** The gate is open only when no code path refuses, no flow is Postgres-only, NO job is refused and no sweep is skipped (CF-JOBS-4). */
 export function gateState(manifest = readManifest()) {
   const jobsRefused = (manifest.jobsRefused ?? []).length;
   const sweepSkips = (manifest.sweepSkips ?? []).length;
+  const jobsAccepted = (manifest.jobsAccepted ?? []).length;
   const open =
     manifest.refusals.length === 0 &&
     manifest.postgresOnly.length === 0 &&
     jobsRefused === 0 &&
+    jobsAccepted === 0 &&
     sweepSkips === 0;
   return {
     open,
     refusals: manifest.refusals.length,
     postgresOnly: manifest.postgresOnly.length,
     jobsRefused,
-    jobsAccepted: (manifest.jobsAccepted ?? []).length,
+    jobsAccepted,
     sweepSkips,
   };
 }

@@ -37,7 +37,7 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 
 ## Not moved (the flip gate stays closed)
 
-Carts, fiscal documents and the order reads (moved in R2, Ruling CF-R2-1), delivery slots, personalisation notes and quotes (moved in D2b-4), expense / PO / stock-adjustment journals (still `unported`, refused for a DO store with a P0). `payment-reconcile-sweep`, `payment-webhook-stuck-sweep` and `refund-reversal-stuck-sweep` moved in Ruling CF-JOBS-3.
+Carts, fiscal documents and the order reads (moved in R2, Ruling CF-R2-1), delivery slots, personalisation notes and quotes (moved in D2b-4), expense / PO / stock-adjustment journals (still `unported`, refused for a DO store with a P0). `payment-reconcile-sweep`, `payment-webhook-stuck-sweep` and `refund-reversal-stuck-sweep` moved in Ruling CF-JOBS-4.
 
 ## Tests
 

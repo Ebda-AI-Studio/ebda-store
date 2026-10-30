@@ -25,6 +25,12 @@ const h = vi.hoisted(() => ({
   runInTenant: vi.fn((_s: string, fn: () => unknown) => fn()),
 }));
 
+// a Postgres store: the Durable Object money client is absent, so the job takes its unchanged Postgres path
+vi.mock('@api/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/lib/repo-factory')>()),
+  storeMoney: async () => null,
+  storeDb: async () => ({}),
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },
