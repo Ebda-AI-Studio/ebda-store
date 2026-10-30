@@ -6,8 +6,8 @@
  * the message always carries the truth and a retry cannot send a stale value.
  */
 import type { ModelWriteEvent } from '@ebda/database';
+import { readStoreDb } from '../jobs/store-db';
 import { whatsappOptInWording } from '@ebda/shared';
-import { prisma, runInTenantContext } from '@ebda/database';
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import logger from '../logger';
 import type { StoreEventInput } from './events';
@@ -69,8 +69,8 @@ export async function consentChangedInput(
   buyerKey: string,
   now: Date = new Date()
 ): Promise<{ input: StoreEventInput; seed: string; occurredAt: Date }> {
-  const row = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppConsent.findUnique({
+  const row = await readStoreDb(storeId, db =>
+    db.storeWhatsAppConsent.findUnique({
       where: { storeId_buyerKey: { storeId, buyerKey } },
       select: { granted: true, grantedAt: true, revokedAt: true, updatedAt: true, locale: true },
     })

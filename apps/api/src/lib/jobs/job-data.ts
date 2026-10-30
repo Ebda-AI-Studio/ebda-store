@@ -20,6 +20,8 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'alerts-failure-watch',
   'audit-log-archive-weekly',
   'billing-renewal-daily',
+  // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-3)
+  'payment-webhook-stuck-sweep',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
@@ -31,33 +33,55 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'cart-recovery-email',
   // campaigns, recipients and the consent list follow the store's backend (Ruling CF-R6A-2)
   'campaign-send',
-]);
-
-export const MONEY_JOBS: ReadonlySet<string> = new Set([
+  // Ruling CF-JOBS-3 (money jobs): each one reaches its store only through `storeDb` / `sweepStoresDb` / the DO money ops
+  // (`storeMoney`), and runs on the store's alarm (sweeps) or its event (the rest) - tests/unit/jobs-money-on-do.test.ts
   'payment-webhook-process',
-  'payment-webhook-stuck-sweep',
   'payment-reconcile-sweep',
   'payment-abandonment-sweep',
   'refund-reversal-stuck-sweep',
-  'shipment-create',
-  'order-refunded-fanout',
-  'order-created-fanout',
   'order-created-stuck-sweep',
-  'order-status-changed-fanout',
   'order-auto-cancel-unpaid',
   'instapay-expiry',
   'instapay-receipt-extract',
   'accounting-post-order-journal',
   'accounting-post-refund-journal',
+  'accounting-daily-close',
+  'accounting-period-reconciliation',
+  // the WhatsApp store events (incl. `customer.erased`): link, consent and order/cart/catalog reads follow the backend
+  'wa-store-events',
+]);
+
+export const MONEY_JOBS: ReadonlySet<string> = new Set([
+  'shipment-create',
+  'order-refunded-fanout',
+  'order-created-fanout',
+  'order-status-changed-fanout',
   'accounting-post-expense-journal',
   'accounting-post-po-receive-journal',
   'accounting-post-stock-adjustment-journal',
-  'accounting-daily-close',
-  'accounting-period-reconciliation',
   'stock-reorder-scan-cron',
   'stock-reorder-scan-on-demand',
   'warehouse-reconcile-sweep-cron',
   'warehouse-reconcile-on-demand',
+]);
+
+/**
+ * The money jobs that ARE ported (Ruling CF-JOBS-3): a skip of a DO store by one of them still pages P0. `MONEY_JOBS` above
+ * lists only the money jobs still refused, so together they are every job that moves money or stock.
+ */
+export const PORTED_MONEY_JOBS: ReadonlySet<string> = new Set([
+  'order-status-fanout-stuck-sweep',
+  'payment-webhook-process',
+  'payment-reconcile-sweep',
+  'payment-abandonment-sweep',
+  'refund-reversal-stuck-sweep',
+  'order-created-stuck-sweep',
+  'order-auto-cancel-unpaid',
+  'instapay-expiry',
+  'accounting-post-order-journal',
+  'accounting-post-refund-journal',
+  'accounting-daily-close',
+  'accounting-period-reconciliation',
 ]);
 
 export function jobDataClass(id: string): JobDataClass {

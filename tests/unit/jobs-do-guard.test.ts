@@ -15,6 +15,7 @@ import { clearJobRegistry, registerJob } from '@api/lib/jobs/registry';
 import { runJobWorkflow } from '@api/lib/jobs/run-workflow';
 import { handleJobsBatch, type QueueMessageLike } from '@api/lib/jobs/run-queue';
 import {
+  EVENT_STORE_RESOLVERS,
   decideRun,
   doStoreIds,
   guardedRun,
@@ -91,6 +92,14 @@ const qmsg = (fn: string, data: Record<string, unknown>) => {
 
 const DO_STORE = '09b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
 const PG_STORE = '11111111-1111-4111-8111-111111111111';
+
+// payment-webhook-process (the only production resolver) is ported (Ruling CF-JOBS-3), so the resolver mechanism is exercised
+// with a still-unported money job: its event names the store through an inbox-like row.
+EVENT_STORE_RESOLVERS['shipment-create'] = async event => {
+  const id = event.data?.webhookEventId;
+  if (typeof id !== 'string' || !id) return undefined;
+  return ((await inbox.get(id)) as { storeId?: string | null } | undefined)?.storeId ?? undefined;
+};
 
 beforeEach(() => {
   vi.unstubAllEnvs();
@@ -188,8 +197,8 @@ describe('with JOBS_ON_DO off (today) nothing changes', () => {
   it('no store is a DO store, every decision is "run", guardedRun is a pass-through', async () => {
     vi.stubEnv('STORE_DO_ENABLED_IDS', DO_STORE); // the Phase 0 spike flag alone must not touch jobs
     expect(doStoreIds().size).toBe(0);
-    registerJob({ id: 'payment-webhook-process' }, async () => 1);
-    const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
+    registerJob({ id: 'shipment-create' }, async () => 1);
+    const def = { id: 'shipment-create', options: { id: 'x' }, handler: async () => 1 };
     expect(decideRun(def, { name: 'a', data: { storeId: DO_STORE } })).toEqual({ run: true });
     expect(await guardedRun(def, { name: 'a' }, async () => 42)).toBe(42);
   });
@@ -202,7 +211,7 @@ describe('events that carry no storeId (PR E residual)', () => {
     for (const m of src.matchAll(/name: '([^']+)';\s*data:\s*(\{[\s\S]*?\n\s*\};|\{[^\n]*\};)/g)) {
       if (!/\bstoreId: string/.test(m[2])) noStore.push(m[1]);
     }
-    // payment/webhook.received is resolved from its inbox row (EVENT_STORE_RESOLVERS); the others touch no store data.
+    // payment/webhook.received is ported (its job reads the inbox row's store); the others touch no store data.
     // Anything new needs a required storeId or a resolver.
     expect(noStore.sort()).toEqual([
       'contact/form.submitted', // storeId optional; without one the message is dropped (no store data read)
@@ -214,9 +223,9 @@ describe('events that carry no storeId (PR E residual)', () => {
   it('payment-webhook-process resolves its store from the inbox row: a DO store is refused (P0), a Postgres store runs', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'payment-webhook-process' }, handler);
+    registerJob({ id: 'shipment-create' }, handler);
     inbox.get.mockResolvedValueOnce({ storeId: DO_STORE });
-    const m = qmsg('payment-webhook-process', { webhookEventId: 'wh1', provider: 'paymob' });
+    const m = qmsg('shipment-create', { webhookEventId: 'wh1', provider: 'paymob' });
     await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
     expect(handler).not.toHaveBeenCalled();
     expect(m.ack).toHaveBeenCalled();
@@ -226,14 +235,14 @@ describe('events that carry no storeId (PR E residual)', () => {
     inbox.get.mockResolvedValueOnce({ storeId: 'some-postgres-store' });
     await handleJobsBatch({
       queue: 'ebda-jobs',
-      messages: [qmsg('payment-webhook-process', { webhookEventId: 'wh2', provider: 'paymob' })],
+      messages: [qmsg('shipment-create', { webhookEventId: 'wh2', provider: 'paymob' })],
     });
     expect(handler).toHaveBeenCalledTimes(1);
     expect(sendAlert).not.toHaveBeenCalled();
   });
   it('a row with no store, a missing id or a failed lookup runs as the platform-only path (no DO store reachable)', async () => {
     flagOn();
-    const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
+    const def = { id: 'shipment-create', options: { id: 'x' }, handler: async () => 1 };
     inbox.get.mockResolvedValueOnce({ storeId: null });
     expect(
       await resolveRunStore(def, { name: 'a', data: { webhookEventId: 'w' } })
@@ -245,7 +254,7 @@ describe('events that carry no storeId (PR E residual)', () => {
     ).toBeUndefined();
   });
   it('with JOBS_ON_DO off the inbox is never read', async () => {
-    const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
+    const def = { id: 'shipment-create', options: { id: 'x' }, handler: async () => 1 };
     inbox.get.mockClear();
     expect(needsStoreLookup(def, { name: 'a', data: { webhookEventId: 'w' } })).toBe(false);
     expect(
@@ -256,10 +265,10 @@ describe('events that carry no storeId (PR E residual)', () => {
   it('the Workflow runner looks the store up in its own step and refuses a DO store', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'payment-webhook-process' }, handler);
+    registerJob({ id: 'shipment-create' }, handler);
     inbox.get.mockResolvedValueOnce({ storeId: DO_STORE });
     wfCalls.length = 0;
-    await runJobWorkflow(wfArgs('payment-webhook-process', { webhookEventId: 'w' }));
+    await runJobWorkflow(wfArgs('shipment-create', { webhookEventId: 'w' }));
     expect(handler).not.toHaveBeenCalled();
     expect(wfCalls).toContain('do:resolve-run-store');
   });
@@ -277,8 +286,8 @@ describe('refusal of unported jobs for a DO store', () => {
     flagOn();
     const handler = vi.fn(async () => 1);
     const onFailure = vi.fn();
-    registerJob({ id: 'order-auto-cancel-unpaid', onFailure }, handler);
-    const m = qmsg('order-auto-cancel-unpaid', { storeId: DO_STORE });
+    registerJob({ id: 'order-created-fanout', onFailure }, handler);
+    const m = qmsg('order-created-fanout', { storeId: DO_STORE });
     await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
     expect(handler).not.toHaveBeenCalled();
     expect(onFailure).not.toHaveBeenCalled();
@@ -310,8 +319,8 @@ describe('refusal of unported jobs for a DO store', () => {
   it('workflow runner: refused before any step body, alert sent in its own step', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'payment-webhook-process' }, handler);
-    await runJobWorkflow(wfArgs('payment-webhook-process', { storeId: DO_STORE }));
+    registerJob({ id: 'shipment-create' }, handler);
+    await runJobWorkflow(wfArgs('shipment-create', { storeId: DO_STORE }));
     expect(handler).not.toHaveBeenCalled();
     expect(wfCalls).toEqual(['do:do-guard-refusal']);
     expect(sendAlert).toHaveBeenCalledWith(expect.objectContaining({ level: 'p0' }));
@@ -320,8 +329,10 @@ describe('refusal of unported jobs for a DO store', () => {
   it('an alarm run for a DO store is refused the same way; a platform ("none") job is never refused', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'accounting-daily-close' }, handler);
-    await runJobWorkflow(wfArgs('accounting-daily-close', { alarm: true, storeId: DO_STORE }));
+    registerJob({ id: 'warehouse-reconcile-sweep-cron' }, handler);
+    await runJobWorkflow(
+      wfArgs('warehouse-reconcile-sweep-cron', { alarm: true, storeId: DO_STORE })
+    );
     expect(handler).not.toHaveBeenCalled();
     const none = vi.fn(async () => 1);
     registerJob({ id: 'billing-renewal-daily' }, none);

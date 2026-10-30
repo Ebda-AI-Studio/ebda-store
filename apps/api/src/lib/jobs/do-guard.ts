@@ -18,8 +18,8 @@ import logger from '../logger';
 import { sendAlert } from '../../services/alerts.service';
 import { enabledStoreIds } from '../store-backend';
 import { runInJobRepoScope } from '../repo-factory';
-import { webhookInbox } from '../definer';
-import { jobDataClass, MONEY_JOBS } from './job-data';
+import { jobDataClass, MONEY_JOBS, PORTED_MONEY_JOBS } from './job-data';
+import { jobRunsOnAlarm } from './alarm-flag';
 import { alarmStoreId } from './store-scope';
 import type { JobDef, JobEvent } from './types';
 
@@ -44,22 +44,15 @@ export type RunDecision = { run: true } | { run: false; storeId: string; money: 
 
 /**
  * Events that carry NO `storeId` of their own name the store through a reference the job's data holds. The resolver reads
- * it (a platform lookup, never the store's tables) so a DO store's event is refused/served like any other. Today only
- * `payment/webhook.received` (`storeId` optional, "undefined for the platform-only path"): its inbox row holds the store
- * the route resolved from the provider reference (WEBHOOK-SCOPE-1). A run for which NO store can be named stays on
+ * it (a platform lookup, never the store's tables) so a DO store's event is refused/served like any other. EMPTY since
+ * `payment-webhook-process` was ported (Ruling CF-JOBS-3): it reads its inbox row's store itself and serves a DO store. A run for which NO store can be named stays on
  * Postgres exactly as before: nothing of a DO store can be reached from it (a DO store's payment reference does not
  * resolve there until the D1 entity index, plan task 3.5, lands - recorded in Ruling CF-MONEY-1).
  */
-export const EVENT_STORE_RESOLVERS: Readonly<
-  Record<string, (event: JobEvent) => Promise<string | undefined>>
-> = {
-  'payment-webhook-process': async event => {
-    const id = event.data?.webhookEventId;
-    if (typeof id !== 'string' || !id) return undefined;
-    const row = await webhookInbox.get(id);
-    return row?.storeId ?? undefined;
-  },
-};
+export const EVENT_STORE_RESOLVERS: Record<
+  string,
+  (event: JobEvent) => Promise<string | undefined>
+> = {};
 
 /** True when the run's store must be looked up (JOBS_ON_DO on, the event carries none, the job has a resolver). */
 export function needsStoreLookup(def: JobDef, event: JobEvent): boolean {
@@ -135,6 +128,22 @@ export async function guardedRun<T>(
       withHiddenStores({ hidden, onExcluded: ids => ids.forEach(i => excluded.add(i)) }, fn)
     );
   } finally {
+    // A PORTED sweep that ran from its cron hides the DO stores because their alarm owns them. When that alarm is not
+    // enabled (`JOBS_CF_ALARMS` does not list the job) nobody owns them: the sweep silently skipped a DO store, which for a
+    // money job is the failure this guard exists to make loud (Ruling CF-JOBS-3).
+    if (excluded.size > 0 && cls === 'ported' && !only && !jobRunsOnAlarm(def.id)) {
+      const ids = [...excluded];
+      logger.error(
+        { job: def.id, storeIds: ids },
+        '[jobs] sweep skipped DO stores (alarms not enabled)'
+      );
+      await sendAlert({
+        level: PORTED_MONEY_JOBS.has(def.id) ? 'p0' : 'p1',
+        source: 'jobs-do-guard',
+        title: `Job ${def.id} skipped ${ids.length} DO store(s): its alarm is not enabled`,
+        body: `${def.id} serves a DO store on that store's alarm, and JOBS_CF_ALARMS does not enable it, so ${ids.join(', ')} was not swept. Set JOBS_CF_ALARMS=all.`,
+      }).catch(err => logger.error({ err, job: def.id }, '[jobs] skip alert failed'));
+    }
     if (excluded.size > 0 && cls === 'unported') {
       const ids = [...excluded];
       logger.error({ job: def.id, storeIds: ids }, '[jobs] sweep skipped DO stores (not ported)');

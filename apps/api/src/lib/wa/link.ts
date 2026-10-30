@@ -1,4 +1,5 @@
 import { prisma, runInTenantContext } from '@ebda/database';
+import { readStoreDb } from '../jobs/store-db';
 import { getAutomationFlags } from '../../services/plan-entitlements';
 
 /**
@@ -46,8 +47,8 @@ async function entitled(
 }
 
 export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
-  const link = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
+  const link = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
   );
   if (link?.linked !== true) return false;
   // The package entitlement alone is enough: do not even read the plan in that case.
@@ -57,8 +58,8 @@ export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
 
 /** Does Ebda WhatsApp know this store (a link row exists: linked now, unlinked, or entitlement only)? */
 export async function hasWhatsAppLinkRow(storeId: string): Promise<boolean> {
-  const row = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
+  const row = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
   );
   return row !== null;
 }
@@ -67,8 +68,8 @@ export async function hasWhatsAppLinkRow(storeId: string): Promise<boolean> {
 export async function whatsAppLinkState(
   storeId: string
 ): Promise<{ linked: boolean; entitled: boolean; active: boolean }> {
-  const link = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
+  const link = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
   );
   const linked = link?.linked === true;
   const e = await entitled(
@@ -84,8 +85,8 @@ export async function whatsAppLinkState(
  * WhatsApp reported an active package for it. Fail closed.
  */
 export async function canLinkWhatsApp(storeId: string): Promise<boolean> {
-  const link = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
+  const link = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
   );
   const e = await entitled(
     storeId,

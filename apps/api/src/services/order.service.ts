@@ -2968,7 +2968,7 @@ export class OrderService {
      * the shelf (a return to origin the merchant chose not to restock,
      * ruling MONEYB-5). Every other caller restores stock as before.
      */
-    opts: { restoreInventory?: boolean } = {}
+    opts: { restoreInventory?: boolean; unpaidOnly?: boolean } = {}
   ) {
     // Cancel on a store's Durable Object (Ruling CF-ORDERS-1): the status flip AND the whole reversal (stock, coupon, loyalty,
     // wallet, backorders) are one section there. The state machine is checked on the DO's own status first.
@@ -3410,7 +3410,7 @@ export class OrderService {
     money: MoneyClient,
     storeId: string,
     orderId: string,
-    opts: { restoreInventory?: boolean }
+    opts: { restoreInventory?: boolean; unpaidOnly?: boolean }
   ) {
     const db = await storeDb(storeId);
     const before = await db.order.findFirst({
@@ -3426,7 +3426,12 @@ export class OrderService {
     if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
     assertValidTransition(before.status, 'cancelled');
     const requestedAt = new Date();
-    const r = await money.cancel({ orderId, restoreInventory: opts.restoreInventory !== false });
+    const r = await money.cancel({
+      orderId,
+      restoreInventory: opts.restoreInventory !== false,
+      // the auto-cancel sweep: the DO refuses (ORDER_ALREADY_PAID) when a payment landed first, in the same section
+      ...(opts.unpaidOnly ? { unpaidOnly: true } : {}),
+    });
     if (!r.replayed) {
       // the same tail as the Postgres path: refund fanout, the status fanout, the customer push
       const hadCapturedPayment = hasCapturedPayment(before);

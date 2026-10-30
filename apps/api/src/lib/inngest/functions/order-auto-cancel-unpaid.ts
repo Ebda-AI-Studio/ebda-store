@@ -8,8 +8,9 @@ import { confirmPaymentFromProviderStatus } from '../../../services/payment-conf
 import type { PaymentProvider } from '../../../services/payment-providers/types';
 import { sendAlert } from '../../../services/alerts.service';
 import { AppError } from '../../../middleware/error-handler';
-import { recordPaymentEvent } from '../../../services/payment-event.service';
-import { sweepAcrossStores } from '../../cross-store';
+import { recordPaymentEventForStore } from '../../../services/payment-event.service';
+import { sweepStoresDb } from '../../jobs/store-db';
+import { storeMoney } from '../../repo-factory';
 
 /**
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
@@ -140,15 +141,17 @@ export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 3 * * *' }], // daily 03:00 UTC
   },
-  async ({ step }) => {
+  async ({ step, event }) => {
+    // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object, rescues a
+    // captured payment through the DO webhook section and cancels through the DO `cancel` (unpaid-only, one section).
     // Cross-tenant — withRlsBypass so FORCE RLS doesn't hide other tenants'
     // rows (no HTTP tenant GUC on a cron).
     const stale = await step.run('find-stale-unpaid', () => {
       // Read inside the step: the cutoff is part of the memoised read, not re-derived on replay.
       const threshold = new Date(Date.now() - AUTO_CANCEL_UNPAID_DAYS * 24 * 60 * 60 * 1000);
-      return sweepAcrossStores({
-        fetch: storeId =>
-          prisma.order.findMany({
+      return sweepStoresDb(event, {
+        fetch: (storeId, db) =>
+          db.order.findMany({
             where: {
               storeId,
               status: 'pending',
@@ -265,39 +268,43 @@ export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
           // The money WAS captured and every push path missed it. Route through
           // the shared single-writer so this transitions identically to a
           // webhook / verify-on-return confirmation and fans out exactly once.
-          const staleConfirm = await runInTenantContext(order.storeId, () =>
-            confirmPaymentFromProviderStatus({
-              payment: {
-                id: payment.id,
-                status: payment.status,
-                provider: payment.provider,
-                metadata: payment.metadata,
-                amount: payment.amount,
-                currency: payment.currency,
-              },
-              order: {
-                id: order.id,
-                storeId: order.storeId,
-                paymentStatus: order.paymentStatus,
-                locale: order.locale,
-              },
-              providerStatus,
-              source: 'auto_cancel_sweep',
-              triggeredByUserId: null,
-            })
+          const doMoney = await storeMoney(order.storeId);
+          const staleConfirm = await (
+            doMoney
+              ? PaymentService.applyCapturedStatusOnDo(
+                  order.storeId,
+                  {
+                    provider: payment.provider,
+                    transactionId: payment.transactionId as string,
+                    amount: payment.amount,
+                    currency: payment.currency,
+                  },
+                  providerStatus
+                )
+              : runInTenantContext(order.storeId, () =>
+                  confirmPaymentFromProviderStatus({
+                    payment: {
+                      id: payment.id,
+                      status: payment.status,
+                      provider: payment.provider,
+                      metadata: payment.metadata,
+                      amount: payment.amount,
+                      currency: payment.currency,
+                    },
+                    order: {
+                      id: order.id,
+                      storeId: order.storeId,
+                      paymentStatus: order.paymentStatus,
+                      locale: order.locale,
+                    },
+                    providerStatus,
+                    source: 'auto_cancel_sweep',
+                    triggeredByUserId: null,
+                  })
+                )
           ).then(
             () => null,
             (err: unknown) => {
-              // ONLY the stale backwards transition is terminal (issue 2137):
-              // the order left `pending` between this run's query and this
-              // step (a merchant cancelled it, or another path confirmed it
-              // and moved it on), so confirming it is INVALID_STATUS_TRANSITION
-              // (#763). Retrying cannot change that, and rethrowing failed the
-              // whole sweep. ANY OTHER error — including some other 4xx — is
-              // rethrown: it would leave the order `pending`, so skipping it
-              // would re-skip it every night while a paid order sat
-              // unconfirmed. Returned as an object so the branch never hangs
-              // on the truthiness of a code string.
               if (err instanceof AppError && err.code === 'INVALID_STATUS_TRANSITION') {
                 return { code: err.code };
               }
@@ -319,23 +326,21 @@ export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
             // Durable, UI-visible trace on the order page's payment timeline
             // (issue 2143) — the money exists at the provider even though the
             // order and payment rows say it does not.
-            await runInTenantContext(order.storeId, () =>
-              recordPaymentEvent({
-                paymentId: payment.id,
-                storeId: order.storeId,
-                orderId: order.id,
-                eventType: 'reconciliation',
-                provider: payment.provider,
-                details: {
-                  reason: 'provider_paid_on_terminal_order',
-                  source: 'auto_cancel_sweep',
-                  providerStatus: providerStatus.status,
-                  transactionId: payment.transactionId,
-                  amount: payment.amount,
-                  note: 'Provider reports this payment captured, but the order had already left pending. Check the provider and refund the customer if the order stays cancelled.',
-                },
-              })
-            );
+            await recordPaymentEventForStore({
+              paymentId: payment.id,
+              storeId: order.storeId,
+              orderId: order.id,
+              eventType: 'reconciliation',
+              provider: payment.provider,
+              details: {
+                reason: 'provider_paid_on_terminal_order',
+                source: 'auto_cancel_sweep',
+                providerStatus: providerStatus.status,
+                transactionId: payment.transactionId,
+                amount: payment.amount,
+                note: 'Provider reports this payment captured, but the order had already left pending. Check the provider and refund the customer if the order stays cancelled.',
+              },
+            });
             return { action: 'stale_confirmed', code: staleConfirm.code } as ReconcileOutcome;
           }
 
@@ -381,18 +386,31 @@ export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
             // after this run's provider answer ('expired') either commits first (the order is paid: not cancelled)
             // or waits and finds it cancelled (its claim is then blocked and raised loudly). confirmed -> cancelled is
             // an allowed transition, so without this a freshly PAID order was cancelled.
-            const cancelled = await runInTenantContext(order.storeId, async () => {
-              const rows = await prisma.$queryRaw<
-                Array<{ status: string; payment_status: string }>
-              >`
+            const doMoney = await storeMoney(order.storeId);
+            const cancelled = doMoney
+              ? // The Durable Object checks "still unpaid" and cancels in ONE section (Postgres: SELECT ... FOR UPDATE);
+                // the normal cancel tail (refund fanout, status fanout, push) runs inside `updateStatus`.
+                await OrderService.updateStatus(order.storeId, order.id, 'cancelled', {
+                  unpaidOnly: true,
+                }).then(
+                  () => true,
+                  (err: { code?: string }) => {
+                    if (err?.code === 'ORDER_ALREADY_PAID') return false;
+                    throw err;
+                  }
+                )
+              : await runInTenantContext(order.storeId, async () => {
+                  const rows = await prisma.$queryRaw<
+                    Array<{ status: string; payment_status: string }>
+                  >`
                 SELECT status::text AS status, payment_status::text AS payment_status
                   FROM orders WHERE id = ${order.id} AND store_id = ${order.storeId} FOR UPDATE`;
-              const cur = rows[0];
-              if (!cur || cur.payment_status === 'paid' || cur.payment_status === 'refunded')
-                return false;
-              await OrderService.updateStatus(order.storeId, order.id, 'cancelled');
-              return true;
-            });
+                  const cur = rows[0];
+                  if (!cur || cur.payment_status === 'paid' || cur.payment_status === 'refunded')
+                    return false;
+                  await OrderService.updateStatus(order.storeId, order.id, 'cancelled');
+                  return true;
+                });
             if (!cancelled) {
               logger.warn(
                 { orderId: order.id, storeId: order.storeId },

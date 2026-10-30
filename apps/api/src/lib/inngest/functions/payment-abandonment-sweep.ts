@@ -1,11 +1,12 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
 import { featureService } from '../../../services/feature.service';
 import { OneSignalService } from '../../../services/onesignal.service';
-import { sweepAcrossStores } from '../../cross-store';
+import { storeNameOf, sweepStoresDb } from '../../jobs/store-db';
+import { storeMoney } from '../../repo-factory';
+import { prisma, runInTenantContext } from '@ebda/database';
 
 import { REGION } from '@ebda/shared';
 /**
@@ -54,7 +55,6 @@ interface AbandonCandidate {
   orderNumber: string;
   total: number;
   currency: string;
-  store: { name: string } | null;
   payments: { provider: string | null }[];
 }
 
@@ -68,14 +68,16 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     // old, deduped once per order by the stamp; the order is auto-cancelled only after days.
     triggers: [{ cron: '7 * * * *' }], // hourly
   },
-  async ({ step }) => {
+  async ({ step, event }) => {
+    // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object and
+    // stamps through the `abandonStamp` op.
     // Cross-tenant sweep — bypass RLS (no HTTP tenant GUC on a cron).
     const candidates = (await stepRunUnlessEmpty(step, 'find-gateway-abandoners', () => {
       // Inside the step: the cutoff is part of the memoised read, not re-derived on replay.
       const threshold = new Date(Date.now() - PAYMENT_ABANDON_MINUTES * 60_000);
-      return sweepAcrossStores({
-        fetch: storeId =>
-          prisma.order.findMany({
+      return sweepStoresDb(event, {
+        fetch: (storeId, db) =>
+          db.order.findMany({
             where: {
               storeId,
               status: 'pending',
@@ -100,7 +102,6 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
               orderNumber: true,
               total: true,
               currency: true,
-              store: { select: { name: true } },
               payments: {
                 where: { paymentUrl: { not: null } },
                 select: { provider: true },
@@ -157,19 +158,23 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
       eligible.map((order: AbandonCandidate) =>
         step.run(`stamp-${order.id}`, async () => {
           const now = new Date();
-          const res = await runInTenantContext(order.storeId, () =>
-            prisma.order.updateMany({
-              where: {
-                id: order.id,
-                storeId: order.storeId,
-                // Double-check conditions still hold (race: webhook may have
-                // completed payment between sweep read and stamp write).
-                paymentStatus: 'unpaid',
-                paymentGatewayAbandonedAt: null,
-              },
-              data: { paymentGatewayAbandonedAt: now },
-            })
-          );
+          // A store on its Durable Object stamps in its own section (the same guard: still unpaid, not yet stamped).
+          const money = await storeMoney(order.storeId);
+          const res = money
+            ? { count: (await money.abandonStamp({ orderId: order.id })).stamped ? 1 : 0 }
+            : await runInTenantContext(order.storeId, () =>
+                prisma.order.updateMany({
+                  where: {
+                    id: order.id,
+                    storeId: order.storeId,
+                    // Double-check conditions still hold (race: webhook may have
+                    // completed payment between sweep read and stamp write).
+                    paymentStatus: 'unpaid',
+                    paymentGatewayAbandonedAt: null,
+                  },
+                  data: { paymentGatewayAbandonedAt: now },
+                })
+              );
           // count === 0 → the guard didn't match (already stamped or paid in the
           // race window). Skip both the counter and the alert so we never
           // double-notify. This is what makes the push exactly-once per order.
@@ -187,7 +192,7 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
               orderId: order.id,
               orderNumber: order.orderNumber,
               storeId: order.storeId,
-              storeName: order.store?.name ?? order.storeId,
+              storeName: await storeNameOf(order.storeId),
               customerName: '',
               total: order.total ?? 0,
               currency: order.currency ?? REGION.currency,

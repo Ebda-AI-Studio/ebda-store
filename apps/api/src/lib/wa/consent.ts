@@ -7,6 +7,7 @@
  * erased with it. It is keyed by the suite buyer key, so it holds no raw phone.
  */
 import { prisma, runInTenantContext } from '@ebda/database';
+import { readStoreDb } from '../jobs/store-db';
 import { buyerKeyFor, toE164 } from '@ebda/shared';
 import { suiteBuyerKeySecret } from './config';
 
@@ -262,8 +263,8 @@ export const WhatsAppConsentService = {
 
   /** True only for an active, un-revoked consent. Unknown buyer = no consent. */
   async hasConsent(storeId: string, buyerKey: string): Promise<boolean> {
-    const row = await runInTenantContext(storeId, () =>
-      prisma.storeWhatsAppConsent.findUnique({
+    const row = await readStoreDb(storeId, db =>
+      db.storeWhatsAppConsent.findUnique({
         where: { storeId_buyerKey: { storeId, buyerKey } },
         select: { granted: true },
       })

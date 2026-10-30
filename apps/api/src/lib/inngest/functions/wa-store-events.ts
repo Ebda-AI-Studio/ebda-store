@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { acrossStores, prisma, runInTenantContext } from '@ebda/database';
+import { acrossStores, prisma, runInTenantContext, withStore } from '@ebda/database';
+import { readStoreDb } from '../../jobs/store-db';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
@@ -76,8 +77,8 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
     locale?: string;
   };
   if (!orderId || !storeId) return [];
-  const order = await runInTenantContext(storeId, () =>
-    prisma.order.findUnique({ where: { id: orderId, storeId }, select: orderSelect })
+  const order = await readStoreDb(storeId, db =>
+    db.order.findUnique({ where: { id: orderId, storeId }, select: orderSelect })
   );
   // `order/created` can be sent from INSIDE the request transaction (Ruling WH-8): the order or its
   // COD payment may not be visible yet. Throw so the job retries (as the other fan-outs do) instead
@@ -168,8 +169,8 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
     updatedAt?: string;
   };
   if (!d.storeId || !d.orderId || !d.shipmentId || !d.status) return [];
-  const order = await runInTenantContext(d.storeId, () =>
-    prisma.order.findUnique({
+  const order = await readStoreDb(d.storeId, db =>
+    db.order.findUnique({
       where: { id: d.orderId!, storeId: d.storeId! },
       select: { orderNumber: true, shippingAddress: true, locale: true },
     })
@@ -206,8 +207,8 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
 async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   const { storeId, cartId } = (event.data ?? {}) as { storeId?: string; cartId?: string };
   if (!storeId || !cartId) return [];
-  const row = await runInTenantContext(storeId, () =>
-    prisma.abandonedCart.findFirst({
+  const row = await readStoreDb(storeId, db =>
+    db.abandonedCart.findFirst({
       where: { storeId, cartId },
       select: {
         status: true,
@@ -215,11 +216,18 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
         customerPhone: true,
         customerId: true,
         createdAt: true,
-        store: { select: { slug: true, domain: true, settings: true } },
       },
     })
   );
   if (!row) throw new Error(`abandoned cart ${cartId} not visible yet`);
+  // `Store` is a platform row, not a store-DO one: read it for either backend
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { slug: true, domain: true, settings: true },
+    })
+  );
+  if (!store) throw new Error(`store ${storeId} not found`);
   // Stop-on-convert: a shopper who already ordered must not be chased.
   if (row.status === 'recovered' || row.recoveredAt) return [];
   // A deactivated / erased account is never chased (belt and braces next to the revoke on delete).
@@ -239,7 +247,7 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   // Ruling WA-CONSENT-1: a cart reminder is MARKETING. No active consent = no cart.abandoned.
   // Checked here, at send time, so a revoke between capture and send also stops it.
   if (!(await WhatsAppConsentService.hasConsent(storeId, buyerKey))) return [];
-  const lang = (row.store.settings as { defaultLanguage?: unknown } | null)?.defaultLanguage;
+  const lang = (store.settings as { defaultLanguage?: unknown } | null)?.defaultLanguage;
   return [
     {
       seed: `cart:${cartId}`,
@@ -253,7 +261,7 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
           phoneE164: phone,
           locale: lang === 'en' ? 'en' : 'ar',
           // Signed, expiring, store-scoped: re-attaches THIS cart for guests too (Ruling CART-RESTORE-1).
-          recoveryUrl: `${storefrontOrigin(row.store)}/cart?restore=${encodeURIComponent(signCartRestoreToken(storeId, cartId))}`,
+          recoveryUrl: `${storefrontOrigin(store)}/cart?restore=${encodeURIComponent(signCartRestoreToken(storeId, cartId))}`,
         },
       },
     },
@@ -286,16 +294,16 @@ async function catalogEvents(event: SourceEvent): Promise<Planned[]> {
   if (!ids) {
     // Unknown or many: resync the store's whole catalog (capped; a store past the cap is resynced by
     // the link flow's catalog read over the bridge anyway).
-    const all = await runInTenantContext(storeId, () =>
-      prisma.product.findMany({ where: { storeId }, select: { id: true }, take: CATALOG_MAX })
+    const all = await readStoreDb(storeId, db =>
+      db.product.findMany({ where: { storeId }, select: { id: true }, take: CATALOG_MAX })
     );
     ids = all.map(p => p.id);
   }
   const out: Planned[] = [];
   for (let i = 0; i < ids.length; i += CATALOG_PAGE) {
     const chunk = ids.slice(i, i + CATALOG_PAGE);
-    const rows = await runInTenantContext(storeId, () =>
-      prisma.product.findMany({
+    const rows = await readStoreDb(storeId, db =>
+      db.product.findMany({
         where: { id: { in: chunk }, storeId },
         select: { id: true, updatedAt: true, deletedAt: true, variants: { select: { id: true } } },
       })
@@ -338,8 +346,8 @@ async function statusEvent(event: SourceEvent): Promise<Planned[]> {
   // still for THIS status.
   let at = d.requestedAt ? new Date(d.requestedAt) : null;
   if (!at || Number.isNaN(at.getTime())) {
-    const order = await runInTenantContext(d.storeId, () =>
-      prisma.order.findUnique({
+    const order = await readStoreDb(d.storeId, db =>
+      db.order.findUnique({
         where: { id: d.orderId!, storeId: d.storeId! },
         select: {
           statusFanoutRequestedAt: true,
@@ -382,8 +390,8 @@ const CONSENT_BACKFILL_KEY = 'wa:consent-backfill:v1.1';
  * Used by the 12-hourly reconcile and for the one-time v1.1 backfill. Idempotent by envelope id.
  */
 export async function resendConsentFor(storeId: string, sinceMs: number): Promise<number> {
-  const rows = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppConsent.findMany({
+  const rows = await readStoreDb(storeId, db =>
+    db.storeWhatsAppConsent.findMany({
       where: {
         storeId,
         ...(sinceMs > 0 ? { updatedAt: { gte: new Date(Date.now() - sinceMs) } } : {}),

@@ -72,7 +72,13 @@ import {
 
 import { REGION } from '@ebda/shared';
 import { paymentWebhookUrl } from './webhook-url';
-import { storeDb, storeMoney, type MoneyClient, type DoWebhookInput } from '../../lib/repo-factory';
+import {
+  storeDb,
+  storeMoney,
+  storeRepo,
+  type MoneyClient,
+  type DoWebhookInput,
+} from '../../lib/repo-factory';
 // ==========================================
 // Payment Factory
 // Database-driven configuration for payment providers
@@ -169,18 +175,26 @@ class PaymentFactory {
       // There are no platform-level (storeId NULL) configs for the app role: strict RLS
       // hides NULL-store rows and the code-level tenant guard refuses an unscoped read
       // (R-EBDA-007), so the old "fall back to global" read could only ever return nothing.
+      // A store on its Durable Object keeps its provider rows THERE (Ruling CF-JOBS-3): a job or webhook for it must read
+      // that copy, not the sealed Postgres rows. `storeRepo` is the pg proxy for a Postgres store, so that path is unchanged.
+      const repo = storeId === null ? null : await storeRepo(storeId);
       const dbConfigs =
         storeId === null
           ? []
-          : await withStore(storeId, () =>
-              prisma.paymentConfig.findMany({
-                where: {
-                  storeId: storeId,
-                  isEnabled: true,
-                },
+          : repo?.backend === 'do'
+            ? await repo.db.paymentConfig.findMany({
+                where: { storeId, isEnabled: true },
                 orderBy: { provider: 'asc' },
               })
-            );
+            : await withStore(storeId, () =>
+                prisma.paymentConfig.findMany({
+                  where: {
+                    storeId: storeId,
+                    isEnabled: true,
+                  },
+                  orderBy: { provider: 'asc' },
+                })
+              );
 
       // There is NO environment-variable fallback: providers come only from a
       // paymentConfig row the merchant saved in settings (their own keys), so a
@@ -961,11 +975,15 @@ export class PaymentService {
     provider?: PaymentProvider,
     storeId?: string
   ): Promise<PaymentStatusResponse> {
-    // Try to find the payment in database to get the provider
-    const payment = await prisma.payment.findFirst({
-      where: { transactionId },
-      include: { order: { include: { store: true } } },
-    });
+    // Try to find the payment in database to get the provider. A caller that already names the provider AND the store
+    // (the auto-cancel sweep, for a store on its Durable Object whose payment is not in Postgres) needs no lookup.
+    const payment =
+      provider && storeId
+        ? null
+        : await prisma.payment.findFirst({
+            where: { transactionId },
+            include: { order: { include: { store: true } } },
+          });
 
     const providerName = provider || (payment?.provider as PaymentProvider) || undefined;
     const effectiveStoreId = storeId || payment?.order?.storeId;
@@ -2635,6 +2653,49 @@ export class PaymentService {
       await PaymentService.afterWebhookOnDo(storeId, provider, result);
     }
     return { success: true, status: result.paymentStatus, orderId: result.orderId };
+  }
+
+  /**
+   * A payment the gateway itself reports CAPTURED, found by a poll rather than a webhook (the auto-cancel sweep), applied to a
+   * store on its Durable Object through the same `paymentWebhook` section a delivered webhook uses (Ruling CF-JOBS-3). The
+   * status came from a server-to-server call, so it is the confirmed gateway record; a replay of the same capture applies once.
+   * Throws the engine's refusal (for example `INVALID_STATUS_TRANSITION` when the order already left pending) for the caller.
+   */
+  static async applyCapturedStatusOnDo(
+    storeId: string,
+    payment: { provider: string; transactionId: string; amount: number; currency?: string },
+    providerStatus: { paidAmount?: number; paidCurrency?: string; currency?: string }
+  ): Promise<{ outcome: string; orderId: string }> {
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(500, 'NOT_A_DO_STORE', 'store is not served by its Durable Object');
+    const result = await money.paymentWebhook({
+      input: {
+        provider: payment.provider,
+        eventId: `status-poll:${payment.transactionId}:completed`,
+        providerRef: payment.transactionId,
+        kind: 'payment',
+        status: 'completed',
+        amount: providerStatus.paidAmount ?? payment.amount,
+        currency:
+          providerStatus.paidCurrency ?? providerStatus.currency ?? payment.currency ?? null,
+        rawPayload: { source: 'auto_cancel_sweep' },
+      },
+      confirmed: { kind: 'payment', status: 'SUCCESS' },
+    });
+    for (const a of result.alerts)
+      void sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: storeId, name: storeId },
+        source: `payment.webhook.${a.kind}`,
+        title: `${payment.provider} status poll: ${a.kind}`,
+        body: a.body,
+        context: { storeId, paymentId: a.paymentId, orderId: a.orderId, ...(a.context ?? {}) },
+      }).catch(() => undefined);
+    if (result.outcome === 'applied')
+      await PaymentService.afterWebhookOnDo(storeId, payment.provider as PaymentProvider, result);
+    return { outcome: result.outcome, orderId: result.orderId };
   }
 
   /** The post-commit work of an applied webhook: the same fan-out as the Postgres branch. */

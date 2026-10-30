@@ -7,7 +7,13 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 // @ts-expect-error plain ESM script shared with the CLI
-import { findRefusals, scan, readManifest, gateState } from '../../scripts/cf/not-on-do.mjs';
+import {
+  findRefusals,
+  scan,
+  readManifest,
+  gateState,
+  jobRefusals,
+} from '../../scripts/cf/not-on-do.mjs';
 
 const ROOT = path.resolve(__dirname, '../..');
 type Found = { code: string; line: number; file: string };
@@ -64,9 +70,74 @@ describe('the refusal inventory equals the manifest', () => {
 
   it('the gate is closed exactly while something is listed', () => {
     const s = gateState(manifest);
-    expect(s.open).toBe(manifest.refusals.length === 0 && manifest.postgresOnly.length === 0);
+    expect(s.open).toBe(
+      manifest.refusals.length === 0 &&
+        manifest.postgresOnly.length === 0 &&
+        manifest.jobsRefused.length === 0 &&
+        manifest.sweepSkips.length === 0
+    );
     expect(gateState({ refusals: [], postgresOnly: [] }).open).toBe(true);
     expect(gateState({ refusals: [{}], postgresOnly: [] }).open).toBe(false);
     expect(gateState({ refusals: [], postgresOnly: [{}] }).open).toBe(false);
+  });
+});
+
+describe('job refusals and sweep skips are part of the gate (Ruling CF-JOBS-3)', () => {
+  const manifest = readManifest();
+  const live = jobRefusals();
+
+  it('the manifest lists exactly the jobs the runtime refuses and the sweeps it skips', () => {
+    expect(manifest.jobsRefused).toEqual(live.jobsRefused);
+    expect(manifest.jobsAccepted).toEqual(live.jobsAccepted);
+    expect(manifest.sweepSkips).toEqual(live.sweepSkips);
+    expect(live.moneyNotInMap).toEqual([]);
+  });
+
+  it('the gate is closed while any money job is refused or any sweep is skipped (negative controls)', () => {
+    const base = {
+      refusals: [],
+      postgresOnly: [],
+      jobsRefused: [],
+      jobsAccepted: [],
+      sweepSkips: [],
+    };
+    expect(gateState(base).open).toBe(true);
+    expect(gateState({ ...base, jobsRefused: ['shipment-create'] }).open).toBe(false);
+    expect(gateState({ ...base, sweepSkips: ['x'] }).open).toBe(false);
+    // an accepted non-money job is counted but does not close the gate
+    const g = gateState({ ...base, jobsAccepted: ['review-request'] });
+    expect(g.open).toBe(true);
+    expect(g.jobsAccepted).toBe(1);
+    // a manifest from before this ruling (no job fields) cannot silently open the gate over a refused job
+    expect(live.jobsRefused.length === 0 || gateState(manifest).open === false).toBe(true);
+  });
+
+  it('jobRefusals sees a job that is neither none nor ported, and a cron sweep with no alarm', () => {
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'jobs-'));
+    fs.writeFileSync(
+      path.join(dir, 'job-data.ts'),
+      `export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set(['a']);
+export const PORTED_JOBS: ReadonlySet<string> = new Set(['p']);
+export const MONEY_JOBS: ReadonlySet<string> = new Set(['m']);`
+    );
+    fs.writeFileSync(
+      path.join(dir, 'jobs-map.ts'),
+      `export const JOBS_MAP = {
+  a: { group: '1', kind: 'queue', trigger: 'cron' },
+  p: { group: '1', kind: 'queue', trigger: 'cron' },
+  m: { group: '7-money', kind: 'queue', trigger: 'event' },
+  'x-other': { group: '1', kind: 'queue', trigger: 'event' },
+};`
+    );
+    fs.writeFileSync(
+      path.join(dir, 'alarm-flag.ts'),
+      `export const ALARM_READY: ReadonlySet<string> = new Set([]);`
+    );
+    expect(jobRefusals(dir)).toEqual({
+      jobsRefused: ['m'],
+      jobsAccepted: ['x-other'],
+      sweepSkips: ['p'],
+      moneyNotInMap: [],
+    });
   });
 });

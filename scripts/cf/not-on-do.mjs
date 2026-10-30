@@ -2,6 +2,11 @@
 // (HTTP 501 / `*_NOT_ON_DO`) is found with the TypeScript AST and must be listed in docs/cf/not-on-do.json. The gate to flip a
 // store to `do` opens only when BOTH lists in that file are empty. `node scripts/cf/not-on-do.mjs` prints the state and exits
 // 1 while the gate is closed.
+//
+// JOBS (Ruling CF-JOBS-3): a background job that is still `unported` (apps/api/src/lib/jobs/job-data.ts) is REFUSED for a DO
+// store, and a ported cron sweep with no alarm is SKIPPED for one. Neither is a `501`, so the AST scan cannot see them; this
+// script reads the same source files the runtime reads and counts them. A refused MONEY job (MONEY_JOBS) or a skipped sweep
+// closes the gate; a refused non-money job is COUNTED and must be listed in the manifest's `jobsAccepted` (P1 alert).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,14 +74,62 @@ export function scan() {
   return found;
 }
 
+const JOBS_DIR = path.join(ROOT, 'apps/api/src/lib/jobs');
+const stripComments = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+function setFrom(src, name) {
+  const m = new RegExp(`export const ${name}[^=]*= new Set\\(\\[([\\s\\S]*?)\\]\\)`).exec(src);
+  if (!m) throw new Error(`not-on-do: ${name} not found in job-data.ts`);
+  return new Set([...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
+}
+
+/** The jobs a DO store cannot use today, read from the runtime's own tables. */
+export function jobRefusals(dir = JOBS_DIR) {
+  const data = stripComments(fs.readFileSync(path.join(dir, 'job-data.ts'), 'utf8'));
+  const map = stripComments(fs.readFileSync(path.join(dir, 'jobs-map.ts'), 'utf8'));
+  const flag = stripComments(fs.readFileSync(path.join(dir, 'alarm-flag.ts'), 'utf8'));
+  const none = setFrom(data, 'NO_STORE_DATA_JOBS');
+  const ported = setFrom(data, 'PORTED_JOBS');
+  const money = setFrom(data, 'MONEY_JOBS');
+  const ready = setFrom(flag, 'ALARM_READY');
+  const entries = [...map.matchAll(/(?:^|\n)\s{2}'?([a-z0-9-]+)'?:\s*\{([^}]*)\}/g)].map(m => ({
+    id: m[1],
+    cron: /trigger:\s*'cron'/.test(m[2]),
+    alarm: /alarm:\s*true/.test(m[2]),
+  }));
+  const unported = entries.filter(e => !none.has(e.id) && !ported.has(e.id)).map(e => e.id);
+  return {
+    jobsRefused: unported.filter(id => money.has(id)).sort(),
+    jobsAccepted: unported.filter(id => !money.has(id)).sort(),
+    // a ported cron sweep serves a DO store only on that store's alarm
+    sweepSkips: entries
+      .filter(e => ported.has(e.id) && e.cron && !(e.alarm && ready.has(e.id)))
+      .map(e => e.id)
+      .sort(),
+    moneyNotInMap: [...money].filter(id => !entries.some(e => e.id === id)).sort(),
+  };
+}
+
 export function readManifest() {
   return JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 }
 
-/** The gate is open only when no code path refuses and no flow is Postgres-only. */
+/** The gate is open only when no code path refuses, no flow is Postgres-only, no money job is refused and no sweep is skipped. */
 export function gateState(manifest = readManifest()) {
-  const open = manifest.refusals.length === 0 && manifest.postgresOnly.length === 0;
-  return { open, refusals: manifest.refusals.length, postgresOnly: manifest.postgresOnly.length };
+  const jobsRefused = (manifest.jobsRefused ?? []).length;
+  const sweepSkips = (manifest.sweepSkips ?? []).length;
+  const open =
+    manifest.refusals.length === 0 &&
+    manifest.postgresOnly.length === 0 &&
+    jobsRefused === 0 &&
+    sweepSkips === 0;
+  return {
+    open,
+    refusals: manifest.refusals.length,
+    postgresOnly: manifest.postgresOnly.length,
+    jobsRefused,
+    jobsAccepted: (manifest.jobsAccepted ?? []).length,
+    sweepSkips,
+  };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

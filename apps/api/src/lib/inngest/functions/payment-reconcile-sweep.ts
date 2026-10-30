@@ -1,10 +1,10 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
+import { storeNameOf, sweepStoresDb, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
 import { sendAlert } from '../../../services/alerts.service';
-import { recordPaymentEvent } from '../../../services/payment-event.service';
+import { recordPaymentEventForStore } from '../../../services/payment-event.service';
 
 /**
  * Payment/order state reconciliation sweep (adversarial audit P2, Task 9).
@@ -42,32 +42,36 @@ interface SweepStep {
 
 /** Extracted handler — testable in isolation (mirrors the other sweeps). */
 export async function handlePaymentReconcileSweep(
-  step: SweepStep
+  step: SweepStep,
+  event?: { data?: unknown }
 ): Promise<{ scanned: number; alerted: number }> {
   const floor = new Date(Date.now() - RECENCY_HOURS * 3_600_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
+  // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
   const mismatches = await stepRunUnlessEmpty(step, 'find-captured-on-cancelled', () =>
-    // `payments` is scoped through its order, so the scan runs store by store
-    // (each in its own tenant scope) and is cut to the same global ceiling.
-    acrossStoresFlat(() =>
-      prisma.payment.findMany({
-        where: {
-          status: 'completed',
-          order: { status: 'cancelled' },
-          OR: [{ updatedAt: { gt: floor } }, { order: { updatedAt: { gt: floor } } }],
-        },
-        select: {
-          id: true,
-          orderId: true,
-          provider: true,
-          amount: true,
-          currency: true,
-          order: { select: { storeId: true, store: { select: { name: true } } } },
-        },
-        take: SWEEP_TAKE,
-      })
-    ).then(rows => rows.slice(0, SWEEP_TAKE))
+    // `payments` is scoped through its order, so the scan runs store by store and is cut to the same global ceiling.
+    sweepStoresDb(event, {
+      fetch: (storeId, db) =>
+        db.payment.findMany({
+          where: {
+            status: 'completed',
+            order: { storeId, status: 'cancelled' },
+            OR: [{ updatedAt: { gt: floor } }, { order: { updatedAt: { gt: floor } } }],
+          },
+          select: {
+            id: true,
+            orderId: true,
+            provider: true,
+            amount: true,
+            currency: true,
+            order: { select: { storeId: true } },
+          },
+          take: SWEEP_TAKE,
+        }),
+      orderKey: () => 0,
+      take: SWEEP_TAKE,
+    })
   );
 
   if (mismatches.length === 0) return { scanned: 0, alerted: 0 };
@@ -78,16 +82,15 @@ export async function handlePaymentReconcileSweep(
       try {
         // Durable alert-once dedupe: the reconciliation PaymentEvent written
         // below marks this payment as already reported.
-        const alreadyReported = await withStore(p.order.storeId, tx =>
-          tx.paymentEvent.findFirst({
-            where: {
-              storeId: p.order.storeId,
-              paymentId: p.id,
-              eventType: 'reconciliation',
-              details: { path: ['reason'], equals: MISMATCH_REASON },
-            },
-            select: { id: true },
+        // The reason is matched here, not with a JSON-path filter: the Durable Object's read client does not take one.
+        const reported = await withStoreDb(p.order.storeId, db =>
+          db.paymentEvent.findMany({
+            where: { storeId: p.order.storeId, paymentId: p.id, eventType: 'reconciliation' },
+            select: { details: true },
           })
+        );
+        const alreadyReported = reported.some(
+          e => (e.details as { reason?: unknown } | null)?.reason === MISMATCH_REASON
         );
         if (alreadyReported) continue;
 
@@ -100,7 +103,7 @@ export async function handlePaymentReconcileSweep(
           scope: 'store',
           store: {
             id: p.order?.storeId ?? '',
-            name: p.order?.store?.name ?? p.order?.storeId ?? 'unknown',
+            name: await storeNameOf(p.order?.storeId ?? ''),
           },
           source: 'payment.completed_on_cancelled_order',
           title: 'payment.completed_on_cancelled_order',
@@ -112,18 +115,16 @@ export async function handlePaymentReconcileSweep(
             amountFils: p.amount,
           },
         });
-        await withStore(p.order.storeId, () =>
-          recordPaymentEvent({
-            paymentId: p.id,
-            storeId: p.order?.storeId ?? '',
-            orderId: p.orderId,
-            eventType: 'reconciliation',
-            fromStatus: 'completed',
-            toStatus: null,
-            provider: p.provider,
-            details: { reason: MISMATCH_REASON },
-          })
-        );
+        await recordPaymentEventForStore({
+          paymentId: p.id,
+          storeId: p.order?.storeId ?? '',
+          orderId: p.orderId,
+          eventType: 'reconciliation',
+          fromStatus: 'completed',
+          toStatus: null,
+          provider: p.provider,
+          details: { reason: MISMATCH_REASON },
+        });
         alerted += 1;
       } catch (err) {
         logger.error(
@@ -147,5 +148,5 @@ export const paymentReconcileSweep: JobDef = inngest.createFunction(
     // CADENCE NOTE (Neon autosuspend cost) applies to every DB-polling cron.
     triggers: [{ cron: '17 * * * *' }],
   },
-  async ({ step }) => handlePaymentReconcileSweep(step)
+  async ({ step, event }) => handlePaymentReconcileSweep(step, event)
 );

@@ -1,11 +1,10 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
 import { sendAlert } from '../../../services/alerts.service';
 import { handleStuckRefundClaimSweep } from './refund-claim-stuck-sweep';
-import { sweepAcrossStores } from '../../cross-store';
+import { sweepStoresDb } from '../../jobs/store-db';
 
 /**
  * Stuck refund-reversal sweep — scheduled safety net (hourly, Ruling INNGEST-BUDGET-1).
@@ -92,16 +91,18 @@ interface SweepStep {
  * The `createFunction` wrapper below just forwards `step`.
  */
 export async function handleRefundReversalStuckSweep(
-  step: SweepStep
+  step: SweepStep,
+  event?: { data?: unknown }
 ): Promise<{ swept: number; resent: number; alerted: number }> {
   const cutoff = new Date(Date.now() - REFUND_REVERSAL_STUCK_MINUTES * 60_000);
   const floorCutoff = new Date(Date.now() - REFUND_REVERSAL_MAX_AGE_MINUTES * 60_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckReversal[] = await stepRunUnlessEmpty(step, 'find-stuck-reversals', async () =>
-    sweepAcrossStores({
-      fetch: storeId =>
-        prisma.order.findMany({
+    // PORTED (Ruling CF-JOBS-3): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
+    sweepStoresDb(event, {
+      fetch: (storeId, db) =>
+        db.order.findMany({
           where: {
             storeId,
             refundReversedAt: null,
@@ -226,7 +227,8 @@ interface StuckPartialReturn {
 }
 
 export async function handlePartialReturnReversalSweep(
-  step: SweepStep
+  step: SweepStep,
+  event?: { data?: unknown }
 ): Promise<{ swept: number; resent: number; alerted: number }> {
   const cutoff = new Date(Date.now() - REFUND_REVERSAL_STUCK_MINUTES * 60_000);
 
@@ -234,9 +236,9 @@ export async function handlePartialReturnReversalSweep(
     step,
     'find-stuck-partial-returns',
     async () =>
-      sweepAcrossStores({
-        fetch: storeId =>
-          prisma.return.findMany({
+      sweepStoresDb(event, {
+        fetch: (storeId, db) =>
+          db.return.findMany({
             where: {
               storeId,
               reversalAppliedAt: null,
@@ -345,11 +347,11 @@ export const refundReversalStuckSweep: JobDef = inngest.createFunction(
     // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
     triggers: [{ cron: '7 * * * *' }], // hourly, off the :00 pile-up
   },
-  async ({ step }) => {
-    const reversals = await handleRefundReversalStuckSweep(step);
+  async ({ step, event }) => {
+    const reversals = await handleRefundReversalStuckSweep(step, event);
     // Same tick, same wake-up of the database — see refund-claim-stuck-sweep.ts.
-    const partials = await handlePartialReturnReversalSweep(step);
-    const claims = await handleStuckRefundClaimSweep(step);
+    const partials = await handlePartialReturnReversalSweep(step, event);
+    const claims = await handleStuckRefundClaimSweep(step, event);
     return {
       ...reversals,
       partialReturnsSwept: partials.swept,
