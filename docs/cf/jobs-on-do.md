@@ -46,3 +46,7 @@ Limits: a step already executing when the flag lands finishes; a freeze over 24 
 ## Non-money jobs, second half (Ruling CF-JOBS-4B)
 
 Ported: `review-request`, `review-moderation`, `invoice-email`, `order-capi-conversion`, `lifecycle-emails`, `lifecycle-first-order`, `wa-plan-sync` (alarm-ready sweep), and `ebda-ads-conversion` / `legal-notice-send` (class `none`: platform tables only). Store data goes through `storeDb` / `storeWriter` / the `orderStamp` DO op; the buyer of a DO order is attached from the platform with `customersById`. The 23 jobs still in `docs/cf/not-on-do.json` `jobsAccepted` are listed with their blockers in `docs/rulings/CF-JOBS-4B.md`.
+
+## Every job serves a DO store (Ruling CF-JOBS-4C)
+
+`docs/cf/not-on-do.json` `jobsAccepted` is empty. Platform-only jobs (`gsc-ingest-*`, `search-log-purge-daily`, `soft-deleted-user-anonymize-monthly`) are class `none`. Sweeps over store data run on the store's alarm (`gold-rate-*`, `instapay-receipt-retention-daily`, `order-anonymize-5y-monthly`, `queue-depth-watch`, `store-usage-snapshot`, `webhook-delivery-purge-daily`, `search-index-backstop`, the stock scans); the event jobs run on the store's event. `r2-orphan-sweep` is one global cron that reads each DO store's references from its DO and aborts before any delete if one cannot be read. Open items (Vectorize index for DO product search, the request-time R2 reference check, plan-limit counts) are listed in `docs/rulings/CF-JOBS-4C.md`.
