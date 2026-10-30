@@ -22,6 +22,14 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'billing-renewal-daily',
   // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-3)
   'payment-webhook-stuck-sweep',
+  // Ruling CF-JOBS-4: jobs that touch only platform (D1) rows or third parties, never a store-do table
+  // third-party erasure (OneSignal, PostHog) + the CI bucket in R2, keyed by ids the event carries
+  'account-erased-propagation',
+  'ci-erasure-second-pass',
+  // the store's public contact address + its owner (stores / users: platform rows) and the mail provider
+  'contact-form-send',
+  // custom-domain claims live on the `stores` row and at the domain provider
+  'domain-claim-sweep',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
@@ -49,6 +57,51 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'accounting-period-reconciliation',
   // the WhatsApp store events (incl. `customer.erased`): link, consent and order/cart/catalog reads follow the backend
   'wa-store-events',
+  // Ruling CF-JOBS-4 (non-money jobs): each reaches its store only through `storeDb` / `storeWriter` / `acrossStoresDb`
+  // (tests/unit/jobs-nonmoney-a-on-do.test.ts), event jobs on the store's own event, sweeps on its alarm
+  'bulk-import-orphan-cleanup',
+  'bulk-import-products',
+  'ai-autofill-cleanup',
+  'bulk-ai-balance-descriptions',
+  'bulk-ai-brand-facts',
+  'bulk-ai-categorize',
+  'bulk-ai-citation-copy',
+  'bulk-ai-excerpt',
+  'bulk-ai-faq-aeo',
+  'bulk-ai-howto-aeo',
+  'bulk-ai-image-alt',
+  'bulk-ai-llms-txt',
+  'bulk-ai-meta-aeo',
+  'bulk-ai-product-faqs',
+  'bulk-ai-recommendations',
+  'bulk-ai-revert-balance',
+  'bulk-ai-seo',
+  'bulk-ai-tags',
+  'bulk-ai-translate',
+  // reads through `storeDb` / `storeWriter` / `storeMoney`; event jobs run on the store's own event
+  'ai-autofill-product',
+  'ci-outcomes',
+  'analytics-rollup-on-demand',
+  'answer-engine-scan-on-demand',
+  // sweeps with a per-store alarm (`alarm: true` + ALARM_READY): the store's own alarm runs them for a DO store
+  'accounting-profit-anomaly-cron',
+  'analytics-daily-rollup',
+  // cross-store crons that cover every store from their ONE cron run (ALL_STORES_JOBS below)
+  'agent-write-denied-watch',
+  'ai-autofill-sweep',
+  'answer-engine-citation-scan-cron',
+]);
+
+/**
+ * Ported cron jobs whose single cron run covers EVERY store, Postgres and Durable Object alike (Ruling CF-JOBS-4): they list
+ * the stores with `allStoresDirectory` / `acrossAllStoresDb` (lib/jobs/store-db.ts) and reach each DO store through its DO.
+ * A watcher that ranks stores against each other, a leader-locked sweep with one shared AI quota and a weekly scan with one
+ * provider budget cannot be split into per-store alarms without losing the aggregate, so they are not "skipped sweeps".
+ */
+export const ALL_STORES_JOBS: ReadonlySet<string> = new Set([
+  'agent-write-denied-watch',
+  'ai-autofill-sweep',
+  'answer-engine-citation-scan-cron',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

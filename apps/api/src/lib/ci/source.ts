@@ -88,6 +88,13 @@ async function inStore<T>(
     : runInTenantContext(storeId, () => fn(repo.db, repo));
 }
 
+/** The store's CI-sharing switch: a platform (`stores`) row, read in a short Postgres scope for either backend. */
+async function readCiSharing(storeId: string): Promise<{ ciSharing: boolean } | null> {
+  return runInTenantContext(storeId, () =>
+    prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } })
+  );
+}
+
 export const prismaCiSource: CiSource = {
   async order(storeId, orderId) {
     return inStore(storeId, async (db, repo) => {
@@ -121,7 +128,7 @@ export const prismaCiSource: CiSource = {
             shipment: { select: { pickedUpAt: true, returnedAt: true } },
           },
         }),
-        prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } }),
+        readCiSharing(storeId),
       ]);
       if (!o) return null;
       const a = (o.shippingAddress ?? {}) as Record<string, unknown>;

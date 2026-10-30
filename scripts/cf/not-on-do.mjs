@@ -82,6 +82,13 @@ function setFrom(src, name) {
   return new Set([...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
 }
 
+/** Like `setFrom`, but an absent set is empty (a fixture without it, or a tree before it existed). */
+function optionalSetFrom(src, name) {
+  return new RegExp(`export const ${name}[^=]*= new Set`).test(src)
+    ? setFrom(src, name)
+    : new Set();
+}
+
 /** The jobs a DO store cannot use today, read from the runtime's own tables. */
 export function jobRefusals(dir = JOBS_DIR) {
   const data = stripComments(fs.readFileSync(path.join(dir, 'job-data.ts'), 'utf8'));
@@ -91,6 +98,8 @@ export function jobRefusals(dir = JOBS_DIR) {
   const ported = setFrom(data, 'PORTED_JOBS');
   const money = setFrom(data, 'MONEY_JOBS');
   const ready = setFrom(flag, 'ALARM_READY');
+  // cron jobs that cover every store from their one run (Ruling CF-JOBS-4) are not skipped sweeps
+  const allStores = optionalSetFrom(data, 'ALL_STORES_JOBS');
   const entries = [...map.matchAll(/(?:^|\n)\s{2}'?([a-z0-9-]+)'?:\s*\{([^}]*)\}/g)].map(m => ({
     id: m[1],
     cron: /trigger:\s*'cron'/.test(m[2]),
@@ -102,7 +111,9 @@ export function jobRefusals(dir = JOBS_DIR) {
     jobsAccepted: unported.filter(id => !money.has(id)).sort(),
     // a ported cron sweep serves a DO store only on that store's alarm
     sweepSkips: entries
-      .filter(e => ported.has(e.id) && e.cron && !(e.alarm && ready.has(e.id)))
+      .filter(
+        e => ported.has(e.id) && e.cron && !(e.alarm && ready.has(e.id)) && !allStores.has(e.id)
+      )
       .map(e => e.id)
       .sort(),
     moneyNotInMap: [...money].filter(id => !entries.some(e => e.id === id)).sort(),

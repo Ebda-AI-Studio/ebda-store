@@ -1,58 +1,12 @@
 {
-  "apps/api/src/lib/inngest/functions/bulk-ai-aeo.ts": {
-    "category": 4,
-    "product": 4
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-balance-descriptions.ts": {
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-categorize.ts": {
-    "category": 1,
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-excerpt.ts": {
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-geo.ts": {
-    "category": 2,
-    "product": 3
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-image-alt.ts": {
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-product-faqs.ts": {
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-recommendations.ts": {
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-revert-balance.ts": {
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-seo.ts": {
-    "category": 2,
-    "product": 2
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-tags.ts": {
-    "product": 2,
-    "tag": 1
-  },
-  "apps/api/src/lib/inngest/functions/bulk-ai-translate.ts": {
-    "product": 2,
-    "category": 2
-  },
-  "apps/api/src/lib/inngest/functions/wa-store-events.ts": {
-    "abandonedCart": 1,
-    "product": 2
+  "apps/api/src/lib/inngest/functions/queue-depth-watch.ts": {
+    "bulkAiJob": 2
   },
   "apps/api/src/lib/savepoint.ts": {
     "cart": 1
   },
   "apps/api/src/lib/wa/consent.ts": {
     "cart": 1
-  },
-  "apps/api/src/routes/admin-search.routes.ts": {
-    "product": 1
   },
   "apps/api/src/routes/admin.routes.ts": {
     "product": 3
@@ -111,11 +65,6 @@
     "product": 1,
     "productVariant": 1
   },
-  "apps/api/src/services/accounting/analytics-rollup.service.ts": {
-    "cart": 1,
-    "cartItem": 1,
-    "abandonedCart": 2
-  },
   "apps/api/src/services/accounting/assert-store-owns.ts": {
     "product": 1,
     "productVariant": 1,
@@ -135,21 +84,13 @@
     "productVariant": 1,
     "product": 1
   },
-  "apps/api/src/services/ai-autofill.service.ts": {
-    "product": 5,
-    "category": 2
-  },
   "apps/api/src/services/analytics.service.ts": {
     "product": 2,
     "productCategory": 1
   },
-  "apps/api/src/services/answer-engine/prompts.ts": {
-    "category": 1,
-    "product": 1
-  },
   "apps/api/src/services/auth.service.ts": {
-    "abandonedCart": 1,
-    "campaignRecipient": 1
+    "campaignRecipient": 1,
+    "abandonedCart": 1
   },
   "apps/api/src/services/barcode-scan.service.ts": {
     "product": 3,
@@ -165,7 +106,6 @@
     "product": 2
   },
   "apps/api/src/services/campaign.service.ts": {
-    "abandonedCart": 1,
     "newsletterSubscriber": 1
   },
   "apps/api/src/services/cart.service.ts": {

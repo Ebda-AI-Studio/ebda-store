@@ -26,6 +26,8 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'stock-reorder-scan-cron',
   'warehouse-reconcile-sweep-cron',
   'wholesale-pending-nudge-cron',
+  // Ruling CF-JOBS-4
+  'bulk-import-orphan-cleanup',
   // money sweeps (Ruling CF-JOBS-3)
   'payment-reconcile-sweep',
   'payment-abandonment-sweep',
