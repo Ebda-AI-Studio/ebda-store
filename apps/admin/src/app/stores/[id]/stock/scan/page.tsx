@@ -465,6 +465,8 @@ function PickMode({ storeId }: { storeId: string }) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [pickResult, setPickResult] = useState<PickResult | null>(null);
   const [pickErr, setPickErr] = useState<string | null>(null);
+  // Mismatch warning: the scan was a real item but the wrong one for this order (or a surplus unit).
+  const [pickWarn, setPickWarn] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
 
   const loadOrder = async () => {
@@ -505,6 +507,7 @@ function PickMode({ storeId }: { storeId: string }) {
       setCameraOpen(false);
       setBarcode(bc);
       setPickErr(null);
+      setPickWarn(null);
       setPickResult(null);
       setPicking(true);
       const { data, error } = await apiPost<PickResult>(
@@ -512,7 +515,16 @@ function PickMode({ storeId }: { storeId: string }) {
         { barcode: bc, qty: 1 }
       );
       setPicking(false);
-      if (error || !data) {
+      if (error?.code === 'NOT_IN_ORDER' || error?.code === 'ALREADY_PICKED') {
+        const d = error.details ?? {};
+        const name = String((locale === 'ar' ? d.productNameAr : null) ?? d.productName ?? bc);
+        setPickWarn(
+          t(error.code === 'NOT_IN_ORDER' ? 'picking.notInOrder' : 'picking.alreadyPicked', {
+            name,
+          })
+        );
+        setBarcode('');
+      } else if (error || !data) {
         setPickErr(scanErrorText(t, error, 'picking.itemNotFound'));
       } else {
         setPickResult(data);
@@ -524,7 +536,7 @@ function PickMode({ storeId }: { storeId: string }) {
         if (progress) setOrder(progress);
       }
     },
-    [order, storeId, t]
+    [order, storeId, t, locale]
   );
 
   return (
@@ -673,6 +685,15 @@ function PickMode({ storeId }: { storeId: string }) {
                 </div>
               )}
               {pickErr && <p className="text-sm text-destructive-ink">{pickErr}</p>}
+              {pickWarn && (
+                <p
+                  role="alert"
+                  data-testid="pick-mismatch-warning"
+                  className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm font-medium text-destructive-ink"
+                >
+                  {pickWarn}
+                </p>
+              )}
             </div>
           )}
         </div>

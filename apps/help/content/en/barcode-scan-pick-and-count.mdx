@@ -1,0 +1,37 @@
+---
+title: Scan to pick orders and count stock
+description: Use your phone to pick an order item by item and to count the shelf, with warnings for a wrong item and a clear record of every change.
+section: Selling
+order: 20
+appPath: /stores
+keywords: barcode scan pick order picking packing cycle count stock take audit inventory variance adjustment mismatch warning phone camera
+---
+
+The **Scan** page (Stock, then Scan) has three modes: Receive, Pick and Count. It belongs to the **Barcode scanning** feature, which is part of the Enterprise plan. Products need a barcode first: see Product barcodes and labels.
+
+## Pick an order
+
+1. Choose **Pick** and type the order number.
+2. Scan each item as you take it off the shelf, with the camera or by typing the code. Every scan adds one unit and the list shows `picked / ordered` for each line.
+3. When every line is complete the order shows **All items in this order are picked**.
+
+If the same product appears on two lines (for example two names embroidered on the same abaya), the scan fills the first line that is still short.
+
+<Callout title="Wrong item warning">
+  If you scan an item that is not in this order, a red warning names it and nothing is recorded. If
+  you scan a unit past the ordered quantity, you are told the item is already fully picked and the
+  count does not move. A code the store does not know at all says so separately.
+</Callout>
+
+## Count the shelf
+
+1. Choose **Count** and start a session (add a note such as "Shelf A, Friday").
+2. Scan each item and type how many you counted. Scanning it again replaces the number.
+3. Each line shows the count, the system quantity and the **variance** (counted minus system).
+4. **Close** the session when the shelf is done, then **Reconcile**.
+
+Reconcile sets the stock of every line with a variance to the number you counted. It is posted as one stock adjustment of type cycle count, so the change appears in the stock history and the accounting journal, and a record of who reconciled the session is kept. Lines with no variance change nothing.
+
+- Reconcile once: pressing it twice, or from two devices, still creates a single adjustment.
+- If posting fails, the session goes back to closed and nothing is changed, so you can try again.
+- Sales that happen between your scan and the reconcile are kept: reconcile applies the difference you measured (counted minus system at the moment of the scan), not the counted total.

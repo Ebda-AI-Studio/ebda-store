@@ -6578,7 +6578,8 @@
       "picking": {
         "success": "تم تجهيز {qty} من {name}. التقدم: {picked}/{total}.",
         "itemNotFound": "هذا الباركود لا يطابق أي صنف في الطلب.",
-        "alreadyPicked": "تم تجهيز هذا الصنف بالكامل.",
+        "notInOrder": "{name} مش في الطلب ده. رجّعه مكانه.",
+        "alreadyPicked": "{name} اتجهّز بالكامل. ماتضيفش وحدة زيادة.",
         "orderComplete": "تم تجهيز جميع أصناف الطلب.",
         "errorGeneric": "فشل تسجيل التجهيز. حاول مجدداً."
       },

@@ -6578,7 +6578,8 @@
       "picking": {
         "success": "Picked {qty} of {name}. Progress: {picked}/{total}.",
         "itemNotFound": "This barcode does not match any item in the order.",
-        "alreadyPicked": "This item is already fully picked.",
+        "notInOrder": "{name} is not in this order. Put it back.",
+        "alreadyPicked": "{name} is already fully picked. Do not add another.",
         "orderComplete": "All items in this order are picked.",
         "errorGeneric": "Failed to record pick. Try again."
       },
