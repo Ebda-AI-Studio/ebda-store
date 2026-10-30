@@ -87,7 +87,11 @@ describe('SEARCH_EMBED_STORE_DAILY_CAP=0 kill switch (SEARCH-T11-8)', () => {
     };
     const r = await handleSearchProductIndex({ event: { data: { storeId: STORE } }, step });
     expect(r).toMatchObject({ capped: true });
-    expect(steps).toEqual(['is-do-store', 'plan-0']); // the D1 backend flag read is its own step; still ONE plan step
+    // The property is "ONE plan step and no embed or write step". The exact step list is NOT the property: pinning it
+    // (`['plan-0']`, then `['is-do-store', 'plan-0']`) failed this test whenever an unrelated memoized step (the D1 backend
+    // flag read, CF-R6B-1) was added to the handler, and passed again once the list was edited - a "flake" that was a coupling.
+    expect(steps.filter(s => s.startsWith('plan-'))).toEqual(['plan-0']);
+    expect(steps.filter(s => /^(embed|write|isolate)/.test(s))).toEqual([]);
     expect(embed).not.toHaveBeenCalled();
   });
 
