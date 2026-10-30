@@ -3,7 +3,7 @@
  * (the static `checkMutation` check alone, then the write on an UNGUARDED client, which is exactly what `runWrites` did) lets
  * the write through and the rows land; the NEW `runWrites` refuses it as an answer and writes nothing.
  *
- * Classes (found in the FWB twin's DO write RPC, checked here against Ebda's):
+ * Classes (found in a sibling product's DO write RPC, checked here against Ebda's):
  *  1. a parser differential: the guard read the args with its own key scan, the executor reads them by relation. A write to a
  *     money/stock model that the scan does not name (a stock table reached through a writable parent) or that sits past the
  *     scan's depth cut-off was never validated.
