@@ -78,7 +78,7 @@ import {
   type ImportVariantRow,
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
-import { orderStampOp } from './job-ops-b';
+import { lastPaidSalesOp, orderAnonymizeOp, orderStampOp, usageCountsOp } from './job-ops-b';
 import { abandonStampOp, periodGlCreditsOp, recordPaymentEventOp, trialBalanceOp } from './job-ops';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -157,7 +157,10 @@ export type MoneyOpName =
   | 'importVariants'
   | 'barcodeFill'
   | 'barcodeEnsure'
-  | 'orderStamp';
+  | 'orderStamp'
+  | 'orderAnonymize'
+  | 'lastPaidSales'
+  | 'usageCounts';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -221,6 +224,9 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'barcodeFill',
   'barcodeEnsure',
   'orderStamp',
+  'orderAnonymize',
+  'lastPaidSales',
+  'usageCounts',
 ];
 
 const TABLE = '_money_ops';
@@ -540,6 +546,9 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
+  usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  lastPaidSales: (db, storeId, a) => lastPaidSalesOp(db, storeId, a),
+  orderAnonymize: (db, storeId, a) => orderAnonymizeOp(db, storeId, a),
   periodGlCredits: (db, storeId, a) => periodGlCreditsOp(db, storeId, a),
   /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */
   quoteOrder: (db, storeId, a) => {

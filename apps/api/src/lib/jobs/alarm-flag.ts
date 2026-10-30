@@ -39,6 +39,9 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   // Ruling CF-JOBS-4B (gold rate): alarm per DO store
   'gold-rate-feed-fetch',
   'gold-rate-staleness-watch',
+  // Ruling CF-JOBS-4B (data retention): receipts and orders are swept on the DO store's own alarm
+  'instapay-receipt-retention-daily',
+  'order-anonymize-5y-monthly',
 ]);
 
 function tokens(): string[] {

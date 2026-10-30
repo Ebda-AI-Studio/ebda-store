@@ -1,8 +1,8 @@
 import { InstapayReceiptService } from '../../../services/payment-providers/instapay-receipt.service';
 import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
-import { acrossOpts } from '../../jobs/store-scope';
-import { storeRepo } from '../../repo-factory';
+import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
+import { storeMoney, storeRepo } from '../../repo-factory';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -150,8 +150,12 @@ export const instapayReceiptRetention: JobDef = inngest.createFunction(
     retries: 1,
     triggers: [{ cron: '30 4 * * *' }],
   },
-  async ({ step }) => {
-    const out = await step.run('sweep', () => InstapayReceiptService.sweepRetention());
+  async ({ event, step }) => {
+    // an alarm run names its store (a DO store sweeps its own receipts); the cron sweeps the Postgres stores
+    const only = alarmStoreId(event);
+    const out = await step.run('sweep', () =>
+      InstapayReceiptService.sweepRetention(new Date(), only)
+    );
     logger.info(
       { images: out.images, scrubbed: out.scrubbed },
       'instapay-receipt-retention: completed'
@@ -264,28 +268,49 @@ export const orderAnonymizeAtFiveYears: JobDef = inngest.createFunction(
     retries: 2,
     triggers: [{ cron: '30 3 1 * *' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     const cutoff = new Date(Date.now() - ORDER_ANONYMIZE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+    // A store on its Durable Object scrubs its own orders on its alarm, in one statement (Ruling CF-JOBS-4B): the marker
+    // `{"anonymized":true}` makes a scrubbed order stop matching, so a second delivery finds nothing left.
+    const only = alarmStoreId(event);
+    if (only && (await storeRepo(only)).backend === 'do') {
+      const out = await step.run('anonymize-do', async () => {
+        const money = await storeMoney(only);
+        if (!money) throw new Error(`order-anonymize-5y: no money client for DO store ${only}`);
+        return money.orderAnonymize({
+          cutoffMs: cutoff.getTime(),
+          limit: ORDER_ANONYMIZE_BATCH_CAP,
+        });
+      });
+      logger.info(
+        { cutoff, storeId: only, ...out },
+        'order-anonymize-5y: completed (durable object)'
+      );
+      return { anonymized: out.anonymized, failed: 0 };
+    }
 
     // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
     const candidates = await step.run('find-candidates', async () =>
       (
-        await acrossStoresFlat(storeId =>
-          prisma.order.findMany({
-            where: {
-              storeId,
-              createdAt: { lt: cutoff },
-              NOT: {
-                shippingAddress: {
-                  path: ['anonymized'],
-                  equals: true,
+        await acrossStoresFlat(
+          storeId =>
+            prisma.order.findMany({
+              where: {
+                storeId,
+                createdAt: { lt: cutoff },
+                NOT: {
+                  shippingAddress: {
+                    path: ['anonymized'],
+                    equals: true,
+                  },
                 },
               },
-            },
-            select: { id: true, storeId: true, createdAt: true },
-            take: ORDER_ANONYMIZE_BATCH_CAP,
-            orderBy: { createdAt: 'asc' },
-          })
+              select: { id: true, storeId: true, createdAt: true },
+              take: ORDER_ANONYMIZE_BATCH_CAP,
+              orderBy: { createdAt: 'asc' },
+            }),
+          acrossOpts(event)
         )
       )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())

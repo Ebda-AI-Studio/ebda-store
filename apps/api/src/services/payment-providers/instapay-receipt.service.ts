@@ -32,7 +32,14 @@ import {
   type InstapayReceiptView,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
-import { storeDb, storeMoney, type DoReceipt, type MoneyClient } from '../../lib/repo-factory';
+import {
+  storeDb,
+  storeMoney,
+  storeRepo,
+  type DoReceipt,
+  type MoneyClient,
+} from '../../lib/repo-factory';
+import { jobsOnDo } from '../../lib/jobs/do-guard';
 import {
   claimInstapayReference,
   releaseInstapayReference,
@@ -922,59 +929,67 @@ export class InstapayReceiptService {
    * Idempotent; per store, in the store's own scope.
    */
   static async sweepRetention(
-    now: Date = new Date()
+    now: Date = new Date(),
+    only?: string
   ): Promise<{ images: number; scrubbed: number }> {
     const day = 86_400_000;
     const imageCut = new Date(now.getTime() - 30 * day);
     const personalCut = new Date(now.getTime() - 180 * day);
-    const parts = await acrossStores(
-      async storeId => {
-        const imgs = await prisma.instapayReceipt.findMany({
-          where: {
-            storeId,
-            imageDeletedAt: null,
-            OR: [
-              { status: 'approved' },
-              { status: { in: ['rejected', 'voided'] }, reviewedAt: { lt: imageCut } },
-              { status: 'draft', createdAt: { lt: imageCut } },
-              // proof nobody ever decided on (an order cancelled outside confirm / reject, a claim left pending)
-              { status: 'submitted', submittedAt: { lt: new Date(now.getTime() - 90 * day) } },
-              // an erasure scrubbed it but its immediate delete missed (the delete runs after the erasure commits)
-              { personalScrubbedAt: { not: null } },
-            ],
-          },
-          select: { id: true },
-          take: 500,
-        });
-        let images = 0;
-        for (const r of imgs) if (await this.deleteImage(storeId, r.id)) images++;
-        const scrub = await prisma.instapayReceipt.updateMany({
-          where: {
-            storeId,
-            personalScrubbedAt: null,
-            OR: [
-              {
-                status: { in: ['approved', 'rejected', 'voided'] },
-                reviewedAt: { lt: personalCut },
+    // An ALARM run (`only` = the store) sweeps that one store on the backend it lives on; a cron run sweeps the Postgres stores.
+    const onlyIsDo = only ? (await storeRepo(only)).backend === 'do' : false;
+    const parts = onlyIsDo
+      ? []
+      : await acrossStores(
+          async storeId => {
+            const imgs = await prisma.instapayReceipt.findMany({
+              where: {
+                storeId,
+                imageDeletedAt: null,
+                OR: [
+                  { status: 'approved' },
+                  { status: { in: ['rejected', 'voided'] }, reviewedAt: { lt: imageCut } },
+                  { status: 'draft', createdAt: { lt: imageCut } },
+                  // proof nobody ever decided on (an order cancelled outside confirm / reject, a claim left pending)
+                  { status: 'submitted', submittedAt: { lt: new Date(now.getTime() - 90 * day) } },
+                  // an erasure scrubbed it but its immediate delete missed (the delete runs after the erasure commits)
+                  { personalScrubbedAt: { not: null } },
+                ],
               },
-              { status: 'submitted', submittedAt: { lt: personalCut } },
-            ],
+              select: { id: true },
+              take: 500,
+            });
+            let images = 0;
+            for (const r of imgs) if (await this.deleteImage(storeId, r.id)) images++;
+            const scrub = await prisma.instapayReceipt.updateMany({
+              where: {
+                storeId,
+                personalScrubbedAt: null,
+                OR: [
+                  {
+                    status: { in: ['approved', 'rejected', 'voided'] },
+                    reviewedAt: { lt: personalCut },
+                  },
+                  { status: 'submitted', submittedAt: { lt: personalCut } },
+                ],
+              },
+              data: SCRUBBED_PERSONAL_FIELDS(now),
+            });
+            return { images, scrubbed: scrub.count };
           },
-          data: SCRUBBED_PERSONAL_FIELDS(now),
-        });
-        return { images, scrubbed: scrub.count };
-      },
-      {
-        onStoreError: (storeId, err) =>
-          logger.error({ err, storeId }, '[instapay-receipt] retention failed'),
-      }
-    );
+          {
+            onStoreError: (storeId, err) =>
+              logger.error({ err, storeId }, '[instapay-receipt] retention failed'),
+            ...(only ? { storeIds: [only] } : {}),
+          }
+        );
     const total = parts.reduce(
       (a, p) => ({ images: a.images + p.value.images, scrubbed: a.scrubbed + p.value.scrubbed }),
       { images: 0, scrubbed: 0 }
     );
     // stores on their Durable Object: `acrossStores` skips them, their receipts are swept in the DO (Ruling INSTAPAY-DO-1)
-    for (const storeId of enabledStoreIds()) {
+    // With jobs on the DO, a DO store's own alarm sweeps it (Ruling CF-JOBS-4B); without, the cron still covers it from here.
+    const doStores = only ? (onlyIsDo ? [only] : []) : jobsOnDo() ? [] : [...enabledStoreIds()];
+    for (const storeId of doStores) {
       try {
         const money = await storeMoney(storeId);
         if (!money) continue;

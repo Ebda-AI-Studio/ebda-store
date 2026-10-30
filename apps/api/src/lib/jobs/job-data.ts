@@ -29,6 +29,9 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   // Ruling CF-JOBS-4B: GSC ingest reads the platform Store row and writes GscDailyMetric (analytics target, Postgres): no DO table is opened, so one cron serves every store
   'gsc-ingest-cron',
   'gsc-ingest-on-demand',
+  // Ruling CF-JOBS-4B (data retention): receipts and orders are swept on the DO store's own alarm
+  'search-log-purge-daily',
+  'soft-deleted-user-anonymize-monthly',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
@@ -72,6 +75,9 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'eta-receipt-enqueue',
   'eta-receipt-submit',
   'eta-receipt-redrive',
+  // Ruling CF-JOBS-4B (data retention): receipts and orders are swept on the DO store's own alarm
+  'instapay-receipt-retention-daily',
+  'order-anonymize-5y-monthly',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([
