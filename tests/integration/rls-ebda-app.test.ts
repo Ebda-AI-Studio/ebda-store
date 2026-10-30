@@ -86,6 +86,8 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
   billing_webhook_events: 'provider-event dedupe ledger (no store_id, no tenant data)',
   billing_referrals: 'referral link between two stores (no store_id column; platform billing data)',
   billing_grants: 'append-only free-month grant ledger (no store_id column; platform billing data)',
+  ci_insights:
+    'platform-wide CI findings over k-anonymous cohort cells; no store_id, no identifier (Ruling CI-9)',
 };
 
 let owner: AppPrismaClient;

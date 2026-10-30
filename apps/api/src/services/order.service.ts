@@ -89,6 +89,7 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { sendCartRecoveredToCi } from '../lib/ci/emit';
 import { assertOrderAllowed, noteOrderCreated } from './plan-limit.service';
 import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
@@ -2340,6 +2341,8 @@ export class OrderService {
                 },
               });
               logger.info(`Abandoned cart ${abandonedCart.id} recovered by order ${newOrder.id}`);
+              // CI-13: after COMMIT, so the planner sees the recovered row and the order.
+              await sendCartRecoveredToCi(storeId, abandonedCart.id, newOrder.id);
             }
           } catch (err) {
             logger.error({ err }, 'Abandoned cart recovery detection failed');

@@ -726,6 +726,44 @@ export const categories = sqliteTable('categories', {
   deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
 });
 
+export const ciHintLogs = sqliteTable('ci_hint_logs', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  orderId: text('order_id').notNull(),
+  feature: text('feature').notNull(),
+  band: text('band').notNull(),
+  source: text('source').notNull(),
+  n: integer('n').notNull().default(0),
+  predictedRate: real('predicted_rate'),
+  outcome: text('outcome'),
+  outcomeAt: integer('outcome_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const ciStoreGates = sqliteTable('ci_store_gates', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  feature: text('feature').notNull(),
+  band: text('band').notNull(),
+  predictedRate: real('predicted_rate').notNull(),
+  actualRate: real('actual_rate').notNull(),
+  resolved: integer('resolved').notNull(),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const codRemittances = sqliteTable('cod_remittances', {
   id: text('id')
     .primaryKey()

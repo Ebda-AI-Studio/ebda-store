@@ -22,6 +22,7 @@ function order(over: Partial<CiOrderFacts> = {}): CiOrderFacts {
     id: ORDER,
     storeId: STORE,
     totalMinor: 150000,
+    shippingMinor: 6000,
     currency: 'EGP',
     channel: 'web',
     status: 'pending',
@@ -31,7 +32,14 @@ function order(over: Partial<CiOrderFacts> = {}): CiOrderFacts {
     phoneE164: PHONE,
     area: { areaKey: 'EG-C-nasr-city', level: 'district' },
     payments: [
-      { provider: 'cod', method: null, status: 'cod_pending', paidAt: null, failureReason: null },
+      {
+        id: 'p1',
+        provider: 'cod',
+        method: null,
+        status: 'cod_pending',
+        paidAt: null,
+        failureReason: null,
+      },
     ],
     transitions: [],
     shipment: null,
@@ -70,6 +78,8 @@ function src(
     priorOrdersByBuyer: vi.fn(async () => 0),
     stampOrder: vi.fn(async () => undefined),
     storeCiSharing: vi.fn(async () => false),
+    abandonedCart: vi.fn(async () => null),
+    storeSetup: vi.fn(async () => null),
   } as never;
 }
 const ctx = (s: CiSource) => ({ source: s, secret: SECRET });
@@ -164,7 +174,11 @@ describe('order status changes', () => {
       status: 'confirmed',
     });
     expect(types(out)).toEqual(['order.cod_confirmed']);
-    expect(out[0]!.data).toEqual({ confirmedVia: 'call', minutesToConfirm: 45 });
+    expect(out[0]!.data).toEqual({
+      confirmedVia: 'call',
+      minutesToConfirm: 45,
+      areaKey: 'EG-C-nasr-city',
+    });
   });
 
   it('a COD outcome that arrived from WhatsApp is NOT re-emitted (WhatsApp already did)', async () => {
@@ -205,7 +219,11 @@ describe('order status changes', () => {
     });
     expect(types(out)).toEqual(['order.cancelled', 'order.cod_unconfirmed']);
     expect(out[0]!.data).toMatchObject({ byActor: 'merchant' });
-    expect(out[1]!.data).toEqual({ confirmedVia: 'none', minutesToConfirm: null });
+    expect(out[1]!.data).toEqual({
+      confirmedVia: 'none',
+      minutesToConfirm: null,
+      areaKey: 'EG-C-nasr-city',
+    });
   });
 
   it('confirmed-then-cancelled, and a returned parcel, are NOT "unconfirmed"', async () => {
@@ -301,12 +319,15 @@ describe('shipments', () => {
       carrier: 'bosta',
       attemptNo: 1,
       reasonCode: 'customer_unreachable',
+      areaKey: 'EG-C-nasr-city',
     });
     expect(out[2]!.data).toEqual({
       carrier: 'bosta',
       codMinor: 150000,
       hoursSincePickup: 7,
       attempts: 1,
+      areaKey: 'EG-C-nasr-city',
+      shippingFeeMinor: 6000, // the order's real shipping fee, not the COD amount (CI-13)
     });
     expect(new Set(out.map(o => o.seed)).size).toBe(3);
   });
@@ -330,6 +351,8 @@ describe('shipments', () => {
       returnReasonRaw: 'Consignee refused',
       attempts: 2,
       hoursSincePickup: 9,
+      areaKey: 'EG-C-nasr-city',
+      shippingFeeMinor: 6000,
     });
   });
 

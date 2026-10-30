@@ -55,6 +55,7 @@ export type NavLabels = {
   platformTaxArchive: string;
   /** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
   platformPolicyUpdates: string;
+  platformCiInsights: string;
   /** Platform-wide settings, e.g. Ebda's own VAT (super_admin only) */
   platformSettings: string;
   // Super-admin store-scoped item
@@ -131,6 +132,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformPolicyUpdates,
       href: '/policy-updates',
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+    {
+      // Light-bulb icon — Customer Intelligence findings to accept or dismiss.
+      name: labels.platformCiInsights,
+      href: '/ci-insights',
+      icon: 'M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0012 3z M10 21h4',
     },
     {
       // Cog icon — platform-wide settings (Ebda's own VAT).

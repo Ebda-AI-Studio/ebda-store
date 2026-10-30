@@ -21,6 +21,7 @@ import { acrossStoresFlat, runInStoreScope, runInTenantContext, withStore } from
 import { storeRepo, type StoreReads, type StoreWrites } from '../lib/repo-factory';
 import { storefrontOrigin } from '@ebda/shared';
 import { inngest } from '../lib/inngest/client';
+import { CI_CART_REMINDER_EVENT } from '../lib/ci/events';
 import { awaitCampaignSendSlot } from '../lib/campaign-send-pacer';
 import { signCartRestoreToken } from '../lib/cart-restore-token';
 import { signSubscriberUnsubscribeToken } from '../lib/campaign-unsubscribe-token';
@@ -400,5 +401,18 @@ export async function deliverCartRecoveryEmail(
   }
   // Outside the try: if this write fails the step retries and Resend's idempotency key dedupes.
   await finish(storeId, ac.id, { emailStatus: 'sent', emailDetail: null, emailSentAt: new Date() });
+  // CI-13: the recovery email went out. A failed enqueue is logged and never undoes the send.
+  await inngest
+    .send({
+      name: CI_CART_REMINDER_EVENT,
+      data: {
+        storeId,
+        abandonedCartId: ac.id,
+        channel: 'email',
+        step: 1,
+        at: new Date().toISOString(),
+      },
+    })
+    .catch(err => logger.warn({ err, abandonedCartId: ac.id }, '[CartEmail] ci event not sent'));
   return { outcome: 'sent' };
 }

@@ -46,6 +46,8 @@ import { recordPaymentSettled } from './provider-verification.service';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { cfWaitUntil } from '../cf/bindings';
 import { assertValidTransition } from './order-status-machine';
+import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
+import { CI_PAYMENT_FAILED_EVENT } from '../lib/ci/events';
 import { claimOrderFailed, claimOrderPaid, lockPaymentRow } from './payment-state-claims';
 
 /**
@@ -417,6 +419,22 @@ export async function confirmPaymentFromProviderStatus(
       },
       data: { status },
     });
+
+    // CI-13: only the call that won the `unpaid -> failed` claim reports the outcome (never blocks the confirm).
+    await sendEventAfterCommit(
+      'ci-payment-failed',
+      {
+        name: CI_PAYMENT_FAILED_EVENT,
+        data: {
+          storeId: order.storeId,
+          orderId: order.id,
+          paymentId: payment.id,
+          kind: status,
+          at: new Date().toISOString(),
+        },
+      },
+      { ifUnhookable: 'send' }
+    );
 
     // Bust the admin aggregated-customers snapshot — this paymentStatus
     // transition changes the paid/failed counts it aggregates.

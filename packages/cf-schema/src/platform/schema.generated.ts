@@ -111,6 +111,26 @@ export const billingWebhookEvents = sqliteTable('billing_webhook_events', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const ciInsights = sqliteTable('ci_insights', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  dedupeKey: text('dedupe_key').notNull(),
+  metric: text('metric').notNull(),
+  cohort: text('cohort').notNull(),
+  finding: text('finding').notNull(),
+  findingAr: text('finding_ar').notNull(),
+  evidence: text('evidence', { mode: 'json' }).$type<unknown>().notNull(),
+  model: text('model').notNull().default('rules-v1'),
+  status: text('status').notNull().default('new'),
+  asOf: integer('as_of', { mode: 'timestamp_ms' }).notNull(),
+  decidedAt: integer('decided_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const entityIndex = sqliteTable(
   'entity_index',
   {

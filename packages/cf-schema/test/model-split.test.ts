@@ -24,16 +24,16 @@ describe('model-split.json', () => {
     }
   });
 
-  it('matches the plan totals (158 models: 26 d1 + 120 store-do + 7 analytics + 1 drop + 4 identity; WhatsAppTemplate dropped by #223; StoreWhatsAppLink and StoreWhatsAppConsent added by #218; EtaConnection and EtaReceipt added by the ETA e-receipt connector; StaffInvite added by the identity invitations, d1; QrScanDaily added by the QR scan counter, analytics; CatalogImportJob, CatalogImportFile and CatalogImportItem added by the catalogue import, store-do)', () => {
+  it('matches the plan totals (161 models: 27 d1 + 122 store-do + 7 analytics + 1 drop + 4 identity; WhatsAppTemplate dropped by #223; StoreWhatsAppLink and StoreWhatsAppConsent added by #218; EtaConnection and EtaReceipt added by the ETA e-receipt connector; StaffInvite added by the identity invitations, d1; QrScanDaily added by the QR scan counter, analytics; CatalogImportJob, CatalogImportFile and CatalogImportItem added by the catalogue import, store-do)', () => {
     const count = (t: string) => Object.values(split).filter(v => v.target === t).length;
-    expect(Object.keys(split).length).toBe(158);
+    expect(Object.keys(split).length).toBe(161);
     expect([
       count('d1'),
       count('store-do'),
       count('analytics'),
       count('drop'),
       count('identity'),
-    ]).toEqual([26, 120, 7, 1, 4]);
+    ]).toEqual([27, 122, 7, 1, 4]);
   });
 
   it('keeps identity out of the platform database (Ruling ID-1: owned by the ebda-identity track)', () => {

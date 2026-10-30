@@ -35,6 +35,8 @@ export async function deletePrefix(r2: R2BucketLike, prefix: string): Promise<nu
 export const ciBuyerIndexKey = (buyerKey: string) =>
   `index/buyer/${buyerKey.slice(0, 2)}/${buyerKey}.json`;
 export const ciStorePrefix = (storeId: string) => `outcomes/v1/store=${storeId}/`;
+/** CI-2 per-store day and window aggregates (Ruling CI-9): the merchant's own counters, deleted with the store. */
+export const ciStoreAggPrefix = (storeId: string) => `aggregates/v1/store=${storeId}/`;
 
 export async function gzipText(text: string): Promise<Uint8Array> {
   const s = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -93,11 +95,15 @@ export function ciSurface(ci: R2BucketLike): ErasureSurface {
     },
     async eraseSubject(s): Promise<SurfaceResult> {
       if (s.kind === 'merchant') {
-        const erased = await deletePrefix(ci, ciStorePrefix(s.storeId));
+        const erased =
+          (await deletePrefix(ci, ciStorePrefix(s.storeId))) +
+          (await deletePrefix(ci, ciStoreAggPrefix(s.storeId)));
         return {
           surface: 'customer-intelligence',
           erased,
-          remaining: (await listAll(ci, ciStorePrefix(s.storeId))).length,
+          remaining:
+            (await listAll(ci, ciStorePrefix(s.storeId))).length +
+            (await listAll(ci, ciStoreAggPrefix(s.storeId))).length,
         };
       }
       // Store-scoped (Ruling CI-8): a buyer key is a hash of a typed phone, so it never erases across

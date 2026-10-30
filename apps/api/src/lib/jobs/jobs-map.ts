@@ -208,6 +208,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'wa-store-events': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'ci-erasure-second-pass': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'ci-outcomes': { group: '5-integrations', kind: 'queue', trigger: 'event' },
+  'ci-aggregation-daily': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
+  'ci-hint-calibration-weekly': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
   'webhook-deliver': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'webhook-fanout': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'campaign-send': { group: '6-comms', kind: 'workflow', trigger: 'event' },

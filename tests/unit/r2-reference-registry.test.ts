@@ -80,6 +80,8 @@ const NOT_R2_REFERENCES: Record<string, string> = {
     'foreign key to catalog_import_files.id (a uuid), never a URL; the stored original lives in CatalogImportFile.storageKey in the private bucket',
   'CatalogImportItem.variants':
     'JSON array of { options, priceMinor, sku } read from a catalogue, validated to at most 30 entries by a CHECK; never a URL',
+  'CiInsight.evidence':
+    'JSON { n, stores, rate, baselineRate, bound, asOf } of a rule-based finding over cohort cells (Ruling CI-9), numbers and a date only, never a URL',
   'OrderItem.goldSnapshot':
     'JSON snapshot of how a gold line was priced (karat, weight, rate id and value, making charge, margin, step, unit price; goldLineSnapshotSchema, Ruling B5-17), never a URL',
   'GoldRate.feedReference':

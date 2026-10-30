@@ -168,6 +168,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       customerRfmSnapshots: 'CustomerRfmSnapshot',
       productDailyViews: 'ProductDailyView',
       qrScanDaily: 'QrScanDaily',
+      ciStoreGates: 'CiStoreGate',
+      ciHintLogs: 'CiHintLog',
       paymentEvents: 'PaymentEvent',
       orderEvents: 'OrderEvent',
       webhookEvents: 'WebhookEvent',
@@ -590,6 +592,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       affiliateReferrals: 'AffiliateReferral',
       events: 'OrderEvent',
       appliedPromotion: 'Promotion',
+      ciHintLogs: 'CiHintLog',
     },
   },
   {
@@ -1321,6 +1324,29 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
   {
     name: 'QrScanDaily',
     table: 'qr_scan_daily',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'CiInsight',
+    table: 'ci_insights',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'CiHintLog',
+    table: 'ci_hint_logs',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      order: 'Order',
+    },
+  },
+  {
+    name: 'CiStoreGate',
+    table: 'ci_store_gates',
     storeId: true,
     relations: {
       store: 'Store',
