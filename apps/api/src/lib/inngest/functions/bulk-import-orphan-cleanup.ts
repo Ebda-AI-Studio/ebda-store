@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, acrossStores } from '@ebda/database';
+import { storeWriter } from '../../repo-factory';
+import { acrossStoresDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -37,13 +38,17 @@ export const bulkImportOrphanCleanup: JobDef = inngest.createFunction(
     retries: 1,
     triggers: [{ cron: '0 */4 * * *' }],
   },
-  async () => {
+  async ({ event }) => {
     const orphanCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
 
     // `bulk_import_jobs` is store-scoped: sweep it store by store, each in its
     // own scope, and mark that store's orphans failed there.
-    const swept = await acrossStores(async storeId => {
-      const found = await prisma.bulkImportJob.findMany({
+    // Per store, on the store's backend (Ruling CF-JOBS-4): the cron run visits the Postgres stores, the alarm run of a
+    // DO store reads and marks that store's own Durable Object. The mark is a guarded `updateMany` on `running`, so a
+    // second delivery finds nothing left to mark.
+    const orphans: Array<{ id: string; storeId: string; startedAt: Date | null }> = [];
+    await acrossStoresDb(event, async (storeId, db) => {
+      const found = await db.bulkImportJob.findMany({
         where: {
           storeId,
           status: 'running',
@@ -52,8 +57,10 @@ export const bulkImportOrphanCleanup: JobDef = inngest.createFunction(
         select: { id: true, storeId: true, startedAt: true },
       });
       if (found.length > 0) {
-        await prisma.bulkImportJob.updateMany({
-          where: { id: { in: found.map(o => o.id) }, storeId },
+        await (
+          await storeWriter(storeId)
+        ).bulkImportJob.updateMany({
+          where: { id: { in: found.map(o => o.id) }, storeId, status: 'running' },
           data: {
             status: 'failed',
             errorMessage:
@@ -62,9 +69,8 @@ export const bulkImportOrphanCleanup: JobDef = inngest.createFunction(
           },
         });
       }
-      return found;
+      orphans.push(...found);
     });
-    const orphans = swept.flatMap(r => r.value);
 
     if (orphans.length === 0) {
       return { orphansSwept: 0 };

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { runInStoreScope, runInTenantContext } from '@ebda/database';
+import { runInStoreScope } from '@ebda/database';
+import { runInStoreCtx } from '../../jobs/store-db';
 import {
   applyFill,
   generateFill,
@@ -74,7 +75,7 @@ export async function handleAiAutofillProduct({
   if (!storeId || !productId) return;
 
   const plan = (await step.run('read', () =>
-    runInTenantContext(storeId, async () => {
+    runInStoreCtx(storeId, async () => {
       if (!(await isAutopilotEnabled(storeId))) {
         logger.info({ storeId, productId }, '[ai-autofill] autopilot off, skipping');
         return null;
