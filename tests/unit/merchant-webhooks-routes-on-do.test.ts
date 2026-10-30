@@ -85,7 +85,17 @@ vi.mock('@api/lib/repo-factory', () => {
       deleteMany: async () => ({ count: 0 }),
     },
   };
-  return { storeRepo: async () => ({ backend: 'do', db, writer }) };
+  const money = {
+    // the cap check and the insert are one DO section
+    webhookEndpointCreate: async (a: Row) => {
+      if (h.endpoints.filter(r => r.storeId === S1).length >= a.maxEndpoints)
+        throw Object.assign(new Error('Webhook endpoint limit reached'), { code: 'WEBHOOK_LIMIT' });
+      const row = { id: E2, storeId: S1, active: true, consecutiveFailures: 0, ...a };
+      h.endpoints.push(row);
+      return { id: E2 };
+    },
+  };
+  return { storeRepo: async () => ({ backend: 'do', db, writer, money }) };
 });
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
@@ -172,5 +182,14 @@ describe('merchant webhook routes on a DO store', () => {
       .send({ url: 'https://hooks.example.com/new', events: ['order.created'] });
     expect(made.status).toBe(201);
     expect(h.endpoints.map(e => e.id)).toContain(E2);
+  });
+
+  it('create is refused at the cap by the DO section, after the URL check', async () => {
+    for (let i = 0; i < 20; i++) h.endpoints.push({ id: `x${i}`, storeId: S1 });
+    const res = await request(app)
+      .post(BASE)
+      .send({ url: 'https://hooks.example.com/new', events: ['order.created'] });
+    expect(res.status).toBe(409);
+    expect(res.body.code ?? res.body.error?.code).toBe('WEBHOOK_LIMIT');
   });
 });

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { storeRwClient } from '../lib/jobs/store-db';
+import { storeRepo } from '../lib/repo-factory';
 import {
   DEFAULT_PLAN_SEEDS,
   PLAN_LIMIT_ERROR_CODE,
@@ -152,34 +153,58 @@ router.post(
     try {
       const { storeId } = req.params;
       const input = webhookEndpointCreateSchema.parse(req.body);
-      // Serialise concurrent creates of one store: count-then-insert would otherwise let two
-      // parallel requests both pass the cap (the lock is released at COMMIT).
-      // Postgres only: a store on its Durable Object has one writer, so there is no parallel pair to serialise
-      if (!(await storeRwClient(storeId)).onDo)
-        await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webhook-endpoints:${storeId}`}, 0))`;
-      const count = await (await wdb(storeId)).webhookEndpoint.count({ where: { storeId } });
-      if (count >= WEBHOOK_MAX_ENDPOINTS_PER_STORE) {
-        throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {
-          limit: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
-        });
-      }
+      // The URL is checked BEFORE any write, on either backend.
       await checkUrl(input.url);
       const { secret, hint } = newWebhookSecret();
-      const endpoint = await (
-        await wdb(storeId)
-      ).webhookEndpoint.create({
-        data: {
-          storeId,
-          url: input.url,
-          description: input.description || null,
-          events: input.events,
-          includeCustomer: input.includeCustomer,
-          secretEnc: encryption.encrypt(secret),
-          secretHint: hint,
-          createdBy: req.user?.userId ?? null,
-        },
-        select: ENDPOINT_SELECT,
-      });
+      const rw = await storeRwClient(storeId);
+      let endpoint;
+      if (rw.onDo) {
+        // A store on its Durable Object: the cap check and the insert are ONE DO section (`webhookEndpointCreate`). A count
+        // here followed by a create there would be two calls, and the DO serves other requests between two calls.
+        const money = (await storeRepo(storeId)).money;
+        if (!money) throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'No money client');
+        try {
+          const made = await money.webhookEndpointCreate({
+            maxEndpoints: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
+            url: input.url,
+            description: input.description || null,
+            events: input.events,
+            includeCustomer: input.includeCustomer,
+            secretEnc: encryption.encrypt(secret),
+            secretHint: hint,
+            createdBy: req.user?.userId ?? null,
+          });
+          endpoint = await endpointOr404(storeId, made.id);
+        } catch (err) {
+          if ((err as { code?: string })?.code === 'WEBHOOK_LIMIT')
+            throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {
+              limit: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
+            });
+          throw err;
+        }
+      } else {
+        // Postgres: serialise concurrent creates of one store with an advisory lock (released at COMMIT).
+        await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webhook-endpoints:${storeId}`}, 0))`;
+        const count = await rw.db.webhookEndpoint.count({ where: { storeId } });
+        if (count >= WEBHOOK_MAX_ENDPOINTS_PER_STORE) {
+          throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {
+            limit: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
+          });
+        }
+        endpoint = await rw.db.webhookEndpoint.create({
+          data: {
+            storeId,
+            url: input.url,
+            description: input.description || null,
+            events: input.events,
+            includeCustomer: input.includeCustomer,
+            secretEnc: encryption.encrypt(secret),
+            secretHint: hint,
+            createdBy: req.user?.userId ?? null,
+          },
+          select: ENDPOINT_SELECT,
+        });
+      }
       await audit(req, 'webhook_endpoint.created', endpoint.id);
       res.status(201).json({ success: true, data: { endpoint, secret } });
     } catch (error) {

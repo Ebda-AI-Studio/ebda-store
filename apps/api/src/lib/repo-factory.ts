@@ -481,6 +481,23 @@ export interface MoneyClient {
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** Create a webhook endpoint under the per-store cap, count and insert in ONE section (Ruling CF-JOBS-4B). */
+  webhookEndpointCreate(a: {
+    maxEndpoints: number;
+    url: string;
+    description: string | null;
+    events: string[];
+    includeCustomer: boolean;
+    secretEnc: string;
+    secretHint: string;
+    createdBy: string | null;
+  }): Promise<{ id: string }>;
+  /** One page of R2-URL-bearing column values of a table (orphan sweep); `missing` when the schema lacks the table or a column. */
+  r2References(a: { table: string; columns: string[]; after?: string; limit: number }): Promise<{
+    missing: boolean;
+    rows: Array<Record<string, string | null>>;
+    last: string | null;
+  }>;
   /** A draft expense (receipt OCR): accounts guarded, number claimed, OCR metadata in the same section (Ruling CF-JOBS-4B). */
   expenseDraft(
     a: Record<string, unknown>,
@@ -868,6 +885,8 @@ export function makeMoneyClient(
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    webhookEndpointCreate: a => call('webhookEndpointCreate', a),
+    r2References: a => call('r2References', a),
     expenseDraft: (a, key) => call('expenseDraft', a, key),
     periodGlCredits: a => call('periodGlCredits', a),
     accountTotals: a => call('accountTotals', a),

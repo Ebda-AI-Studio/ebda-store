@@ -186,3 +186,57 @@ describe('expenseDraft (Ruling CF-JOBS-4B)', () => {
     expect(() => op('expenseDraft', args(), 's2')).toThrow();
   });
 });
+
+describe('webhookEndpointCreate and r2References (Ruling CF-JOBS-4B)', () => {
+  const ep = (i: number) => ({
+    maxEndpoints: 2,
+    url: `https://h.example/${i}`,
+    description: null,
+    events: ['order.created'],
+    includeCustomer: false,
+    secretEnc: 'enc',
+    secretHint: 'abcd',
+    createdBy: 'u',
+  });
+
+  it('counts and inserts in one call: the cap holds, per store', () => {
+    const { op } = rig();
+    op('webhookEndpointCreate', ep(1));
+    op('webhookEndpointCreate', ep(2));
+    expect(() => op('webhookEndpointCreate', ep(3))).toThrow(/limit/);
+    expect(op('webhookEndpointCreate', ep(1), 's2')).toHaveProperty('id');
+  });
+
+  it('r2References pages a registry column, refuses odd identifiers and reports a missing table', () => {
+    const { raw, op } = rig();
+    raw.exec(
+      `INSERT INTO product_images (id, product_id, url, position) VALUES ('i1', 'sku', 'https://r2/a.jpg', 0), ('i2', 'sku', 'https://r2/b.jpg', 1)`
+    );
+    const p1 = op('r2References', { table: 'product_images', columns: ['url'], limit: 1 });
+    expect(p1).toMatchObject({
+      missing: false,
+      rows: [{ id: 'i1', url: 'https://r2/a.jpg' }],
+      last: 'i1',
+    });
+    const p2 = op('r2References', {
+      table: 'product_images',
+      columns: ['url'],
+      after: 'i1',
+      limit: 5,
+    });
+    expect(p2.rows).toHaveLength(1);
+    expect(p2.last).toBeNull();
+    expect(op('r2References', { table: 'no_such_table', columns: ['url'], limit: 5 }).missing).toBe(
+      true
+    );
+    expect(
+      op('r2References', { table: 'product_images', columns: ['nope'], limit: 5 }).missing
+    ).toBe(true);
+    expect(() =>
+      op('r2References', { table: 'orders; DROP TABLE orders', columns: ['url'], limit: 5 })
+    ).toThrow();
+    expect(() =>
+      op('r2References', { table: 'product_images', columns: ['url"--'], limit: 5 })
+    ).toThrow();
+  });
+});

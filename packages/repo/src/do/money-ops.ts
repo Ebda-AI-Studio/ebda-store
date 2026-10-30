@@ -83,7 +83,9 @@ import {
   lastPaidSalesOp,
   orderAnonymizeOp,
   orderStampOp,
+  r2ReferencesOp,
   usageCountsOp,
+  webhookEndpointCreateOp,
 } from './job-ops-b';
 import {
   abandonStampOp,
@@ -176,7 +178,9 @@ export type MoneyOpName =
   | 'orderAnonymize'
   | 'lastPaidSales'
   | 'usageCounts'
-  | 'expenseDraft';
+  | 'expenseDraft'
+  | 'r2References'
+  | 'webhookEndpointCreate';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -246,6 +250,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'lastPaidSales',
   'usageCounts',
   'expenseDraft',
+  'r2References',
+  'webhookEndpointCreate',
 ];
 
 const TABLE = '_money_ops';
@@ -566,6 +572,8 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  webhookEndpointCreate: (db, storeId, a) => webhookEndpointCreateOp(db, storeId, a),
+  r2References: (db, storeId, a) => r2ReferencesOp(db, storeId, a),
   expenseDraft: (db, storeId, a) => expenseDraftOp(db, storeId, a),
   lastPaidSales: (db, storeId, a) => lastPaidSalesOp(db, storeId, a),
   orderAnonymize: (db, storeId, a) => orderAnonymizeOp(db, storeId, a),

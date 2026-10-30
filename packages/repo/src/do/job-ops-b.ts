@@ -248,3 +248,99 @@ export function expenseDraftOp(
   );
   return { expenseId, expenseNumber };
 }
+
+const IDENT = /^[a-z][a-z0-9_]{0,63}$/;
+
+/**
+ * One page of the values that may hold an R2 URL (`r2-orphan-sweep`): `columns` of `table`, keyset-paged on `id`. The table and
+ * column names come from the Worker's reference registry, so they are never trusted as SQL: each must be a plain identifier AND
+ * exist in this store's schema (`pragma_table_info`). A table or column the schema does not have answers `missing`, so the caller
+ * can refuse to delete anything rather than call a live object an orphan. Values come back as stored text (JSON stays text; the
+ * Worker parses it with the same extractor the Postgres read uses). Store-scoped by the DO, read-only.
+ */
+export function r2ReferencesOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { missing: boolean; rows: Array<Record<string, string | null>>; last: string | null } {
+  const table = a.table;
+  const columns = a.columns;
+  if (typeof table !== 'string' || !IDENT.test(table))
+    throw new MoneyError('BAD_ARGS', 'table', 400);
+  if (
+    !Array.isArray(columns) ||
+    columns.length === 0 ||
+    columns.length > 16 ||
+    columns.some(c => typeof c !== 'string' || !IDENT.test(c))
+  )
+    throw new MoneyError('BAD_ARGS', 'columns', 400);
+  const after = typeof a.after === 'string' ? a.after : '';
+  const limit = intArg(a.limit, 'limit', 1, 2000);
+  const have = new Set(
+    db.all(`SELECT name FROM pragma_table_info('${table}')`, []).map(r => String(r.name))
+  );
+  if (!have.has('id') || (columns as string[]).some(c => !have.has(c)))
+    return { missing: true, rows: [], last: null };
+  const scoped = have.has('store_id');
+  const select = (columns as string[]).map(c => `CAST("${c}" AS TEXT) AS "${c}"`).join(', ');
+  const rows = db.all(
+    `SELECT "id" AS id, ${select} FROM "${table}" WHERE "id" > ?1 ${scoped ? 'AND "store_id" = ?3' : ''} ORDER BY "id" ASC LIMIT ?2`,
+    scoped ? [after, limit, storeId] : [after, limit]
+  ) as Array<Record<string, string | null>>;
+  return {
+    missing: false,
+    rows,
+    last: rows.length === limit ? String(rows[rows.length - 1].id) : null,
+  };
+}
+
+/**
+ * Create a merchant webhook endpoint under the per-store cap in ONE section: the count and the insert are the same synchronous
+ * run, so N concurrent creates (a Durable Object interleaves requests at every `await` between calls, never inside one) can never
+ * pass the cap together. The Worker validates the URL BEFORE this call and sends the secret already encrypted.
+ */
+export function webhookEndpointCreateOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { id: string } {
+  const max = intArg(a.maxEndpoints, 'maxEndpoints', 1, 1000);
+  const str = (v: unknown, what: string, maxLen: number, nullable = false): string | null => {
+    if (v == null && nullable) return null;
+    if (typeof v !== 'string' || v.length === 0 || v.length > maxLen)
+      throw new MoneyError('BAD_ARGS', what, 400);
+    return v;
+  };
+  const events = a.events;
+  if (
+    !Array.isArray(events) ||
+    events.length === 0 ||
+    events.length > 64 ||
+    events.some(e => typeof e !== 'string')
+  )
+    throw new MoneyError('BAD_ARGS', 'events', 400);
+  const n = Number(
+    db.all('SELECT COUNT(*) AS n FROM webhook_endpoints WHERE store_id = ?', [storeId])[0].n
+  );
+  if (n >= max)
+    throw new MoneyError('WEBHOOK_LIMIT', 'Webhook endpoint limit reached', 409, { limit: max });
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  db.run(
+    `INSERT INTO webhook_endpoints (id, store_id, url, description, events, include_customer, secret_enc, secret_hint, created_by, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)`,
+    [
+      id,
+      storeId,
+      str(a.url, 'url', 2048),
+      str(a.description, 'description', 120, true),
+      JSON.stringify(events),
+      a.includeCustomer === true ? 1 : 0,
+      str(a.secretEnc, 'secretEnc', 4000),
+      str(a.secretHint, 'secretHint', 8),
+      str(a.createdBy, 'createdBy', 128, true),
+      now,
+    ]
+  );
+  return { id };
+}
