@@ -60,6 +60,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   // the channel credentials and per-event switches the push / SMS / WhatsApp dispatchers read (Ruling CF-NOTIFY-1)
   'NotificationConfig',
   'NotificationEventConfig',
+  // review moderation (INFRA-CF-1, Ruling CF-JOBS-4)
+  'Review',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

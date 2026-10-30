@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { GeminiFailoverClient } from './gemini-keys';
 import { prisma, currentStoreId } from '@ebda/database';
+import { storeDb, storeWriter } from '../repo-factory';
 import { config } from '../../config';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
@@ -60,7 +61,10 @@ function stripFences(text: string): string {
 //    Smart-skips if bodyTranslated is already set.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function translateReview(reviewId: string): Promise<void> {
-  const review = await prisma.review.findUnique({
+  // the review lives in the store's backend: its Durable Object, or Postgres under the tenant scope (Ruling CF-JOBS-4)
+  const review = await (
+    await storeDb(currentStoreId())
+  ).review.findUnique({
     where: { id: reviewId, storeId: currentStoreId() },
     select: { id: true, storeId: true, body: true, language: true, bodyTranslated: true },
   });
@@ -90,7 +94,9 @@ ${review.body}`;
   }
   const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
 
-  await prisma.review.update({
+  await (
+    await storeWriter(review.storeId)
+  ).review.update({
     where: { id: reviewId, storeId: review.storeId },
     data: { bodyTranslated: parsed.translated, bodyTranslatedAt: new Date() },
   });
@@ -110,7 +116,9 @@ export interface SpamCheckResult {
 }
 
 export async function detectSpamReview(reviewId: string): Promise<SpamCheckResult> {
-  const review = await prisma.review.findUnique({
+  const review = await (
+    await storeDb(currentStoreId())
+  ).review.findUnique({
     where: { id: reviewId, storeId: currentStoreId() },
     select: { storeId: true, body: true, title: true, rating: true, language: true },
   });

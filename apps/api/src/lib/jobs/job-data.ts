@@ -22,6 +22,10 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'billing-renewal-daily',
   // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-3)
   'payment-webhook-stuck-sweep',
+  // Ruling CF-JOBS-4: platform tables only (the ad-attribution ledger `BillingEvent` and the identity `User`; the legal
+  // notice fan-out reads `User` / `LegalNotice*`), so there is no store data to move
+  'ebda-ads-conversion',
+  'legal-notice-send',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
@@ -49,6 +53,15 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'accounting-period-reconciliation',
   // the WhatsApp store events (incl. `customer.erased`): link, consent and order/cart/catalog reads follow the backend
   'wa-store-events',
+  // Ruling CF-JOBS-4 (non-money jobs): each reaches its store only through `storeDb` / `storeWriter` / `acrossStoresDb` / the
+  // store's DO ops, and the platform rows (`Store`, `User`, billing) through `withStore` - tests/unit/jobs-nonmoney-b-on-do.test.ts
+  'wa-plan-sync',
+  'review-request',
+  'review-moderation',
+  'invoice-email',
+  'order-capi-conversion',
+  'lifecycle-emails',
+  'lifecycle-first-order',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

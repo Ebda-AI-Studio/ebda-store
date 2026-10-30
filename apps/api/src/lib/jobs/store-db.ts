@@ -120,3 +120,42 @@ export async function readStoreDb<T>(
   if (repo.backend === 'do') return fn(repo.db);
   return runInTenantContext(storeId, () => fn(repo.db));
 }
+
+/**
+ * The shoppers (platform `User` rows registered on THIS store) behind a list of customer ids, for rows a job read from a store's
+ * Durable Object: `Order.customer` is a join into the platform database, which the DO cannot do (Ruling CF-R2-1 attaches it the
+ * same way for requests). The select and the visibility are the Postgres relation's: a user of this store only (Ruling CF-JOBS-4).
+ */
+export async function customersById(
+  storeId: string,
+  ids: ReadonlyArray<string | null | undefined>
+): Promise<
+  Map<
+    string,
+    {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string | null;
+      phone: string | null;
+      language: string | null;
+    }
+  >
+> {
+  const want = [...new Set(ids.filter((x): x is string => !!x))];
+  if (want.length === 0) return new Map();
+  const users = await withStore(storeId, tx =>
+    tx.user.findMany({
+      where: { id: { in: want }, storeId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        language: true,
+      },
+    })
+  );
+  return new Map(users.map(u => [u.id, u]));
+}

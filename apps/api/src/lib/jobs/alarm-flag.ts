@@ -34,6 +34,8 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'order-auto-cancel-unpaid',
   'instapay-expiry',
   'order-status-fanout-stuck-sweep',
+  // non-money sweeps (Ruling CF-JOBS-4)
+  'wa-plan-sync',
 ]);
 
 function tokens(): string[] {

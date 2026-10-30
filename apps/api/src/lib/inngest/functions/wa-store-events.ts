@@ -1,6 +1,7 @@
 import type { JobDef } from '../../jobs/types';
-import { acrossStores, prisma, runInTenantContext, withStore } from '@ebda/database';
-import { readStoreDb } from '../../jobs/store-db';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { acrossStoresDb, readStoreDb } from '../../jobs/store-db';
+import { alarmStoreId } from '../../jobs/store-scope';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
@@ -498,17 +499,22 @@ export const waPlanSync: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '41 */12 * * *' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Idle exit BEFORE any step: most ticks find no store that ever linked WhatsApp (one execution).
-    const linked = (
-      await acrossStores(storeId =>
-        prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
-      )
-    )
-      .filter(r => r.value)
-      .map(r => r.storeId);
+    // The cron run lists the Postgres stores; a DO store runs on its own alarm and reads its link row from its DO (Ruling CF-JOBS-4).
+    const only = alarmStoreId(event);
+    const linked: string[] = [];
+    await acrossStoresDb(event, async (storeId, db) => {
+      const row = await db.storeWhatsAppLink.findUnique({
+        where: { storeId },
+        select: { storeId: true },
+      });
+      if (row) linked.push(storeId);
+    });
     if (linked.length === 0) return { sent: 0 };
-    const backfill = !(await redis.exists(CONSENT_BACKFILL_KEY));
+    // The v1.1 backfill is once per store: the cron run shares one flag for every store it visits, an alarm run (one store) keeps its own
+    const backfillKey = only ? `${CONSENT_BACKFILL_KEY}:${only}` : CONSENT_BACKFILL_KEY;
+    const backfill = !(await redis.exists(backfillKey));
     const sinceMs = backfill ? 0 : 36 * 3600 * 1000;
     const sent = await step.run('sweep', async () => {
       let n = 0;
@@ -518,7 +524,7 @@ export const waPlanSync: JobDef = inngest.createFunction(
         // ONCE, every row: the v1.1 backfill). Same state = same envelope id, so this is idempotent.
         n += await resendConsentFor(storeId, sinceMs);
       }
-      if (backfill) await redis.set(CONSENT_BACKFILL_KEY, '1', 365 * 24 * 3600);
+      if (backfill) await redis.set(backfillKey, '1', 365 * 24 * 3600);
       return n;
     });
     return { sent };

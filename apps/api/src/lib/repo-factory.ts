@@ -92,7 +92,8 @@ export type WritableModel =
   | 'campaign'
   | 'campaignRecipient'
   | 'notificationConfig'
-  | 'notificationEventConfig';
+  | 'notificationEventConfig'
+  | 'review';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -460,6 +461,8 @@ export interface MoneyClient {
   }): Promise<{ recorded: true }>;
   /** The payment-abandonment stamp: once, only while the order is unpaid and unstamped. */
   abandonStamp(a: { orderId: string }): Promise<{ stamped: boolean }>;
+  /** Stamp an order once for a job (`reviewRequestSentAt`): false when an earlier run already did (Ruling CF-JOBS-4). */
+  orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Posted debit / credit totals of the store (accounting daily close). */
   trialBalance(): Promise<{ debit: number; credit: number }>;
   /** Revenue-side GL credits posted since `sinceMs` (accounting period reconciliation). */
@@ -816,6 +819,7 @@ export function makeMoneyClient(
     paymentEventRecord: a => call('paymentEventRecord', a),
     abandonStamp: a => call('abandonStamp', a),
     trialBalance: () => call('trialBalance', {}),
+    orderStamp: a => call('orderStamp', a),
     periodGlCredits: a => call('periodGlCredits', a),
     orderStatus: (a, key) => call('orderStatus', a, key),
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),

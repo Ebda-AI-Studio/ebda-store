@@ -40,3 +40,7 @@ Limits: a step already executing when the flag lands finishes; a freeze over 24 
 ## Flip gate and Ruling CF-JOBS-3
 
 `node scripts/cf/not-on-do.mjs` also counts jobs: `jobsRefused` (MONEY_JOBS still unported) and `sweepSkips` (a ported cron sweep with no alarm: `alarm: true` in JOBS_MAP + `ALARM_READY`) CLOSE the gate; `jobsAccepted` (non-money unported jobs, P1 alert) is counted and listed. `tests/unit/do-not-on-do-guard.test.ts` keeps the manifest equal to the source. A ported cron sweep that runs from its cron with DO stores hidden and no alarm enabled pages (P0 for money). Still unported money jobs (no DO engine yet): `shipment-create`, `order-created-fanout`, `order-status-changed-fanout`, `order-refunded-fanout`, `accounting-post-expense-journal`, `accounting-post-po-receive-journal`, `accounting-post-stock-adjustment-journal`, `stock-reorder-scan-*`, `warehouse-reconcile-*`.
+
+## Non-money jobs, second half (Ruling CF-JOBS-4B)
+
+Ported: `review-request`, `review-moderation`, `invoice-email`, `order-capi-conversion`, `lifecycle-emails`, `lifecycle-first-order`, `wa-plan-sync` (alarm-ready sweep), and `ebda-ads-conversion` / `legal-notice-send` (class `none`: platform tables only). Store data goes through `storeDb` / `storeWriter` / the `orderStamp` DO op; the buyer of a DO order is attached from the platform with `customersById`. The 23 jobs still in `docs/cf/not-on-do.json` `jobsAccepted` are listed with their blockers in `docs/rulings/CF-JOBS-4B.md`.

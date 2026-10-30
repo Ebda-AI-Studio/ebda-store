@@ -166,7 +166,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'order-capi-conversion': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'search-index-backstop': { group: '5-integrations', kind: 'workflow', trigger: 'cron' },
   'search-product-index': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
-  'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
+  'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron', alarm: true },
   'wa-store-events': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'ci-erasure-second-pass': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'ci-outcomes': { group: '5-integrations', kind: 'queue', trigger: 'event' },
