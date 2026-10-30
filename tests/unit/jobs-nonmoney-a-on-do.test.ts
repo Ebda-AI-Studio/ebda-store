@@ -179,7 +179,8 @@ const FIRST_HALF = [
   'domain-claim-sweep',
 ] as const;
 /** Needs the accounting stack (expense, account, journal services) on the DO: written down as a blocker, still refused. */
-const BLOCKED = ['accounting-expense-ocr-process'];
+// the expense-OCR job was blocked on the accounting stack here; Ruling CF-JOBS-4C ports it (tests/unit/jobs-blocked-expense-ocr-on-do.test.ts)
+const BLOCKED: string[] = [];
 const SERVED = FIRST_HALF.filter(id => !BLOCKED.includes(id));
 
 beforeEach(() => {
@@ -205,7 +206,7 @@ describe('the guard serves a DO store for every job of the first half', () => {
     }
   });
 
-  it('does not refuse any of them for a DO store (32 served), and still refuses the blocked one', () => {
+  it('does not refuse any of them for a DO store (all served; none is blocked any more)', () => {
     for (const id of SERVED)
       expect(decideRunForStore({ id } as never, DO_STORE), id).toEqual({ run: true });
     for (const id of BLOCKED)

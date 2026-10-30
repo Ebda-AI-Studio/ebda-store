@@ -284,7 +284,7 @@ export const orderAnonymizeAtFiveYears: JobDef = inngest.createFunction(
         });
       });
       logger.info(
-        { cutoff, storeId: only, ...out },
+        { cutoff, storeId: only, anonymized: out.anonymized },
         'order-anonymize-5y: completed (durable object)'
       );
       return { anonymized: out.anonymized, failed: 0 };
