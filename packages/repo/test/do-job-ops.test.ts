@@ -231,3 +231,94 @@ describe('reorder scan ops (Ruling CF-JOBS-4)', () => {
     );
   });
 });
+
+describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', () => {
+  function books() {
+    const r = rig();
+    for (const [code, name, type] of [
+      ['2000', 'AP', 'liability'],
+      ['3000', 'Equity', 'equity'],
+      ['5010', 'COGS variance', 'expense'],
+      ['5200', 'Rent', 'expense'],
+      ['5900', 'Damage', 'expense'],
+    ])
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a${code}', 's1', '${code}', '${name}', '${type}', 1)`
+      );
+    return r;
+  }
+  const tb = (r: ReturnType<typeof rig>) => r.op('trialBalance', {});
+
+  it('journalExpense posts DR expense / CR paid-from once, skips a draft, and a replay posts nothing', () => {
+    const r = books();
+    r.raw.exec(
+      `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, 1, 'posted'), ('e2', 's1', 'EXP-2', 'a5200', 'a1000', 700, 700, 1, 'draft')`
+    );
+    expect(r.op('journalExpense', { expenseId: 'e1' })).toEqual({ posted: true });
+    expect(r.op('journalExpense', { expenseId: 'e1' })).toEqual({ posted: false });
+    expect(r.op('journalExpense', { expenseId: 'e2' })).toEqual({
+      posted: false,
+      skipped: 'not_posted',
+    });
+    expect(r.op('journalExpense', { expenseId: 'nope' }).skipped).toBe('expense_not_found');
+    expect(tb(r)).toEqual({ debit: 500, credit: 500 });
+  });
+
+  it('journalStockAdjustment: a loss debits damage and credits inventory; a gain the reverse; a replay is a no-op', () => {
+    const r = books();
+    r.raw.exec(
+      `INSERT INTO stock_adjustments (id, store_id, adjustment_number, type, status, total_value_impact) VALUES ('s1', 's1', 'ADJ-1', 'damage', 'posted', -300), ('s2', 's1', 'ADJ-2', 'found', 'posted', 200)`
+    );
+    expect(r.op('journalStockAdjustment', { adjustmentId: 's1' })).toEqual({ posted: true });
+    expect(r.op('journalStockAdjustment', { adjustmentId: 's2' })).toEqual({ posted: true });
+    expect(r.op('journalStockAdjustment', { adjustmentId: 's1' })).toEqual({ posted: false });
+    const dr = r.q(
+      `SELECT a.code, l.debit d, l.credit c FROM journal_lines l JOIN accounts a ON a.id = l.account_id ORDER BY a.code, l.debit`
+    );
+    expect(dr).toEqual(
+      expect.arrayContaining([
+        { code: '5900', d: 300, c: 0 },
+        { code: '1200', d: 0, c: 300 },
+        { code: '1200', d: 200, c: 0 },
+        { code: '3000', d: 0, c: 200 },
+      ])
+    );
+    expect(tb(r).debit).toBe(tb(r).credit);
+  });
+
+  it('journalPoReceive books the received value, then each cleared backorder once; a missing account fails and writes nothing', () => {
+    const r = books();
+    r.raw.exec(
+      `INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status) VALUES ('po1', 's1', 'sup', 'PO-1', 'received');
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 10, 10, 100, 1000);`
+    );
+    const cleared = [
+      {
+        backorderLineId: 'bo-12345678',
+        orderItemId: 'oi',
+        qty: 2,
+        actualUnitCost: 120,
+        estimateUnitCost: 100,
+        variance: 40,
+      },
+    ];
+    const a = r.op('journalPoReceive', { poId: 'po1', clearedBackorders: cleared });
+    expect(a).toMatchObject({ posted: true, entries: 2 });
+    expect(r.op('journalPoReceive', { poId: 'po1', clearedBackorders: cleared })).toMatchObject({
+      posted: false,
+      entries: 0,
+    });
+    expect(tb(r).debit).toBe(tb(r).credit);
+    const r2 = rig(); // no AP / COGS-variance accounts seeded
+    r2.raw.exec(
+      `INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status) VALUES ('po1', 's1', 'sup', 'PO-1', 'received');
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 1, 1, 100, 100);`
+    );
+    expect(r2.code('journalPoReceive', { poId: 'po1', clearedBackorders: [] })).toBe(
+      'ACCOUNT_NOT_FOUND/409'
+    );
+    expect(r2.q('SELECT count(*) n FROM journal_entries')[0].n).toBe(0);
+  });
+});

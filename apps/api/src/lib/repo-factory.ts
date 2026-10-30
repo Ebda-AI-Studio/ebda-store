@@ -476,6 +476,15 @@ export interface MoneyClient {
   trialBalance(): Promise<{ debit: number; credit: number }>;
   /** Revenue-side GL credits posted since `sinceMs` (accounting period reconciliation). */
   periodGlCredits(a: { sinceMs: number }): Promise<{ total: number }>;
+  /** Expense / stock-adjustment / PO-receive journals on the DO (Ruling CF-JOBS-4); idempotent per source row. */
+  journalExpense(a: { expenseId: string }): Promise<{ posted: boolean; skipped?: string }>;
+  journalStockAdjustment(a: {
+    adjustmentId: string;
+  }): Promise<{ posted: boolean; skipped?: string }>;
+  journalPoReceive(a: {
+    poId: string;
+    clearedBackorders: Array<Record<string, unknown>>;
+  }): Promise<{ posted: boolean; skipped?: string; entries: number }>;
   /** Reorder scan phase 1: expire stale / unit-gone suggestions (Ruling CF-JOBS-4). */
   reorderExpire(a: {
     thresholdMs: number;
@@ -839,6 +848,9 @@ export function makeMoneyClient(
     abandonStamp: a => call('abandonStamp', a),
     trialBalance: () => call('trialBalance', {}),
     periodGlCredits: a => call('periodGlCredits', a),
+    journalExpense: a => call('journalExpense', a),
+    journalStockAdjustment: a => call('journalStockAdjustment', a),
+    journalPoReceive: a => call('journalPoReceive', a),
     reorderExpire: a => call('reorderExpire', a),
     reorderUpsert: a => call('reorderUpsert', a),
     orderStatus: (a, key) => call('orderStatus', a, key),

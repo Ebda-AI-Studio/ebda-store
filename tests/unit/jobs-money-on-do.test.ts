@@ -33,6 +33,9 @@ const h = vi.hoisted(() => ({
     periodGlCredits: vi.fn(async () => ({ total: 50 })),
     journalSale: vi.fn(async () => ({ posted: true, entries: 2 })),
     journalRefund: vi.fn(async () => ({ reversed: 2 })),
+    journalExpense: vi.fn(async () => ({ posted: true })),
+    journalStockAdjustment: vi.fn(async () => ({ posted: true })),
+    journalPoReceive: vi.fn(async () => ({ posted: true, entries: 1 })),
   },
   stock: {
     reconcileWarehouseAll: vi.fn(async () => ({
@@ -118,6 +121,9 @@ import { handlePaymentReconcileSweep } from '@api/lib/inngest/functions/payment-
 import { paymentWebhookProcess } from '@api/lib/inngest/functions/payment-webhook-process';
 import { accountingPostOrderJournal } from '@api/lib/inngest/functions/accounting-post-order-journal';
 import { accountingPostRefundJournal } from '@api/lib/inngest/functions/accounting-post-refund-journal';
+import { accountingPostExpenseJournal } from '@api/lib/inngest/functions/accounting-post-expense-journal';
+import { accountingPostPoReceiveJournal } from '@api/lib/inngest/functions/accounting-post-po-receive-journal';
+import { accountingPostStockAdjustmentJournal } from '@api/lib/inngest/functions/accounting-post-stock-adjustment-journal';
 import { accountingDailyClose } from '@api/lib/inngest/functions/accounting-daily-close';
 import { sweepAllWarehouseStores } from '@api/lib/inngest/functions/warehouse-reconcile-sweep';
 import { emitStoreEventsFor, waPlanSync } from '@api/lib/inngest/functions/wa-store-events';
@@ -291,6 +297,21 @@ describe('accounting jobs on a DO store', () => {
       step,
     });
     expect(h.money.journalRefund).toHaveBeenCalledWith(expect.objectContaining({ orderId: 'o1' }));
+  });
+  it('the expense, PO-receive and stock-adjustment journals post through the DO ops', async () => {
+    const run = (job: unknown, name: string, data: Record<string, unknown>) =>
+      (job as Handler).handler({ event: { name, data: { storeId: DO_STORE, ...data } }, step });
+    await run(accountingPostExpenseJournal, 'accounting/expense-posted', { expenseId: 'e1' });
+    await run(accountingPostPoReceiveJournal, 'stock/po-received', {
+      poId: 'po1',
+      clearedBackorders: [],
+    });
+    await run(accountingPostStockAdjustmentJournal, 'stock/adjustment-posted', {
+      adjustmentId: 'a1',
+    });
+    expect(h.money.journalExpense).toHaveBeenCalledWith({ expenseId: 'e1' });
+    expect(h.money.journalPoReceive).toHaveBeenCalledWith({ poId: 'po1', clearedBackorders: [] });
+    expect(h.money.journalStockAdjustment).toHaveBeenCalledWith({ adjustmentId: 'a1' });
   });
   it('the daily close reads the DO trial balance and alerts P0 only on drift', async () => {
     const run = () => (accountingDailyClose as unknown as Handler).handler({ event: alarm, step });

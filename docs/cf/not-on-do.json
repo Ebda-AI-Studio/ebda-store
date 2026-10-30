@@ -3,9 +3,6 @@
   "refusals": [],
   "postgresOnly": [],
   "jobsRefused": [
-    "accounting-post-expense-journal",
-    "accounting-post-po-receive-journal",
-    "accounting-post-stock-adjustment-journal",
     "order-created-fanout",
     "order-refunded-fanout",
     "order-status-changed-fanout",

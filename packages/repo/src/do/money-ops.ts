@@ -78,6 +78,7 @@ import {
   type ImportVariantRow,
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
+import { journalExpenseOp, journalPoReceiveOp, journalStockAdjustmentOp } from './books-journals';
 import {
   abandonStampOp,
   periodGlCreditsOp,
@@ -130,6 +131,9 @@ export type MoneyOpName =
   | 'abandonStamp'
   | 'trialBalance'
   | 'periodGlCredits'
+  | 'journalExpense'
+  | 'journalStockAdjustment'
+  | 'journalPoReceive'
   | 'reorderExpire'
   | 'reorderUpsert'
   | 'orderStatus'
@@ -194,6 +198,9 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'abandonStamp',
   'trialBalance',
   'periodGlCredits',
+  'journalExpense',
+  'journalStockAdjustment',
+  'journalPoReceive',
   'reorderExpire',
   'reorderUpsert',
   'orderStatus',
@@ -547,6 +554,9 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   abandonStamp: (db, storeId, a) => abandonStampOp(db, storeId, a),
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),
   periodGlCredits: (db, storeId, a) => periodGlCreditsOp(db, storeId, a),
+  journalExpense: (db, storeId, a) => journalExpenseOp(db, storeId, a),
+  journalStockAdjustment: (db, storeId, a) => journalStockAdjustmentOp(db, storeId, a),
+  journalPoReceive: (db, storeId, a) => journalPoReceiveOp(db, storeId, a),
   reorderExpire: (db, storeId, a) => reorderExpireOp(db, storeId, a),
   reorderUpsert: (db, storeId, a) => reorderUpsertOp(db, storeId, a),
   /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */
