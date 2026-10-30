@@ -73,6 +73,7 @@ A fresh worktree needs the built workspace packages (`npm run build -w packages/
 | 13  | Erasure on the Cloudflare path is store-scoped (Ruling CI-8 residual, PR #228): the DO-side erasure trigger calls `apps/api/src/lib/ci/erase.ts` (store-scoped, proof-gated), NOT `ciSurface.eraseSubject`, which erases by buyer key across ALL stores. Every table the DO holds is erasure-classified (`packages/cf-migrate/test/coverage.test.ts`; a customer subject fails closed on an unclassified table)                                                                                                                                                                                                   | `packages/cf-migrate/test/erasure-ci.test.ts` and `coverage.test.ts` green                                                                                                                                                                        |
 | 14  | Postgres stays the read-only fallback: nobody has a plan to delete, resize or `DROP` anything in Neon inside 7 days; the replay URL (a WRITABLE owner connection to the Neon DIRECT endpoint) is in the operator's keychain, not in a file                                                                                                                                                                                                                                                                                                                                                                        | the operator confirms                                                                                                                                                                                                                             |
 | 15  | Ahmad has said go in this session                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | the message                                                                                                                                                                                                                                       |
+| 16  | The privacy-policy switch is ready: a branch flips `PRIVACY_STACK` to `'cloudflare'` in `packages/shared/src/legal/index.ts` AND appends a material privacy 1.2 entry to `LEGAL_POLICIES` in the same commit (`tests/unit/privacy-stack-switch.test.ts` fails otherwise); it is reviewed and held, not merged. Until it ships the live policy names Neon, Resend and Inngest, which are gone after the flip                                                                                                                                                                                                       | `npx vitest run tests/unit/privacy-stack-switch.test.ts` green on that branch; `curl -s https://ebda.app/en/privacy/` today still names Neon                                                                                                      |
 
 Any "no": stop, fix, rehearse again. Do not shorten the checklist.
 
@@ -151,6 +152,24 @@ It refuses without a passing verify report younger than 60 minutes that covers e
 ### 8.3 Unfreeze reads and writes, and switch the jobs over
 
 ONE deploy: set `JOBS_ON_DO=1`, do NOT set `STORE_DO_ENABLED_IDS` (the flip writes D1 `stores.storage_backend` only, Ruling CF-R6B-1: the jobs guard, alarm arming, the DO webhook resolver, the backup sweep and the InstaPay retention sweep all read that column live; the env list is not defined in `wrangler.jsonc`) and remove `WRITES_FROZEN` (or set `0`). `JOBS_ON_DO=1` makes the flagged stores DO stores for jobs (Ruling CF-JOBS-1): their alarms are armed, their money and stock jobs are ALL ported and run (Ruling CF-JOBS-4; the flip gate `node scripts/cf/not-on-do.mjs` refuses to open while one is not), and the sweeps run on each store's alarm; no job is refused (the gate refuses to open otherwise). It is never set earlier, and never without the flip (a flag with no flipped store arms nothing; a flipped store without it runs Postgres jobs against sealed rows). The parked messages, Workflow instances and alarms run on their own within 5 minutes, in the order they were parked (a parked daily cron runs once, a skipped sweep tick is replaced by the next tick). Run the smoke below once the backlog drains.
+
+### 8.3a Switch the privacy policy to the Cloudflare stack (`PRIVACY_STACK`)
+
+The processors change the day the flip does, so the policy must change that day (Ruling DOC-2, `docs/runbooks/legal-policy-change.md`, `docs/launch/marketing-launch-checklist.md` row 5). Merge the held branch from checklist row 16 right after 8.3 (the marketing site redeploys on its own: `cf-marketing-deploy.yml`). Without it `ebda.app/privacy` keeps listing Neon, Resend and Inngest after they are gone.
+
+1. Merge the branch (the one commit that sets `PRIVACY_STACK = 'cloudflare'` and adds the material privacy 1.2 `LEGAL_POLICIES` entry) with `scripts/ci/merge-gate.sh`.
+2. Wait for the marketing deploy of that commit to finish green.
+3. Verify on the live site, in both languages:
+
+```bash
+for u in https://ebda.app/en/privacy/ https://ebda.app/privacy/; do
+  curl -s "$u" | grep -c 'Neon' ; curl -s "$u" | grep -c 'Cloudflare'
+done
+```
+
+`Neon` must print 0 and `Cloudflare` must print 1 or more on both pages (today the pages name Neon). The page must show version 1.2 or later. A material version needs its notice the same day: super admin -> Policy updates (`https://store.ebda.app/policy-updates`) -> **Send notice** (`docs/runbooks/legal-policy-change.md` section 3). Confirm the document shows the new version there before sending.
+
+Rollback: revert that commit (the switch and the version entry go back together; the test keeps them paired). The text is not part of the data rollback in section 9, so decide it by the facts: if the flip is rolled back to Postgres, revert this too.
 
 ### 8.4 Smoke (NEVER complete a purchase)
 
