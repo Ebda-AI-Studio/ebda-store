@@ -65,6 +65,10 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   // Ruling CF-JOBS-4B (gold rate): alarm per DO store
   'gold-rate-feed-fetch',
   'gold-rate-staleness-watch',
+  // Ruling CF-JOBS-4B (ETA e-receipts): the receipt and connection rows are DO-writable; every read and write goes through withStoreRw
+  'eta-receipt-enqueue',
+  'eta-receipt-submit',
+  'eta-receipt-redrive',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

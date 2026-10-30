@@ -1,4 +1,4 @@
-import { withStore } from '@ebda/database';
+import { withStoreRw } from '../lib/jobs/store-db';
 import {
   ETA_SUBMISSION_WINDOW_MS,
   etaConnectionInputSchema,
@@ -90,7 +90,9 @@ export const EtaReceiptService = {
   },
 
   async getConnection(storeId: string): Promise<EtaConnectionView> {
-    const row = await withStore(storeId, tx => tx.etaConnection.findFirst({ where: { storeId } }));
+    const row = await withStoreRw(storeId, db =>
+      db.etaConnection.findFirst({ where: { storeId } })
+    );
     if (!row)
       return {
         connected: false,
@@ -130,8 +132,8 @@ export const EtaReceiptService = {
   /** Create or update the connection. A masked or omitted secret keeps the stored one. */
   async saveConnection(storeId: string, raw: unknown, actor: Actor): Promise<EtaConnectionView> {
     const input = parseInput(etaConnectionInputSchema, raw) as EtaConnectionInput;
-    const existing = await withStore(storeId, tx =>
-      tx.etaConnection.findFirst({ where: { storeId } })
+    const existing = await withStoreRw(storeId, db =>
+      db.etaConnection.findFirst({ where: { storeId } })
     );
     const prev = existing ? decryptSecrets(existing.credentialsEnc) : null;
     const keep = (next: string | undefined, old: string | undefined) =>
@@ -157,15 +159,15 @@ export const EtaReceiptService = {
       address: input.address,
       signingBridgeUrl: input.signingBridgeUrl ?? null,
     };
-    await withStore(storeId, async tx => {
+    await withStoreRw(storeId, async db => {
       if (existing) {
         // Changing credentials or environment invalidates the last check.
-        await tx.etaConnection.update({
+        await db.etaConnection.update({
           where: { id: existing.id },
           data: { ...data, lastCheckStatus: null, lastCheckedAt: null },
         });
       } else {
-        await tx.etaConnection.create({ data: { storeId, ...data } });
+        await db.etaConnection.create({ data: { storeId, ...data } });
       }
     });
     await auditLog({
@@ -191,8 +193,8 @@ export const EtaReceiptService = {
     if (!loaded) throw new AppError(404, 'ETA_NOT_CONNECTED', 'no ETA connection saved');
     const r = await new EtaClient(loaded.environment, loaded.creds).authenticate();
     const status = r.ok ? 'ok' : r.code;
-    await withStore(storeId, tx =>
-      tx.etaConnection.updateMany({
+    await withStoreRw(storeId, db =>
+      db.etaConnection.updateMany({
         where: { storeId },
         data: { lastCheckStatus: status, lastCheckedAt: new Date() },
       })
@@ -201,7 +203,7 @@ export const EtaReceiptService = {
   },
 
   async loadCredentials(storeId: string) {
-    const c = await withStore(storeId, tx => tx.etaConnection.findFirst({ where: { storeId } }));
+    const c = await withStoreRw(storeId, db => db.etaConnection.findFirst({ where: { storeId } }));
     if (!c) return null;
     const s = decryptSecrets(c.credentialsEnc);
     const creds: EtaCredentials = {
@@ -219,23 +221,23 @@ export const EtaReceiptService = {
    */
   async enqueueSale(storeId: string, orderId: string): Promise<'queued' | 'skipped'> {
     if (!(await this.isEnabledForStore(storeId))) return 'skipped';
-    const conn = await withStore(storeId, tx =>
-      tx.etaConnection.findFirst({
+    const conn = await withStoreRw(storeId, db =>
+      db.etaConnection.findFirst({
         where: { storeId },
         select: { enabled: true, environment: true },
       })
     );
     if (!conn?.enabled) return 'skipped';
-    const order = await withStore(storeId, tx =>
-      tx.order.findFirst({
+    const order = await withStoreRw(storeId, db =>
+      db.order.findFirst({
         where: { id: orderId, storeId },
         select: { sellerTaxRegistrationNumber: true },
       })
     );
     // Only orders sold under a VERIFIED VAT registration are tax invoices (Ruling TAX-2).
     if (!order?.sellerTaxRegistrationNumber) return 'skipped';
-    const existing = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({ where: { storeId, orderId, kind: 'sale' }, select: { id: true } })
+    const existing = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({ where: { storeId, orderId, kind: 'sale' }, select: { id: true } })
     );
     if (existing) return 'queued'; // the same order event delivered twice
     return this.createRowAndSend(storeId, orderId, 'sale', conn.environment);
@@ -254,8 +256,8 @@ export const EtaReceiptService = {
     orderId: string,
     partial?: ReturnEvent | null
   ): Promise<'queued' | 'manual' | 'skipped'> {
-    const sale = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({ where: { storeId, orderId, kind: 'sale' } })
+    const sale = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({ where: { storeId, orderId, kind: 'sale' } })
     );
     if (!sale || sale.status === 'failed' || sale.status === 'rejected') return 'skipped';
     const goods = partial?.items?.filter(i => i.quantity > 0) ?? [];
@@ -263,8 +265,8 @@ export const EtaReceiptService = {
     const refundKey = partial
       ? partial.refundKey || `amount:${orderId}:${partial.refundAmount ?? 0}`
       : 'full';
-    const done = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({
+    const done = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({
         where: { storeId, orderId, kind: 'return', refundKey },
         select: { id: true },
       })
@@ -274,8 +276,8 @@ export const EtaReceiptService = {
       if (!(typeof partial!.refundAmount === 'number' && partial!.refundAmount > 0))
         return 'skipped';
       const seq = await this.nextSeq(storeId, orderId, 'return');
-      await withStore(storeId, tx =>
-        tx.etaReceipt.create({
+      await withStoreRw(storeId, db =>
+        db.etaReceipt.create({
           data: {
             storeId,
             orderId,
@@ -310,14 +312,14 @@ export const EtaReceiptService = {
    */
   async setReturnReason(storeId: string, receiptId: string, rawReason: unknown): Promise<void> {
     const { reason } = parseInput(etaReturnReasonSchema, { reason: rawReason });
-    const row = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({ where: { id: receiptId, storeId } })
+    const row = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({ where: { id: receiptId, storeId } })
     );
     const map = row?.lineMap as { amountOnly?: boolean; refundAmount?: number } | null;
     if (!row || row.kind !== 'return' || row.status !== 'manual' || !map?.amountOnly)
       throw new AppError(409, 'ETA_REASON_NOT_NEEDED', 'this receipt is not waiting for a reason');
-    const claim = await withStore(storeId, tx =>
-      tx.etaReceipt.updateMany({
+    const claim = await withStoreRw(storeId, db =>
+      db.etaReceipt.updateMany({
         where: { id: receiptId, storeId, status: 'manual' },
         data: {
           status: 'queued',
@@ -332,8 +334,8 @@ export const EtaReceiptService = {
     try {
       await inngest.send({ name: 'eta/receipt.submit', data: { storeId, receiptId } });
     } catch (err) {
-      await withStore(storeId, tx =>
-        tx.etaReceipt.updateMany({
+      await withStoreRw(storeId, db =>
+        db.etaReceipt.updateMany({
           where: { id: receiptId, storeId, status: 'queued' },
           data: {
             status: 'failed',
@@ -348,8 +350,8 @@ export const EtaReceiptService = {
   },
 
   async nextSeq(storeId: string, orderId: string, kind: string): Promise<number> {
-    const last = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({
+    const last = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({
         where: { storeId, orderId, kind },
         orderBy: { seq: 'desc' },
         select: { seq: true },
@@ -368,8 +370,8 @@ export const EtaReceiptService = {
     const seq = await this.nextSeq(storeId, orderId, kind);
     let id: string | null = null;
     try {
-      const row = await withStore(storeId, tx =>
-        tx.etaReceipt.create({
+      const row = await withStoreRw(storeId, db =>
+        db.etaReceipt.create({
           data: {
             storeId,
             orderId,
@@ -385,8 +387,8 @@ export const EtaReceiptService = {
       id = row.id;
     } catch (err) {
       // Unique (store, order, kind, seq): the same event delivered twice raced us to this seq.
-      const dup = await withStore(storeId, tx =>
-        tx.etaReceipt.findFirst({ where: { storeId, orderId, kind, seq }, select: { id: true } })
+      const dup = await withStoreRw(storeId, db =>
+        db.etaReceipt.findFirst({ where: { storeId, orderId, kind, seq }, select: { id: true } })
       );
       if (dup) return 'queued' as const;
       throw err;
@@ -394,8 +396,8 @@ export const EtaReceiptService = {
     try {
       await inngest.send({ name: 'eta/receipt.submit', data: { storeId, receiptId: id } });
     } catch (err) {
-      await withStore(storeId, tx =>
-        tx.etaReceipt.updateMany({
+      await withStoreRw(storeId, db =>
+        db.etaReceipt.updateMany({
           where: { id: id!, storeId, status: 'queued' },
           data: {
             status: 'failed',
@@ -418,8 +420,8 @@ export const EtaReceiptService = {
     signerOverride?: ReceiptSigner,
     clientOverride?: EtaClient
   ): Promise<string> {
-    const row = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({ where: { id: receiptId, storeId } })
+    const row = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({ where: { id: receiptId, storeId } })
     );
     if (!row || !['queued', 'retrying', 'submitted'].includes(row.status))
       return row?.status ?? 'missing';
@@ -452,8 +454,8 @@ export const EtaReceiptService = {
       try {
         const built = await this.build(storeId, row, loaded.conn, loaded.environment, now);
         doc = built.doc;
-        await withStore(storeId, tx =>
-          tx.etaReceipt.updateMany({
+        await withStoreRw(storeId, db =>
+          db.etaReceipt.updateMany({
             where: { id: row.id, storeId },
             data: {
               document: doc as never,
@@ -534,8 +536,8 @@ export const EtaReceiptService = {
     environment: string,
     now: Date
   ) {
-    const order = await withStore(storeId, tx =>
-      tx.order.findFirst({
+    const order = await withStoreRw(storeId, db =>
+      db.order.findFirst({
         where: { id: row.orderId, storeId },
         select: {
           orderNumber: true,
@@ -571,8 +573,8 @@ export const EtaReceiptService = {
       throw new EtaMapError('ETA_NO_LINES', 'order has no VAT registration');
     // Chain: previousUUID = the latest receipt of this POS+environment that carries a uuid and was not
     // refused. Builds are serialized per store by the job's concurrency key.
-    const prev = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({
+    const prev = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({
         where: {
           storeId,
           environment,
@@ -586,8 +588,8 @@ export const EtaReceiptService = {
     );
     const old =
       row.seq > 1
-        ? await withStore(storeId, tx =>
-            tx.etaReceipt.findFirst({
+        ? await withStoreRw(storeId, db =>
+            db.etaReceipt.findFirst({
               where: {
                 storeId,
                 orderId: row.orderId,
@@ -611,8 +613,8 @@ export const EtaReceiptService = {
       address: conn.address as EtaSeller['address'],
     };
     if (row.kind === 'return') {
-      const sale = await withStore(storeId, tx =>
-        tx.etaReceipt.findFirst({
+      const sale = await withStoreRw(storeId, db =>
+        db.etaReceipt.findFirst({
           where: { storeId, orderId: row.orderId, kind: 'sale' },
           select: { document: true, status: true, lineMap: true },
         })
@@ -628,8 +630,8 @@ export const EtaReceiptService = {
         if (rowMap.reason !== 'I' && rowMap.reason !== 'B')
           throw new EtaMapError('ETA_NO_LINES', 'no return reason chosen');
         // Never refund more (across non-refused return receipts) than the sale receipt.
-        const others = await withStore(storeId, tx =>
-          tx.etaReceipt.findMany({
+        const others = await withStoreRw(storeId, db =>
+          db.etaReceipt.findMany({
             where: {
               storeId,
               orderId: row.orderId,
@@ -640,8 +642,8 @@ export const EtaReceiptService = {
             select: { totalPiastres: true, refundKey: true },
           })
         );
-        const saleRow = await withStore(storeId, tx =>
-          tx.etaReceipt.findFirst({
+        const saleRow = await withStoreRw(storeId, db =>
+          db.etaReceipt.findFirst({
             where: { storeId, orderId: row.orderId, kind: 'sale' },
             select: { totalPiastres: true },
           })
@@ -664,8 +666,8 @@ export const EtaReceiptService = {
       }
       const saleLines = sale.lineMap as unknown as LineQty[];
       // Earlier return receipts that were not refused count as already returned.
-      const earlier = await withStore(storeId, tx =>
-        tx.etaReceipt.findMany({
+      const earlier = await withStoreRw(storeId, db =>
+        db.etaReceipt.findMany({
           where: {
             storeId,
             orderId: row.orderId,
@@ -772,8 +774,8 @@ export const EtaReceiptService = {
   },
 
   async save(storeId: string, id: string, patch: Patch): Promise<string> {
-    await withStore(storeId, tx =>
-      tx.etaReceipt.updateMany({
+    await withStoreRw(storeId, db =>
+      db.etaReceipt.updateMany({
         where: { id, storeId },
         data: {
           status: patch.status,
@@ -791,8 +793,8 @@ export const EtaReceiptService = {
   },
 
   async listForOrder(storeId: string, orderId: string) {
-    const rows = await withStore(storeId, tx =>
-      tx.etaReceipt.findMany({
+    const rows = await withStoreRw(storeId, db =>
+      db.etaReceipt.findMany({
         where: { storeId, orderId },
         orderBy: [{ createdAt: 'asc' }],
         select: {
@@ -848,10 +850,12 @@ export const EtaReceiptService = {
    * receipts are not re-issued here: they need a Late Submission Request in the ETA portal first.
    */
   async retry(storeId: string, id: string): Promise<boolean> {
-    const row = await withStore(storeId, tx => tx.etaReceipt.findFirst({ where: { id, storeId } }));
+    const row = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({ where: { id, storeId } })
+    );
     if (!row || !['failed', 'rejected'].includes(row.status)) return false;
-    const newer = await withStore(storeId, tx =>
-      tx.etaReceipt.findFirst({
+    const newer = await withStoreRw(storeId, db =>
+      db.etaReceipt.findFirst({
         where: {
           storeId,
           orderId: row.orderId,
@@ -878,8 +882,8 @@ export const EtaReceiptService = {
 
   /** Job crashed past its retries: never leave the row looking alive. */
   async markJobCrashed(storeId: string, receiptId: string): Promise<void> {
-    await withStore(storeId, tx =>
-      tx.etaReceipt.updateMany({
+    await withStoreRw(storeId, db =>
+      db.etaReceipt.updateMany({
         where: { id: receiptId, storeId, status: { in: ['queued', 'retrying', 'submitted'] } },
         data: {
           status: 'failed',

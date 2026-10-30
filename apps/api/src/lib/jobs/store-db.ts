@@ -159,3 +159,30 @@ export async function customersById(
   );
   return new Map(users.map(u => [u.id, u]));
 }
+
+/** The tenant client `withStore` hands its callback. */
+export type StoreTx = Parameters<Parameters<typeof withStore>[1]>[0];
+
+/**
+ * Read AND write a store's rows through one `tx`-shaped client, for services written against `withStore(storeId, tx => ...)`
+ * (Ruling CF-JOBS-4B). A Postgres store gets exactly `withStore` (the tenant scope and its RLS GUCs, unchanged). A store on its
+ * Durable Object gets each model delegate as the DO read client's find/count/aggregate plus the DO writer's create/update/delete
+ * ops: a model the DO does not accept writes for (`DO_WRITABLE_MODELS`) has no write method, so a write to it throws instead of
+ * reaching Postgres. Each write is one atomic DO call; a service that needs two writes to land together must not use this.
+ */
+export async function withStoreRw<T>(storeId: string, fn: (db: StoreTx) => Promise<T>): Promise<T> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return withStore(storeId, tx => fn(tx));
+  const reads = repo.db as unknown as Record<string, object>;
+  const writes = repo.writer as unknown as Record<string, object>;
+  const merged = new Proxy(
+    {},
+    {
+      get: (_t, model: string) =>
+        model === '$transaction'
+          ? (writes as Record<string, unknown>)[model]
+          : { ...(reads[model] ?? {}), ...(writes[model] ?? {}) },
+    }
+  );
+  return fn(merged as unknown as StoreTx);
+}

@@ -2,7 +2,7 @@ import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { EtaReceiptService, type ReturnEvent } from '../../../services/eta-receipt.service';
-import { withStore } from '@ebda/database';
+import { withStoreRw } from '../../jobs/store-db';
 
 /**
  * Egypt ETA e-receipts (Ruling ETA-1, plan docs/plans/2026-10-07-egypt-vat-and-eta.md addendum).
@@ -65,8 +65,8 @@ export const etaReceiptSubmit: JobDef = inngest.createFunction(
       const status = await EtaReceiptService.processReceipt(storeId, receiptId);
       const next =
         status === 'retrying' || status === 'submitted'
-          ? await withStore(storeId, tx =>
-              tx.etaReceipt.findFirst({
+          ? await withStoreRw(storeId, db =>
+              db.etaReceipt.findFirst({
                 where: { id: receiptId, storeId },
                 select: { nextAttemptAt: true },
               })
