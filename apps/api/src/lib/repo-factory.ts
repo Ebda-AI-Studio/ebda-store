@@ -369,6 +369,26 @@ export interface MoneyClient {
     guestOrderIds: string[];
     truncated: boolean;
   }>;
+  /** Product lexical search on the DO's own index (Ruling CF-R6A-1). A read. */
+  searchProducts(a: {
+    raw: string;
+    opts: {
+      scope: 'storefront' | 'admin';
+      field?: 'doc' | 'name';
+      limit?: number;
+      includeDeleted?: boolean;
+      withSku?: boolean;
+      order?: 'similarity' | 'featured';
+    };
+  }): Promise<{ ids: string[]; truncated: boolean }>;
+  /** Registered customers and guest orders matching a typed term, from the DO's index (Ruling CF-R6A-1). A read. */
+  searchCustomers(a: { q: string; userCap?: number; guestCap?: number }): Promise<{
+    userIds: string[];
+    guestOrderIds: string[];
+    truncated: boolean;
+    usersTruncated: boolean;
+    guestsTruncated: boolean;
+  }>;
   /** A merchant's manual order (Ruling CF-R4-2). */
   createAdminOrder(
     a: Record<string, unknown>,
@@ -754,6 +774,8 @@ export function makeMoneyClient(
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
     searchOrders: a => call('searchOrders', a),
+    searchProducts: a => call('searchProducts', a),
+    searchCustomers: a => call('searchCustomers', a),
     createAdminOrder: (a, key) => call('createAdminOrder', a, key),
     recoveryCoupon: (a, key) => call('recoveryCoupon', a, key),
     barcodeFill: a => call('barcodeFill', a),

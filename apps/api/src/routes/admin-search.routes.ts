@@ -21,6 +21,7 @@
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { prisma } from '@ebda/database';
+import { storeRepo } from '../lib/repo-factory';
 import type { AdminSearchResponse } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { hasPermission, type Permission } from '../middleware/rbac';
@@ -94,18 +95,24 @@ router.get(
               }),
             }
           : null;
+      // A store on its Durable Object reads the display rows from its own tables (Ruling CF-R6A-1): its registered
+      // customers are the `customers` rows (what `orders.customer_id` points at), there is no `Order.customer` relation to
+      // include, and the platform `prisma` has none of these rows.
+      const repo = await storeRepo(storeId);
+      const onDo = repo.backend === 'do';
+      const db = repo.db as unknown as typeof prisma;
       const userIds = matches?.userIds ?? [];
       const guestOrderIds = matches?.guestOrderIds ?? [];
 
       const [products, orders, users, guestOrders] = await Promise.all([
         productIds.length
-          ? prisma.product.findMany({
+          ? db.product.findMany({
               where: { storeId, id: { in: productIds }, deletedAt: null },
               select: { id: true, name: true, nameAr: true, sku: true },
             })
           : [],
         orderWhere
-          ? prisma.order.findMany({
+          ? db.order.findMany({
               where: orderWhere,
               orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
               take: PER_KIND,
@@ -114,19 +121,27 @@ router.get(
                 orderNumber: true,
                 total: true,
                 shippingAddress: true,
-                customer: { select: { firstName: true, lastName: true } },
+                ...(onDo ? { customerId: true } : {}),
+                ...(onDo ? {} : { customer: { select: { firstName: true, lastName: true } } }),
               },
             })
           : [],
         userIds.length
-          ? prisma.user.findMany({
-              where: { storeId, deletedAt: null, id: { in: userIds.slice(0, USER_CAP) } },
-              select: { id: true, firstName: true, lastName: true, phone: true },
-              take: PER_KIND,
-            })
+          ? onDo
+            ? (db as never as { customer: typeof prisma.customer }).customer.findMany({
+                where: { storeId, id: { in: userIds.slice(0, USER_CAP) } },
+                select: { id: true, firstName: true, lastName: true, phone: true },
+                orderBy: { id: 'asc' },
+                take: PER_KIND,
+              })
+            : prisma.user.findMany({
+                where: { storeId, deletedAt: null, id: { in: userIds.slice(0, USER_CAP) } },
+                select: { id: true, firstName: true, lastName: true, phone: true },
+                take: PER_KIND,
+              })
           : [],
         guestOrderIds.length
-          ? prisma.order.findMany({
+          ? db.order.findMany({
               where: {
                 storeId,
                 customerId: null,
@@ -142,9 +157,34 @@ router.get(
 
       const byId = new Map(products.map(p => [p.id, p]));
       data.products = productIds.flatMap(id => (byId.has(id) ? [byId.get(id)!] : []));
+      // DO: the order's registered customer is attached by id after the read (the Postgres twin includes the relation).
+      const doCustomers = new Map<string, { firstName: string | null; lastName: string | null }>();
+      if (onDo) {
+        const ids = [
+          ...new Set(
+            orders.flatMap(o =>
+              (o as { customerId?: string | null }).customerId
+                ? [(o as { customerId: string }).customerId]
+                : []
+            )
+          ),
+        ];
+        if (ids.length)
+          for (const c of await (
+            db as never as { customer: typeof prisma.customer }
+          ).customer.findMany({
+            where: { storeId, id: { in: ids } },
+            select: { id: true, firstName: true, lastName: true },
+          }))
+            doCustomers.set(c.id, c);
+      }
       data.orders = orders.map(o => {
         const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
-        const name = [o.customer?.firstName ?? a.firstName, o.customer?.lastName ?? a.lastName]
+        const cust = onDo
+          ? doCustomers.get((o as { customerId?: string | null }).customerId ?? '')
+          : (o as { customer?: { firstName: string | null; lastName: string | null } | null })
+              .customer;
+        const name = [cust?.firstName ?? a.firstName, cust?.lastName ?? a.lastName]
           .filter((s): s is string => typeof s === 'string' && s.length > 0)
           .join(' ');
         return { id: o.id, orderNumber: o.orderNumber, customerName: name, total: o.total };

@@ -13,6 +13,7 @@ import { hybridOrder } from '../lib/search/rrf';
 import { queryBudgetSpent, takeQueryEmbed } from '../lib/search/embed-budget';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
+import { storeMoney } from '../lib/repo-factory';
 
 /** Most ids a lexical search binds into the follow-up Prisma query (list, typeahead, admin). */
 export const PRODUCT_SEARCH_ID_CAP = 1000;
@@ -112,6 +113,11 @@ export async function searchProductIdSet(
   raw: string,
   opts: ProductSearchOpts
 ): Promise<ProductSearchIdSet> {
+  // A store on its Durable Object answers from the DO's own product index (Ruling CF-R6A-1): same words-AND meaning, the
+  // Arabic fold is the one shared TS function. The Postgres statement below is untouched.
+  if (searchTokens(raw).length === 0) return { ids: [], truncated: false };
+  const money = await storeMoney(storeId);
+  if (money) return money.searchProducts({ raw, opts });
   const sql = productSearchSql(storeId, raw, opts);
   if (!sql) return { ids: [], truncated: false };
   const limit = clampLimit(opts.limit);

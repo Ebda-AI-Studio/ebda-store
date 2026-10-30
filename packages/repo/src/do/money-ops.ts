@@ -40,6 +40,8 @@ import {
 } from './gold-pricing';
 import { placeAdminOrder, type AdminOrderInput } from './admin-order';
 import { searchOrderIds } from './order-search';
+import { searchProductIdSet } from './search';
+import { matchingCustomers } from './search-customers';
 import {
   claimReturn,
   createReturn,
@@ -115,6 +117,8 @@ export type MoneyOpName =
   | 'fiscalRefund'
   | 'fiscalCancelSale'
   | 'searchOrders'
+  | 'searchProducts'
+  | 'searchCustomers'
   | 'createAdminOrder'
   | 'recoveryCoupon'
   | 'returnCreate'
@@ -169,6 +173,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fiscalRefund',
   'fiscalCancelSale',
   'searchOrders',
+  'searchProducts',
+  'searchCustomers',
   'createAdminOrder',
   'recoveryCoupon',
   'returnCreate',
@@ -550,6 +556,25 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       typeof a.search === 'string' ? a.search : '',
       typeof a.numberLimit === 'number' && a.numberLimit > 0 ? a.numberLimit : undefined
     ),
+  /** Product lexical search (admin palette, lists, storefront; Ruling CF-R6A-1): the ids, best name match first. A read. */
+  searchProducts: (db, storeId, a) => {
+    const o = (a.opts ?? {}) as Record<string, unknown>;
+    return searchProductIdSet(db, storeId, typeof a.raw === 'string' ? a.raw : '', {
+      scope: o.scope === 'storefront' ? 'storefront' : 'admin',
+      field: o.field === 'name' ? 'name' : o.field === 'doc' ? 'doc' : undefined,
+      limit: typeof o.limit === 'number' ? o.limit : undefined,
+      includeDeleted: o.includeDeleted === true,
+      withSku: typeof o.withSku === 'boolean' ? o.withSku : undefined,
+      order:
+        o.order === 'featured' ? 'featured' : o.order === 'similarity' ? 'similarity' : undefined,
+    });
+  },
+  /** Registered-customer and guest-order matching for the admin palette and customer typeahead (Ruling CF-R6A-1). A read. */
+  searchCustomers: (db, storeId, a) =>
+    matchingCustomers(db, storeId, typeof a.q === 'string' ? a.q : '', {
+      userCap: typeof a.userCap === 'number' && a.userCap > 0 ? a.userCap : undefined,
+      guestCap: typeof a.guestCap === 'number' && a.guestCap > 0 ? a.guestCap : undefined,
+    }),
   /** A merchant's manual order (Ruling CF-R4-2): priced from the DO's rows, no stock reserved, overrides recorded in the section. */
   createAdminOrder: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a as Partial<AdminOrderInput>;
