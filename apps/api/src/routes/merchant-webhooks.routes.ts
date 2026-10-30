@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
+import { storeRwClient } from '../lib/jobs/store-db';
 import {
   DEFAULT_PLAN_SEEDS,
   PLAN_LIMIT_ERROR_CODE,
@@ -90,8 +91,13 @@ const ENDPOINT_SELECT = {
   updatedAt: true,
 } as const;
 
+/** The store's own backend: the Durable Object for a DO store, Postgres (the request transaction) otherwise. */
+const wdb = async (storeId: string) => (await storeRwClient(storeId)).db;
+
 async function endpointOr404(storeId: string, id: string) {
-  const ep = await prisma.webhookEndpoint.findFirst({
+  const ep = await (
+    await wdb(storeId)
+  ).webhookEndpoint.findFirst({
     where: { id, storeId },
     select: ENDPOINT_SELECT,
   });
@@ -124,7 +130,9 @@ const audit = (req: Request, action: string, resourceId: string) =>
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const endpoints = await prisma.webhookEndpoint.findMany({
+    const endpoints = await (
+      await wdb(storeId)
+    ).webhookEndpoint.findMany({
       where: { storeId },
       select: ENDPOINT_SELECT,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -146,8 +154,10 @@ router.post(
       const input = webhookEndpointCreateSchema.parse(req.body);
       // Serialise concurrent creates of one store: count-then-insert would otherwise let two
       // parallel requests both pass the cap (the lock is released at COMMIT).
-      await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webhook-endpoints:${storeId}`}, 0))`;
-      const count = await prisma.webhookEndpoint.count({ where: { storeId } });
+      // Postgres only: a store on its Durable Object has one writer, so there is no parallel pair to serialise
+      if (!(await storeRwClient(storeId)).onDo)
+        await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webhook-endpoints:${storeId}`}, 0))`;
+      const count = await (await wdb(storeId)).webhookEndpoint.count({ where: { storeId } });
       if (count >= WEBHOOK_MAX_ENDPOINTS_PER_STORE) {
         throw new AppError(409, 'WEBHOOK_LIMIT', 'Webhook endpoint limit reached', {
           limit: WEBHOOK_MAX_ENDPOINTS_PER_STORE,
@@ -155,7 +165,9 @@ router.post(
       }
       await checkUrl(input.url);
       const { secret, hint } = newWebhookSecret();
-      const endpoint = await prisma.webhookEndpoint.create({
+      const endpoint = await (
+        await wdb(storeId)
+      ).webhookEndpoint.create({
         data: {
           storeId,
           url: input.url,
@@ -202,7 +214,7 @@ router.patch(
           ? { active: false, disabledReason: 'merchant', disabledAt: new Date() }
           : {}),
       };
-      await prisma.webhookEndpoint.updateMany({ where: { id, storeId }, data });
+      await (await wdb(storeId)).webhookEndpoint.updateMany({ where: { id, storeId }, data });
       await audit(req, 'webhook_endpoint.updated', id);
       res.json({ success: true, data: { endpoint: await endpointOr404(storeId, id) } });
     } catch (error) {
@@ -216,7 +228,7 @@ router.delete('/:id', writeLimiter, async (req: Request, res: Response, next: Ne
     const { storeId } = req.params;
     const { id } = idParam.parse(req.params);
     await endpointOr404(storeId, id);
-    await prisma.webhookEndpoint.deleteMany({ where: { id, storeId } });
+    await (await wdb(storeId)).webhookEndpoint.deleteMany({ where: { id, storeId } });
     await audit(req, 'webhook_endpoint.deleted', id);
     res.json({ success: true, data: { deleted: true } });
   } catch (error) {
@@ -234,7 +246,9 @@ router.post(
       const { id } = idParam.parse(req.params);
       await endpointOr404(storeId, id);
       const { secret, hint } = newWebhookSecret();
-      await prisma.webhookEndpoint.updateMany({
+      await (
+        await wdb(storeId)
+      ).webhookEndpoint.updateMany({
         where: { id, storeId },
         data: { secretEnc: encryption.encrypt(secret), secretHint: hint },
       });
@@ -273,7 +287,9 @@ router.get('/:id/deliveries', async (req: Request, res: Response, next: NextFunc
     const { storeId } = req.params;
     const { id } = idParam.parse(req.params);
     await endpointOr404(storeId, id);
-    const deliveries = await prisma.webhookDelivery.findMany({
+    const deliveries = await (
+      await wdb(storeId)
+    ).webhookDelivery.findMany({
       where: { storeId, endpointId: id },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: WEBHOOK_LOG_KEEP_PER_ENDPOINT,
@@ -305,7 +321,9 @@ router.get(
     try {
       const { storeId } = req.params;
       const { id, deliveryId } = deliveryParam.parse(req.params);
-      const delivery = await prisma.webhookDelivery.findFirst({
+      const delivery = await (
+        await wdb(storeId)
+      ).webhookDelivery.findFirst({
         where: { id: deliveryId, endpointId: id, storeId },
         select: { id: true, eventId: true, eventType: true, status: true, payload: true },
       });
@@ -326,7 +344,9 @@ router.post(
       const { storeId } = req.params;
       const { id, deliveryId } = deliveryParam.parse(req.params);
       await endpointOr404(storeId, id);
-      const owned = await prisma.webhookDelivery.findFirst({
+      const owned = await (
+        await wdb(storeId)
+      ).webhookDelivery.findFirst({
         where: { id: deliveryId, endpointId: id, storeId },
         select: { id: true },
       });

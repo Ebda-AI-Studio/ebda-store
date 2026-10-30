@@ -35,10 +35,6 @@
   "apps/api/src/routes/insights.routes.ts": {
     "product": 2
   },
-  "apps/api/src/routes/merchant-webhooks.routes.ts": {
-    "webhookEndpoint": 3,
-    "webhookDelivery": 3
-  },
   "apps/api/src/routes/product.routes.ts": {
     "product": 4,
     "productFaq": 2

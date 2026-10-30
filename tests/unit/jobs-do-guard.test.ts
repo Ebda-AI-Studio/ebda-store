@@ -298,18 +298,19 @@ describe('refusal of unported jobs for a DO store', () => {
     );
   });
 
+  // a made-up id: every real non-money job is ported by now, and an id nobody classified is `unported` (the safe default)
   it('queue runner: a non-money unported job pages P1; the same job for a Postgres store runs normally', async () => {
     flagOn();
     const handler = vi.fn(async () => 1);
-    registerJob({ id: 'accounting-expense-ocr-process' }, handler);
+    registerJob({ id: 'a-job-nobody-ported' }, handler);
     await handleJobsBatch({
       queue: 'ebda-jobs',
-      messages: [qmsg('accounting-expense-ocr-process', { storeId: DO_STORE })],
+      messages: [qmsg('a-job-nobody-ported', { storeId: DO_STORE })],
     });
     expect(handler).not.toHaveBeenCalled();
     expect(sendAlert).toHaveBeenCalledWith(expect.objectContaining({ level: 'p1' }));
     sendAlert.mockClear();
-    const m = qmsg('accounting-expense-ocr-process', { storeId: PG_STORE });
+    const m = qmsg('a-job-nobody-ported', { storeId: PG_STORE });
     await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
     expect(handler).toHaveBeenCalledTimes(1);
     expect(sendAlert).not.toHaveBeenCalled();
