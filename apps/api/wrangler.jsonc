@@ -231,6 +231,7 @@
       "0 22 * * *",
       "0 23 * * *",
       "0 3 * * *",
+      "40 3 * * *",
       "0 3 * * SUN",
       "0 3 1 * *",
       "0 4 * * *",
@@ -253,6 +254,9 @@
 
   // Node-only packages replaced by Workers-native code or stubbed (see src/cf/stubs/*).
   "alias": {
+    "culori": "./src/cf/stubs/pdf-lib-unused.ts",
+    "html-entities": "./src/cf/stubs/pdf-lib-unused.ts",
+    "node-html-better-parser": "./src/cf/stubs/pdf-lib-unused.ts",
     "ioredis": "./src/cf/stubs/ioredis.ts",
     // Rulings BUNDLE-BUDGET-5/6. exceljs resolves to a build of its own `lib/` source (scripts/ci/gen-exceljs-workers.mjs) that
     // leaves crypto/events/buffer/util/stream to nodejs_compat instead of the browserify copies the dist files embed (-390 KB).

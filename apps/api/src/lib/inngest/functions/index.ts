@@ -2,6 +2,9 @@ import type { JobDef } from '../../jobs/types';
 import { orderCreated } from './order-created';
 import { orderRefunded } from './order-refunded';
 import { bulkImportProducts } from './bulk-import';
+import { catalogImportRun } from './catalog-import-run';
+import { catalogImportCreateDrafts } from './catalog-import-create-drafts';
+import { catalogImportUploadsSweep } from './catalog-import-uploads-sweep';
 import { bulkImportOrphanCleanup } from './bulk-import-orphan-cleanup';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
@@ -101,6 +104,10 @@ const allInngestFunctions: JobDef[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
+  // Catalogue import (photos / PDFs -> reviewed drafts).
+  catalogImportRun,
+  catalogImportCreateDrafts,
+  catalogImportUploadsSweep,
   bulkImportOrphanCleanup,
   invoiceEmail,
   heartbeat,

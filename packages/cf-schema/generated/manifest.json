@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 122,
+      "tables": 125,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -122,6 +122,9 @@
         "store_whatsapp_consents": 12,
         "eta_connections": 15,
         "eta_receipts": 25,
+        "catalog_import_jobs": 16,
+        "catalog_import_files": 20,
+        "catalog_import_items": 26,
         "store_profile": 62,
         "store_config": 24,
         "commerce_outcomes": 14,
@@ -1195,6 +1198,60 @@
       "name": "store_subscriptions_billing_anchor_day_check",
       "table": "store_subscriptions",
       "disposition": "d1:store_subscriptions"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_jobs_status_chk",
+      "table": "catalog_import_jobs",
+      "disposition": "store-do:catalog_import_jobs"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_files_status_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_files_pages_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_files_charged_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_status_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_tags_max_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_variants_max_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_price_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_len_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
     },
     {
       "kind": "index",

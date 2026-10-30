@@ -76,8 +76,8 @@
     "access": "staff",
     "en": "Bulk Operations",
     "ar": "العمليات الجماعية",
-    "synEn": "import export csv excel upload",
-    "synAr": "استيراد تصدير اكسل رفع جماعي",
+    "synEn": "import export csv excel upload photo pdf catalogue catalog price list menu image",
+    "synAr": "استيراد تصدير اكسل رفع جماعي صور PDF كتالوج قائمة أسعار منيو",
     "feature": "bulk_operations"
   },
   {

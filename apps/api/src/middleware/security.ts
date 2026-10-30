@@ -1528,6 +1528,25 @@ export const uploadLimiter = rateLimit({
   },
 });
 
+// Catalogue import: uploads per STORE per hour (a staff pile-on or a looping client cannot spend a
+// store's AI budget). Keyed on the store from the route, never the body. The page ledger and the
+// active-jobs cap are the money-side limits; this is the request-rate side.
+export const catalogImportStoreLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'catalog-import-store'),
+  windowMs: 60 * 60 * 1000,
+  max: parseInt(process.env.CATALOG_IMPORT_UPLOADS_PER_HOUR || '10', 10),
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many imports this hour, try again later.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTest,
+  keyGenerator: req => `store:${req.params.storeId || 'unknown'}`,
+  validate: { keyGeneratorIpFallback: false },
+});
+
 // Daily upload limit per user
 export const dailyUploadLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'upload-daily'),

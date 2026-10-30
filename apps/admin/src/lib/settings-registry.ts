@@ -115,7 +115,10 @@ export const PAGES: PageEntry[] = [
   }),
   page('/bulk', 'bulk.page.title', 'staff', {
     feature: 'bulk_operations',
-    syn: { en: 'import export csv excel upload', ar: 'استيراد تصدير اكسل رفع جماعي' },
+    syn: {
+      en: 'import export csv excel upload photo pdf catalogue catalog price list menu image',
+      ar: 'استيراد تصدير اكسل رفع جماعي صور PDF كتالوج قائمة أسعار منيو',
+    },
   }),
   page('/builder', `${HUB}.editor`, 'staff', {
     syn: {

@@ -141,6 +141,9 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       affiliateEvents: 'AffiliateEvent',
       pages: 'StorePage',
       bulkImportJobs: 'BulkImportJob',
+      catalogImportJobs: 'CatalogImportJob',
+      catalogImportFiles: 'CatalogImportFile',
+      catalogImportItems: 'CatalogImportItem',
       aiUsage: 'AiUsage',
       bulkAiJobs: 'BulkAiJob',
       faqs: 'StoreFaq',
@@ -299,6 +302,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     table: 'categories',
     storeId: true,
     relations: {
+      catalogImportItems: 'CatalogImportItem',
       store: 'Store',
       parent: 'Category',
       children: 'Category',
@@ -345,6 +349,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       embedFailure: 'ProductEmbedFailure',
       priceTiers: 'ProductPriceTier',
       sizeChart: 'SizeChart',
+      catalogImportItems: 'CatalogImportItem',
     },
   },
   {
@@ -1602,6 +1607,38 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     storeId: true,
     relations: {
       store: 'Store',
+    },
+  },
+  {
+    name: 'CatalogImportJob',
+    table: 'catalog_import_jobs',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      files: 'CatalogImportFile',
+      items: 'CatalogImportItem',
+    },
+  },
+  {
+    name: 'CatalogImportFile',
+    table: 'catalog_import_files',
+    storeId: true,
+    relations: {
+      job: 'CatalogImportJob',
+      store: 'Store',
+      items: 'CatalogImportItem',
+    },
+  },
+  {
+    name: 'CatalogImportItem',
+    table: 'catalog_import_items',
+    storeId: true,
+    relations: {
+      job: 'CatalogImportJob',
+      file: 'CatalogImportFile',
+      store: 'Store',
+      category: 'Category',
+      product: 'Product',
     },
   },
 ];

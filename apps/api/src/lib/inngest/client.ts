@@ -42,6 +42,16 @@ type InvoiceEmailRequestedEvent = EventPayload & {
   };
 };
 
+type CatalogImportStartedEvent = EventPayload & {
+  name: 'catalog-import/started';
+  data: { jobId: string; storeId: string };
+};
+
+type CatalogImportCreateDraftsEvent = EventPayload & {
+  name: 'catalog-import/create-drafts';
+  data: { jobId: string; storeId: string; itemIds?: string[] };
+};
+
 type BulkAiTranslateEvent = EventPayload & {
   name: 'bulk-ai/translate-requested';
   data: {
@@ -422,6 +432,8 @@ export type AppEvent =
   | BulkAiImageAltEvent
   | BulkAiExcerptEvent
   | BulkAiTagsEvent
+  | CatalogImportStartedEvent
+  | CatalogImportCreateDraftsEvent
   | AccountErasedEvent
   | AnswerEngineScanRequestedEvent
   | GscIngestRequestedEvent

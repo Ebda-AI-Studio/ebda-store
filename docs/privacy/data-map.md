@@ -225,3 +225,7 @@ response the customer receives:
   only the opaque `userId` (already the established logging convention
   across this codebase) and provider-issued opaque ids (OneSignal player
   id, PostHog person id).
+
+## Catalogue import (photos / PDFs)
+
+A merchant's uploaded photos and PDFs are stored in the private bucket under `stores/<storeId>/catalogimport-<jobId>/`, readable only through a tenant-checked admin endpoint, and sent once per read to the AI vendor for extraction (no files are kept by us beyond 30 days). Phone numbers, emails, links and handles in the extracted text are redacted before they reach any product field or log; logs carry ids and counts only. Rows: `catalog_import_jobs` (acting user id, scrubbed on user erasure), `catalog_import_files`, `catalog_import_items`. Retention: 30 days (`docs/RETENTION.md`). Rulings CATIMP-1..5.

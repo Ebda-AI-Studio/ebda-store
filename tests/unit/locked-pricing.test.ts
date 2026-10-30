@@ -78,10 +78,16 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
       // `wholesalePricing` arrived later (20261028000200_b2b_product_columns_order_snapshots UPDATEs it onto the rows,
       // pinned in tests/unit/b2b-plan-gate.test.ts); this migration predates it, so compare every OTHER lever.
       // `whatsappAutomation` for Business was set later by 20261104000200 (WA-PKG-1); pinned below.
-      const { wholesalePricing: _w, whatsappAutomation: _wa, ...seedLimits } = p.limits;
+      const {
+        wholesalePricing: _w,
+        whatsappAutomation: _wa,
+        catalogImportPagesPerMonth: _cs,
+        ...seedLimits
+      } = p.limits;
       const {
         wholesalePricing: _m,
         whatsappAutomation: _ma,
+        catalogImportPagesPerMonth: _cm,
         ...migrated
       } = planLimitsSchema.parse(JSON.parse(json));
       expect(migrated, p.code).toEqual(seedLimits);

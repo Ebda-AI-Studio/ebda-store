@@ -1129,7 +1129,10 @@
     "subjectKeys": ["email"],
     "note": "invitee address; pending invites expire, rows leave with the store",
     "userIdColumns": ["invited_by", "accepted_by"],
-    "actorScrub": { "invited_by": null, "accepted_by": null }
+    "actorScrub": {
+      "invited_by": null,
+      "accepted_by": null
+    }
   },
   "d1:store_staff": {
     "db": "d1",
@@ -1440,5 +1443,35 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
+  },
+  "store-do:catalog_import_jobs": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by"],
+    "subjectKeys": ["userId"],
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record and expires after 30 days",
+    "userIdColumns": ["created_by"],
+    "actorScrub": {
+      "created_by": null
+    }
+  },
+  "store-do:catalog_import_files": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "the stored original is purged with its job (30 days); the file name is display-only text typed by the merchant",
+    "reviewedNotPii": ["original_name", "input_tokens", "output_tokens"]
+  },
+  "store-do:catalog_import_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "extracted product text; phone numbers, emails and links are redacted before staging (packages/shared/src/catalogue/pii.ts)",
+    "reviewedNotPii": ["category_name"]
   }
 }
