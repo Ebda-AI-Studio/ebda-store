@@ -1,6 +1,7 @@
 import { canonicalJson, fingerprint } from './keyed-op';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { planDeficit } from './warehouse-deficit';
+import { BOOKS_OPS, type BooksOpName } from './stock-books';
 
 /**
  * Stock and inventory on the StoreDO (INFRA-CF-1 PR D2a, Ruling CF-STOCK-1; plan section 4 rows 1, 2, 6).
@@ -23,7 +24,8 @@ export type StockOpName =
   | 'setWarehouseStock'
   | 'adjustWarehouseStock'
   | 'reconcileWarehouseSku'
-  | 'reconcileWarehouseAll';
+  | 'reconcileWarehouseAll'
+  | BooksOpName;
 
 export const STOCK_OP_NAMES: readonly StockOpName[] = [
   'adjustProduct',
@@ -34,6 +36,21 @@ export const STOCK_OP_NAMES: readonly StockOpName[] = [
   'adjustWarehouseStock',
   'reconcileWarehouseSku',
   'reconcileWarehouseAll',
+  // R7 (CF-R7-1): the accounting + scan flows of stock-books.ts; a test keeps this list EQUAL to BOOKS_OPS (a value import of
+  // stock-books at module top would make a circular evaluation order matter)
+  'createStockAdjustment',
+  'postStockAdjustment',
+  'createPurchaseOrder',
+  'cancelPurchaseOrder',
+  'receivePurchaseOrder',
+  'seedCoa',
+  'openingBalance',
+  'receiveVariant',
+  'openCountSession',
+  'submitCountLine',
+  'closeCountSession',
+  'reconcileCountSession',
+  'bulkSetInventory',
 ];
 
 type HistoryType =
@@ -207,7 +224,7 @@ function defaultWarehouse(db: SyncSql, storeId: string): string | null {
 }
 
 /** Shift the default warehouse's row so the shadow sums to the aggregate that was just written. */
-function reconcileToAggregate(
+export function reconcileToAggregate(
   db: SyncSql,
   storeId: string,
   productId: string,
@@ -567,7 +584,7 @@ function reconcileWarehouseAll(db: SyncSql, storeId: string, a: Record<string, u
 }
 
 const OPS: Record<
-  StockOpName,
+  Exclude<StockOpName, BooksOpName>,
   (db: SyncSql, storeId: string, a: Record<string, unknown>) => unknown
 > = {
   adjustProduct,
@@ -592,7 +609,11 @@ export function runStockOp(
   key?: string,
   now: () => number = Date.now
 ): unknown {
-  if (!Object.prototype.hasOwnProperty.call(OPS, op))
+  const table = { ...OPS, ...BOOKS_OPS } as Record<
+    string,
+    (db: SyncSql, storeId: string, a: Record<string, unknown>) => unknown
+  >;
+  if (!Object.prototype.hasOwnProperty.call(table, op))
     throw new MoneyError('STOCK_OP_NOT_ALLOWED', `stock operation ${op}`, 400);
   if (!args || typeof args !== 'object' || Array.isArray(args))
     throw new MoneyError('BAD_ARGS', 'args', 400);
@@ -609,7 +630,7 @@ export function runStockOp(
       }
       if (prior) db.run('DELETE FROM _stock_ops WHERE k = ?', [key]);
     }
-    const out = OPS[op as StockOpName](db, storeId, args as Record<string, unknown>);
+    const out = table[op](db, storeId, args as Record<string, unknown>);
     if (key) {
       db.run('DELETE FROM _stock_ops WHERE at < ?', [now() - KEY_TTL_MS]);
       db.run('INSERT INTO _stock_ops (k, op, fp, result, at) VALUES (?, ?, ?, ?, ?)', [
