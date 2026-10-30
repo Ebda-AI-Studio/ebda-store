@@ -36,6 +36,12 @@
     },
     "/en/legal/whatsapp-terms": {
       "htmlGzipKb": 26
+    },
+    "/terms": {
+      "htmlGzipKb": 22
+    },
+    "/merchant-agreement": {
+      "htmlGzipKb": 21.5
     }
   },
   "lcpMs": 2500,
