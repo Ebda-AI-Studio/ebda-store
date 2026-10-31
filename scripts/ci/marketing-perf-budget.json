@@ -17,7 +17,8 @@
       "htmlGzipKb": 25
     },
     "/whatsapp": {
-      "jsGzipKb": 193
+      "jsGzipKb": 193,
+      "htmlGzipKb": 21
     },
     "/legal/whatsapp-terms": {
       "htmlGzipKb": 26
@@ -38,7 +39,8 @@
       "htmlGzipKb": 25
     },
     "/en/whatsapp": {
-      "jsGzipKb": 193
+      "jsGzipKb": 193,
+      "htmlGzipKb": 21
     },
     "/en/legal/whatsapp-terms": {
       "htmlGzipKb": 26
