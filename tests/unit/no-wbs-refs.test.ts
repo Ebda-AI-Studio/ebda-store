@@ -35,7 +35,9 @@ const tracked = execFileSync('git', ['ls-files', '-z', 'apps', 'packages'], {
   .split('\0')
   .filter(Boolean)
   .filter(f => !f.startsWith(EXEMPT_PREFIX))
-  .filter(f => !f.endsWith('package-lock.json'));
+  .filter(f => !f.endsWith('package-lock.json'))
+  // a generated minified third-party build (pdf-lib, Ruling BUNDLE-BUDGET-7), not source
+  .filter(f => f !== 'apps/api/src/cf/modules/pdf-lib.mjs');
 
 const read = (f: string): string | null => {
   try {

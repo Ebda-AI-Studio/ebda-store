@@ -3,7 +3,7 @@ import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 
@@ -20,7 +20,9 @@ const adminChain = [authenticate, authorize('store_admin', 'super_admin'), requi
 router.get('/', ...adminChain, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const rows = await prisma.tag.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).tag.findMany({
       where: { storeId },
       select: { id: true, name: true, nameAr: true, _count: { select: { products: true } } },
       orderBy: { name: 'asc' },
@@ -59,19 +61,20 @@ router.put(
     try {
       const { storeId, tagId } = req.params;
       const data = updateTagSchema.parse(req.body);
-      const existing = await prisma.tag.findFirst({
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+      const existing = await w.tag.findFirst({
         where: { id: tagId, storeId },
         select: { id: true },
       });
       if (!existing) throw new AppError(404, 'NOT_FOUND', 'Tag not found');
       if (data.name !== undefined) {
-        const clash = await prisma.tag.findFirst({
+        const clash = await w.tag.findFirst({
           where: { storeId, name: data.name, NOT: { id: tagId } },
           select: { id: true },
         });
         if (clash) throw new AppError(409, 'TAG_EXISTS', 'A tag with this name already exists');
       }
-      const tag = await prisma.tag.update({
+      const tag = await w.tag.update({
         where: { id: tagId, storeId },
         data: {
           ...(data.name !== undefined ? { name: data.name } : {}),

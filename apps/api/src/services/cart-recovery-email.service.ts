@@ -17,9 +17,11 @@
  * variant of the address has unsubscribed, nothing is sent. Every email carries
  * the per-subscriber one-click unsubscribe (RFC 8058 headers + footer link).
  */
-import { prisma, acrossStoresFlat, runInStoreScope, runInTenantContext } from '@ebda/database';
+import { acrossStoresFlat, runInStoreScope, runInTenantContext, withStore } from '@ebda/database';
+import { storeRepo, type StoreReads, type StoreWrites } from '../lib/repo-factory';
 import { storefrontOrigin } from '@ebda/shared';
 import { inngest } from '../lib/inngest/client';
+import { CI_CART_REMINDER_EVENT } from '../lib/ci/events';
 import { awaitCampaignSendSlot } from '../lib/campaign-send-pacer';
 import { signCartRestoreToken } from '../lib/cart-restore-token';
 import { signSubscriberUnsubscribeToken } from '../lib/campaign-unsubscribe-token';
@@ -69,6 +71,19 @@ export function cartEmailDailyCap(): number {
 // rate limits, unknown codes, network errors) is transient and is rethrown so the job retries it;
 // `onFailure` marks the cart failed once the retries are exhausted.
 
+/**
+ * One store's reads and writes for a job step (Ruling CF-R4-5). A store on Postgres keeps its request-style tenant scope
+ * (`runInTenantContext`, unchanged); a store on its Durable Object has no Postgres scope to open, its rows come over RPC.
+ */
+async function inStore<T>(
+  storeId: string,
+  fn: (db: StoreReads, w: StoreWrites) => Promise<T>
+): Promise<T> {
+  const repo = await storeRepo(storeId);
+  const run = () => fn(repo.db, repo.writer);
+  return repo.backend === 'do' ? run() : runInTenantContext(storeId, run);
+}
+
 export const CART_RECOVERY_EMAIL_EVENT = 'cart-recovery/email-requested';
 
 /** Delay is minutes of inactivity; the record already exists after 60 idle minutes. */
@@ -87,8 +102,8 @@ export async function sweepCartRecoveryEmails(
 
   // Only stores with the channel ON are scanned at all (one config read per store, then the
   // cart queries only for the enabled ones).
-  const enabled = await acrossStoresFlat(storeId =>
-    prisma.abandonedCartConfig.findMany({
+  const enabled = await acrossStoresFlat(async storeId =>
+    (await storeRepo(storeId)).db.abandonedCartConfig.findMany({
       where: { storeId, emailEnabled: true },
       select: { storeId: true, emailDelayMinutes: true },
     })
@@ -104,8 +119,9 @@ export async function sweepCartRecoveryEmails(
 
   for (const cfg of enabled) {
     const { storeId } = cfg;
+    const { db, writer } = await storeRepo(storeId).then(r => ({ db: r.db, writer: r.writer }));
     await runInStoreScope(storeId, async () => {
-      const carts = await prisma.abandonedCart.findMany({
+      const carts = await db.abandonedCart.findMany({
         where: {
           storeId,
           emailStatus: null,
@@ -119,7 +135,7 @@ export async function sweepCartRecoveryEmails(
         const dueAt = cartEmailDueAt(c.createdAt, cfg.emailDelayMinutes);
         if (now.getTime() < dueAt.getTime()) continue;
         if (now.getTime() - dueAt.getTime() > STALE_AFTER_MS) {
-          await prisma.abandonedCart.updateMany({
+          await writer.abandonedCart.updateMany({
             where: { id: c.id, storeId, emailStatus: null },
             data: { emailStatus: 'skipped', emailDetail: 'stale' },
           });
@@ -127,7 +143,7 @@ export async function sweepCartRecoveryEmails(
           continue;
         }
         // The once-per-cart gate: only the sweep that flips NULL -> queued sends the event.
-        const claim = await prisma.abandonedCart.updateMany({
+        const claim = await writer.abandonedCart.updateMany({
           where: { id: c.id, storeId, emailStatus: null },
           data: { emailStatus: 'queued' },
         });
@@ -137,7 +153,7 @@ export async function sweepCartRecoveryEmails(
           result.claimed++;
         } catch (err) {
           logger.error({ err, storeId, abandonedCartId: c.id }, '[CartEmail] enqueue failed');
-          await prisma.abandonedCart.updateMany({
+          await writer.abandonedCart.updateMany({
             where: { id: c.id, storeId, emailStatus: 'queued' },
             data: { emailStatus: 'failed', emailDetail: 'ENQUEUE_FAILED' },
           });
@@ -148,7 +164,7 @@ export async function sweepCartRecoveryEmails(
       // A row claimed but never finished (the process died between the claim and the send, or the
       // event was lost) is re-emitted with the SAME event id: a live duplicate dedupes in Inngest,
       // a lost one runs. The job and the Resend key are idempotent either way.
-      const stuck = await prisma.abandonedCart.findMany({
+      const stuck = await db.abandonedCart.findMany({
         where: {
           storeId,
           emailStatus: 'queued',
@@ -237,8 +253,8 @@ async function finish(
   id: string,
   data: { emailStatus: string; emailDetail?: string | null; emailSentAt?: Date }
 ) {
-  await runInTenantContext(storeId, () =>
-    prisma.abandonedCart.updateMany({
+  await inStore(storeId, (_db, w) =>
+    w.abandonedCart.updateMany({
       where: { id, storeId, emailStatus: 'queued' },
       data,
     })
@@ -249,8 +265,8 @@ export async function deliverCartRecoveryEmail(
   storeId: string,
   abandonedCartId: string
 ): Promise<DeliverOutcome> {
-  const loaded = await runInTenantContext(storeId, async () => {
-    const ac = await prisma.abandonedCart.findFirst({
+  const loaded = await inStore(storeId, async db => {
+    const ac = await db.abandonedCart.findFirst({
       where: { id: abandonedCartId, storeId },
       select: {
         id: true,
@@ -264,14 +280,14 @@ export async function deliverCartRecoveryEmail(
       },
     });
     if (!ac) return null;
-    const cfg = await prisma.abandonedCartConfig.findUnique({
+    const cfg = await db.abandonedCartConfig.findUnique({
       where: { storeId },
       select: { emailEnabled: true },
     });
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: CAMPAIGN_STORE_SELECT,
-    });
+    // `Store` is a platform table: a context-independent read, whichever backend serves the store's rows
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT })
+    );
     return { ac, cfg, store: store as CampaignStoreContext | null };
   });
 
@@ -295,8 +311,8 @@ export async function deliverCartRecoveryEmail(
 
   // Consent: active newsletter subscriber of THIS store; any unsubscribed casing variant blocks.
   const email = normalizeEmail(ac.customerEmail);
-  const subs = await runInTenantContext(storeId, () =>
-    prisma.newsletterSubscriber.findMany({
+  const subs = await inStore(storeId, db =>
+    db.newsletterSubscriber.findMany({
       where: { storeId, email: { equals: email, mode: 'insensitive' } },
       select: {
         id: true,
@@ -312,8 +328,8 @@ export async function deliverCartRecoveryEmail(
     return skip('no_consent');
   }
   // The store's own fuse: past it the reminder is skipped, not queued for tomorrow (stale mail).
-  const sentToday = await runInTenantContext(storeId, () =>
-    prisma.abandonedCart.count({
+  const sentToday = await inStore(storeId, db =>
+    db.abandonedCart.count({
       where: { storeId, emailSentAt: { gte: new Date(Date.now() - DAY_MS) } },
     })
   );
@@ -347,14 +363,14 @@ export async function deliverCartRecoveryEmail(
   // Stop-on-convert (Ruling CART-EMAIL-3): the slot wait above can take up to 30 s, so re-read the
   // cart's state in the last moment before Resend. An order placed meanwhile, or a cart the
   // shopper emptied, must not get the reminder.
-  const fresh = await runInTenantContext(storeId, async () => {
+  const fresh = await inStore(storeId, async db => {
     const [row, items, bundles] = await Promise.all([
-      prisma.abandonedCart.findFirst({
+      db.abandonedCart.findFirst({
         where: { id: ac.id, storeId },
         select: { status: true, recoveredAt: true, emailStatus: true },
       }),
-      prisma.cartItem.count({ where: { cartId: ac.cartId } }),
-      prisma.cartBundle.count({ where: { cartId: ac.cartId } }),
+      db.cartItem.count({ where: { cartId: ac.cartId } }),
+      db.cartBundle.count({ where: { cartId: ac.cartId } }),
     ]);
     return { row, hasItems: items + bundles > 0 };
   });
@@ -385,5 +401,18 @@ export async function deliverCartRecoveryEmail(
   }
   // Outside the try: if this write fails the step retries and Resend's idempotency key dedupes.
   await finish(storeId, ac.id, { emailStatus: 'sent', emailDetail: null, emailSentAt: new Date() });
+  // CI-13: the recovery email went out. A failed enqueue is logged and never undoes the send.
+  await inngest
+    .send({
+      name: CI_CART_REMINDER_EVENT,
+      data: {
+        storeId,
+        abandonedCartId: ac.id,
+        channel: 'email',
+        step: 1,
+        at: new Date().toISOString(),
+      },
+    })
+    .catch(err => logger.warn({ err, abandonedCartId: ac.id }, '[CartEmail] ci event not sent'));
   return { outcome: 'sent' };
 }

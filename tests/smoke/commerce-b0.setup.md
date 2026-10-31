@@ -27,7 +27,8 @@ The spec drives the Phase B0 flow against a LOCAL stack. It never runs in CI and
 
 ```bash
 export B0_OWNER_EMAIL=<owner email>
-export B0_OWNER_PASSWORD=<owner password>
+export B0_JWT_SECRET=<the JWT_SECRET the local API was started with>
+export B0_DB_URL=<LOCAL owner database URL>  # merchants sign in at the identity service; the spec mints the owner token
 # optional overrides
 export B0_WEB_URL=http://b0-minimal.localhost:3100
 export B0_API_URL=http://127.0.0.1:4100/api/v1

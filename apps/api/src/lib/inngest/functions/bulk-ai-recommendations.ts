@@ -1,5 +1,7 @@
 import type { JobDef } from '../../jobs/types';
-import { Prisma, prisma, withMoneyTx, runInStoreScope } from '@ebda/database';
+import { storeRepo, storeWriter, type StoreReads } from '../../repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
+import { Prisma, prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -82,6 +84,69 @@ const FBT_PAIRS_PER_PRODUCT = 6;
 // reflects the store's CURRENT catalogue behaviour, not stale history.
 const FBT_WINDOW_DAYS = 180;
 
+async function coPurchaseRowsPg(
+  storeId: string,
+  since: Date
+): Promise<Array<{ a_id: string; b_id: string; co_orders: bigint }>> {
+  return prisma.$queryRaw<Array<{ a_id: string; b_id: string; co_orders: bigint }>>(
+    Prisma.sql`
+      SELECT a.product_id AS a_id,
+             b.product_id AS b_id,
+             COUNT(DISTINCT o.id) AS co_orders
+      FROM order_items a
+      JOIN order_items b
+        ON a.order_id = b.order_id
+       AND a.product_id < b.product_id
+      JOIN orders o ON o.id = a.order_id
+      WHERE o.store_id = ${storeId}
+        AND o.created_at >= ${since}
+        AND o.status NOT IN ('cancelled', 'refunded')
+      GROUP BY a.product_id, b.product_id
+      HAVING COUNT(DISTINCT o.id) >= 1
+      ORDER BY co_orders DESC
+      LIMIT 2000
+    `
+  );
+}
+
+/**
+ * The same pairs for a store on its Durable Object (Ruling CF-JOBS-4): the read client has no raw SQL, so the qualifying
+ * orders are read with their lines (bounded to the newest FBT_DO_MAX_ORDERS orders) and paired here. Same filter as the SQL: this store, inside
+ * the window, status not cancelled/refunded; top 2000 pairs by distinct co-orders.
+ */
+const FBT_DO_MAX_ORDERS = 5000;
+export async function coPurchaseRowsOnDo(
+  db: StoreReads,
+  storeId: string,
+  since: Date
+): Promise<Array<{ a_id: string; b_id: string; co_orders: number }>> {
+  const orders = await db.order.findMany({
+    where: { storeId, createdAt: { gte: since }, status: { notIn: ['cancelled', 'refunded'] } },
+    select: { id: true, items: { select: { productId: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: FBT_DO_MAX_ORDERS,
+  });
+  const byOrder = new Map<string, Set<string>>(
+    orders.map(o => [o.id, new Set(o.items.map(i => i.productId))])
+  );
+  const pairs = new Map<string, number>();
+  for (const set of byOrder.values()) {
+    const ids = [...set].sort();
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++) {
+        const k = `${ids[i]}\u0000${ids[j]}`;
+        pairs.set(k, (pairs.get(k) ?? 0) + 1);
+      }
+  }
+  return [...pairs.entries()]
+    .map(([k, n]) => {
+      const [a_id, b_id] = k.split('\u0000');
+      return { a_id, b_id, co_orders: n };
+    })
+    .sort((x, y) => y.co_orders - x.co_orders)
+    .slice(0, 2000);
+}
+
 /**
  * Compute the strongest frequently-bought-together (FBT) pairs for the
  * store from real order history. Self-joins `order_items` within the same
@@ -103,25 +168,11 @@ async function computeCoPurchasePairs(
 ): Promise<Map<string, Array<{ productId: string; coOrders: number }>>> {
   const since = new Date(Date.now() - FBT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const rows = await prisma.$queryRaw<Array<{ a_id: string; b_id: string; co_orders: bigint }>>(
-    Prisma.sql`
-      SELECT a.product_id AS a_id,
-             b.product_id AS b_id,
-             COUNT(DISTINCT o.id) AS co_orders
-      FROM order_items a
-      JOIN order_items b
-        ON a.order_id = b.order_id
-       AND a.product_id < b.product_id
-      JOIN orders o ON o.id = a.order_id
-      WHERE o.store_id = ${storeId}
-        AND o.created_at >= ${since}
-        AND o.status NOT IN ('cancelled', 'refunded')
-      GROUP BY a.product_id, b.product_id
-      HAVING COUNT(DISTINCT o.id) >= 1
-      ORDER BY co_orders DESC
-      LIMIT 2000
-    `
-  );
+  const repo = await storeRepo(storeId);
+  const rows: Array<{ a_id: string; b_id: string; co_orders: bigint | number }> =
+    repo.backend === 'do'
+      ? await coPurchaseRowsOnDo(repo.db, storeId, since)
+      : await coPurchaseRowsPg(storeId, since);
 
   const map = new Map<string, Array<{ productId: string; coOrders: number }>>();
   const push = (src: string, tgt: string, n: number) => {
@@ -196,6 +247,11 @@ const bulkAiRecommendationsFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       // Flip the job to 'running' as the very first step BEFORE any heavy
       // load. Two reasons: (a) the queue-depth watcher can distinguish
       // "Inngest never delivered the event" (status stays 'queued' for
@@ -206,7 +262,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
       // so Inngest persists the transition independently from subsequent
       // failures — a Gemini error doesn't roll back this update.
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
@@ -216,7 +272,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
       // build batches and as the Gemini candidate list. Loaded ONCE so
       // batch boundaries never shift across retries.
       const catalogIndex = await step.run('load-items', async () => {
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, status: 'active', deletedAt: null },
           select: {
             id: true,
@@ -225,7 +281,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
           },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: products.length },
         });
@@ -245,7 +301,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
         // invalidating nothing.
         await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
         await step.run('finalize-small', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: {
               status: 'completed',
@@ -278,7 +334,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
         const batchIds = batches[i];
 
         const result: RecBatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -302,7 +358,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
 
           // Smart-skip set + FBT signal rebuilt fresh per batch — cheap
           // reads, and always reflect what earlier batches just wrote.
-          const existingRecRows = await prisma.aiRecommendation.findMany({
+          const existingRecRows = await sdb.aiRecommendation.findMany({
             where: { storeId },
             select: { sourceProductId: true },
             distinct: ['sourceProductId'],
@@ -336,7 +392,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
             }
 
             // Fresh re-fetch — the idempotency re-check.
-            const product = await prisma.product.findUnique({
+            const product = await sdb.product.findUnique({
               where: { id: productId, storeId },
               select: { id: true, name: true, description: true },
             });
@@ -435,11 +491,14 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
               if (validRecs.length === 0) {
                 bSkipped++;
               } else {
-                await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-                  await tx.aiRecommendation.deleteMany({
+                // replace this product's rows as ONE atomic batch (Postgres: the writer is `prisma`, the batch one
+                // transaction; DO: one `mutate` RPC). A re-delivery replaces the same rows again, so it is idempotent.
+                const rw = await storeWriter(storeId);
+                await rw.$transaction([
+                  rw.aiRecommendation.deleteMany({
                     where: { storeId, sourceProductId: product.id },
-                  });
-                  await tx.aiRecommendation.createMany({
+                  }),
+                  rw.aiRecommendation.createMany({
                     data: validRecs.map(r => ({
                       storeId,
                       sourceProductId: product.id,
@@ -448,8 +507,8 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
                       reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
                     })),
                     skipDuplicates: true,
-                  });
-                });
+                  }),
+                ]);
                 bFilled++;
               }
             } catch (err) {
@@ -496,7 +555,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
@@ -534,12 +593,12 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await step.run('finalize', async () => {
-        const finalRow = await prisma.bulkAiJob.findUnique({
+        const finalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',

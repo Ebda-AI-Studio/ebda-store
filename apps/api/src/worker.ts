@@ -30,6 +30,7 @@ import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
+import { parkIfFrozen, type ParkableBatch } from './cf/queue-freeze';
 import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
 import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
@@ -120,6 +121,14 @@ async function checkRole(): Promise<void> {
     );
     return rows;
   });
+}
+
+/** Drop a client-supplied `x-ebda-backend` (the retired Phase 0 opt-in) before anything reads the request. */
+export function stripBackendHeader(request: Request): Request {
+  if (!request.headers.has('x-ebda-backend')) return request;
+  const headers = new Headers(request.headers);
+  headers.delete('x-ebda-backend');
+  return new Request(request, { headers });
 }
 
 /** Overwrite X-Forwarded-For with the address Cloudflare saw, so `trust proxy` cannot be spoofed. */
@@ -316,7 +325,9 @@ async function floodGuard(
   );
 }
 
-async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
+async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
+  // The backend of a store is server-side state only (Ruling CF-BACKEND-1): the retired Phase 0 opt-in header never gets in.
+  const request = stripBackendHeader(incoming);
   const path = new URL(request.url).pathname;
   if (path === '/__dev/stats') {
     const res = devStats(env, isolateDb);
@@ -377,6 +388,9 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
 }
 
 async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promise<void> {
+  // Write freeze (Ruling CF-JOBS-2): park every message of every consumer, drop none.
+  setCfBindings(env);
+  if (await parkIfFrozen(batch as unknown as ParkableBatch, env)) return;
   await withWorkerContext(env, ctx, () =>
     // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
     batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ

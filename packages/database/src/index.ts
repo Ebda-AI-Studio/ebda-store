@@ -12,6 +12,14 @@ import {
 import { setTenantGucs as setTenantGucsImpl } from './tenant-gucs';
 import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
+import { dropHiddenStores } from './job-store-guard';
+
+export {
+  withHiddenStores,
+  withoutHiddenStores,
+  dropHiddenStores,
+  type HiddenStoresScope,
+} from './job-store-guard';
 
 // The client factory, the per-request client binding and the process singleton
 // live in ./client and ./request-db. Everything below resolves its client
@@ -809,7 +817,8 @@ export async function storeDirectory(
     hasDomain: r.has_domain,
     hasPendingDomain: r.has_pending_domain,
   }));
-  return filter ? all.filter(filter) : all;
+  const kept = dropHiddenStores(all, s => s.id, 'storeDirectory');
+  return filter ? kept.filter(filter) : kept;
 }
 
 /**
@@ -884,7 +893,9 @@ export async function acrossStores<T>(
   fn: (storeId: string) => Promise<T>,
   opts: AcrossStoresOptions = {}
 ): Promise<Array<{ storeId: string; value: T }>> {
-  const storeIds = opts.storeIds ?? (await storeDirectory(opts.filter)).map(s => s.id);
+  const storeIds = opts.storeIds
+    ? dropHiddenStores(opts.storeIds, id => id, 'acrossStores')
+    : (await storeDirectory(opts.filter)).map(s => s.id);
 
   const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
   let next = 0;

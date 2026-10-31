@@ -1,0 +1,39 @@
+---
+title: Customer wallet and store credit
+description: How store credit works in your store, how customers spend it at checkout, and exactly how every credit, spend, reversal and write-off shows up in your accounting.
+section: Selling
+order: 10
+appPath: /stores
+keywords: wallet store credit balance goodwill refund checkout accounting liability 2150 forfeit expire
+---
+
+## What it is
+
+The customer wallet holds **store credit**: a balance a signed-in customer can spend on your store. It is money you owe the customer until they spend it, so your books show it as a **liability**, never as income.
+
+Credit gets into a wallet when you:
+
+- complete a return with **store credit** as the refund method;
+- give a **manual credit** from the customer's page (a goodwill gesture, a correction). A note is required and the action is recorded.
+
+Customers spend it at checkout: part of an order, or all of it. When the wallet covers the whole order, no payment step is needed.
+
+## What your accounting shows
+
+When accounting is on, every movement is recorded the moment it happens, on the account **2150 Customer Wallet Liability**. The balance of 2150 always equals the total of all customers' wallet balances.
+
+| What happened                                                 | Recorded as                                                                                                          |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| You give a goodwill or manual credit                          | Expense **5950 Customer Goodwill** up, 2150 up                                                                       |
+| A customer pays for an order from the wallet                  | 2150 down by the wallet part, sales recorded in full. The part paid by card or cash on delivery is recorded as usual |
+| You take back part of a manual credit                         | The opposite of the entry above                                                                                      |
+| An order paid from the wallet is refunded in full             | The sale is reversed, 2150 goes back up and the customer gets the credit back                                        |
+| A balance is written off (the customer deleted their account) | 2150 down, **4100 Unused Store Credit** (other income) up                                                            |
+
+Credit you give from a return is recorded with the return, so it is never counted twice.
+
+## Good to know
+
+- Wallet checkout works with accounting on. It no longer needs accounting to be off.
+- Store credit that nobody spends stays a liability until you write it off. Only a written-off balance becomes income.
+- Existing stores get the two new accounts (5950 and 4100) automatically the first time they are needed.

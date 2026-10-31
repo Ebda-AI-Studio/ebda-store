@@ -85,6 +85,14 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [cf/fn-map.json](cf/fn-map.json) - fn map
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
+- [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
+- [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
+- [cf/opus-review-closure.md](cf/opus-review-closure.md) - Opus review of #356 closed item by item with the proving test and its result, the leftovers closed, and the merge point for feat/cf-r6b (INFRA-CF-1)
+- [cf/r6a-on-do.md](cf/r6a-on-do.md) - The last three Postgres-only flows on the store Durable Object: palette search, campaigns, shopper erasure; InstaPay receipts at cutover (INFRA-CF-1 PR R6a)
+- [cf/payments-on-do.md](cf/payments-on-do.md) - Payments, webhooks, refunds, ledger and gold repricing on the store Durable Object (INFRA-CF-1 PR D2b-3)
+- [cf/returns-on-do.md](cf/returns-on-do.md) - The Return lifecycle and the partial-return journal on the store Durable Object (INFRA-CF-1 R1)
+- [cf/not-on-do.json](cf/not-on-do.json) - The flip-gate inventory: every refusal and Postgres-only flow of a Durable Object store (INFRA-CF-1 PR D2b-4, `node scripts/cf/not-on-do.mjs`)
+- [cf/repo-factory.md](cf/repo-factory.md) - Repo factory: reads on the store's backend (INFRA-CF-1 PR C, Ruling CF-REPO-1)
 
 ## contracts - Service and API contracts
 
@@ -296,7 +304,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [runbooks/support-wholesaler-sees-retail.md](runbooks/support-wholesaler-sees-retail.md) - Support: "a wholesaler sees the retail price"
 - [runbooks/tenant-routing-canary.md](runbooks/tenant-routing-canary.md) - Tenant routing canary (demo-boutique first)
 - [runbooks/whatsapp-og-preview.md](runbooks/whatsapp-og-preview.md) - WhatsApp / Social Link Preview Runbook
-- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1)
+- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1); go/no-go, write freeze, rollback replay, Neon decommission gate; rehearsed by `scripts/cf/rehearse-cutover.sh` (Ruling CUTOVER-5)
 - [runbooks/neon-decommission.md](runbooks/neon-decommission.md) - Neon decommission (INFRA-CF-1 phase 7)
 
 ## security - Security

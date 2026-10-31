@@ -3,7 +3,7 @@
  *
  * One versioned envelope; `data` is a STRICT object per type, so an extra key (a phone, a name, an
  * address line) fails validation instead of riding along. `buyerKey` is the only buyer identifier.
- * Adding a key to `data` is a minor change (add it here, optional); renaming or removing one is `v: 2`.
+ * Adding a key to `data` is a minor change (add it here, optional; CI-2 added `areaKey` to the cod/delivery/return types so a rate can be cut by area without joining events); renaming or removing one is `v: 2`.
  */
 import { z } from 'zod/v3';
 import { RETURN_REASON_CODES, RETURN_REASON_RAW_MAX, asciiDigits } from './return-reason';
@@ -11,6 +11,14 @@ import { RETURN_REASON_CODES, RETURN_REASON_RAW_MAX, asciiDigits } from './retur
 export const CI_PRODUCTS = ['store', 'whatsapp', 'crm', 'erp'] as const;
 const HEX64 = /^[0-9a-f]{64}$/;
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+/** Closed list: the gateway's own text never enters the stream (it can carry a card fragment or a name). */
+export const PAYMENT_FAILURE_CODES = ['declined', 'expired', 'cancelled'] as const;
+/** `notification` = the push/SMS/WhatsApp steps, which the dispatcher routes per store; `email` has its own sender. */
+export const CART_CHANNELS = ['email', 'notification'] as const;
+export const ONBOARDING_STEPS = ['store_created', 'payment_methods', 'went_live'] as const;
+/** Events about a merchant or a cart, not about one order: they carry `orderId: null`. */
+export const ORDERLESS_TYPES = ['cart.abandoned', 'merchant.onboarding_step'] as const;
 
 const money = z.number().int().nonnegative();
 const short = z.string().min(1).max(48);
@@ -30,10 +38,12 @@ const dataByType = {
   'order.cod_confirmed': z.strictObject({
     confirmedVia: z.enum(['whatsapp', 'call', 'none']),
     minutesToConfirm: z.number().int().nonnegative().nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'order.cod_unconfirmed': z.strictObject({
     confirmedVia: z.enum(['whatsapp', 'call', 'none']),
     minutesToConfirm: z.number().int().nonnegative().nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'order.cancelled': z.strictObject({
     reason: short,
@@ -51,6 +61,13 @@ const dataByType = {
     totalMinor: money,
     failureCode: z.string().max(48).nullable(),
   }),
+  /** The gateway or its webhook said failed / expired / cancelled. `failureCode` is a closed code, never provider text. */
+  'payment.failed': z.strictObject({
+    provider: short,
+    methodKind: short,
+    totalMinor: money,
+    failureCode: z.enum(PAYMENT_FAILURE_CODES),
+  }),
   'shipment.created': z.strictObject({
     carrier: short,
     codMinor: money,
@@ -63,12 +80,16 @@ const dataByType = {
     carrier: short,
     attemptNo: z.number().int().positive(),
     reasonCode: reasonCode.nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'shipment.delivered': z.strictObject({
     carrier: short,
     codMinor: money,
     hoursSincePickup: hours.nullable(),
     attempts: z.number().int().nonnegative(),
+    areaKey: z.string().max(64).nullable().optional(),
+    /** What the buyer was charged for shipping (`orders.shipping`); added after CI-9, absent on older rows. */
+    shippingFeeMinor: money.nullable().optional(),
   }),
   'shipment.returned': z.strictObject({
     carrier: short,
@@ -77,6 +98,24 @@ const dataByType = {
     returnReasonRaw: z.string().max(RETURN_REASON_RAW_MAX).nullable(),
     attempts: z.number().int().nonnegative(),
     hoursSincePickup: hours.nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
+    shippingFeeMinor: money.nullable().optional(),
+  }),
+  /** A recovery message went out for an abandoned cart (no order exists yet: `orderId` is null). */
+  'cart.abandoned': z.strictObject({
+    channel: z.enum(CART_CHANNELS),
+    step: z.number().int().min(1).max(3),
+  }),
+  /** The order that came after a reminder. `hoursToRecover` runs from the FIRST reminder. */
+  'cart.recovered': z.strictObject({
+    channel: z.enum(CART_CHANNELS),
+    hoursToRecover: hours.nullable(),
+  }),
+  /** A store-setup milestone (no order: `orderId` is null). `step` is a closed code. */
+  'merchant.onboarding_step': z.strictObject({
+    step: z.enum(ONBOARDING_STEPS),
+    secondsSinceSignup: z.number().int().nonnegative().nullable(),
+    template: short.nullable(),
   }),
 } as const;
 
@@ -91,7 +130,7 @@ const envelopeBase = {
   product: z.enum(CI_PRODUCTS),
   storeId: z.string().uuid(),
   xstore: z.boolean(),
-  orderId: z.string().uuid(),
+  orderId: z.string().uuid().nullable(),
   buyerKey: z.string().regex(HEX64).nullable(),
   keyVersion: z.number().int().positive(),
 };
@@ -121,7 +160,7 @@ export type CiOutcomeInput = {
     seed: string;
     occurredAt: Date;
     storeId: string;
-    orderId: string;
+    orderId: string | null;
     buyerKey: string | null;
     xstore: boolean;
     data: z.infer<(typeof dataByType)[T]>;
@@ -190,6 +229,13 @@ export function assertNoPiiShapes(data: unknown, path = 'data'): void {
 
 export function parseEnvelope(body: unknown): CiEnvelope {
   const parsed = ciEnvelopeSchema.parse(body) as CiEnvelope;
+  // `orderId` is nullable in the shape only for the two order-less types; every other type needs one.
+  const orderless = (ORDERLESS_TYPES as readonly string[]).includes(parsed.type);
+  if (orderless !== (parsed.orderId === null)) {
+    throw new Error(
+      `CI envelope refused: ${parsed.type} ${orderless ? 'carries no orderId' : 'needs an orderId'}`
+    );
+  }
   assertNoPiiShapes(parsed.data);
   return parsed;
 }

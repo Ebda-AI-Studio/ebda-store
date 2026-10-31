@@ -19,7 +19,7 @@
  * runs once per store per scan, multiplied by every enabled engine, so its
  * output size directly drives AI spend.
  */
-import { prisma } from '@ebda/database';
+import { storeDb } from '../../lib/repo-factory';
 
 import { REGION } from '@ebda/shared';
 import { visibleProductWhere } from '../../lib/visible-product';
@@ -46,15 +46,16 @@ const MAX_PRODUCTS = 2;
  * unit test against a seeded store/category/product fixture.
  */
 export async function generatePrompts(storeId: string): Promise<GeneratedPrompt[]> {
+  const db = await storeDb(storeId);
   const [categories, products] = await Promise.all([
-    prisma.category.findMany({
+    db.category.findMany({
       where: { storeId, deletedAt: null, isActive: true },
       orderBy: { position: 'asc' },
       select: { name: true, nameAr: true },
       take: MAX_CATEGORIES,
     }),
     // A wholesale-only product's NAME must never reach a third-party answer engine (Ruling B2B-7; final review minor 1).
-    prisma.product.findMany({
+    db.product.findMany({
       where: { storeId, deletedAt: null, status: 'active', ...visibleProductWhere() },
       orderBy: [{ isBestSeller: 'desc' }, { viewCount: 'desc' }],
       select: { name: true, nameAr: true },

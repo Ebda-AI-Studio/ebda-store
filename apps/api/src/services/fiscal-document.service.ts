@@ -3,6 +3,7 @@ import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Fiscal documents (rulings MONEYB-1, MONEYB-4).
@@ -418,14 +419,14 @@ export class FiscalDocumentService {
 
   /** The order's sale document, if one was issued (legacy orders have none). */
   static async saleDocumentFor(storeId: string, orderId: string) {
-    return prisma.fiscalDocument.findFirst({
+    return (await storeDb(storeId)).fiscalDocument.findFirst({
       where: { storeId, orderId, docType: { in: [...SALE_TYPES] } },
     });
   }
 
   /** Every document of an order (sale first, then refunds in issue order). */
   static async documentsForOrder(storeId: string, orderId: string) {
-    return prisma.fiscalDocument.findMany({
+    return (await storeDb(storeId)).fiscalDocument.findMany({
       where: { storeId, orderId },
       orderBy: [{ issuedAt: 'asc' }, { serial: 'asc' }],
       select: {
@@ -558,7 +559,9 @@ export class FiscalDocumentService {
     opts: { cursor?: string; limit?: number; docType?: FiscalDocTypeValue } = {}
   ) {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
-    const rows = await prisma.fiscalDocument.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).fiscalDocument.findMany({
       where: { storeId, ...(opts.docType ? { docType: opts.docType } : {}) },
       orderBy: [{ issuedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -591,7 +594,7 @@ export class FiscalDocumentService {
   }
 
   static async getById(storeId: string, id: string) {
-    const doc = await prisma.fiscalDocument.findFirst({ where: { id, storeId } });
+    const doc = await (await storeDb(storeId)).fiscalDocument.findFirst({ where: { id, storeId } });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
     return doc;
   }

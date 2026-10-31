@@ -5,7 +5,7 @@ import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty, type StepLike } from '../empty-exit';
-import { goldFeedStores } from '../../definer';
+import { goldFeedStoresFor } from '../../jobs/gold-stores';
 import { sendAlert } from '../../../services/alerts.service';
 import { EmailService } from '../../../services/email.service';
 import { GoldRateService } from '../../../services/gold-rate/gold-rate.service';
@@ -35,13 +35,13 @@ import { config } from '../../../config';
  * over a store's jump gate is stored pending too (`GoldRateService.applyRates`, actor `feed`).
  */
 export async function handleGoldRateFeedFetch(
-  { step }: { step: StepLike },
+  { step, event }: { step: StepLike; event?: { data?: unknown } },
   adapter: { fetch(signal: AbortSignal): Promise<GoldFeedResult> } = goldFeed()
 ) {
   {
     // Read inside a step on a Workflow (no database between steps); on Inngest the empty tick (no
     // store opted in) still costs ONE execution.
-    const stores = await stepRunUnlessEmpty(step, 'stores', goldFeedStores);
+    const stores = await stepRunUnlessEmpty(step, 'stores', () => goldFeedStoresFor(event));
     if (stores.length === 0) return { stores: 0 };
 
     const result = await step.run('fetch', async (): Promise<GoldFeedResult> => {
@@ -219,5 +219,5 @@ export const goldRateFeedFetchCron: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '5 */6 * * *' }],
   },
-  ({ step }) => handleGoldRateFeedFetch({ step })
+  ({ step, event }) => handleGoldRateFeedFetch({ step, event })
 );

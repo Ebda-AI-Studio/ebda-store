@@ -82,13 +82,12 @@ const CONFIGS = [
 ];
 
 /**
- * Where each app's Content-Security-Policy is DEFINED. The storefront's is static (next.config.js,
- * Ahmad 2026-09-02: no nonce there, docs/architecture/storefront-csp.md). Admin and Orders build
- * theirs per request in middleware from src/lib/csp.ts, because it carries a nonce (SEC-4 / M-067):
- * `headers()` runs once at build time and cannot mint one.
+ * Where each app's Content-Security-Policy is DEFINED. All three build theirs per request in middleware
+ * from a csp.ts, because it carries a nonce (SEC-4 / M-067 for admin and Orders, Ruling CSP-WEB-1 for the
+ * storefront): `headers()` runs once at build time and cannot mint one.
  */
 const CSP_SOURCES = [
-  'apps/web/next.config.js',
+  'apps/web/src/lib/csp.ts',
   'apps/admin/src/lib/csp.ts',
   'apps/orders/src/lib/csp.ts',
 ];
@@ -120,7 +119,7 @@ const REQUIRED: { directive: string; pattern: RegExp }[] = [
  * Storefront and Orders PWA only; no inline `on*=` attribute exists in either.
  */
 describe("script-src-attr 'none' on the storefront and the Orders PWA (S10)", () => {
-  it.each(['apps/web/next.config.js', 'apps/admin/src/lib/csp.ts', 'apps/orders/src/lib/csp.ts'])(
+  it.each(['apps/web/src/lib/csp.ts', 'apps/admin/src/lib/csp.ts', 'apps/orders/src/lib/csp.ts'])(
     '%s',
     config => {
       const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
@@ -136,7 +135,7 @@ describe("script-src-attr 'none' on the storefront and the Orders PWA (S10)", ()
  * previews it. Same media hosts as the storefront's connect-src.
  */
 describe('media-src admits R2 video on the storefront and the admin (B0 Task 7)', () => {
-  it.each(['apps/web/next.config.js', 'apps/admin/src/lib/csp.ts'])('%s', config => {
+  it.each(['apps/web/src/lib/csp.ts', 'apps/admin/src/lib/csp.ts'])('%s', config => {
     const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
     const m = src.match(/media-src ([^;"`]*)/);
     expect(m, `${config} has no media-src`).not.toBeNull();
@@ -187,6 +186,18 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
           `so the scan covers it again.`
       ).toBe(true);
     }
+  });
+
+  it('the storefront: script-src is nonce + strict-dynamic with no unsafe-inline and no unsafe-eval (Ruling CSP-WEB-1)', async () => {
+    const { buildStorefrontCsp } = await import('../../apps/web/src/lib/csp');
+    const nonce = 'AAAAAAAAAAAAAAAAAAAAAA==';
+    const scriptSrc = buildStorefrontCsp(nonce)
+      .split('; ')
+      .find(d => d.startsWith('script-src '))!;
+    expect(scriptSrc).toContain(`'nonce-${nonce}'`);
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
   });
 
   it('admin and orders: script-src is nonce + strict-dynamic, with no unsafe-inline and no ad hosts (SEC-4)', async () => {

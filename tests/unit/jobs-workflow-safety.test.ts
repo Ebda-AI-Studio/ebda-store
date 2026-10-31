@@ -39,6 +39,10 @@ export const RULED: Array<[RegExp, string]> = [
     'sweep cutoffs: a wall-clock read that only parameterises the find step (read inside the step, memoised) or an alert age threshold; a replay or a step retry shifts it by seconds and the next tick re-evaluates, every write is guarded by its own state predicate',
   ],
   [
+    /^(order-created-fanout|order-(refunded|status-changed)\.ts#\w+)\|await-outside-step\|await storeMoney\(storeId\)$/,
+    'Ruling CF-JOBS-4: reads the store backend flag from D1 (a binding, not a Postgres connection), which only changes while writes are frozen, so every replay of one run sees the same answer; the DO client it returns is used only inside steps',
+  ],
+  [
     /^order-(refunded|status-changed)\.ts#\w+\|await-outside-step\|await Promise\.allSettled\(/,
     'awaits promises that are each a step.run (parallel steps); no database access in the await itself',
   ],

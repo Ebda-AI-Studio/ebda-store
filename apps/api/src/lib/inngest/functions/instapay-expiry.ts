@@ -1,9 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma } from '@ebda/database';
 import { AWAITING_PAYMENT_CONFIRMATION } from '@ebda/shared';
 import logger from '../../logger';
 import { inngest } from '../client';
-import { sweepAcrossStores } from '../../cross-store';
+import { sweepStoresDb } from '../../jobs/store-db';
 import { stepRunUnlessEmpty } from '../empty-exit';
 import { InstapayService } from '../../../services/payment-providers/instapay.service';
 
@@ -34,13 +33,15 @@ export const instapayExpiry: JobDef = inngest.createFunction(
     // shopper or merchant can see; stock is released 1h later at worst.
     triggers: [{ cron: '7 * * * *' }],
   },
-  async ({ step }) => {
+  async ({ step, event }) => {
     const due = await stepRunUnlessEmpty(step, 'find-due', () => {
       // Read inside the step: the cutoff is part of the memoised read, not re-derived on replay.
       const now = new Date();
-      return sweepAcrossStores({
-        fetch: storeId =>
-          prisma.order.findMany({
+      // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object;
+      // `expireOne` then takes the DO path (`expireHold`) for it.
+      return sweepStoresDb(event, {
+        fetch: (storeId, db) =>
+          db.order.findMany({
             where: {
               storeId,
               status: AWAITING_PAYMENT_CONFIRMATION,

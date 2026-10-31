@@ -259,10 +259,11 @@ describe('payment webhook', () => {
           })
         )
       )
-    ).toBe('INVALID_STATUS_TRANSITION');
-    expect(f.one('SELECT status s FROM payments').s).toBe('pending');
-    expect(f.one('SELECT count(*) n FROM payment_event_log').n).toBe(0);
-    expect(f.one(`SELECT count(*) n FROM payment_events WHERE event_type = 'webhook'`).n).toBe(0);
+    ).toBe('NO_ERROR'); // an external money fact is never rejected (Opus I3, Ruling CF-OPUS-3)
+    expect(f.one('SELECT status s FROM payments').s).toBe('completed');
+    expect(f.one('SELECT status s FROM orders').s).toBe('cancelled');
+    expect(f.one('SELECT count(*) n FROM payment_event_log').n).toBe(1);
+    expect(f.one(`SELECT count(*) n FROM payment_events WHERE event_type = 'webhook'`).n).toBe(1);
   });
 
   it('a late failed/expired notice never downgrades a captured payment; failed on an unpaid one marks it failed', async () => {
@@ -291,7 +292,7 @@ describe('payment webhook', () => {
     expect(g.one('SELECT payment_status ps FROM orders').ps).toBe('failed');
   });
 
-  it('P08: a fulfilled order (processing / shipped) is marked PAID without moving its status; a cancelled one still refuses', async () => {
+  it('P08: a fulfilled order (processing / shipped) is marked PAID without moving its status; a cancelled one is recorded and flagged, never refused', async () => {
     for (const st of ['processing', 'shipped'] as const) {
       const f = fx();
       const o = f.order();
@@ -348,8 +349,9 @@ describe('payment webhook', () => {
           })
         )
       )
-    ).not.toBe('NO_ERROR');
-    expect(g.one('SELECT payment_status ps FROM orders').ps).toBe('unpaid');
+    ).toBe('NO_ERROR'); // recorded and flagged, not refused (Opus I3)
+    expect(g.one('SELECT payment_status ps FROM orders').ps).toBe('paid');
+    expect(g.one('SELECT status s FROM orders').s).toBe('cancelled');
   });
 
   it('P08: a second completed event (a verify after a webhook) does not fan out twice; a completed replay never overwrites a refunded payment', async () => {

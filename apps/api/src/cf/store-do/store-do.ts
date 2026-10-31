@@ -1,19 +1,66 @@
 /**
  * StoreDO: ONE SQLite Durable Object per store (Ruling INFRA-CF-1, Phase 0 spike).
  *
- * Reachable ONLY for a store listed in STORE_DO_ENABLED_IDS (default empty = nobody) AND a request
- * carrying `x-ebda-backend: do` (lib/store-backend.ts). Production storefront traffic never touches it.
+ * Reachable ONLY for a store whose server-side flag says 'do' (D1 stores.storage_backend, lib/store-backend.ts; Ruling
+ * CF-BACKEND-1). No request header selects it.
  * Data layer: Drizzle on DO SQLite (Ruling INFRA-CF-2). Every money/stock section is one synchronous
  * `transactionSync`: no `await` between the stock read and the write.
  */
+/**
+ * StoreDO: ONE SQLite Durable Object per store (Ruling INFRA-CF-1, CF-DO-SCHEMA-1).
+ *
+ * The DO carries the FULL generated cf-schema (packages/cf-schema), versioned in `_migrations` and applied
+ * idempotently on start (`runMigrations`). It is reachable only for a store whose D1 flag says `do`
+ * (lib/store-backend.ts); no flag is on by default, so production traffic never touches it.
+ *
+ * Store isolation has two layers: the namespace routes a store id to its own instance (`idFromName(storeId)`), and the
+ * instance BINDS to the first store id it serves and refuses any other (`bind`): a routing bug cannot read or write
+ * another store's rows, because there are none in this instance.
+ *
+ * Every money/stock section is one synchronous `transactionSync`: no `await` between the stock read and the write.
+ * Reads from the API Worker arrive as prisma-lite queries over `query()`; the non-money catalogue/content WRITES arrive
+ * over `mutate()` (PR D1): one atomic transaction per call, optionally idempotent, allow-listed models only. Money, stock
+ * and lock paths are not here (PR D2).
+ */
 import { DurableObject } from 'cloudflare:workers';
 import { handleStoreAdmin } from '../../../../../packages/cf-migrate/src/store-admin.mjs';
-import * as schema from './schema';
-import { makeDrizzle, listProducts, addCartItem, createOrder, StoreError, type Db } from './repo';
-import { CORE_0001 } from './migrations';
-import { statements } from './sql';
-import { STORE_TABLES } from './tables';
-import { countCustomerRows, eraseCustomerRows, exportCustomerRows } from '../erasure/store-do-sql';
+import {
+  createPrismaLite,
+  doSqlRunner,
+  doSyncSql,
+  answerStockOp,
+  answerMoneyOp,
+  ensureMoneyOpsSchema,
+  type MoneyAnswer,
+  applyStoreSettings,
+  decodeRpc,
+  ensureStockOpsSchema,
+  type StockAnswer,
+  ensureIdempotencySchema,
+  ensurePaymentSchema,
+  scrubReceiptsForOrders,
+  ensureSearchIndex,
+  purgeErasureLedger,
+  MoneyError,
+  runReads,
+  runWrites,
+  type DoMutation,
+  type DoQuery,
+  type DoQueryResult,
+  type Meta,
+  type SyncSql,
+} from '@ebda-src/repo';
+import * as repo from './repo';
+import { StoreError } from './repo';
+import { runMigrations, SCHEMA_VERSION } from './migrations';
+import { exportOrder, storeTables } from './tables';
+import {
+  countCustomerRows,
+  eraseCustomerRows,
+  exportCustomerRows,
+  matchedIds,
+} from '../erasure/store-do-sql';
+import { unclassifiedTables } from '../erasure/registry';
 import type { Subject } from '../erasure/types';
 import {
   buildBackup,
@@ -25,8 +72,6 @@ import {
   type BackupManifest,
 } from './backup';
 
-export const MIGRATIONS: { id: string; sql: string }[] = [{ id: '0001_core', sql: CORE_0001 }];
-
 export type Result<T> = { ok: true; data: T } | { ok: false; code: string; status: number };
 
 function run<T>(fn: () => T): Result<T> {
@@ -34,6 +79,8 @@ function run<T>(fn: () => T): Result<T> {
     return { ok: true, data: fn() };
   } catch (e) {
     if (e instanceof StoreError) return { ok: false, code: e.code, status: e.status };
+    if (e instanceof MoneyError) return { ok: false, code: e.code, status: e.status };
+    if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
     throw e;
   }
 }
@@ -44,14 +91,28 @@ export interface R2Like {
   get(key: string): Promise<{ text(): Promise<string> } | null>;
 }
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export class StoreDO extends DurableObject<Record<string, unknown>> {
-  readonly db: Db;
+  private readonly sync: SyncSql;
+  private liteClient?: Record<string, unknown>;
+  private boundStore?: string;
 
   constructor(ctx: ConstructorParameters<typeof DurableObject>[0], env: Record<string, unknown>) {
     super(ctx, env);
-    this.db = makeDrizzle(ctx.storage); // once per DO lifetime: no per-request client
-    void ctx.blockConcurrencyWhile(async () => this.migrate());
+    this.sync = doSyncSql(ctx.storage);
+    // Schema first, then the derived-state bootstrap (search index + triggers, payment claims). All idempotent.
+    void ctx.blockConcurrencyWhile(async () => {
+      runMigrations(ctx.storage);
+      ctx.storage.sql.exec(
+        'CREATE TABLE IF NOT EXISTS _identity (k TEXT PRIMARY KEY, v TEXT NOT NULL)'
+      );
+      ensureSearchIndex(this.sync);
+      ensurePaymentSchema(this.sync);
+      ensureIdempotencySchema(doSqlRunner(ctx.storage));
+      ensureStockOpsSchema(this.sync);
+      ensureMoneyOpsSchema(this.sync);
+    });
   }
 
   /**
@@ -65,53 +126,150 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     });
   }
 
-  private migrate(): void {
-    const sqlx = this.ctx.storage.sql;
-    sqlx.exec(
-      'CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)'
-    );
-    const done = new Set(
-      sqlx
-        .exec('SELECT id FROM _migrations')
-        .toArray()
-        .map(r => r.id as string)
-    );
-    for (const m of MIGRATIONS) {
-      if (done.has(m.id)) continue;
-      this.ctx.storage.transactionSync(() => {
-        for (const stmt of statements(m.sql)) sqlx.exec(stmt);
-        sqlx.exec('INSERT INTO _migrations (id, applied_at) VALUES (?, ?)', m.id, Date.now());
-      });
+  /** Schema version this instance runs (the id of the last applied migration). */
+  schemaVersion(): { current: string; applied: string[] } {
+    const applied = this.ctx.storage.sql
+      .exec('SELECT id FROM _migrations ORDER BY applied_at, id')
+      .toArray()
+      .map(r => r.id as string);
+    return { current: SCHEMA_VERSION, applied };
+  }
+
+  /**
+   * Bind this instance to its store, once. Every entry point that names a store calls this first: a second, different
+   * store id is refused (`STORE_MISMATCH`), whatever routed it here.
+   */
+  private bind(storeId: string): void {
+    if (typeof storeId !== 'string' || !ID_RE.test(storeId))
+      throw new StoreError('PRODUCT_NOT_FOUND', 404);
+    if (this.boundStore === storeId) return;
+    const row = this.ctx.storage.sql
+      .exec("SELECT v FROM _identity WHERE k = 'store_id'")
+      .toArray()[0];
+    if (row && row.v !== storeId) throw new StoreMismatch();
+    if (!row)
+      this.ctx.storage.sql.exec("INSERT INTO _identity (k, v) VALUES ('store_id', ?)", storeId);
+    this.boundStore = storeId;
+  }
+
+  /** The store this instance serves, or undefined before its first use. */
+  boundStoreId(): string | undefined {
+    const row = this.ctx.storage.sql
+      .exec("SELECT v FROM _identity WHERE k = 'store_id'")
+      .toArray()[0];
+    return row ? (row.v as string) : undefined;
+  }
+
+  private async lite(storeId: string): Promise<Record<string, unknown>> {
+    this.bind(storeId);
+    if (!this.liteClient) {
+      // Lazy: the 550 KB model metadata is parsed only by an instance that serves a prisma-lite read.
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      this.liteClient = createPrismaLite(meta, doSqlRunner(this.ctx.storage), 'store-do', {
+        storeId,
+      }) as unknown as Record<string, unknown>;
+    }
+    return this.liteClient;
+  }
+
+  /**
+   * prisma-lite reads for the API Worker (lib/repo-factory.ts). READ OPS ONLY: runReads refuses anything else.
+   * Returns, never throws: a refused store or a failed query is an answer.
+   */
+  async query(storeId: string, queries: DoQuery[]): Promise<DoQueryResult> {
+    try {
+      return await runReads(await this.lite(storeId), queries);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', message: e.message };
+      throw e;
     }
   }
 
-  seed(rows: {
-    store: typeof schema.stores.$inferInsert;
-    products: (typeof schema.products.$inferInsert)[];
-    variants?: (typeof schema.productVariants.$inferInsert)[];
-  }): Result<{ products: number; variants: number }> {
-    return run(() =>
-      this.ctx.storage.transactionSync(() => {
-        this.db.insert(schema.stores).values(rows.store).onConflictDoNothing().run();
-        for (const p of rows.products)
-          this.db
-            .insert(schema.products)
-            .values(p)
-            .onConflictDoUpdate({ target: schema.products.id, set: { ...p, id: undefined } })
-            .run();
-        for (const v of rows.variants ?? [])
-          this.db
-            .insert(schema.productVariants)
-            .values(v)
-            .onConflictDoUpdate({ target: schema.productVariants.id, set: { ...v, id: undefined } })
-            .run();
-        return { products: rows.products.length, variants: rows.variants?.length ?? 0 };
-      })
-    );
+  /**
+   * Catalogue/content writes for the API Worker (lib/repo-factory.ts `storeWriter`). ONE atomic transaction per call;
+   * `m.key` makes a retry return the first run's result. Refuses (as an answer, never a throw) a model that is not on the
+   * D1 allow-list, a stock-column write, another store's id, and anything runWrites does not know.
+   */
+  async mutate(storeId: string, m: DoMutation): Promise<DoQueryResult> {
+    try {
+      return await runWrites(await this.lite(storeId), doSqlRunner(this.ctx.storage), m);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', message: e.message };
+      throw e;
+    }
+  }
+
+  /**
+   * Stock and inventory operations (Ruling CF-STOCK-1): ONE named operation = ONE `transactionSync` section, the
+   * single-threaded replacement for the Postgres row locks. `argsJson` is the wire-encoded argument object; `key` makes a
+   * retry return the first run's result. A refusal is an ANSWER, never a throw.
+   */
+  stockOp(storeId: string, op: string, argsJson: string, key?: string): StockAnswer {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    return answerStockOp(this.sync, storeId, op, argsJson, key);
+  }
+
+  /**
+   * Money operations (Ruling CF-MONEY-1): the same contract as `stockOp` (one named operation = one `transactionSync`
+   * section, optional idempotency key, a refusal is an ANSWER) for the money paths moved in PR D2b.
+   */
+  moneyOp(storeId: string, op: string, argsJson: string, key?: string): MoneyAnswer {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    return answerMoneyOp(this.sync, storeId, op, argsJson, key);
+  }
+
+  /**
+   * The settings copy (Ruling CF-WRITES-2): the API writes the authoritative `Store` row first, then sends the changed
+   * fields here as an RPC JSON string. Applied to `store_profile` / `store_config`; D1-only fields are reported, not stored.
+   */
+  async applySettings(
+    storeId: string,
+    fieldsJson: string
+  ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
+    try {
+      this.bind(storeId);
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const fields = decodeRpc<Record<string, unknown>>(fieldsJson);
+      return {
+        ok: true,
+        data: applyStoreSettings(doSqlRunner(this.ctx.storage), meta, storeId, fields),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  seed(rows: repo.SeedRows): Result<{ products: number; variants: number }> {
+    return run(() => {
+      const id = rows.store?.id ?? rows.products[0]?.storeId;
+      if (!id) throw new StoreError('PRODUCT_NOT_FOUND', 404);
+      this.bind(id);
+      for (const p of rows.products) if (p.storeId !== id) throw new StoreMismatch();
+      return repo.seed(this.sync, rows);
+    });
   }
 
   listProducts(storeId: string, limit: number) {
-    return run(() => listProducts(this.db, storeId, limit));
+    return run(() => {
+      this.bind(storeId);
+      return repo.listProducts(this.sync, storeId, limit);
+    });
   }
 
   addCartItem(
@@ -121,17 +279,23 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     qty: number,
     variantId?: string
   ) {
-    return run(() => addCartItem(this.db, storeId, sessionId, productId, qty, variantId));
+    return run(() => {
+      this.bind(storeId);
+      return repo.addCartItem(this.sync, storeId, sessionId, productId, qty, variantId);
+    });
   }
 
   createOrder(storeId: string, sessionId: string) {
-    return run(() => createOrder(this.db, storeId, sessionId));
+    return run(() => {
+      this.bind(storeId);
+      return repo.createOrder(this.sync, storeId, sessionId);
+    });
   }
 
   rowCounts(): Record<string, number> {
     const out: Record<string, number> = {};
-    for (const t of STORE_TABLES)
-      out[t] = this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM ${t}`).one().n as number;
+    for (const t of storeTables(this.ctx.storage.sql))
+      out[t] = this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM "${t}"`).one().n as number;
     return out;
   }
 
@@ -158,6 +322,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
 
   /** Export every table + manifest to R2 under store-do-backups/<store>/<yyyy-mm-dd>/. */
   async backupNow(storeId: string): Promise<BackupManifest> {
+    this.bind(storeId);
     const r2 = this.bucket();
     if (!r2) throw new Error('STORE_BACKUPS binding missing');
     const dump = dumpTables(this.ctx.storage.sql); // sync read: consistent snapshot
@@ -174,8 +339,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
 
   async alarm(): Promise<void> {
     try {
-      const storeId = this.ctx.storage.sql.exec('SELECT id FROM stores LIMIT 1').toArray()[0]
-        ?.id as string | undefined;
+      // The saved scope of a half-finished shopper erasure never outlives its TTL (Ruling CF-R6A-3).
+      try {
+        purgeErasureLedger(this.sync);
+      } catch (err) {
+        console.error('erasure ledger purge failed', err);
+      }
+      const storeId = this.boundStoreId();
       if (storeId) await this.backupNow(storeId);
     } finally {
       // Re-arm even when the export threw: a failed night must not stop the next one (alerting: a missing
@@ -190,6 +360,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     day: string
   ): Promise<Result<Record<string, { rows: number; sha256: string; ok: boolean }>>> {
     try {
+      this.bind(sourceStoreId); // the restored rows carry the source store's id: this instance now serves that store
       return { ok: true, data: await this.restoreFromUnsafe(sourceStoreId, day) };
     } catch (e) {
       // Returned, not thrown: a refused restore is an answer, not a Durable Object fault.
@@ -206,22 +377,27 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     const m = await r2.get(backupKey(sourceStoreId, day, 'manifest.json'));
     if (!m) throw new Error('no manifest: incomplete or missing backup');
     const manifest = JSON.parse(await m.text()) as BackupManifest;
+    // The manifest, not this DO's current schema, says which tables the backup holds; a table the target lacks fails.
+    const tables = Object.keys(manifest.tables);
+    const live = new Set(storeTables(this.ctx.storage.sql));
+    const missing = tables.filter(t => !live.has(t));
+    if (missing.length) throw new Error(`restore target has no table ${missing[0]}`);
     const files: Record<string, string> = {};
-    for (const t of STORE_TABLES) {
+    for (const t of tables) {
       const f = await r2.get(backupKey(sourceStoreId, day, `${t}.ndjson`));
       if (!f) throw new Error(`missing ${t}.ndjson`);
       files[`${t}.ndjson`] = await f.text();
       if ((await sha256Hex(files[`${t}.ndjson`])) !== manifest.tables[t].sha256)
         throw new Error(`${t}: file checksum differs from manifest`);
     }
-    for (const t of STORE_TABLES)
-      if (this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM ${t}`).one().n !== 0)
+    for (const t of live)
+      if (this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM "${t}"`).one().n !== 0)
         throw new Error('restore target must be empty');
-    this.ctx.storage.transactionSync(() => loadBackup(this.ctx.storage.sql, files));
+    this.ctx.storage.transactionSync(() => loadBackup(this.ctx.storage.sql, files, tables));
     // Re-export the restored DO with the same canonical serialization and compare to the manifest.
     const again = await buildBackup(sourceStoreId, dumpTables(this.ctx.storage.sql));
     const out: Record<string, { rows: number; sha256: string; ok: boolean }> = {};
-    for (const t of STORE_TABLES) {
+    for (const t of tables) {
       const want = manifest.tables[t];
       const got = again.manifest.tables[t];
       out[t] = {
@@ -234,12 +410,25 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   // ---- PDPL export / erasure (G10; cf/erasure). Registry-driven, see cf/erasure/registry.ts ----
+  /** Customer subjects FAIL CLOSED until the registry classifies every table of the live schema (see registry.ts). */
+  private assertRegistryCoversSchema(): void {
+    const gap = unclassifiedTables(storeTables(this.ctx.storage.sql));
+    if (gap.length)
+      throw new Error(
+        `ERASURE_REGISTRY_INCOMPLETE: ${gap.length} StoreDO tables have no erasure entry (first: ${gap[0]})`
+      );
+  }
+
   /** Merchant: every table, whole. Customer: only the registry's customer-pii rows that match. */
   exportSubject(s: Subject): { tables: Record<string, Array<Record<string, unknown>>> } {
-    if (s.kind === 'customer') return { tables: exportCustomerRows(this.ctx.storage.sql, s) };
+    const sqlx = this.ctx.storage.sql;
+    if (s.kind === 'customer') {
+      this.assertRegistryCoversSchema();
+      return { tables: exportCustomerRows(sqlx, s) };
+    }
     const tables: Record<string, Array<Record<string, unknown>>> = {};
-    for (const t of STORE_TABLES)
-      tables[t] = this.ctx.storage.sql.exec(`SELECT * FROM ${t} ORDER BY rowid`).toArray();
+    for (const t of storeTables(sqlx))
+      tables[t] = sqlx.exec(`SELECT * FROM "${t}" ORDER BY ${exportOrder(sqlx, t)}`).toArray();
     return { tables };
   }
 
@@ -247,7 +436,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   async eraseSubject(s: Subject): Promise<{ erased: Record<string, number>; remaining: number }> {
     const sqlx = this.ctx.storage.sql;
     if (s.kind === 'customer') {
-      const erased = this.ctx.storage.transactionSync(() => eraseCustomerRows(sqlx, s));
+      this.assertRegistryCoversSchema();
+      const erased = this.ctx.storage.transactionSync(() => {
+        // InstaPay receipts of the subject's orders (Ruling INSTAPAY-DO-1): the personal fields go AND the rows are marked so the
+        // retention sweep deletes their screenshots. Found through the DO's own order ids, before the orders lose their link.
+        scrubReceiptsForOrders(this.sync, { orderIds: matchedIds(sqlx, 'orders', s) });
+        return eraseCustomerRows(sqlx, s);
+      });
       return { erased, remaining: countCustomerRows(sqlx, s) };
     }
     const erased = this.rowCounts();
@@ -265,5 +460,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   async pitrBookmark(): Promise<string> {
     const s = this.ctx.storage as unknown as { getCurrentBookmark(): Promise<string> };
     return s.getCurrentBookmark();
+  }
+}
+
+/** A request named a store this instance does not serve. */
+export class StoreMismatch extends Error {
+  constructor() {
+    super('this StoreDO serves a different store');
+    this.name = 'StoreMismatch';
   }
 }

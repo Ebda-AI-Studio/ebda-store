@@ -411,7 +411,10 @@ export default function StockInventoryPage() {
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 {activeStockFilter
-                  ? `Showing ${visibleProducts.length} of ${products?.length ?? 0} products`
+                  ? t('showingFiltered', {
+                      shown: visibleProducts.length,
+                      total: products?.length ?? 0,
+                    })
                   : t('showingCount', { shown: visibleProducts.length, total: totalSkus })}
               </span>
             </div>

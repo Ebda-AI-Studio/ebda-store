@@ -30,6 +30,7 @@
  */
 import { getLook } from '@ebda/shared';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
+import { renewNonce } from './csp-nonce-renew';
 
 export const DEMO_EDGE_FRESH_S = 300;
 export const DEMO_EDGE_STALE_S = 86400;
@@ -158,7 +159,9 @@ export function ageSeconds(stored: Response, now = Date.now()): number {
 }
 
 function withEdgeHeaders(res: Response, state: 'HIT' | 'MISS' | 'STALE'): Response {
-  const out = new Response(res.body, res);
+  // A stored page is served to many visitors: each response gets its own CSP nonce (Ruling CSP-WEB-1).
+  const out =
+    state === 'MISS' ? new Response(res.body, res) : renewNonce(new Response(res.body, res));
   // The Worker caches internally; clients (and office/ISP proxies) must not keep copies.
   out.headers.set('Cache-Control', 'private, no-store');
   out.headers.set('x-demo-edge', state);

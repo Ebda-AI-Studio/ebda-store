@@ -115,7 +115,10 @@ export const PAGES: PageEntry[] = [
   }),
   page('/bulk', 'bulk.page.title', 'staff', {
     feature: 'bulk_operations',
-    syn: { en: 'import export csv excel upload', ar: 'استيراد تصدير اكسل رفع جماعي' },
+    syn: {
+      en: 'import export csv excel upload photo pdf catalogue catalog price list menu image',
+      ar: 'استيراد تصدير اكسل رفع جماعي صور PDF كتالوج قائمة أسعار منيو',
+    },
   }),
   page('/builder', `${HUB}.editor`, 'staff', {
     syn: {
@@ -195,6 +198,12 @@ export const PAGES: PageEntry[] = [
   page('/wallet', `${HUB}.wallet`, 'staff', {
     feature: 'customer_wallet',
     syn: { en: 'store credit balance', ar: 'رصيد محفظة' },
+  }),
+  page('/customer-intelligence', `${HUB}.customerIntelligence`, 'staff', {
+    syn: {
+      en: 'cod risk courier suggestion returns hints intelligence sharing',
+      ar: 'تلميحات خطر الدفع عند الاستلام شركة الشحن المرتجعات',
+    },
   }),
   page('/payment-abandonments', `${HUB}.paymentAbandonments`, 'staff', {
     feature: 'payment_abandonment',
@@ -847,6 +856,69 @@ export const SETTINGS: SettingEntry[] = [
         'select=theme',
         'search field icon header find products',
         'البحث خانة بحث ايقونة الهيدر',
+      ],
+      [
+        'builder.header-wordmark',
+        'builder.theme.headerWordmark',
+        'select=theme',
+        'wordmark lockup store name logo designed plain header brand',
+        'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
+      ],
+      [
+        'builder.card-heart',
+        'builder.theme.cardHeart',
+        'select=theme',
+        'wishlist heart favourite button card home hide show',
+        'قلب المفضلة زر الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.card-swatches',
+        'builder.theme.cardSwatches',
+        'select=theme',
+        'colour dots swatches card variants home hide show',
+        'نقط الالوان الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.card-tags',
+        'builder.theme.cardTags',
+        'select=theme',
+        'tag chips labels material card home hide show',
+        'شارات تصنيف الخامة الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.grid-gutter',
+        'builder.theme.gridGutter',
+        'select=theme',
+        'grid gutter gap spacing space between cards home tight airy',
+        'مسافة فاصل بين الكروت الرئيسية ضيقة واسعة الشبكة',
+      ],
+      [
+        'builder.heading-weight',
+        'builder.theme.headingWeight',
+        'select=theme',
+        'heading weight bold regular section title typography',
+        'سمك عناوين الاقسام عريض عادي خط العنوان',
+      ],
+      [
+        'builder.price-colour',
+        'builder.theme.priceColour',
+        'select=theme',
+        'price colour accent text card product',
+        'لون السعر اللون المميز النص الكارت المنتج',
+      ],
+      [
+        'builder.tab-bar',
+        'builder.theme.tabBar',
+        'select=theme',
+        'bottom tab bar navigation phone home cart bag hide show',
+        'الشريط السفلي التبويبات الموبايل الرئيسية السلة شنطة اخفاء اظهار',
+      ],
+      [
+        'builder.hero-ratio',
+        'builder.theme.heroRatio',
+        'select=theme',
+        'hero height ratio tall portrait square wide banner image phone',
+        'طول الهيرو نسبة بورتريه مربع عريض البانر الصورة الرئيسية الموبايل',
       ],
       [
         'builder.fonts',

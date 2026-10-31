@@ -1,4 +1,54 @@
-# Storefront CSP — why `script-src 'unsafe-inline'` stays
+# Storefront CSP: nonce + `strict-dynamic` (Ruling CSP-WEB-1, 2026-10-29)
+
+**Status: the nonce policy below is SHIPPED. It supersedes the 2026-09-02 decision further down
+(kept as the record of the measurement and the trade-off).** The policy is built per request in
+`apps/web/middleware.ts` from `apps/web/src/lib/csp.ts`: `script-src 'self' 'nonce-<per request>'
+'strict-dynamic' <host fallbacks>`, with no `'unsafe-inline'` and no `'unsafe-eval'` for scripts.
+`next.config.js` no longer emits a CSP (it would be doubled or override the nonce one on OpenNext).
+
+## What carries the nonce
+
+- Next's own bootstrap and flight-data scripts: Next stamps the nonce when the REQUEST carries the policy
+  (the middleware puts `Content-Security-Policy` and `x-nonce` on it).
+- The root layout's one executable inline script (dark-mode guard): `nonce={nonce}` from `x-nonce`.
+- The merchant pixels (`MarketingPixels.tsx`, `next/script`): `nonce` prop, and `'strict-dynamic'` trusts what
+  they load. JSON-LD blocks are data, never executed, so they need none.
+- OneSignal and PostHog load through a nonced script and are trusted by `'strict-dynamic'`.
+
+## Why the 2026-09-02 reasons no longer hold
+
+- "A nonce forces dynamic rendering": measured 2026-10-29, every storefront route is already dynamic and
+  `no-store` (31 of 32 route files are `force-dynamic`; the build prerenders only `/_global-error`).
+  `STOREFRONT_TENANT_ROUTING` is off by default and nothing caches storefront HTML today except the
+  opt-in worker edge cache below.
+- "`'unsafe-eval'` is required by OneSignal": admin and Orders shipped without it (SEC-4b) and the SDK
+  initialised with no violation; the storefront follows (`STOREFRONT_NEEDS_UNSAFE_EVAL = false` in
+  `src/lib/csp.ts`, one line to restore).
+
+## Residuals (accepted, Ruling CSP-WEB-1)
+
+- The worker HTML edge caches (`demo-edge-cache.ts`, `store-edge-cache.ts`) store the rendered page with the nonce
+  it was rendered with. A HIT or STALE response is therefore never served as stored: `csp-nonce-renew.ts` mints a
+  fresh nonce per response and replaces the old one in the CSP header and throughout the streamed body (attributes
+  and the flight payload), so no two visitors share a nonce and the stored one is never sent to anyone but the
+  visitor who triggered the MISS. Test: `tests/unit/edge-cache-nonce.test.ts` (two hits, two nonces, header and
+  body agreeing).
+- If `STOREFRONT_TENANT_ROUTING` caching is ever turned on for real, its cached HTML has the same shape:
+  decide then between a per-request nonce (no HTML caching) and hash/`strict-dynamic` bootstrap.
+- `/_global-error` is prerendered with no nonce: when the root layout itself crashes its scripts are blocked
+  and the static fallback shows without hydration.
+- Pixel vendors that inject further inline script rely on `'strict-dynamic'`; a browser without it falls
+  back to the host list and the nonce on the pixel scripts we render.
+
+Tests: `tests/unit/web-csp-nonce-middleware.test.ts`, `csp-directive-floor.test.ts`,
+`storefront-frame-ancestors-prod.test.ts`, `storefront-csp-google-ads.test.ts`, `edge-cache-nonce.test.ts`. Browser checks:
+`node scripts/qa/storefront-csp-check.mjs` against a local `next start` (every demo template, ar and en) and
+`node scripts/qa/storefront-pixel-csp-check.mjs` (a store with GTM and Meta pixels configured, real loader code,
+stubbed vendor endpoints).
+
+---
+
+# Storefront CSP: why `script-src 'unsafe-inline'` stayed (superseded 2026-10-29)
 
 **Decision (Ahmad, 2026-09-02): keep `'unsafe-inline'`. Do not introduce a nonce.**
 
@@ -99,4 +149,4 @@ XSS lives on the anonymous pages, so it would protect the lower-risk half.
 - `docs/audits/2026-09-02-adversarial-audit.md` — the finding and the attacks
   that were tried against the escapers.
 - `docs/plans/2026-07-12-tenant-cacheable-routing.md` — the caching work.
-- `apps/web/next.config.js` — the policy itself.
+- `apps/web/src/lib/csp.ts` — the policy itself (built per request by `apps/web/middleware.ts`).

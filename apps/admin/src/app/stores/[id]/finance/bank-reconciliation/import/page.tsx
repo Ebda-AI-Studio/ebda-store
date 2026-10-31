@@ -221,7 +221,7 @@ export default function ImportStatementPage() {
                   ))}
                   {result.parseErrors.length > 10 && (
                     <li className="text-xs text-amber-500">
-                      …and {result.parseErrors.length - 10} more
+                      {ti('andMore', { count: result.parseErrors.length - 10 })}
                     </li>
                   )}
                 </ul>

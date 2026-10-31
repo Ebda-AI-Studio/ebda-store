@@ -1,7 +1,14 @@
 import type { JobDef } from '../../jobs/types';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { loadS3 } from '../../lazy-modules';
-import { prisma, isOwnerRole, withOwnerTx } from '@ebda/database';
+import {
+  prisma,
+  isOwnerRole,
+  withOwnerTx,
+  storeDirectory,
+  withoutHiddenStores,
+} from '@ebda/database';
+import { collectDoStoreReferencedKeys } from '../../r2-do-references';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -112,6 +119,24 @@ async function collectReferencedKeys(): Promise<Set<string>> {
   });
 }
 
+/**
+ * The keys referenced from the tables of every store that lives on its Durable Object (Ruling CF-JOBS-4B). Their Postgres rows
+ * are sealed and stale, so the reference set must come from the DO: one `r2References` page at a time per registered column set.
+ * ANY failure (a store whose DO cannot be read, a registry table the DO schema does not have) throws: with a partial reference
+ * set live images would be called orphans, so the run ends here and nothing is deleted.
+ */
+export async function collectDoReferencedKeys(): Promise<string[]> {
+  const stores = await withoutHiddenStores(() =>
+    storeDirectory(undefined, { includeDeleted: true })
+  );
+  const keys = new Set<string>();
+  for (const { id } of stores) {
+    const storeKeys = await collectDoStoreReferencedKeys(id, urlToR2Key);
+    if (storeKeys) for (const k of storeKeys) keys.add(k);
+  }
+  return [...keys];
+}
+
 export const r2OrphanSweep: JobDef = inngest.createFunction(
   {
     id: 'r2-orphan-sweep',
@@ -196,7 +221,11 @@ export const r2OrphanSweep: JobDef = inngest.createFunction(
     const referencedList = await step.run('collect-referenced-keys', async () =>
       Array.from(await collectReferencedKeys())
     );
-    const referenced = new Set(referencedList);
+    // + the references held on the Durable Object of every DO store (their Postgres rows are not the truth any more)
+    const doReferenced = await step.run('collect-do-referenced-keys', () =>
+      collectDoReferencedKeys()
+    );
+    const referenced = new Set([...referencedList, ...doReferenced]);
     logger.info({ count: referenced.size }, 'r2-orphan-sweep: collected referenced keys from DB');
 
     // ── Step 3: compute orphans ───────────────────────────────────────────

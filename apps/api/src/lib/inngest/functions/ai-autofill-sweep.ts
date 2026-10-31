@@ -24,7 +24,8 @@
  */
 
 import type { JobDef } from '../../jobs/types';
-import { runInStoreScope, storeDirectory } from '@ebda/database';
+import { runInStoreScope } from '@ebda/database';
+import { allStoresDirectory } from '../../jobs/store-db';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
@@ -69,7 +70,7 @@ const aiAutofillSweepFn = inngest.createFunction(
     // products idle > STALE_TTL_DAYS, so a caught-up catalogue makes no Gemini calls.
     triggers: [{ cron: '0 0 * * *' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // 12h lock TTL: a crash-safety ceiling that comfortably covers even a very
     // large throttled sweep (2.5s/product → 12h ≈ 17k products) yet still clears
     // before the next daily tick — so a crashed run can't wedge the sweep for
@@ -81,8 +82,9 @@ const aiAutofillSweepFn = inngest.createFunction(
       // suspended / inactive / churned stores. Loaded ONCE so batch
       // boundaries are stable across retries.
       const storeIds = await step.run('load-stores', async () => {
-        // `stores` is under RLS: a cron lists stores through the directory definer.
-        const stores = await storeDirectory(s => s.status === 'active');
+        // `stores` is under RLS: a cron lists stores through the directory definer. DO stores are listed too: the sweep
+        // reaches each one through its Durable Object (Ruling CF-JOBS-4), one leader-locked run keeps ONE shared quota.
+        const stores = await allStoresDirectory(event, s => s.status === 'active');
         return stores.map(s => s.id);
       });
 

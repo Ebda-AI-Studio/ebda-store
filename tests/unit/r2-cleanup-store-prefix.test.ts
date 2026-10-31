@@ -26,6 +26,10 @@ vi.mock('@ebda/database', () => {
     withStore: (_id: string, fn: (t: typeof tx) => Promise<unknown>) => fn(tx),
   };
 });
+// both stores are Postgres stores: no Durable Object is consulted (the DO path has its own test, r2-cleanup-do-references)
+vi.mock('../../apps/api/src/lib/repo-factory', () => ({
+  storeRepo: async () => ({ backend: 'pg', money: null }),
+}));
 vi.mock('../../apps/api/src/services/storage.service', () => ({
   StorageService: { isAvailable: () => true, delete: h.storageDelete },
 }));

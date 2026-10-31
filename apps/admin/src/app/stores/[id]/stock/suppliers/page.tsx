@@ -153,7 +153,7 @@ export default function SuppliersPage() {
               cell: s => (
                 <span className="text-muted-foreground">
                   {s.paymentTerms === 'custom'
-                    ? `${s.customTermsDays ?? '?'} days`
+                    ? t('termsDays', { count: s.customTermsDays ?? 0 })
                     : t(`terms.${s.paymentTerms}`)}
                 </span>
               ),

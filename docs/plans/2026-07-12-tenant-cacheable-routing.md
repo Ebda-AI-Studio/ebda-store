@@ -224,6 +224,8 @@ Two concerns need an explicit decision, not a silent default, because they curre
 - NOT provable yet — cache hits: every tenant-tree route still builds as `ƒ` and answers `cache-control: private, no-store`, because the root `app/layout.tsx` still calls `headers()`/`cookies()`. The canary moves traffic onto the new tree with no perf change; the cache-key tests (§10 second bullet) become meaningful only after the root-layout decomposition (§3.6).
 - Blocker for full-page caching (not for the canary): with no `force-language` cookie the middleware keys the request as `en`, but the root layout renders the store's `defaultLanguage` (both live stores default to `ar`). Once pages cache, a cookie-less visitor and an `en`-cookie visitor would share one `/en/` entry with different content. The middleware now learns the store default from the store token (`STOREFRONT_TENANT_ROUTING_STORES=demo-boutique:ar`, Ruling TRC-7), so a cookie-less visitor to an Arabic-default store is keyed `ar`; the declared default must equal the store's `settings.defaultLanguage` (the runbook's cookie-less check catches a drift). Until the root-layout decomposition the tenant layout emits no metadata of its own and the product page resolves locale cookie-then-store-default like the root (issue 2407, Ruling TRC-5), so the canary's titles and `og:locale` match flag-off.
 
+**Phase 0 re-check (2026-10-29, Ruling TRC-8):** gate NOT passed, flag stays off. Root layout still reads `headers()`/`cookies()`; all 15 tenant-tree routes build dynamic; prod serves `no-store`. Unblock = root-layout decomposition (3.6), then Phase 2 on a CF preview.
+
 **Phase 3 — Consent-gating decision + production canary**
 
 - Ship the consent-gating adaptation (§3.6) with explicit sign-off.

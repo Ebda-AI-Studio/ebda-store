@@ -3,6 +3,7 @@ import type { StockAdjustmentType } from '@prisma/client';
 import { postEntry } from '../journal.service';
 import { getSystemAccountIdByCode } from '../account.service';
 import logger from '../../../lib/logger';
+import { storeMoney } from '../../../lib/repo-factory';
 
 /**
  * Counterpart account code per adjustment type.
@@ -38,6 +39,12 @@ export interface StockAdjustmentJournalInput {
  * Guards: skips if adjustment not found, accounting disabled, or not posted.
  */
 export async function postStockAdjustmentJournal(args: StockAdjustmentJournalInput): Promise<void> {
+  // A store on its Durable Object posts in one section there (Ruling CF-JOBS-4); idempotent per source row.
+  const money = await storeMoney(args.storeId);
+  if (money) {
+    await money.journalStockAdjustment({ adjustmentId: args.adjustmentId });
+    return;
+  }
   const adjustment = await prisma.stockAdjustment.findFirst({
     where: { id: args.adjustmentId, storeId: args.storeId },
     include: { store: { select: { accountingEnabled: true } } },

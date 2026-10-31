@@ -14,8 +14,10 @@
 // __seal    marks the store as live on the DO and records a per-row baseline of every table.
 // __diff    rows added / changed / deleted since the seal (the data a rollback would otherwise lose).
 // __rebase  baseline := current state, after a verified rollback replay.
+// __tables  every application table of the DO (verify checks each is mapped, a CF-only rule or a runtime table).
 // __unseal  {confirm:'wipe-and-unseal'}: wipes the DO so a retried cutover can re-import.
 import { PK_SEP, TableDigest, canonRow, canonValue, sha256Hex } from './canon.mjs';
+import { DO_DERIVED_TABLE } from './coverage.mjs';
 
 export const MAX_PAGE_ROWS = 2000;
 export const MAX_BODY_BYTES = 8 * 1024 * 1024;
@@ -241,7 +243,10 @@ function appTables(sql) {
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE 'cf\\_%' ESCAPE '\\' ORDER BY name`
     )
     .toArray()
-    .map(r => r.name);
+    .map(r => r.name)
+    // The FTS search indexes and their shadow tables (`*_data` holds a BLOB) are derived state: the seal baseline and the diff
+    // cannot canonicalise a BLOB, and a DELETE on a shadow table corrupts the index. The base-table triggers re-mark them dirty.
+    .filter(name => !DO_DERIVED_TABLE.test(name));
   return names.map(name => {
     const info = sql.exec(`SELECT name, pk FROM pragma_table_info(?) ORDER BY cid`, name).toArray();
     return {
@@ -372,6 +377,11 @@ function doUnseal(request, { sql, transactionSync }, body) {
   return json({ ok: true, sealed: false, wiped: true });
 }
 
+// TABLES: the names of every application table the DO holds, so verify can prove it looked at all of them.
+function doTables({ sql }) {
+  return json({ ok: true, tables: appTables(sql).map(t => t.table) });
+}
+
 function doStatus({ sql }) {
   ensureLedger(sql);
   const ledger = sql
@@ -396,6 +406,7 @@ export async function handleStoreAdmin(request, ctx) {
     if (request.method === 'POST' && path.endsWith('/__unseal'))
       return doUnseal(request, ctx, await request.json().catch(() => null));
     if (request.method === 'GET' && path.endsWith('/__status')) return doStatus(ctx);
+    if (request.method === 'GET' && path.endsWith('/__tables')) return doTables(ctx);
     return json({ ok: false, error: 'not found' }, 404);
   } catch (e) {
     if (e instanceof HttpError) return json({ ok: false, error: e.message, ...e.extra }, e.status);

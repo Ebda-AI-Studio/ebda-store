@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { apiPost } from '../../../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 /**
  * Per-product language balance / revert button pair.
@@ -37,6 +38,7 @@ export function BalanceDescriptionButton({
     descriptionAr: string
   ) => void;
 }) {
+  const t = useT('products.edit');
   const [busyBalance, setBusyBalance] = useState(false);
   const [busyRevert, setBusyRevert] = useState(false);
   const [failedBalance, setFailedBalance] = useState(false);
@@ -88,21 +90,17 @@ export function BalanceDescriptionButton({
               ? 'bg-emerald-100 text-emerald-700'
               : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
         }`}
-        title={
-          failedBalance
-            ? 'Balance failed — try again / فشلت الموازنة، حاول مجددًا'
-            : 'Balance languages (name + description EN/AR) / موازنة اللغات'
-        }
+        title={failedBalance ? t('balanceFailed') : t('balanceTitle')}
       >
         {busyBalance ? <SpinIcon /> : <span aria-hidden>⚖️</span>}
         <span>
           {busyBalance
             ? '…'
             : failedBalance
-              ? '⚠ Retry'
+              ? t('retryWarn')
               : balanced
-                ? '✓ Balanced'
-                : 'Balance languages'}
+                ? t('balanced')
+                : t('balanceLanguages')}
         </span>
       </button>
 
@@ -134,14 +132,10 @@ export function BalanceDescriptionButton({
               ? 'bg-destructive/10 text-destructive-ink'
               : 'bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive-ink'
           }`}
-          title={
-            failedRevert
-              ? 'Revert failed — try again / فشل التراجع، حاول مجددًا'
-              : 'Revert balance — restore originals / التراجع عن الموازنة'
-          }
+          title={failedRevert ? t('revertFailed') : t('revertTitle')}
         >
           {busyRevert ? <SpinIcon /> : null}
-          <span>{busyRevert ? '…' : failedRevert ? '⚠ Retry' : '↩ Revert'}</span>
+          <span>{busyRevert ? '…' : failedRevert ? t('retryWarn') : t('revert')}</span>
         </button>
       )}
     </div>

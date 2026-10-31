@@ -8,6 +8,7 @@ import {
   transformValue,
 } from './plan.mjs';
 import { cursorPages, pgColumns } from './pg.mjs';
+import { pgSourcedTables } from '../../../packages/cf-migrate/src/coverage.mjs';
 import { TableDigest } from '../../../packages/cf-migrate/src/canon.mjs';
 
 /** plan tables that exist in Postgres, bound to the real columns; `skipped` = Cloudflare-only tables */
@@ -18,7 +19,22 @@ export async function bindPlan(client, plan) {
     tables: list.filter(t => t.inPg).map(t => bindTable(t, cols, covered)),
     cfOnly: list.filter(t => !t.inPg).map(t => t.name),
   });
-  return { store: bind(plan.store), platform: bind(plan.platform), cols };
+  // DO tables sourced from part of a Postgres table (instapay_order_receipts, Ruling CF-R6A-4)
+  const extra = pgSourcedTables().map(t => {
+    const have = cols.get(t.origin);
+    if (!have) throw new Error(`table ${t.origin} is not in Postgres`);
+    for (const c of t.columns)
+      if (!have.has(c.src)) throw new Error(`${t.name}.${c.col}: Postgres has no column ${c.src}`);
+    const dropped = [...have].filter(
+      n => !t.columns.some(c => c.src === n) && !t.ignored.includes(n)
+    );
+    if (dropped.length)
+      throw new Error(
+        `${t.origin} gained column(s) ${dropped.join(', ')} that ${t.name} does not carry: map or ignore them in PG_SOURCED_DO_TABLES`
+      );
+    return { ...t, dropped: [], missingExtra: [] };
+  });
+  return { store: bind(plan.store), platform: bind(plan.platform), extra, cols };
 }
 
 /** async generator of { rows } pages, rows already transformed (aligned with bt.columns) */

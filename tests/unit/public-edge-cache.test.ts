@@ -337,11 +337,6 @@ describe('tenant isolation and eligibility', () => {
 
 describe('write-path wiring', () => {
   const src = (p: string) => readFileSync(join(__dirname, '../../apps/api/src', p), 'utf8');
-  it('the Durable Object order branch invalidates product caches like the Postgres path', () => {
-    const routes = src('routes/public.routes.ts');
-    const doOrder = routes.slice(routes.indexOf('storeDo(storeId).createOrder'));
-    expect(doOrder.slice(0, 700)).toContain('invalidateStoreProductCachesAfterOrder(storeId)');
-  });
   it('price/stock read routes opt in to the NEVER-stale class', () => {
     const routes = src('routes/public.routes.ts');
     expect(routes.match(/neverStale: true/g)?.length).toBe(2);

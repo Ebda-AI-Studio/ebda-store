@@ -12,3 +12,8 @@
 # SEO-5: self-hosted look fonts are named by Google's content hash.
 /fonts/look/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Static fallback CSP for assets that can carry script (an SVG opened directly). Page responses get the nonce
+# CSP from middleware.ts instead (Ruling CSP-WEB-1); NOT on /*: sw.js and OneSignalSDKWorker.js are workers.
+/*.svg
+  Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'; frame-ancestors 'none'

@@ -28,6 +28,7 @@ import { ReturnService } from '@api/services/return.service';
 import { CartService } from '@api/services/cart.service';
 import { AuthService } from '@api/services/auth.service';
 import { StoreService } from '@api/services/store.service';
+import { configureIdentityClient } from '@api/lib/identity-client';
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
 
@@ -183,7 +184,8 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
         slug: `${TAG}-store`,
         ownerId,
         status: 'active',
-        // Wallet checkout is refused while accounting is on (Ruling W-3).
+        // The fixture store keeps accounting OFF; accounting-on wallet checkout is covered below
+        // and in tests/integration/accounting/wallet-gl.test.ts (Ruling WALLET-GL-1).
         accountingEnabled: false,
       },
     });
@@ -214,6 +216,9 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
 
   afterAll(async () => {
     if (!storeId) return;
+    await prisma.journalLine.deleteMany({ where: { entry: { storeId } } });
+    await prisma.journalEntry.updateMany({ where: { storeId }, data: { reversedById: null } });
+    await prisma.journalEntry.deleteMany({ where: { storeId } });
     await prisma.walletTransaction.deleteMany({ where: { storeId } });
     await prisma.customerWallet.deleteMany({ where: { storeId } });
     await prisma.returnItem.deleteMany({ where: { return: { storeId } } });
@@ -501,18 +506,18 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     }
   });
 
-  it('accounting ON: wallet checkout is unavailable (Ruling W-3)', async () => {
+  it('accounting ON: wallet checkout is available and spends the balance (Ruling WALLET-GL-1)', async () => {
     await prisma.store.update({ where: { id: storeId }, data: { accountingEnabled: true } });
     try {
       expect(await WalletService.getCheckoutAvailability(storeId)).toEqual({
-        available: false,
-        reason: 'accounting_enabled',
+        available: true,
+        reason: null,
       });
       const c = await newCustomer();
       await fund(c, 3000);
       const { order } = await checkout(c, [[productA, 1]], true);
-      expect(order.walletAmount).toBe(0);
-      expect(await balanceOf(c)).toBe(3000);
+      expect(order.walletAmount).toBe(3000);
+      expect(await balanceOf(c)).toBe(0);
     } finally {
       await prisma.store.update({ where: { id: storeId }, data: { accountingEnabled: false } });
     }
@@ -627,7 +632,17 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
         role: 'super_admin',
       },
     });
-    await StoreService.delete(s2.id, operator.id);
+    // StoreService.delete asks the identity service about the owner; no ACCOUNTS binding in-process.
+    configureIdentityClient({
+      getAccountState: async () => null,
+      setStatus: async () => undefined,
+      revokeUser: async () => undefined,
+    });
+    try {
+      await StoreService.delete(s2.id, operator.id);
+    } finally {
+      configureIdentityClient(undefined);
+    }
 
     expect(await prisma.store.count({ where: { id: s2.id } })).toBe(0);
     expect(await prisma.customerWallet.count({ where: { storeId: s2.id } })).toBe(0);

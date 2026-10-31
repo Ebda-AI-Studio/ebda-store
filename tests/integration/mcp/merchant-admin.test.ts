@@ -25,11 +25,12 @@
  * Real Postgres, gated on `hasDb`. Verified against a throwaway postgres:17
  * container before commit; production Neon is never a test target.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { withRlsBypass } from '@ebda/database';
 import { AuthService } from '@api/services/auth.service';
+import { configureIdentityClient } from '@api/lib/identity-client';
 import mcpAdminRoutes from '@api/routes/mcp-admin.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { generateMerchantKey, MERCHANT_SCOPES, MERCHANT_KEY_HEADER } from '@api/mcp/merchant-auth';
@@ -405,7 +406,16 @@ describe.skipIf(!hasDb)('merchant-admin MCP surface', () => {
 
     expect((await rpc(A.slug, initialize, fresh.plaintext)).status).toBe(200);
 
-    await AuthService.revokeAllSessions(owner.id);
+    // `owner` is an admin-namespace account, so revoking its sessions also ends them at the identity service (accounts, not
+    // in this tier; its revokeUser is covered by apps/accounts/test/rpc.test.ts): a spy stands in and proves the Store asks.
+    const revokeUser = vi.fn(async () => undefined);
+    configureIdentityClient({ revokeUser });
+    try {
+      await AuthService.revokeAllSessions(owner.id);
+    } finally {
+      configureIdentityClient(undefined);
+    }
+    expect(revokeUser).toHaveBeenCalledWith(owner.id, expect.any(String));
     expect((await rpc(A.slug, initialize, fresh.plaintext)).status).toBe(404);
 
     await withRlsBypass(tx => tx.user.delete({ where: { id: owner.id } }));

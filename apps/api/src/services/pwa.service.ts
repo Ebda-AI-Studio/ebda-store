@@ -10,6 +10,7 @@ import { BRAND } from '@ebda/shared';
 import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
 import { redis } from './redis.service';
 import { sendAlert } from './alerts.service';
+import { storeUpdate } from '../lib/repo-factory';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -381,7 +382,7 @@ export class PWAService {
       : currentSettings;
 
     const store = await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: {
           pwaEnabled: data.pwaEnabled,

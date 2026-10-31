@@ -35,6 +35,7 @@ import { featureService } from '../services/feature.service';
 import { AGENT_OPEN_WRITES_FEATURE } from '../mcp/agent-auth';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -115,7 +116,7 @@ router.post(
       }
 
       const key = mintKey();
-      await prisma.store.update({
+      await storeUpdate(prisma, {
         where: { id: storeId },
         data: {
           agentApiKeyRotatedAt: new Date(),
@@ -176,7 +177,7 @@ router.delete(
         return;
       }
 
-      await prisma.store.update({
+      await storeUpdate(prisma, {
         where: { id: storeId },
         data: {
           agentApiKeyRotatedAt: new Date(),

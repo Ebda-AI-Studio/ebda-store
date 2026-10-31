@@ -17,7 +17,7 @@ import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visi
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
-import { lockupFor } from '@ebda/shared';
+import { resolveLockup } from '@ebda/shared';
 import { StoreLogo } from '../shared/StoreLogo';
 import { StoreLockup } from '../shared/StoreLockup';
 import { useStore } from '../../contexts/StoreContext';
@@ -41,7 +41,7 @@ export default function DahabHeader({
   const { isRtl: ctxIsRtl, language, setLanguage, t } = useLanguage();
   const tabBarShown = useTabBarShown();
   const { store } = useStore();
-  const lockup = lockupFor(store?.look, store?.template);
+  const lockup = resolveLockup(store?.theme, store?.look, store?.template);
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [menuOpen, setMenuOpen] = useState(false);

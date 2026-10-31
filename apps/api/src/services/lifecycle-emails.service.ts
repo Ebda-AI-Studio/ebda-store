@@ -15,7 +15,9 @@
  *
  * Must run with the store's tenant context available: every read/write goes through `withStore`.
  */
-import { prisma, withStore, runInTenantContext } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
+import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
 import {
   LIFECYCLE_EMAIL_KINDS,
   LIFECYCLE_OPTOUT_KIND,
@@ -161,7 +163,7 @@ export async function processLifecycleEmail(
   if (!store.owner?.email) return skip('no_recipient');
 
   // Real state, read through the same service the dashboard checklist uses.
-  const guide = await runInTenantContext(storeId, () => SetupGuideService.get(storeId));
+  const guide = await runInStoreCtx(storeId, () => SetupGuideService.get(storeId));
   const done = (key: string) => guide.items.find(i => i.key === key)?.done === true;
   const facts: LifecycleFacts = {
     productAdded: done('add_product'),
@@ -174,16 +176,19 @@ export async function processLifecycleEmail(
   if (kind === 'first_order') {
     // The owner placing a test order from their own storefront is not "the first order".
     if (!opts.orderId) return { status: 'ignored', reason: 'no_order_id' };
-    const order = await withStore(storeId, tx =>
-      tx.order.findUnique({
-        where: { id: opts.orderId, storeId },
-        select: {
-          status: true,
-          shippingAddress: true,
-          customer: { select: { email: true } },
-        },
-      })
-    );
+    const found = await (
+      await storeDb(storeId)
+    ).order.findUnique({
+      where: { id: opts.orderId, storeId },
+      select: { status: true, shippingAddress: true, customerId: true },
+    });
+    // the buyer is a platform `User`, attached after the read (Ruling CF-JOBS-4)
+    const order = found
+      ? {
+          ...found,
+          customer: (await customersById(storeId, [found.customerId])).get(found.customerId ?? ''),
+        }
+      : null;
     if (!order || order.status === 'cancelled')
       return { status: 'ignored', reason: 'order_unusable' };
     const shipEmail = (order.shippingAddress as { email?: unknown } | null)?.email;
@@ -208,9 +213,9 @@ export async function processLifecycleEmail(
   const storefront = store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
   let recoveredCarts: number | undefined;
   if (kind === 'trial_recap') {
-    recoveredCarts = await withStore(storeId, tx =>
-      tx.abandonedCart.count({ where: { storeId, recoveredAt: { not: null } } })
-    );
+    recoveredCarts = await (
+      await storeDb(storeId)
+    ).abandonedCart.count({ where: { storeId, recoveredAt: { not: null } } });
   }
   const now = opts.now ?? new Date();
   try {

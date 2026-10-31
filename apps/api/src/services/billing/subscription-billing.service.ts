@@ -84,6 +84,7 @@ import {
   type LedgerVat,
   type PlatformVat,
 } from './charge-amount';
+import { storeUpdate } from '../../lib/repo-factory';
 
 type Tx = Prisma.TransactionClient;
 
@@ -241,13 +242,13 @@ async function downgradeToFree(
       providerPaymentMethodRef: null,
     },
   });
-  if (free) await tx.store.update({ where: { id: storeId }, data: { plan: free.featureTier } });
+  if (free) await storeUpdate(tx, { where: { id: storeId }, data: { plan: free.featureTier } });
   effects.push({ kind: 'downgraded', storeId, reason });
 }
 
 async function applyPlan(tx: Tx, storeId: string, planCode: string): Promise<void> {
   const plan = await tx.plan.findUnique({ where: { code: planCode } });
-  if (plan) await tx.store.update({ where: { id: storeId }, data: { plan: plan.featureTier } });
+  if (plan) await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
 }
 
 async function applySuccess(

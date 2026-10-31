@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, withStore, acrossStores } from '@ebda/database';
+import { acrossAllStoresDb, allStoresDirectory } from '../../jobs/store-db';
+import type { JobEvent } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -179,7 +180,7 @@ function titleFor(finding: AgentDenialFinding): string {
  * classifier nobody calls is the same defect as no classifier at all, and only
  * a test that runs THIS proves the wiring.
  */
-export async function handleAgentWriteDeniedWatch(): Promise<{
+export async function handleAgentWriteDeniedWatch(event?: Pick<JobEvent, 'data'>): Promise<{
   ok: true;
   denials: number;
   findings: number;
@@ -190,9 +191,11 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   // the rows themselves. See MAX_ROWS_PER_STORE above for why this replaced a
   // single global `take`.
   // Per store (each in its own tenant scope): `audit_logs` is store-scoped.
+  // Every store, Postgres and Durable Object alike, from this one run (Ruling CF-JOBS-4): the watcher ranks stores against each
+  // other and classifies patterns ACROSS them, so it cannot be split into per-store alarms. A DO store is read through its DO.
   const activeStores = (
-    await acrossStores(storeId =>
-      prisma.auditLog.count({
+    await acrossAllStoresDb(event, (storeId, db) =>
+      db.auditLog.count({
         where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
       })
     )
@@ -209,6 +212,9 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
     );
   }
 
+  const names = new Map(
+    (await allStoresDirectory(event)).map(s => [s.id, { name: s.name, slug: s.slug }] as const)
+  );
   const rowsByStore: Array<
     Array<{
       storeId: string | null;
@@ -220,21 +226,24 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   for (let i = 0; i < storeIds.length; i += STORE_READ_BATCH) {
     const batch = storeIds.slice(i, i + STORE_READ_BATCH);
     const slices = await Promise.all(
-      batch.map(storeId =>
-        withStore(storeId, tx =>
-          tx.auditLog.findMany({
-            where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
-            select: {
-              storeId: true,
-              ipAddress: true,
-              details: true,
-              store: { select: { name: true, slug: true } },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: MAX_ROWS_PER_STORE,
-          })
-        )
-      )
+      batch.map(async storeId => {
+        const [rows] = (
+          await acrossAllStoresDb(
+            event,
+            (_id, db) =>
+              db.auditLog.findMany({
+                where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
+                select: { storeId: true, ipAddress: true, details: true },
+                orderBy: { createdAt: 'desc' },
+                take: MAX_ROWS_PER_STORE,
+              }),
+            { storeIds: [storeId] }
+          )
+        ).map(r => r.value);
+        // the store's name and slug come from the platform directory (the DO has no `stores` row to join)
+        const meta = names.get(storeId) ?? null;
+        return (rows ?? []).map(r => ({ ...r, store: meta }));
+      })
     );
     rowsByStore.push(...slices);
   }
@@ -276,9 +285,10 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   const storeIdsInWindow = [...new Set(denials.map(d => d.storeId))];
   const priorAgentStores = new Set<string>();
   if (storeIdsInWindow.length > 0) {
-    const prior = await acrossStores(
-      storeId =>
-        prisma.order.findFirst({ where: { source: 'agent', storeId }, select: { storeId: true } }),
+    const prior = await acrossAllStoresDb(
+      event,
+      (storeId, db) =>
+        db.order.findFirst({ where: { source: 'agent', storeId }, select: { storeId: true } }),
       { storeIds: storeIdsInWindow }
     );
     for (const row of prior) {
@@ -346,7 +356,7 @@ const agentWriteDeniedWatchFn = inngest.createFunction(
     // HOURLY (Ruling INNGEST-BUDGET-1); DENIAL_WINDOW_MINUTES is cadence + 1 min and moves with it.
     triggers: [{ cron: '7 * * * *' }],
   },
-  handleAgentWriteDeniedWatch
+  async ({ event }) => handleAgentWriteDeniedWatch(event)
 );
 
 export const agentWriteDeniedWatch: JobDef = agentWriteDeniedWatchFn;

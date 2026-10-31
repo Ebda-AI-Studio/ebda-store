@@ -1,6 +1,7 @@
 import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
-import { acrossOpts } from '../../jobs/store-scope';
+import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
+import { storeMoney, storeRepo } from '../../repo-factory';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -51,6 +52,80 @@ export function toJsonSafeRows<T extends Record<string, unknown>>(
   );
 }
 
+/**
+ * One store on its Durable Object (Ruling CF-JOBS-4B): the catalogue and commerce counts come from the DO op `usageCounts`
+ * (same definitions as the Postgres query below), the product-view and AI-usage numbers from the analytics tables, which stay
+ * in Postgres; the `Store` row (deleted or not) is platform. Same row shape as the Postgres collection, so one upsert serves both.
+ */
+export async function collectDoStoreUsage(
+  storeId: string,
+  start: Date,
+  end: Date
+): Promise<Array<Record<string, number | bigint | string>>> {
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { deletedAt: true } })
+  );
+  if (!store || store.deletedAt) return [];
+  const money = await storeMoney(storeId);
+  if (!money) throw new Error(`store-usage-snapshot: no money client for DO store ${storeId}`);
+  const c = await money.usageCounts({ startMs: start.getTime(), endMs: end.getTime() });
+  const [a] = await withStore(
+    storeId,
+    tx =>
+      tx.$queryRaw<
+        Array<{
+          product_views: bigint;
+          ai_calls: bigint;
+          ai_billable_calls: bigint;
+          ai_tokens_in: bigint;
+          ai_tokens_out: bigint;
+          ai_cost_micros: bigint;
+          ai_unpriced_calls: bigint;
+        }>
+      >`
+      SELECT
+        (SELECT COALESCE(SUM(v.count), 0) FROM product_daily_views v
+          WHERE v.store_id = ${storeId} AND v.date >= ${start} AND v.date < ${end}) AS product_views,
+        (SELECT COUNT(*) FROM ai_usage a
+          WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_calls,
+        (SELECT COUNT(*) FROM ai_usage a
+          WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}
+            AND a.cached_hit = false) AS ai_billable_calls,
+        (SELECT COALESCE(SUM(a.input_tokens), 0) FROM ai_usage a
+          WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_tokens_in,
+        (SELECT COALESCE(SUM(a.output_tokens), 0) FROM ai_usage a
+          WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_tokens_out,
+        (SELECT COALESCE(SUM(a.cost_micros), 0) FROM ai_usage a
+          WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_cost_micros,
+        (SELECT COUNT(*) FROM ai_usage a
+          WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}
+            AND a.cached_hit = false AND a.cost_micros IS NULL) AS ai_unpriced_calls
+    `
+  );
+  return [
+    {
+      store_id: storeId,
+      products: c.products,
+      products_active: c.productsActive,
+      variants: c.variants,
+      images: c.images,
+      categories: c.categories,
+      orders: c.orders,
+      revenue_fils: c.revenueFils,
+      customers: c.customers,
+      sessions_proxy: c.sessionsProxy,
+      carts_with_items: c.cartsWithItems,
+      product_views: a?.product_views ?? 0,
+      ai_calls: a?.ai_calls ?? 0,
+      ai_billable_calls: a?.ai_billable_calls ?? 0,
+      ai_tokens_in: a?.ai_tokens_in ?? 0,
+      ai_tokens_out: a?.ai_tokens_out ?? 0,
+      ai_cost_micros: a?.ai_cost_micros ?? 0,
+      ai_unpriced_calls: a?.ai_unpriced_calls ?? 0,
+    },
+  ];
+}
+
 export const storeUsageSnapshot: JobDef = inngest.createFunction(
   {
     id: 'store-usage-snapshot',
@@ -79,33 +154,36 @@ export const storeUsageSnapshot: JobDef = inngest.createFunction(
     const start = new Date(periodStart);
     const end = new Date(periodEnd);
 
+    const onlyStore = alarmStoreId(event);
     const rows = await step.run('collect', async () =>
-      // Every table read below is store-scoped under RLS, so the collection runs
-      // store by store (`acrossStoresFlat`: one short tenant transaction each),
-      // one joined SQL pass per store rather than N queries per store.
-      acrossStoresFlat(async storeId => {
-        return prisma.$queryRaw<
-          Array<{
-            store_id: string;
-            products: bigint;
-            products_active: bigint;
-            variants: bigint;
-            images: bigint;
-            categories: bigint;
-            orders: bigint;
-            revenue_fils: bigint;
-            customers: bigint;
-            sessions_proxy: bigint;
-            carts_with_items: bigint;
-            product_views: bigint;
-            ai_calls: bigint;
-            ai_billable_calls: bigint;
-            ai_tokens_in: bigint;
-            ai_tokens_out: bigint;
-            ai_cost_micros: bigint;
-            ai_unpriced_calls: bigint;
-          }>
-        >`
+      onlyStore && (await storeRepo(onlyStore)).backend === 'do'
+        ? toJsonSafeRows(await collectDoStoreUsage(onlyStore, start, end))
+        : // Every table read below is store-scoped under RLS, so the collection runs
+          // store by store (`acrossStoresFlat`: one short tenant transaction each),
+          // one joined SQL pass per store rather than N queries per store.
+          acrossStoresFlat(async storeId => {
+            return prisma.$queryRaw<
+              Array<{
+                store_id: string;
+                products: bigint;
+                products_active: bigint;
+                variants: bigint;
+                images: bigint;
+                categories: bigint;
+                orders: bigint;
+                revenue_fils: bigint;
+                customers: bigint;
+                sessions_proxy: bigint;
+                carts_with_items: bigint;
+                product_views: bigint;
+                ai_calls: bigint;
+                ai_billable_calls: bigint;
+                ai_tokens_in: bigint;
+                ai_tokens_out: bigint;
+                ai_cost_micros: bigint;
+                ai_unpriced_calls: bigint;
+              }>
+            >`
           SELECT
             s.id AS store_id,
 
@@ -169,7 +247,7 @@ export const storeUsageSnapshot: JobDef = inngest.createFunction(
           FROM stores s
           WHERE s.id = ${storeId} AND s.deleted_at IS NULL
         `;
-      }, acrossOpts(event)).then(toJsonSafeRows)
+          }, acrossOpts(event)).then(toJsonSafeRows)
     );
 
     let written = 0;

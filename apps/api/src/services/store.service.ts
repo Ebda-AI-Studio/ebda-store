@@ -9,6 +9,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
+import { copyStoreSettings, storeDb, storeRepo, syncStoreFields } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -114,6 +115,38 @@ export async function bustStoreCaches(
 }
 
 /**
+ * Settings write-through (Ruling CF-WRITES-2): runs the authoritative `Store` update (D1/Postgres) exactly as `withStore`
+ * did, then copies the changed fields to the Durable Object's settings copy for a store served by its DO. On Postgres the
+ * copy is a no-op. The patch is captured from the `tx.store.update({ data })` call itself, so no call site restates it.
+ */
+async function updateStoreThrough<T>(
+  storeId: string,
+  run: (tx: Parameters<Parameters<typeof withStore>[1]>[0]) => Promise<T>
+): Promise<T> {
+  let patch: Record<string, unknown> | undefined;
+  const result = await withStore(storeId, tx => {
+    const watched = new Proxy(tx as object, {
+      get(target, prop) {
+        const v = (target as any)[prop];
+        if (prop !== 'store') return v;
+        return new Proxy(v, {
+          get(st, m) {
+            if (m !== 'update') return st[m];
+            return (args: { data: Record<string, unknown> }) => {
+              patch = args.data;
+              return st.update(args);
+            };
+          },
+        });
+      },
+    });
+    return run(watched as typeof tx);
+  });
+  if (patch) await copyStoreSettings(storeId, patch);
+  return result as T;
+}
+
+/**
  * Convenience wrapper for callers that only have a `storeId` in scope (the
  * bulk-AI Inngest sweeps that write FAQs/HowTos/llmsTxt/aboutJson — all
  * served off the `public:store:*` keys `bustStoreCaches` busts, never off
@@ -182,9 +215,11 @@ async function countStoreRows(
   opts: { orders?: boolean } = {}
 ): Promise<{ products: number; categories: number; orders?: number }> {
   return withStore(storeId, async tx => {
+    // products + categories follow the store's backend (a Postgres store keeps this very tx); orders stay on the tx
+    const db = (await storeRepo(storeId)).backend === 'do' ? await storeDb(storeId) : tx;
     const [products, categories, orders] = await Promise.all([
-      tx.product.count({ where: { storeId } }),
-      tx.category.count({ where: { storeId } }),
+      db.product.count({ where: { storeId } }),
+      db.category.count({ where: { storeId } }),
       opts.orders ? tx.order.count({ where: { storeId } }) : Promise.resolve(undefined),
     ]);
     return opts.orders
@@ -242,7 +277,7 @@ export class StoreService {
       (
         await acrossStores(
           async storeId => ({
-            products: await prisma.product.count({ where: { storeId } }),
+            products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
           { storeIds: stores.map(st => st.id) }
@@ -280,7 +315,7 @@ export class StoreService {
    * path does.
    */
   static async setStatus(storeId: string, status: StoreStatus) {
-    const store = await withStore(storeId, tx =>
+    const store = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { status },
@@ -557,7 +592,7 @@ export class StoreService {
       ) as Prisma.InputJsonValue;
     }
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -948,7 +983,7 @@ export class StoreService {
     // Ahmad 2026-05-21 — Demo Shop had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
-        prisma.product.count({ where: { storeId, status: 'active' } }),
+        (await storeDb(storeId)).product.count({ where: { storeId, status: 'active' } }),
         prisma.order.count({ where: { storeId } }),
         prisma.customer.count({ where: { storeId } }),
         prisma.order.aggregate({
@@ -1044,7 +1079,7 @@ export class StoreService {
 
     // A bare skin is the legacy way to style a store: picking one leaves the looks
     // system (the storefront composes skin < look < theme only while `look` is set).
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { template: template as StoreTemplate, ...(store.look ? { look: null } : {}) },
@@ -1122,7 +1157,7 @@ export class StoreService {
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that
     // must not be overwritten.
-    const updated = await withStore(storeId, async tx => {
+    const updated = await updateStoreThrough(storeId, async tx => {
       const live = await tx.store.findUnique({
         where: { id: storeId },
         select: { theme: true },
@@ -1167,7 +1202,7 @@ export class StoreService {
     const mergedTheme: Record<string, unknown> = { ...existingTheme, ...theme };
     for (const [k, v] of Object.entries(theme)) if (v === null) delete mergedTheme[k];
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { theme: mergedTheme as Prisma.InputJsonValue },
@@ -1198,7 +1233,7 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1250,7 +1285,7 @@ export class StoreService {
   static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { socialLinks },
@@ -1279,7 +1314,7 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1315,7 +1350,7 @@ export class StoreService {
         : {};
     const merged = { ...existing, ...announcementBar };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { announcementBar: merged as Prisma.InputJsonValue },
@@ -1351,6 +1386,7 @@ export class StoreService {
             updated_at = now()
         WHERE id = ${storeId}`
     );
+    await syncStoreFields(storeId, ['settings']);
     await StoreService.invalidateCache(store);
   }
 
@@ -1365,6 +1401,7 @@ export class StoreService {
             updated_at = now()
         WHERE id = ${storeId}`
     );
+    await syncStoreFields(storeId, ['settings']);
     await StoreService.invalidateCache(store);
   }
 
@@ -1373,7 +1410,7 @@ export class StoreService {
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, floatingWidget };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { settings: mergedSettings as Prisma.InputJsonValue },
@@ -1397,7 +1434,7 @@ export class StoreService {
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, mcpWriteEnabled: enabled };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { settings: mergedSettings as Prisma.InputJsonValue },
@@ -1432,7 +1469,7 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1482,7 +1519,7 @@ export class StoreService {
       }
     >;
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {

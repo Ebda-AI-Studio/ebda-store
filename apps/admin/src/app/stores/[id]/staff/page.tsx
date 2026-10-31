@@ -447,11 +447,11 @@ export default function StoreStaffPage() {
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
-          Remove{' '}
-          <strong>
-            {removeTarget?.firstName} {removeTarget?.lastName}
-          </strong>{' '}
-          ({removeTarget?.email}) from this store? They will lose access immediately.
+          {t.rich('removeBody', {
+            name: `${removeTarget?.firstName ?? ''} ${removeTarget?.lastName ?? ''}`.trim(),
+            email: removeTarget?.email ?? '',
+            b: chunks => <strong>{chunks}</strong>,
+          })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setRemoveTarget(null)} disabled={removing}>

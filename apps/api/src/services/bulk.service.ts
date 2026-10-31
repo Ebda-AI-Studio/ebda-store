@@ -1,4 +1,6 @@
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
+import { storeDb, storeMoney, storeWriter } from '../lib/repo-factory';
+import logger from '../lib/logger';
 import {
   AI_AUTOFILL_FIELD_NAMES,
   SEARCH_TERMS_MAX_LENGTH,
@@ -173,7 +175,7 @@ export function buildVariantTitle(values: string[]): string {
  * Replace-semantics: any existing options/variants for the product are cleared
  * first (mirrors how categories/tags/images are replaced on re-import).
  */
-async function createVariantsForProductTx(
+export async function createVariantsForProductTx(
   tx: Prisma.TransactionClient,
   storeId: string,
   productId: string,
@@ -357,6 +359,43 @@ async function createVariantsForProductTx(
   return createdVariants.length;
 }
 
+/**
+ * The product columns an import row sets (shared by the Postgres batch and the Durable Object batch, so both write the same
+ * thing). A blank barcode on an update, and blank search words, leave the stored value alone.
+ */
+function buildProductFields(row: ProductImportRow, slug: string, existing: { id: string } | null) {
+  // Blank = leave alone (bulk cannot clear; documented in the import help).
+  const cleanedSearchTerms = cleanSearchTerms(row.searchTerms);
+  const productFields = {
+    name: row.name,
+    nameAr: row.nameAr || null,
+    slug,
+    description: row.description || null,
+    descriptionAr: row.descriptionAr || null,
+    price: parseInt(String(row.price)),
+    compareAtPrice: row.compareAtPrice ? parseInt(String(row.compareAtPrice)) : null,
+    costPrice: row.costPrice ? parseInt(String(row.costPrice)) : null,
+    sku: row.sku || null,
+    // BARCODE-1: blank = leave alone on update (a code may be on a printed label).
+    ...(row.barcode || !existing ? { barcode: row.barcode || null } : {}),
+    inventory: row.inventory ? parseInt(String(row.inventory)) : 0,
+    lowStockThreshold: row.lowStockThreshold ? parseInt(String(row.lowStockThreshold)) : 5,
+    trackInventory: row.trackInventory !== undefined ? String(row.trackInventory) === 'true' : true,
+    weight: row.weight ? parseFloat(String(row.weight)) : null,
+    status: (row.status as ProductStatus) || 'draft',
+    featured: row.featured !== undefined ? String(row.featured) === 'true' : false,
+    isNew: row.isNew !== undefined ? String(row.isNew) === 'true' : false,
+    metaTitle: row.metaTitle || null,
+    metaTitleAr: row.metaTitleAr || null,
+    metaDescription: row.metaDescription || null,
+    metaDescriptionAr: row.metaDescriptionAr || null,
+    // A blank/absent column leaves curated search words alone on
+    // update (older exports have no such column) and is null on create.
+    ...(cleanedSearchTerms ? { searchTerms: cleanedSearchTerms } : {}),
+  };
+  return productFields;
+}
+
 interface ExportOptions {
   status?: ProductStatus;
   category?: string;
@@ -394,7 +433,9 @@ export class BulkService {
 
     // Hard ceiling to prevent OOM on very large stores.
     // Most stores have well under 10,000 products.
-    const products = await prisma.product.findMany({
+    const products = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where,
       include: {
         images: { orderBy: { position: 'asc' } },
@@ -690,6 +731,13 @@ export class BulkService {
       errors: [],
     };
 
+    // A store on its Durable Object (Ruling IMPORT-DO-1): every read and the category / tag creation go to the DO through
+    // the repo, and each batch of Phase 4 is ONE DO section instead of the interactive Postgres transaction. For a
+    // Postgres store `db` is `prisma` and nothing below changes.
+    const money = await storeMoney(storeId);
+    const db = money ? await storeDb(storeId) : prisma;
+    const writer = await storeWriter(storeId);
+
     // Split into records respecting quoted fields that may contain embedded
     // newlines (e.g. a product description with line breaks). A naive
     // split('\n') shatters such records into broken rows.
@@ -712,7 +760,7 @@ export class BulkService {
 
     // ---- Phase 1: Pre-load existing data for fast in-memory lookups ----
 
-    const existingProducts = await prisma.product.findMany({
+    const existingProducts = await db.product.findMany({
       where: { storeId, deletedAt: null },
       select: { id: true, sku: true, slug: true },
     });
@@ -729,7 +777,7 @@ export class BulkService {
     // CURRENT price (an export edited and re-imported) but never change it or add a compare-at
     // price: that row fails with a clear error and the other rows import.
     const goldPrice = new Map<string, number>();
-    for (const g of await prisma.product.findMany({
+    for (const g of await db.product.findMany({
       where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
       select: { id: true, price: true },
     }))
@@ -738,7 +786,7 @@ export class BulkService {
     // Pre-load all existing slugs into a Set for fast unique-slug generation
     const existingSlugs = new Set(existingProducts.map(p => p.slug));
 
-    const existingCategories = await prisma.category.findMany({
+    const existingCategories = await db.category.findMany({
       where: { storeId },
       select: { id: true, name: true, slug: true },
     });
@@ -749,7 +797,7 @@ export class BulkService {
       existingCategorySlugs.add(c.slug);
     }
 
-    const existingTags = await prisma.tag.findMany({
+    const existingTags = await db.tag.findMany({
       where: { storeId },
       select: { id: true, name: true },
     });
@@ -799,11 +847,11 @@ export class BulkService {
           prisma as unknown as Parameters<typeof lockStoreBarcodes>[0],
           storeId
         );
-        const heldProducts = await prisma.product.findMany({
+        const heldProducts = await db.product.findMany({
           where: { storeId, barcode: { in: codes }, deletedAt: null },
           select: { id: true, barcode: true },
         });
-        const heldVariants = await prisma.productVariant.findMany({
+        const heldVariants = await db.productVariant.findMany({
           where: { barcode: { in: codes }, product: { storeId, deletedAt: null } },
           select: { productId: true, barcode: true },
         });
@@ -1146,7 +1194,7 @@ export class BulkService {
       }
     }
     if (parentIdBySku.size > 0) {
-      const pinned = await prisma.bundleItem.findMany({
+      const pinned = await db.bundleItem.findMany({
         where: { productId: { in: [...parentIdBySku.values()] }, variantId: { not: null } },
         select: { productId: true, bundle: { select: { name: true } } },
       });
@@ -1194,10 +1242,10 @@ export class BulkService {
         categoryData.push({ storeId, name, slug });
       }
 
-      await prisma.category.createMany({ data: categoryData, skipDuplicates: true });
+      await writer.category.createMany({ data: categoryData, skipDuplicates: true });
 
       // Re-fetch to get generated IDs
-      const newCats = await prisma.category.findMany({
+      const newCats = await db.category.findMany({
         where: { storeId, name: { in: [...newCategoryNames] } },
         select: { id: true, name: true },
       });
@@ -1209,10 +1257,10 @@ export class BulkService {
 
     if (newTagNames.size > 0) {
       const tagData = [...newTagNames].map(name => ({ storeId, name }));
-      await prisma.tag.createMany({ data: tagData, skipDuplicates: true });
+      await writer.tag.createMany({ data: tagData, skipDuplicates: true });
 
       // Re-fetch to get generated IDs
-      const newTags = await prisma.tag.findMany({
+      const newTags = await db.tag.findMany({
         where: { storeId, name: { in: [...newTagNames] } },
         select: { id: true, name: true },
       });
@@ -1241,207 +1289,245 @@ export class BulkService {
       }> = [];
 
       try {
-        await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-          for (const { rowIndex, row, slug, existing } of batch) {
-            try {
-              // Blank = leave alone (bulk cannot clear; documented in the import help).
-              const cleanedSearchTerms = cleanSearchTerms(row.searchTerms);
-              const productFields = {
-                name: row.name,
-                nameAr: row.nameAr || null,
-                slug,
-                description: row.description || null,
-                descriptionAr: row.descriptionAr || null,
-                price: parseInt(String(row.price)),
-                compareAtPrice: row.compareAtPrice ? parseInt(String(row.compareAtPrice)) : null,
-                costPrice: row.costPrice ? parseInt(String(row.costPrice)) : null,
-                sku: row.sku || null,
-                // BARCODE-1: blank = leave alone on update (a code may be on a printed label).
-                ...(row.barcode || !existing ? { barcode: row.barcode || null } : {}),
-                inventory: row.inventory ? parseInt(String(row.inventory)) : 0,
-                lowStockThreshold: row.lowStockThreshold
-                  ? parseInt(String(row.lowStockThreshold))
-                  : 5,
-                trackInventory:
-                  row.trackInventory !== undefined ? String(row.trackInventory) === 'true' : true,
-                weight: row.weight ? parseFloat(String(row.weight)) : null,
-                status: (row.status as ProductStatus) || 'draft',
-                featured: row.featured !== undefined ? String(row.featured) === 'true' : false,
-                isNew: row.isNew !== undefined ? String(row.isNew) === 'true' : false,
-                metaTitle: row.metaTitle || null,
-                metaTitleAr: row.metaTitleAr || null,
-                metaDescription: row.metaDescription || null,
-                metaDescriptionAr: row.metaDescriptionAr || null,
-                // A blank/absent column leaves curated search words alone on
-                // update (older exports have no such column) and is null on create.
-                ...(cleanedSearchTerms ? { searchTerms: cleanedSearchTerms } : {}),
-              };
-
-              let productId: string;
-
-              const imported = importedAiValues(productFields as Record<string, unknown>);
-
-              if (existing) {
-                // Update existing product
-                const current = (await tx.product.findUnique({
-                  where: { id: existing.id, storeId },
-                  select: AI_PROVENANCE_SELECT,
-                })) as Record<string, unknown> | null;
-                await tx.product.update({
-                  where: { id: existing.id, storeId },
-                  data: {
-                    ...productFields,
-                    aiFieldSources: stampHumanEdits(
-                      (current?.aiFieldSources as Record<string, 'ai' | 'human'>) ?? {},
-                      current ?? {},
-                      imported
-                    ),
-                  },
-                });
-                productId = existing.id;
-                result.updated++;
-
-                // The incoming row's slug may differ from the product's current
-                // one (e.g. a re-export from a source system with a different
-                // handle) -- Phase 2 already decided to write it, so this is a
-                // live rename exactly like a manual edit. Record old -> new so
-                // the previously-indexed handle 301s instead of 404ing.
-                if (existing.slug !== slug) {
-                  await recordSlugRedirect(
-                    tx,
-                    storeId,
-                    SlugEntityType.PRODUCT,
-                    existing.slug,
-                    slug
-                  );
-                }
-              } else {
-                // Create new product
-                const created = await tx.product.create({
-                  data: {
-                    store: { connect: { id: storeId } },
-                    ...productFields,
-                    aiFieldSources: stampHumanEdits({}, {}, imported),
-                  },
-                });
-                productId = created.id;
-
-                // Create inventory history entry for initial stock
-                if (productFields.inventory > 0) {
-                  await tx.inventoryHistory.create({
-                    data: {
-                      productId,
-                      storeId,
-                      type: 'initial',
-                      quantity: productFields.inventory,
-                      previousStock: 0,
-                      newStock: productFields.inventory,
-                      reason: 'Initial stock from bulk import',
-                      createdBy: userId,
-                    },
-                  });
-                }
-
-                result.created++;
-              }
-
-              // Handle categories: delete existing links, then bulk create new ones
-              if (row.categories) {
-                const categoryNames = String(row.categories)
-                  .split(',')
-                  .map(c => c.trim())
-                  .filter(Boolean);
-
-                await tx.productCategory.deleteMany({ where: { productId } });
-
-                const categoryLinks = categoryNames
-                  .map(name => {
-                    const categoryId = categoryByName.get(name);
-                    return categoryId ? { productId, categoryId } : null;
-                  })
-                  .filter(
-                    (link): link is { productId: string; categoryId: string } => link !== null
-                  );
-
-                if (categoryLinks.length > 0) {
-                  await tx.productCategory.createMany({
-                    data: categoryLinks,
-                    skipDuplicates: true,
-                  });
-                }
-              }
-
-              // Handle tags: delete existing links, then bulk create new ones
-              if (row.tags) {
-                const tagNames = String(row.tags)
-                  .split(',')
-                  .map(t => t.trim())
-                  .filter(Boolean);
-
-                await tx.productTag.deleteMany({ where: { productId } });
-
-                const tagLinks = tagNames
-                  .map(name => {
-                    const tagId = tagByName.get(name);
-                    return tagId ? { productId, tagId } : null;
-                  })
-                  .filter((link): link is { productId: string; tagId: string } => link !== null);
-
-                if (tagLinks.length > 0) {
-                  await tx.productTag.createMany({ data: tagLinks, skipDuplicates: true });
-                }
-              }
-
-              // Handle images: delete existing, then bulk create new ones
-              if (row.images) {
-                const imageUrls = String(row.images)
-                  .split(',')
-                  .map(u => u.trim())
-                  .filter(Boolean);
-
-                await tx.productImage.deleteMany({ where: { productId } });
-
-                if (imageUrls.length > 0) {
-                  await tx.productImage.createMany({
-                    data: imageUrls.map((url, position) => ({ productId, url, position })),
-                  });
-                }
-              }
-
-              // Attach any variant rows that referenced this product's sku.
-              // Created in the SAME transaction so a batch rollback also
-              // rolls back the variants.
-              if (productFields.sku && variantsByParent.has(productFields.sku)) {
-                const made = await createVariantsForProductTx(
-                  tx,
-                  storeId,
-                  productId,
-                  variantsByParent.get(productFields.sku)!
-                );
-                batchVariants += made;
-                variantsByParent.delete(productFields.sku); // mark consumed
-              }
-              const goldMode = String(row.pricing_mode ?? '')
-                .trim()
-                .toLowerCase();
-              if (goldMode === 'gold_rate' || (goldMode === 'fixed' && existing)) {
-                goldApply.push({
-                  rowIndex,
-                  productId,
-                  mode: goldMode,
-                  karat: Number(String(row.gold_karat ?? '').trim()) as GoldKarat,
-                  weightMg: parseGramsToMg(String(row.gold_weight_g ?? '')),
-                });
-              }
-            } catch (error) {
-              // Re-throw to roll back the batch transaction; per-row errors
-              // are only possible for validation issues caught in Phase 2.
-              throw Object.assign(error instanceof Error ? error : new Error('Unknown error'), {
-                __rowIndex: rowIndex,
+        if (money) {
+          // ONE Durable Object section for the whole batch (Ruling IMPORT-DO-1): products, stock, links and variants commit
+          // together or not at all, like the interactive transaction below. Optimistic counts are undone by the catch.
+          const plan = batch.map(({ rowIndex, row, slug, existing }) => {
+            const productFields = buildProductFields(row, slug, existing);
+            const names = (v: unknown) =>
+              String(v)
+                .split(',')
+                .map(c => c.trim())
+                .filter(Boolean);
+            const sku = productFields.sku;
+            if (existing) result.updated++;
+            else result.created++;
+            return {
+              rowIndex,
+              existingId: existing?.id ?? null,
+              existingSlug: existing?.slug ?? null,
+              slug,
+              fields: productFields as Record<string, unknown>,
+              imported: importedAiValues(productFields as Record<string, unknown>),
+              categoryIds: row.categories
+                ? names(row.categories)
+                    .map(n => categoryByName.get(n))
+                    .filter((id): id is string => !!id)
+                : null,
+              tagIds: row.tags
+                ? names(row.tags)
+                    .map(n => tagByName.get(n))
+                    .filter((id): id is string => !!id)
+                : null,
+              imageUrls: row.images ? names(row.images) : null,
+              variants: sku && variantsByParent.has(sku) ? variantsByParent.get(sku)! : null,
+            };
+          });
+          const applied = await money.importBatch({
+            rows: plan,
+            aiFields: [...AI_AUTOFILL_FIELD_NAMES],
+            userId: userId ?? null,
+          });
+          for (const p of plan) if (p.variants) variantsByParent.delete(String(p.fields.sku));
+          batchVariants += applied.variantsCreated;
+          const productIdByRow = new Map(applied.products.map(p => [p.rowIndex, p.productId]));
+          for (const { rowIndex, row } of batch) {
+            const goldMode = String(row.pricing_mode ?? '')
+              .trim()
+              .toLowerCase();
+            const existing = batch.find(b => b.rowIndex === rowIndex)!.existing;
+            if (goldMode === 'gold_rate' || (goldMode === 'fixed' && existing)) {
+              goldApply.push({
+                rowIndex,
+                productId: productIdByRow.get(rowIndex)!,
+                mode: goldMode,
+                karat: Number(String(row.gold_karat ?? '').trim()) as GoldKarat,
+                weightMg: parseGramsToMg(String(row.gold_weight_g ?? '')),
               });
             }
           }
-        });
+          // slug redirects are platform data (D1/Postgres): recorded after the commit, idempotent, never fail the import
+          for (const r of applied.renames) {
+            try {
+              await recordSlugRedirect(prisma, storeId, SlugEntityType.PRODUCT, r.from, r.to);
+            } catch (err) {
+              logger.error(
+                { err, storeId, fromSlug: r.from },
+                '[IMPORT] slug redirect not recorded'
+              );
+            }
+          }
+        } else
+          await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+            for (const { rowIndex, row, slug, existing } of batch) {
+              try {
+                const productFields = buildProductFields(row, slug, existing);
+
+                let productId: string;
+
+                const imported = importedAiValues(productFields as Record<string, unknown>);
+
+                if (existing) {
+                  // Update existing product
+                  const current = (await tx.product.findUnique({
+                    where: { id: existing.id, storeId },
+                    select: AI_PROVENANCE_SELECT,
+                  })) as Record<string, unknown> | null;
+                  await tx.product.update({
+                    where: { id: existing.id, storeId },
+                    data: {
+                      ...productFields,
+                      aiFieldSources: stampHumanEdits(
+                        (current?.aiFieldSources as Record<string, 'ai' | 'human'>) ?? {},
+                        current ?? {},
+                        imported
+                      ),
+                    },
+                  });
+                  productId = existing.id;
+                  result.updated++;
+
+                  // The incoming row's slug may differ from the product's current
+                  // one (e.g. a re-export from a source system with a different
+                  // handle) -- Phase 2 already decided to write it, so this is a
+                  // live rename exactly like a manual edit. Record old -> new so
+                  // the previously-indexed handle 301s instead of 404ing.
+                  if (existing.slug !== slug) {
+                    await recordSlugRedirect(
+                      tx,
+                      storeId,
+                      SlugEntityType.PRODUCT,
+                      existing.slug,
+                      slug
+                    );
+                  }
+                } else {
+                  // Create new product
+                  const created = await tx.product.create({
+                    data: {
+                      store: { connect: { id: storeId } },
+                      ...productFields,
+                      aiFieldSources: stampHumanEdits({}, {}, imported),
+                    },
+                  });
+                  productId = created.id;
+
+                  // Create inventory history entry for initial stock
+                  if (productFields.inventory > 0) {
+                    await tx.inventoryHistory.create({
+                      data: {
+                        productId,
+                        storeId,
+                        type: 'initial',
+                        quantity: productFields.inventory,
+                        previousStock: 0,
+                        newStock: productFields.inventory,
+                        reason: 'Initial stock from bulk import',
+                        createdBy: userId,
+                      },
+                    });
+                  }
+
+                  result.created++;
+                }
+
+                // Handle categories: delete existing links, then bulk create new ones
+                if (row.categories) {
+                  const categoryNames = String(row.categories)
+                    .split(',')
+                    .map(c => c.trim())
+                    .filter(Boolean);
+
+                  await tx.productCategory.deleteMany({ where: { productId } });
+
+                  const categoryLinks = categoryNames
+                    .map(name => {
+                      const categoryId = categoryByName.get(name);
+                      return categoryId ? { productId, categoryId } : null;
+                    })
+                    .filter(
+                      (link): link is { productId: string; categoryId: string } => link !== null
+                    );
+
+                  if (categoryLinks.length > 0) {
+                    await tx.productCategory.createMany({
+                      data: categoryLinks,
+                      skipDuplicates: true,
+                    });
+                  }
+                }
+
+                // Handle tags: delete existing links, then bulk create new ones
+                if (row.tags) {
+                  const tagNames = String(row.tags)
+                    .split(',')
+                    .map(t => t.trim())
+                    .filter(Boolean);
+
+                  await tx.productTag.deleteMany({ where: { productId } });
+
+                  const tagLinks = tagNames
+                    .map(name => {
+                      const tagId = tagByName.get(name);
+                      return tagId ? { productId, tagId } : null;
+                    })
+                    .filter((link): link is { productId: string; tagId: string } => link !== null);
+
+                  if (tagLinks.length > 0) {
+                    await tx.productTag.createMany({ data: tagLinks, skipDuplicates: true });
+                  }
+                }
+
+                // Handle images: delete existing, then bulk create new ones
+                if (row.images) {
+                  const imageUrls = String(row.images)
+                    .split(',')
+                    .map(u => u.trim())
+                    .filter(Boolean);
+
+                  await tx.productImage.deleteMany({ where: { productId } });
+
+                  if (imageUrls.length > 0) {
+                    await tx.productImage.createMany({
+                      data: imageUrls.map((url, position) => ({ productId, url, position })),
+                    });
+                  }
+                }
+
+                // Attach any variant rows that referenced this product's sku.
+                // Created in the SAME transaction so a batch rollback also
+                // rolls back the variants.
+                if (productFields.sku && variantsByParent.has(productFields.sku)) {
+                  const made = await createVariantsForProductTx(
+                    tx,
+                    storeId,
+                    productId,
+                    variantsByParent.get(productFields.sku)!
+                  );
+                  batchVariants += made;
+                  variantsByParent.delete(productFields.sku); // mark consumed
+                }
+                const goldMode = String(row.pricing_mode ?? '')
+                  .trim()
+                  .toLowerCase();
+                if (goldMode === 'gold_rate' || (goldMode === 'fixed' && existing)) {
+                  goldApply.push({
+                    rowIndex,
+                    productId,
+                    mode: goldMode,
+                    karat: Number(String(row.gold_karat ?? '').trim()) as GoldKarat,
+                    weightMg: parseGramsToMg(String(row.gold_weight_g ?? '')),
+                  });
+                }
+              } catch (error) {
+                // Re-throw to roll back the batch transaction; per-row errors
+                // are only possible for validation issues caught in Phase 2.
+                throw Object.assign(error instanceof Error ? error : new Error('Unknown error'), {
+                  __rowIndex: rowIndex,
+                });
+              }
+            }
+          });
         // Transaction committed — safe to count this batch's variants.
         result.variantsCreated += batchVariants;
         for (const g of goldApply) {
@@ -1463,7 +1549,7 @@ export class BulkService {
               continue;
             }
             // Keep the making charge and margin a gold product already has; a new one starts at none.
-            const cur = await prisma.product.findFirst({
+            const cur = await db.product.findFirst({
               where: { id: g.productId, storeId },
               select: { makingChargeType: true, makingChargeValue: true, goldMarginBps: true },
             });
@@ -1492,11 +1578,13 @@ export class BulkService {
         }
       } catch (error) {
         // If the batch transaction fails, mark all rows in the batch as failed
-        const rowIndex =
-          error && typeof error === 'object' && '__rowIndex' in error
+        const doRow = error instanceof Error ? /^row (\d+): ([\s\S]*)$/.exec(error.message) : null;
+        const rowIndex = doRow
+          ? Number(doRow[1])
+          : error && typeof error === 'object' && '__rowIndex' in error
             ? (error as { __rowIndex: number }).__rowIndex
             : batch[0].rowIndex;
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const message = doRow ? doRow[2] : error instanceof Error ? error.message : 'Unknown error';
 
         // Undo optimistic counts from within the rolled-back transaction
         for (const item of batch) {
@@ -1531,10 +1619,14 @@ export class BulkService {
         continue;
       }
       try {
-        await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-          const made = await createVariantsForProductTx(tx, storeId, existing.id, variants);
-          result.variantsCreated += made;
-        });
+        if (money) {
+          const r = await money.importVariants({ productId: existing.id, variants });
+          result.variantsCreated += r.variantsCreated;
+        } else
+          await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+            const made = await createVariantsForProductTx(tx, storeId, existing.id, variants);
+            result.variantsCreated += made;
+          });
       } catch (error) {
         result.failed += variants.length;
         result.errors.push({
@@ -1551,30 +1643,28 @@ export class BulkService {
     // it failed and rolled back). Delete the unreferenced ones — leaves
     // categories/tags that another product happens to use intact.
     if (createdCategoryIds.size > 0) {
-      const referenced = await prisma.productCategory.findMany({
+      const referenced = await db.productCategory.findMany({
         where: { categoryId: { in: [...createdCategoryIds] } },
         select: { categoryId: true },
-        distinct: ['categoryId'],
       });
       const referencedIds = new Set(referenced.map(r => r.categoryId));
       const orphanIds = [...createdCategoryIds].filter(id => !referencedIds.has(id));
       if (orphanIds.length > 0) {
-        await prisma.category.deleteMany({
+        await writer.category.deleteMany({
           where: { id: { in: orphanIds }, storeId },
         });
       }
     }
 
     if (createdTagIds.size > 0) {
-      const referenced = await prisma.productTag.findMany({
+      const referenced = await db.productTag.findMany({
         where: { tagId: { in: [...createdTagIds] } },
         select: { tagId: true },
-        distinct: ['tagId'],
       });
       const referencedIds = new Set(referenced.map(r => r.tagId));
       const orphanIds = [...createdTagIds].filter(id => !referencedIds.has(id));
       if (orphanIds.length > 0) {
-        await prisma.tag.deleteMany({
+        await writer.tag.deleteMany({
           where: { id: { in: orphanIds }, storeId },
         });
       }
@@ -1585,6 +1675,7 @@ export class BulkService {
     if (result.created + result.updated > 0) await requestStoreReindex(storeId, 'bulk-import');
 
     // BARCODE-1: rows imported without a barcode get one (inventory.barcode stores only).
+    // (a DO store allocates in one DO section, Ruling BARCODE-DO-1)
     if (result.created + result.updated > 0) await fillMissingAfterImport(storeId);
 
     return result;
@@ -1611,7 +1702,9 @@ export class BulkService {
       // it. Fall back to one delete per id ONLY on that specific failure, so
       // the common case (no bundle-pinned products) stays a single query.
       try {
-        const result = await prisma.product.deleteMany({
+        const result = await (
+          await storeWriter(storeId)
+        ).product.deleteMany({
           where: { id: { in: productIds }, storeId },
         });
         return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
@@ -1623,7 +1716,9 @@ export class BulkService {
         const errors: string[] = [];
         for (const id of productIds) {
           try {
-            const r = await prisma.product.deleteMany({ where: { id, storeId } });
+            const r = await (
+              await storeWriter(storeId)
+            ).product.deleteMany({ where: { id, storeId } });
             deleted += r.count;
           } catch (innerErr) {
             if (bundleFkViolationKind(innerErr) === 'product') {
@@ -1640,7 +1735,9 @@ export class BulkService {
     }
 
     // Soft delete: stamp deletedAt on all matching rows in one query
-    const result = await prisma.product.updateMany({
+    const result = await (
+      await storeWriter(storeId)
+    ).product.updateMany({
       where: { id: { in: productIds }, storeId },
       data: { deletedAt: new Date() },
     });
@@ -1663,7 +1760,9 @@ export class BulkService {
     }
 
     // Update all matching rows for this store in one query
-    const result = await prisma.product.updateMany({
+    const result = await (
+      await storeWriter(storeId)
+    ).product.updateMany({
       where: { id: { in: productIds }, storeId, deletedAt: null },
       data: { status },
     });

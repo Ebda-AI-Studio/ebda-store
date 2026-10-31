@@ -28,7 +28,9 @@
 
 import type { JobDef } from '../../jobs/types';
 import { storefrontOrigin } from '@ebda/shared';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { storeDb } from '../../repo-factory';
+import { customersById, runInStoreCtx } from '../../jobs/store-db';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import {
@@ -77,18 +79,17 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
     // (plaintext access tokens, not masked). We need the DIRECT Prisma call
     // with runInTenantContext so RLS doesn't filter it out.
     const store = await step.run('load-store-pixels', () =>
-      runInTenantContext(storeId, () =>
-        prisma.store
-          .findUnique({
-            where: { id: storeId },
-            select: {
-              marketingPixels: true,
-              slug: true,
-              domain: true,
-            },
-          })
-          .catch(() => null)
-      )
+      // `Store` is a platform row (D1): the same read for a Postgres store and a store on its Durable Object
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            marketingPixels: true,
+            slug: true,
+            domain: true,
+          },
+        })
+      ).catch(() => null)
     );
 
     if (!store) {
@@ -104,8 +105,10 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
     // runInTenantContext ensures RLS allows the read (Inngest runs without
     // an HTTP request context, so there's no middleware-set tenant GUC).
     const order = await step.run('load-order', () =>
-      runInTenantContext(storeId, () =>
-        prisma.order
+      runInStoreCtx(storeId, async () => {
+        const row = await (
+          await storeDb(storeId)
+        ).order
           .findUnique({
             where: { id: orderId, storeId },
             select: {
@@ -113,13 +116,15 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
               total: true,
               currency: true,
               shippingAddress: true,
-              customer: {
-                select: { email: true, phone: true },
-              },
+              customerId: true,
             },
           })
-          .catch(() => null)
-      )
+          .catch(() => null);
+        if (!row) return null;
+        // the buyer is a platform `User`, attached after the read (Ruling CF-JOBS-4)
+        const c = (await customersById(storeId, [row.customerId])).get(row.customerId ?? '');
+        return { ...row, customer: c ? { email: c.email, phone: c.phone } : null };
+      })
     );
 
     if (!order) {

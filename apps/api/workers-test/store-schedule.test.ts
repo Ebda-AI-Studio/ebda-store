@@ -11,7 +11,10 @@ import type { AlarmEvent } from '../src/cf/store-schedule';
 interface Sched {
   arm(storeId: string, e: { job: string; cron: string }[], now?: number): Promise<ScheduleRow[]>;
   status(): Promise<{ storeId?: string; alarmAt: number | null; rows: ScheduleRow[] }>;
-  fire(now?: number): Promise<{ started: string[]; skipped: string[]; failed: string[] }>;
+  fire(
+    now?: number
+  ): Promise<{ started: string[]; skipped: string[]; failed: string[]; parked: string[] }>;
+  setFrozen(on: boolean): Promise<void>;
   failNext(n: number): Promise<void>;
   calls(): Promise<{ job: string; event: AlarmEvent }[]>;
   gaveUp(): Promise<string[]>;
@@ -30,6 +33,39 @@ async function makeDue(stub: Sched, msAgo = 1000) {
     state.storage.sql.exec('UPDATE schedule SET next_at = ?', Date.now() - msAgo);
   });
 }
+
+describe('StoreSchedule alarm under the write freeze (Ruling CF-JOBS-2)', () => {
+  it('a frozen alarm starts NOTHING, keeps its due time and attempts, re-arms 5 minutes out, and runs after the thaw', async () => {
+    const s = fresh();
+    await s.arm('store-f', [{ job: 'accounting-daily-close', cron: CAIRO_1AM }]);
+    await makeDue(s);
+    const before = (await s.status()).rows[0];
+    await s.setFrozen(true);
+    const t0 = Date.now();
+    expect(await runDurableObjectAlarm(s as never)).toBe(true);
+    expect(await s.calls()).toEqual([]);
+    const held = await s.status();
+    expect(held.rows[0]).toMatchObject({
+      next_at: before.next_at,
+      attempts: 0,
+      fence: before.fence,
+    });
+    expect(held.rows[0].retry_at).toBeGreaterThanOrEqual(t0 + 5 * 60_000 - 1000);
+    expect(held.alarmAt).toBeGreaterThanOrEqual(t0 + 5 * 60_000 - 1000); // re-armed, not dropped
+    // still frozen at the retry time: still nothing
+    expect((await s.fire(held.rows[0].retry_at! + 1)).parked).toEqual(['accounting-daily-close']);
+    expect(await s.calls()).toEqual([]);
+    // thaw: the SAME occurrence runs, with its original event id
+    await s.setFrozen(false);
+    const again = (await s.status()).rows[0];
+    expect(again.next_at).toBe(before.next_at); // parking twice still did not move the occurrence
+    const out = await s.fire(again.retry_at! + 1);
+    expect(out.started).toEqual(['accounting-daily-close']);
+    const calls = await s.calls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event.id).toBe(`alarm-accounting-daily-close-store-f-${before.next_at}`);
+  });
+});
 
 describe('StoreSchedule alarm', () => {
   it('arm sets the alarm at the next 01:00 Cairo and is idempotent', async () => {

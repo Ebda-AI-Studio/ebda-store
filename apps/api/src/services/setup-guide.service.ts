@@ -13,6 +13,8 @@
  * callers wrap it in `readInStoreContext`.
  */
 import { prisma, withStore } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
+import { syncStoreFields } from '../lib/repo-factory';
 import {
   getLook,
   SETUP_GUIDE_ITEMS,
@@ -50,11 +52,13 @@ export class SetupGuideService {
     );
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
+    // the catalogue, zones, orders and gateways live in the store's backend (Durable Object or Postgres)
+    const db = await storeDb(storeId);
     const [products, zones, orders, otherMethods] = await Promise.all([
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.shippingZone.count({ where: { storeId, isActive: true } }),
-      prisma.order.count({ where: { storeId } }),
-      prisma.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
+      db.product.count({ where: { storeId, deletedAt: null } }),
+      db.shippingZone.count({ where: { storeId, isActive: true } }),
+      db.order.count({ where: { storeId } }),
+      db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
     ]);
 
     const stored = readStored(store.settings);
@@ -117,6 +121,7 @@ export class SetupGuideService {
                     || jsonb_build_object(${key}::text, ${done}::boolean)
         ), true)
       WHERE id = ${storeId}`;
+    await syncStoreFields(storeId, ['settings']);
     return this.get(storeId);
   }
 
@@ -127,6 +132,7 @@ export class SetupGuideService {
         COALESCE(settings->'setupGuide', '{}'::jsonb)
           || jsonb_build_object('dismissed', ${dismissed}::boolean), true)
       WHERE id = ${storeId}`;
+    await syncStoreFields(storeId, ['settings']);
     return this.get(storeId);
   }
 }

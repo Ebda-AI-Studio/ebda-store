@@ -432,7 +432,7 @@ export default function StoreDomainPage() {
                     className: 'whitespace-nowrap',
                     cell: record => (
                       <span className="font-mono text-xs text-muted-foreground">
-                        {record.ttl ?? '1 Hour'}
+                        {record.ttl ?? t('ttlAuto')}
                       </span>
                     ),
                   },

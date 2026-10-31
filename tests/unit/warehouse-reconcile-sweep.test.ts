@@ -27,14 +27,20 @@ const h = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   runInTenantContext: h.runInTenant,
   runInStoreScope: h.runInStoreScope,
-  prisma: {},
-  // The sweep visits every store and keeps those that have a warehouse row;
-  // `warehouseFindMany` stands for "the stores that have one".
-  acrossStores: async () =>
-    ((await h.warehouseFindMany()) as Array<{ storeId: string }>).map(r => ({
-      storeId: r.storeId,
-      value: { storeId: r.storeId },
-    })),
+  // the sweep asks each store whether it has a warehouse row; `warehouseFindMany` stands for "the stores that have one"
+  prisma: {
+    warehouse: {
+      findFirst: async ({ where }: { where: { storeId: string } }) => ({ storeId: where.storeId }),
+    },
+  },
+  acrossStores: async (fn: (storeId: string) => Promise<unknown>) => {
+    const rows = (await h.warehouseFindMany()) as Array<{ storeId: string }>;
+    for (const r of rows) await fn(r.storeId);
+    return [];
+  },
+}));
+vi.mock('@api/lib/repo-factory', () => ({
+  storeRepo: async (storeId: string) => ({ storeId, backend: 'pg', db: {} }),
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/services/warehouse.service', () => ({

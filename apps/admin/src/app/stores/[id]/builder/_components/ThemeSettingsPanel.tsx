@@ -20,6 +20,7 @@ import {
   hslToHex,
   isShown,
   overriddenLookKeys,
+  traitDefault,
   type DraftTypography,
   type LookDefinition,
   type StoreTheme,
@@ -139,17 +140,22 @@ export function ThemeSettingsPanel({
         />
       );
     }
-    if (s.type === 'select')
+    if (s.type === 'select') {
+      // A trait the merchant has not set shows the look's own value; a header chrome key with no look
+      // opinion shows "same as the look" until picked.
+      const lookValue = s.trait ? traitDefault(String(s.id), look?.id) : undefined;
+      const shown = typeof v === 'string' ? v : typeof lookValue === 'string' ? lookValue : '';
+      const hint = locale === 'ar' ? s.hintAr : s.hintEn;
       return (
         <label key={s.id} className="block text-sm">
           <span className="mb-1 block text-xs font-semibold">{label}</span>
           <select
-            value={typeof v === 'string' ? v : ''}
+            value={shown}
             onChange={e => set(s.id, e.target.value)}
             className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
           >
-            {typeof v !== 'string' &&
-              (s.id === 'headerLogoPlacement' || s.id === 'headerSearch') && (
+            {shown === '' &&
+              (s.trait || s.id === 'headerLogoPlacement' || s.id === 'headerSearch') && (
                 <option value="" disabled>
                   {t('inherit')}
                 </option>
@@ -160,8 +166,10 @@ export function ThemeSettingsPanel({
               </option>
             ))}
           </select>
+          {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
         </label>
       );
+    }
     if (s.type === 'checkbox')
       return (
         <div key={s.id} className="space-y-0.5">
@@ -244,6 +252,60 @@ export function ThemeSettingsPanel({
               if (s.id === 'headerSearch')
                 return (
                   <div key={s.id} className="space-y-1" data-setting-id="builder.header-search">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'headerWordmark')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.header-wordmark">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'cardHeart')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-heart">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'cardSwatches')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-swatches">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'cardTags')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-tags">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'gridGutter')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.grid-gutter">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'headingWeight')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.heading-weight">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'priceColour')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.price-colour">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'tabBar')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.tab-bar">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'heroRatio')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.hero-ratio">
                     {field}
                   </div>
                 );

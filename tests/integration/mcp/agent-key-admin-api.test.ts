@@ -38,6 +38,7 @@ import { prisma } from '@ebda/database';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { API_BASE } from '../../helpers/api-base';
+import { identityTokenFor } from '../../helpers/identity-session';
 
 const API = API_BASE;
 
@@ -131,14 +132,12 @@ beforeAll(async () => {
   });
   productId = product.id;
 
-  const login = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: adminEmail, password: ADMIN_PASSWORD }),
-  });
-  const body = await login.json();
-  adminToken = body.data?.accessToken;
-  expect(adminToken, 'store_admin login must succeed for this suite to mean anything').toBeTruthy();
+  // A store_admin signs in at the identity service; the suite presents the token it would issue (tests/helpers/identity-session.ts).
+  adminToken = await identityTokenFor(ownerId);
+  expect(
+    adminToken,
+    'store_admin identity token must be minted for this suite to mean anything'
+  ).toBeTruthy();
 });
 
 afterAll(async () => {
@@ -397,12 +396,7 @@ describe('agent key admin API — authorisation', () => {
       },
     });
     try {
-      const login = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: otherEmail, password: ADMIN_PASSWORD }),
-      });
-      const token = (await login.json()).data?.accessToken;
+      const token = await identityTokenFor(other.id);
       expect(token).toBeTruthy();
 
       for (const method of ['GET', 'POST', 'DELETE']) {

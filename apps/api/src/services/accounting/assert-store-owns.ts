@@ -1,6 +1,7 @@
 import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../middleware/error-handler';
+import { storeRepo } from '../../lib/repo-factory';
 
 /**
  * Assert that every id supplied in a request body belongs to the calling store.
@@ -136,6 +137,12 @@ export async function assertStoreOwnsInTenantScope(
   storeId: string,
   ids: StoreOwnedIds
 ): Promise<void> {
+  // A store on its Durable Object owns its rows there (Ruling CF-R7-1): the same checks, against the DO read client.
+  const repo = await storeRepo(storeId);
+  if (repo.backend === 'do') {
+    await assertStoreOwns(storeId, ids, repo.db as unknown as typeof prisma);
+    return;
+  }
   if (hasTenantContext()) {
     await assertStoreOwns(storeId, ids);
     return;

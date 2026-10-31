@@ -15,6 +15,7 @@ import { StorageService } from './storage.service';
 import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
+import { storeUpdate } from '../lib/repo-factory';
 
 /**
  * Egypt VAT gate (ruling TAX-2): the merchant's VAT-registration profile and
@@ -424,7 +425,7 @@ export class TaxProfileService {
         if (decision.decision === 'revoke') {
           // Turn the merchant's switch off too: a later re-verification must not
           // silently restart VAT without the merchant choosing it (ruling TAX-3).
-          await prisma.store.update({ where: { id: storeId }, data: { taxEnabled: false } });
+          await storeUpdate(prisma, { where: { id: storeId }, data: { taxEnabled: false } });
         }
         bustPublicTaxCaches(storeId);
         await auditLog({

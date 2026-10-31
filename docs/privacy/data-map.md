@@ -169,6 +169,14 @@ Purpose: improving delivery, courier choice and fraud signals (internal first; m
 Retention: raw envelopes 24 months (R2 lifecycle rule `expire-ci-raw-24m` on `outcomes/`, `scripts/ops/ci-capture-setup.sh`); Analytics Engine 90 days (Cloudflare); aggregates (later) indefinite and k-anonymous.
 Erasure/export: customer erasure removes the account's own orders' rows in its store (and, for a proven phone, that key's rows in that store only) via the buyer index (`index/buyer/`) and a second prefix pass, nulls `orders.buyer_key`/`area_key`, and is verified by re-reading the partitions (`eraseCiOutcomes`, `cf/erasure/surfaces.ts`); merchant erasure deletes the store's whole prefix. Erasure tombstones (`tombstone/`, 30 days) stop in-flight events re-creating erased data; parked dead letters (`dlq/`, 14 days) are erased with the account. The account export includes the buyer's own rows (`customerIntelligence`).
 
+### Customer Intelligence aggregates and hints (CI-2 / CI-3, Rulings CI-9 to CI-13)
+
+What: derived counters only. Per store and day, and a 90-day window per store, in R2 `ebda-ci` under `aggregates/v1/store=<id>/` (counts by carrier, area key, COD amount band, shipping-fee band, payment provider, onboarding step, cart-reminder channel; no buyer key, no order id, no person); a cross-store cohort (`aggregates/v1/<metric>/dt=<day>.json`, `aggregates/v1/xstore/latest.json`) built ONLY from stores that switched `ciSharing` on, with every cell under 100 outcomes / 5 stores / 40% single-store share written as suppressed and no store id in the file. `ci_insights` (Neon; findings over the cohort, no identifier) and `ci_hint_logs` (Neon; per order: a band, a sample size, later whether it was delivered or returned; no buyer key, phone or text).
+Purpose: show the merchant advice (COD risk note, courier suggestion, shipping-fee card) and let a super-admin review platform-wide findings. Advice only: nothing holds, delays or cancels an order.
+Retention: aggregates indefinite (k-anonymous cohort) / store-level files until the store closes; `ci_hint_logs` 400 days; `ci_store_gates` (a feature name, a band and three numbers when a store's own hints were off) until the store's numbers recover or age out, and with the store.
+New outcome events (CI-13): `payment.failed` (a closed code, never the gateway's text), `cart.abandoned` / `cart.recovered` (a cart reminder went out / an order followed it; the reminder carries NO buyer key, the recovered order uses the order's), `merchant.onboarding_step` (a store-setup milestone, no buyer, no order). The first and last have no order id.
+Erasure: customer erasure needs nothing here (counts only; `ci_hint_logs` rows leave with the order); merchant erasure deletes `aggregates/v1/store=<id>/` with the outcome prefix. Published cohort cells stay (k-anonymous).
+
 ## 5. Deletion & backups — the honest erasure boundary
 
 `eraseAccount` (+ its third-party propagation, §3) only ever mutates the
@@ -225,3 +233,7 @@ response the customer receives:
   only the opaque `userId` (already the established logging convention
   across this codebase) and provider-issued opaque ids (OneSignal player
   id, PostHog person id).
+
+## Catalogue import (photos / PDFs)
+
+A merchant's uploaded photos and PDFs are stored in the private bucket under `stores/<storeId>/catalogimport-<jobId>/`, readable only through a tenant-checked admin endpoint, and sent once per read to the AI vendor for extraction (no files are kept by us beyond 30 days). Phone numbers, emails, links and handles in the extracted text are redacted before they reach any product field or log; logs carry ids and counts only. Rows: `catalog_import_jobs` (acting user id, scrubbed on user erasure), `catalog_import_files`, `catalog_import_items`. Retention: 30 days (`docs/RETENTION.md`). Rulings CATIMP-1..5.

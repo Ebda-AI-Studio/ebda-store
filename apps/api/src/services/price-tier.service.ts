@@ -4,6 +4,7 @@
  * TIER_NOT_MONOTONE, TIER_VARIANT_ABOVE_PRODUCT (B2B-12), TIER_DUPLICATE, TIER_LIMIT, below-cost warning.
  * Every write invalidates the cached public payload after commit (lib/b2b-invalidate).
  */
+import { storeWriter } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { validateTierWrite, isStaleTier, type TierInput } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -29,7 +30,9 @@ const tierSelect = {
 } as const;
 
 async function loadProduct(storeId: string, productId: string) {
-  const product = await prisma.product.findFirst({
+  const product = await (
+    await storeWriter(storeId)
+  ).product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: { id: true, price: true, costPrice: true, moq: true, pricingMode: true },
   });
@@ -78,7 +81,9 @@ async function validate(
   let variantPrice: number | null = null;
   let variantCost: number | null = null;
   if (tier.variantId) {
-    const variant = await prisma.productVariant.findFirst({
+    const variant = await (
+      await storeWriter(storeId)
+    ).productVariant.findFirst({
       where: { id: tier.variantId, productId, product: { storeId } },
       select: { price: true, costPrice: true },
     });
@@ -93,7 +98,9 @@ async function validate(
     });
     if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
   }
-  const existing = await prisma.productPriceTier.findMany({
+  const existing = await (
+    await storeWriter(storeId)
+  ).productPriceTier.findMany({
     where: { storeId, productId },
     select: tierSelect,
   });
@@ -119,12 +126,15 @@ export const PriceTierService = {
   async list(storeId: string, productId: string) {
     const product = await loadProduct(storeId, productId);
     const [tiers, variants] = await Promise.all([
-      prisma.productPriceTier.findMany({
+      (await storeWriter(storeId)).productPriceTier.findMany({
         where: { storeId, productId },
         select: tierSelect,
         orderBy: [{ variantId: 'asc' }, { groupId: 'asc' }, { minQty: 'asc' }],
       }),
-      prisma.productVariant.findMany({ where: { productId }, select: { id: true, price: true } }),
+      (await storeWriter(storeId)).productVariant.findMany({
+        where: { productId },
+        select: { id: true, price: true },
+      }),
     ]);
     const vPrice = new Map(variants.map(v => [v.id, v.price]));
     return tiers.map(t => ({
@@ -144,9 +154,10 @@ export const PriceTierService = {
       priceMinor: input.priceMinor,
     };
     const warnings = await validate(storeId, productId, tier, product);
+    const w = await storeWriter(storeId);
     try {
       const created = await withSavepoint(() =>
-        prisma.productPriceTier.create({
+        w.productPriceTier.create({
           data: { storeId, productId, ...tier },
           select: tierSelect,
         })
@@ -175,7 +186,9 @@ export const PriceTierService = {
     await assertWholesaleEntitled(storeId);
     const product = await loadProduct(storeId, productId);
     assertNotGold(product);
-    const current = await prisma.productPriceTier.findFirst({
+    const current = await (
+      await storeWriter(storeId)
+    ).productPriceTier.findFirst({
       where: { id: tierId, storeId, productId },
       select: tierSelect,
     });
@@ -188,9 +201,10 @@ export const PriceTierService = {
       priceMinor: input.priceMinor ?? current.priceMinor,
     };
     const warnings = await validate(storeId, productId, tier, product);
+    const w = await storeWriter(storeId);
     try {
       const updated = await withSavepoint(() =>
-        prisma.productPriceTier.update({
+        w.productPriceTier.update({
           where: { id: tierId, storeId },
           data: { minQty: tier.minQty, priceMinor: tier.priceMinor },
           select: tierSelect,
@@ -212,12 +226,14 @@ export const PriceTierService = {
 
   /** Deleting is allowed on a downgraded store (benefits switch off; the merchant can still clean up). */
   async remove(storeId: string, productId: string, tierId: string) {
-    const current = await prisma.productPriceTier.findFirst({
+    const current = await (
+      await storeWriter(storeId)
+    ).productPriceTier.findFirst({
       where: { id: tierId, storeId, productId },
       select: { id: true },
     });
     if (!current) throw new AppError(404, 'NOT_FOUND', 'Price tier not found');
-    await prisma.productPriceTier.delete({ where: { id: tierId, storeId } });
+    await (await storeWriter(storeId)).productPriceTier.delete({ where: { id: tierId, storeId } });
     invalidateB2bPricing(storeId);
   },
 };

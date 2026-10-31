@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createHash } from 'node:crypto';
-import { withRlsBypass } from '@ebda/database';
+import { runInStoreScope, withRlsBypass } from '@ebda/database';
 import { runRfmRollup } from '@api/services/accounting/analytics-rollup.service';
 import { rfmKeyFor } from '@api/lib/customer-key';
 import { aggregateCustomers, segmentsForCustomers } from '@api/services/customer-aggregate.service';
@@ -142,7 +142,10 @@ describe.skipIf(!hasDb)('RFM guest key = Customers-page key', () => {
 
   it("resolves every snapshot to a Customers-page row (the segment drill-down's join)", async () => {
     const { customers } = await withRlsBypass(() => aggregateCustomers(storeId));
-    const segmentOf = await withRlsBypass(() => segmentsForCustomers(storeId, customers));
+    // the routes and the MCP tools call it inside the request's tenant context; a direct call needs the same scope
+    const segmentOf = await runInStoreScope(storeId, () =>
+      segmentsForCustomers(storeId, customers)
+    );
     const guestRow = customers.find(c => c.isGuest)!;
     expect(guestRow.id).toBe(guestEmail.toLowerCase());
     expect(segmentOf.has(guestRow.id)).toBe(true);

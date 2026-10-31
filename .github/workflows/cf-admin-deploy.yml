@@ -71,7 +71,7 @@ jobs:
       - name: Deploy ebda-admin Worker
         working-directory: apps/admin
         run: |
-          npx wrangler deploy
+          npx wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA
       - name: Verify the live Worker serves THIS build, roll back automatically if not
         # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
         # previous version for a few seconds). Identity: /_next/static/<BUILD_ID>/_buildManifest.js
@@ -88,6 +88,7 @@ jobs:
             --probe "https://store.ebda.app/_next/static/$BUILD_ID/_buildManifest.js|200" \
             --probe "https://store.ebda.app/signup|200" \
             --probe "https://store.ebda.app/login|200" \
+            --probe "https://store.ebda.app/health|200|commit=$GITHUB_SHA" \
             --rollback-probe "https://store.ebda.app/signup|200" \
             --rollback-probe "https://store.ebda.app/login|200"
 

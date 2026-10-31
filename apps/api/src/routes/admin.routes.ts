@@ -81,6 +81,7 @@ import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 import { referralSignupCounts } from '../services/lifecycle-emails.service';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -798,7 +799,7 @@ router.put(
         select: { slug: true },
       });
 
-      const store = await prisma.store.update({
+      const store = await storeUpdate(prisma, {
         where: { id },
         data: {
           ...(name !== undefined && { name }),

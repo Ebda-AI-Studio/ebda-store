@@ -7,6 +7,10 @@
 
 set -e
 
+# pre-push gets '<local ref> <local sha> <remote ref> <remote sha>' lines on stdin; capture before anything else reads it.
+PUSH_REFS=""
+[ -t 0 ] || PUSH_REFS=$(cat)
+
 current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 # DB backup -- only on main, non-blocking (preserved from original hook)
@@ -66,46 +70,20 @@ if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
     echo "! scripts/blast-radius.sh missing; skipping blast-radius"
   fi
 
-  # Model routing (LEAN mode, Ahmad 2026-10-28): Sonnet reviews every push; Opus only when
-  # the diff touches a critical path (money, auth/identity, secrets, consent/erasure,
-  # tenancy/RLS, migrations, CI/hooks). Force one with AI_REVIEW_MODEL=opus|sonnet.
-  CRITICAL_RE='(migrations/|payment|billing|wallet|refund|payout|webhook|auth|mfa|passkey|login|session|identity|encrypt|crypto|secret|consent|erasure|privacy|rls|tenant|cod-reconciliation|price|coupon|fiscal|tax|money|\.husky/|\.github/workflows/)'
-  if [ -n "${AI_REVIEW_MODEL:-}" ]; then
-    review_model="$AI_REVIEW_MODEL"
-  elif git diff --name-only "$RANGE" 2>/dev/null | grep -Eiq "$CRITICAL_RE"; then
-    review_model=opus
-  else
-    review_model=sonnet
+  # AI review (advisory, never blocks, never silent): reviews only the commits being pushed (remote ref..HEAD), in chunks under
+  # a size cap, Opus for chunks touching critical paths (money, auth/identity, secrets, consent/erasure, tenancy, migrations,
+  # CI/hooks), Sonnet otherwise (AI_REVIEW_MODEL=opus|sonnet forces one). Unreviewed files get a LOUD warning + a log.
+  # Logic lives in scripts/ci/pre-push-ai-review.sh.
+  review_range="$RANGE"
+  push_line=$(printf '%s\n' "$PUSH_REFS" | awk -v b="refs/heads/$current_branch" '$3==b {print; exit}')
+  if [ -n "$push_line" ]; then
+    local_sha=$(printf '%s' "$push_line" | awk '{print $2}')
+    remote_sha=$(printf '%s' "$push_line" | awk '{print $4}')
+    case "$remote_sha" in *[!0]*) [ -n "$remote_sha" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null && review_range="$remote_sha..$local_sha" ;; esac
+    # New branch (remote sha all zeros) or unknown remote sha: commits not already on origin/main.
+    [ "$review_range" = "$RANGE" ] && review_range="origin/main..$local_sha"
   fi
-  echo "-> AI-OS gate: AI review of this diff with $review_model (advisory)..."
-  if command -v claude >/dev/null 2>&1; then
-    review_dir=$(mktemp -d)
-    git diff "$RANGE" -- ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' > "$review_dir/diff" 2>/dev/null || true
-    if [ -s "$review_dir/diff" ]; then
-      # Dedup gate: skip the LLM call when this exact diff was already reviewed on
-      # this branch. Session mining 2026-07-11 found 11/15 review calls were
-      # byte-identical re-reviews (one diff reviewed 5x) — pure Opus spend for
-      # zero new signal. Marker lives in the worktree's git dir, keyed by branch.
-      diff_hash=$(shasum -a 256 "$review_dir/diff" | cut -c1-16)
-      marker="$(git rev-parse --git-dir)/.ai-review-$(printf '%s' "$current_branch" | tr '/' '_')"
-      if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$diff_hash" ]; then
-        echo "-> AI review skipped: identical diff already reviewed on this branch ($diff_hash)"
-      else
-        {
-          printf 'Review this diff for CRITICAL bugs, security issues, and regressions ONLY. Be terse; list nothing if clean.\n\n'
-          cat "$review_dir/diff"
-        } > "$review_dir/review.md"
-        if claude -p --model "$review_model" < "$review_dir/review.md"; then
-          printf '%s' "$diff_hash" > "$marker"
-        else
-          echo "! AI review advisory failed (non-blocking)"
-        fi
-      fi
-    fi
-    rm -rf "$review_dir"
-  else
-    echo "! claude CLI not found; skipping AI review (npm i -g @anthropic-ai/claude-code)"
-  fi
+  bash scripts/ci/pre-push-ai-review.sh "$review_range" "$current_branch" || echo "! AI review script errored (non-blocking)"
 fi
 
 echo "OK pre-push CI gate passed -- push proceeding"

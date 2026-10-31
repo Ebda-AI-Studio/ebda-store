@@ -14,6 +14,7 @@ export const ENTITY_KINDS = [
   'return',
   'refund',
   'webhook',
+  'instapay_ref',
 ] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 

@@ -1,5 +1,5 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
-import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
+import { prisma, hasTenantContext, runInTenantContext, withStore } from '@ebda/database';
 import type { Expense } from '@prisma/client';
 import {
   isCashOrBankAccount,
@@ -8,7 +8,9 @@ import {
   ALLOWED_CURRENCIES,
   REGION,
 } from '@ebda/shared';
+import { createHash } from 'node:crypto';
 import { nextSequence } from '../sequence.service';
+import { storeRepo } from '../../lib/repo-factory';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
@@ -44,6 +46,11 @@ export interface CreateExpenseInput {
   notes?: string;
   notesAr?: string;
   createdBy?: string;
+  /**
+   * OCR metadata of a receipt draft. A store on its Durable Object stores it in the same atomic section as the draft; a Postgres
+   * store ignores it here (the OCR service attaches it with its own non-fatal update, as before).
+   */
+  ocr?: { json: unknown; confidence: number | null; modelVersion: string; processedAtMs: number };
 }
 
 export type ExpenseWithRelations = Expense & {
@@ -57,6 +64,9 @@ export type ExpenseWithRelations = Expense & {
  * Status is always 'draft' on creation.
  */
 export async function createExpense(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
+  // A store on its Durable Object (Ruling CF-JOBS-4B): the draft is one DO section (guards, number, row).
+  const repo = await storeRepo(input.storeId);
+  if (repo.backend === 'do') return createExpenseOnDo(input, repo);
   // Issue 2291: with no ambient tenant transaction (the expense-OCR Inngest
   // job) the guard below opened its own transient transaction, but every
   // statement after it — the paid-from lookup and the INSERT, both on STRICT
@@ -68,6 +78,93 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
     return runInTenantContext(input.storeId, () => createExpenseInScope(input));
   }
   return createExpenseInScope(input);
+}
+
+/**
+ * The base-currency amounts of a draft: EGP is stored as given; a foreign amount is converted with the rate, or with the
+ * placeholder 1 when the caller has none (the merchant corrects it before posting). Pure; shared by both backends.
+ */
+function expenseAmounts(input: CreateExpenseInput) {
+  const currency = (input.currency ?? REGION.currency).toUpperCase();
+  if (!ALLOWED_CURRENCIES.includes(currency as (typeof ALLOWED_CURRENCIES)[number])) {
+    throw new AppError(422, 'INVALID_CURRENCY', `Currency '${currency}' is not supported.`);
+  }
+  if (!requiresFxRate(currency)) {
+    return {
+      currency,
+      amountBase: input.amount,
+      taxAmountBase: input.taxAmount ?? 0,
+      fxRate: 1,
+      original: input.amount + (input.taxAmount ?? 0),
+    };
+  }
+  const rate = input.fxRate ?? 1;
+  if (rate <= 0 || !isFinite(rate)) {
+    throw new AppError(422, 'INVALID_FX_RATE', 'fxRate must be a finite positive number.');
+  }
+  const rawAmount = input.originalAmount ?? input.amount;
+  const rawTax = input.taxAmount ?? 0;
+  return {
+    currency,
+    amountBase: convertToBase(rawAmount, rate, currency),
+    taxAmountBase: convertToBase(rawTax, rate, currency),
+    fxRate: rate,
+    original: rawAmount + rawTax,
+  };
+}
+
+async function createExpenseOnDo(
+  input: CreateExpenseInput,
+  repo: Awaited<ReturnType<typeof storeRepo>>
+): Promise<ExpenseWithRelations> {
+  if (!repo.money) throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'No money client');
+  const a = expenseAmounts(input);
+  let made;
+  try {
+    made = await repo.money.expenseDraft(
+      {
+        supplierId: input.supplierId ?? null,
+        expenseAccountId: input.expenseAccountId,
+        paidFromAccountId: input.paidFromAccountId,
+        amount: a.amountBase,
+        taxAmount: a.taxAmountBase,
+        total: a.amountBase + a.taxAmountBase,
+        currency: a.currency,
+        fxRate: a.fxRate,
+        originalAmount: a.original,
+        expenseDate: new Date(input.expenseDate).getTime(),
+        receiptImageUrl: input.receiptImageUrl ?? null,
+        notes: input.notes ?? null,
+        notesAr: input.notesAr ?? null,
+        createdBy: input.createdBy ?? null,
+        ...(input.ocr ? { ocr: input.ocr } : {}),
+      },
+      // a retried job (same receipt) gets the first draft back instead of a second one
+      input.receiptImageUrl
+        ? `expense-draft:${createHash('sha256').update(input.receiptImageUrl).digest('hex').slice(0, 40)}`
+        : undefined
+    );
+  } catch (err) {
+    const e = err as { code?: string; status?: number; message?: string };
+    if (e.code && e.status && e.status < 500)
+      throw new AppError(e.status, e.code, e.message ?? e.code);
+    throw err;
+  }
+  const row = await repo.db.expense.findFirst({
+    where: { id: made.expenseId, storeId: input.storeId },
+    include: {
+      supplier: { select: { id: true, name: true, nameAr: true } },
+      expenseAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+      paidFromAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+    },
+  });
+  if (!row)
+    throw new AppError(
+      500,
+      'EXPENSE_NOT_FOUND',
+      'The draft expense was not found after it was created.'
+    );
+  return row as unknown as ExpenseWithRelations;
 }
 
 async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
@@ -181,6 +278,45 @@ async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseW
   });
 }
 
+const EXPENSE_INCLUDE = {
+  supplier: { select: { id: true, name: true, nameAr: true } },
+  expenseAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+  paidFromAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+} as const;
+
+/** A store on its Durable Object (Ruling CF-EXP-1): the repo, or null for a Postgres store (whose code below is unchanged). */
+async function doRepoOf(storeId: string) {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return null;
+  if (!repo.money) throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'No money client');
+  return { db: repo.db, money: repo.money };
+}
+
+/** The status step on the DO, then the row re-read with its relations. Errors read like the Postgres twin's. */
+async function expenseStepOnDo(
+  r: NonNullable<Awaited<ReturnType<typeof doRepoOf>>>,
+  storeId: string,
+  id: string,
+  action: 'approve' | 'post' | 'reject',
+  extra: { userId?: string | null; pending?: boolean } = {}
+): Promise<ExpenseWithRelations> {
+  const out = await r.money.expenseTransition({ expenseId: id, action, ...extra });
+  if (!out.found) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!out.changed) {
+    if (action === 'post')
+      throw new Error(`Expense ${id} must be approved before posting (status=${out.status})`);
+    throw new Error(
+      `Expense ${id} cannot be ${action === 'approve' ? 'approved' : 'rejected'} (status=${out.status})`
+    );
+  }
+  const row = await r.db.expense.findFirst({
+    where: { id, storeId },
+    include: EXPENSE_INCLUDE,
+  });
+  if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  return row as unknown as ExpenseWithRelations;
+}
+
 /**
  * Approve a draft (or pending) expense.
  *
@@ -194,6 +330,20 @@ export async function approveExpense(
   id: string,
   userId?: string
 ): Promise<ExpenseWithRelations> {
+  const onDo = await doRepoOf(storeId);
+  if (onDo) {
+    const row = await onDo.db.expense.findFirst({
+      where: { id, storeId },
+      select: { createdBy: true },
+    });
+    if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { expenseTwoStepApproval: true } })
+    );
+    const selfApproval =
+      (store?.expenseTwoStepApproval ?? false) && userId != null && userId === row.createdBy;
+    return expenseStepOnDo(onDo, storeId, id, 'approve', { userId, pending: selfApproval });
+  }
   const expense = await prisma.expense.findFirst({
     where: { id, storeId },
     include: { store: { select: { expenseTwoStepApproval: true } } },
@@ -228,6 +378,12 @@ export async function approveExpense(
  * then fires `accounting/expense-posted` so the GL journal posts async.
  */
 export async function postExpense(storeId: string, id: string): Promise<ExpenseWithRelations> {
+  const onDo = await doRepoOf(storeId);
+  if (onDo) {
+    const posted = await expenseStepOnDo(onDo, storeId, id, 'post');
+    await fireExpensePosted(storeId, id);
+    return posted;
+  }
   const expense = await prisma.expense.findFirst({ where: { id, storeId } });
 
   if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
@@ -245,7 +401,13 @@ export async function postExpense(storeId: string, id: string): Promise<ExpenseW
     },
   });
 
-  // Fire async journal posting — non-blocking; journal service is idempotent
+  await fireExpensePosted(storeId, id);
+
+  return updated;
+}
+
+/** Fire async journal posting: non-blocking, and the journal job is idempotent per source row. */
+async function fireExpensePosted(storeId: string, id: string): Promise<void> {
   try {
     await inngest.send({
       name: 'accounting/expense-posted',
@@ -254,14 +416,14 @@ export async function postExpense(storeId: string, id: string): Promise<ExpenseW
   } catch (err) {
     logger.error({ err, expenseId: id, storeId }, 'postExpense: failed to fire inngest event');
   }
-
-  return updated;
 }
 
 /**
  * Reject a draft or pending expense.
  */
 export async function rejectExpense(storeId: string, id: string): Promise<ExpenseWithRelations> {
+  const onDo = await doRepoOf(storeId);
+  if (onDo) return expenseStepOnDo(onDo, storeId, id, 'reject');
   const expense = await prisma.expense.findFirst({ where: { id, storeId } });
 
   if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
@@ -317,14 +479,14 @@ export async function listExpenses(
     if (opts.to) where.expenseDate.lte = opts.to;
   }
 
-  const include = {
-    supplier: { select: { id: true, name: true, nameAr: true } },
-    expenseAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
-    paidFromAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
-  } as const;
+  const include = EXPENSE_INCLUDE;
+
+  // A store on its Durable Object reads its own expenses (Ruling CF-EXP-1); the Postgres reads below are unchanged.
+  const onDo = await doRepoOf(storeId);
+  const rows = onDo ? onDo.db.expense : prisma.expense;
 
   const [items, total] = await Promise.all([
-    prisma.expense.findMany({
+    rows.findMany({
       where,
       // `expenseDate` is a calendar day (UTC midnight), so same-day rows tie byte-for-byte; `id`
       // makes the order total so page N+1 never repeats or skips a row of page N (issue 2429).
@@ -333,7 +495,7 @@ export async function listExpenses(
       take: perPage,
       include,
     }),
-    prisma.expense.count({ where }),
+    rows.count({ where }),
   ]);
 
   return { items: items as unknown as ExpenseWithRelations[], total, page, perPage };
@@ -346,7 +508,8 @@ export async function getExpense(
   storeId: string,
   id: string
 ): Promise<ExpenseWithRelations | null> {
-  return prisma.expense.findFirst({
+  const onDo = await doRepoOf(storeId);
+  return (onDo ? onDo.db.expense : prisma.expense).findFirst({
     where: { id, storeId },
     include: {
       supplier: { select: { id: true, name: true, nameAr: true } },

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { storeDb, storeWriter } from '../../repo-factory';
+import { runInStoreCtx } from '../../jobs/store-db';
 import { recommendationService } from '../../../services/recommendation.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -34,10 +35,12 @@ export const aiAutofillCleanup: JobDef = inngest.createFunction(
       return;
     }
 
-    await runInTenantContext(storeId, async () => {
+    await runInStoreCtx(storeId, async () => {
+      const sdb = await storeDb(storeId);
+      const sw = await storeWriter(storeId);
       // Collect the source products whose recommendation caches need busting
       // BEFORE we delete the rows (we need the sourceProductId values).
-      const referrers = await prisma.aiRecommendation.findMany({
+      const referrers = await sdb.aiRecommendation.findMany({
         where: { storeId, targetProductId: productId },
         select: { sourceProductId: true },
       });
@@ -47,20 +50,20 @@ export const aiAutofillCleanup: JobDef = inngest.createFunction(
       // both directions explicitly: rows pointing AT it (so it's never
       // recommended) and rows it generated (so they don't orphan in the table /
       // inflate the overview count).
-      await prisma.$transaction([
-        prisma.aiRecommendation.deleteMany({
+      await sw.$transaction([
+        sw.aiRecommendation.deleteMany({
           where: {
             storeId,
             OR: [{ targetProductId: productId }, { sourceProductId: productId }],
           },
         }),
-        prisma.frequentlyBoughtTogether.deleteMany({
+        sw.frequentlyBoughtTogether.deleteMany({
           where: {
             storeId,
             OR: [{ productId1: productId }, { productId2: productId }],
           },
         }),
-        prisma.productRelation.deleteMany({
+        sw.productRelation.deleteMany({
           where: {
             storeId,
             OR: [{ targetProductId: productId }, { sourceProductId: productId }],
@@ -86,6 +89,6 @@ export const aiAutofillCleanup: JobDef = inngest.createFunction(
         { storeId, productId, referrers: referrers.length },
         '[ai-autofill-cleanup] cleanup done'
       );
-    }); // end runInTenantContext
+    }); // end runInStoreCtx
   }
 );

@@ -164,6 +164,33 @@ describe('banner', () => {
     [...bar.querySelectorAll('button')].find(b => b.textContent === 'Decline')!.click();
     expect(t.consent()).toEqual({ v: 1, analytics: false, marketing: false });
   });
+  it('is compact on a phone (MKT-IMPECCABLE-3): tighter padding, 13px type, 44px buttons side by side', () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => ({
+      matches: q === '(max-width:600px)',
+    })) as typeof window.matchMedia;
+    try {
+      createTracker(CFG, window).showBanner();
+      const bar = document.getElementById('ebda-consent')!;
+      expect(bar.style.padding).toBe('10px 12px');
+      expect(bar.style.bottom).toBe('8px');
+      const buttons = [...bar.querySelectorAll('button')];
+      expect(buttons).toHaveLength(2);
+      for (const b of buttons) {
+        expect(b.style.minHeight).toBe('44px');
+        expect(b.style.flex).toContain('1');
+      }
+      expect((bar.querySelector('div') as HTMLElement).style.flexWrap).toBe('');
+    } finally {
+      window.matchMedia = real;
+    }
+  });
+  it('keeps the roomy desktop bar when the viewport is wide', () => {
+    createTracker(CFG, window).showBanner();
+    const bar = document.getElementById('ebda-consent')!;
+    expect(bar.style.padding).toBe('16px');
+    expect(bar.style.bottom).toBe('16px');
+  });
   it('does not reappear once decided, unless forced (cookie settings link)', () => {
     setConsent(false, false);
     const t = createTracker(CFG, window);

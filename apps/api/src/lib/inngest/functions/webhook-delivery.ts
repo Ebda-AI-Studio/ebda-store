@@ -1,5 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { acrossStores, prisma, runInTenantContext, storeDirectory } from '@ebda/database';
+import { acrossStores, storeDirectory, withStore } from '@ebda/database';
+import { alarmStoreId } from '../../jobs/store-scope';
+import { runInStoreCtx, storeRwClient } from '../../jobs/store-db';
+import { storeRepo } from '../../repo-factory';
 import {
   WEBHOOK_CONSECUTIVE_FAILURE_LIMIT,
   WEBHOOK_LOG_RETENTION_DAYS,
@@ -67,8 +70,9 @@ export async function runWebhookFanout(
   for (let i = 0; i <= FANOUT_NOT_READY_WAITS_SEC.length; i++) {
     // Each pass is its own memoised step, so a replay never repeats a completed one.
     const r = await step.run(`create-deliveries-${i}`, () =>
-      runInTenantContext(storeId, async () => {
-        const subscribers = await prisma.webhookEndpoint.count({
+      runInStoreCtx(storeId, async () => {
+        const { db } = await storeRwClient(storeId);
+        const subscribers = await db.webhookEndpoint.count({
           where: { storeId, active: true },
         });
         if (subscribers === 0) return { ready: true as const, ids: [] as string[] };
@@ -129,15 +133,19 @@ export const webhookFanout: JobDef = inngest.createFunction(
 );
 
 async function notifyEndpointDisabled(storeId: string, endpointId: string): Promise<void> {
-  const info = await runInTenantContext(storeId, async () => {
-    const endpoint = await prisma.webhookEndpoint.findFirst({
+  const info = await runInStoreCtx(storeId, async () => {
+    const { db } = await storeRwClient(storeId);
+    const endpoint = await db.webhookEndpoint.findFirst({
       where: { id: endpointId, storeId },
       select: { url: true },
     });
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, owner: { select: { email: true } } },
-    });
+    // `Store` and its owner are platform rows (read from Postgres for either backend)
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, owner: { select: { email: true } } },
+      })
+    );
     return {
       url: endpoint?.url ?? '',
       name: store?.name ?? storeId,
@@ -212,14 +220,29 @@ export const webhookDeliveryPurge: JobDef = inngest.createFunction(
     retries: 1,
     triggers: [{ cron: '45 4 * * *' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     const purged = await step.run('purge', async () => {
       const cutoff = new Date(Date.now() - WEBHOOK_LOG_RETENTION_DAYS * 86_400_000);
-      const storeIds = (await storeDirectory(undefined, { includeDeleted: true })).map(s => s.id);
+      // A store on its Durable Object purges its own log on its alarm (Ruling CF-JOBS-4B)
+      const only = alarmStoreId(event);
+      if (only) {
+        const repo = await storeRepo(only);
+        if (repo.backend === 'do') {
+          const r = await repo.writer.webhookDelivery.deleteMany({
+            where: { storeId: only, createdAt: { lt: cutoff } },
+          });
+          return { count: r.count, failed: 0 };
+        }
+      }
+      const storeIds = only
+        ? [only]
+        : (await storeDirectory(undefined, { includeDeleted: true })).map(s => s.id);
       let failed = 0;
       const results = await acrossStores(
-        storeId =>
-          prisma.webhookDelivery.deleteMany({ where: { storeId, createdAt: { lt: cutoff } } }),
+        async storeId =>
+          (await storeRwClient(storeId)).db.webhookDelivery.deleteMany({
+            where: { storeId, createdAt: { lt: cutoff } },
+          }),
         {
           storeIds,
           onStoreError: (storeId, err) => {

@@ -18,6 +18,7 @@ import {
   type AppPrismaClient,
 } from '@ebda/database';
 import { AuthService } from '@api/services/auth.service';
+import { configureIdentityClient } from '@api/lib/identity-client';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -204,6 +205,9 @@ describe.skipIf(!hasDb)('passkey_credentials under strict RLS', () => {
     await owner.$executeRawUnsafe(insertSql, crypto.randomUUID(), who, cred('reset2'));
     await owner.$executeRawUnsafe(insertSql, crypto.randomUUID(), bystander, cred('by'));
     const raw = crypto.randomBytes(32).toString('hex');
+    // `who` is an admin-namespace account, so the reset also asks the identity service to end its sessions; that service
+    // (accounts) is not in this tier, a no-op stands in (its revocation is covered by apps/accounts/test/rpc.test.ts).
+    configureIdentityClient({ revokeUser: async () => undefined });
     await prisma.refreshToken.create({
       data: {
         token: `reset:${crypto.createHash('sha256').update(raw).digest('hex')}`,
@@ -211,7 +215,11 @@ describe.skipIf(!hasDb)('passkey_credentials under strict RLS', () => {
         expiresAt: new Date(Date.now() + 3600_000),
       },
     });
-    await AuthService.resetPassword(raw, 'BrandNew!2345');
+    try {
+      await AuthService.resetPassword(raw, 'BrandNew!2345');
+    } finally {
+      configureIdentityClient(undefined);
+    }
     const count = async (id: string) =>
       Number(
         (

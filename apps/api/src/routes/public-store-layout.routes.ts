@@ -11,6 +11,8 @@ import { lookupStore } from '../lib/definer';
 import { isSectionPageKind, normalizeLegacyTemplate, resolveLayoutSettings } from '@ebda/shared';
 import { redis } from '../services/redis.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
+import { storeRepo } from '../lib/repo-factory';
+import { customersById } from '../lib/jobs/store-db';
 import {
   getPublishedDefinition,
   getPublishedPageDocument,
@@ -247,23 +249,36 @@ router.get(
       // public request carries no tenant context, so this read must enter the
       // store's scope or it returns [] — which hid the testimonials section on
       // every store (found by the Dahab pilot, 2026-10-07).
-      const reviews = await readInStoreContext(storeId, () =>
-        prisma.review.findMany({
+      const repo = await storeRepo(storeId);
+      const rows = await readInStoreContext(storeId, () =>
+        repo.db.review.findMany({
           where: {
             storeId,
             status: 'published',
             rating: { gte: minRating },
             ...(verifiedOnly ? { verifiedPurchase: true } : {}),
           },
-          include: {
-            customer: {
-              select: { firstName: true, lastName: true },
-            },
-          },
+          // Postgres joins the buyer; a store on its Durable Object cannot (a platform row), so it is attached below
+          ...(repo.backend === 'do'
+            ? {}
+            : { include: { customer: { select: { firstName: true, lastName: true } } } }),
           orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
           take: limit,
         })
       );
+      const buyers =
+        repo.backend === 'do'
+          ? await customersById(
+              storeId,
+              rows.map(r => r.customerId)
+            )
+          : new Map();
+      const reviews = rows.map(r => ({
+        ...r,
+        customer:
+          (r as { customer?: { firstName: string | null; lastName: string | null } | null })
+            .customer ?? (r.customerId ? (buyers.get(r.customerId) ?? null) : null),
+      }));
 
       const testimonials = reviews.map(r => ({
         id: r.id,

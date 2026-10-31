@@ -52,8 +52,13 @@ vi.mock('@ebda/database', () => ({
     fn({
       store: { findUnique: async () => ({ ...(db.store as object), createdAt: new Date() }) },
       storeSubscription: { findUnique: async () => db.sub },
-      order: { findUnique: async () => db.order },
-      abandonedCart: { count: async () => db.recovered },
+      // the buyer is a platform `User`, attached after the DO/Postgres order read (Ruling CF-JOBS-4)
+      user: {
+        findMany: async () => {
+          const c = (db.order as { customer?: { email: string } | null }).customer;
+          return c ? [{ id: 'u1', email: c.email }] : [];
+        },
+      },
       storeLifecycleEmail: {
         createMany: async ({ data }: { data: Array<(typeof db.rows)[number]> }) => {
           const d = data[0];
@@ -83,6 +88,22 @@ vi.mock('@ebda/database', () => ({
         findMany: async () => db.rows,
       },
     }),
+}));
+vi.mock('@api/lib/repo-factory', () => ({
+  storeRepo: async () => ({ backend: 'pg' }),
+  storeDb: async () => ({
+    order: {
+      findUnique: async () => {
+        const o = db.order as { status: string; shippingAddress: unknown; customer?: unknown };
+        return {
+          status: o.status,
+          shippingAddress: o.shippingAddress,
+          customerId: o.customer ? 'u1' : null,
+        };
+      },
+    },
+    abandonedCart: { count: async () => db.recovered },
+  }),
 }));
 vi.mock('@api/services/setup-guide.service', () => ({
   SetupGuideService: {

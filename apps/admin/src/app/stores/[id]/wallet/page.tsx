@@ -31,7 +31,7 @@ interface WalletsResponse {
   summary: { outstandingTotal: number; walletsWithBalance: number };
   checkout: {
     available: boolean;
-    reason: 'feature_off' | 'checkout_feature_off' | 'accounting_enabled' | null;
+    reason: 'feature_off' | 'checkout_feature_off' | null;
   };
 }
 
@@ -91,13 +91,7 @@ export default function WalletPage() {
   if (gate) return gate;
 
   const money = (piastres: number) => formatPrice(piastres, { locale });
-  const checkoutCopy = !data
-    ? null
-    : data.checkout.available
-      ? t('checkoutOn')
-      : data.checkout.reason === 'accounting_enabled'
-        ? t('checkoutAccounting')
-        : t('checkoutOff');
+  const checkoutCopy = !data ? null : data.checkout.available ? t('checkoutOn') : t('checkoutOff');
 
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>

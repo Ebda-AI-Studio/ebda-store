@@ -59,6 +59,11 @@ export const FEATURE_KEYS_ARRAY = [
   // Egypt ETA e-receipt connector (2026-10-26, Ruling ETA-1). Per-store, OFF by default, in NO plan
   // baseline: a super-admin StoreFeature override turns it on for a VAT-registered merchant.
   'eta_ereceipt',
+  // Customer Intelligence hints (2026-10-29, CI-3, Ruling CI-10). Advise-never-block hints from the
+  // store's own outcomes and the opted-in cohort: COD risk band on an order, a courier suggestion when
+  // booking, a COD-amount suggestion card. In NO plan baseline: OFF for every store until the merchant
+  // (or a super-admin) turns it on; turning it off is the merchant's "turn off hints" switch.
+  'customer_intelligence',
   // MCP agent-write ESCAPE HATCH (2026-09-09, Ruling M2). NOT part of any
   // plan baseline, so it is OFF for every store and the default posture is
   // ENFORCEMENT ON: the MCP write tools (add_to_cart, place_order) require
@@ -249,8 +254,8 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'محافظ رصيد المتجر: تُضاف المبالغ المستردة كرصيد متجر إلى محفظة العميل، ويمكن للتاجر تعديل الأرصدة، ويرى العميل رصيده في حسابه.',
     category: 'commerce',
     tier: 'addon',
-    // Un-hidden 2026-09-25 (D1). NOT in any plan baseline, so it resolves OFF
-    // for every store until a super-admin override turns it on.
+    // Un-hidden 2026-09-25 (D1). In the Growth + Business baselines since 2026-10-29 (Ruling W-8);
+    // a super-admin override still wins both ways.
   },
   customer_wallet_checkout: {
     key: 'customer_wallet_checkout',
@@ -740,6 +745,17 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     tier: 'addon',
     hidden: true,
     superAdminToggleable: true,
+  },
+  customer_intelligence: {
+    key: 'customer_intelligence',
+    name: 'Smart hints (Customer Intelligence)',
+    nameAr: 'تلميحات ذكية من نتائج طلباتك',
+    description:
+      'Advice from your own delivery and return history: a COD risk note on an order, which courier has delivered best to an area, and when a COD amount starts to return more. Hints only ever advise: they never hold, delay or cancel an order, and each one shows how many orders it rests on.',
+    descriptionAr:
+      'نصايح من تاريخ توصيل وارتجاع طلباتك: ملاحظة على خطر الدفع عند الاستلام في الطلب، وأنهي شركة شحن وصّلت أحسن لمنطقة معينة، ومتى يبدأ مبلغ الدفع عند الاستلام يرجع أكتر. التلميحات بتنصح بس: عمرها ما بتوقف أو تأجّل أو تلغي طلب، وكل واحد بيوضّح عدد الطلبات اللي اعتمد عليها.',
+    category: 'operations',
+    tier: 'addon',
   },
 };
 

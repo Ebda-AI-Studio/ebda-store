@@ -164,7 +164,9 @@ const tableByName = (all, n) => all.find(x => x.name === n);
 /** a SQL boolean restricting `alias` rows of table t to one store ($1 = store id) */
 export function scopeWhere(t, all, alias = 't', depth = 0) {
   if (t.origin === 'stores') return `${alias}.id = $1`;
-  if (t.columns.some(c => c.col === 'store_id')) return `${alias}.store_id = $1`;
+  // a DO table fed from PART of a Postgres table (instapay_order_receipts: the kind = 'order' rows) narrows by its own filter
+  if (t.columns.some(c => c.col === 'store_id'))
+    return `${alias}.store_id = $1${t.filter ? ` AND ${t.filter(alias)}` : ''}`;
   if (USER_SCOPED[t.name]) return userScopeWhere(alias, USER_SCOPED[t.name]);
   if (depth > 4) throw new Error(`${t.name}: cannot reach a store_id`);
   for (const fk of t.fks) {

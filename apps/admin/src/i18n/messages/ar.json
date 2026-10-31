@@ -70,7 +70,9 @@
       "empty": "مفيش نتايج لـ «{q}»",
       "error": "البحث مش شغال دلوقتي. جرّب تاني.",
       "count": "{n, plural, =0 {مفيش نتايج} one {نتيجة واحدة} two {نتيجتين} few {{n} نتايج} other {{n} نتيجة}}"
-    }
+    },
+    "egp": "ج.م",
+    "egpParen": "(ج.م)"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -441,6 +443,9 @@
         "createFailed": "تعذّر إنشاء المتجر",
         "generic": "حدث خطأ ما"
       }
+    },
+    "avatar": {
+      "logoAlt": "شعار {name}"
     }
   },
   "products": {
@@ -580,7 +585,9 @@
         "selected": "{count} محدد",
         "massEdit": "تعديل جماعي",
         "clear": "إلغاء التحديد"
-      }
+      },
+      "priceFrom": "من",
+      "selectProduct": "اختار {name}"
     },
     "detail": {
       "loading": "جارٍ التحميل...",
@@ -809,7 +816,9 @@
         "maxLength": "أقصى عدد حروف",
         "required": "لازم يتكتب قبل الإضافة للسلة",
         "needLabel": "التخصيص محتاج عنوان بالعربي أو الإنجليزي.",
-        "invalidMax": "أقصى عدد حروف لازم يكون رقم صحيح من 1 لـ 200."
+        "invalidMax": "أقصى عدد حروف لازم يكون رقم صحيح من 1 لـ 200.",
+        "embroideryNameArSample": "الاسم للتطريز",
+        "embroideryNameEnSample": "Name to embroider"
       },
       "fulfilment": {
         "title": "التجهيز",
@@ -817,7 +826,19 @@
         "leadTime": "مدة التجهيز (أيام)",
         "placeholder": "جاهز للشحن",
         "invalid": "مدة التجهيز لازم تكون رقم صحيح من 0 لـ {max}."
-      }
+      },
+      "balanceFailed": "فشلت الموازنة، حاول مجددًا",
+      "balanceTitle": "موازنة اللغات (الاسم والوصف بالعربي والإنجليزي)",
+      "retryWarn": "⚠ إعادة المحاولة",
+      "balanced": "✓ تمت الموازنة",
+      "balanceLanguages": "موازنة اللغات",
+      "revertFailed": "فشل التراجع، حاول مجددًا",
+      "revertTitle": "التراجع عن الموازنة واسترجاع الأصل",
+      "revert": "↩ تراجع",
+      "faqQuestionEnSample": "e.g. What sizes are available?",
+      "faqQuestionArSample": "مثال: ما الأحجام المتوفرة؟",
+      "faqAnswerEnSample": "e.g. Available in S, M, L, XL.",
+      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL."
     },
     "recommendations": {
       "loading": "جارٍ التحميل...",
@@ -1235,7 +1256,8 @@
         "retry": "إعادة المحاولة",
         "confirmInstapay": "تعذّر تأكيد دفعة إنستاباي"
       },
-      "agentBadge": "وكيل ذكي"
+      "agentBadge": "وكيل ذكي",
+      "newOrder": "+ طلب جديد"
     },
     "status": {
       "pending": "قيد الانتظار",
@@ -1615,7 +1637,10 @@
         "successTitle": "ملأ الذكاء الاصطناعي حقول الشارة العلوية والعنوان الفرعي الفارغة",
         "generating": "جارٍ التوليد…",
         "generateWithAi": "توليد بالذكاء الاصطناعي"
-      }
+      },
+      "fontFamilyExample": "مثال: Cairo, Inter, \"Open Sans\"",
+      "fontNameExample": "مثال: \"My Brand Sans\"",
+      "uploadFileSize": "{name} ({kb} ك.ب)"
     },
     "devices": {
       "title": "أجهزة الإشعارات",
@@ -1627,7 +1652,8 @@
       "removeConfirmDescription": "لن تصل الإشعارات الفورية إلى هذا الجهاز. يمكنك إعادة التفعيل من نفس المتصفح.",
       "loading": "جاري تحميل الأجهزة…",
       "error": "فشل تحميل الأجهزة",
-      "removeError": "فشل حذف الجهاز"
+      "removeError": "فشل حذف الجهاز",
+      "browserFallback": "المتصفح"
     },
     "invoice": {
       "title": "الفاتورة",
@@ -1979,7 +2005,9 @@
       "group": "مجموعة الجملة",
       "empty": "لسه مفيش مبيعات في الفترة دي.",
       "loadFailed": "معرفناش نحمّل تقسيم الجملة."
-    }
+    },
+    "dateTo": "إلى",
+    "dateFrom": "من"
   },
   "settings": {
     "page": {
@@ -2974,7 +3002,15 @@
       "addCustomLocationHint": "أضف دولة ومحافظة ومنطقة غير موجودة في القائمة أعلاه.",
       "remove": "حذف",
       "deleteFailed": "تعذّر حذف المنطقة",
-      "incompleteRowsError": "هذه المناطق الجديدة تحتاج إلى رسوم توصيل (أو تفعيلها) قبل أن يمكن حفظها: {areas}"
+      "incompleteRowsError": "هذه المناطق الجديدة تحتاج إلى رسوم توصيل (أو تفعيلها) قبل أن يمكن حفظها: {areas}",
+      "areaNameEnSample": "Area name",
+      "areaNameArSample": "اسم المنطقة",
+      "countryEnSample": "e.g. Saudi Arabia",
+      "countryArSample": "مثال: المملكة العربية السعودية",
+      "cityEnSample": "e.g. Riyadh",
+      "cityArSample": "مثال: الرياض",
+      "districtEnSample": "e.g. Al Olaya",
+      "districtArSample": "مثال: العليا"
     },
     "returnPolicy": {
       "title": "سياسة الإرجاع",
@@ -3492,7 +3528,18 @@
         "payout_completed": "اكتملت عملية الدفع",
         "payout_failed": "فشلت عملية الدفع"
       }
-    }
+    },
+    "subtitle": "المسوقون",
+    "backToAffiliates": "رجوع للمسوقين",
+    "auditTrail2": "سجل المراجعة ←",
+    "noEventsYet": "لسه مفيش أحداث",
+    "eventHistory": "سجل الأحداث",
+    "orderLabel": "الطلب:",
+    "commissionLabel": "العمولة:",
+    "amountLabel": "المبلغ:",
+    "via": "عن طريق",
+    "eventsTitle": "{name} — الأحداث",
+    "eventsTitleFallback": "أحداث المسوّق"
   },
   "bulk": {
     "page": {
@@ -3503,7 +3550,8 @@
     "tabs": {
       "ariaLabel": "تبويبات العمليات المجمّعة",
       "import": "استيراد منتجات",
-      "export": "تصدير منتجات"
+      "export": "تصدير منتجات",
+      "catalog": "من صور أو PDF"
     },
     "import": {
       "instructionsTitle": "كيفية استيراد المنتجات",
@@ -3594,6 +3642,152 @@
     "errors": {
       "network": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
       "importFailed": "فشل الاستيراد"
+    },
+    "catalogImport": {
+      "title": "استيراد منتجات من صور أو PDF",
+      "intro": "ارفع صور لمنيو أو رف أو سعر أو قائمة أسعار، أو ملف PDF. بنقرا المنتجات والأسعار وانت تراجعها. مفيش حاجة بتظهر للعملاء غير لما تنشرها.",
+      "choose": "اختار ملفات",
+      "uploading": "جاري الرفع...",
+      "limits": "لحد 4 ملفات، كل واحد 6 ميجا. الـ PDF لحد 10 صفحات.",
+      "allowance": "فاضل {count} صفحة الشهر ده",
+      "privacyNote": "أرقام التليفونات والإيميلات واللينكات اللي في الصورة مش بتتنسخ لمنتجاتك. الملفات المرفوعة بتتمسح بعد 30 يوم.",
+      "upgradeTitle": "مش متاح في باقتك",
+      "upgradeBody": "الاستيراد من الصور وملفات PDF متاح في الباقات المدفوعة. رقّي باقتك عشان تفعّله.",
+      "jobsTitle": "استيراداتك",
+      "noJobs": "لسه مفيش استيرادات.",
+      "jobLine": "{files} ملف، {items} منتج",
+      "reviewLink": "راجع",
+      "review": {
+        "pageTitle": "مراجعة المنتجات المستوردة",
+        "progress": "{done} من {total} ملف اتقرا",
+        "back": "رجوع للعمليات الجماعية",
+        "processing": "بنقرا ملفاتك. تقدر تراجع المنتجات أول بأول.",
+        "creating": "بنعمل المسودات...",
+        "cancel": "إلغاء",
+        "fileWaiting": "مستني الحد يتجدد",
+        "fileFailed": "ماتقراش",
+        "retry": "جرّب تاني",
+        "tabsAria": "حالة المنتجات",
+        "tab": {
+          "pending": "للمراجعة",
+          "accepted": "مقبول",
+          "rejected": "مرفوض",
+          "created": "مسودات"
+        },
+        "waiting": "المنتجات هتظهر هنا لما نقرا ملفاتك.",
+        "empty": "مفيش حاجة هنا.",
+        "selectDraft": "اختار المسودة دي",
+        "acceptHigh": "اقبل كل المنتجات الواضحة",
+        "bulkAccepted": "اتقبل {count} منتج",
+        "createDrafts": "اعمل مسودات للمقبول ({count})",
+        "publishSelected": "انشر المختار ({count})",
+        "published": "اتنشر {published}، و{refused} مش جاهز",
+        "draftsHidden": "{count} مسودة. العملاء مش بيشوفوا المسودات غير لما تنشرها.",
+        "confidenceAria": "درجة الثقة: {level}",
+        "band": {
+          "high": "واضح",
+          "medium": "راجع",
+          "low": "مش متأكد"
+        },
+        "flags": {
+          "price_unclear": "السعر مش واضح",
+          "price_range": "السعر من-لـ",
+          "price_from": "السعر يبدأ من",
+          "price_per_unit": "السعر بالوحدة",
+          "currency_mismatch": "مش بالجنيه",
+          "no_price": "مفيش سعر",
+          "phone_removed": "رقم تليفون اتشال",
+          "injection_suspected": "نص غريب، راجعه",
+          "variants_truncated": "بعض الاختيارات اتقطعت",
+          "duplicate_sku": "نفس كود منتج موجود",
+          "duplicate_exact": "شبه منتج موجود"
+        },
+        "openSource": "افتح الأصل",
+        "printedAs": "المكتوب:",
+        "nameAr": "الاسم بالعربي",
+        "nameEn": "الاسم بالإنجليزي",
+        "price": "السعر (جنيه)",
+        "sku": "كود المنتج",
+        "category": "القسم",
+        "noCategory": "من غير قسم",
+        "noCategoryYet": "لسه ماتحددش",
+        "createCategory": "اعمل قسم \"{name}\"",
+        "tags": "الوسوم (بفاصلة)",
+        "variants": "{count} اختيار",
+        "variantPrice": "سعر {name}",
+        "moreDetails": "تفاصيل أكتر (كود المنتج، الوسوم، الوصف)",
+        "descriptionAr": "الوصف بالعربي",
+        "descriptionEn": "الوصف بالإنجليزي",
+        "checkTitle": "راجع قبل القبول",
+        "check": {
+          "price_from": "راجعت: ده سعر بيبدأ من",
+          "price_per_unit": "راجعت: السعر ده بالوحدة",
+          "injection_suspected": "راجعت النص ده",
+          "duplicate_exact": "راجعت: ضيفه برضو"
+        },
+        "draftCreated": "اتعملت مسودة",
+        "undo": "تراجع عن القبول",
+        "accept": "اقبل",
+        "reject": "ارفض",
+        "errors": {
+          "GENERIC": "ماتحفظش. جرّب تاني.",
+          "BAD_PRICE": "اكتب سعر زي 150 أو 150.50",
+          "BLOCKING_FLAG": "علّم على المراجعة قبل القبول.",
+          "SKU_CONFLICT": "الكود ده مستخدم قبل كده.",
+          "PLAN_LIMIT_REACHED": "وصلت للحد الأقصى للمنتجات في باقتك.",
+          "CREATE_FAILED": "ماقدرناش نعمل المسودة.",
+          "VARIANTS_FAILED": "ماقدرناش نعمل الاختيارات.",
+          "NAME_MISSING": "اكتب اسم الأول.",
+          "CATEGORY_NOT_FOUND": "القسم ده مش موجود."
+        }
+      },
+      "open": "افتح",
+      "status": {
+        "queued": "في الانتظار",
+        "processing": "بنقرا",
+        "review": "جاهز للمراجعة",
+        "creating": "بنعمل مسودات",
+        "done": "خلص",
+        "failed": "فشل",
+        "cancelled": "اتلغى"
+      },
+      "errors": {
+        "GENERIC": "حصل خطأ. جرّب تاني.",
+        "FEATURE_NOT_AVAILABLE": "الاستيراد من الصور مش متاح في باقتك.",
+        "UNSUPPORTED_FILE_TYPE": "المسموح صور (JPG وPNG وWebP وHEIC) وملفات PDF بس.",
+        "FILE_TOO_LARGE": "في ملف حجمه كبير. خلّي كل ملف أقل من 6 ميجا.",
+        "LIMIT_FILE_SIZE": "في ملف حجمه كبير. خلّي كل ملف أقل من 6 ميجا.",
+        "TOO_MANY_FILES": "ملفات كتير. ارفع لحد 4 ملفات مرة واحدة.",
+        "LIMIT_UNEXPECTED_FILE": "ملفات كتير. ارفع لحد 4 ملفات مرة واحدة.",
+        "TOO_MANY_PAGES": "صفحات كتير. خلّي الـ PDF لحد 10 صفحات والاستيراد الواحد لحد 30.",
+        "UNREADABLE_PDF": "الـ PDF ده ماقدرناش نقراه. جرّب تصدّره تاني.",
+        "CATALOG_IMPORT_BUSY": "خلّص الاستيرادات الشغّالة الأول.",
+        "CATALOG_IMPORT_DISABLED": "الاستيراد من الصور موقوف مؤقتًا.",
+        "RATE_LIMITED": "استيرادات كتير في الساعة دي. جرّب بعدين.",
+        "DAILY_LIMIT": "وصلت للحد اليومي للرفع. جرّب بكرة.",
+        "ENQUEUE_FAILED": "ماقدرناش نبدأ المعالجة. جرّب تاني.",
+        "NOT_STARTED": "المعالجة ماابتدتش. جرّب تاني.",
+        "STUCK": "المعالجة وقفت فجأة. جرّب تاني.",
+        "JOB_FAILED": "المعالجة فشلت. جرّب تاني.",
+        "NO_FILES": "ماقدرناش نقرا أي ملف من اللي رفعتهم.",
+        "PLAN_PAGES_EXHAUSTED": "خلّصت صفحات الشهر ده. بتتجدد الشهر الجاي، أو رقّي باقتك.",
+        "DAILY_PAGES_EXHAUSTED": "وصلت للحد اليومي للصفحات. جرّب بكرة.",
+        "AI_QUOTA_EXCEEDED": "الحد اليومي للأدوات الذكية خلص. جرّب بكرة.",
+        "AI_QUOTA_DAILY_EXCEEDED": "الحد اليومي للأدوات الذكية خلص. جرّب بكرة.",
+        "AI_QUOTA_MONTHLY_EXCEEDED": "الحد الشهري للأدوات الذكية خلص.",
+        "AI_QUOTA_STORE_DAILY_EXCEEDED": "الحد اليومي للأدوات الذكية لمتجرك خلص. جرّب بكرة.",
+        "AI_RATE_LIMITED": "الضغط عالي دلوقتي. جرّب الملف ده تاني بعد دقيقة.",
+        "AI_NOT_CONFIGURED": "الأدوات الذكية مش متاحة دلوقتي.",
+        "AI_UPSTREAM_ERROR": "ماقدرناش نقرا الملف ده. جرّب تاني.",
+        "AI_BAD_RESPONSE": "ماقدرناش نقرا الملف ده. جرّب تاني.",
+        "BAD_RESPONSE": "ماقدرناش نقرا الملف ده. جرّب تاني.",
+        "FILE_UNREADABLE": "الملف ده ماتفتحش.",
+        "EXTRACTION_FAILED": "ماقدرناش نقرا الملف ده. جرّب تاني.",
+        "TOO_MANY_RETRIES": "جرّبنا الملف ده مرات كتير. ارفعه من جديد.",
+        "DRAFTS_FAILED": "في مسودات ماتعملتش. راجع المنتجات وجرّب تاني.",
+        "NETWORK": "مفيش اتصال. جرّب تاني.",
+        "REQUEST_FAILED": "حصل خطأ. جرّب تاني."
+      }
     }
   },
   "newsletter": {
@@ -3623,7 +3817,8 @@
       "broadcastCancel": "إلغاء",
       "broadcastSent": "تم الإرسال!",
       "broadcastSentCount": "تم الإرسال إلى {sent} من أصل {total} مشترك.",
-      "broadcastClose": "إغلاق"
+      "broadcastClose": "إغلاق",
+      "chunksFailed": "فشلت {count} دفعة، راجع سجلات السيرفر"
     },
     "table": {
       "email": "البريد الإلكتروني",
@@ -4219,7 +4414,12 @@
         "numbered": "قائمة مرقمة",
         "image": "صورة",
         "button": "زر"
-      }
+      },
+      "aiFaqNote": "الأسئلة الشائعة اللي بيولّدها الذكاء الاصطناعي موجودة في أدوات السيو، مش هنا.",
+      "aiHowToNote": "أدلة الخطوات اللي بيولّدها الذكاء الاصطناعي موجودة في أدوات السيو، مش هنا.",
+      "wrapperNote": "المحرر ده بيتحكم في إطار الصفحة الثابت (صورة الغلاف والفقرات التعريفية وغيرها). محتوى الأكورديون اللي بيظهر في المتجر فعلاً بييجي من شاشة تانية.",
+      "openFaqInSeo": "افتح الأسئلة الشائعة في السيو ←",
+      "openHowToInSeo": "افتح أدلة الخطوات في السيو ←"
     }
   },
   "pages": {
@@ -4479,7 +4679,8 @@
       "tabs": {
         "settings": "الإعدادات",
         "members": "الأعضاء"
-      }
+      },
+      "transactions": "المعاملات"
     },
     "stats": {
       "totalMembers": "إجمالي الأعضاء",
@@ -5085,7 +5286,10 @@
       "socialRedirectNote": "روابط منصات التواصل الاجتماعي (إنستغرام، فيسبوك، تيك توك...) تُدار في الهوية البصرية ← التواصل الاجتماعي. عدِّلها هناك لتُبقي كل شيء في مكان واحد.",
       "socialRedirectNoteLinkText": "الذهاب إلى الهوية البصرية ← التواصل الاجتماعي",
       "redirectsLoadMore": "عرض المزيد",
-      "redirectsLoadingMore": "جارٍ التحميل…"
+      "redirectsLoadingMore": "جارٍ التحميل…",
+      "generating": "جارٍ التوليد…",
+      "generateWithAi": "ولّد بالذكاء الاصطناعي",
+      "stepsCount": "{count, plural, one {خطوة} two {خطوتين} few {{count} خطوات} other {{count} خطوة}}"
     }
   },
   "language": {
@@ -5160,7 +5364,8 @@
       "wwwAutoAttachedTitle": "تم ربط النطاق الفرعي www تلقائياً",
       "wwwAutoAttachedMessage": "سيصل الزوار الذين يكتبون www.{domain} إلى متجرك أيضاً. لا تحتاج إلى أي إعداد إضافي في DNS لـ www — نقوم بربطه تلقائياً على مستوى المنصة عند حفظ النطاق.",
       "copy": "نسخ",
-      "copyValueAriaLabel": "نسخ قيمة {type}"
+      "copyValueAriaLabel": "نسخ قيمة {type}",
+      "ttlAuto": "ساعة"
     }
   },
   "categories": {
@@ -5197,7 +5402,9 @@
       "bestSellersTileShown": "تم إظهار بطاقة الأكثر مبيعًا",
       "bestSellersTileHidden": "تم إخفاء بطاقة الأكثر مبيعًا",
       "bestSellersCoverUpdated": "تم تحديث غلاف الأكثر مبيعًا",
-      "bestSellersCoverRemoved": "تمت إزالة غلاف الأكثر مبيعًا"
+      "bestSellersCoverRemoved": "تمت إزالة غلاف الأكثر مبيعًا",
+      "countUnitEnSample": "pieces",
+      "countUnitArSample": "قطعة"
     },
     "form": {
       "editTitle": "تعديل الفئة",
@@ -5375,7 +5582,8 @@
       "aiSaveResponseFailed": "تعذّر حفظ الرد. يرجى المحاولة مرة أخرى.",
       "saving": "جارٍ الحفظ...",
       "searchPlaceholder": "ابحث في المراجعات…"
-    }
+    },
+    "spam": "سبام"
   },
   "audit": {
     "title": "سجلات التدقيق",
@@ -5666,6 +5874,7 @@
     "adminLayout": {
       "navDashboard": "لوحة التحكم",
       "navCatalog": "الكتالوج",
+      "navEditor": "المحرر",
       "navSales": "المبيعات",
       "navStock": "الجرد",
       "navFinance": "المحاسبة",
@@ -5731,7 +5940,8 @@
         "locations": "الفروع",
         "customerGroups": "مجموعات العملاء",
         "wallet": "المحفظة",
-        "wholesaleApplications": "طلبات الجملة"
+        "wholesaleApplications": "طلبات الجملة",
+        "customerIntelligence": "تلميحات ذكية"
       },
       "superAdmin": "مدير عام",
       "superAdminHint": "صلاحية كاملة على المنصة",
@@ -5771,7 +5981,8 @@
       "navPlatformPolicyUpdates": "تحديثات السياسات",
       "navPlatformSettings": "إعدادات المنصة",
       "navPlatformProviderActivation": "طلبات التفعيل (المنصة)",
-      "wholesalePendingBadge": "{count} طلب جملة مستني ردك"
+      "wholesalePendingBadge": "{count} طلب جملة مستني ردك",
+      "navPlatformCiInsights": "ذكاء العملاء"
     },
     "errorState": {
       "defaultTitle": "حدث خطأ ما",
@@ -5944,7 +6155,8 @@
       "subtitleDefault": "مختارات منسّقة",
       "productNamePlaceholder": "منتج",
       "addToCartLabel": "أضف",
-      "headingSuffix": "عنوان {label}"
+      "headingSuffix": "عنوان {label}",
+      "samplePrice": "50.00 ج.م"
     },
     "colorContrastPreview": {
       "backgroundLabel": "الخلفية: {label}",
@@ -5960,7 +6172,12 @@
       "notTracked": "غير متتبَّع للدفع كضيف",
       "registeredOnly": "العملاء المسجَّلون فقط",
       "checkoutsTableNote": "عمليات الدفع التي بدأت غير متتبَّعة للدفع كضيف — تظهر تلك الأيام «—» بدلاً من 0."
-    }
+    },
+    "title": "مسار الإرجاع",
+    "noEvents": "لسه مفيش أحداث في المسار",
+    "by": "بواسطة",
+    "reasonLabel": "السبب:",
+    "refundViaLabel": "الاسترداد عن طريق:"
   },
   "finance": {
     "accounts": {
@@ -6268,7 +6485,8 @@
         "error": "فشل الاستيراد.",
         "fileTypesHint": "CSV أو Excel (.xlsx) أو OFX (بحد أقصى 5 ميغابايت)",
         "skippedLabel": "تم التجاوز",
-        "viewReconciliation": "عرض المطابقة"
+        "viewReconciliation": "عرض المطابقة",
+        "andMore": "…و{count} كمان"
       },
       "tx": {
         "date": "التاريخ",
@@ -6303,7 +6521,8 @@
         "confirm": "ربط",
         "cancel": "إلغاء",
         "entryIdHelp": "يمكنك العثور على معرّفات القيود في المالية ← دفتر اليومية.",
-        "confirming": "جارٍ الربط…"
+        "confirming": "جارٍ الربط…",
+        "uuidExample": "مثال: 550e8400-e29b-41d4-a716-446655440000"
       },
       "difference": {
         "title": "فارق المطابقة",
@@ -6354,7 +6573,8 @@
       "colRate": "السعر (ج.م)",
       "colDate": "التاريخ",
       "colRecorded": "وقت التسجيل",
-      "loading": "جارٍ التحميل…"
+      "loading": "جارٍ التحميل…",
+      "rateExample2": "مثال: 50.00"
     }
   },
   "stock": {
@@ -6404,7 +6624,8 @@
       "loadFailed": "تعذّر تحميل المنتجات — {error}",
       "filteredLabel": "الفلتر:",
       "filterLowStock": "مخزون منخفض",
-      "filterOutOfStock": "نفد المخزون"
+      "filterOutOfStock": "نفد المخزون",
+      "showingFiltered": "عرض {shown} من {total} منتج"
     },
     "scan": {
       "title": "مسح الباركود",
@@ -6431,7 +6652,8 @@
       "picking": {
         "success": "تم تجهيز {qty} من {name}. التقدم: {picked}/{total}.",
         "itemNotFound": "هذا الباركود لا يطابق أي صنف في الطلب.",
-        "alreadyPicked": "تم تجهيز هذا الصنف بالكامل.",
+        "notInOrder": "{name} مش في الطلب ده. رجّعه مكانه.",
+        "alreadyPicked": "{name} اتجهّز بالكامل. ماتضيفش وحدة زيادة.",
         "orderComplete": "تم تجهيز جميع أصناف الطلب.",
         "errorGeneric": "فشل تسجيل التجهيز. حاول مجدداً."
       },
@@ -6470,7 +6692,15 @@
       "colItem": "الصنف",
       "colPicked": "المُلتقط",
       "pickItemsTableLabel": "أصناف الطلب",
-      "countLinesTableLabel": "أسطر الجرد"
+      "countLinesTableLabel": "أسطر الجرد",
+      "onHandLabel": "المتاح:",
+      "countSession": "جلسة جرد",
+      "linesSuffix": "سطر",
+      "systemQtyLabel": "الكمية في النظام:",
+      "adjustmentLabel": "التسوية:",
+      "skuLabel": "رمز المنتج: {sku}",
+      "linesAdjusted": "{count, plural, one {اتسوّى سطر واحد.} two {اتسوّى سطرين.} few {اتسوّت {count} سطور.} other {اتسوّى {count} سطر.}}",
+      "sessionReconciledOn": "الجلسة اتسوّت في {date}."
     },
     "adjustments": {
       "title": "تسويات المخزون",
@@ -6551,7 +6781,9 @@
         "itemsTableLabel": "بنود التسوية"
       },
       "searchPlaceholder": "ابحث في التسويات…",
-      "emptyState": "لا توجد تسويات مخزون بعد. أنشئ واحدة باستخدام الزر أعلاه."
+      "emptyState": "لا توجد تسويات مخزون بعد. أنشئ واحدة باستخدام الزر أعلاه.",
+      "reasonEnPlaceholder": "السبب بالإنجليزي (اختياري)",
+      "reasonArPlaceholder": "سبب التسوية بالعربي (اختياري)"
     },
     "suppliers": {
       "title": "الموردون",
@@ -6584,7 +6816,13 @@
         "leadTimeDays": "مدة التوريد (أيام)",
         "leadTimeDaysTip": "عدد الأيام من وضع الطلب لدى هذا المورد حتى وصول البضاعة. يستخدمها محرك إعادة الطلب عند عدم وجود قاعدة خاصة بالمنتج تتجاوزها."
       },
-      "searchPlaceholder": "ابحث عن مورد…"
+      "searchPlaceholder": "ابحث عن مورد…",
+      "supplierNameEnSample": "e.g. Al-Mutlaq Trading",
+      "supplierNameArPlaceholder": "اسم المورد بالعربي",
+      "termsDaysExample": "مثال: 45",
+      "notesEnPlaceholder": "ملاحظات بالإنجليزي (اختياري)",
+      "notesArPlaceholder": "ملاحظات بالعربي (اختياري)",
+      "termsDays": "{count, plural, one {يوم} two {يومين} few {{count} أيام} other {{count} يوم}}"
     },
     "purchaseOrders": {
       "title": "أوامر الشراء",
@@ -6648,7 +6886,9 @@
         "VARIANT_REQUIRED_RECEIVE": "هذا السطر لا يحدد متغيرًا مع أن لمنتجه متغيرات، لذلك لا يمكن استلامه. ألغِ أمر الشراء هذا وأنشئه من جديد لكل متغير."
       },
       "emptyState": "لا توجد أوامر شراء بعد. أنشئ واحداً باستخدام الزر أعلاه.",
-      "totalCount": "{total} أمر شراء"
+      "totalCount": "{total} أمر شراء",
+      "backToPurchaseOrders": "→ رجوع لأوامر الشراء",
+      "notesArPlaceholder": "ملاحظات بالعربي (اختياري)"
     },
     "backorders": {
       "title": "طلبات الانتظار المفتوحة",
@@ -6750,7 +6990,10 @@
       },
       "validation": {
         "nameCodeRequired": "الاسم والرمز مطلوبان"
-      }
+      },
+      "warehouseNameEnSample": "Main Warehouse",
+      "warehouseNameArSample": "المستودع الرئيسي",
+      "addressSample": "منطقة الشويخ الصناعية، مصر"
     },
     "warehouseStock": {
       "title": "مخزون المستودع",
@@ -6782,7 +7025,8 @@
       "reconcileHint": "يتم مطابقة أعداد كل مستودع مع مخزون المنتج المعتمد لديك.",
       "searchTruncated": "هذه أقرب النتائج فقط، أضف كلمة لتضييق البحث",
       "reconcileDone": "تمت مطابقة {reconciled} منتج (فشل {failed})",
-      "reconcileStarted": "بدأت عملية المطابقة — ستُحدَّث أعداد المستودعات قريباً"
+      "reconcileStarted": "بدأت عملية المطابقة — ستُحدَّث أعداد المستودعات قريباً",
+      "deltaExample": "+10 أو -5"
     }
   },
   "insights": {
@@ -6804,7 +7048,9 @@
       "colSku": "رمز المنتج (SKU)",
       "colName": "الاسم",
       "colSold7d": "المباع (7 أيام)",
-      "colVelocity": "معدل البيع"
+      "colVelocity": "معدل البيع",
+      "perDay": "/يوم",
+      "topSegmentCustomers": "{count, plural, one {عميل} two {عميلين} few {{count} عملاء} other {{count} عميل}}"
     },
     "cohorts": {
       "title": "شرائح العملاء الزمنية",
@@ -6818,7 +7064,9 @@
       "ltvByCohortTitle": "القيمة الدائمة التراكمية حسب الشريحة",
       "colTotalRevenue": "إجمالي الإيرادات (ج.م)",
       "colLtvPerCustomer": "القيمة الدائمة / عميل",
-      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت القاهرة."
+      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت القاهرة.",
+      "cellTitle": "{active} / {total} عميل نشط",
+      "legendNote": "الخلايا بتوضّح نسبة عملاء المجموعة اللي عملوا طلب في الفترة دي. الأخضر = احتفاظ عالي، والأحمر = احتفاظ ضعيف."
     },
     "funnel": {
       "title": "قمع إتمام الشراء",
@@ -7623,7 +7871,8 @@
       "revokeFailed": "معرفناش نلغي الدعوة",
       "sentTitle": "اتبعتت الدعوة",
       "sentDesc": "{email} هيوصله إيميل يقبل منه الدعوة. مفيش حاجة بتتغير في حسابه قبل ما يقبل."
-    }
+    },
+    "removeBody": "هتشيل <b>{name}</b> ({email}) من المتجر ده؟ هيفقد الوصول فوراً."
   },
   "blog": {
     "page": {
@@ -7675,7 +7924,10 @@
       "cancel": "إلغاء",
       "createPost": "إنشاء التدوينة",
       "saveChanges": "حفظ التغييرات",
-      "saving": "جاري الحفظ…"
+      "saving": "جاري الحفظ…",
+      "titleArPlaceholder": "ما الجديد في متجرك...",
+      "excerptArPlaceholder": "جملة أو اثنتان تظهران في قائمة المدونة...",
+      "bodyArPlaceholder": "اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
     }
   },
   "checkoutDelivery": {
@@ -8011,7 +8263,13 @@
     "savedToast": "تم حفظ الودجة العائمة",
     "saveHint": "تُطبَّق التغييرات على واجهة المتجر الفعلية بعد الحفظ.",
     "saving": "جارٍ الحفظ…",
-    "saveChanges": "حفظ التغييرات"
+    "saveChanges": "حفظ التغييرات",
+    "menuLabelEnSample": "Open menu",
+    "menuLabelArSample": "القائمة",
+    "prefillExample": "أهلاً! عايز أسأل عن…",
+    "handleSampleDemoShop": "demo-shop",
+    "handleSample": "mystore",
+    "emailSubjectExample": "سؤال عن متجرك"
   },
   "zoneEditor": {
     "resetToDefault": "إعادة التعيين إلى الافتراضي",
@@ -8109,7 +8367,6 @@
     "checkoutTitle": "الدفع من المحفظة عند الشراء",
     "checkoutOn": "مفعّل — يمكن للعملاء المسجلين دفع جزء من الطلب أو كامله من رصيدهم.",
     "checkoutOff": "غير مفعّل — يرى العملاء رصيدهم في حساباتهم لكن لا يمكنهم إنفاقه عند الشراء بعد. تواصل مع دعم ابدأ ستور لتفعيله.",
-    "checkoutAccounting": "غير متاح أثناء تفعيل المحاسبة — دفتر الحسابات لا يسجل رصيد المتجر كالتزام بعد، فستُسجَّل مدفوعات المحفظة كنقد.",
     "colCustomer": "العميل",
     "colContact": "التواصل",
     "colBalance": "الرصيد",
@@ -8478,7 +8735,8 @@
         "prefix": "أوافق على ",
         "sep": "، ",
         "lastSep": " و"
-      }
+      },
+      "companyWebsite": "موقع الشركة"
     },
     "verify": {
       "verifying": "جارٍ تأكيد بريدك…",
@@ -9490,6 +9748,15 @@
       "resetError": "ماقدرناش نرجّعها. جرّب تاني.",
       "headerLogo": "مكان الشعار",
       "headerSearch": "البحث في الهيدر",
+      "cardHeart": "قلب المفضلة على كروت الرئيسية",
+      "cardSwatches": "نقط الألوان على كروت الرئيسية",
+      "cardTags": "شارات التصنيف على كروت الرئيسية",
+      "gridGutter": "المسافة بين كروت الرئيسية",
+      "headingWeight": "سُمك عناوين الأقسام",
+      "priceColour": "لون السعر على الكروت",
+      "tabBar": "الشريط السفلي على الموبايل",
+      "heroRatio": "طول الصورة الرئيسية على الموبايل",
+      "headerWordmark": "اسم المتجر لما مفيش شعار",
       "cardBrandBadge": "اسم المتجر على كل كارت",
       "cardNewBadge": "شارة «جديد» على الكروت",
       "cardQuickAdd": "إضافة سريعة (+) على كروت الكاروسيل",
@@ -9795,7 +10062,8 @@
       "noteRequired": "اكتب ملاحظة من 3 حروف على الأقل.",
       "cancel": "إلغاء",
       "working": "جاري التنفيذ…"
-    }
+    },
+    "unknown": "غير معروف"
   },
   "goldRates": {
     "page": {
@@ -10654,5 +10922,100 @@
     },
     "testNote": "اطبع ملصق واحد وجرّبه بموبايل قبل ما تطبع ورقة كاملة.",
     "loading": "جاري التحميل"
+  },
+  "customerIntelligence": {
+    "title": "تلميحات ذكية",
+    "subtitle": "نصايح من طريقة توصيل وارتجاع طلباتك. بتنصح بس: عمرها ما بتوقف أو تأجّل أو تلغي طلب.",
+    "loadFailed": "مقدرناش نحمّل الصفحة.",
+    "retry": "حاول تاني",
+    "saveFailed": "التعديل ما اتحفظش. حاول تاني.",
+    "hints": {
+      "title": "اعرض التلميحات الذكية",
+      "body": "ملاحظة على خطر الدفع عند الاستلام في كل طلب، وأنهي شركة شحن وصّلت أحسن لمنطقة معينة، واقتراح لمصاريف الشحن. كل تلميح بيوضّح عدد الطلبات اللي اعتمد عليها.",
+      "on": "التلميحات شغّالة في متجرك.",
+      "off": "التلميحات مقفولة. مش هيظهر حاجة لحد ما تفتحها."
+    },
+    "sharing": {
+      "title": "استفيد من خبرة متاجر تانية كمان",
+      "body": "لو وافقت، أرقام متجرك (من غير أي اسم أو رقم تليفون أو إيميل أو عنوان) بتتحسب مع متاجر تانية عشان التلميحات تبقى أدق للكل. محدش بيشوف متجرك ولا أي عميل عندك، وتقدر توقف ده في أي وقت. ده مقفول لحد ما تفتحه."
+    },
+    "fee": {
+      "title": "اقتراح لمصاريف الشحن",
+      "suggestion": "طلبات الدفع عند الاستلام اللي مصاريف شحنها {amount} أو أكتر بترجع {rate} من المرات ({base} في المتوسط، من {n} طلب). فكّر تخفّض مصاريف الشحن أو تطلب عربون على إنستاباي للطلبات دي.",
+      "none": "مفيش شريحة مصاريف شحن بترجع أكتر من الباقي بشكل واضح."
+    },
+    "notEnough": "لسه مفيش بيانات كفاية. التلميحات بتظهر لما يبقى فيه طلبات اتسلّمت أو رجعت بعدد كفاية.",
+    "status": {
+      "title": "التلميحات مبنية على إيه",
+      "store": "متجرك، بيانات لحد",
+      "cohort": "متاجر تانية، بيانات لحد",
+      "none": "لسه مفيش بيانات"
+    },
+    "shown": {
+      "title": "التلميحات اللي ظهرت في آخر 30 يوم",
+      "features": {
+        "cod_risk": "خطر الدفع عند الاستلام",
+        "courier": "شركة الشحن",
+        "fee": "مصاريف الشحن"
+      }
+    },
+    "paused": {
+      "title": "موقوف لمتجرك",
+      "item": "{feature}: التلميح ده توقّع {predicted} بس اللي حصل فعلاً {actual} على {resolved} طلب من طلباتك، فاتوقف لمتجرك أنت بس. وبيرجع يشتغل لوحده أول ما أرقامك تتظبط تاني."
+    },
+    "bands": {
+      "typical": "عادي",
+      "elevated": "أعلى من المعتاد",
+      "insufficient": "مفيش بيانات كفاية"
+    },
+    "footnote": "التلميحات نصيحة بس. عمرها ما بتوقف أو تأجّل أو تلغي طلب، والقرار دايمًا بتاعك.",
+    "order": {
+      "title": "خطر الدفع عند الاستلام",
+      "band": {
+        "typical": "عادي لمنطقة زي دي.",
+        "elevated": "المرتجعات هنا أعلى من المعتاد.",
+        "insufficient": "لسه مفيش بيانات كفاية."
+      },
+      "reason": {
+        "area": "الطلبات لمنطقة زي دي رجعت أكتر من المتوسط.",
+        "buyer": "العميل ده رجّع طلبات كتير من متجرك."
+      },
+      "basedOn": "مبني على {n} طلب.",
+      "suggest": {
+        "confirm_by_phone": "اتأكد بالتليفون قبل ما تشحن.",
+        "ask_instapay_deposit": "اطلب عربون على إنستاباي."
+      },
+      "advisory": "نصيحة بس. الطلب مش متوقف."
+    },
+    "courier": {
+      "best": "أحسن سجل توصيل للمنطقة دي: {carrier} ({rate} اتسلّم، من {n} طلب). اختيارك زي ما هو."
+    }
+  },
+  "ciInsights": {
+    "title": "ذكاء العملاء",
+    "subtitle": "ملاحظات من أرقام المتاجر اللي وافقت على المشاركة. مفيش حاجة بتتغيّر قبل ما حد يوافق عليها.",
+    "loadFailed": "مقدرناش نحمّل.",
+    "loading": "جارٍ التحميل",
+    "empty": "مفيش حاجة هنا.",
+    "filter": "فلتر بالحالة",
+    "status": {
+      "new": "جديد",
+      "accepted": "مقبول",
+      "dismissed": "مرفوض"
+    },
+    "evidence": "{n} نتيجة من {stores} متجر، بيانات لحد {date}.",
+    "accept": "قبول",
+    "dismiss": "رفض",
+    "gates": {
+      "title": "مفاتيح التلميحات",
+      "body": "قفل أي مفتاح بيوقف التلميح ده لكل المتاجر. المعايرة بتنبّه بس: قفل المفتاح قرارك.",
+      "close": "قفل",
+      "open": "فتح",
+      "features": {
+        "cod_risk": "ملاحظة خطر الدفع عند الاستلام",
+        "courier": "اقتراح شركة الشحن",
+        "fee": "كارت مصاريف الشحن"
+      }
+    }
   }
 }

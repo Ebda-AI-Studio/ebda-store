@@ -25,6 +25,13 @@ export function openSqlite(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON'); // Store/User FKs are not emitted in the DO schema (other database), so ON only enforces in-DO FKs
   db.exec(STORE_SQL);
+  // A real DO store always has its `store_profile` row (the settings write-through needs it), and an order's sale document reads the
+  // seller from it (Ruling CF-R2-1). Test worlds that do not care get a default one the first time an order is written.
+  db.exec(
+    `CREATE TRIGGER test_seed_store_profile BEFORE INSERT ON orders BEGIN
+       INSERT OR IGNORE INTO store_profile (store_id, name, slug, owner_id) VALUES (NEW.store_id, 'Test shop', NEW.store_id, 'test-owner');
+     END`
+  );
   return db;
 }
 

@@ -11,9 +11,11 @@ size="$(wc -c < "$f" | tr -d ' ')"
 [ "$size" -ge "$min_bytes" ] || { echo "verify-db-dump: $f is only $size bytes (< $min_bytes) - refusing" >&2; exit 1; }
 restore="${PG_RESTORE:-pg_restore}"
 toc="$("$restore" --list "$f")" || { echo "verify-db-dump: pg_restore cannot read $f" >&2; exit 1; }
-n="$(printf '%s\n' "$toc" | grep -c ' TABLE DATA ' || true)"
+# No `printf | grep -q`: grep -q exits at the first match, printf then dies of SIGPIPE, and under `set -o pipefail` that
+# turns a FOUND table into "no data entry" (141 -> exit 1) whenever the host is loaded. Feed grep from a here-string instead.
+n="$(grep -c ' TABLE DATA ' <<<"$toc" || true)"
 [ "$n" -ge "$min_tables" ] || { echo "verify-db-dump: only $n TABLE DATA entries (< $min_tables) - refusing" >&2; exit 1; }
 for t in stores orders users; do
-  printf '%s\n' "$toc" | grep -q " TABLE DATA public $t " || { echo "verify-db-dump: no data entry for table $t - refusing" >&2; exit 1; }
+  grep -q " TABLE DATA public $t " <<<"$toc" || { echo "verify-db-dump: no data entry for table $t - refusing" >&2; exit 1; }
 done
 echo "verify-db-dump: ok ($size bytes, $n tables with data)"

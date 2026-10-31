@@ -5,12 +5,7 @@
  * sent on EVERY write of a plan or subscription (one observer on the database client, see
  * `installWaWriteObservers`), with an 12-hourly reconciliation as the backstop.
  */
-import {
-  prisma,
-  runInTenantContext,
-  setModelWriteObserver,
-  type ModelWriteEvent,
-} from '@ebda/database';
+import { withStore, setModelWriteObserver, type ModelWriteEvent } from '@ebda/database';
 import { getEntitlements } from '../../services/plan-entitlements';
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import logger from '../logger';
@@ -117,8 +112,9 @@ export async function planChangedInput(
 ): Promise<{ input: StoreEventInput; seed: string } | null> {
   const [ent, store] = await Promise.all([
     getEntitlements(storeId),
-    runInTenantContext(storeId, () =>
-      prisma.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+    // `Store` is a platform row: the same read for a Postgres store and a store on its Durable Object (Ruling CF-JOBS-4)
+    withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
     ),
   ]);
   if (!ent || !store) return null;

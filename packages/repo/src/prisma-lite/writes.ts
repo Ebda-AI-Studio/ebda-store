@@ -2,7 +2,8 @@ import { Prisma } from '@prisma/client';
 import { Engine, MAX_PARAMS } from './engine';
 import { encode } from './codec';
 import { expandUnique } from './unique';
-import type { ModelMeta, RelationField, ScalarField } from './types';
+import { enumRankSql } from './enum-order';
+import type { ModelMeta, RelationField, ScalarField, WriteGuard } from './types';
 
 type Args = Record<string, any>;
 type Row = Record<string, unknown>;
@@ -54,13 +55,35 @@ export function mapDbError(e: unknown): unknown {
 export class WriteEngine extends Engine {
   /** The StoreDO's own store id: when set, no row may be written with any other `storeId` (no RLS inside a DO). */
   private readonly ownStoreId: string | undefined;
+  private readonly guard: WriteGuard | undefined;
   constructor(
     meta: ConstructorParameters<typeof Engine>[0],
     sql: ConstructorParameters<typeof Engine>[1],
-    opts: { storeId?: string } = {}
+    opts: { storeId?: string; guard?: WriteGuard } = {}
   ) {
     super(meta, sql);
     this.ownStoreId = opts.storeId;
+    this.guard = opts.guard;
+  }
+
+  /**
+   * RPC write guard (Ruling CF-R7-4): called wherever a row of `model` is written, linked or deleted, whatever path
+   * reached it. Fails closed: a model that is not writable, or a stock column in `data`, throws before the statement runs.
+   */
+  private allow(model: string, data?: Row): void {
+    const g = this.guard;
+    if (!g) return;
+    if (!g.writable.has(model))
+      throw Object.assign(new Error(`${model} is not ported to the StoreDO write path`), {
+        code: 'MODEL_NOT_WRITABLE',
+      });
+    const cols = g.stock[model];
+    if (cols && data)
+      for (const c of cols)
+        if (data[c] !== undefined)
+          throw Object.assign(new Error(`${model}: stock columns are not written here`), {
+            code: 'STOCK_WRITE_REFUSED',
+          });
   }
 
   private assertStore(m: ModelMeta, values: Row): void {
@@ -171,6 +194,7 @@ export class WriteEngine extends Engine {
 
   /** Insert one row (and its nested creates). `parentFk` pre-fills the foreign key of a nested child. */
   private insert(model: string, m: ModelMeta, data: Row, parentFk: Row | undefined): Row {
+    this.allow(model, data);
     if (parentFk) this.assertNoFkInData(m, data, Object.keys(parentFk));
     const now = new Date();
     const values: Row = {};
@@ -198,11 +222,14 @@ export class WriteEngine extends Engine {
         // this row holds the FK: resolve (or create) the target first
         const op = v as Row;
         let target: Row | undefined;
-        if (op.connect) target = this.requireUnique(f.type, op.connect as Row);
-        else if (op.create)
+        if (op.connect) {
+          this.allow(f.type); // linking to a row of a model the DO does not own is a write path too
+          target = this.requireUnique(f.type, op.connect as Row);
+        } else if (op.create)
           target = this.insert(f.type, this.model(f.type), op.create as Row, undefined);
         else if (op.connectOrCreate) {
           const coc = op.connectOrCreate as Row;
+          this.allow(f.type); // the FOUND branch links without inserting, so the insert hook alone would not see it
           target =
             this.findUnique(f.type, coc.where as Row) ??
             this.insert(f.type, this.model(f.type), coc.create as Row, undefined);
@@ -379,6 +406,7 @@ export class WriteEngine extends Engine {
 
   /** `where` here is a full primary-key selector of one row; the SET list is built from `data`. */
   private applyUpdate(model: string, m: ModelMeta, pkSel: Row, data: Row): void {
+    this.allow(model, data);
     if (
       this.ownStoreId !== undefined &&
       data.storeId !== undefined &&
@@ -647,18 +675,19 @@ export class WriteEngine extends Engine {
         { cause: 'Record to delete does not exist.' }
       );
     const out = this.reread(model, hit, args); // read BEFORE the delete (FK cascades may remove children)
-    this.deleteByPk(m, hit);
+    this.deleteByPk(model, m, hit);
     return out;
   }
 
   deleteMany(model: string, args: Args = {}): { count: number } {
     const m = this.model(model);
     const rows = this.pkRows(model, args.where ?? {});
-    for (const r of rows) this.deleteByPk(m, r);
+    for (const r of rows) this.deleteByPk(model, m, r);
     return { count: rows.length };
   }
 
-  private deleteByPk(m: ModelMeta, pk: Row): void {
+  private deleteByPk(model: string, m: ModelMeta, pk: Row): void {
+    this.allow(model);
     const where = m.pk.map(p => `${q(this.scalar(m, p).column)} = ?`).join(' AND ');
     this.run(
       `DELETE FROM ${q(m.table)} WHERE ${where}`,
@@ -725,7 +754,19 @@ export class WriteEngine extends Engine {
   }
 
   groupBy(model: string, args: Args): Row[] {
-    onlyArgs(args, ['by', 'where', '_count', '_sum', '_avg', '_min', '_max', 'orderBy', 'having']);
+    onlyArgs(args, [
+      'by',
+      'where',
+      '_count',
+      '_sum',
+      '_avg',
+      '_min',
+      '_max',
+      'orderBy',
+      'having',
+      'take',
+      'skip',
+    ]);
     const m = this.model(model);
     const by = (Array.isArray(args.by) ? args.by : [args.by]) as string[];
     if (by.length === 0 || by.some(b => typeof b !== 'string'))
@@ -758,20 +799,45 @@ export class WriteEngine extends Engine {
         shape.push([fn, f, `${fn}__${f}`]);
       }
     let sql = `SELECT ${sel.join(', ')} FROM ${q(m.table)} t0 WHERE ${where} GROUP BY ${byCols.join(', ')}`;
+    if (args.having !== undefined) sql += ` HAVING ${this.groupHaving(m, by, args.having, params)}`;
     if (args.orderBy) {
       const ob = (Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy]) as Row[];
       const parts: string[] = [];
       for (const item of ob)
         for (const [k, dir] of Object.entries(item)) {
-          if (k === '_count' || k === '_sum' || k === '_avg' || k === '_min' || k === '_max')
-            throw new Error('prisma-lite: groupBy orderBy on an aggregate is not supported');
+          if (k === '_count' || k === '_sum' || k === '_avg' || k === '_min' || k === '_max') {
+            // order by an aggregate: { _sum: { price: 'desc' } } / { _count: { _all: 'desc' } }
+            for (const [f, d] of Object.entries(dir as Row)) {
+              const dd = dirOf(d);
+              const expr =
+                k === '_count' && f === '_all'
+                  ? 'count(*)'
+                  : `${k === '_count' ? 'count' : k.slice(1).toUpperCase()}(t0.${q(this.scalar(m, f).column)})`;
+              if (k !== '_count' && k !== '_min' && k !== '_max') this.numericOnly(m, f, k);
+              parts.push(`${expr} ${dd} NULLS ${dd === 'ASC' ? 'LAST' : 'FIRST'}`);
+            }
+            continue;
+          }
           if (!by.includes(k))
             throw new Error('prisma-lite: groupBy orderBy must name a group field');
-          parts.push(`${q(`k__${k}`)} ${dirOf(dir)}`);
+          const sf = this.scalar(m, k);
+          const col = q(`k__${k}`);
+          const d = dirOf(dir);
+          parts.push(
+            `${sf.kind === 'enum' && sf.enum ? enumRankSql(col, sf.enum, this.meta.enums) : col} ${d} NULLS ${d === 'ASC' ? 'LAST' : 'FIRST'}`
+          );
         }
       if (parts.length) sql += ` ORDER BY ${parts.join(', ')}`;
     }
-    if (args.having) throw new Error('prisma-lite: groupBy having is not supported');
+    const take = args.take;
+    const skip = args.skip;
+    if (take !== undefined || skip !== undefined) {
+      if (take !== undefined && (!Number.isInteger(take) || take < 0))
+        throw new Error('prisma-lite: groupBy take must be a non-negative integer');
+      if (skip !== undefined && (!Number.isInteger(skip) || skip < 0))
+        throw new Error('prisma-lite: groupBy skip must be a non-negative integer');
+      sql += ` LIMIT ${take === undefined ? -1 : take} OFFSET ${skip ?? 0}`;
+    }
     const rows = this.sql.all(sql, params);
     return rows.map(r => {
       const o: Row = {};
@@ -789,6 +855,105 @@ export class WriteEngine extends Engine {
       }
       return o;
     });
+  }
+
+  private numericOnly(m: ModelMeta, field: string, fn: string): void {
+    if (!['Int', 'Float', 'Decimal', 'BigInt'].includes(this.scalar(m, field).type))
+      throw new Error(`prisma-lite: ${fn} needs a numeric field`);
+  }
+
+  /**
+   * groupBy `having`: `{ price: { _avg: { gt: 5 } } }` (an aggregate of a field), a plain filter on a group key
+   * (`{ status: 'active' }` / `{ status: { in: [...] } }`), and AND / OR / NOT of those. Anything else throws.
+   */
+  private groupHaving(
+    m: ModelMeta,
+    by: string[],
+    having: unknown,
+    params: unknown[],
+    depth = 0
+  ): string {
+    if (depth > 8) throw new Error('prisma-lite: having nests too deep');
+    if (!having || typeof having !== 'object' || Array.isArray(having))
+      throw new Error('prisma-lite: having must be an object');
+    const OPS: Record<string, string> = {
+      equals: '=',
+      not: '<>',
+      gt: '>',
+      gte: '>=',
+      lt: '<',
+      lte: '<=',
+    };
+    const cond = (expr: string, f: ScalarField, filter: unknown): string => {
+      const parts: string[] = [];
+      const entries =
+        filter !== null && typeof filter === 'object' && !Array.isArray(filter)
+          ? Object.entries(filter as Row)
+          : [['equals', filter] as [string, unknown]];
+      for (const [op, val] of entries) {
+        if (op === 'in' || op === 'notIn') {
+          if (!Array.isArray(val) || val.length === 0)
+            throw new Error(`prisma-lite: having ${op} needs a non-empty array`);
+          for (const v of val) params.push(encode(f, v));
+          parts.push(`${expr} ${op === 'in' ? 'IN' : 'NOT IN'} (${val.map(() => '?').join(', ')})`);
+        } else if (op in OPS) {
+          if (val === null) parts.push(`${expr} IS ${op === 'not' ? 'NOT ' : ''}NULL`);
+          else {
+            params.push(f.type === 'Float' ? val : encode(f, val));
+            parts.push(`${expr} ${OPS[op]} ?`);
+          }
+        } else throw new Error(`prisma-lite: unsupported having operator ${JSON.stringify(op)}`);
+      }
+      if (parts.length === 0) throw new Error('prisma-lite: empty having filter');
+      return parts.join(' AND ');
+    };
+    const out: string[] = [];
+    for (const [k, v] of Object.entries(having as Row)) {
+      if (k === 'AND' || k === 'OR') {
+        const list = (Array.isArray(v) ? v : [v]) as unknown[];
+        if (list.length === 0) throw new Error(`prisma-lite: empty having ${k}`);
+        out.push(
+          `(${list.map(w => this.groupHaving(m, by, w, params, depth + 1)).join(k === 'AND' ? ' AND ' : ' OR ')})`
+        );
+      } else if (k === 'NOT') {
+        const list = (Array.isArray(v) ? v : [v]) as unknown[];
+        out.push(
+          `NOT (${list.map(w => this.groupHaving(m, by, w, params, depth + 1)).join(' AND ')})`
+        );
+      } else {
+        const f = this.scalar(m, k);
+        const col = `t0.${q(f.column)}`;
+        const aggs =
+          v !== null && typeof v === 'object' && !Array.isArray(v)
+            ? Object.keys(v as Row).filter(x => x.startsWith('_'))
+            : [];
+        if (aggs.length === 0) {
+          if (!by.includes(k))
+            throw new Error(`prisma-lite: having on ${k} needs an aggregate or a group field`);
+          out.push(cond(col, f, v));
+        } else {
+          if (aggs.length !== Object.keys(v as Row).length)
+            throw new Error('prisma-lite: having mixes aggregate and plain operators');
+          for (const fn of aggs) {
+            if (!['_count', '_sum', '_avg', '_min', '_max'].includes(fn))
+              throw new Error(`prisma-lite: unsupported having aggregate ${JSON.stringify(fn)}`);
+            if (fn === '_sum' || fn === '_avg') this.numericOnly(m, k, fn);
+            if (f.type === 'Decimal')
+              throw new Error('prisma-lite: having on a Decimal aggregate is not supported');
+            const expr = fn === '_count' ? `count(${col})` : `${fn.slice(1).toUpperCase()}(${col})`;
+            out.push(
+              cond(
+                expr,
+                fn === '_count' ? { ...f, type: 'Int', kind: 'scalar' as const } : f,
+                (v as Row)[fn]
+              )
+            );
+          }
+        }
+      }
+    }
+    if (out.length === 0) throw new Error('prisma-lite: empty having');
+    return out.join(' AND ');
   }
 }
 

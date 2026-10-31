@@ -1,3 +1,4 @@
+import { storeDb } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, customerUserId } from '../middleware/auth';
@@ -586,7 +587,9 @@ router.get(
       const { storeId, id: returnId } = req.params;
 
       // Verify the return belongs to this store before exposing audit rows.
-      const returnRecord = await prisma.return.findFirst({
+      const returnRecord = await (
+        await storeDb(storeId)
+      ).return.findFirst({
         where: { id: returnId, storeId },
         select: { id: true, returnNumber: true, status: true, createdAt: true },
       });

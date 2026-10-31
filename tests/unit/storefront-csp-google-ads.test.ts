@@ -6,14 +6,13 @@
  * every conversion. Read from the config text (PR tier, no network).
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { buildStorefrontCsp } from '../../apps/web/src/lib/csp';
 
-const src = readFileSync(join(__dirname, '../../apps/web/next.config.js'), 'utf8');
+const csp = buildStorefrontCsp('AAAAAAAAAAAAAAAAAAAAAA==');
 const directive = (name: string) => {
-  const m = src.match(new RegExp(`"${name} [^"]*"`));
-  expect(m, `${name} not found in apps/web/next.config.js`).not.toBeNull();
-  return m![0];
+  const d = csp.split('; ').find(x => x.startsWith(`${name} `));
+  expect(d, `${name} not found in the storefront CSP`).toBeDefined();
+  return d!;
 };
 
 describe('storefront CSP — Google Ads', () => {

@@ -38,7 +38,7 @@ export default function DahabProductGrid({
     <div className={DAHAB_CONTAINER} data-zone="products">
       <DahabSectionHeading title={pick(isRtl, title, titleAr)} />
       {products.length > 0 ? (
-        <div className={dahabGridCols(columns)}>
+        <div data-part="product-grid" className={dahabGridCols(columns)}>
           {products.map(product => (
             <DahabProductCard
               key={product.id}

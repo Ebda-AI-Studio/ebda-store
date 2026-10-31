@@ -38,7 +38,7 @@ describe('one mobile menu', () => {
       join(__dirname, '../../apps/web/src/templates/shared/BottomTabBar.tsx'),
       'utf8'
     );
-    expect(src).toMatch(/tabBarShownOn\(/);
+    expect(src).toMatch(/useTabBarShown\(/);
     expect(HEADER_MENU_WITH_TAB_BAR).toMatch(/max-md:/);
   });
 });

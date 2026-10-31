@@ -1,3 +1,5 @@
+import { settleFiscalOnReversal } from './fiscal';
+import { postWalletMovementJournal } from './ledger';
 import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
 import { recordMovement, restock } from './stock';
 import { MoneyError, type SyncSql } from './sync-sql';
@@ -30,7 +32,7 @@ import { MoneyError, type SyncSql } from './sync-sql';
  *     return flow with the gateway legs): pass `walletCredit` for a store-credit refund instead;
  *   - the pre-2026-09-30 admin-order coupon cutover (DO orders always reserve their coupon) and the single-line
  *     backorder cancel/heal (`cancelBackorder`): this slice cancels open lines for a whole-order event only;
- *   - the Return row lifecycle (`returns`/`return_items` status) and tier/B2B return adjustments.
+ *   - the Return row lifecycle (`returns`/`return_items` status) and tier/B2B return adjustments live in `do/returns.ts` (CF-RETURNS-1).
  * Hardening vs the original: a partial line that does not belong to the order is REFUSED (the original skips it), and a
  * partial restock is capped at the line's REMAINING restorable quantity, not just its quantity.
  */
@@ -79,6 +81,7 @@ export function applyWalletEntry(
     idempotencyKey: string;
     orderId?: string | null;
     returnId?: string | null;
+    actorId?: string | null;
     note?: string | null;
     now?: number;
   }
@@ -118,12 +121,8 @@ export function applyWalletEntry(
     }
 
     if (a.amount > 0) {
-      const cust = db.all('SELECT id FROM customers WHERE id = ? AND store_id = ?', [
-        a.customerId,
-        a.storeId,
-      ])[0];
-      if (!cust)
-        throw new MoneyError('CUSTOMER_NOT_FOUND', 'customer not found in this store', 404);
+      // `customerId` is the shopper's users.id (Ruling CF-FIX-2): a wallet belongs to the account, never to a CRM row, and
+      // a credit must not be refused because the merchant has no CRM row for the shopper (the Postgres twin checks `users`).
       db.run(
         `INSERT INTO customer_wallets (id, store_id, customer_id, balance, created_at, updated_at)
          VALUES (?, ?, ?, 0, ?, ?) ON CONFLICT (store_id, customer_id) DO NOTHING`,
@@ -142,11 +141,12 @@ export function applyWalletEntry(
         'the wallet balance is not enough for this amount',
         409
       );
+    const entryId = crypto.randomUUID();
     db.run(
-      `INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, return_id, idempotency_key, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, return_id, idempotency_key, actor_id, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        crypto.randomUUID(),
+        entryId,
         a.storeId,
         w.id,
         a.customerId,
@@ -156,10 +156,19 @@ export function applyWalletEntry(
         a.orderId ?? null,
         a.returnId ?? null,
         a.idempotencyKey,
+        a.actorId ?? null,
         a.note ?? null,
         now,
       ]
     );
+    // Ruling WALLET-GL-1: the GL row commits with the wallet row it mirrors, never on a replay
+    postWalletMovementJournal(db, {
+      storeId: a.storeId,
+      entryId,
+      type: a.type,
+      amount: a.amount,
+      now,
+    });
     return { balance: w.balance as number, replayed: false };
   });
 }
@@ -354,6 +363,8 @@ export interface RefundResult {
   walletCredited: number;
   loyalty: { earnedReversed: number; redeemedRecredited: number };
   backorderLinesCancelled: number;
+  /** set when an `external` refund was recorded in full but exceeded the order or hit a state a refund would not normally reach */
+  review?: string;
 }
 
 function emptyResult(o: OrderRow, kind: RefundResult['kind'], replayed: boolean): RefundResult {
@@ -377,13 +388,24 @@ function reverseWholeOrder(
   storeId: string,
   o: OrderRow,
   now: number,
-  into: RefundResult
+  into: RefundResult,
+  restoreInventory = true
 ): void {
-  // arm the completion claim (applyRefundEffects), then run every reversal, then claim (claim-reversed step)
-  db.run(
-    'UPDATE orders SET refund_reversal_requested_at = ?1, refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
-    [now, o.id, storeId]
-  );
+  // arm the completion claim (applyRefundEffects), then run every reversal, then claim (claim-reversed step).
+  // restoreInventory:false (a cancel whose goods are NOT going back on the shelf, MONEYB-5) is never armed, like Postgres.
+  if (restoreInventory)
+    db.run(
+      'UPDATE orders SET refund_reversal_requested_at = ?1, refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
+      [now, o.id, storeId]
+    );
+  else
+    db.run(
+      'UPDATE orders SET refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
+      [now, o.id, storeId]
+    );
+
+  // the fiscal document of the reversal (credit note, or the cancelled sale), in the same section
+  settleFiscalOnReversal(db, { storeId, orderId: o.id, now });
 
   const legacy = db.all(
     `SELECT id FROM inventory_history WHERE store_id = ? AND reference = ? AND type = 'adjustment' AND reason = ?`,
@@ -395,7 +417,7 @@ function reverseWholeOrder(
     `SELECT id FROM inventory_history WHERE store_id = ? AND reference = ? AND (type = 'return_stock' OR (type = 'adjustment' AND reason = ?)) LIMIT 1`,
     [storeId, o.id, LEGACY_ROLLBACK_REASON]
   )[0];
-  if (!stockMarker) {
+  if (!stockMarker && restoreInventory) {
     const restored = alreadyRestoredByItem(db, storeId, o.id);
     const neverTaken = neverTakenByItem(db, storeId, o.id);
     for (const item of loadItems(db, o.id)) {
@@ -463,7 +485,7 @@ function reverseWholeOrder(
  */
 export function cancelOrder(
   db: SyncSql,
-  a: { storeId: string; orderId: string; now?: number }
+  a: { storeId: string; orderId: string; now?: number; restoreInventory?: boolean }
 ): RefundResult {
   id(a.storeId, 'storeId');
   id(a.orderId, 'orderId');
@@ -488,7 +510,7 @@ export function cancelOrder(
       addEvent(db, a.storeId, o.id, o.status, 'cancelled', {}, now);
       out.status = 'cancelled';
     }
-    reverseWholeOrder(db, a.storeId, o, now, out);
+    reverseWholeOrder(db, a.storeId, o, now, out, a.restoreInventory !== false);
     return out;
   });
 }
@@ -521,6 +543,23 @@ export interface PartialLine {
 }
 
 /**
+ * The whole-order effects of a FULL return completed by a manual method (stock back, coupon, loyalty, wallet spend, backorders),
+ * with the order status UNTOUCHED, like the `order/refunded` fanout the Postgres path sends (Ruling CF-RETURNS-1). Idempotent.
+ */
+export function reverseOrderEffects(
+  db: SyncSql,
+  a: { storeId: string; orderId: string; now?: number }
+): RefundResult {
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    const o = loadOrder(db, a.storeId, a.orderId);
+    const out = emptyResult(o, 'refund', false);
+    reverseWholeOrder(db, a.storeId, o, now, out);
+    return out;
+  });
+}
+
+/**
  * Refund an order.
  *   neither `lines` nor `amount`: FULL refund. Status `refunded` (payment_status `refunded` if it was paid/disputed)
  *     and the full reversal; legal from confirmed, processing, shipped, delivered, cancelled.
@@ -539,6 +578,13 @@ export function refundOrder(
     lines?: PartialLine[];
     refundKey?: string;
     walletCredit?: number;
+    /**
+     * The provider or the merchant ALREADY refunded this money (a completed gateway refund, a dashboard refund): an
+     * external fact, recorded in full and never rejected (CF-PAY-1). The ceiling and the order-state checks do not throw;
+     * the full amount is stored on the marker and `review` is set so the surplus or the state is visible.
+     */
+    external?: boolean;
+    keepPaymentStatus?: boolean;
     now?: number;
   }
 ): RefundResult {
@@ -560,10 +606,12 @@ export function refundOrder(
         );
       const out = emptyResult(o, 'refund', false);
       if (o.status !== 'refunded') {
+        // `keepPaymentStatus`: a merchant status change leaves `payment_status` alone, like OrderService.updateStatus; a provider refund
+        // flips it (the gateway paths write status AND payment_status together)
         db.run(
-          `UPDATE orders SET status = 'refunded', payment_status = CASE WHEN payment_status IN ('paid', 'disputed') THEN 'refunded' ELSE payment_status END, updated_at = ?1
+          `UPDATE orders SET status = 'refunded', payment_status = CASE WHEN ?4 = 0 AND payment_status IN ('paid', 'disputed') THEN 'refunded' ELSE payment_status END, updated_at = ?1
            WHERE id = ?2 AND store_id = ?3`,
-          [now, o.id, a.storeId]
+          [now, o.id, a.storeId, a.keepPaymentStatus ? 1 : 0]
         );
         addEvent(db, a.storeId, o.id, o.status, 'refunded', {}, now);
         out.status = 'refunded';
@@ -622,14 +670,24 @@ export function refundOrder(
       [a.storeId, a.orderId, PARTIAL_RESTORE_MARKER, PARTIAL_REFUND_MARKER, key]
     )[0];
     if (done) return { ...out, replayed: true };
-    if (o.status === 'cancelled' || o.status === 'refunded')
-      throw new MoneyError(
-        'ORDER_ALREADY_REVERSED',
-        'the order is already cancelled or refunded',
-        409
-      );
-    if (o.status === 'pending' || o.status === 'awaiting_payment_confirmation')
-      throw new MoneyError('INVALID_TRANSITION', 'an unconfirmed order has nothing to refund', 409);
+    let review: string | null = null;
+    if (o.status === 'cancelled' || o.status === 'refunded') {
+      if (!a.external)
+        throw new MoneyError(
+          'ORDER_ALREADY_REVERSED',
+          'the order is already cancelled or refunded',
+          409
+        );
+      review = 'order_already_reversed';
+    } else if (o.status === 'pending' || o.status === 'awaiting_payment_confirmation') {
+      if (!a.external)
+        throw new MoneyError(
+          'INVALID_TRANSITION',
+          'an unconfirmed order has nothing to refund',
+          409
+        );
+      review = 'order_not_confirmed';
+    }
 
     // Bound EVERYTHING credited back for this order, across all partial events and channels, by what was actually paid:
     // provider/cash amounts recorded on events + store credit already written to the wallet ledger + this call.
@@ -649,13 +707,16 @@ export function refundOrder(
       o.payment_status === 'paid' || o.payment_status === 'disputed'
         ? o.total
         : (o.wallet_amount ?? 0);
-    if (priorAmount + priorCredit + (amount ?? 0) + (walletCredit ?? 0) > captured)
-      throw new MoneyError(
-        'REFUND_EXCEEDS_ORDER',
-        'refunds and store credit would exceed what the customer paid',
-        409,
-        { captured, prior: priorAmount + priorCredit }
-      );
+    if (priorAmount + priorCredit + (amount ?? 0) + (walletCredit ?? 0) > captured) {
+      if (a.external) review = review ?? 'refund_exceeds_order';
+      else
+        throw new MoneyError(
+          'REFUND_EXCEEDS_ORDER',
+          'refunds and store credit would exceed what the customer paid',
+          409,
+          { captured, prior: priorAmount + priorCredit }
+        );
+    }
 
     const restored: Array<{ orderItemId: string; quantity: number }> = [];
     if (a.lines !== undefined) {
@@ -708,9 +769,11 @@ export function refundOrder(
         items: restored,
         ...(amount !== undefined ? { amount } : {}),
         ...(walletCredit !== undefined ? { walletCredit } : {}),
+        ...(review ? { review } : {}),
       },
       now
     );
+    if (review) out.review = review;
     return out;
   });
 }

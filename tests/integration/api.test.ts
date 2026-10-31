@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { API_BASE, API_ORIGIN } from '../helpers/api-base';
+import { identityTokenForEmail } from '../helpers/identity-session';
 
 // Health is the public/load-balancer endpoint (no /api/v1 prefix); everything
 // else lives under /api/v1. Both forms come from one validated knob — see
@@ -70,7 +71,7 @@ describe('API Integration Tests', () => {
   });
 
   describe('Authentication Endpoints', () => {
-    it('should login with valid credentials', async () => {
+    it('closes the Store password login for the platform admin (it signs in at the identity service)', async () => {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,12 +82,17 @@ describe('API Integration Tests', () => {
       });
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.accessToken).toBeDefined();
-      expect(data.data.refreshToken).toBeDefined();
+      expect(response.status).toBe(409);
+      expect(data.success).toBe(false);
+      expect(data.error.code).toBe('USE_IDENTITY_SERVICE');
+    });
 
-      authToken = data.data.accessToken;
+    it('accepts the identity-service token of the platform admin', async () => {
+      authToken = await identityTokenForEmail(ADMIN_EMAIL);
+      const response = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      expect(response.status).toBe(200);
     });
 
     it('should reject invalid credentials', async () => {

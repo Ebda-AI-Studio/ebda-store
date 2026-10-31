@@ -35,6 +35,23 @@ export function isJobQueueMessage(v: unknown): v is JobQueueMessage {
   );
 }
 
+/** A rare legacy cron (cf/cron.ts CRON_SCHEDULE) that fell in a write freeze: parked on the jobs queue, run after it. */
+export interface LegacyCronMessage {
+  kind: 'legacy-cron';
+  name: string;
+  cron: string;
+}
+
+export function isLegacyCronMessage(v: unknown): v is LegacyCronMessage {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    (v as { kind?: unknown }).kind === 'legacy-cron' &&
+    typeof (v as { name?: unknown }).name === 'string' &&
+    typeof (v as { cron?: unknown }).cron === 'string'
+  );
+}
+
 const ALREADY_EXISTS = /already.*exist|exists|duplicate/i;
 
 export async function startJob(def: JobDef, event: JobEvent): Promise<'started' | 'duplicate'> {

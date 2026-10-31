@@ -18,16 +18,19 @@ const call = (store: string, action: string, init: RequestInit = {}) =>
     e
   ) as Promise<Response>;
 
+// The DO has no `stores` table (the platform keeps the Store row); its per-store identity row is `store_profile`, keyed by store_id.
+const TABLE = 'store_profile';
+const COLUMNS = ['store_id', 'slug', 'name', 'owner_id', 'currency', 'created_at', 'updated_at'];
 const page = (n: number, name = 'Store') =>
   [
     JSON.stringify({
       batch: 'cut-test-1',
-      table: 'stores',
+      table: TABLE,
       page: n,
-      columns: ['id', 'slug', 'name', 'currency', 'created_at', 'updated_at'],
-      pk: ['id'],
+      columns: COLUMNS,
+      pk: ['store_id'],
     }),
-    JSON.stringify([`s${n}`, `slug${n}`, name, 'EGP', 1, 1]),
+    JSON.stringify([`s${n}`, `slug${n}`, name, 'owner-1', 'EGP', 1, 1]),
   ].join('\n');
 
 describe('cutover admin surface on the real StoreDO', () => {
@@ -47,6 +50,8 @@ describe('cutover admin surface on the real StoreDO', () => {
     const s = id();
     expect((await call(s, '__import', { body: page(0) })).status).toBe(200);
     expect((await call(s, '__seal')).status).toBe(200);
+    // the derived FTS search tables (a BLOB shadow table) are not application tables: sealing (the baseline) and diffing skip them
+    expect((await call(s, '__diff')).status).toBe(200);
     expect((await call(s, '__import', { body: page(1) })).status).toBe(423);
     expect(((await (await call(s, '__status')).json()) as { sealed: boolean }).sealed).toBe(true);
     const bad = await call(s, '__unseal', { body: JSON.stringify({ confirm: 'yes' }) });
@@ -61,17 +66,11 @@ describe('cutover admin surface on the real StoreDO', () => {
     await call(s, '__import', { body: page(0) });
     const r = await call(s, '__verify', {
       body: JSON.stringify({
-        tables: [
-          {
-            table: 'stores',
-            columns: ['id', 'slug', 'name', 'currency', 'created_at', 'updated_at'],
-            pk: ['id'],
-          },
-        ],
+        tables: [{ table: TABLE, columns: COLUMNS, pk: ['store_id'] }],
       }),
     });
-    const j = (await r.json()) as { tables: { stores: { count: number } } };
-    expect(j.tables.stores.count).toBe(1);
+    const j = (await r.json()) as { tables: Record<string, { count: number }> };
+    expect(j.tables[TABLE].count).toBe(1);
   });
 
   it('no bearer: 401 and nothing is written', async () => {

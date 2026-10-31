@@ -164,7 +164,7 @@ export default function NewSupplierPage() {
               onChange={e => setName(e.target.value)}
               required
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-              placeholder="e.g. Al-Mutlaq Trading"
+              placeholder={t('supplierNameEnSample')}
             />
           </label>
           <label className="space-y-1" dir="rtl">
@@ -175,7 +175,7 @@ export default function NewSupplierPage() {
               onChange={e => setNameAr(e.target.value)}
               dir="rtl"
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-              placeholder="اسم المورد بالعربية"
+              placeholder={t('supplierNameArPlaceholder')}
             />
           </label>
         </div>
@@ -244,7 +244,7 @@ export default function NewSupplierPage() {
                 value={customTermsDays}
                 onChange={e => setCustomTermsDays(e.target.value)}
                 className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-                placeholder="e.g. 45"
+                placeholder={t('termsDaysExample')}
               />
             </label>
           )}
@@ -279,7 +279,7 @@ export default function NewSupplierPage() {
               onChange={e => setNotes(e.target.value)}
               rows={3}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder="Optional notes in English"
+              placeholder={t('notesEnPlaceholder')}
             />
           </label>
           <label className="space-y-1" dir="rtl">
@@ -290,7 +290,7 @@ export default function NewSupplierPage() {
               rows={3}
               dir="rtl"
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder="ملاحظات بالعربية (اختياري)"
+              placeholder={t('notesArPlaceholder')}
             />
           </label>
         </div>

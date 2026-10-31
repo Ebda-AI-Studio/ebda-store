@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { featureService } from '../services/feature.service';
+import { storeDb } from '../lib/repo-factory';
 import { activeVariants, lineAllowsBackorder } from '../lib/effective-inventory';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
@@ -344,7 +345,9 @@ router.get(
         // variant's flag), so the report never says "accepts backorder" for a
         // product the cart refuses (W1b fix round 2).
         const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
-        const productFlags = await prisma.product.findMany({
+        const productFlags = await (
+          await storeDb(storeId)
+        ).product.findMany({
           where: { storeId, id: { in: productIds } },
           select: {
             id: true,

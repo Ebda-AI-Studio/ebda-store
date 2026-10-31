@@ -24,6 +24,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { prisma, withRlsBypass } from '@ebda/database';
 import { API_BASE, API_ORIGIN } from '../helpers/api-base';
+import { identityTokenFor } from '../helpers/identity-session';
 
 // One knob (TEST_API_URL) points the whole suite at one API, so a run cannot
 // silently talk to whatever holds port 4000 — which on this machine was a
@@ -72,22 +73,8 @@ async function createStoreAndLogin(label: string): Promise<{ storeId: string; to
     });
   });
 
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const loginJson = (await loginRes.json()) as { data?: { accessToken?: string } };
-  const token = loginJson.data?.accessToken ?? '';
-
-  // Without this, a broken login (wrong API_URL, a route 404, a bad
-  // password hash) silently returns '', and every downstream request made
-  // with an empty Authorization Bearer token gets a 401/403 that the
-  // cross-tenant assertions below (`[403, 404]`) could not distinguish from
-  // "the guard correctly rejected a cross-store admin" — the exact ambiguity
-  // #1625/#1628 already found once against this suite's API_URL.
-  expect(loginRes.status, `login for ${label} failed: ${JSON.stringify(loginJson)}`).toBe(200);
-  expect(token, `login for ${label} returned no accessToken`).not.toBe('');
+  // Store admins sign in at the identity service; the stand-in mints its token.
+  const token = await identityTokenFor(user.id);
 
   return { storeId: store.id, token };
 }

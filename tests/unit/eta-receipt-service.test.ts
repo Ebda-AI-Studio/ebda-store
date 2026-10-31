@@ -69,6 +69,8 @@ vi.mock('@ebda/database', () => ({
   withStore: async (_id: string, fn: any) =>
     fn({ etaConnection: table(h.conn), etaReceipt: table(h.rec), order: table(h.orders) }),
 }));
+// the service reads and writes through `withStoreRw`, which asks the repo factory for the store's backend: Postgres here
+vi.mock('@api/lib/repo-factory', () => ({ storeRepo: async () => ({ backend: 'pg' }) }));
 vi.mock('@api/services/encryption.service', () => ({
   encryption: { encrypt: (s: string) => `enc:${s}`, decrypt: (s: string) => s.slice(4) },
 }));

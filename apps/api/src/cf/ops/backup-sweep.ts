@@ -103,19 +103,12 @@ export interface SweepReport {
 }
 
 export interface SweepDeps {
-  listStoreIds: (env: SweepEnv) => string[];
+  listStoreIds: (env: SweepEnv) => string[] | Promise<string[]>;
   alert: (title: string, body: string) => Promise<unknown>;
   now?: Date;
 }
 
 const dayOf = (d: Date) => d.toISOString().slice(0, 10);
-
-/** Store ids the StoreDO serves. Phase 0: the flag list; Phase 1 swaps in the D1 store directory. */
-export const flaggedStoreIds = (raw: string | undefined): string[] =>
-  (raw ?? '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
 
 export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<SweepReport> {
   const now = deps.now ?? new Date();
@@ -129,7 +122,7 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
     ok: true,
   };
 
-  for (const id of deps.listStoreIds(env)) {
+  for (const id of await deps.listStoreIds(env)) {
     try {
       const ns = env.STORE_DO;
       if (!ns) throw new Error('STORE_DO binding missing');

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1398,
+    "wired": 1443,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -2950,6 +2950,45 @@
       "evidence": "static"
     },
     {
+      "id": "dahab|theme|cardHeart",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|cardSwatches",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|cardTags",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "dahab|theme|fontFamily",
       "skin": "dahab",
       "looks": [
@@ -2976,6 +3015,32 @@
       "evidence": "static"
     },
     {
+      "id": "dahab|theme|gridGutter",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|headerWordmark",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "dahab|theme|headingFont",
       "skin": "dahab",
       "looks": [
@@ -2987,6 +3052,32 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|headingWeight",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|heroRatio",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "dahab|theme|mutedColor",
@@ -3013,6 +3104,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|priceColour",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "dahab|theme|primaryColor",
@@ -3091,6 +3195,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|tabBar",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "dahab|theme|uppercaseStyle",
@@ -6707,6 +6824,45 @@
       "evidence": "static"
     },
     {
+      "id": "jasmine|theme|cardHeart",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "jasmine|theme|cardSwatches",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "jasmine|theme|cardTags",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "jasmine|theme|fontFamily",
       "skin": "jasmine",
       "looks": [
@@ -6733,6 +6889,19 @@
       "evidence": "static"
     },
     {
+      "id": "jasmine|theme|gridGutter",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "jasmine|theme|headerLogoPlacement",
       "skin": "jasmine",
       "looks": [
@@ -6742,6 +6911,19 @@
       ],
       "surface": "theme",
       "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "jasmine|theme|headerWordmark",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
       "status": "wired",
       "evidence": "static (compose.ts)"
     },
@@ -6757,6 +6939,32 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|headingWeight",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "jasmine|theme|heroRatio",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "jasmine|theme|mutedColor",
@@ -6783,6 +6991,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|priceColour",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "jasmine|theme|primaryColor",
@@ -6861,6 +7082,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|tabBar",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "jasmine|theme|uppercaseStyle",
@@ -10490,6 +10724,45 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|cardHeart",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "lamma|theme|cardSwatches",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "lamma|theme|cardTags",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "lamma|theme|fontFamily",
       "skin": "lamma",
       "looks": [
@@ -10516,6 +10789,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|gridGutter",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "lamma|theme|headerLogoPlacement",
       "skin": "lamma",
       "looks": [
@@ -10525,6 +10811,19 @@
       ],
       "surface": "theme",
       "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "lamma|theme|headerWordmark",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
       "status": "wired",
       "evidence": "static (compose.ts)"
     },
@@ -10540,6 +10839,32 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|headingWeight",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "lamma|theme|heroRatio",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "lamma|theme|mutedColor",
@@ -10566,6 +10891,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|priceColour",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "lamma|theme|primaryColor",
@@ -10644,6 +10982,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|tabBar",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "lamma|theme|uppercaseStyle",
@@ -14260,6 +14611,45 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|cardHeart",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "qamar|theme|cardSwatches",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "qamar|theme|cardTags",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "qamar|theme|fontFamily",
       "skin": "qamar",
       "looks": [
@@ -14286,6 +14676,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|gridGutter",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "qamar|theme|headerLogoPlacement",
       "skin": "qamar",
       "looks": [
@@ -14295,6 +14698,19 @@
       ],
       "surface": "theme",
       "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "qamar|theme|headerWordmark",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
       "status": "wired",
       "evidence": "static (compose.ts)"
     },
@@ -14310,6 +14726,32 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|headingWeight",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "qamar|theme|heroRatio",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "qamar|theme|mutedColor",
@@ -14336,6 +14778,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|priceColour",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "qamar|theme|primaryColor",
@@ -14414,6 +14869,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|tabBar",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "qamar|theme|uppercaseStyle",
@@ -18030,6 +18498,45 @@
       "evidence": "static"
     },
     {
+      "id": "souq|theme|cardHeart",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|cardSwatches",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|cardTags",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "souq|theme|fontFamily",
       "skin": "souq",
       "looks": [
@@ -18054,6 +18561,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|gridGutter",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "souq|theme|headerLogoPlacement",
@@ -18082,6 +18602,19 @@
       "evidence": "static (compose.ts)"
     },
     {
+      "id": "souq|theme|headerWordmark",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "souq|theme|headingFont",
       "skin": "souq",
       "looks": [
@@ -18093,6 +18626,32 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|headingWeight",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|heroRatio",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "souq|theme|mutedColor",
@@ -18119,6 +18678,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|priceColour",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "souq|theme|primaryColor",
@@ -18197,6 +18769,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|tabBar",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "souq|theme|uppercaseStyle",

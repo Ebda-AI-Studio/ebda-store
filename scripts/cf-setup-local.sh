@@ -59,7 +59,9 @@ for app in "${APPS[@]}"; do
     MAIN_ENTRY="sentry-worker-entry.ts"
     COMPAT_DATE="2025-08-16"   # >= required by @sentry/cloudflare (https.request)
   else
-    MAIN_ENTRY=".open-next/worker.js"
+    # admin + orders: health-worker-entry.ts answers GET /health (commit + deploymentId) in front of the
+    # OpenNext handler. A Next route handler cannot: with no incremental cache every one 500s (Ruling HEALTH-ALL-1).
+    MAIN_ENTRY="health-worker-entry.ts"
     COMPAT_DATE="2025-03-25"
   fi
   # OpenNext cache config (2026-06-27). DEFAULT = empty config = current
@@ -135,6 +137,7 @@ EOF
   ] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOShardedTagCache", "DOQueueHandler"] }],
 ${ROUTES_JSON}
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "logpush": true
 }
@@ -152,6 +155,7 @@ EOF
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
 ${ROUTES_JSON}
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "logpush": true
 }

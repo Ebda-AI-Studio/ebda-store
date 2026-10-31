@@ -261,7 +261,7 @@ export default function InsightsFunnelPage() {
                   <p className="text-2xl font-semibold font-mono text-green-700">
                     {minorToMajor(totals.revenueFils)}
                   </p>
-                  <p className="text-xs text-muted-foreground">EGP</p>
+                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 </div>
                 <div className="rounded-xl border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">

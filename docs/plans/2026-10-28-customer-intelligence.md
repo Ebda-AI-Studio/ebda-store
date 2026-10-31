@@ -1,6 +1,6 @@
 # Customer Intelligence (CI): capture, internal learning, merchant features
 
-Owner: controller. Status: plan (docs only). Register: 2026-10-24 "Customer Intelligence" entry; migration plan gap G3 (`business/ebda/plans/2026-10-28-store-on-cloudflare-detailed.md`). Applies to every Ebda AI Studio product (Store now; WhatsApp, CRM, ERP feed the same stream later).
+Owner: controller. Status: CI-1 shipped (#228); CI-2 (aggregates, insights) and CI-3 (hints, Smart hints page, help article) built on the Postgres/Prisma path behind the same ports (Rulings CI-9 to CI-12); the plan text below is unchanged. CI-13 emits the rest of the 1.2 table the first cut left out (`payment.failed`, `cart.abandoned`/`cart.recovered`, `merchant.onboarding_step`), carries the real shipping fee, adds their metrics and pauses a feature for a single store when its own calibration is off (Ruling CI-13). Register: 2026-10-24 "Customer Intelligence" entry; migration plan gap G3 (`business/ebda/plans/2026-10-28-store-on-cloudflare-detailed.md`). Applies to every Ebda AI Studio product (Store now; WhatsApp, CRM, ERP feed the same stream later).
 
 **Goal:** learn from commerce outcomes (what shipped, what was delivered, what came back and why) so Ebda can improve defaults, courier routing, COD risk, onboarding and templates, then expose proven features to merchants.
 **Why now:** the capture half is unrecoverable. A return reason or a delivery time that was never stored cannot be rebuilt later. Everything else (analysis, features) can wait for data.

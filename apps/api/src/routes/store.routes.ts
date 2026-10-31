@@ -4,7 +4,14 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { storeScopeContext, tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
-import { Prisma, prisma, StoreStatus, withUser, asPlatformOperator } from '@ebda/database';
+import {
+  Prisma,
+  prisma,
+  StoreStatus,
+  currentStoreId,
+  withUser,
+  asPlatformOperator,
+} from '@ebda/database';
 import { StoreService } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { resolveDomainService } from '../services/domain-provider';
@@ -41,6 +48,7 @@ import {
 } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
+import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -1489,7 +1497,7 @@ router.put(
         // Clearing: drop the verified domain AND any pending claim.
         await DomainClaimService.cancelPending(id, domainSvc);
         if (oldDomain) {
-          await prisma.store.update({
+          await storeUpdate(prisma, {
             where: { id },
             data: { domain: null, domainStatus: null, domainVerifiedAt: null },
           });
@@ -1574,7 +1582,9 @@ router.get(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const faqs = await prisma.storeFaq.findMany({
+      const faqs = await (
+        await storeDb(currentStoreId())
+      ).storeFaq.findMany({
         where: { storeId: req.params.id },
         orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       });
@@ -1597,7 +1607,9 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.parse(req.body);
-      const faq = await prisma.storeFaq.create({
+      const faq = await (
+        await storeWriter(currentStoreId())
+      ).storeFaq.create({
         data: {
           storeId: req.params.id,
           question: body.question,
@@ -1629,7 +1641,9 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.partial().parse(req.body);
-      const faq = await prisma.storeFaq.updateMany({
+      const faq = await (
+        await storeWriter(currentStoreId())
+      ).storeFaq.updateMany({
         where: { id: req.params.faqId, storeId: req.params.id },
         data: {
           ...(body.question !== undefined && { question: body.question }),
@@ -1644,7 +1658,9 @@ router.put(
       if (faq.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
-      const updated = await prisma.storeFaq.findUnique({
+      const updated = await (
+        await storeDb(currentStoreId())
+      ).storeFaq.findUnique({
         where: { id: req.params.faqId, storeId: req.params.id },
       });
       res.json({ success: true, data: updated });
@@ -1665,7 +1681,9 @@ router.delete(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const deleted = await prisma.storeFaq.deleteMany({
+      const deleted = await (
+        await storeWriter(currentStoreId())
+      ).storeFaq.deleteMany({
         where: { id: req.params.faqId, storeId: req.params.id },
       });
       if (deleted.count === 0) {
@@ -1708,7 +1726,9 @@ router.get(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const howtos = await prisma.storeHowto.findMany({
+      const howtos = await (
+        await storeDb(currentStoreId())
+      ).storeHowto.findMany({
         where: { storeId: req.params.id },
         orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       });
@@ -1731,7 +1751,9 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = howtoSchema.parse(req.body);
-      const howto = await prisma.storeHowto.create({
+      const howto = await (
+        await storeWriter(currentStoreId())
+      ).storeHowto.create({
         data: {
           storeId: req.params.id,
           title: body.title,
@@ -1766,7 +1788,9 @@ router.put(
     try {
       const body = howtoSchema.partial().parse(req.body);
       // Verify ownership before update
-      const existing = await prisma.storeHowto.findFirst({
+      const existing = await (
+        await storeDb(currentStoreId())
+      ).storeHowto.findFirst({
         where: { id: req.params.howtoId, storeId: req.params.id },
         select: { id: true },
       });
@@ -1785,7 +1809,9 @@ router.put(
       }
       if (body.orderIndex !== undefined) updateData.orderIndex = body.orderIndex;
       if (body.isActive !== undefined) updateData.isActive = body.isActive;
-      const updated = await prisma.storeHowto.update({
+      const updated = await (
+        await storeWriter(currentStoreId())
+      ).storeHowto.update({
         where: { id: req.params.howtoId, storeId: req.params.id },
         data: updateData,
       });
@@ -1807,7 +1833,9 @@ router.delete(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const deleted = await prisma.storeHowto.deleteMany({
+      const deleted = await (
+        await storeWriter(currentStoreId())
+      ).storeHowto.deleteMany({
         where: { id: req.params.howtoId, storeId: req.params.id },
       });
       if (deleted.count === 0) {

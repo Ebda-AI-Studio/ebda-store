@@ -89,6 +89,8 @@ const REVIEWED_SPREADS: Record<string, string> = {
     'DeadstockScanResult → scanned / flagged / expiredCount',
   'apps/api/src/lib/inngest/functions/stock-reorder-scan.ts|result':
     'ReorderScanResult → scanned / suggested / expiredCount',
+  'apps/api/src/lib/inngest/functions/catalog-import-uploads-sweep.ts|result':
+    'bare first arg: SweepResult → { storesScanned; objectsSeen; expired; deleted; failed; capped } counts and a flag',
   'apps/api/src/lib/inngest/functions/r2-orphan-sweep.ts|summary':
     'bare first arg: { totalKeys; totalBytes; orphanCount; orphanBytes; skippedYoung; applyDeletes } — counts and a flag',
   'apps/api/src/lib/inngest/functions/warehouse-reconcile-sweep.ts|result':

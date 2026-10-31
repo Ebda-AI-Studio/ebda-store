@@ -39,6 +39,7 @@ import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { reconcileOneStoreOnDemand } from '@api/lib/inngest/functions/warehouse-reconcile-sweep';
 import { API_BASE } from '../../helpers/api-base';
+import { identityTokenFor } from '../../helpers/identity-session';
 
 // Minimal Inngest step stub — mirrors the one used in
 // tests/unit/warehouse-reconcile-sweep.test.ts. `reconcileOneStoreOnDemand`
@@ -88,16 +89,8 @@ async function createStoreAdmin(tag: string, plan: 'starter' | 'enterprise'): Pr
     },
   });
 
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const loginData = await loginRes.json();
-  const token = loginData.data?.accessToken;
-  if (!token) {
-    throw new Error(`login failed for ${email}: ${JSON.stringify(loginData)}`);
-  }
+  // Store admins sign in at the identity service; the stand-in mints its token.
+  const token = await identityTokenFor(user.id);
 
   return { userId: user.id, storeId: store.id, token };
 }

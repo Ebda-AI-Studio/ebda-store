@@ -6,6 +6,7 @@
  * The applicant is ALWAYS the signed-in customer (customerUserId); a body can never name another user. Zod `.strict()`.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import {
   authenticate,
@@ -115,7 +116,9 @@ publicWholesaleRouter.post(
       const buyer = buyerFromRequest(req);
       setBuyerPrivate(res);
       const member = await canSeeWholesaleOnly(storeId, buyer);
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: {
           id: { in: [...new Set(items.map(i => i.productId))] },
           storeId,

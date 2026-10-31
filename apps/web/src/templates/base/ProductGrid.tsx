@@ -40,7 +40,7 @@ export default function MinimalProductGrid({
         )}
 
         {/* Products Grid */}
-        <div className={`grid ${gridCols} gap-3 md:gap-4`}>
+        <div data-part="product-grid" className={`grid ${gridCols} gap-3 md:gap-4`}>
           {products.map((product, i) => (
             // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
             // motion-safe only — no layout shift (opacity/transform only).

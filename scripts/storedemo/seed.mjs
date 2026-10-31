@@ -526,6 +526,27 @@ export function guard(url, argv) {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
+/**
+ * The slugs flagged `isNew` ("New in" lists only these): the first `count` products that have a photo.
+ * Lamma's Family table look renders its whole menu from that list under one tab per category, so
+ * for Lamma the pick leads with one dish per category (a menu limited to the first 12 products
+ * showed 4 of 8 tabs) and fills the rest in catalogue order.
+ */
+export function pickNewIn(spec, count) {
+  const photo = spec.products.filter(p => p.images.length > 0);
+  const picked = [];
+  if (spec.template === 'lamma') {
+    const seen = new Set();
+    for (const p of photo)
+      if (!seen.has(p.category)) {
+        seen.add(p.category);
+        picked.push(p);
+      }
+  }
+  for (const p of photo) if (picked.length < count && !picked.includes(p)) picked.push(p);
+  return new Set(picked.slice(0, count).map(p => p.slug));
+}
+
 /** The catalogue, size charts, shipping zone and settings for ONE store (owner client, one tx). */
 export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLATE_SPECS.qamar) {
   const url = f => `${base}/${f}`;
@@ -597,12 +618,7 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
       // Ruling B1-117 (decisions-1016, on main): the card "New" badge is a merchant toggle
       // (`theme.showNewBadge`, default OFF), so both showrooms and the local look stores seed it ON
       // (`SHOWROOM_THEME`); with `theme: {}` every NEW chip would disappear (STOP-2 final review).
-      const newIn = new Set(
-        spec.products
-          .filter(p => p.images.length > 0)
-          .slice(0, NEW_IN_COUNT)
-          .map(p => p.slug)
-      );
+      const newIn = pickNewIn(spec, NEW_IN_COUNT);
       for (const [i, p] of spec.products.entries()) {
         const hasVariants = Boolean(p.options?.length);
         const data = {

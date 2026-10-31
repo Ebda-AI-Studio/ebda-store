@@ -13,6 +13,7 @@ import { LEGAL_DOC_KEYS, LEGAL_POLICIES, currentLegalVersion } from '@ebda/share
 import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
+import { configureIdentityClient } from '@api/lib/identity-client';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -61,6 +62,10 @@ describe.skipIf(!hasDb)('signup click-wrap (server side)', () => {
     owner.user.findFirst({ where: { email, storeId: null }, select: { id: true } });
 
   beforeAll(() => {
+    // The credential is created by the identity service (accounts), which this in-process router cannot reach: stand in for its
+    // createUser by echoing the id the Store chose (that id handshake is Store-side; the service's own hashing/mail is covered
+    // by apps/accounts tests and tests/unit/identity-lifecycle-paths.test.ts).
+    configureIdentityClient({ createUser: async i => ({ id: i.id! }) });
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 2, role: 'owner' });
     app = express();
     app.set('trust proxy', true);
@@ -70,6 +75,7 @@ describe.skipIf(!hasDb)('signup click-wrap (server side)', () => {
   });
 
   afterAll(async () => {
+    configureIdentityClient(undefined);
     await owner.user.deleteMany({ where: { email: { in: emails }, storeId: null } });
     await owner.$disconnect();
   });

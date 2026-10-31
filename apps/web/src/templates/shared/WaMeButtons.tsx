@@ -151,6 +151,7 @@ export function WaMeCodConfirmButton({
     total: number;
     items: Array<{ quantity: number; product?: { name: string; nameAr?: string | null } | null }>;
     shippingAddress?: WaMeAddress | null;
+    deliveryLine?: string | null;
   };
   className?: string;
 }) {
@@ -171,6 +172,7 @@ export function WaMeCodConfirmButton({
       items,
       totalMinor: order.total,
       address: order.shippingAddress,
+      deliveryLine: order.deliveryLine,
       storeName,
     })
   );

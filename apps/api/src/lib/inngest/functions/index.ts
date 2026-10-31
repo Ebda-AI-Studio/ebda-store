@@ -2,6 +2,9 @@ import type { JobDef } from '../../jobs/types';
 import { orderCreated } from './order-created';
 import { orderRefunded } from './order-refunded';
 import { bulkImportProducts } from './bulk-import';
+import { catalogImportRun } from './catalog-import-run';
+import { catalogImportCreateDrafts } from './catalog-import-create-drafts';
+import { catalogImportUploadsSweep } from './catalog-import-uploads-sweep';
 import { bulkImportOrphanCleanup } from './bulk-import-orphan-cleanup';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
@@ -89,6 +92,7 @@ import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 import { waStoreEvents, waPlanSync } from './wa-store-events';
 import { ciOutcomes } from './ci-outcomes';
+import { ciAggregationDaily, ciHintCalibrationWeekly } from './ci-aggregation';
 import { ciErasureSecondPassFn } from './ci-erasure-second-pass';
 
 /**
@@ -101,6 +105,10 @@ const allInngestFunctions: JobDef[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
+  // Catalogue import (photos / PDFs -> reviewed drafts).
+  catalogImportRun,
+  catalogImportCreateDrafts,
+  catalogImportUploadsSweep,
   bulkImportOrphanCleanup,
   invoiceEmail,
   heartbeat,
@@ -248,6 +256,8 @@ const allInngestFunctions: JobDef[] = [
   legalNoticeSend,
   waStoreEvents,
   ciOutcomes,
+  ciAggregationDaily,
+  ciHintCalibrationWeekly,
   ciErasureSecondPassFn,
   waPlanSync,
   // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate

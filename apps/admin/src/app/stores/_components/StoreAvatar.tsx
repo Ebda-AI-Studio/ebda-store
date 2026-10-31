@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from '@/i18n/useT';
 
 interface StoreAvatarProps {
   /** Store display name — used for the letter fallback + alt text. */
@@ -24,6 +25,7 @@ interface StoreAvatarProps {
  * aspect ratio / transparent logo readable.
  */
 export function StoreAvatar({ name, logo, className = '' }: StoreAvatarProps) {
+  const t = useT('stores.avatar');
   const [errored, setErrored] = useState(false);
   const letter = name.charAt(0).toUpperCase();
 
@@ -35,7 +37,7 @@ export function StoreAvatar({ name, logo, className = '' }: StoreAvatarProps) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={logo}
-          alt={`${name} logo`}
+          alt={t('logoAlt', { name })}
           className="h-full w-full object-contain p-1"
           loading="lazy"
           onError={() => setErrored(true)}

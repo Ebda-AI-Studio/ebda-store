@@ -34,6 +34,27 @@ import { CardStepperProvider } from '../templates/shared/card-stepper-context';
  */
 const ANNOUNCEMENT_BAR_MIN_PX = 41;
 const HEADER_MIN_PX = 68;
+/**
+ * Header heights of the look stores at 390 px, measured after hydration (2026-10-31, `main` top minus the 41 px
+ * announcement row). The placeholder reserves the look's own height, so the page moves by nothing when the real
+ * header arrives (Qamar lookbook moved 27 px: CLS 0.100-0.151 on slow 3G, budget 0.1). A look missing here keeps
+ * HEADER_MIN_PX. Re-measure when a look's header changes.
+ */
+const LOOK_HEADER_PX: Record<string, number> = {
+  'qamar.atelier': 92,
+  'qamar.lookbook': 95,
+  'qamar.vitrine': 120,
+  'souq.catalogue': 124,
+  'souq.night': 75,
+  'jasmine.apothecary': 95,
+  'jasmine.bloom': 75,
+  'lamma.table': 78,
+  'lamma.notebook': 75,
+  'lamma.market': 75,
+  'dahab.worn': 65,
+  'dahab.workshop': 65,
+  'dahab.giftbox': 65,
+};
 
 interface ShopChromeProps {
   children: ReactNode;
@@ -60,6 +81,9 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   // Prop wins (homepage server-fetches layout for SSR correctness); context
   // layout is the lazy-fetched fallback for other routes.
   const layout = layoutProp ?? ctxLayout ?? undefined;
+  // Ruling TEMPLATES-POLISH-1: a look store pins its header like the mock-ups do; an explicit merchant
+  // choice (`sticky: false`) still wins, and a store without a look keeps the old default (scrolls away).
+  const headerSticky = layout?.header?.sticky ?? Boolean(store?.look);
   const branding = useStoreBranding();
   const contact = useStoreContact();
   const storeUrl = useStoreUrl();
@@ -344,7 +368,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         >
           {/* announcement slot: reserves its row so the bar arriving later does not push the page down */}
           {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
-            store.announcementBar?.text && (
+            store.announcementBar?.text &&
+            !store.isDemo && (
               <aside
                 data-zone="beforeHeader"
                 aria-hidden
@@ -356,14 +381,18 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             data-zone="header"
             className={
               [
-                layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
+                headerSticky ? 'sticky top-0 z-40' : undefined,
                 sectionVisibilityClass(layout?.header),
               ]
                 .filter(Boolean)
                 .join(' ') || undefined
             }
           >
-            <div aria-hidden className="border-b" style={{ minHeight: HEADER_MIN_PX }} />
+            <div
+              aria-hidden
+              className="border-b"
+              style={{ minHeight: LOOK_HEADER_PX[store?.look ?? ''] ?? HEADER_MIN_PX }}
+            />
           </div>
           <main role="main" className="flex-1">
             {children}
@@ -397,7 +426,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           of content). bgColor falls back: layout.announcement.bgColor wins
           over the legacy store.announcementBar.bgColor. */}
         {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
-          store.announcementBar?.text && (
+          store.announcementBar?.text &&
+          !store.isDemo && (
             <aside
               data-zone="beforeHeader"
               aria-label={isRtl ? 'إعلان المتجر' : 'Store announcement'}
@@ -425,10 +455,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         <div
           data-zone="header"
           className={
-            [
-              layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
-              sectionVisibilityClass(layout?.header),
-            ]
+            [headerSticky ? 'sticky top-0 z-40' : undefined, sectionVisibilityClass(layout?.header)]
               .filter(Boolean)
               .join(' ') || undefined
           }
@@ -519,6 +546,18 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         {/* afterFooter — empty placeholder so any merchant-injected text
           below the footer (cookie disclaimer, copyright, etc) inherits
           the typography zone. Kept zero-height when there's no content. */}
+        {/* TEMPLATES-MOCK-5: the showroom's notice (e.g. "photos are illustrative") is a quiet footer line, not a
+          41 px strip above every page. Only the demo store: a merchant's own announcement bar is untouched. */}
+        {store.isDemo && store.announcementBar?.text && (
+          <p
+            data-demo-notice
+            className="border-t border-border/60 px-4 py-3 text-center text-xs text-muted-foreground"
+          >
+            {isRtl && store.announcementBar.textAr
+              ? store.announcementBar.textAr
+              : store.announcementBar.text}
+          </p>
+        )}
         <div data-zone="afterFooter" />
         {/* Sprint 3 (2026-05-17): mobile sticky bottom tab bar. Hides
           itself on PDP / checkout / auth routes via usePathname inside

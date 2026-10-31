@@ -3,7 +3,9 @@ import { lockupLatin, type Lockup } from '@ebda/shared';
 
 const COLOR: Record<'ink' | 'muted' | 'primary' | 'accent', string> = {
   ink: 'hsl(var(--foreground))',
-  muted: 'hsl(var(--muted-foreground))',
+  // not --muted-foreground: on Qamar lookbook that token is the dark ground's light grey and the PLP header
+  // is light (1.57:1 measured); the ink at 70% keeps >= 4.5:1 on either ground
+  muted: 'hsl(var(--foreground) / 0.7)',
   primary: 'hsl(var(--primary))',
   accent: 'hsl(var(--accent))',
 };
@@ -35,11 +37,20 @@ export function StoreLockup({
   // the Latin line only accompanies an Arabic name (in English the name IS the Latin form)
   const latin = isRtl && nameAr ? lockupLatin(lockup, name) : null;
   const stack = lockup.layout === 'stack';
+  // On a phone the logo may use about 134 px (the bar keeps room for cart and language on one side), so a
+  // long name steps its display size down instead of wrapping into a column that hangs out of the bar.
+  const phoneSize = Math.max(
+    18,
+    Math.min(lockup.size, Math.floor(134 / (Math.max(main.length, 1) * 0.75)))
+  );
   const mainStyle: CSSProperties = {
-    fontFamily: 'var(--font-display)',
+    ['--ls' as string]: `${phoneSize}px`,
     fontSize: lockup.size,
+    fontFamily: 'var(--font-display)',
     fontWeight: lockup.weight,
-    lineHeight: 1.1,
+    // The display faces (Lalezar, Reem Kufi...) draw Arabic marks well above and below a 1.1 line box and
+    // `line-clamp` clips at it: a 1.4 line keeps them whole (Qamar lookbook's name was cut at the page top).
+    lineHeight: 1.4,
     color: COLOR[lockup.color],
     letterSpacing: 'normal',
   };
@@ -61,11 +72,18 @@ export function StoreLockup({
       translate="no"
       title={main}
     >
-      <span className="block max-w-full line-clamp-2 [text-wrap:balance]" style={mainStyle}>
+      <span
+        className="block max-w-full line-clamp-2 [text-wrap:balance] max-md:![font-size:var(--ls)]"
+        style={mainStyle}
+      >
         {main}
       </span>
       {latin && (
-        <span aria-hidden="true" className="block whitespace-nowrap uppercase" style={latinStyle}>
+        <span
+          aria-hidden="true"
+          className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap uppercase"
+          style={latinStyle}
+        >
           {latin}
         </span>
       )}

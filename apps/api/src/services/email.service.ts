@@ -308,6 +308,8 @@ export interface OrderEmailData {
   promotionName?: string;
   promotionNameAr?: string | null;
   total: number;
+  /** The delivery pick (the first notes line without its prefix); absent when the order has none. */
+  deliveryLine?: string | null;
   shippingAddress: {
     firstName: string;
     lastName: string;

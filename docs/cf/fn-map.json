@@ -16,17 +16,17 @@
   },
   "billing_grants_guard": {
     "target": "d1",
-    "replacement": "NOT YET PORTED: FOUNDING-1 (billing_grants) landed after cf-schema phase 1. Until billing moves to the D1 platform database the guard runs on Postgres only; port it to migrations/platform/0002_invariants.sql (as SQLite triggers, like billing_events_guard_*) before that cutover. Ruling CF-SCHEMA-GRANTS-1.",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql), ported in CF-LAST-2",
     "test": "packages/cf-schema/test/platform.test.ts"
   },
   "billing_grants_guard_delete": {
     "target": "d1",
-    "replacement": "NOT YET PORTED: FOUNDING-1 (billing_grants) landed after cf-schema phase 1. Until billing moves to the D1 platform database the guard runs on Postgres only; port it to migrations/platform/0002_invariants.sql (as SQLite triggers, like billing_events_guard_*) before that cutover. Ruling CF-SCHEMA-GRANTS-1.",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql), ported in CF-LAST-2",
     "test": "packages/cf-schema/test/platform.test.ts"
   },
   "billing_grants_guard_update": {
     "target": "d1",
-    "replacement": "NOT YET PORTED: FOUNDING-1 (billing_grants) landed after cf-schema phase 1. Until billing moves to the D1 platform database the guard runs on Postgres only; port it to migrations/platform/0002_invariants.sql (as SQLite triggers, like billing_events_guard_*) before that cutover. Ruling CF-SCHEMA-GRANTS-1.",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql), ported in CF-LAST-2",
     "test": "packages/cf-schema/test/platform.test.ts"
   },
   "current_store_id": {

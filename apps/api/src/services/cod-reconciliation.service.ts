@@ -7,6 +7,7 @@
  * store scope (the admin routes' tenant context).
  */
 import { prisma } from '@ebda/database';
+import { storeDb, storeStock } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import {
   parseSettlementCsv,
@@ -90,8 +91,30 @@ export class CodReconciliationService {
       return { inserted: 0, duplicates: 0, unmatched: 0, rejected: parsed.rejected };
     }
 
+    // A store on its Durable Object keeps its remittance lines there, beside the shipments they reference (Ruling CF-R7-2):
+    // matching and insert are one section, so a line never points at a shipment that is not in the store.
+    const stock = await storeStock(storeId);
+    if (stock) {
+      const r = await stock.importCodRemittances({
+        carrier,
+        source: opts.source ?? 'csv',
+        rows: parsed.rows.map(x => ({
+          trackingNumber: x.trackingNumber,
+          lineRef: x.lineRef,
+          batchId: x.batchId ?? null,
+          grossAmount: x.grossAmount,
+          feeAmount: x.feeAmount,
+          netAmount: x.netAmount,
+          remittedAt: x.remittedAt,
+        })),
+      });
+      return { ...r, rejected: parsed.rejected };
+    }
+
     const trackings = [...new Set(parsed.rows.map(r => r.trackingNumber))];
-    const shipments = await prisma.shipment.findMany({
+    const shipments = await (
+      await storeDb(storeId)
+    ).shipment.findMany({
       where: { storeId, carrier, trackingNumber: { in: trackings } },
       select: { id: true, trackingNumber: true },
     });
@@ -130,7 +153,7 @@ export class CodReconciliationService {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 25));
 
     const [shipmentsRead, linesRead] = await Promise.all([
-      prisma.shipment.findMany({
+      (await storeDb(storeId)).shipment.findMany({
         where: {
           storeId,
           status: { notIn: ['creation_failed', 'creating'] },
@@ -151,7 +174,7 @@ export class CodReconciliationService {
         orderBy: { createdAt: 'desc' },
         take: COD_REPORT_MAX_SHIPMENTS + 1,
       }),
-      prisma.codRemittance.findMany({
+      (await storeDb(storeId)).codRemittance.findMany({
         where: { storeId, ...(opts.carrier ? { carrier: opts.carrier } : {}) },
         orderBy: { remittedAt: 'asc' },
         take: COD_REPORT_MAX_LINES + 1,

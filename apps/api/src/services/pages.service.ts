@@ -1,8 +1,8 @@
-import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { withSavepoint } from '../lib/savepoint';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 /**
  * Per-store Pages CMS service.
@@ -195,7 +195,8 @@ export type PublicPageResult =
 export class PagesService {
   /** List all pages for a store, ordered by position then slug. */
   static async list(storeId: string) {
-    return prisma.storePage.findMany({
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    return db.storePage.findMany({
       where: { storeId },
       orderBy: [{ position: 'asc' }, { slug: 'asc' }],
     });
@@ -204,7 +205,8 @@ export class PagesService {
   /** Fetch a single page by slug. Returns null when not found. */
   static async get(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);
-    return prisma.storePage.findUnique({
+    const db = await storeDb(storeId);
+    return db.storePage.findUnique({
       where: { storeId_slug: { storeId, slug } },
     });
   }
@@ -225,7 +227,8 @@ export class PagesService {
    */
   static async getPublic(storeId: string, slugRaw: string): Promise<PublicPageResult> {
     const slug = normalizeSlug(slugRaw);
-    const page = await prisma.storePage.findUnique({
+    const db = await storeDb(storeId);
+    const page = await db.storePage.findUnique({
       where: { storeId_slug: { storeId, slug } },
     });
     if (!page) return { status: 'not_found' };
@@ -286,16 +289,17 @@ export class PagesService {
     // banner gets queued for cleanup post-write. Fetch is best-effort —
     // if the row doesn't exist yet (create path) `previous` is null and
     // the cleanup is a no-op.
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
     const existing =
       payload.coverImage !== undefined
-        ? await prisma.storePage.findUnique({
+        ? await w.storePage.findUnique({
             where: { storeId_slug: { storeId, slug } },
             select: { coverImage: true },
           })
         : null;
     const previousCover = existing?.coverImage ?? null;
 
-    const page = await prisma.storePage.upsert({
+    const page = await w.storePage.upsert({
       where: { storeId_slug: { storeId, slug } },
       create: createData,
       update: updateData,
@@ -322,7 +326,8 @@ export class PagesService {
     const slug = normalizeSlug(slugRaw);
     // Fetch coverImage BEFORE delete so we can clean up R2 after
     // commit — mirrors BlogService.remove.
-    const existing = await prisma.storePage.findUnique({
+    const w = await storeWriter(storeId);
+    const existing = await w.storePage.findUnique({
       where: { storeId_slug: { storeId, slug } },
       select: { coverImage: true },
     });
@@ -332,7 +337,7 @@ export class PagesService {
       // error as "already deleted" — an FK/RLS failure aborted the
       // transaction while the route answered success.
       await withSavepoint(() =>
-        prisma.storePage.delete({
+        w.storePage.delete({
           where: { storeId_slug: { storeId, slug } },
         })
       );

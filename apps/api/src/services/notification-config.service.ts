@@ -1,9 +1,11 @@
-import { prisma, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { storeRepo, storeWriter } from '../lib/repo-factory';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { smsService } from './sms.service';
 import type { SmsConfig } from './sms.service';
 import logger from '../lib/logger';
+import { config as appConfig } from '../config';
 import { AppError } from '../middleware/error-handler';
 
 // ==========================================
@@ -79,12 +81,16 @@ class NotificationConfigService {
     // (and Redis-cached) config map: storefront push/SMS silently disabled. This
     // is a trusted internal read already scoped by `where: { storeId }`, so it
     // enters the store's scope itself (withStore) to be context-independent.
-    const rows = await withStore(storeId, tx =>
-      tx.notificationConfig.findMany({
-        where: { storeId },
-        select: { channel: true, provider: true, credentials: true, enabled: true },
-      })
-    );
+    // A store on its Durable Object reads its own row set (Ruling CF-NOTIFY-1); there is no RLS inside a DO.
+    const args = {
+      where: { storeId },
+      select: { channel: true, provider: true, credentials: true, enabled: true },
+    } as const;
+    const repo = await storeRepo(storeId);
+    const rows =
+      repo.backend === 'do'
+        ? await (repo.db as any).notificationConfig.findMany(args)
+        : await withStore(storeId, tx => tx.notificationConfig.findMany(args));
 
     const map: Record<string, DecryptedConfig> = {};
 
@@ -162,8 +168,9 @@ class NotificationConfigService {
           // and a cache entry that fails to decrypt reads as "no credentials"
           // and erases the secret outright. Same defect fixed the same way in
           // shipping-carrier.service.ts.
-          const current = await prisma.notificationConfig.findUnique({
-            where: { storeId_channel: { storeId, channel } },
+          const repo = await storeRepo(storeId);
+          const current = await (repo.db as any).notificationConfig.findFirst({
+            where: { storeId, channel },
             select: { credentials: true },
           });
           stored = {};
@@ -251,7 +258,9 @@ class NotificationConfigService {
     );
     const encryptedCredentials = encryption.encrypt(JSON.stringify(mergedCredentials));
 
-    await prisma.notificationConfig.upsert({
+    await (
+      await storeWriter(storeId)
+    ).notificationConfig.upsert({
       where: { storeId_channel: { storeId, channel } },
       create: {
         storeId,
@@ -280,7 +289,9 @@ class NotificationConfigService {
    * Removes a notification channel config and invalidates cache.
    */
   async deleteConfig(storeId: string, channel: string): Promise<void> {
-    await prisma.notificationConfig.deleteMany({
+    await (
+      await storeWriter(storeId)
+    ).notificationConfig.deleteMany({
       where: { storeId, channel },
     });
 
@@ -299,7 +310,9 @@ class NotificationConfigService {
    *      a sanitized error (no credential values) when creds are missing or
    *      rejected by the provider.
    *
-   * Other channels: returns {success: true} until their providers are wired.
+   * Push: checks the platform VAPID keys and that at least one device is subscribed.
+   *
+   * Any other channel (whatsapp, unknown): {success: false, message: 'not testable'} - never a fake success.
    */
   async testConnection(
     storeId: string,
@@ -334,12 +347,31 @@ class NotificationConfigService {
       return { success: true };
     }
 
-    // Other channels (push, whatsapp) — no provider test wired yet.
-    logger.debug(
-      { storeId, channel },
-      '[NotificationConfigService] testConnection: channel not yet wired, returning true'
-    );
-    return { success: true };
+    // Push: web-push uses the platform's VAPID keys (no per-store credentials), so the honest test is
+    // "can this platform send, and is there a device to send to". No notification is sent to a shopper.
+    if (channel === 'push' || channel === 'push_notifications') {
+      if (!appConfig.vapidPublicKey || !appConfig.vapidPrivateKey) {
+        return {
+          success: false,
+          message: 'Push is not configured on the platform (VAPID keys are missing).',
+        };
+      }
+      const devices = await (
+        await storeRepo(storeId)
+      ).db.pushSubscription.count({ where: { storeId } });
+      if (devices === 0) {
+        return {
+          success: false,
+          message:
+            'Push is set up, but no device is subscribed yet, so there is nothing to deliver to.',
+        };
+      }
+      return { success: true, message: `Push is ready: ${devices} subscribed device(s).` };
+    }
+
+    // WhatsApp is a separate product, and any other channel has no provider test: never a fake success.
+    logger.debug({ storeId, channel }, '[NotificationConfigService] testConnection: not testable');
+    return { success: false, message: `The ${channel} channel is not testable from here.` };
   }
 
   /**
@@ -347,7 +379,9 @@ class NotificationConfigService {
    * If no row exists for an event, defaults all channels to true.
    */
   async getEventConfigs(storeId: string): Promise<Record<string, EventConfigData>> {
-    const rows = await prisma.notificationEventConfig.findMany({
+    const rows = await (
+      await storeRepo(storeId)
+    ).db.notificationEventConfig.findMany({
       where: { storeId },
       select: { event: true, whatsapp: true, sms: true, push: true },
     });
@@ -373,7 +407,9 @@ class NotificationConfigService {
     event: string,
     config: EventConfigData
   ): Promise<EventConfigData> {
-    const row = await prisma.notificationEventConfig.upsert({
+    const row = await (
+      await storeWriter(storeId)
+    ).notificationEventConfig.upsert({
       where: { storeId_event: { storeId, event } },
       create: {
         storeId,

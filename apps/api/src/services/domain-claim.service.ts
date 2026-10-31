@@ -32,6 +32,7 @@ import { AppError } from '../middleware/error-handler';
 import { redis } from './redis.service';
 import type { DomainProvider } from './domain-provider';
 import { bustStoreCaches } from './store.service';
+import { storeUpdate, storeUpdateMany } from '../lib/repo-factory';
 
 export type DomainClaimState = 'pending' | 'active' | 'failed';
 
@@ -138,7 +139,7 @@ export class DomainClaimService {
     const previousPending = store.pendingDomain;
     try {
       await withStore(storeId, tx =>
-        tx.store.update({
+        storeUpdate(tx, {
           where: { id: storeId },
           data: { pendingDomain: domain, domainStatus: 'pending', domainClaimedAt: now },
         })
@@ -163,7 +164,7 @@ export class DomainClaimService {
     );
     if (!store?.pendingDomain) return;
     await withStore(storeId, tx =>
-      tx.store.updateMany({
+      storeUpdateMany(tx, {
         where: { id: storeId, pendingDomain: store.pendingDomain },
         data: {
           pendingDomain: null,
@@ -189,7 +190,7 @@ export class DomainClaimService {
     const pending = store?.pendingDomain ?? null;
     if (!store || !pending) return { released: null };
     const res = await withStore(storeId, tx =>
-      tx.store.updateMany({
+      storeUpdateMany(tx, {
         where: { id: storeId, pendingDomain: pending },
         data: {
           pendingDomain: null,
@@ -242,7 +243,7 @@ export class DomainClaimService {
     }
     if (verifiedStatus?.failed && store.domainStatus !== 'failed') {
       await withStore(storeId, tx =>
-        tx.store.updateMany({
+        storeUpdateMany(tx, {
           where: { id: storeId, pendingDomain: pending },
           data: { domainStatus: 'failed' },
         })
@@ -271,7 +272,7 @@ export class DomainClaimService {
     const oldDomain = before.domain;
     try {
       const res = await withStore(storeId, tx =>
-        tx.store.updateMany({
+        storeUpdateMany(tx, {
           where: { id: storeId, pendingDomain: pending },
           data: {
             domain: pending,
@@ -286,7 +287,7 @@ export class DomainClaimService {
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         await withStore(storeId, tx =>
-          tx.store.updateMany({
+          storeUpdateMany(tx, {
             where: { id: storeId, pendingDomain: pending },
             data: { domainStatus: 'failed' },
           })
@@ -324,7 +325,7 @@ export class DomainClaimService {
     if (oldDomain === newDomain) return;
 
     await withStore(storeId, tx =>
-      tx.store.update({ where: { id: storeId }, data: { llmsTxt: null } })
+      storeUpdate(tx, { where: { id: storeId }, data: { llmsTxt: null } })
     ).catch(err => logger.warn({ err, storeId }, '[DOMAIN CLAIM] failed to clear stale llms.txt'));
 
     // Old hostname leaves the provider only AFTER the DB points at the new one.

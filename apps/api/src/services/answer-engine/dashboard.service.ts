@@ -57,6 +57,7 @@
  * engine with no grounded check has `citedRate: null` (unknown, not 0%).
  */
 import { prisma, Prisma } from '@ebda/database';
+import { storeDb } from '../../lib/repo-factory';
 import { getCachedAnalytics } from '../analytics.service';
 
 export interface AnswerEngineSummary {
@@ -239,7 +240,9 @@ export function aggregateAnswerEngineChecks(checks: CheckRow[]): AnswerEngineSum
 }
 
 async function computeAnswerEngineSummary(storeId: string): Promise<AnswerEngineSummary> {
-  const checks = await prisma.answerEngineCheck.findMany({
+  const checks = await (
+    await storeDb(storeId)
+  ).answerEngineCheck.findMany({
     where: { storeId },
     orderBy: { runAt: 'desc' },
     take: MAX_ROWS,

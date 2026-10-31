@@ -21,6 +21,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma, runInTenantContext } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -174,23 +175,27 @@ router.get(
       const where: any = { storeId: req.params.storeId };
       if (status === 'open') where.status = 'open';
 
-      const [items, total, valueUnknownCount] = await runInTenantContext(req.params.storeId, () =>
-        Promise.all([
-          prisma.deadStockFlag.findMany({
-            where,
-            include: {
-              product: { select: { id: true, name: true, sku: true } },
-            },
-            // Known values first, largest first; flags whose product has no
-            // cost price (value unknown = NULL) after them. `id` keeps the
-            // page boundaries stable across ties.
-            orderBy: [{ stockValueFils: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
-            skip: (page - 1) * perPage,
-            take: perPage,
-          }),
-          prisma.deadStockFlag.count({ where }),
-          prisma.deadStockFlag.count({ where: { ...where, stockValueFils: null } }),
-        ])
+      const [items, total, valueUnknownCount] = await runInTenantContext(
+        req.params.storeId,
+        async () =>
+          Promise.all([
+            (await storeDb(req.params.storeId)).deadStockFlag.findMany({
+              where,
+              include: {
+                product: { select: { id: true, name: true, sku: true } },
+              },
+              // Known values first, largest first; flags whose product has no
+              // cost price (value unknown = NULL) after them. `id` keeps the
+              // page boundaries stable across ties.
+              orderBy: [{ stockValueFils: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+              skip: (page - 1) * perPage,
+              take: perPage,
+            }),
+            (await storeDb(req.params.storeId)).deadStockFlag.count({ where }),
+            (await storeDb(req.params.storeId)).deadStockFlag.count({
+              where: { ...where, stockValueFils: null },
+            }),
+          ])
       );
 
       res.json({
@@ -290,15 +295,16 @@ router.get(
       if (acknowledged === 'true') where.acknowledged = true;
       if (acknowledged === 'false') where.acknowledged = false;
 
+      const anomalyDb = await storeDb(req.params.storeId);
       const [items, total] = await runInTenantContext(req.params.storeId, () =>
         Promise.all([
-          prisma.profitAnomaly.findMany({
+          anomalyDb.profitAnomaly.findMany({
             where,
             orderBy: [{ severity: 'desc' }, { detectedAt: 'desc' }],
             skip: (page - 1) * perPage,
             take: perPage,
           }),
-          prisma.profitAnomaly.count({ where }),
+          anomalyDb.profitAnomaly.count({ where }),
         ])
       );
 
@@ -320,8 +326,9 @@ router.post(
   requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const anomalyWriter = await storeWriter(req.params.storeId);
       await runInTenantContext(req.params.storeId, () =>
-        prisma.profitAnomaly.updateMany({
+        anomalyWriter.profitAnomaly.updateMany({
           where: { id: req.params.id, storeId: req.params.storeId, acknowledged: false },
           data: {
             acknowledged: true,

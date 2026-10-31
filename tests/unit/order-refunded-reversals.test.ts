@@ -93,6 +93,12 @@ vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => 
   ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
   loadCodFeeConfig: vi.fn().mockResolvedValue(null),
 }));
+// a Postgres store: the Durable Object money client is absent, so the job takes its unchanged Postgres path
+vi.mock('@api/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/lib/repo-factory')>()),
+  storeMoney: async () => null,
+  storeDb: async () => ({}),
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },

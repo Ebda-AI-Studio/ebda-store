@@ -14,3 +14,5 @@ wallet share, which the merchant must add from the Wallet page. When a split
 leaves the gateway nothing to send (an order paid entirely from the wallet, or
 a rounding fils) no provider call is made. Cost if wrong: that customer's wallet
 share is added by hand.
+
+_Amended 2026-10-29 (Ruling WALLET-GL-1):_ W-3 is lifted, so a wallet-paid order now HAS a sale entry (DR 2150 for the wallet part) and its partial returns post their adjustments, including the CR 2150 wallet leg. The "GL books nothing" statement above no longer holds.

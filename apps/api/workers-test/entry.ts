@@ -25,6 +25,14 @@ export class TestSchedule extends StoreScheduleBase {
     kv.put('gaveUp', [...((kv.get('gaveUp') as string[] | undefined) ?? []), job]);
   }
 
+  /** Write freeze (Ruling CF-JOBS-2): the deployed class reads WRITES_FROZEN; the test flips it per instance. */
+  protected override isFrozen(): boolean {
+    return this.ctx.storage.kv.get('frozen') === true;
+  }
+  setFrozen(on: boolean): void {
+    this.ctx.storage.kv.put('frozen', on);
+  }
+
   failNext(n: number): void {
     this.ctx.storage.kv.put('failures', n);
   }

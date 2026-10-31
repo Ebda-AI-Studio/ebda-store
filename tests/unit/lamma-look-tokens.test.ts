@@ -85,7 +85,7 @@ describe('lamma looks: shape', () => {
       table.muted,
       table.accent,
       table.line,
-    ]).toEqual(['#A5303F', '#FBF1F2', '#2B1A1F', '#62505A', '#2F6B34', '#EBD6DA']);
+    ]).toEqual(['#A5303F', '#FBF1F2', '#2B1A1F', '#62505A', '#3E7A3A', '#EBD6DA']);
     const nb = by('lamma.notebook');
     expect([nb.page, nb.surface, nb.ink, nb.muted, nb.primary, nb.accent, nb.line]).toEqual([
       '#1F3D2B',

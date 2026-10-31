@@ -19,6 +19,7 @@ import { isGrantedPlan } from './billing/period';
 import { reconcileStoreAccess } from './billing/account.service';
 import logger from '../lib/logger';
 import { planSubscriberCounts, storeIdsOnPlan } from '../lib/definer';
+import { storeUpdate } from '../lib/repo-factory';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -168,7 +169,7 @@ export const planService = {
           ordersOverLimitNotifiedAt: null,
         },
       });
-      await tx.store.update({ where: { id: storeId }, data: { plan: plan.featureTier } });
+      await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
       return s;
     });
 
