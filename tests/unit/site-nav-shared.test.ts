@@ -1,7 +1,8 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { acquireSiteBuildLock } from '../helpers/site-build-lock';
 import { renderStatusPage } from '../../apps/status/src/render';
 import {
   SITE_NAV_PANEL_CSS,
@@ -39,10 +40,14 @@ const snap: Snapshot = {
 } as unknown as Snapshot;
 
 describe('shared header nav on docs, help and status', () => {
-  beforeAll(() => {
+  let release: () => void = () => {};
+  // the help/docs builds wipe and rewrite out/; another test file building them in parallel would delete our pages mid-read
+  beforeAll(async () => {
+    release = await acquireSiteBuildLock();
     for (const app of ['docs', 'help'])
       execFileSync('npm', ['run', 'build', '-w', `apps/${app}`], { cwd: ROOT, stdio: 'pipe' });
-  }, 240_000);
+  }, 840_000);
+  afterAll(() => release());
 
   for (const lang of ['ar', 'en'] as const) {
     describe(lang, () => {
