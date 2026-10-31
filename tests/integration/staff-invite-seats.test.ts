@@ -78,7 +78,9 @@ const uid = () => crypto.randomUUID().slice(0, 10);
 /** A store on a plan with `seats` staff seats, `n` invitees each holding their own pending invitation. */
 async function seed(seats: number, n: number) {
   const tag = uid();
-  const base = await prisma.plan.findFirst({ orderBy: { sort: 'asc' } });
+  // The seeded 'basic' plan, not the lowest sort: other files leave sort-0 grant plans behind whose partial limits would
+  // fail plans.limits validation and silently fall back to the seed (1 seat), voiding the seat count under test.
+  const base = await prisma.plan.findUnique({ where: { code: 'basic' } });
   const planCode = `seat-test-${tag}`;
   await prisma.plan.create({
     data: {
