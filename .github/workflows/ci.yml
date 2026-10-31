@@ -493,6 +493,8 @@ jobs:
         run: npm run build -w apps/${{ matrix.app }}
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
+          # 4 GB, not the 2 GB default: the integrated api tsc ran out of heap on Umbra (#367).
+          NODE_OPTIONS: --max-old-space-size=4096
 
       # Marketing performance budget (marketing-levelup P2): up-front JS/CSS/HTML weight per page, no browser, fails the PR.
       - name: Marketing page-weight budget

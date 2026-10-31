@@ -109,6 +109,11 @@ vi.mock('@api/lib/ai/gemini-keys', () => ({
     }
   },
 }));
+// The AI call is mocked, but getModel() refuses without a key: pin one so the suite does not depend on the runner's env.
+vi.mock('@api/config', async importOriginal => {
+  const actual = await importOriginal<typeof import('@api/config')>();
+  return { ...actual, config: { ...actual.config, googleAiKey: 'test-key' } };
+});
 vi.mock('@api/lib/ai-quota', () => ({ assertAiQuota: vi.fn() }));
 vi.mock('@api/lib/wa/events', () => ({
   buildStoreEvent: async (input: unknown) => input,
