@@ -1,7 +1,8 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { acquireSiteBuildLock } from '../helpers/site-build-lock';
 
 /**
  * help.ebda.app, docs.ebda.app and status.ebda.app are each their own live host (6c): master-brand titles
@@ -10,6 +11,13 @@ import path from 'node:path';
  */
 const ROOT = path.resolve(__dirname, '../..');
 const read = (...p: string[]) => readFileSync(path.join(ROOT, ...p), 'utf8');
+
+// the help/docs builds wipe and rewrite out/; another test file building them in parallel would delete our pages mid-read
+let releaseBuildLock: () => void = () => {};
+beforeAll(async () => {
+  releaseBuildLock = await acquireSiteBuildLock();
+}, 650_000);
+afterAll(() => releaseBuildLock());
 
 describe.each([
   ['help', 'Ebda AI Studio Help', 'مركز مساعدة ابدأ استوديو للذكاء الاصطناعي'],
