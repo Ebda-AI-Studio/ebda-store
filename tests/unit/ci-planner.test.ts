@@ -102,7 +102,9 @@ describe('order.placed', () => {
       areaKey: 'EG-C-nasr-city',
       buyerKey: key,
     });
-    const wire = JSON.stringify(await Promise.all(out.map(i => buildEnvelope(i))));
+    const wire = JSON.stringify(
+      await Promise.all(out.map(i => buildEnvelope(i, 'store', new Date('2026-11-03T10:00:01Z'))))
+    );
     expect(wire).not.toContain('01001234567');
     expect(wire).not.toContain('1001234567');
   });

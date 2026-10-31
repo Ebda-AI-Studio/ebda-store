@@ -31,6 +31,14 @@ const OTHER = '9b2f4c1e-0c2e-4c3a-8a4e-0a9c6d7e1f20';
 const ORDER = '0d8ea0f4-5a47-4c7d-9a49-6ff3d3b8f6aa';
 const CART = '5c1d3a22-7b41-4d0e-9b53-1f6a2d9c8e11';
 const at = (s: string) => new Date(`2026-11-03T${s}Z`);
+// buildEnvelope stamps `recordedAt` from the wall clock (a 13-digit number that can contain any short digit run, e.g. the
+// card fragment '4111'), so every privacy scan below pins the clock AND drops the id/time fields before serialising: only
+// fields that could carry buyer or provider text are searched.
+const NOW = new Date('2026-11-03T10:00:01Z');
+const scanable = (e: Awaited<ReturnType<typeof buildEnvelope>>) => {
+  const { eventId: _id, recordedAt: _r, occurredAt: _o, ...rest } = e;
+  return JSON.stringify(rest);
+};
 
 const orderFacts = (over: Record<string, unknown> = {}) => ({
   id: ORDER,
@@ -91,7 +99,7 @@ describe('payment.failed', () => {
       xstore: true,
       data: { provider: 'kashier', methodKind: 'card', totalMinor: 90000, failureCode: 'declined' },
     });
-    const wire = JSON.stringify(await buildEnvelope(out[0]!));
+    const wire = scanable(await buildEnvelope(out[0]!, 'store', NOW));
     expect(wire).not.toContain('4111');
     expect(wire).not.toContain('Ahmed');
     expect(wire).not.toContain('1001234567');
@@ -146,9 +154,9 @@ describe('cart events', () => {
       xstore: true,
       data: { channel: 'email', step: 1 },
     });
-    const env = await buildEnvelope(out[0]!);
+    const env = await buildEnvelope(out[0]!, 'store', NOW);
     expect(env.orderId).toBeNull();
-    expect(JSON.stringify(env)).not.toMatch(/email@|\+20/);
+    expect(scanable(env)).not.toMatch(/email@|\+20/);
   });
 
   it('every step and channel is its own event; an unknown channel is "notification"', async () => {
