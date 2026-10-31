@@ -236,11 +236,12 @@ async function doVerify(request, { sql }) {
   return json({ ok: true, tables, fk });
 }
 
-/** every application table of this DO (not sqlite_*, not the cf_* bookkeeping), with all its columns and pk */
+/** every application table of this DO (not sqlite_*, not the cf_* bookkeeping, not the platform's own _cf_* tables such as _cf_KV, which
+ * the SQL authorizer refuses to read: `pragma_table_info('_cf_KV')` is SQLITE_AUTH and broke verify/seal for any DO that had used storage.put or an alarm), with all its columns and pk */
 function appTables(sql) {
   const names = sql
     .exec(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE 'cf\\_%' ESCAPE '\\' ORDER BY name`
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE 'cf\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\' ORDER BY name`
     )
     .toArray()
     .map(r => r.name)
