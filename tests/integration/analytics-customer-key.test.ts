@@ -14,13 +14,17 @@
  * verbatim, so these assertions cover it too.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass } from '@ebda/database';
+import { prisma, withRlsBypass, runInStoreScope } from '@ebda/database';
 import { AnalyticsService } from '../../apps/api/src/services/analytics.service';
 import { customerKeyOf } from '../../apps/api/src/lib/customer-key';
 import { aggregateCustomers } from '../../apps/api/src/services/customer-aggregate.service';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
+
+// The routes and the MCP tool call the service inside the request's tenant context; a direct call needs the same scope.
+const dashboardStats = (storeId: string) =>
+  runInStoreScope(storeId, () => AnalyticsService.getDashboardStats(storeId, range()));
 
 const OWNER = '00000000-0000-0000-0000-0000000000f8';
 const stores: string[] = [];
@@ -217,7 +221,7 @@ describe.skipIf(!hasDb)('customer key: SQL twin agrees with the Customers page h
 describe.skipIf(!hasDb)('Customers page KPI summary agrees with analytics', () => {
   it('summary.customers equals allTimeCustomers on the same orders', async () => {
     const { summary, customers } = await withRlsBypass(() => aggregateCustomers(mixed.storeId));
-    const stats = await AnalyticsService.getDashboardStats(mixed.storeId, range());
+    const stats = await dashboardStats(mixed.storeId);
     expect(customers.length).toBe(6);
     expect(summary.customers).toBe(stats.allTimeCustomers);
     // `buyers` drops the customer whose only order was cancelled; analytics
@@ -227,7 +231,7 @@ describe.skipIf(!hasDb)('Customers page KPI summary agrees with analytics', () =
 
   it('a zero-order registered customer is a page row but not an analytics customer', async () => {
     const { summary } = await withRlsBypass(() => aggregateCustomers(zeroOrder.storeId));
-    const stats = await AnalyticsService.getDashboardStats(zeroOrder.storeId, range());
+    const stats = await dashboardStats(zeroOrder.storeId);
     expect(stats.allTimeCustomers).toBe(1);
     expect(summary.customers).toBe(2);
     expect(summary.buyers).toBe(1);
@@ -236,13 +240,13 @@ describe.skipIf(!hasDb)('Customers page KPI summary agrees with analytics', () =
 
 describe.skipIf(!hasDb)('getDashboardStats (also the MCP admin_get_analytics payload)', () => {
   it('totalCustomers counts guests exactly like the Customers page', async () => {
-    const stats = await AnalyticsService.getDashboardStats(mixed.storeId, range());
+    const stats = await dashboardStats(mixed.storeId);
     expect(stats.allTimeCustomers).toBe(6);
     expect(stats.totalCustomers).toBe(6);
   });
 
   it('profit covers costed lines and reports the lines without cost', async () => {
-    const stats = await AnalyticsService.getDashboardStats(mixed.storeId, range());
+    const stats = await dashboardStats(mixed.storeId);
     // (1000−400)×2 + 5 × (1000−500)
     expect(stats.totalProfit).toBe(3700);
     // The second registered order's line and the 3000 guest line.
@@ -253,17 +257,17 @@ describe.skipIf(!hasDb)('getDashboardStats (also the MCP admin_get_analytics pay
   });
 
   it('profit is null (unknown), not 0, when no sold line has a cost', async () => {
-    const stats = await AnalyticsService.getDashboardStats(uncosted.storeId, range());
+    const stats = await dashboardStats(uncosted.storeId);
     expect(stats.totalProfit).toBeNull();
     expect(stats.profitItemsMissingCost).toBe(1);
     expect(stats.profitRevenueMissingCost).toBe(1000);
   });
 
   it('conversionRate is orders per product view, or null with no views', async () => {
-    const withViews = await AnalyticsService.getDashboardStats(mixed.storeId, range());
+    const withViews = await dashboardStats(mixed.storeId);
     expect(withViews.conversionRate).toBe(2.5);
     expect(withViews.conversionRateBasis).toBe('orders_per_product_view');
-    const noViews = await AnalyticsService.getDashboardStats(uncosted.storeId, range());
+    const noViews = await dashboardStats(uncosted.storeId);
     expect(noViews.conversionRate).toBeNull();
   });
 });

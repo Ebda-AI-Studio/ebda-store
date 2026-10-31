@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import { describe, it, expect, afterAll, vi } from 'vitest';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import { prisma, createPrismaClient, runWithRequestDb } from '@ebda/database';
+import { prisma, createPrismaClient, runWithRequestDb, withStore } from '@ebda/database';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
@@ -211,17 +211,18 @@ describe.skipIf(!hasDb)('staff invitations on ebda_app (strict RLS, real locks)'
   it('RLS: the app role sees only its own store invitations', async () => {
     const one = await seed(1, 1);
     const two = await seed(1, 1);
-    const app = createPrismaClient({ connectionString: appUrl(), max: 2 });
-    try {
-      const rows = await app.$transaction(async tx => {
-        await tx.$executeRaw`SELECT set_config('app.current_store_id', ${one.storeId}, true)`;
-        return tx.$queryRaw<Array<{ store_id: string }>>`SELECT store_id FROM staff_invites`;
-      });
-      expect(rows.length).toBeGreaterThan(0);
-      expect(rows.every(r => r.store_id === one.storeId)).toBe(true);
-      expect(rows.some(r => r.store_id === two.storeId)).toBe(false);
-    } finally {
-      await app.$disconnect();
-    }
+    // The tenant guard refuses a raw statement on a tenant table with no scope, so the read runs inside withStore(one): the
+    // app role (no BYPASSRLS) must still see only that store's rows. The service wrapper sets the GUC; the policy does the filtering.
+    const rows = await runWithRequestDb(
+      () => createPrismaClient({ connectionString: appUrl(), max: 2 }),
+      () =>
+        withStore(
+          one.storeId,
+          tx => tx.$queryRaw<Array<{ store_id: string }>>`SELECT store_id FROM staff_invites`
+        )
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every(r => r.store_id === one.storeId)).toBe(true);
+    expect(rows.some(r => r.store_id === two.storeId)).toBe(false);
   });
 });

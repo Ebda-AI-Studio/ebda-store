@@ -519,11 +519,19 @@ describe.skipIf(!hasDb)('shopper erasure: Postgres vs the store DO', () => {
     expect(evt.data.ciProven.buyerKeys).toHaveLength(1);
     expect(evt.data.buyerKey).toBe(evt.data.ciProven.buyerKeys[0]);
     expect(deleteImages).toHaveBeenCalledWith(ids.store, ['rcpt-1', 'rcpt-late']);
-    // the late order is unlinked too, and the finished erasure left no saved scope behind
+    // the late order is unlinked too
     expect(
       sqlite.prepare('SELECT count(*) AS n FROM orders WHERE customer_id = ?').get(d.U)
     ).toEqual({ n: 0 });
-    expect(sqlite.prepare('SELECT count(*) AS n FROM erasure_ledger').get()).toEqual({ n: 0 });
+    // eraseAccount does NOT drop the saved scope (enqueue is not execution, Ruling CF-OPUS-1): the account/erased job's last
+    // step does, once every propagation succeeded
+    const ledgerOf = () =>
+      sqlite.prepare('SELECT count(*) AS n FROM erasure_ledger WHERE user_id = ?').get(d.U);
+    expect(ledgerOf()).toEqual({ n: 1 });
+    const { finalizeDoErasure } =
+      await import('../../apps/api/src/lib/inngest/functions/account-erased-propagation');
+    await withRepo(doRepo, () => finalizeDoErasure(ids.store, d.U));
+    expect(ledgerOf()).toEqual({ n: 0 });
     // and the receipt was scrubbed and marked by the first (committed) DO section
     expect(
       sqlite

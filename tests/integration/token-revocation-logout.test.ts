@@ -14,6 +14,8 @@ import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { API_BASE } from '../helpers/api-base';
+import { legacySessionFor } from '../helpers/legacy-session';
+import { identityTokenFor } from '../helpers/identity-session';
 
 // One knob configures the whole suite; see tests/helpers/api-base.ts for why
 // it is TEST_API_URL rather than the server's own API_URL or API_HOST. The
@@ -26,7 +28,9 @@ const PW = 'Test1234!pw';
 const createdUserIds: string[] = [];
 
 /**
- * Create a fresh test user, log in, and return the access token + user id.
+ * Create a fresh test user and mint its Store (HS256) session (+ refresh row); /auth/login is closed for this role (Rulings
+ * ID-1/ID-2), the HS256 shape is what customer and impersonation tokens still use. Logout of an ES256 identity session
+ * has its own test below.
  */
 async function setupAndLogin(): Promise<{ token: string; userId: string; refreshToken: string }> {
   const email = `logout-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.test`;
@@ -36,7 +40,7 @@ async function setupAndLogin(): Promise<{ token: string; userId: string; refresh
       passwordHash: await bcrypt.hash(PW, 10),
       firstName: 'Log',
       lastName: 'Out',
-      role: 'super_admin',
+      role: 'store_admin',
       emailVerified: true,
       storeId: null,
     },
@@ -44,20 +48,7 @@ async function setupAndLogin(): Promise<{ token: string; userId: string; refresh
   });
   createdUserIds.push(user.id);
 
-  const r = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PW }),
-  });
-
-  if (!r.ok) {
-    const body = await r.text();
-    throw new Error(`login failed (${r.status}): ${body}`);
-  }
-
-  const json = await r.json();
-  const token = json.data.accessToken as string;
-  const refreshToken = json.data.refreshToken as string;
+  const { accessToken: token, refreshToken } = await legacySessionFor(user.id);
 
   return { token, userId: user.id, refreshToken };
 }
@@ -106,6 +97,25 @@ describe('logout jti denylist (Task 7)', () => {
     expect(after.status).toBe(401);
     const afterBody = await after.json();
     expect(afterBody.error.code).toBe('TOKEN_REVOKED');
+  });
+
+  it('POST /auth/logout of an identity-service (ES256) session revokes that session by sid — same token 401 afterwards', async () => {
+    const { userId } = await setupAndLogin();
+    const token = await identityTokenFor(userId);
+
+    const before = await fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(before.status).toBe(200);
+
+    const logoutRes = await fetch(`${API}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({}),
+    });
+    expect(logoutRes.status).toBe(200);
+
+    const after = await fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(after.status).toBe(401);
+    expect((await after.json()).error.code).toBe('TOKEN_REVOKED');
   });
 
   it('POST /auth/logout without a token still clears session (200, no jti denylist attempt)', async () => {

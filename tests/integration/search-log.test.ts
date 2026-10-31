@@ -14,6 +14,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import request from 'supertest';
 import { prisma, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import { REGION, zonedIsoDay } from '@ebda/shared';
+import { configureIdentityClient } from '@api/lib/identity-client';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
@@ -380,7 +381,19 @@ describe.skipIf(!hasDb)('read API, retention and erasure', () => {
       },
     });
     created.userIds.push(operator.id);
-    await StoreService.delete(storeId, operator.id);
+    // Deleting a store flips its identity-managed owner at the identity service (store.service.ts); the Postgres tier has no
+    // ACCOUNTS binding, so answer as the service would for an active account.
+    configureIdentityClient({
+      getAccountState: async () => ({ status: 'active' }) as never,
+      setStatus: async () => undefined,
+      revokeUser: async () => undefined,
+      deleteStoreClients: async () => ({ clients: 0 }),
+    });
+    try {
+      await StoreService.delete(storeId, operator.id);
+    } finally {
+      configureIdentityClient(undefined);
+    }
     expect(await prisma.store.count({ where: { id: storeId } })).toBe(0);
     expect(await prisma.searchQueryDaily.count({ where: { storeId } })).toBe(0);
   });

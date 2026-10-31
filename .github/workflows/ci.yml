@@ -1086,6 +1086,14 @@ jobs:
           ALTER ROLE ebda_app WITH PASSWORD 'ci-only-app-pw' LOGIN;
           SQL
 
+      - name: Throw-away identity key for the integration tier
+        # Merchants, staff and super admins sign in at the identity service, not the Store (Rulings ID-1/ID-2), so the tests
+        # mint the ES256 token it would issue (tests/helpers/identity-session.ts) and the API server verifies it with the
+        # matching public key (apps/api/src/lib/test-identity.ts: NODE_ENV=test + this variable, nothing else installs it).
+        # A fresh P-256 key per job; it exists only inside this disposable runner environment.
+        run: |
+          node -e "const {generateKeyPairSync}=require('crypto');const k=generateKeyPairSync('ec',{namedCurve:'P-256'}).privateKey.export({format:'jwk'});k.kid='ci-'+Date.now();k.alg='ES256';console.log('EBDA_TEST_IDENTITY_JWK='+JSON.stringify(k))" >> "$GITHUB_ENV"
+
       - name: Start API server
         # tests/integration hit a real HTTP server at localhost:4000.
         # Background-launch the built API and poll /health until it is

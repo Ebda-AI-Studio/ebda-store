@@ -298,10 +298,11 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
       const { order, payment } = await startPayment(s, gateway);
       const w = deliveryFor(gateway, payment.transactionId!);
 
-      // A valid delivery posted to ANOTHER store's URL moves nothing.
+      // A valid delivery posted to ANOTHER store's URL moves nothing: signed for that store but no payment of its own, so the
+      // same 503 + retry as an unknown payment (WEBHOOK-SCOPE-1), never a hint that the reference exists elsewhere.
       const wrong = await send(gateway, w, '', other.id);
-      expect(wrong.status).toBe(200);
-      expect(wrong.body.data.status).toBe('ignored');
+      expect(wrong.status).toBe(503);
+      expect(wrong.body.error.code).toBe('PAYMENT_NOT_YET_VISIBLE');
       expect((await state(order.id)).payment.status).toBe('pending');
 
       const right = await send(gateway, w, '', s.id);
@@ -347,7 +348,7 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
       const good = deliveryFor(gateway, payment.transactionId!);
       const tampered = controls[gateway].tamperAmount(good, 500);
       const res = await send(gateway, tampered);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(401); // the one constant refusal (SEC-5 / WEBHOOK-ORDER-1)
       const st = await state(order.id);
       expect(st.payment.status).toBe('pending');
       expect(st.order.paymentStatus).toBe('unpaid');
@@ -369,7 +370,7 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
         forged.rawBody = JSON.stringify(p);
       }
       const res = await send(gateway, forged);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(401);
       expect((await state(order.id)).payment.status).toBe('pending');
     });
 
@@ -394,7 +395,7 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
       rawBody: w.rawBody,
       headers: { [PAYMOB_HMAC_HEADER]: paymobHmac(body.obj, PAYMOB_STUB.hmacSecret) }, // not 'store-a-hmac-secret'
     };
-    expect((await send('paymob', forged)).status).toBe(400);
+    expect((await send('paymob', forged)).status).toBe(401);
     expect((await state(order.id)).payment.status).toBe('pending');
     // ...and the store's own secret is accepted.
     const own: SignedWebhook = {
@@ -517,11 +518,11 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
       )
     );
     const res = await send('kashier', w);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     expect((await state(order.id)).payment.status).toBe('pending');
   });
 
-  it('a delivery for a payment no store owns is acknowledged without touching anything', async () => {
+  it('a delivery for a payment no store owns gets the constant 401 without touching anything', async () => {
     const w = controls.fawry.paymentWebhook(
       await (async () => {
         const s = await mkStore('orphan');
@@ -548,6 +549,6 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
       FAWRY_STUB.secureKey
     );
     const res = await send('fawry', { rawBody: JSON.stringify(body), headers: {} });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 });

@@ -3,15 +3,20 @@
  * member used to create an account the invitee could not discover — no
  * invite-token flow, and when the owner left the password field blank the
  * generated password was known to nobody. Every add now mails the invitee: a
- * brand-new account gets a real set-password link (the same token + redeem
- * path as "forgot password"); an account that already exists elsewhere gets a
- * short notice only.
+ * brand-new account is created at the identity service, which mails the
+ * set-password code (Ruling ID-1/ID-13); an account that already exists
+ * elsewhere gets a short notice only.
+ *
+ * The identity service (accounts) is not reachable from this in-process harness, so a recording fake stands in for its
+ * `inviteUser` / `getAccountState`. What the Store owns is asserted for real: the id handshake, the profile row, the seat,
+ * the membership and which mail the Store itself sends. The code mail, the set-password redemption and the credential live in
+ * accounts: apps/accounts/test/rpc.test.ts (inviteUser) and tests/unit/staff-invite-flow.test.ts (Store half with mocks).
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
-import { withRlsBypass } from '@ebda/database';
+import { withRlsBypass, prisma } from '@ebda/database';
 import staffRoutes from '@api/routes/staff.routes';
 import authRoutes from '@api/routes/auth.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
@@ -21,6 +26,9 @@ import {
   latestCapturedMailTo,
   tokenFromCapturedMail,
 } from '@api/services/platform-mailer';
+import { configureIdentityClient } from '@api/lib/identity-client';
+import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
+import type { AccountsRpc } from '@api/cf/bindings';
 import { hasDb, storeAdminAccessTokenFor, type FixtureStore } from '../helpers/bundle-fixtures';
 
 function buildApp(): Express {
@@ -60,9 +68,34 @@ async function seedPlainStore(suffix: string): Promise<FixtureStore> {
 describe.skipIf(!hasDb)('staff invite consent', () => {
   let app: Express;
 
+  type Invite = Parameters<NonNullable<AccountsRpc['inviteUser']>>[0];
+  const invites: Invite[] = [];
+  /** Accounts the fake identity service "holds": id -> verified staff (set once the invitee has finished the code step). */
+  const verifiedStaff = new Set<string>();
+
   beforeAll(() => {
     app = buildApp();
+    configureIdentityClient({
+      inviteUser: async input => {
+        invites.push(input);
+        return { id: input.id, created: true };
+      },
+      getAccountState: async id => ({
+        id,
+        email: `${id}@example.test`,
+        emailVerified: verifiedStaff.has(id),
+        mfaEnabled: false,
+        mfaEnrolledAt: null,
+        status: 'active',
+        role: 'staff',
+        firstName: '',
+        lastName: '',
+        phone: null,
+        language: 'ar',
+      }),
+    });
   });
+  afterAll(() => configureIdentityClient(undefined));
 
   // The invite mail goes out via `cfWaitUntil` — fire-and-forget outside a
   // real Workers request (no `waitUntilStore` context in this bare Express
@@ -78,12 +111,19 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
     );
   }
 
-  it('a brand-new staff account gets a mailed set-password link that actually works', async () => {
+  const profile = (email: string) =>
+    prisma.user.findFirst({
+      where: { email, storeId: null },
+      select: { id: true, role: true, emailVerified: true },
+    });
+
+  it('a brand-new staff account is created at the identity service (which mails the code); the Store binds profile + seat only', async () => {
     const run = crypto.randomUUID().slice(0, 8);
     const store = await seedPlainStore(run);
     const token = storeAdminAccessTokenFor(store.ownerId);
     const staffEmail = `new-staff-${run}@example.com`;
     clearCapturedMail();
+    invites.length = 0;
 
     const res = await request(app)
       .post(`/api/v1/stores/${store.storeId}/staff`)
@@ -91,30 +131,34 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
       .send({ email: staffEmail, firstName: 'Sara', lastName: 'Ali' });
 
     expect(res.status).toBe(201);
+    expect(invites).toHaveLength(1);
+    expect(invites[0]).toMatchObject({ email: staffEmail, role: 'staff', firstName: 'Sara' });
+    const user = await profile(staffEmail);
+    expect(user).toMatchObject({ role: 'staff', emailVerified: false });
+    expect(invites[0].id, 'the profile carries the id THIS request generated').toBe(user!.id);
+    expect(
+      await prisma.storeStaff.count({ where: { storeId: store.storeId, userId: user!.id } })
+    ).toBe(1);
 
-    const mail = await waitForMailTo(staffEmail);
-    const resetToken = tokenFromCapturedMail(mail);
-    expect(resetToken, 'mail carries a working set-password token').toBeTruthy();
+    // The set-password code is the identity service's mail, so the Store sends none of its own for a new account.
+    await awaitDeferredWork(5000);
+    expect(latestCapturedMailTo(staffEmail)).toBeFalsy();
 
-    // Redeem it exactly like a self-service password reset — same endpoint,
-    // proving this is a REAL, usable path into the account, not just a link.
-    const redeem = await request(app)
-      .post('/api/v1/auth/reset-password')
-      .send({ token: resetToken, password: 'NewStr0ng!Passw0rd' });
-    expect(redeem.status).toBe(200);
-
+    // And the Store holds no password for the account (placeholder hash): no password signs in here.
     const login = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: staffEmail, password: 'NewStr0ng!Passw0rd' });
-    expect(login.status).toBe(200);
+    expect(login.status).toBe(401);
+    expect(login.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
-  it('an owner-supplied password still works even though a set-password link is also mailed', async () => {
+  it('an owner-supplied password is never forwarded or stored: the invitee sets it through the identity service', async () => {
     const run = crypto.randomUUID().slice(0, 8);
     const store = await seedPlainStore(run);
     const token = storeAdminAccessTokenFor(store.ownerId);
     const staffEmail = `owner-set-${run}@example.com`;
     clearCapturedMail();
+    invites.length = 0;
 
     const res = await request(app)
       .post(`/api/v1/stores/${store.storeId}/staff`)
@@ -127,30 +171,33 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
       });
     expect(res.status).toBe(201);
 
-    await waitForMailTo(staffEmail);
+    expect(invites).toHaveLength(1);
+    expect(JSON.stringify(invites[0])).not.toContain('OwnerChosen!9');
+    await awaitDeferredWork(5000);
     const login = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: staffEmail, password: 'OwnerChosen!9' });
-    expect(login.status).toBe(200);
+    expect(login.status).toBe(401);
+    expect(login.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
-  it('adding an EXISTING account to a second store sends a notice, not a new password link', async () => {
+  it('adding an EXISTING verified staff account to a second store sends a notice, not a new invitation or password link', async () => {
     const runA = crypto.randomUUID().slice(0, 8);
     const runB = crypto.randomUUID().slice(0, 8);
     const storeA = await seedPlainStore(runA);
     const storeB = await seedPlainStore(runB);
     const staffEmail = `shared-staff-${runA}@example.com`;
+    invites.length = 0;
 
     const firstAdd = await request(app)
       .post(`/api/v1/stores/${storeA.storeId}/staff`)
       .set('Authorization', `Bearer ${storeAdminAccessTokenFor(storeA.ownerId)}`)
-      .send({ email: staffEmail, firstName: 'Omar', lastName: 'Said', password: 'FirstPass!1' });
+      .send({ email: staffEmail, firstName: 'Omar', lastName: 'Said' });
     expect(firstAdd.status).toBe(201);
-    // Drain the first add's OWN deferred invite mail before clearing — it
-    // runs after the response (`deferAfterTenantCommit`), so it can still be
-    // in flight here; clearing too early would let it land AFTER the clear
-    // and be mistaken for the second add's notice.
-    await waitForMailTo(staffEmail);
+    // Drain the first add's OWN deferred work before clearing: it runs after the response (`deferAfterTenantCommit`).
+    await awaitDeferredWork(5000);
+    // The invitee has since finished the code step at the identity service.
+    verifiedStaff.add((await profile(staffEmail))!.id);
 
     clearCapturedMail();
     const secondAdd = await request(app)
@@ -161,11 +208,10 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
 
     const mail = await waitForMailTo(staffEmail);
     expect(tokenFromCapturedMail(mail), 'no set-password link for an existing account').toBeNull();
-
-    // The original password still works — the notice didn't touch it.
-    const login = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: staffEmail, password: 'FirstPass!1' });
-    expect(login.status).toBe(200);
+    expect(invites, 'no second identity is created for the same address').toHaveLength(1);
+    const user = await profile(staffEmail);
+    expect(
+      await prisma.storeStaff.count({ where: { userId: user!.id, storeId: storeB.storeId } })
+    ).toBe(1);
   });
 });

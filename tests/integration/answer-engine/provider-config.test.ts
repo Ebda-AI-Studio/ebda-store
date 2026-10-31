@@ -27,9 +27,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
 import { encryption } from '../../../apps/api/src/services/encryption.service';
 import { API_BASE } from '../../helpers/api-base';
+import { identityTokenFor } from '../../helpers/identity-session';
 
 // One knob (TEST_API_URL) configures the whole integration suite; see
 // tests/helpers/api-base.ts for why it is not the server's own API_URL — the
@@ -60,24 +60,13 @@ async function createUserAndLogin(role: 'super_admin' | 'store_admin'): Promise<
   });
   createdUserIds.push(user.id);
 
-  const res = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PW }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`login failed for ${role} (${res.status}): ${body}`);
-  }
-  const json = await res.json();
-  return json.data.accessToken as string;
+  // Admins sign in at the identity service; the stand-in mints its token (tests/helpers/identity-session.ts).
+  return identityTokenFor(user.id);
 }
 
 /**
- * Create a super_admin, enroll real TOTP MFA on them (begin → verify), then
- * log in again and complete the MFA challenge — mirroring the
- * "enrolled super_admin" flow in tests/integration/mfa-enforcement.test.ts.
- * Returns a fully-enrolled access token that clears `requireMfaEnrolled`.
+ * Create a super_admin with MFA enrolled (`mfaEnabled`, the flag `requireMfaEnrolled` reads). The TOTP enrol/verify flow now
+ * lives in the identity service, so the Store only sees the flag and an identity token.
  */
 async function createMfaEnrolledSuperAdminAndLogin(): Promise<string> {
   const email = `aei-provider-cfg-mfa-super-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.test`;
@@ -90,66 +79,12 @@ async function createMfaEnrolledSuperAdminAndLogin(): Promise<string> {
       role: 'super_admin',
       emailVerified: true,
       storeId: null,
+      mfaEnabled: true,
     },
     select: { id: true },
   });
   createdUserIds.push(user.id);
-
-  // First login (not yet enrolled) → normal access token.
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PW }),
-  });
-  if (!loginRes.ok) {
-    throw new Error(
-      `login failed for mfa super_admin (${loginRes.status}): ${await loginRes.text()}`
-    );
-  }
-  const loginJson = await loginRes.json();
-  const preEnrollToken = loginJson.data.accessToken as string;
-
-  // Begin + verify TOTP enrollment.
-  const beginRes = await fetch(`${API_URL}/auth/mfa/enroll/begin`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${preEnrollToken}` },
-  });
-  if (!beginRes.ok) {
-    throw new Error(`mfa enroll/begin failed (${beginRes.status}): ${await beginRes.text()}`);
-  }
-  const beginJson = await beginRes.json();
-  const secret = beginJson.data.secret as string;
-
-  const verifyEnrollRes = await fetch(`${API_URL}/auth/mfa/enroll/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${preEnrollToken}` },
-    body: JSON.stringify({ code: authenticator.generate(secret) }),
-  });
-  if (!verifyEnrollRes.ok) {
-    throw new Error(
-      `mfa enroll/verify failed (${verifyEnrollRes.status}): ${await verifyEnrollRes.text()}`
-    );
-  }
-
-  // Second login → MFA challenge required.
-  const login2Res = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PW }),
-  });
-  const login2Json = await login2Res.json();
-  const challengeToken = login2Json.data.challengeToken as string;
-
-  const mfaVerifyRes = await fetch(`${API_URL}/auth/mfa/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ challengeToken, code: authenticator.generate(secret) }),
-  });
-  if (!mfaVerifyRes.ok) {
-    throw new Error(`mfa verify failed (${mfaVerifyRes.status}): ${await mfaVerifyRes.text()}`);
-  }
-  const mfaVerifyJson = await mfaVerifyRes.json();
-  return mfaVerifyJson.data.accessToken as string;
+  return identityTokenFor(user.id);
 }
 
 function authHeaders(token: string) {

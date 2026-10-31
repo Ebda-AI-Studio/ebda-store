@@ -653,6 +653,7 @@ CREATE INDEX IF NOT EXISTS "catalog_import_items_job_id_status_idx" ON "catalog_
 CREATE INDEX IF NOT EXISTS "catalog_import_items_store_id_sku_idx" ON "catalog_import_items" ("store_id", "sku");
 CREATE INDEX IF NOT EXISTS "catalog_import_items_product_id_idx" ON "catalog_import_items" ("product_id");
 CREATE INDEX IF NOT EXISTS "catalog_import_items_category_id_idx" ON "catalog_import_items" ("category_id");
+CREATE INDEX IF NOT EXISTS "catalog_import_items_file_id_idx" ON "catalog_import_items" ("file_id");
 
 CREATE TABLE IF NOT EXISTS "catalog_import_jobs" (
   "id" TEXT NOT NULL,

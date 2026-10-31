@@ -104,13 +104,22 @@ describe.skipIf(!hasDb)('catalog after migrations', () => {
       await prisma.$executeRawUnsafe(stmt.slice(stmt.indexOf('INSERT INTO plans')));
     }
     // The replay is the migration history IN ORDER: the later migrations that merge a key into
-    // plans.limits re-apply too (B2B-1 adds "wholesalePricing"), or the blob stops matching the seeds.
-    const later = fs.readFileSync(
-      'packages/database/prisma/migrations/20261028000200_b2b_product_columns_order_snapshots/migration.sql',
-      'utf8'
-    );
-    for (const stmt of later.split(/;\s*\n/).filter(s => /UPDATE "plans" SET "limits"/.test(s))) {
-      await prisma.$executeRawUnsafe(stmt.slice(stmt.indexOf('UPDATE "plans"')));
+    // plans.limits re-apply too (B2B-1 adds "wholesalePricing", Business gets "whatsappAutomation", CATIMP-2 adds "catalogImportPagesPerMonth"), or the
+    // blob stops matching the seeds, and the replay would leave the shared catalog stale for every later test.
+    for (const migration of [
+      '20261028000200_b2b_product_columns_order_snapshots',
+      '20261104000200_business_plan_includes_whatsapp',
+      '20261108000200_catalog_import_plan_limits',
+    ]) {
+      const later = fs.readFileSync(
+        `packages/database/prisma/migrations/${migration}/migration.sql`,
+        'utf8'
+      );
+      for (const stmt of later
+        .split(/;\s*\n/)
+        .filter(s => /UPDATE "plans"\s+SET "limits"/.test(s))) {
+        await prisma.$executeRawUnsafe(stmt.slice(stmt.indexOf('UPDATE "plans"')));
+      }
     }
     for (const [code, storeId] of Object.entries(ids)) {
       const e = await getEntitlements(storeId);

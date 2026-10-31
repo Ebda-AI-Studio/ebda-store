@@ -27,6 +27,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { API_BASE } from '../../helpers/api-base';
+import { identityTokenFor } from '../../helpers/identity-session';
 
 // One knob (TEST_API_URL) configures the whole integration suite; see
 // tests/helpers/api-base.ts for why it is not the server's own API_URL.
@@ -77,20 +78,13 @@ async function createStoreAdminWithStore(
   });
   createdStoreIds.push(store.id);
 
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PW }),
-  });
-  if (!loginRes.ok) {
-    throw new Error(`login failed for ${label} (${loginRes.status}): ${await loginRes.text()}`);
-  }
-  const loginJson = await loginRes.json();
+  // Store admins sign in at the identity service; the stand-in mints its token.
+  const token = await identityTokenFor(user.id);
 
   return {
     storeId: store.id,
     userId: user.id,
-    token: loginJson.data.accessToken as string,
+    token,
     domain,
   };
 }

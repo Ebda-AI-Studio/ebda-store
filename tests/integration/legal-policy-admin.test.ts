@@ -58,6 +58,15 @@ const fixture = (effectiveInDays = 40, feeChange = true): LegalPolicies => ({
   },
 });
 const FIXTURE = fixture();
+/** A document whose CURRENT version is not material (the registry moves: 'privacy' became material at 1.1), so the NOT_MATERIAL and canSend=false paths keep a real subject. */
+const NON_MATERIAL_DOC = (Object.keys(FIXTURE) as Array<keyof LegalPolicies>).find(k => {
+  const h = FIXTURE[k].history;
+  return !h[h.length - 1].material;
+})!;
+const nonMaterialCurrent = () => {
+  const h = FIXTURE[NON_MATERIAL_DOC].history;
+  return h[h.length - 1].version;
+};
 
 function appUrl(): string {
   const u = new URL(OWNER_URL);
@@ -155,16 +164,18 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
     ]);
     const terms = rows.find(r => r.docKey === 'terms')!;
     expect(terms).toMatchObject({ current: { version: V }, canSend: true, send: null });
-    expect(rows.find(r => r.docKey === 'privacy')!.canSend).toBe(false);
+    expect(rows.find(r => r.docKey === NON_MATERIAL_DOC)!.canSend).toBe(false);
     expect(
       (await call('get', merchant, 'store_admin', '/api/v1/admin/legal-policies')).status
     ).toBe(403);
   });
 
   it('refuses a non-material, a non-current and an unknown document', async () => {
-    expect((await call('post', op, 'super_admin', sendUrl('privacy', '1.0'))).body.error.code).toBe(
-      'NOT_MATERIAL'
-    );
+    expect(NON_MATERIAL_DOC).toBeTruthy();
+    expect(
+      (await call('post', op, 'super_admin', sendUrl(NON_MATERIAL_DOC, nonMaterialCurrent()))).body
+        .error.code
+    ).toBe('NOT_MATERIAL');
     expect((await call('post', op, 'super_admin', sendUrl('terms', '1.0'))).body.error.code).toBe(
       'NOT_CURRENT'
     );

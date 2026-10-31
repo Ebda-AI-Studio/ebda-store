@@ -204,7 +204,11 @@ const stateOf = async (campaignId: string) => {
     select: { email: true, isActive: true },
     orderBy: { email: 'asc' },
   });
-  return { campaign, recipients, subs };
+  // Postgres orders text by the database collation (punctuation-insensitive on a glibc/ICU locale: '.c@' vs '.cart@'), SQLite
+  // by bytes: compare both backends in one byte order instead of trusting either ORDER BY.
+  const byEmail = (a: { email: string }, b: { email: string }) =>
+    a.email < b.email ? -1 : a.email > b.email ? 1 : 0;
+  return { campaign, recipients: [...recipients].sort(byEmail), subs: [...subs].sort(byEmail) };
 };
 
 async function runJob(c: { id: string; scheduledAt: Date | null }) {

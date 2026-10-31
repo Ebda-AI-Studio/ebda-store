@@ -6165,5 +6165,6 @@ model CatalogImportItem {
   @@index([storeId, sku])
   @@index([productId])
   @@index([categoryId])
+  @@index([fileId])
   @@map("catalog_import_items")
 }

@@ -31,6 +31,7 @@ import {
 } from '../../apps/api/src/lib/repo-factory';
 import { META, canon, insertSqlite, openSqlite } from '../../packages/repo/test/diff-harness';
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
+import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
 
 vi.mock('../../apps/api/src/lib/b2b-invalidate', async importOriginal => ({
   ...(await importOriginal<typeof import('../../apps/api/src/lib/b2b-invalidate')>()),
@@ -115,7 +116,19 @@ beforeAll(async () => {
     })
   ).id;
 });
+// A routed Store write (page publish) copies the changed settings to the store's DO after the authoritative write
+// (copyStoreSettings, CF-WRITES-2/3). Node has no DO binding, so bind a stub that accepts the copy; the copy itself is proven
+// by the applyStoreSettings test below, and what this file compares is the row parity of the writers.
+beforeAll(() => {
+  setCfBindings({
+    STORE_DO: {
+      idFromName: (n: string) => n,
+      get: () => ({ applySettings: async () => ({ ok: true }) }),
+    },
+  } as never);
+});
 afterAll(async () => {
+  clearCfBindings();
   await prisma.store.deleteMany({ where: { id: STORE } });
   await prisma.user.deleteMany({ where: { id: userId } });
   await prisma.$disconnect();
@@ -138,7 +151,9 @@ describe('products', () => {
         a,
         b,
         products: await rows('product', { orderBy: { slug: 'asc' } }),
+        // product_images has no store_id: the Postgres side here is the owner role (no RLS), so scope by this scenario's products.
         images: await ((await storeWriter(STORE)) as any).productImage.findMany({
+          where: { productId: { in: [a.id, b.id] } },
           orderBy: { position: 'asc' },
         }),
       };
