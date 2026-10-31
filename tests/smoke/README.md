@@ -89,10 +89,10 @@ For deeper coverage, write a normal e2e under `tests/e2e/` (Vitest + supertest, 
 `commerce-b0.spec.ts` is not a read-only prod smoke and **it does not run in CI**. It is a manual gate you run on a developer machine against a local seeded stack (setup recipe: [`commerce-b0.setup.md`](./commerce-b0.setup.md)). It drives the Phase B0 flow (swatches, struck Size x Length combo, facts, delivery chip, size guide, required personalisation, sticky add-to-cart bar, personalised cart lines, COD checkout, receipt-printer success page, admin order via API) and has its own Playwright project.
 
 ```bash
-export B0_OWNER_EMAIL=... B0_OWNER_PASSWORD=...   # env only, no credentials file
+export B0_OWNER_EMAIL=... B0_JWT_SECRET=... B0_DB_URL=...   # env only, no credentials file
 B0_REQUIRE_STACK=1 npx playwright test tests/smoke/commerce-b0.spec.ts --project=commerce-b0
 ```
 
 With `B0_REQUIRE_STACK=1` a missing stack or missing credentials FAILS the run. Without it the file skips itself (so a smoke run against a deployed environment is unaffected), and a skip is not a pass.
 
-Env: `B0_WEB_URL`, `B0_API_URL`, `B0_STORE_SLUG`, `B0_PRODUCT_SLUG`, `B0_OWNER_EMAIL`, `B0_OWNER_PASSWORD`, `B0_REQUIRE_STACK`. It writes to the local DB only (one size chart, product facts/personalisation/lead time, a COD config, one order) and restores the product, chart and COD config afterwards. The admin order step asserts through the admin API the order page calls; the admin UI is not driven.
+Env: `B0_WEB_URL`, `B0_API_URL`, `B0_STORE_SLUG`, `B0_PRODUCT_SLUG`, `B0_OWNER_EMAIL`, `B0_JWT_SECRET`, `B0_DB_URL`, `B0_REQUIRE_STACK`. It writes to the local DB only (one size chart, product facts/personalisation/lead time, a COD config, one order) and restores the product, chart and COD config afterwards. The admin order step asserts through the admin API the order page calls; the admin UI is not driven.
