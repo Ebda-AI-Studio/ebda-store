@@ -53,3 +53,12 @@ export async function runAxe(page: Page): Promise<AxeViolation[]> {
     );
   });
 }
+
+/**
+ * GET a URL through the BROWSER, which maps `*.localhost-b5.test` to loopback; Playwright's Node-side
+ * request context cannot resolve those names (SOUQ_HOST_BASE on a production build).
+ */
+export async function fetchVia(page: Page, url: string) {
+  const res = await page.goto(url, { waitUntil: 'domcontentloaded' });
+  return { status: res!.status(), text: await res!.text() };
+}

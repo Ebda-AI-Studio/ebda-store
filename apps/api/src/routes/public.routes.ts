@@ -75,6 +75,7 @@ import {
   CONTACT_HONEYPOT_FIELD,
   normalizeArabicSearch,
   normalizeLegacyTemplate,
+  deliveryLineFromNotes,
 } from '@ebda/shared';
 import {
   assertScalarQuery,
@@ -1539,7 +1540,8 @@ router.get(
       void _ip;
       void _notes;
       void _idem;
-      const visible = shopperOrder;
+      // The delivery pick, alone: `notes` stays hidden, but the receipt must show when it arrives.
+      const visible = { ...shopperOrder, deliveryLine: deliveryLineFromNotes(order.notes) };
       // The answer differs by token: never cache it shared.
       res.setHeader('Cache-Control', 'private, no-store');
       res.vary('X-Order-View-Token');

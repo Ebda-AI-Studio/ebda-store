@@ -126,6 +126,33 @@ function finishFeed() {
 }
 
 describe('ReceiptPrinter', () => {
+  it('prints the delivery pick (Ruling B4-7) in both locales, and nothing without one', () => {
+    const pick = 'الثلاثاء 3 نوفمبر، غدا 12-2 (12:00 م–2:00 م)';
+    render(
+      <ReceiptPrinter order={{ ...order, deliveryLine: pick }} paymentState="cod" store={store} />
+    );
+    finishFeed();
+    expect(screen.getByTestId('receipt-delivery-pick').textContent).toBe(pick);
+    expect(screen.getByText('التوصيل')).toBeTruthy();
+
+    cleanup();
+    lang = 'en';
+    render(
+      <ReceiptPrinter
+        order={{ ...order, deliveryLine: 'Tue 3 Nov, Lunch (12:00 PM–2:00 PM)' }}
+        paymentState="cod"
+        store={store}
+      />
+    );
+    finishFeed();
+    expect(screen.getByText('Delivery')).toBeTruthy();
+
+    cleanup();
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    finishFeed();
+    expect(screen.queryByTestId('receipt-delivery-pick')).toBeNull();
+  });
+
   it('cod receipt never says paid', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     finishFeed();

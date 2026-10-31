@@ -255,7 +255,8 @@ test('delivery date chips: today and tomorrow in words, windows per date, arrow 
   // a second dish carrying an order note
   await open(page, store, 'ar', NOTE_PDP);
   const note = 'من غير فستق';
-  await page.getByRole('textbox').first().fill(note);
+  // the dish's own note field, by its label (a tablet header also carries a search box)
+  await page.getByRole('textbox', { name: /ملاحظة على الطلب|Order note/ }).fill(note);
   await page.getByTestId('pdp-add').first().click();
   await page.waitForTimeout(1500);
   await open(page, store, 'ar', '/cart');

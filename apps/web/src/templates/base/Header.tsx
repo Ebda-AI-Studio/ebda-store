@@ -157,7 +157,9 @@ export default function MinimalHeader({
                   ? `top-3 ${logoPlacement ? 'max-w-[calc(100%-13rem)]' : 'max-w-[calc(100%-7rem)]'} md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]`
                   : logoPlacement
                     ? // the cart and language (96 px) sit on one side, so the centred logo may not reach them
-                      'max-w-[calc(100%-13rem)] md:max-w-none'
+                      // 768-1023 px: the hamburger is absolutely placed at the start, so the logo (a flex item
+                      // from md up) centres in the free space instead of sitting under it (WCAG 2.5.8 overlap)
+                      'max-w-[calc(100%-13rem)] md:max-w-none md:max-lg:mx-auto'
                     : 'max-w-[65%] md:max-w-none'
             }`}
           >

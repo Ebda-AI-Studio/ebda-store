@@ -1,7 +1,7 @@
 import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { storeDb, storeMoney } from '../../repo-factory';
-import { groupOrderLinesForDisplay } from '@ebda/shared';
+import { groupOrderLinesForDisplay, deliveryLineFromNotes } from '@ebda/shared';
 import { EmailService, type OrderEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -180,6 +180,7 @@ export const orderCreated: JobDef = inngest.createFunction(
       promotionName: order.appliedPromotion?.name ?? undefined,
       promotionNameAr: order.appliedPromotion?.nameAr ?? undefined,
       total: order.total,
+      deliveryLine: deliveryLineFromNotes(order.notes),
       shippingAddress: shippingAddress as OrderEmailData['shippingAddress'],
       isCod: (paymentMethod || '').toLowerCase() === 'cod',
     };
