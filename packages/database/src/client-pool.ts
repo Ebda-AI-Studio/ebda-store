@@ -44,7 +44,14 @@ export class ConnectionScope {
   constructor(
     private readonly connectionString: string,
     private readonly onPoolError: (err: Error) => void,
-    private readonly maxConnections: number
+    private readonly maxConnections: number,
+    /**
+     * Runs ONCE on the freshly connected adapter, before anything else may use it. A throw refuses
+     * the whole scope (every later `get()` of this request rejects with it) and ends the pool. This
+     * is the single point where a request first needs Postgres, so a safety check that must hold
+     * for every Postgres use (the role guard) lives here, lazily, not on the request's hot path.
+     */
+    private readonly onConnect?: (adapter: SqlDriverAdapter) => Promise<void>
   ) {}
 
   get(): Promise<SqlDriverAdapter> {
@@ -57,10 +64,19 @@ export class ConnectionScope {
         ...resolvePoolConfig(this.connectionString, this.maxConnections),
         Client: TextFallbackClient,
       });
-      return new PrismaPg(pool, {
+      const adapter = await new PrismaPg(pool, {
         disposeExternalPool: true,
         onPoolError: this.onPoolError,
       }).connect();
+      if (this.onConnect) {
+        try {
+          await this.onConnect(adapter);
+        } catch (err) {
+          await adapter.dispose().catch(() => undefined);
+          throw err;
+        }
+      }
+      return adapter;
     })();
     return this.adapter;
   }
@@ -253,6 +269,8 @@ export interface ClientRangeErrorContext {
 
 export interface ClientPoolOptions {
   connectionString: string;
+  /** See `ConnectionScope`'s `onConnect`: runs on each request's first Postgres use; a throw fails closed. */
+  onConnect?: (adapter: SqlDriverAdapter) => Promise<void>;
   /**
    * Clients (engines, ~3.3 MB each) per isolate; concurrent requests beyond this wait. Default 6.
    * Locally (no network latency) 4 and 8 drain a burst in the same time because the isolate is CPU
@@ -512,7 +530,8 @@ export class ClientPool {
     const scope = new ConnectionScope(
       this.opts.connectionString,
       this.opts.onPoolError ?? (() => undefined),
-      Math.max(1, this.opts.connectionsPerRequest ?? 3)
+      Math.max(1, this.opts.connectionsPerRequest ?? 3),
+      this.opts.onConnect
     );
     const held = slot;
     held.adapter.scope = scope;
