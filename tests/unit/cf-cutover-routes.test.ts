@@ -104,7 +104,10 @@ describe('routeCutover', () => {
     }
     const s = await routeCutover(new Request(URL_(ID, '__status'), { headers: bearer() }), e);
     expect(s?.status).toBe(200);
-    expect(fetched).toHaveLength(7);
+    // verify-store.mjs lists every DO's tables; a missing route made verify refuse every store on the deployed Worker
+    const t = await routeCutover(new Request(URL_(ID, '__tables'), { headers: bearer() }), e);
+    expect(t?.status).toBe(200);
+    expect(fetched).toHaveLength(8);
     expect(new Set(names)).toEqual(new Set([ID]));
   });
 
