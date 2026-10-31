@@ -2,6 +2,7 @@
 
 import { focusFirstError } from '@/lib/focus-first-error';
 import { signedText } from '@/lib/bidi';
+import { randomUuid } from '@/lib/uuid';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
@@ -1590,7 +1591,7 @@ export default function CheckoutClient() {
         : formData.notes;
 
       // ONE key per checkout attempt, kept across retries of the same submit (double tap, timeout) and dropped once an order exists
-      checkoutKeyRef.current ??= crypto.randomUUID();
+      checkoutKeyRef.current ??= randomUuid();
       const orderResult = await api.createOrder(
         {
           shippingAddress: {

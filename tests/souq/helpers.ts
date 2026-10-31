@@ -4,7 +4,11 @@ import path from 'node:path';
 const AXE = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 const PORT = process.env.SOUQ_PORT ?? '3200';
 
-export const hostOf = (store: string) => `http://${store}.localhost:${PORT}`;
+// SOUQ_HOST_BASE=localhost-b5.test drives a PRODUCTION web build, which refuses `.localhost` store
+// hosts (same as the other template suites; playwright.souq.config.ts maps the name to loopback).
+const HOST_BASE = process.env.SOUQ_HOST_BASE ?? 'localhost';
+
+export const hostOf = (store: string) => `http://${store}.${HOST_BASE}:${PORT}`;
 
 /** Open `p` on `store` in `lang` with the consent banner already accepted. */
 export async function open(page: Page, store: string, lang: 'ar' | 'en', p: string) {

@@ -191,12 +191,30 @@ test('the card stepper: the add control becomes - qty + once the dish is in the 
 }) => {
   test.skip((page.viewportSize()?.width ?? 0) > 420, 'the bar and the tab bar are phone surfaces');
   await open(page, 'lamma-market', 'ar', '/products');
-  const card = page.locator('article:has([data-cta="button"], [data-cta="add-compact"])').first();
-  await card.locator('[data-cta="button"], [data-cta="add-compact"]').click();
+  // A dish with portion sizes shows a "View" LINK that also carries data-cta="button": only a real
+  // <button> adds to the cart, and /products leads with the newest dish, which can be a variant one.
+  const add = 'button[data-cta="button"], button[data-cta="add-compact"]';
+  // Pinned by index: once the stepper replaces the add button the card no longer matches `add`, and
+  // a `:has(add).first()` locator would silently move on to the NEXT dish.
+  const at = await page
+    .locator('article')
+    .evaluateAll((els, sel) => els.findIndex(e => e.querySelector(sel)), add);
+  expect(at, 'a dish with an add button').toBeGreaterThanOrEqual(0);
+  const card = page.locator('article').nth(at);
+  await card.locator(add).click();
   await expect(card.locator('[data-cta="stepper"]')).toBeVisible();
   for (const b of await card.locator('[data-cta="stepper"] button').all())
     expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // CardStepper ignores a tap while its previous cart call is in flight (double-tap guard), so each
+  // stepper tap waits for its own PUT/DELETE response (not the add's POST) before the next one.
+  const cartCall = () =>
+    page.waitForResponse(
+      r =>
+        /\/cart\/items\//.test(r.url()) && ['PUT', 'PATCH', 'DELETE'].includes(r.request().method())
+    );
+  let settled = cartCall();
   await card.getByRole('button', { name: 'زيادة الكمية' }).click();
+  await settled;
   await expect(card.getByRole('status')).toHaveText('2');
   // ONE bottom layer: the browse cart bar is up and the tab bar is hidden
   await expect(page.getByTestId('sticky-browse-cart-bar')).toBeVisible();
@@ -212,7 +230,9 @@ test('the card stepper: the add control becomes - qty + once the dish is in the 
   // the minimum order (150 EGP) reads as progress while the basket is under it
   await expect(page.getByTestId('min-order-progress').first()).toBeVisible();
   // - at 1 removes the line
+  settled = cartCall();
   await card.getByRole('button', { name: 'إنقاص الكمية' }).click();
+  await settled;
   await expect(card.getByRole('status')).toHaveText('1');
   // at 1 the same button removes the line and is NAMED for it (a11y P2-2)
   await card.getByRole('button', { name: 'إزالة من السلة' }).click();

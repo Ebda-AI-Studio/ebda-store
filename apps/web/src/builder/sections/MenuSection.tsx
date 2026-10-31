@@ -131,9 +131,11 @@ export function MenuSection({
     const s = strip.getBoundingClientRect();
     if (c.left < s.left || c.right > s.right) {
       const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      cur.scrollIntoView({
-        inline: 'nearest',
-        block: 'nearest',
+      // Scroll the STRIP only. `cur.scrollIntoView` is a second smooth scroll on the window: it
+      // supersedes the anchor jump the tap just started, which then stops where it is (a tab half
+      // outside the strip never reached its group). scrollBy is signed in both directions (RTL too).
+      strip.scrollBy({
+        left: c.left < s.left ? c.left - s.left : c.right - s.right,
         behavior: reduce ? 'auto' : 'smooth',
       });
     }

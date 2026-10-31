@@ -349,15 +349,16 @@ test('Apothecary on white-background merchant photos: no white rectangle on the 
   ).toBe(true);
 });
 
-test('Arabic-Indic numerals pass: a store that opts in shows Arabic-Indic digits on the PDP price', async ({
+test('Western digits only (Ruling DIGITS-1): a store carrying the retired arabicNumerals flag still shows 0-9 on the PDP price', async ({
   page,
 }) => {
-  await open(page, 'jasmine-edge-light', 'ar', SHADE_PDP);
-  const price = (await page.locator('[data-zone="productPrice"]').first().innerText()).trim();
-  expect(price, 'Arabic-Indic digits').toMatch(/[٠-٩]/);
-  await open(page, 'jasmine-clinic', 'ar', SHADE_PDP);
-  const western = (await page.locator('[data-zone="productPrice"]').first().innerText()).trim();
-  expect(western, 'Western digits by default').toMatch(/[0-9]/);
+  // jasmine-edge-light is seeded with theme.arabicNumerals = true; DIGITS-1 ignores that flag.
+  for (const store of ['jasmine-edge-light', 'jasmine-clinic']) {
+    await open(page, store, 'ar', SHADE_PDP);
+    const price = (await page.locator('[data-zone="productPrice"]').first().innerText()).trim();
+    expect(price, `${store}: Western digits`).toMatch(/[0-9]/);
+    expect(price, `${store}: no Arabic-Indic digits`).not.toMatch(/[٠-٩]/);
+  }
 });
 
 test('slow 3G: the Clinic home paints its content with no layout shift', async ({

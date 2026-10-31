@@ -19,6 +19,7 @@ import {
   seedStoreClaim,
   SHOWROOM_THEME,
   marketGoldRates,
+  pickNewIn,
   // @ts-expect-error plain .mjs script
 } from '../../scripts/storedemo/seed.mjs';
 // @ts-expect-error plain .mjs data module
@@ -508,5 +509,23 @@ describe('dahab seed gold rates track the market', () => {
   it('the fallback constants stay within the 500 bps jump gate of market (24k 7,101 EGP/g on 2026-10-23)', () => {
     const k24 = TEMPLATE_SPECS.dahab.gold.rates.find((x: { karat: number }) => x.karat === 24)!;
     expect(Math.abs(k24.ratePerGram - 710_142) / 710_142).toBeLessThan(0.05);
+  });
+});
+
+describe('pickNewIn ("New in" flags)', () => {
+  it('flags 12 photo products for every template', () => {
+    for (const spec of Object.values(TEMPLATE_SPECS) as { products: { images: string[] }[] }[])
+      expect(pickNewIn(spec, 12).size).toBe(12);
+  });
+
+  it('Lamma flags at least one dish in every category, so the Table menu shows every tab', () => {
+    const spec = TEMPLATE_SPECS.lamma;
+    const slugs = pickNewIn(spec, 12) as Set<string>;
+    const cats = new Set(
+      spec.products
+        .filter((p: { slug: string }) => slugs.has(p.slug))
+        .map((p: { category: string }) => p.category)
+    );
+    expect(cats.size).toBe(spec.categories.length);
   });
 });

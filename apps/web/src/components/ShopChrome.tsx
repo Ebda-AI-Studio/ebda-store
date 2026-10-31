@@ -34,6 +34,27 @@ import { CardStepperProvider } from '../templates/shared/card-stepper-context';
  */
 const ANNOUNCEMENT_BAR_MIN_PX = 41;
 const HEADER_MIN_PX = 68;
+/**
+ * Header heights of the look stores at 390 px, measured after hydration (2026-10-31, `main` top minus the 41 px
+ * announcement row). The placeholder reserves the look's own height, so the page moves by nothing when the real
+ * header arrives (Qamar lookbook moved 27 px: CLS 0.100-0.151 on slow 3G, budget 0.1). A look missing here keeps
+ * HEADER_MIN_PX. Re-measure when a look's header changes.
+ */
+const LOOK_HEADER_PX: Record<string, number> = {
+  'qamar.atelier': 92,
+  'qamar.lookbook': 95,
+  'qamar.vitrine': 120,
+  'souq.catalogue': 124,
+  'souq.night': 75,
+  'jasmine.apothecary': 95,
+  'jasmine.bloom': 75,
+  'lamma.table': 78,
+  'lamma.notebook': 75,
+  'lamma.market': 75,
+  'dahab.worn': 65,
+  'dahab.workshop': 65,
+  'dahab.giftbox': 65,
+};
 
 interface ShopChromeProps {
   children: ReactNode;
@@ -367,7 +388,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
                 .join(' ') || undefined
             }
           >
-            <div aria-hidden className="border-b" style={{ minHeight: HEADER_MIN_PX }} />
+            <div
+              aria-hidden
+              className="border-b"
+              style={{ minHeight: LOOK_HEADER_PX[store?.look ?? ''] ?? HEADER_MIN_PX }}
+            />
           </div>
           <main role="main" className="flex-1">
             {children}
