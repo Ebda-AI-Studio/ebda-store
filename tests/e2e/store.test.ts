@@ -12,7 +12,7 @@ import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { authenticate } from '@api/middleware/auth';
-import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
+import { createSuperAdminWithMfa, loginAsSuperAdmin, mintAccessToken } from './helpers/mfa-login';
 
 const app = express();
 app.use(express.json());
@@ -77,11 +77,11 @@ describe('Store Management', () => {
     // Login super admin — completes MFA challenge automatically
     superAdminToken = await loginAsSuperAdmin(app, superAdminUser.email, superAdminUser.password);
 
-    const storeAdminLogin = await request(app).post('/auth/login').send({
+    storeAdminToken = mintAccessToken({
+      id: storeAdmin.id,
       email: storeAdminUser.email,
-      password: storeAdminUser.password,
+      role: 'store_admin',
     });
-    storeAdminToken = storeAdminLogin.body.data?.accessToken;
   });
 
   afterAll(async () => {

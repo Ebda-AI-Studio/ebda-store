@@ -11,6 +11,12 @@ import { defineConfig, devices } from '@playwright/test';
 //     `<slug>.localhost-b4.test` (stores.domain, local DB only; the name contains "localhost" so the
 //     API's dev CORS rule admits the origin) and the browser maps `*.localhost-b4.test` to loopback
 //     (LAMMA_HOST_BASE=localhost-b4.test adds `--host-resolver-rules=MAP *.localhost-b4.test 127.0.0.1`).
+// SAME-SITE API (needed by every test that signs a customer in, e.g. "order again"): the API sets its refresh
+// cookie SameSite=Lax outside production, and a Lax cookie is not sent on a fetch from `<slug>.localhost-b4.test`
+// to `localhost:4000` (cross-site), so the session restore got 401 on tablet and desktop. Build and start the web
+// with NEXT_PUBLIC_API_URL=http://api.<LAMMA_HOST_BASE>:<api port>/api/v1 (the browser maps `*.<HOST_BASE>` to
+// loopback; the Next server needs the same name mapped, e.g. `node --require` a dns.lookup patch), so web and API
+// share one site. Proven 2026-10-31: the same test passes on tablet and desktop once the API host is same-site.
 // Never reads a production URL. Not part of CI.
 const PORT = process.env.LAMMA_PORT ?? '3400';
 const HOST_BASE = process.env.LAMMA_HOST_BASE ?? 'localhost';

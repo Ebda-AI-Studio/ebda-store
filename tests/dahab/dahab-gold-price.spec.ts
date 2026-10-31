@@ -7,16 +7,20 @@
  * sentence). Store: `dahab-gold` (scripts/storedemo/scenario-stores.mjs --template dahab), whose owner can
  * log in. LOCAL ONLY: it writes rates, an order and backdates a rate row through the owner DB URL.
  *
+ * Needs DAHAB_JWT_SECRET (the local API's JWT secret): merchants sign in at the identity service, so the spec mints the
+ * owner's token instead of calling POST /auth/login (409 USE_IDENTITY_SERVICE).
+ *
  * Runs at 390-ar and 1280-en (the phone and desktop projects of playwright.dahab.config.ts).
  */
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+import jwt from 'jsonwebtoken';
 import { open, runAxe, fillShipping, placeCodOrder, releaseOpenHolds, GOLD_PDP } from './helpers';
 
 const STORE = 'dahab-gold';
 const API = process.env.DAHAB_API ?? 'http://localhost:4000/api/v1';
 const DB = process.env.DAHAB_DB_URL ?? process.env.TEST_DATABASE_URL ?? '';
-const OWNER = { email: 'dahab-gold-owner@example.test', password: 'Gold-Owner-1' };
+const OWNER = { email: 'dahab-gold-owner@example.test' };
 const BASE_RATE = 410_000; // 21 karat, piastres per gram: 4,100 EGP
 const MOVED_RATE = 430_000; // +4.9 %, under the 5 % jump gate, so no confirmation is asked
 
@@ -48,16 +52,28 @@ test.beforeAll(async () => {
   expect(DB, 'DAHAB_DB_URL or TEST_DATABASE_URL (a LOCAL owner URL) is required').toMatch(
     /127\.0\.0\.1|localhost|192\.168\.64\./
   );
-  const login = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(OWNER),
-  });
+  // Merchants sign in at the identity service now (POST /auth/login answers 409 USE_IDENTITY_SERVICE), so a
+  // local run mints the owner's API token the way the integration tests do: the API's own JWT secret
+  // (DAHAB_JWT_SECRET, the secret the local API was started with) over the seeded owner's id.
+  const secret = process.env.DAHAB_JWT_SECRET;
+  expect(secret, 'DAHAB_JWT_SECRET (the local API JWT secret) is required').toBeTruthy();
+  const db = new pg.Client({ connectionString: DB });
+  await db.connect();
+  const owner = await db.query('select id from users where email = $1', [OWNER.email]);
+  await db.end();
   expect(
-    login.status,
-    'the dahab-gold owner can log in (scenario-stores.mjs --template dahab)'
-  ).toBe(200);
-  token = (await login.json()).data.accessToken;
+    owner.rowCount,
+    'the dahab-gold owner is seeded (scenario-stores.mjs --template dahab)'
+  ).toBe(1);
+  token = jwt.sign(
+    { userId: owner.rows[0].id, email: OWNER.email, role: 'store_admin', tv: 0 },
+    secret!,
+    {
+      expiresIn: '30m',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
+    }
+  );
   const resolved = await fetch(`${API}/public/store/resolve`, {
     headers: { 'x-store-domain': `${STORE}.${process.env.DAHAB_HOST_BASE ?? 'localhost-b5.test'}` },
   });
