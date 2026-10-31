@@ -295,6 +295,8 @@ jobs:
       - name: Type check (affected workspaces)
         env:
           TSCONFIGS: ${{ needs.changes.outputs.typecheck }}
+          # 4 GB, not the 2 GB default: a fold-sized affected set ran tsc out of heap on Umbra (#367).
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           status=0
           for p in $TSCONFIGS; do
@@ -352,7 +354,7 @@ jobs:
       - name: Run unit tests (affected paths)
         env:
           UNIT_PATHS: ${{ needs.changes.outputs.unit }}
-          NODE_OPTIONS: --max-old-space-size=2048
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npx vitest run $UNIT_PATHS --reporter=verbose --retry=0
 
       # The editor control matrix and the classic-builder parity ratchet (plan 2026-10-22-visual-editor,
@@ -1056,6 +1058,8 @@ jobs:
           ADMIN_EMAIL: admin@ebda.app
 
       - name: Build API
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build -w apps/api
 
       - name: Give ebda_app a CI-only login for the API server
