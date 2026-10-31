@@ -5,6 +5,7 @@ import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
 import { storeMoney, storeRepo } from '../../repo-factory';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
+import { shippingAddressNotAnonymized } from './order-anonymize-where';
 import { inngest } from '../client';
 import { auditLog } from '../../../middleware/security';
 import {
@@ -299,12 +300,7 @@ export const orderAnonymizeAtFiveYears: JobDef = inngest.createFunction(
               where: {
                 storeId,
                 createdAt: { lt: cutoff },
-                NOT: {
-                  shippingAddress: {
-                    path: ['anonymized'],
-                    equals: true,
-                  },
-                },
+                ...shippingAddressNotAnonymized,
               },
               select: { id: true, storeId: true, createdAt: true },
               take: ORDER_ANONYMIZE_BATCH_CAP,
