@@ -1617,7 +1617,11 @@ export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
     // applied after the tx COMMITS (dropped on rollback), and the caller gets the projected row; with no post-commit hook available
     // (a job's own transaction) it is refused, so that caller gets a proper port.
     if ((db as unknown) !== (prisma as unknown))
-      return (await storeUpdateAfterCommit(db as object, id, a)) as Prisma.StoreGetPayload<A>;
+      return (await storeUpdateAfterCommit(
+        db as object,
+        id,
+        a as never
+      )) as Prisma.StoreGetPayload<A>;
     // The base `prisma` proxy writes into the AMBIENT tenant transaction (`withStore` hands callers `prisma` itself, not a registered
     // tx object). An ENTITLEMENT / lifecycle change (plan, billing suspension, status) made there must not outlive that transaction's
     // rollback (a free upgrade, a re-activation): it applies after the AMBIENT transaction commits, when one with a hook registry
@@ -1625,7 +1629,7 @@ export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
     if (touchesEntitlement(a.data as Record<string, unknown>)) {
       let write: (() => Promise<void>) | undefined;
       if (afterTenantTxCommit(() => write?.())) {
-        const projected = await projectStoreUpdate(id, a);
+        const projected = await projectStoreUpdate(id, a as never);
         const patch = Object.fromEntries(
           Object.entries(a.data as object).filter(([, v]) => v !== undefined)
         );
@@ -1746,7 +1750,8 @@ export async function closeDoIfNoMoney(storeId: string): Promise<{ token: string
 export async function reopenDoAfterFailedDelete(storeId: string, token: string): Promise<void> {
   const stub = storeDo(storeId) as unknown as {
     reopenAfterFailedDelete(
-      id: string
+      id: string,
+      token: string
     ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
   };
   const r = await stub.reopenAfterFailedDelete(storeId, token);
