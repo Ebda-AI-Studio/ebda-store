@@ -556,13 +556,25 @@ export class FiscalDocumentService {
   /** Paged list for the merchant's Invoices page. */
   static async list(
     storeId: string,
-    opts: { cursor?: string; limit?: number; docType?: FiscalDocTypeValue } = {}
+    opts: { cursor?: string; limit?: number; docType?: FiscalDocTypeValue; q?: string } = {}
   ) {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
     const rows = await (
       await storeDb(storeId)
     ).fiscalDocument.findMany({
-      where: { storeId, ...(opts.docType ? { docType: opts.docType } : {}) },
+      where: {
+        storeId,
+        ...(opts.docType ? { docType: opts.docType } : {}),
+        // Document numbers are issued upper-case (INV-000042), so an upper-cased substring needs no case-insensitive mode.
+        ...(opts.q
+          ? {
+              OR: [
+                { number: { contains: opts.q.toUpperCase() } },
+                { originalNumber: { contains: opts.q.toUpperCase() } },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ issuedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),

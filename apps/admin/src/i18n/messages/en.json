@@ -7714,7 +7714,25 @@
       "bootstrapCodeLabel": "E-mailed code (6 digits)",
       "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
       "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
-      "savedSignInAgainButton": "Saved, sign me out"
+      "savedSignInAgainButton": "Saved, sign me out",
+      "phone": {
+        "title": "Phone number",
+        "description": "The number on your account. It is where a password-reset code goes over WhatsApp when that is switched on, so changing it needs your password (and your authenticator code if 2FA is on).",
+        "current": "Current number",
+        "none": "No number saved yet.",
+        "newLabel": "New phone number",
+        "newPlaceholder": "e.g. +20 100 123 4567",
+        "passwordLabel": "Your password",
+        "codeLabel": "Authenticator code",
+        "save": "Change number",
+        "saving": "Saving…",
+        "saved": "Phone number updated.",
+        "errorPassword": "That password is not right.",
+        "errorCode": "That authenticator code is not right.",
+        "errorInvalid": "Enter a valid phone number, with the country code if it is not an Egyptian number.",
+        "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
+        "errorGeneric": "Could not change the number. Try again."
+      }
     }
   },
   "answerEngine": {
@@ -8576,8 +8594,12 @@
       "title": "Plan & trial",
       "chosenPlan": "Chosen plan",
       "nextCharge": "Next charge",
-      "nextChargeLine": "{amount} for {plan} on {date}",
-      "nextChargeNoAmount": "{plan} on {date}"
+      "nextChargeLine": "{amount} ({interval}) for {plan} on {date}",
+      "nextChargeNoAmount": "{plan} on {date}",
+      "instapayDue": "Payment due",
+      "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
+      "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
+      "returnsToFree": "Your plan returns to Free if it is not paid by then."
     },
     "pay": {
       "title": "Payment method",
@@ -8876,7 +8898,7 @@
       "retry": "Try again",
       "plan": {
         "title": "Choose your plan",
-        "trialNote": "Every plan starts with a 14-day Growth trial. On day 15 you're charged for the plan you pick.",
+        "trialNote": "Every plan starts with a 14-day Growth trial. On day 15 the plan you pick is due; if it is not paid, your store returns to the Free plan.",
         "monthly": "Monthly",
         "yearly": "Annual",
         "saveBadge": "Save 25%",
@@ -8899,7 +8921,7 @@
         "noOption": "No payment method can be set up right now. You can continue and add one from Billing before you launch.",
         "cardTitle": "Card",
         "cardSaved": "Card saved:",
-        "cardBody": "Save a card. Nothing is charged now; we charge {amount} for {plan} on {date}.",
+        "cardBody": "Save a card. Nothing is charged now; we charge {amount} ({interval}) for {plan} on {date}.",
         "cardBodyNoAmount": "Save a card. Nothing is charged now; we charge the plan you chose on {date}.",
         "cardCta": "Save a card",
         "redirecting": "Redirecting to the secure page…",
@@ -8915,7 +8937,9 @@
         "copied": "Copied",
         "instapayUnavailable": "InstaPay is not available right now.",
         "instapayFailed": "We could not set up InstaPay. Please try again.",
-        "continueAnyway": "Continue without payment for now"
+        "continueAnyway": "Continue without payment for now",
+        "intervalMonthly": "monthly",
+        "intervalYearly": "yearly"
       }
     },
     "setupGuide": {
@@ -9437,7 +9461,8 @@
       "loading": "Loading the document…",
       "loadFailed": "Could not load the document.",
       "printFailed": "Could not open the print dialog."
-    }
+    },
+    "searchPlaceholder": "Search by document number"
   },
   "taxArchive": {
     "title": "Tax archive",

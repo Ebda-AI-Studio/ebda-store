@@ -45,7 +45,12 @@ import {
   type BillingWebhookEvent,
   type ChargeResult,
 } from './types';
-import { getBillingProvider, getBillingProviderByName, resolveTrialCardMode } from './index';
+import {
+  getBillingProvider,
+  getBillingProviderByName,
+  resolveBillingProviderName,
+  resolveTrialCardMode,
+} from './index';
 import {
   DUNNING_RETRY_DAYS,
   FREE_PLAN_CODE,
@@ -1920,6 +1925,14 @@ export async function getSubscriptionBillingState(storeId: string) {
   } catch {
     trialCardMode = null;
   }
+  // Ruling BILLING-NONE-COPY-1: with BILLING_PROVIDER=none (InstaPay only) no card is ever charged, so the merchant
+  // screens must say "payment due", not "next charge". Resolving the provider throws exactly then (and when unset in prod).
+  let cardBilling = true;
+  try {
+    resolveBillingProviderName();
+  } catch {
+    cardBilling = false;
+  }
   const store = await withStore(storeId, tx =>
     tx.store.findUnique({
       where: { id: storeId },
@@ -1982,6 +1995,7 @@ export async function getSubscriptionBillingState(storeId: string) {
     trialEndsAt: sub?.status === 'trialing' ? sub.trialEndsAt : null,
     nextCharge: next,
     trialCardMode,
+    cardBilling,
   };
 }
 
