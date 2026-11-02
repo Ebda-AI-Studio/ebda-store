@@ -18,10 +18,10 @@
     },
     "/whatsapp": {
       "jsGzipKb": 193,
-      "htmlGzipKb": 21
+      "htmlGzipKb": 22
     },
     "/legal/whatsapp-terms": {
-      "htmlGzipKb": 26
+      "htmlGzipKb": 27
     },
     "/terms": {
       "htmlGzipKb": 21.5
@@ -40,10 +40,10 @@
     },
     "/en/whatsapp": {
       "jsGzipKb": 193,
-      "htmlGzipKb": 21
+      "htmlGzipKb": 22
     },
     "/en/legal/whatsapp-terms": {
-      "htmlGzipKb": 26
+      "htmlGzipKb": 27
     },
     "/terms": {
       "htmlGzipKb": 22
@@ -57,5 +57,6 @@
   "_lcp": "TARGET lcpMs=2500 (plan: mobile LCP < 2.5 s). GATE lcpGateMs fails the PR. Measured 2026-10-26 on a loaded dev Mac (host load ~30, Lighthouse mobile simulated throttling, median of 3): / = 6226 ms, /en/ = 6213 ms, i.e. the target is NOT met today. The gate sits above that so it catches a regression without blocking every PR; ratchet it down as the LCP work lands, and re-measure on the CI runner first (INFERRED, not CI-measured).",
   "lcpGateMs": 9000,
   "_chat": "2026-11-02 (QA sweep batch 1): home html gzip is 53KB limit, was 52.5KB. The Ebda Chat rename (#388, merged 14:31Z without this lane running) grew / to 52.8KB on the CI runner (measured, run 41470702518). A reviewed bump of 0.5KB; trim the home copy to ratchet it back down.",
+  "_wa1": "2026-11-02 (Ruling PERF-BUDGET-WA-1): /whatsapp(+/en) html 21 -> 22KB and /legal/whatsapp-terms(+/en) 26 -> 27KB; CI run 41488612797 measured 21.1KB and 26.2KB after WhatsApp copy/phone/Latin-digit fixes (no marketing source changed on this branch).",
   "_wave2": "WAVE-2 (2026-10-27, Ruling PERF-BUDGET-WAVE2-1): the merged wave measured on the CI runner: home 196.7KB js, /features and /whatsapp 180.5KB js, /legal/whatsapp-terms 21.1KB html (vendored WhatsApp legal text). Per-page overrides sit ~0.5-1KB above those numbers and must ratchet DOWN, never up, without a reviewed reason."
 }
