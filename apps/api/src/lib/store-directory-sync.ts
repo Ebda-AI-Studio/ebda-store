@@ -19,7 +19,6 @@
 import { withStore } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
-import { deferAfterTenantCommit } from './after-tenant-commit';
 import { STORE_D1_ONLY_FIELDS, STORE_MIRROR_FIELDS, d1StorePatch } from './store-columns';
 
 interface D1Stmt {
@@ -77,6 +76,8 @@ export async function scheduleStoreDirectorySync(
 ): Promise<void> {
   if (!d1()) return;
   if (Object.keys(d1StorePatch(patch)).length === 0) return;
+  // Lazy: after-tenant-commit pulls the logger / config / alerts graph, which repo-factory's other importers must not load eagerly.
+  const { deferAfterTenantCommit } = await import('./after-tenant-commit.js');
   await deferAfterTenantCommit('store.directory.sync', () => syncStoreDirectoryFromPg(storeId));
 }
 
