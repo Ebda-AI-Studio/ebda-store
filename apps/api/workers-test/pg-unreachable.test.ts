@@ -24,6 +24,14 @@ describe.skipIf(e.E2E_DB === '1')('built Worker with Postgres unreachable', () =
     expect('deploymentId' in body).toBe(true);
   });
 
+  it('an unknown store slug is a 404 from D1 (NEON-ZERO-1), a reserved label too, never a Postgres 500', async () => {
+    await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
+    const res = await e.API.fetch('https://api.ebda.app/api/v1/public/stores/no-such-store-zz9');
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('STORE_NOT_FOUND');
+  });
+
   it('a Durable Object store answers its reads (seed + counts) without Postgres', async () => {
     // The flipped state of production: the store is `do` in D1 `ebda-platform`.
     await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
