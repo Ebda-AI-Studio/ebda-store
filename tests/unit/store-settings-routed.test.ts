@@ -15,8 +15,11 @@ import path from 'node:path';
 import ts from 'typescript';
 
 const ROOT = path.resolve(__dirname, '../../apps/api/src');
-/** the helpers themselves hold the one real `db.store.update(` */
-const ALLOWLIST = new Set(['lib/repo-factory.ts']);
+/**
+ * the helpers themselves hold the one real `db.store.update(`; the reconciler's raw statement writes the D1 DIRECTORY row of a `do`
+ * store (restrictive direction only, Ruling NZ-D14), never the Postgres Store row this gate protects
+ */
+const ALLOWLIST = new Set(['lib/repo-factory.ts', 'lib/store-directory-reconcile.ts']);
 const WRITES = new Set(['update', 'updateMany', 'upsert']);
 
 function files(dir: string): string[] {

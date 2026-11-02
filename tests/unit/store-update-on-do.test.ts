@@ -21,6 +21,8 @@ const realHooks = vi.hoisted(() => ({
   afterTxCommit: (_tx: object, _fn: () => unknown): boolean => false,
 }));
 const h = vi.hoisted(() => ({
+  /** Fake Postgres `stores` rows: the authoritative home of plan / billing / status / deletion (Ruling NZ-D20). */
+  pg: new Map<string, Record<string, unknown>>(),
   d1: null as unknown,
   doDb: null as unknown,
   doCalls: [] as string[],
@@ -31,8 +33,27 @@ vi.mock('@ebda/database', () => {
     throw new Error('POSTGRES TOUCHED');
   };
   return {
-    prisma: new Proxy({}, { get: boom }),
-    withStore: boom,
+    prisma: new Proxy(
+      {},
+      {
+        get: (_t, k) =>
+          k === 'store'
+            ? {
+                update: async ({ where, data }: any) =>
+                  void Object.assign(h.pg.get(where.id) ?? {}, data),
+              }
+            : boom(),
+      }
+    ),
+    withStore: async (id: string, fn: (tx: unknown) => unknown) =>
+      fn({
+        store: {
+          findUnique: async ({ select }: any) => {
+            const r = h.pg.get(id);
+            return r ? Object.fromEntries(Object.keys(select).map(k => [k, r[k] ?? null])) : null;
+          },
+        },
+      }),
     withUser: boom,
     withSystemJob: boom,
     afterTxCommit: (tx: object, fn: () => unknown) => realHooks.afterTxCommit(tx, fn),
@@ -79,14 +100,28 @@ vi.mock('../../apps/api/src/lib/identity-client', () => ({
 import { prisma } from '@ebda/database';
 import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
 import { applyStoreUpdateRetry } from '../../apps/api/src/lib/store-update-retry';
-import { storeUpdate, storeUpdateMany, storeWritesToDo } from '../../apps/api/src/lib/repo-factory';
+import {
+  storeUpdate,
+  storeUpdateMany,
+  storeWritesToDo,
+  syncStoreEntitlement,
+} from '../../apps/api/src/lib/repo-factory';
 import { afterTxCommit, runCommitHooks } from '../../packages/database/src/tx-hooks';
 import { withMoneyTx } from '../../packages/database/src/with-money-tx';
 
 realHooks.afterTxCommit = afterTxCommit;
 /** A fake Prisma whose $transaction runs the callback with a fresh tx object and COMMITS unless it throws. */
 const fakePrisma = {
-  $transaction: async (cb: (tx: object) => unknown) => cb({ id: Math.random() }),
+  $transaction: async (cb: (tx: object) => unknown) => {
+    const staged: Array<[string, Record<string, unknown>]> = [];
+    const tx = {
+      id: Math.random(),
+      store: { update: async ({ where, data }: any) => void staged.push([where.id, data]) },
+    };
+    const out = await cb(tx);
+    for (const [id, data] of staged) Object.assign(h.pg.get(id) ?? {}, data); // commit; a throw above discards them
+    return out;
+  },
 } as never;
 
 /** The base (non-transaction) client: what a service with no open transaction passes. */
@@ -148,6 +183,15 @@ beforeEach(() => {
         "INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES (?,?,?, 'owner-1')"
       )
       .run(id, slug, slug);
+  h.pg.clear();
+  for (const id of [S, T])
+    h.pg.set(id, {
+      plan: 'starter',
+      status: 'active',
+      billingSuspendedReason: null,
+      billingSuspendedAt: null,
+      deletedAt: null,
+    });
   h.doCalls.length = 0;
   realHooks.ambient = null;
   realHooks.failD1Writes = 0;
@@ -346,68 +390,77 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
       } as never);
       expect(d1row(S).plan).toBe('enterprise');
     });
-    it('a post-commit D1 failure is ALERTED, a retry is queued, and the retry converges (D1 and the DO match)', async () => {
-      const sent: unknown[] = [];
-      setCfBindings({ JOBS_QUEUE: { send: async (m: unknown) => void sent.push(m) } } as never);
-      const { sendAlert } = await import('../../apps/api/src/services/alerts.service');
-      (sendAlert as ReturnType<typeof vi.fn>).mockClear();
+    const commitPlan = async (plan: string, failD1: boolean) => {
       const ambient: Array<() => unknown> = [];
       realHooks.ambient = ambient;
       await storeUpdate(BASE, {
         where: { id: S },
-        data: { plan: 'professional' },
+        data: { plan },
         select: { plan: true },
       } as never);
-      realHooks.failD1Writes = 1; // the post-commit write hits a D1 outage
+      realHooks.failD1Writes = failD1 ? 1 : 0; // the post-commit write hits a D1 outage
       await runCommitHooks(ambient);
       realHooks.ambient = null;
+    };
+    const queue = () => {
+      const sent: unknown[] = [];
+      setCfBindings({ JOBS_QUEUE: { send: async (m: unknown) => void sent.push(m) } } as never);
+      return sent;
+    };
+    it('a post-commit D1 failure is ALERTED, a {storeId}-only retry is queued, and it re-syncs the committed state', async () => {
+      const sent = queue();
+      const { sendAlert } = await import('../../apps/api/src/services/alerts.service');
+      (sendAlert as ReturnType<typeof vi.fn>).mockClear();
+      await commitPlan('professional', true);
       expect(d1row(S).plan).not.toBe('professional');
       expect(sendAlert).toHaveBeenCalledTimes(1);
-      expect(sent).toHaveLength(1);
-      expect(sent[0]).toMatchObject({
-        kind: 'store-update-retry',
-        storeId: S,
-        data: { plan: 'professional' },
-        version: expect.any(Number),
-      });
-      // the queue redelivers: D1 is back, the retry applies it
-      const { storeUpdateVersioned } = await import('../../apps/api/src/lib/repo-factory');
-      const out = await applyStoreUpdateRetry(sent[0] as never, { apply: storeUpdateVersioned });
+      expect(sent).toEqual([{ kind: 'store-update-retry', storeId: S }]);
+      const out = await applyStoreUpdateRetry(sent[0] as never, { sync: syncStoreEntitlement });
       expect(out).toBe('done');
       expect(d1row(S).plan).toBe('professional');
       expect(doProfile(S).plan).toBe('professional');
       clearCfBindings();
     });
-
-    it('commit A (v5) fails -> commit B (v6) succeeds -> the retry of A arrives -> SKIPPED; D1 and the DO stay at B', async () => {
-      const { storeUpdateVersioned } = await import('../../apps/api/src/lib/repo-factory');
-      sqlite.prepare('UPDATE stores SET updated_at = 1 WHERE id = ?').run(S); // the row's last write is older than v5
-      // A (v5) failed earlier and is queued; B (v6) lands
-      expect(await storeUpdateVersioned(S, { plan: 'enterprise' }, 6)).toBe('applied');
+    it('NZ-D20: A fails, B succeeds, the retry of A runs -> D1 and the DO equal B (the current state)', async () => {
+      const sent = queue();
+      await commitPlan('professional', true); // A fails
+      await commitPlan('enterprise', false); // B lands
       expect(d1row(S).plan).toBe('enterprise');
-      expect(d1row(S).updated_at).toBe(6);
-      // the stale retry of A (v5, plan professional) arrives: skipped, nothing changes
-      const out = await applyStoreUpdateRetry(
-        { kind: 'store-update-retry', storeId: S, data: { plan: 'professional' }, version: 5 },
-        { apply: storeUpdateVersioned }
+      expect(await applyStoreUpdateRetry(sent[0] as never, { sync: syncStoreEntitlement })).toBe(
+        'done'
       );
-      expect(out).toBe('done');
       expect(d1row(S).plan).toBe('enterprise');
-      expect(d1row(S).updated_at).toBe(6);
       expect(doProfile(S).plan).toBe('enterprise');
+      clearCfBindings();
     });
-    it('an EQUAL version is the same write: D1 is untouched and the DO side is re-copied (>= skips the D1 write)', async () => {
-      const { storeUpdateVersioned } = await import('../../apps/api/src/lib/repo-factory');
-      sqlite.prepare('UPDATE stores SET updated_at = 1 WHERE id = ?').run(S);
-      await storeUpdateVersioned(S, { plan: 'professional' }, 10);
-      (h.doDb as DatabaseSync)
-        .prepare("UPDATE store_profile SET plan = 'starter' WHERE store_id = ?")
-        .run(S); // the DO copy was the part that failed
-      h.doCalls.length = 0;
-      expect(await storeUpdateVersioned(S, { plan: 'professional' }, 10)).toBe('applied');
-      expect(h.doCalls).toEqual(['applySettings']);
-      expect(doProfile(S).plan).toBe('professional');
-      expect(d1row(S).updated_at).toBe(10);
+    it('NZ-D20: a retry for a suspended / deleted store copies the RESTRICTIVE state', async () => {
+      const sent = queue();
+      await commitPlan('professional', true); // A fails; meanwhile the store is suspended and soft-deleted in Postgres
+      Object.assign(h.pg.get(S)!, {
+        status: 'suspended',
+        billingSuspendedReason: 'unpaid',
+        deletedAt: new Date('2026-11-01T00:00:00Z'),
+      });
+      await applyStoreUpdateRetry(sent[0] as never, { sync: syncStoreEntitlement });
+      expect(d1row(S)).toMatchObject({ status: 'suspended', billing_suspended_reason: 'unpaid' });
+      expect(d1row(S).deleted_at).not.toBeNull();
+      expect(doProfile(S)).toMatchObject({ status: 'suspended' });
+      clearCfBindings();
+    });
+    it('NZ-D20: concurrent retries converge on the current state', async () => {
+      const sent = queue();
+      await commitPlan('professional', true);
+      h.pg.get(S)!.plan = 'enterprise';
+      const msg = sent[0] as never;
+      const outs = await Promise.all([
+        applyStoreUpdateRetry(msg, { sync: syncStoreEntitlement }),
+        applyStoreUpdateRetry(msg, { sync: syncStoreEntitlement }),
+        applyStoreUpdateRetry(msg, { sync: syncStoreEntitlement }),
+      ]);
+      expect(outs).toEqual(['done', 'done', 'done']);
+      expect(d1row(S).plan).toBe('enterprise');
+      expect(doProfile(S).plan).toBe('enterprise');
+      clearCfBindings();
     });
   });
 });

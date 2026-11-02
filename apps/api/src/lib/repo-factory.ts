@@ -47,7 +47,7 @@ import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
 import { d1StorePatch } from './store-columns';
-import { reportAndRetryStoreUpdate } from './store-update-retry';
+import { reportAndRetryStoreUpdate, reportStoreUpdateFailure } from './store-update-retry';
 import { getAccountState } from './identity-client';
 
 type WriteOp =
@@ -1444,16 +1444,9 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
-  const d1 = d1StorePatch(data);
-  if (Object.keys(d1).length > 0) {
-    const platform = await requirePlatformDb();
-    await platform.store.update({ where: { id: storeId }, data: d1, select: { id: true } });
-  } else {
-    // no D1 column in the patch: still prove the store exists in the directory (fail closed, never a blind DO write)
-    const platform = await requirePlatformDb();
-    const found = await platform.store.findUnique({ where: { id: storeId }, select: { id: true } });
-    if (!found) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  }
+  // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await copyStoreSettings(storeId, data);
   const stub = storeDo(storeId) as unknown as QueryStub;
   const { decodeRpc } = await import('@ebda-src/repo');
@@ -1482,55 +1475,66 @@ export async function storeUpdateOnDo(
  * Defer a DO store's update to the commit of the surrounding transaction (Ruling NZ-D18). Returns the PROJECTED row (the current
  * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
  */
-let lastVersion = 0;
-/** A monotonic per-isolate version stamped at COMMIT time (wall clock, never equal to the previous one). */
-const nextVersion = (): number => (lastVersion = Math.max(Date.now(), lastVersion + 1));
-
 /**
- * Last-writer-wins by COMMIT VERSION (Ruling NZ-D19 follow-up). D1 `stores.updated_at` carries the version of the write that last
- * changed the row, so the ONE conditional statement `UPDATE ... WHERE updated_at < version` applies a write only when no newer one
- * has landed: a stale retry A (v5) after a successful B (v6) is `skipped` and D1 stays at v6. An EQUAL version is the same write
- * already applied to D1: it re-copies to the DO only (idempotent; the DO copy may be what failed). Returns 'applied' or 'skipped'.
+ * THE one writer of D1 `stores` (Ruling NZ-D20): every Store directory / entitlement write to D1 goes through here (an immediate DO
+ * update, a compare-and-set, a post-commit sync, a retry). Returns the number of rows written (for an empty patch: matched).
  */
-export async function storeUpdateVersioned(
-  storeId: string,
-  data: Record<string, unknown>,
-  version: number
-): Promise<'applied' | 'skipped'> {
+async function d1StoreWrite(
+  where: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Promise<number> {
   const platform = await requirePlatformDb();
-  const patch = { ...d1StorePatch(data), updatedAt: new Date(version) };
-  const res = (await platform.store.updateMany({
-    where: { id: storeId, updatedAt: { lt: new Date(version) } },
-    data: patch,
-  })) as { count: number };
-  if (res.count === 0) {
-    const row = (await platform.store.findUnique({
-      where: { id: storeId },
-      select: { updatedAt: true },
-    })) as { updatedAt: Date } | null;
-    if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-    if (row.updatedAt.getTime() > version) return 'skipped'; // a newer write already landed
-    // equal: this very write is already in D1; fall through and (re)copy the DO side
-  }
-  await copyStoreSettings(storeId, data);
-  return 'applied';
+  if (Object.keys(patch).length === 0) return (await platform.store.count({ where })) as number;
+  return ((await platform.store.updateMany({ where, data: patch })) as { count: number }).count;
 }
 
 /**
- * The post-commit D1 / DO write of a deferred update. Postgres has already committed, so a failure here is never swallowed: it is
- * logged, alerted and put on the jobs queue for a durable retry (lib/store-update-retry.ts) stamped with THIS commit's version.
+ * Re-sync a DO store's ENTITLEMENT state from its committed authoritative row (Ruling NZ-D20). Plan, billing suspension, status and
+ * deletion are decided in Postgres (the write that the transaction committed); this reads the CURRENT row there and copies the
+ * full current state to D1 and the DO. It replays no patch and carries no version: idempotent and latest-state-wins, so a late or
+ * duplicated retry, or two concurrent ones, converge on whatever Postgres holds NOW (a deleted or suspended store copies its
+ * restrictive state). Throws when the row cannot be read or either copy fails (the caller retries).
+ */
+export async function syncStoreEntitlement(storeId: string): Promise<void> {
+  const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
+  const row = (await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select })
+  )) as Record<string, unknown> | null;
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(row))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found in the directory');
+  await copyStoreSettings(storeId, row);
+}
+
+/**
+ * The post-commit D1 / DO write of a deferred update. Postgres has already committed it. Entitlement fields are re-synced from the
+ * committed row (`syncStoreEntitlement`); a failure is logged, alerted and put on the jobs queue as `{storeId}` only
+ * (lib/store-update-retry.ts), the handler re-syncs the CURRENT state. Other fields of the same patch are absolute profile / config
+ * values written once through the same D1 writer; a failure there is alerted (P1) with no retry (residual, NZ-D20).
  */
 async function applyPostCommit(storeId: string, patch: Record<string, unknown>): Promise<void> {
-  const version = nextVersion(); // captured when the hook runs, i.e. after the commit, in commit order
-  try {
-    await storeUpdateVersioned(storeId, patch, version);
-  } catch (err) {
-    await reportAndRetryStoreUpdate(storeId, patch, err, { version });
+  const rest = Object.fromEntries(
+    Object.entries(patch).filter(([k]) => !(ENTITLEMENT_FIELDS as readonly string[]).includes(k))
+  );
+  if (touchesEntitlement(patch)) {
+    try {
+      await syncStoreEntitlement(storeId);
+    } catch (err) {
+      await reportAndRetryStoreUpdate(storeId, err);
+    }
+  }
+  if (Object.keys(rest).length > 0) {
+    try {
+      await d1StoreWrite({ id: storeId }, d1StorePatch(rest));
+      await copyStoreSettings(storeId, rest);
+    } catch (err) {
+      await reportStoreUpdateFailure(storeId, Object.keys(rest), err);
+    }
   }
 }
 
 /** Fields whose rollback must not leave a D1 / DO change behind: plan (entitlements), billing suspension, lifecycle status. */
-const ENTITLEMENT_FIELDS = [
+const ENTITLEMENT_FIELDS: readonly string[] = [
   'plan',
   'billingSuspendedReason',
   'billingSuspendedAt',
@@ -1587,6 +1591,13 @@ export async function storeUpdateAfterCommit(
     ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
   });
   if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  // Postgres owns the entitlement fields: the committed intent lives in THIS transaction, so it commits or rolls back with it and a
+  // retry can re-read it (NZ-D20). Never a bare patch held only in memory.
+  await (tx as StoreUpdateClient).store.update({
+    where: { id: storeId },
+    data,
+    select: { id: true },
+  });
   write = () => applyPostCommit(storeId, data);
   const projected: Record<string, unknown> = { ...current };
   for (const [k, v] of Object.entries(data))
@@ -1618,6 +1629,7 @@ export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
         const patch = Object.fromEntries(
           Object.entries(a.data as object).filter(([, v]) => v !== undefined)
         );
+        await db.store.update({ where: { id }, data: patch, select: { id: true } });
         write = () => applyPostCommit(id, patch);
         return projected as Prisma.StoreGetPayload<A>;
       }
@@ -1657,15 +1669,9 @@ export async function storeUpdateMany(
     const data = Object.fromEntries(
       Object.entries(args.data as object).filter(([, v]) => v !== undefined)
     );
-    const platform = await requirePlatformDb();
-    const patch = d1StorePatch(data);
-    const res =
-      Object.keys(patch).length > 0
-        ? ((await platform.store.updateMany({
-            where: args.where,
-            data: patch,
-          })) as Prisma.BatchPayload)
-        : { count: (await platform.store.count({ where: args.where })) as number };
+    const res = {
+      count: await d1StoreWrite(args.where as Record<string, unknown>, d1StorePatch(data)),
+    } as Prisma.BatchPayload;
     if (res.count > 0) await copyStoreSettings(args.where.id, data);
     return res;
   }

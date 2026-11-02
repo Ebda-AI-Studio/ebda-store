@@ -226,17 +226,16 @@ async function parkForGate(msg: QueueMessageLike, body: JobQueueMessage, gate: G
 
 /** Retries exhausted at the platform level (a crash loop): same failure path, once. */
 /**
- * A post-commit D1 / DO Store write that failed once (lib/store-update-retry.ts): apply it again with backoff. It lands, or it is
- * superseded by a newer write (done); otherwise the delivery is retried until the queue dead-letters it (alerted there).
+ * A post-commit D1 / DO Store write that failed once (lib/store-update-retry.ts): re-sync the CURRENT committed state with backoff (Ruling NZ-D20); otherwise the delivery is retried until the queue dead-letters it (alerted there).
  */
 async function handleStoreUpdateRetry(
   msg: QueueMessageLike,
   m: StoreUpdateRetryMessage
 ): Promise<void> {
   const out = await applyStoreUpdateRetry(m, {
-    apply: async (storeId, data, version) => {
-      const { storeUpdateVersioned } = await import('../repo-factory.js');
-      return storeUpdateVersioned(storeId, data, version);
+    sync: async storeId => {
+      const { syncStoreEntitlement } = await import('../repo-factory.js');
+      await syncStoreEntitlement(storeId);
     },
   });
   if (out === 'done') msg.ack();
@@ -254,7 +253,7 @@ async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
       scope: 'platform',
       source: 'store.update.retry_exhausted',
       title: 'Store update retry exhausted: D1/DO still behind Postgres',
-      body: `store ${msg.body.storeId} fields ${Object.keys(msg.body.data).join(', ')}: apply the change to D1 and the StoreDO by hand.`,
+      body: `store ${msg.body.storeId}: re-sync its plan / billing / status to D1 and the StoreDO by hand.`,
       context: { storeId: msg.body.storeId },
     }).catch(() => undefined);
     msg.ack();

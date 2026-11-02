@@ -1,6 +1,6 @@
 /**
  * Ruling NZ-D19 follow-up: a failed post-commit D1 / DO Store write is logged, ALERTED and put on the jobs queue for a durable retry;
- * the retry converges (idempotent, absolute patch) and never undoes a newer write. runCommitHooks reports, never swallows.
+ * the retry carries {storeId} only and re-syncs the current committed state (Ruling NZ-D20). runCommitHooks reports, never swallows.
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
@@ -38,75 +38,49 @@ describe('runCommitHooks reports a failing hook (never silent)', () => {
   });
 });
 
-describe('reportAndRetryStoreUpdate', () => {
-  it('logs, alerts and enqueues a retry message carrying the absolute patch', async () => {
+describe('reportAndRetryStoreUpdate (NZ-D20: {storeId} only, never a patch)', () => {
+  it('logs, alerts and enqueues a retry message carrying only the store id', async () => {
     const enqueue = vi.fn(async () => undefined);
     const alert = vi.fn();
-    const r = await reportAndRetryStoreUpdate(
-      's1',
-      { plan: 'professional' },
-      new Error('d1 down'),
-      { version: 1234 },
-      { enqueue, alert }
-    );
+    const r = await reportAndRetryStoreUpdate('s1', new Error('d1 down'), { enqueue, alert });
     expect(r.enqueued).toBe(true);
-    expect(enqueue).toHaveBeenCalledWith({
-      kind: 'store-update-retry',
-      storeId: 's1',
-      data: { plan: 'professional' },
-      version: 1234,
-    });
+    expect(enqueue).toHaveBeenCalledWith({ kind: 'store-update-retry', storeId: 's1' });
     expect(alert).toHaveBeenCalledTimes(1);
     expect(String(alert.mock.calls[0][1])).toMatch(/retry is queued/i);
   });
   it('a failing enqueue still alerts, and says NO RETRY QUEUED', async () => {
     const alert = vi.fn();
-    const r = await reportAndRetryStoreUpdate(
-      's1',
-      { plan: 'x' },
-      new Error('d1 down'),
-      { version: 1 },
-      {
-        enqueue: async () => {
-          throw new Error('queue down');
-        },
-        alert,
-      }
-    );
+    const r = await reportAndRetryStoreUpdate('s1', new Error('d1 down'), {
+      enqueue: async () => {
+        throw new Error('queue down');
+      },
+      alert,
+    });
     expect(r.enqueued).toBe(false);
     expect(String(alert.mock.calls[0][1])).toMatch(/NO RETRY QUEUED/);
   });
 });
 
 describe('applyStoreUpdateRetry', () => {
-  const m = {
-    kind: 'store-update-retry' as const,
-    storeId: 's1',
-    data: { plan: 'professional' },
-    version: 5,
-  };
-  it('retry succeeds -> applied once and done', async () => {
-    const apply = vi.fn(async () => 'applied' as const);
-    expect(await applyStoreUpdateRetry(m, { apply })).toBe('done');
-    expect(apply).toHaveBeenCalledWith('s1', { plan: 'professional' }, 5);
+  const m = { kind: 'store-update-retry' as const, storeId: 's1' };
+  it('sync succeeds -> done', async () => {
+    const sync = vi.fn(async () => undefined);
+    expect(await applyStoreUpdateRetry(m, { sync })).toBe('done');
+    expect(sync).toHaveBeenCalledWith('s1');
   });
-  it('a failing apply asks for a redelivery, then converges when D1 is back', async () => {
+  it('a failing sync asks for a redelivery, then converges when D1 is back', async () => {
     let down = true;
-    const apply = vi.fn(async () => {
+    const sync = vi.fn(async () => {
       if (down) throw new Error('d1 down');
-      return 'applied' as const;
     });
-    expect(await applyStoreUpdateRetry(m, { apply })).toBe('retry');
+    expect(await applyStoreUpdateRetry(m, { sync })).toBe('retry');
     down = false;
-    expect(await applyStoreUpdateRetry(m, { apply })).toBe('done');
-    expect(apply).toHaveBeenCalledTimes(2);
+    expect(await applyStoreUpdateRetry(m, { sync })).toBe('done');
+    expect(sync).toHaveBeenCalledTimes(2);
   });
-  it('a retry superseded by a newer commit is done (skipped), not retried forever', async () => {
-    expect(await applyStoreUpdateRetry(m, { apply: async () => 'skipped' })).toBe('done');
-  });
-  it('isStoreUpdateRetry recognises only its own message shape (version, not a timestamp)', () => {
+  it('isStoreUpdateRetry recognises only its own message shape', () => {
     expect(isStoreUpdateRetry(m)).toBe(true);
-    expect(isStoreUpdateRetry({ ...m, version: undefined })).toBe(false);
+    expect(isStoreUpdateRetry({ kind: 'store-update-retry' })).toBe(false);
     expect(isStoreUpdateRetry({ kind: 'job' })).toBe(false);
     expect(isStoreUpdateRetry(null)).toBe(false);
   });
