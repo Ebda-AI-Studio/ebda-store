@@ -18,6 +18,11 @@ permissions:
 concurrency:
   group: ebda-web-production
   cancel-in-progress: false
+# Ruling DEPLOY-OOM-1: every tsc / build step of a deploy gets the same heap as ci.yml. cf-api-deploy's `tsc --noEmit` hit the
+# default heap limit on 2026-11-02 (exit 134) and left main undeployed; tests/unit/deploy-workflows-heap.test.ts pins this.
+env:
+  NODE_OPTIONS: --max-old-space-size=4096
+
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
