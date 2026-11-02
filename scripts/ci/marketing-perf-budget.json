@@ -9,7 +9,7 @@
   "pages": {
     "/": {
       "jsGzipKb": 207.5,
-      "htmlGzipKb": 52.5,
+      "htmlGzipKb": 13,
       "maxScripts": 13
     },
     "/features": {
@@ -31,7 +31,7 @@
     },
     "/en": {
       "jsGzipKb": 207.5,
-      "htmlGzipKb": 51.5,
+      "htmlGzipKb": 13,
       "maxScripts": 13
     },
     "/en/features": {
@@ -47,7 +47,7 @@
     },
     "/store": {
       "jsGzipKb": 207.5,
-      "htmlGzipKb": 52.5,
+      "htmlGzipKb": 52.8,
       "maxScripts": 13
     },
     "/en/store": {
