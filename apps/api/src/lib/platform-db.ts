@@ -7,6 +7,7 @@
  * the StoreDO; see lib/store-record.ts) and NOT for identity / store-do models (the client throws on those).
  */
 import { cfBindings } from '../cf/bindings';
+import { AppError } from '../middleware/error-handler';
 
 type PlatformClient = Record<string, any>;
 const clients = new WeakMap<object, Promise<PlatformClient>>();
@@ -33,6 +34,5 @@ export async function platformDb(): Promise<PlatformClient | undefined> {
 export async function requirePlatformDb(): Promise<PlatformClient> {
   const c = await platformDb();
   if (c) return c;
-  const { AppError } = await import('../middleware/error-handler');
   throw new AppError(503, 'PLATFORM_DB_UNBOUND', 'Platform database is not bound');
 }
