@@ -26,7 +26,12 @@ describe('web middleware has a single implementation (WEB-MW-DUP-2)', () => {
   });
 
   it('no third middleware file exists', () => {
-    for (const p of ['apps/web/src/proxy.ts', 'apps/web/proxy.ts', 'apps/web/src/middleware.js', 'apps/web/middleware.js']) {
+    for (const p of [
+      'apps/web/src/proxy.ts',
+      'apps/web/proxy.ts',
+      'apps/web/src/middleware.js',
+      'apps/web/middleware.js',
+    ]) {
       expect(() => read(p), p).toThrow();
     }
   });

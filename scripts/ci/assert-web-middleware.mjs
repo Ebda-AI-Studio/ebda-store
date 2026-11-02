@@ -24,8 +24,12 @@ const entries = Object.values(manifest.middleware ?? {});
 if (entries.length === 0) fail('middleware-manifest.json has no middleware entry');
 const files = entries.flatMap(e => e.files ?? []).map(f => join(app, '.next', f));
 if (files.length === 0) fail('the middleware entry lists no bundle files');
-const text = files.filter(existsSync).map(f => readFileSync(f, 'utf8')).join('\n');
+const text = files
+  .filter(existsSync)
+  .map(f => readFileSync(f, 'utf8'))
+  .join('\n');
 if (!text) fail('none of the middleware bundle files exist');
 // 'x-nonce' is a string literal in the root middleware (minifiers keep it; they mangle function names).
-if (!text.includes('x-nonce')) fail('the middleware bundle does not contain the nonce CSP code (x-nonce)');
+if (!text.includes('x-nonce'))
+  fail('the middleware bundle does not contain the nonce CSP code (x-nonce)');
 console.log(`assert-web-middleware: ok (${files.length} bundle file(s), nonce CSP present)`);
