@@ -14,6 +14,7 @@ import {
   storeDb,
   storeRepo,
   storeUpdateOnDo,
+  doMoneyInFlight,
   storeWritesToDo,
   syncStoreFields,
 } from '../lib/repo-factory';
@@ -29,7 +30,11 @@ import {
 import { AppError } from '../middleware/error-handler';
 import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
 import { config as appConfig } from '../config';
-import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
+import {
+  archiveFiscalRecords,
+  assertNoMoneyInFlight,
+  assertNoMoneyInFlightOnDo,
+} from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
   slugifyWithFallback,
@@ -66,6 +71,7 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
+import { finishStoreDeletion } from '../lib/store-delete-post-commit';
 import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
@@ -740,6 +746,10 @@ export class StoreService {
    */
   static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
+    // Decided BEFORE the Postgres delete (Ruling NZ-D14): the post-commit teardown must know whether the store lived on its DO.
+    const wasOnDo = await storeWritesToDo(storeId);
+    // A DO store's money lives in the DO, not in its stale Postgres copy: refuse while any is in flight (Ruling NZ-D15).
+    if (wasOnDo) await assertNoMoneyInFlightOnDo(storeId, doMoneyInFlight);
     // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
     // owner still has other live stores would strand the paid period and re-parent the
     // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
@@ -945,6 +955,9 @@ export class StoreService {
         )
       );
     }
+
+    // Ruling NZ-D14: lookups read D1 and a DO store keeps its data in the DO; neither is touched by the Postgres delete above.
+    await finishStoreDeletion({ storeId, wasOnDo });
 
     // Invalidate store cache (best-effort, post-commit)
     try {

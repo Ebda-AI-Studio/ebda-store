@@ -7,7 +7,9 @@
  * Rules, per store (Postgres = committed truth, D1 = what lookups read):
  *   - in Postgres, missing from D1            -> sync it in (corrected)
  *   - in D1, gone from Postgres               -> delete the D1 row (corrected)
- *   - `storage_backend = 'do'` rows are SKIPPED: D1 + the DO own them and Postgres is stale by design
+ *   - `storage_backend = 'do'` rows (Ruling NZ-D14): D1 + the DO own them and Postgres is stale by design, so Postgres NEVER overwrites
+ *       one, but the RESTRICTIVE direction is always applied: a Postgres row that is suspended / inactive / deleted closes the D1 row
+ *       (status and deleted_at only) and alerts. A Postgres row that is ABSENT for a `do` store is alert-only, never a delete
  *   - differs in slug / status / plan / has-domain / has-pending-domain / deleted:
  *       D1 LESS restrictive than Postgres (e.g. D1 active, Postgres suspended or deleted) -> sync from Postgres (corrected)
  *       D1 MORE restrictive than Postgres (D1 suspended or deleted, Postgres active)    -> KEEP D1 (a store is never
@@ -44,10 +46,29 @@ const RANK: Record<string, number> = { active: 0, inactive: 1, suspended: 2 };
 const restrictiveness = (status: string, deleted: boolean): number =>
   deleted ? 99 : (RANK[status] ?? 99);
 
+/** Close a `do` row in the restrictive direction only: status and deleted_at, nothing else. */
+async function closeDoRow(
+  d1: D1Like,
+  id: string,
+  status: string,
+  pgDeleted: boolean,
+  d1Deleted: boolean
+): Promise<void> {
+  const deletedAt = pgDeleted && !d1Deleted ? Date.now() : null;
+  await d1
+    .prepare(
+      `UPDATE "stores" SET "status" = ?, "deleted_at" = COALESCE("deleted_at", ?) WHERE "id" = ? AND "storage_backend" = 'do'`
+    )
+    .bind(status, deletedAt, id)
+    .run();
+}
+
 export interface ReconcileReport {
   checked: number;
   corrected: Array<{ id: string; why: string }>;
   keptRestrictive: Array<{ id: string; why: string }>;
+  /** `do` stores Postgres does not know: reported, never deleted. */
+  alertOnly: Array<{ id: string; why: string }>;
 }
 
 export async function reconcileStoreDirectory(
@@ -71,7 +92,7 @@ export async function reconcileStoreDirectory(
   const d1 =
     deps.d1 ??
     ((cfBindings() as { PLATFORM_DB?: D1Like } | undefined)?.PLATFORM_DB as D1Like | undefined);
-  const report: ReconcileReport = { checked: 0, corrected: [], keptRestrictive: [] };
+  const report: ReconcileReport = { checked: 0, corrected: [], keptRestrictive: [], alertOnly: [] };
   if (!d1) return report;
   const sync = deps.sync ?? syncStoreDirectoryFromPg;
   const alert =
@@ -106,7 +127,17 @@ export async function reconcileStoreDirectory(
   for (const s of all) {
     const pgDeleted = !liveIds.has(s.id);
     const row = d1ById.get(s.id);
-    if (row?.backend === 'do') continue; // D1 + the DO own it (plan N-22): Postgres is stale by design
+    if (row?.backend === 'do') {
+      // D1 + the DO own it (plan N-22): never overwritten from Postgres, but a stricter Postgres state is applied (NZ-D14).
+      if (restrictiveness(s.status, pgDeleted) > restrictiveness(row.status, !!row.deleted)) {
+        await closeDoRow(d1, s.id, s.status, pgDeleted, !!row.deleted);
+        report.corrected.push({
+          id: s.id,
+          why: `do store closed to match Postgres (${pgDeleted ? 'deleted' : s.status})`,
+        });
+      }
+      continue;
+    }
     if (!row) {
       await sync(s.id);
       report.corrected.push({ id: s.id, why: 'missing from D1' });
@@ -136,20 +167,33 @@ export async function reconcileStoreDirectory(
     });
   }
   for (const [id] of d1ById) {
-    if (pgIds.has(id) || d1ById.get(id)?.backend === 'do') continue;
+    if (pgIds.has(id)) continue;
+    if (d1ById.get(id)?.backend === 'do') {
+      report.alertOnly.push({
+        id,
+        why: 'do store unknown to Postgres (never deleted by the reconciler)',
+      });
+      continue;
+    }
     await d1.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(id).run();
     report.corrected.push({ id, why: 'in D1, gone from Postgres' });
   }
 
-  if (report.corrected.length || report.keptRestrictive.length) {
+  if (report.corrected.length || report.keptRestrictive.length || report.alertOnly.length) {
     logger.error(
-      { corrected: report.corrected, keptRestrictive: report.keptRestrictive },
+      {
+        corrected: report.corrected,
+        keptRestrictive: report.keptRestrictive,
+        alertOnly: report.alertOnly,
+      },
       '[store-directory] D1 directory drift'
     );
     await alert(
       'Store directory drift between Postgres and D1',
-      `corrected ${report.corrected.length}, kept-restrictive ${report.keptRestrictive.length}: ` +
-        JSON.stringify([...report.corrected, ...report.keptRestrictive].slice(0, 20))
+      `corrected ${report.corrected.length}, kept-restrictive ${report.keptRestrictive.length}, alert-only ${report.alertOnly.length}: ` +
+        JSON.stringify(
+          [...report.corrected, ...report.keptRestrictive, ...report.alertOnly].slice(0, 20)
+        )
     );
   }
   return report;

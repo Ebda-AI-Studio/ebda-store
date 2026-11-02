@@ -352,4 +352,52 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
       n: 1,
     });
   });
+
+  it('PG says suspended or deleted for a do store: the RESTRICTIVE direction is applied (status / deleted_at only) and alerted (NZ-D14)', async () => {
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    const alerts: string[] = [];
+    const pgRow = (status: string) => [
+      { id: A, slug: 'alpha', status, plan: 'starter', hasDomain: false, hasPendingDomain: false },
+    ];
+    let r = await reconcileStoreDirectory({
+      pgAll: async () => pgRow('suspended'),
+      pgLive: async () => [{ id: A }],
+      alert: t => void alerts.push(t),
+    });
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(d1Status()).toBe('suspended');
+    expect(d1Backend()).toBe('do');
+    expect(await lookupStore({ slug: 'alpha' })).toBeNull();
+    expect(alerts).toHaveLength(1);
+    // Postgres deleted: the D1 row gets a deleted_at and stops resolving
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    r = await reconcileStoreDirectory({
+      pgAll: async () => pgRow('active'),
+      pgLive: async () => [],
+      alert: t => void alerts.push(t),
+    });
+    expect(r.corrected).toHaveLength(1);
+    expect(await lookupStore({ id: A }, ['active', 'inactive', 'suspended'])).toBeNull();
+    expect(
+      (
+        sqlite.prepare('SELECT deleted_at FROM stores WHERE id=?').get(A) as {
+          deleted_at: number | null;
+        }
+      ).deleted_at
+    ).not.toBeNull();
+  });
+  it('a do store ABSENT from Postgres: D1 untouched, alert only (never a delete)', async () => {
+    const alerts: string[] = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [],
+      pgLive: async () => [],
+      alert: t => void alerts.push(t),
+    });
+    expect(r.alertOnly.map(a => a.id)).toEqual([A]);
+    expect(r.corrected).toEqual([]);
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM stores WHERE id=?').get(A)).toMatchObject({
+      n: 1,
+    });
+    expect(alerts).toHaveLength(1);
+  });
 });

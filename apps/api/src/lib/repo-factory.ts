@@ -1552,3 +1552,33 @@ export function withRepo<T>(repo: StoreRepo, fn: () => T, req: RequestLike = NO_
 export function runInJobRepoScope<T>(fn: () => T): T {
   return scopes.run({ req: NO_REQUEST, repos: new Map() }, fn);
 }
+
+/**
+ * Money in flight inside a DO store's own tables (Ruling NZ-D15): the deletion gate for a store whose Postgres copy is stale.
+ */
+export async function doMoneyInFlight(storeId: string): Promise<Record<string, number>> {
+  const stub = storeDo(storeId) as unknown as {
+    moneyInFlight(
+      id: string
+    ): Promise<
+      { ok: true; data: Record<string, number> } | { ok: false; code: string; status: number }
+    >;
+  };
+  const r = await stub.moneyInFlight(storeId);
+  if (!r.ok) throw new AppError(r.status, r.code, `money-in-flight check refused: ${r.code}`);
+  return r.data;
+}
+
+/**
+ * CLOSE a deleted store's Durable Object (Ruling NZ-D15): one flag row; every write is refused afterwards (410 STORE_CLOSED) and
+ * reads, exports and backups keep working. NOTHING is deleted: payments, refunds and fiscal documents are retained records.
+ */
+export async function closeDoStore(storeId: string): Promise<void> {
+  const stub = storeDo(storeId) as unknown as {
+    closeStoreForDeletion(
+      id: string
+    ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
+  };
+  const r = await stub.closeStoreForDeletion(storeId);
+  if (!r.ok) throw new AppError(r.status, r.code, `store close refused: ${r.code}`);
+}

@@ -41,6 +41,10 @@ import {
   ensureIdempotencySchema,
   ensurePaymentSchema,
   scrubReceiptsForOrders,
+  moneyInFlightOnDo,
+  isStoreClosed,
+  closeStore,
+  type DoMoneyInFlight,
   ensureSearchIndex,
   purgeErasureLedger,
   MoneyError,
@@ -122,6 +126,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    * cf/cutover.ts, which checks the CUTOVER_IMPORT_SECRET bearer before this DO sees the request.
    */
   async fetch(request: Request): Promise<Response> {
+    // A closed store's data is a retained legal record: the cutover surface may not import into it or WIPE it (__unseal).
+    if (isStoreClosed(this.sync) && /\/__(import|unseal)\b/.test(new URL(request.url).pathname))
+      return new Response(JSON.stringify({ ok: false, code: 'STORE_CLOSED' }), {
+        status: 423,
+        headers: { 'content-type': 'application/json' },
+      });
     return handleStoreAdmin(request, {
       sql: this.ctx.storage.sql as never,
       transactionSync: fn => this.ctx.storage.transactionSync(fn),
@@ -188,6 +198,33 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     }
   }
 
+  /** A closed store (Ruling NZ-D15) refuses every write; reads, exports and backups keep working. Nothing is ever deleted. */
+  private closedOr<T>(answer: T): T | null {
+    return isStoreClosed(this.sync) ? answer : null;
+  }
+
+  /** Writes call this first; a closed store is a 410 answer (inside `run`, a StoreError). */
+  private assertOpen(): void {
+    if (isStoreClosed(this.sync)) throw new StoreError('STORE_CLOSED', 410);
+  }
+
+  /** Money in flight, read from THIS DO (the Postgres copy of a DO store is stale): the deletion gate (Ruling NZ-D15). */
+  moneyInFlight(storeId: string): Result<DoMoneyInFlight> {
+    return run(() => {
+      this.bind(storeId);
+      return moneyInFlightOnDo(this.sync);
+    });
+  }
+
+  /** Close the store: ONE flag row, idempotent, deletes nothing (Ruling NZ-D15). */
+  closeStoreForDeletion(storeId: string): Result<{ closed: true }> {
+    return run(() => {
+      this.bind(storeId);
+      closeStore(this.sync);
+      return { closed: true as const };
+    });
+  }
+
   /**
    * Catalogue/content writes for the API Worker (lib/repo-factory.ts `storeWriter`). ONE atomic transaction per call;
    * `m.key` makes a retry return the first run's result. Refuses (as an answer, never a throw) a model that is not on the
@@ -195,6 +232,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    */
   async mutate(storeId: string, m: DoMutation): Promise<DoQueryResult> {
     try {
+      this.bind(storeId);
+      const closed = this.closedOr({
+        ok: false as const,
+        code: 'STORE_CLOSED',
+        message: 'store is closed',
+      });
+      if (closed) return closed;
       return await runWrites(await this.lite(storeId), doSqlRunner(this.ctx.storage), m);
     } catch (e) {
       if (e instanceof StoreMismatch)
@@ -216,6 +260,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
       return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
     }
+    const closed = this.closedOr({
+      ok: false as const,
+      code: 'STORE_CLOSED',
+      status: 410,
+      message: 'store is closed',
+    });
+    if (closed) return closed;
     return answerStockOp(this.sync, storeId, op, argsJson, key);
   }
 
@@ -231,6 +282,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
       return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
     }
+    const closed = this.closedOr({
+      ok: false as const,
+      code: 'STORE_CLOSED',
+      status: 410,
+      message: 'store is closed',
+    });
+    if (closed) return closed;
     return answerMoneyOp(this.sync, storeId, op, argsJson, key);
   }
 
@@ -244,6 +302,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
     try {
       this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
       const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
       const fields = decodeRpc<Record<string, unknown>>(fieldsJson);
       return {
@@ -282,6 +341,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       const id = rows.store?.id ?? rows.products[0]?.storeId;
       if (!id) throw new StoreError('PRODUCT_NOT_FOUND', 404);
       this.bind(id);
+      this.assertOpen();
       for (const p of rows.products) if (p.storeId !== id) throw new StoreMismatch();
       return repo.seed(this.sync, rows);
     });
@@ -303,6 +363,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   ) {
     return run(() => {
       this.bind(storeId);
+      this.assertOpen();
       return repo.addCartItem(this.sync, storeId, sessionId, productId, qty, variantId);
     });
   }
@@ -310,6 +371,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   createOrder(storeId: string, sessionId: string) {
     return run(() => {
       this.bind(storeId);
+      this.assertOpen();
       return repo.createOrder(this.sync, storeId, sessionId);
     });
   }
@@ -383,6 +445,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   ): Promise<Result<Record<string, { rows: number; sha256: string; ok: boolean }>>> {
     try {
       this.bind(sourceStoreId); // the restored rows carry the source store's id: this instance now serves that store
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
       return { ok: true, data: await this.restoreFromUnsafe(sourceStoreId, day) };
     } catch (e) {
       // Returned, not thrown: a refused restore is an answer, not a Durable Object fault.
