@@ -1,0 +1,136 @@
+name: load-test
+# Reusable k6 load test on GitHub-hosted runners (never the Mac). Ruling SCALE-READY-1 #7 / NEON-FOLD-1.
+# Docs: docs/load-testing.md. Checkout scenarios stop BEFORE payment and never place an order.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'API root incl. /api/v1 (a PR preview or prod)'
+        required: true
+        type: string
+      scenario:
+        description: 'smoke | storefront-mix | flash-sale'
+        required: true
+        default: smoke
+        type: choice
+        options: [smoke, storefront-mix, flash-sale]
+      duration:
+        description: 'k6 duration, e.g. 60s'
+        required: false
+        default: 60s
+        type: string
+      rps:
+        description: 'Target requests (smoke/flash-sale) or sessions x2 (storefront-mix) per second'
+        required: false
+        default: '200'
+        type: string
+      paths:
+        description: 'smoke: comma list of paths under base_url'
+        required: false
+        default: /public/health
+        type: string
+      store_ids:
+        description: 'storefront-mix: comma list; flash-sale: exactly one'
+        required: false
+        default: ''
+        type: string
+      product_slug:
+        description: 'flash-sale / storefront-mix product slug'
+        required: false
+        default: ''
+        type: string
+      p95_ms:
+        description: 'p95 threshold in ms'
+        required: false
+        default: '500'
+        type: string
+      error_rate:
+        description: 'max http error rate (0 = none)'
+        required: false
+        default: '0'
+        type: string
+      allow_prod:
+        description: 'must be true for flash-sale against a prod host'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      base_url: { required: true, type: string }
+      scenario: { required: false, type: string, default: smoke }
+      duration: { required: false, type: string, default: 60s }
+      rps: { required: false, type: string, default: '200' }
+      paths: { required: false, type: string, default: /public/health }
+      store_ids: { required: false, type: string, default: '' }
+      product_slug: { required: false, type: string, default: '' }
+      p95_ms: { required: false, type: string, default: '500' }
+      error_rate: { required: false, type: string, default: '0' }
+      allow_prod: { required: false, type: boolean, default: false }
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-test-${{ inputs.base_url }}
+  cancel-in-progress: false
+
+jobs:
+  k6:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Guard (target and scenario)
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          SCENARIO: ${{ inputs.scenario }}
+          ALLOW_PROD: ${{ inputs.allow_prod }}
+        run: |
+          case "$BASE_URL" in https://*) ;; *) echo "base_url must be https://"; exit 1;; esac
+          case "$SCENARIO" in smoke|storefront-mix|flash-sale) ;; *) echo "unknown scenario"; exit 1;; esac
+          host=$(printf '%s' "$BASE_URL" | sed -E 's#https://([^/]+).*#\1#')
+          case "$host" in
+            api.ebda.app|*.ebda.app|ebda.app) prod=true;;
+            *) prod=false;;
+          esac
+          if [ "$SCENARIO" = "flash-sale" ] && [ "$prod" = true ] && [ "$ALLOW_PROD" != "true" ]; then
+            echo "::error::flash-sale against prod ($host) needs allow_prod=true"; exit 1
+          fi
+          echo "target=$host prod=$prod scenario=$SCENARIO"
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+        with:
+          k6-version: '2.3.0'
+      - name: Run k6
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          SCENARIO: ${{ inputs.scenario }}
+          DURATION: ${{ inputs.duration }}
+          RPS: ${{ inputs.rps }}
+          PATHS: ${{ inputs.paths }}
+          STORE_IDS: ${{ inputs.store_ids }}
+          PRODUCT_SLUG: ${{ inputs.product_slug }}
+          P95_MS: ${{ inputs.p95_ms }}
+          ERROR_RATE: ${{ inputs.error_rate }}
+        run: |
+          set +e
+          k6 run tests/load/ebda-load.js | tee k6-output.txt
+          echo "k6_exit=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### k6 ${{ inputs.scenario }} on ${{ inputs.base_url }}"
+            echo "Thresholds: p95 < ${{ inputs.p95_ms }} ms, error rate <= ${{ inputs.error_rate }}. k6 exit: ${k6_exit:-n/a}"
+            echo '```'; tail -n 40 k6-output.txt 2>/dev/null; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: k6-results
+          path: |
+            k6-summary.json
+            k6-output.txt
+          if-no-files-found: warn
+      - name: Fail on thresholds
+        if: always()
+        run: '[ "${k6_exit:-1}" = "0" ]'
