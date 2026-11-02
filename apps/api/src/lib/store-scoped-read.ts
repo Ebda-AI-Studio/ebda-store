@@ -1,5 +1,4 @@
 import { currentTenantGucs, runInTenantContext } from '@ebda/database';
-import { storeRepo } from './repo-factory';
 
 /**
  * Run `fn` scoped to `storeId` under RLS, whether or not the caller already
@@ -32,11 +31,13 @@ import { storeRepo } from './repo-factory';
  * Identical result on the owner role (policies ignored), so this is inert
  * until the cutover and correct after it. Never use it for work that spans
  * stores — that is `withRlsBypass`.
+ *
+ * It opens the tenant context for a store on its Durable Object TOO (regression 2026-11-02, #382 hotfix): callers that still read
+ * Postgres for such a store (raw `$queryRaw` of FAQs / how-tos, tax rates, features, notification config: not ported yet, plan
+ * N-3..N-11) are refused by the code-level tenant guard without it, which made GET /public/stores/:slug a 500 for every DO store.
+ * Skipping the transaction is each caller's decision, once it reads ONLY through `storeDb`, never this helper's.
  */
-export async function readInStoreContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+export function readInStoreContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
   if (currentTenantGucs()?.storeId === storeId) return fn();
-  // NEON-ZERO-1: a store on its Durable Object has no RLS and no Postgres: `fn` reads through `storeDb`, which routes to the DO.
-  // Opening a tenant transaction here would acquire a Postgres connection the request does not need (and cannot get).
-  if ((await storeRepo(storeId)).backend === 'do') return fn();
   return runInTenantContext(storeId, fn);
 }
