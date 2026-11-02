@@ -103,12 +103,17 @@ async function readSharedGens(names: string[]): Promise<string | null> {
 
 async function bumpGeneration(name: string): Promise<void> {
   localGens.set(name, ++localGenSeq);
-  dropEdgeGensMemo(); // the isolate that took the write must not serve its own stale edge copy (Ruling NZ-D3)
+  // Ruling NZ-D3: drop the edge-hit memo BEFORE the bump (a read that starts now cannot be remembered past it) and AFTER it
+  // resolved (a read that started between the two drops, and memoised the pre-bump value, is forgotten). The isolate that
+  // took the write never serves its own stale edge copy.
+  dropEdgeGensMemo();
   try {
     await redis.bumpCacheGeneration(name, GEN_TTL_SECONDS);
   } catch {
     // Redis unavailable: no replica can write the shared layer either, and the
     // delete below fails the same way — the pre-existing outage residual.
+  } finally {
+    dropEdgeGensMemo();
   }
 }
 

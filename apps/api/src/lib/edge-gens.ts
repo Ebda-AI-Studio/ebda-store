@@ -47,18 +47,51 @@ export function edgeDepNames(storeId: string, host: string): string[] {
   return [...new Set(keys.flatMap(generationNamesFor))];
 }
 
-/** The generations as one comparable string, or null when the shared layer cannot vouch for them. */
-export async function readEdgeGens(names: string[]): Promise<string | null> {
+/**
+ * Stamp layout epoch. Bumped when the generation shard layout changes (Ruling NZ-D3: per-store shards): a counter on a new
+ * shard restarts from 0 and could otherwise equal a stamp taken under the old layout, validating an old copy as fresh (ABA).
+ * `v2:` makes every pre-shard stamp a guaranteed miss.
+ */
+export const EDGE_STAMP_EPOCH = 'v2:';
+
+/** The status generation of a store host: NEVER-stale (Ruling NZ-D1), so it is read fresh on every hit and never memoised. */
+const isStatusGeneration = (name: string): boolean => /^public:store:resolve:.+/.test(name);
+
+/** Raw values of `names` (null = unverifiable). */
+export async function readEdgeGenValues(names: string[]): Promise<string[] | null> {
   try {
-    return (await redis.getCacheGenerations(names)).map(v => v ?? '0').join(',');
+    return (await redis.getCacheGenerations(names)).map(v => v ?? '0');
   } catch {
     return null;
   }
 }
 
-/** Hit validation: `readEdgeGens` memoised per isolate for 2 s (Ruling NZ-D3; lib/edge-gens-memo.ts). Never used for a fill. */
-export const readEdgeGensForHit = (names: string[]): Promise<string | null> =>
-  memoisedGens(names, readEdgeGens);
+const stamp = (values: string[]): string => EDGE_STAMP_EPOCH + values.join(',');
+
+/** The generations as one comparable string, or null when the shared layer cannot vouch for them. */
+export async function readEdgeGens(names: string[]): Promise<string | null> {
+  const v = await readEdgeGenValues(names);
+  return v === null ? null : stamp(v);
+}
+
+/**
+ * Hit validation (Ruling NZ-D3): every generation EXCEPT the store status generation is memoised per isolate for 2 s
+ * (lib/edge-gens-memo.ts); the status generation (`public:store:resolve:<host>`, on its own per-host shard) is read fresh every
+ * time. Never used for a fill.
+ */
+export async function readEdgeGensForHit(names: string[]): Promise<string | null> {
+  const fresh = names.filter(isStatusGeneration);
+  const memoed = names.filter(n => !isStatusGeneration(n));
+  const [m, f] = await Promise.all([
+    memoed.length ? memoisedGens(memoed, readEdgeGenValues) : Promise.resolve([] as string[]),
+    fresh.length ? readEdgeGenValues(fresh) : Promise.resolve([] as string[]),
+  ]);
+  if (m === null || f === null) return null;
+  const byName = new Map<string, string>();
+  memoed.forEach((n, i) => byName.set(n, m[i]));
+  fresh.forEach((n, i) => byName.set(n, f[i]));
+  return stamp(names.map(n => byName.get(n)!));
+}
 
 const SNAPSHOT = Symbol('ebda.edgeSnapshot');
 

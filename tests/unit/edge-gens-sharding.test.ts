@@ -2,7 +2,30 @@
  * Ruling NZ-D3: store-scoped cache generations are sharded per store (no single hot Durable Object) and edge-hit validation is
  * memoised per isolate for 2 s. The memo is dropped by a bump in the same isolate; an unverifiable answer is never remembered.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const h = vi.hoisted(() => ({
+  gens: new Map<string, string>(),
+  reads: [] as string[][],
+  bumpGate: null as null | Promise<void>,
+}));
+vi.mock('../../apps/api/src/services/redis.service', () => ({
+  redis: {
+    isAvailable: () => true,
+    getCacheGenerations: async (names: string[]) => {
+      h.reads.push(names);
+      return names.map(n => h.gens.get(n) ?? null);
+    },
+    bumpCacheGeneration: async (name: string) => {
+      if (h.bumpGate) await h.bumpGate;
+      h.gens.set(name, String(Number(h.gens.get(name) ?? 0) + 1));
+    },
+    get: async () => null,
+    set: async () => undefined,
+    delete: async () => undefined,
+    deleteByPattern: async () => 0,
+  },
+}));
 import {
   shardOf,
   CACHEGEN_SHARD,
@@ -48,7 +71,7 @@ describe('cachegen sharding', () => {
 describe('edge-hit generation memo', () => {
   it('1000 hits inside the window cost one read; a new window reads again', async () => {
     dropEdgeGensMemo();
-    const read = vi.fn(async () => '1,2,3');
+    const read = vi.fn(async () => ['1', '2', '3']);
     for (let i = 0; i < 1000; i++) await memoisedGens(['a', 'b'], read, 10_000 + i);
     expect(read).toHaveBeenCalledTimes(1);
     await memoisedGens(['a', 'b'], read, 10_000 + EDGE_GENS_MEMO_MS + 1);
@@ -56,7 +79,7 @@ describe('edge-hit generation memo', () => {
   });
   it('a bump in this isolate drops the memo at once', async () => {
     dropEdgeGensMemo();
-    const read = vi.fn(async () => 'g');
+    const read = vi.fn(async () => ['g']);
     await memoisedGens(['a'], read, 1);
     dropEdgeGensMemo();
     await memoisedGens(['a'], read, 2);
@@ -67,16 +90,68 @@ describe('edge-hit generation memo', () => {
     const read = vi
       .fn<(n: string[]) => Promise<string | null>>()
       .mockResolvedValueOnce(null)
-      .mockResolvedValue('ok');
+      .mockResolvedValue(['ok']);
     expect(await memoisedGens(['a'], read, 1)).toBeNull();
     await Promise.resolve();
-    expect(await memoisedGens(['a'], read, 2)).toBe('ok');
+    expect(await memoisedGens(['a'], read, 2)).toEqual(['ok']);
     expect(read).toHaveBeenCalledTimes(2);
   });
   it('different name sets do not share a slot', async () => {
     dropEdgeGensMemo();
-    const read = vi.fn(async (n: string[]) => n.join('+'));
-    expect(await memoisedGens(['a'], read, 1)).toBe('a');
-    expect(await memoisedGens(['b'], read, 1)).toBe('b');
+    const read = vi.fn(async (n: string[]) => [n.join('+')]);
+    expect(await memoisedGens(['a'], read, 1)).toEqual(['a']);
+    expect(await memoisedGens(['b'], read, 1)).toEqual(['b']);
+  });
+});
+
+import {
+  readEdgeGens,
+  readEdgeGensForHit,
+  EDGE_STAMP_EPOCH,
+} from '../../apps/api/src/lib/edge-gens';
+import { invalidateCachedPrefix } from '../../apps/api/src/lib/public-cache';
+
+describe('security review fixes (ABA epoch, bump race, status never memoised)', () => {
+  beforeEach(() => {
+    h.gens.clear();
+    h.reads.length = 0;
+    h.bumpGate = null;
+    dropEdgeGensMemo();
+  });
+  const NAMES = ['public:', `public:products:${S1}:`, 'public:store:resolve:amelia.ebda.app'];
+
+  it('an entry stamped under the OLD (pre-shard) layout is a miss under the new one', async () => {
+    // an old stamp was the bare joined counters; the new layout counters restart at 0, which is the SAME bare string
+    const oldStamp = '0,0,0';
+    const now = await readEdgeGens(NAMES);
+    expect(now).toBe(EDGE_STAMP_EPOCH + '0,0,0');
+    expect(now).not.toBe(oldStamp);
+  });
+  it('the status generation is read fresh on every hit; the others are memoised', async () => {
+    for (let i = 0; i < 20; i++) await readEdgeGensForHit(NAMES);
+    const statusReads = h.reads.filter(r => r.includes('public:store:resolve:amelia.ebda.app'));
+    const otherReads = h.reads.filter(r => r.includes('public:'));
+    expect(statusReads).toHaveLength(20);
+    expect(
+      otherReads.filter(r => !r.some(n => n.startsWith('public:store:resolve:')))
+    ).toHaveLength(1);
+  });
+  it('the status generation of a host has its own shard, never the base instance', () => {
+    expect(shardOf('cachegen:public:store:resolve:amelia.ebda.app')).toBeLessThan(CACHEGEN_SHARD);
+  });
+  it('a read racing a bump never returns the pre-bump generation once the bump resolved', async () => {
+    h.gens.set(NAMES[1], '1');
+    await readEdgeGensForHit(NAMES); // warm the memo with the OLD generation
+    let release!: () => void;
+    h.bumpGate = new Promise<void>(r => (release = r));
+    const bump = invalidateCachedPrefix(`public:products:${S1}:`);
+    await Promise.resolve();
+    const during = await readEdgeGensForHit(NAMES); // re-memoises the old value while the bump is pending
+    expect(during).toContain('1');
+    h.bumpGate = null;
+    release();
+    await bump;
+    const after = await readEdgeGensForHit(NAMES);
+    expect(after).not.toBe(during);
   });
 });

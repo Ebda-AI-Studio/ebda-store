@@ -50,7 +50,9 @@ const UUID_IN_NAME = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 
 export function shardOf(key: string): number {
   if (key.startsWith(CACHEGEN_PREFIX)) {
-    const id = key.slice(CACHEGEN_PREFIX.length).match(UUID_IN_NAME)?.[0];
+    const rest = key.slice(CACHEGEN_PREFIX.length);
+    // the store STATUS generation is keyed by host (`public:store:resolve:<host>`): its own shard per host, never the base one
+    const id = rest.match(UUID_IN_NAME)?.[0] ?? rest.match(/^public:store:resolve:(.+)$/)?.[1];
     return id ? CACHEGEN_SHARD - 1 - (fnv1a(id) % CACHEGEN_STORE_SHARDS) : CACHEGEN_SHARD;
   }
   return fnv1a(shardKey(key)) % AUTH_STATE_SHARDS;
