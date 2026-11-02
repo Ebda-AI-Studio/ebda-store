@@ -1482,15 +1482,50 @@ export async function storeUpdateOnDo(
  * Defer a DO store's update to the commit of the surrounding transaction (Ruling NZ-D18). Returns the PROJECTED row (the current
  * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
  */
+let lastVersion = 0;
+/** A monotonic per-isolate version stamped at COMMIT time (wall clock, never equal to the previous one). */
+const nextVersion = (): number => (lastVersion = Math.max(Date.now(), lastVersion + 1));
+
+/**
+ * Last-writer-wins by COMMIT VERSION (Ruling NZ-D19 follow-up). D1 `stores.updated_at` carries the version of the write that last
+ * changed the row, so the ONE conditional statement `UPDATE ... WHERE updated_at < version` applies a write only when no newer one
+ * has landed: a stale retry A (v5) after a successful B (v6) is `skipped` and D1 stays at v6. An EQUAL version is the same write
+ * already applied to D1: it re-copies to the DO only (idempotent; the DO copy may be what failed). Returns 'applied' or 'skipped'.
+ */
+export async function storeUpdateVersioned(
+  storeId: string,
+  data: Record<string, unknown>,
+  version: number
+): Promise<'applied' | 'skipped'> {
+  const platform = await requirePlatformDb();
+  const patch = { ...d1StorePatch(data), updatedAt: new Date(version) };
+  const res = (await platform.store.updateMany({
+    where: { id: storeId, updatedAt: { lt: new Date(version) } },
+    data: patch,
+  })) as { count: number };
+  if (res.count === 0) {
+    const row = (await platform.store.findUnique({
+      where: { id: storeId },
+      select: { updatedAt: true },
+    })) as { updatedAt: Date } | null;
+    if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    if (row.updatedAt.getTime() > version) return 'skipped'; // a newer write already landed
+    // equal: this very write is already in D1; fall through and (re)copy the DO side
+  }
+  await copyStoreSettings(storeId, data);
+  return 'applied';
+}
+
 /**
  * The post-commit D1 / DO write of a deferred update. Postgres has already committed, so a failure here is never swallowed: it is
- * logged, alerted and put on the jobs queue for a durable retry (lib/store-update-retry.ts).
+ * logged, alerted and put on the jobs queue for a durable retry (lib/store-update-retry.ts) stamped with THIS commit's version.
  */
 async function applyPostCommit(storeId: string, patch: Record<string, unknown>): Promise<void> {
+  const version = nextVersion(); // captured when the hook runs, i.e. after the commit, in commit order
   try {
-    await storeUpdateOnDo(storeId, { data: patch, select: { id: true } } as never);
+    await storeUpdateVersioned(storeId, patch, version);
   } catch (err) {
-    await reportAndRetryStoreUpdate(storeId, patch, err);
+    await reportAndRetryStoreUpdate(storeId, patch, err, { version });
   }
 }
 

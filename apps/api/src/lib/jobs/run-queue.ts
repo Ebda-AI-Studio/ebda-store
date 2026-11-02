@@ -234,26 +234,9 @@ async function handleStoreUpdateRetry(
   m: StoreUpdateRetryMessage
 ): Promise<void> {
   const out = await applyStoreUpdateRetry(m, {
-    apply: async (storeId, data) => {
-      const { storeUpdateOnDo } = await import('../repo-factory.js');
-      await storeUpdateOnDo(storeId, { data, select: { id: true } } as never);
-    },
-    updatedAt: async storeId => {
-      const d1 = (
-        cfBindings() as
-          | {
-              PLATFORM_DB?: {
-                prepare(s: string): { bind(...v: unknown[]): { first<T>(): Promise<T | null> } };
-              };
-            }
-          | undefined
-      )?.PLATFORM_DB;
-      if (!d1) return null;
-      const row = await d1
-        .prepare('SELECT updated_at FROM stores WHERE id = ?')
-        .bind(storeId)
-        .first<{ updated_at: number }>();
-      return row ? Number(row.updated_at) : null;
+    apply: async (storeId, data, version) => {
+      const { storeUpdateVersioned } = await import('../repo-factory.js');
+      return storeUpdateVersioned(storeId, data, version);
     },
   });
   if (out === 'done') msg.ack();

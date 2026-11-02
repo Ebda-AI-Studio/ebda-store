@@ -46,26 +46,33 @@ describe('reportAndRetryStoreUpdate', () => {
       's1',
       { plan: 'professional' },
       new Error('d1 down'),
-      { enqueue, alert, now: () => 1234 }
+      { version: 1234 },
+      { enqueue, alert }
     );
     expect(r.enqueued).toBe(true);
     expect(enqueue).toHaveBeenCalledWith({
       kind: 'store-update-retry',
       storeId: 's1',
       data: { plan: 'professional' },
-      at: 1234,
+      version: 1234,
     });
     expect(alert).toHaveBeenCalledTimes(1);
     expect(String(alert.mock.calls[0][1])).toMatch(/retry is queued/i);
   });
   it('a failing enqueue still alerts, and says NO RETRY QUEUED', async () => {
     const alert = vi.fn();
-    const r = await reportAndRetryStoreUpdate('s1', { plan: 'x' }, new Error('d1 down'), {
-      enqueue: async () => {
-        throw new Error('queue down');
-      },
-      alert,
-    });
+    const r = await reportAndRetryStoreUpdate(
+      's1',
+      { plan: 'x' },
+      new Error('d1 down'),
+      { version: 1 },
+      {
+        enqueue: async () => {
+          throw new Error('queue down');
+        },
+        alert,
+      }
+    );
     expect(r.enqueued).toBe(false);
     expect(String(alert.mock.calls[0][1])).toMatch(/NO RETRY QUEUED/);
   });
@@ -76,31 +83,30 @@ describe('applyStoreUpdateRetry', () => {
     kind: 'store-update-retry' as const,
     storeId: 's1',
     data: { plan: 'professional' },
-    at: 1000,
+    version: 5,
   };
   it('retry succeeds -> applied once and done', async () => {
-    const apply = vi.fn(async () => undefined);
-    expect(await applyStoreUpdateRetry(m, { apply, updatedAt: async () => 500 })).toBe('done');
-    expect(apply).toHaveBeenCalledWith('s1', { plan: 'professional' });
+    const apply = vi.fn(async () => 'applied' as const);
+    expect(await applyStoreUpdateRetry(m, { apply })).toBe('done');
+    expect(apply).toHaveBeenCalledWith('s1', { plan: 'professional' }, 5);
   });
   it('a failing apply asks for a redelivery, then converges when D1 is back', async () => {
     let down = true;
     const apply = vi.fn(async () => {
       if (down) throw new Error('d1 down');
+      return 'applied' as const;
     });
-    const deps = { apply, updatedAt: async () => null };
-    expect(await applyStoreUpdateRetry(m, deps)).toBe('retry');
+    expect(await applyStoreUpdateRetry(m, { apply })).toBe('retry');
     down = false;
-    expect(await applyStoreUpdateRetry(m, deps)).toBe('done');
+    expect(await applyStoreUpdateRetry(m, { apply })).toBe('done');
     expect(apply).toHaveBeenCalledTimes(2);
   });
-  it('a NEWER write already changed the store: the stale retry is skipped (never undoes it)', async () => {
-    const apply = vi.fn();
-    expect(await applyStoreUpdateRetry(m, { apply, updatedAt: async () => 2000 })).toBe('done');
-    expect(apply).not.toHaveBeenCalled();
+  it('a retry superseded by a newer commit is done (skipped), not retried forever', async () => {
+    expect(await applyStoreUpdateRetry(m, { apply: async () => 'skipped' })).toBe('done');
   });
-  it('isStoreUpdateRetry recognises only its own message shape', () => {
+  it('isStoreUpdateRetry recognises only its own message shape (version, not a timestamp)', () => {
     expect(isStoreUpdateRetry(m)).toBe(true);
+    expect(isStoreUpdateRetry({ ...m, version: undefined })).toBe(false);
     expect(isStoreUpdateRetry({ kind: 'job' })).toBe(false);
     expect(isStoreUpdateRetry(null)).toBe(false);
   });

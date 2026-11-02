@@ -368,18 +368,46 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
         kind: 'store-update-retry',
         storeId: S,
         data: { plan: 'professional' },
+        version: expect.any(Number),
       });
       // the queue redelivers: D1 is back, the retry applies it
-      const { storeUpdateOnDo } = await import('../../apps/api/src/lib/repo-factory');
-      const out = await applyStoreUpdateRetry(sent[0] as never, {
-        apply: async (id, data) =>
-          void (await storeUpdateOnDo(id, { data, select: { id: true } } as never)),
-        updatedAt: async () => null,
-      });
+      const { storeUpdateVersioned } = await import('../../apps/api/src/lib/repo-factory');
+      const out = await applyStoreUpdateRetry(sent[0] as never, { apply: storeUpdateVersioned });
       expect(out).toBe('done');
       expect(d1row(S).plan).toBe('professional');
       expect(doProfile(S).plan).toBe('professional');
       clearCfBindings();
+    });
+
+    it('commit A (v5) fails -> commit B (v6) succeeds -> the retry of A arrives -> SKIPPED; D1 and the DO stay at B', async () => {
+      const { storeUpdateVersioned } = await import('../../apps/api/src/lib/repo-factory');
+      sqlite.prepare('UPDATE stores SET updated_at = 1 WHERE id = ?').run(S); // the row's last write is older than v5
+      // A (v5) failed earlier and is queued; B (v6) lands
+      expect(await storeUpdateVersioned(S, { plan: 'enterprise' }, 6)).toBe('applied');
+      expect(d1row(S).plan).toBe('enterprise');
+      expect(d1row(S).updated_at).toBe(6);
+      // the stale retry of A (v5, plan professional) arrives: skipped, nothing changes
+      const out = await applyStoreUpdateRetry(
+        { kind: 'store-update-retry', storeId: S, data: { plan: 'professional' }, version: 5 },
+        { apply: storeUpdateVersioned }
+      );
+      expect(out).toBe('done');
+      expect(d1row(S).plan).toBe('enterprise');
+      expect(d1row(S).updated_at).toBe(6);
+      expect(doProfile(S).plan).toBe('enterprise');
+    });
+    it('an EQUAL version is the same write: D1 is untouched and the DO side is re-copied (>= skips the D1 write)', async () => {
+      const { storeUpdateVersioned } = await import('../../apps/api/src/lib/repo-factory');
+      sqlite.prepare('UPDATE stores SET updated_at = 1 WHERE id = ?').run(S);
+      await storeUpdateVersioned(S, { plan: 'professional' }, 10);
+      (h.doDb as DatabaseSync)
+        .prepare("UPDATE store_profile SET plan = 'starter' WHERE store_id = ?")
+        .run(S); // the DO copy was the part that failed
+      h.doCalls.length = 0;
+      expect(await storeUpdateVersioned(S, { plan: 'professional' }, 10)).toBe('applied');
+      expect(h.doCalls).toEqual(['applySettings']);
+      expect(doProfile(S).plan).toBe('professional');
+      expect(d1row(S).updated_at).toBe(10);
     });
   });
 });
