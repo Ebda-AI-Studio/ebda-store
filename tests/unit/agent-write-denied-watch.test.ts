@@ -13,71 +13,70 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const {
-  mockAuditFindMany,
-  mockAuditGroupBy,
-  mockAuditCount,
-  mockOrderFindMany,
-  mockSendAlert,
-  mockRlsBypass,
-} = vi.hoisted(() => {
-  const findMany = vi.fn();
-  // #1656: the watcher now discovers WHICH stores had any denial in the
-  // window via a groupBy, then pulls each store's own bounded slice —
-  // rather than one global `take` that a single noisy store could fill.
-  // Defaults to no active stores (empty window); tests that configure rows
-  // via `setDenials` below configure this alongside `findMany`.
-  const groupBy = vi.fn(async () => [] as { storeId: string | null }[]);
-  // The watcher makes a SECOND cross-tenant read: which of the stores in this
-  // window have ever completed an agent order. That flag is what separates a
-  // broken pre-existing integration from crawler noise, so the stub has to
-  // answer it — defaulting to "no prior agent activity", which is what every
-  // pre-existing case in this file assumes.
-  const orderFindMany = vi.fn(async () => []);
+const { mockAuditFindMany, mockAuditGroupBy, mockAuditCount, mockOrderFindMany, mockSendAlert } =
+  vi.hoisted(() => {
+    const findMany = vi.fn();
+    // #1656: the watcher now discovers WHICH stores had any denial in the
+    // window via a groupBy, then pulls each store's own bounded slice —
+    // rather than one global `take` that a single noisy store could fill.
+    // Defaults to no active stores (empty window); tests that configure rows
+    // via `setDenials` below configure this alongside `findMany`.
+    const groupBy = vi.fn(async () => [] as { storeId: string | null }[]);
+    // The watcher makes a SECOND cross-tenant read: which of the stores in this
+    // window have ever completed an agent order. That flag is what separates a
+    // broken pre-existing integration from crawler noise, so the stub has to
+    // answer it — defaulting to "no prior agent activity", which is what every
+    // pre-existing case in this file assumes.
+    const orderFindMany = vi.fn(async () => []);
+    return {
+      mockAuditFindMany: findMany,
+      mockAuditGroupBy: groupBy,
+      // one store's count of denials in the window: the argument is what the watcher asked for
+      mockAuditCount: vi.fn(),
+      mockOrderFindMany: orderFindMany,
+      mockSendAlert: vi.fn(),
+    };
+  });
+
+// The watcher reads every store (Postgres and Durable Object alike) through `acrossAllStoresDb` and names them through
+// `allStoresDirectory` (Ruling CF-JOBS-4). The stand-in visits the stores the `groupBy` stub names (or the given `storeIds`) and
+// hands each the read client the watcher asked for, so the queries it builds stay observable without a database.
+const counts = vi.hoisted(() => new Map<string, number>());
+vi.mock('@api/lib/jobs/store-db', () => {
+  const dbFor = () => ({
+    auditLog: {
+      count: async (args: { where: { storeId: string } }) => {
+        mockAuditCount(args);
+        return counts.get(args.where.storeId) ?? 0;
+      },
+      findMany: (...a: unknown[]) => mockAuditFindMany(...a),
+    },
+    order: {
+      findFirst: async (args: { where: { storeId: string } }) => {
+        const rows = (await mockOrderFindMany({ where: { source: 'agent' } })) as Array<{
+          storeId: string;
+        }>;
+        return rows.some(r => r.storeId === args.where.storeId)
+          ? { storeId: args.where.storeId }
+          : null;
+      },
+    },
+  });
   return {
-    mockAuditFindMany: findMany,
-    mockAuditGroupBy: groupBy,
-    // one store's count of denials in the window: the argument is what the watcher asked for
-    mockAuditCount: vi.fn(),
-    mockOrderFindMany: orderFindMany,
-    mockSendAlert: vi.fn(),
-    // `withStore(storeId, fn)`: one short tenant transaction per store read.
-    mockRlsBypass: vi.fn((_storeId: string, fn: (tx: unknown) => unknown) =>
-      fn({ auditLog: { findMany } })
-    ),
+    allStoresDirectory: async () =>
+      [...counts.keys()].map(id => ({ id, name: 'Acme', slug: 'acme' })),
+    acrossAllStoresDb: async (
+      _event: unknown,
+      fn: (storeId: string, db: unknown) => Promise<unknown>,
+      o?: { storeIds?: string[] }
+    ) => {
+      const ids = o?.storeIds ?? [...counts.keys()];
+      const out: Array<{ storeId: string; value: unknown }> = [];
+      for (const id of ids) out.push({ storeId: id, value: await fn(id, dbFor()) });
+      return out;
+    },
   };
 });
-
-// `acrossStores` visits every store in its own tenant transaction. The stand-in answers the
-// two questions the watcher asks of it without a database: the per-store denial counts
-// (`groupBy` stub) and which of the given stores have ever had an agent order (`orderFindMany`).
-vi.mock('@ebda/database', () => ({
-  prisma: { auditLog: { count: (...a: unknown[]) => mockAuditCount(...a) } },
-  withStore: mockRlsBypass,
-  acrossStores: async (fn: (storeId: string) => Promise<unknown>, o?: { storeIds?: string[] }) => {
-    if (!o?.storeIds) {
-      // Per-store denial counts: each active store (the `groupBy` stub names them and their
-      // counts) is visited and `fn` runs for it, so the query the watcher builds is observable.
-      const groups = (await mockAuditGroupBy()) as Array<{
-        storeId: string | null;
-        _count?: { _all: number };
-      }>;
-      const out: Array<{ storeId: string; value: unknown }> = [];
-      for (const g of groups) {
-        mockAuditCount.mockResolvedValueOnce(g._count?._all ?? 0);
-        out.push({ storeId: g.storeId as string, value: await fn(g.storeId as string) });
-      }
-      return out;
-    }
-    const rows = (await mockOrderFindMany({ where: { source: 'agent' } })) as Array<{
-      storeId: string;
-    }>;
-    return o.storeIds.map(storeId => ({
-      storeId,
-      value: rows.some(r => r.storeId === storeId) ? { storeId } : null,
-    }));
-  },
-}));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: vi.fn(), createFunction: vi.fn(() => ({})) },
 }));
@@ -111,7 +110,7 @@ function setDenials(rows: ReturnType<typeof deniedRow>[]) {
   mockAuditFindMany.mockImplementation(async (args?: { where?: { storeId?: string } }) =>
     args?.where?.storeId ? rows.filter(r => r.storeId === args.where!.storeId) : rows
   );
-  const counts = new Map<string, number>();
+  counts.clear();
   for (const r of rows) if (r.storeId) counts.set(r.storeId, (counts.get(r.storeId) ?? 0) + 1);
   mockAuditGroupBy.mockResolvedValue(
     [...counts].map(([storeId, n]) => ({ storeId, _count: { _all: n } }))
@@ -359,8 +358,8 @@ describe('agent-write-denied-watch — bounded fan-out (issue 2055, issue 2060)'
     );
     expect(perStoreReads).toHaveLength(100);
     expect(perStoreReads).toContain('store-149');
-    // One short tenant transaction per store — never one spanning the whole fan-out.
-    expect(mockRlsBypass).toHaveBeenCalledTimes(100);
+    // One short read per store — never one spanning the whole fan-out.
+    expect(mockAuditFindMany).toHaveBeenCalledTimes(100);
   });
 
   it('marks the tick truncated when whole stores were dropped', async () => {

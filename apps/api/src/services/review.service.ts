@@ -1,5 +1,6 @@
 import { visibleProductWhere } from '../lib/visible-product';
-import { prisma, Prisma } from '@ebda/database';
+import { Prisma } from '@ebda/database';
+import { customersById, storeRwClient } from '../lib/jobs/store-db';
 import { AppError } from '../middleware/error-handler';
 import { socketService } from './socket.service';
 import logger from '../lib/logger';
@@ -41,6 +42,7 @@ export class ReviewService {
       viewerCustomerId?: string;
     } = {}
   ) {
+    const { db, onDo } = await storeRwClient(storeId);
     const { page = 1, limit = 10, sortBy = 'newest', viewerCustomerId } = options;
     const skip = (page - 1) * limit;
 
@@ -66,7 +68,7 @@ export class ReviewService {
         };
 
     const [reviews, total, stats] = await Promise.all([
-      prisma.review.findMany({
+      db.review.findMany({
         where,
         skip,
         take: limit,
@@ -87,7 +89,7 @@ export class ReviewService {
           customerId: true,
         },
       }),
-      prisma.review.count({ where }),
+      db.review.count({ where }),
       this.getProductReviewStats(storeId, productId),
     ]);
 
@@ -116,15 +118,16 @@ export class ReviewService {
    * Get review statistics for a product
    */
   static async getProductReviewStats(storeId: string, productId: string) {
+    const { db, onDo } = await storeRwClient(storeId);
     const where = { storeId, productId, status: 'published', product: visibleProductWhere() };
 
     const [aggregate, distribution] = await Promise.all([
-      prisma.review.aggregate({
+      db.review.aggregate({
         where,
         _avg: { rating: true },
         _count: true,
       }),
-      prisma.review.groupBy({
+      db.review.groupBy({
         by: ['rating'],
         where,
         _count: true,
@@ -162,6 +165,7 @@ export class ReviewService {
       productId?: string;
     } = {}
   ) {
+    const { db, onDo } = await storeRwClient(storeId);
     const { page = 1, limit = 20, status = 'all', productId } = options;
     const skip = (page - 1) * limit;
 
@@ -169,8 +173,8 @@ export class ReviewService {
     if (status !== 'all') where.status = status;
     if (productId) where.productId = productId;
 
-    const [reviews, total] = await Promise.all([
-      prisma.review.findMany({
+    const [firstPage, total] = await Promise.all([
+      db.review.findMany({
         where,
         skip,
         take: limit,
@@ -179,13 +183,31 @@ export class ReviewService {
           product: {
             select: { id: true, name: true, slug: true },
           },
-          customer: {
-            select: { id: true, email: true, firstName: true, lastName: true },
-          },
+          // Postgres joins the buyer; a store on its Durable Object cannot (the buyer is a platform row), so it is attached below
+          ...(onDo
+            ? {}
+            : { customer: { select: { id: true, email: true, firstName: true, lastName: true } } }),
         },
       }),
-      prisma.review.count({ where }),
+      db.review.count({ where }),
     ]);
+
+    let reviews = firstPage;
+    if (onDo) {
+      const buyers = await customersById(
+        storeId,
+        reviews.map(r => r.customerId)
+      );
+      reviews = reviews.map(r => {
+        const u = r.customerId ? buyers.get(r.customerId) : undefined;
+        return {
+          ...r,
+          customer: u
+            ? { id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName }
+            : null,
+        };
+      }) as typeof reviews;
+    }
 
     return {
       reviews,
@@ -202,6 +224,7 @@ export class ReviewService {
    * Create a review (verified-purchase only — requires a valid orderId)
    */
   static async create(storeId: string, customerId: string | null, data: CreateReviewData) {
+    const { db, onDo } = await storeRwClient(storeId);
     // Validate rating
     if (data.rating < 1 || data.rating > 5) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Rating must be between 1 and 5');
@@ -213,7 +236,7 @@ export class ReviewService {
     }
 
     // Check if product exists in this store
-    const product = await prisma.product.findFirst({
+    const product = await db.product.findFirst({
       where: { id: data.productId, storeId },
     });
 
@@ -222,7 +245,7 @@ export class ReviewService {
     }
 
     // Verify order exists, belongs to this store/customer, and is delivered
-    const order = await prisma.order.findFirst({
+    const order = await db.order.findFirst({
       where: {
         id: data.orderId,
         storeId,
@@ -237,7 +260,7 @@ export class ReviewService {
     }
 
     // Enforce unique (orderId, productId) — one review per buyer-product pair
-    const existingReview = await prisma.review.findFirst({
+    const existingReview = await db.review.findFirst({
       where: { storeId, orderId: data.orderId, productId: data.productId },
     });
 
@@ -249,7 +272,7 @@ export class ReviewService {
       );
     }
 
-    const review = await prisma.review.create({
+    const review = await db.review.create({
       data: {
         storeId,
         productId: data.productId,
@@ -283,7 +306,8 @@ export class ReviewService {
    * Update a review (admin)
    */
   static async update(storeId: string, reviewId: string, data: UpdateReviewData) {
-    const review = await prisma.review.findFirst({
+    const { db } = await storeRwClient(storeId);
+    const review = await db.review.findFirst({
       where: { id: reviewId, storeId },
     });
 
@@ -291,7 +315,7 @@ export class ReviewService {
       throw new AppError(404, 'NOT_FOUND', 'Review not found');
     }
 
-    return prisma.review.update({
+    return db.review.update({
       where: { id: reviewId, storeId },
       data: {
         rating: data.rating,
@@ -307,7 +331,8 @@ export class ReviewService {
    * Publish a review (admin approval)
    */
   static async approve(storeId: string, reviewId: string) {
-    const review = await prisma.review.findFirst({
+    const { db } = await storeRwClient(storeId);
+    const review = await db.review.findFirst({
       where: { id: reviewId, storeId },
     });
 
@@ -315,7 +340,7 @@ export class ReviewService {
       throw new AppError(404, 'NOT_FOUND', 'Review not found');
     }
 
-    return prisma.review.update({
+    return db.review.update({
       where: { id: reviewId, storeId },
       data: { status: 'published' },
     });
@@ -325,7 +350,8 @@ export class ReviewService {
    * Reject a review (admin)
    */
   static async reject(storeId: string, reviewId: string, reason?: string) {
-    const review = await prisma.review.findFirst({
+    const { db } = await storeRwClient(storeId);
+    const review = await db.review.findFirst({
       where: { id: reviewId, storeId },
     });
 
@@ -333,7 +359,7 @@ export class ReviewService {
       throw new AppError(404, 'NOT_FOUND', 'Review not found');
     }
 
-    return prisma.review.update({
+    return db.review.update({
       where: { id: reviewId, storeId },
       data: { status: 'rejected', rejectionReason: reason },
     });
@@ -343,7 +369,8 @@ export class ReviewService {
    * Delete a review
    */
   static async delete(storeId: string, reviewId: string) {
-    const review = await prisma.review.findFirst({
+    const { db } = await storeRwClient(storeId);
+    const review = await db.review.findFirst({
       where: { id: reviewId, storeId },
     });
 
@@ -351,7 +378,7 @@ export class ReviewService {
       throw new AppError(404, 'NOT_FOUND', 'Review not found');
     }
 
-    await prisma.review.delete({
+    await db.review.delete({
       where: { id: reviewId, storeId },
     });
 
@@ -362,7 +389,8 @@ export class ReviewService {
    * Get reviews by customer
    */
   static async getCustomerReviews(storeId: string, customerId: string) {
-    return prisma.review.findMany({
+    const { db } = await storeRwClient(storeId);
+    return db.review.findMany({
       where: { storeId, customerId },
       take: 100,
       include: {
@@ -378,8 +406,9 @@ export class ReviewService {
    * Check if customer can review a product (verified-purchase check)
    */
   static async canReview(storeId: string, productId: string, customerId: string) {
+    const { db, onDo } = await storeRwClient(storeId);
     // Check if already reviewed (any status — prevent duplicate pending submissions)
-    const existingReview = await prisma.review.findFirst({
+    const existingReview = await db.review.findFirst({
       where: { storeId, productId, customerId },
     });
 
@@ -388,7 +417,7 @@ export class ReviewService {
     }
 
     // Require a delivered order for this product
-    const purchase = await prisma.order.findFirst({
+    const purchase = await db.order.findFirst({
       where: {
         storeId,
         customerId,

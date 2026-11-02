@@ -49,8 +49,14 @@ export function SwatchDots({
   const total = Math.max(opt._count?.values ?? 0, vals.length);
   return (
     <>
-      <span className="sr-only">{countText(language === 'ar' ? 'ar' : 'en', total, COLOURS)}</span>
-      <div className={`flex items-center gap-1 ${className}`.trim()} aria-hidden="true">
+      <span data-card-chrome="swatches" className="sr-only">
+        {countText(language === 'ar' ? 'ar' : 'en', total, COLOURS)}
+      </span>
+      <div
+        data-card-chrome="swatches"
+        className={`flex items-center gap-1 ${className}`.trim()}
+        aria-hidden="true"
+      >
         {shown.map(v => {
           const s = swatchOf(v)!;
           return (

@@ -1,4 +1,6 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { balanceProductLanguages } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
@@ -80,19 +82,22 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
     // long-lived DB transaction (#461). `runInStoreScope` gives each query its
     // own short tenant transaction instead.
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+      const sdb = lazyStoreDb(storeId);
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
       );
 
       const productIds = await step.run('load-items', async () => {
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: products.length },
         });
@@ -113,7 +118,7 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
         const batchIds = batches[i];
 
         const result: BalanceBatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -130,7 +135,7 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
             };
           }
 
-          const items = await prisma.product.findMany({
+          const items = await sdb.product.findMany({
             where: { id: { in: batchIds }, storeId },
             select: { id: true, name: true },
           });
@@ -207,7 +212,7 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: {
               processed,
@@ -250,7 +255,7 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
 
       await step.run('finalize', async () => {
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: 'completed',

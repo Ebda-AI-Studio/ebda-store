@@ -1,8 +1,13 @@
 /**
  * Integration test for Task 8: MFA enroll + login challenge flow.
  *
+ * Subject: a storefront CUSTOMER. Merchants, staff and super admins no longer sign in at the Store (Rulings ID-1/ID-2: login
+ * and /auth/mfa/verify session mint answer 409 USE_IDENTITY_SERVICE, /auth/mfa/enroll/* too, see the last describe), so the
+ * Store's own TOTP enroll + challenge flow is exercised on the one account type that still uses it. Customer tokens are bound to
+ * their store (F-01), hence the store fixture below. Enrollment/challenge for admins is covered by the identity service.
+ *
  * Flow:
- *   1. Create a super_admin user.
+ *   1. Create a customer user.
  *   2. Normal login → succeeds (no MFA yet), get accessToken.
  *   3. POST /auth/mfa/enroll/begin (authenticated) → receive secret + QR.
  *   4. POST /auth/mfa/enroll/verify (authenticated) → confirm TOTP code, enable MFA.
@@ -23,6 +28,7 @@ import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { API_BASE } from '../helpers/api-base';
+import { identityTokenFor } from '../helpers/identity-session';
 
 // One knob configures the whole suite; see tests/helpers/api-base.ts for why
 // it is TEST_API_URL rather than the server's own API_URL or API_HOST (both
@@ -31,6 +37,40 @@ import { API_BASE } from '../helpers/api-base';
 const API = API_BASE;
 const PW = 'Test1234!pw';
 const EMAIL = `mfa-${Date.now()}@example.test`;
+
+// Customer store fixture (customer tokens are bound to the store they were issued for).
+const OWNER_EMAIL = `mfa-owner-${Date.now()}@example.test`;
+let STORE_ID: string;
+let OWNER_ID: string;
+
+beforeAll(async () => {
+  const owner = await prisma.user.create({
+    data: {
+      email: OWNER_EMAIL,
+      passwordHash: await bcrypt.hash(PW, 10),
+      firstName: 'Mfa',
+      lastName: 'Owner',
+      role: 'store_admin',
+      emailVerified: true,
+    },
+  });
+  OWNER_ID = owner.id;
+  const store = await prisma.store.create({
+    data: {
+      name: 'MFA Test Store',
+      slug: `mfa-test-${Date.now()}`,
+      ownerId: owner.id,
+      plan: 'enterprise',
+      status: 'active',
+    },
+  });
+  STORE_ID = store.id;
+});
+afterAll(async () => {
+  await prisma.user.deleteMany({ where: { storeId: STORE_ID } }).catch(() => {});
+  await prisma.store.delete({ where: { id: STORE_ID } }).catch(() => {});
+  await prisma.user.delete({ where: { id: OWNER_ID } }).catch(() => {});
+});
 
 describe('MFA enroll + login challenge', () => {
   // Clean up before the suite starts (handles leftover rows from a previous
@@ -52,9 +92,9 @@ describe('MFA enroll + login challenge', () => {
         passwordHash: await bcrypt.hash(PW, 10),
         firstName: 'M',
         lastName: 'F',
-        role: 'super_admin',
+        role: 'customer',
         emailVerified: true,
-        storeId: null,
+        storeId: STORE_ID,
       },
     });
 
@@ -62,7 +102,7 @@ describe('MFA enroll + login challenge', () => {
     const login1Res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, password: PW }),
+      body: JSON.stringify({ email: EMAIL, password: PW, storeId: STORE_ID }),
     });
     expect(login1Res.status).toBe(200);
     const login1 = await login1Res.json();
@@ -95,7 +135,7 @@ describe('MFA enroll + login challenge', () => {
     const login2Res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, password: PW }),
+      body: JSON.stringify({ email: EMAIL, password: PW, storeId: STORE_ID }),
     });
     expect(login2Res.status).toBe(200);
     const login2 = await login2Res.json();
@@ -148,9 +188,9 @@ describe('SEC-1: MFA challenge token must not bypass authenticate middleware', (
         passwordHash: await bcrypt.hash(PW, 10),
         firstName: 'Sec',
         lastName: 'One',
-        role: 'super_admin',
+        role: 'customer',
         emailVerified: true,
-        storeId: null,
+        storeId: STORE_ID,
       },
     });
 
@@ -158,7 +198,7 @@ describe('SEC-1: MFA challenge token must not bypass authenticate middleware', (
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SEC1_EMAIL, password: PW }),
+      body: JSON.stringify({ email: SEC1_EMAIL, password: PW, storeId: STORE_ID }),
     });
     const loginData = await loginRes.json();
     const accessToken = loginData.data.accessToken as string;
@@ -182,7 +222,7 @@ describe('SEC-1: MFA challenge token must not bypass authenticate middleware', (
     const login2Res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SEC1_EMAIL, password: PW }),
+      body: JSON.stringify({ email: SEC1_EMAIL, password: PW, storeId: STORE_ID }),
     });
     const login2 = await login2Res.json();
     const challengeToken = login2.data.challengeToken as string;
@@ -223,16 +263,16 @@ describe('SEC-2/SEC-3: re-enrollment requires current TOTP code when MFA is acti
         passwordHash: await bcrypt.hash(PW, 10),
         firstName: 'Sec',
         lastName: 'Two',
-        role: 'super_admin',
+        role: 'customer',
         emailVerified: true,
-        storeId: null,
+        storeId: STORE_ID,
       },
     });
 
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SEC2_EMAIL, password: PW }),
+      body: JSON.stringify({ email: SEC2_EMAIL, password: PW, storeId: STORE_ID }),
     });
     const loginData = await loginRes.json();
     const accessToken = loginData.data.accessToken as string;
@@ -275,7 +315,7 @@ describe('SEC-2/SEC-3: re-enrollment requires current TOTP code when MFA is acti
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SEC2_EMAIL, password: PW }),
+      body: JSON.stringify({ email: SEC2_EMAIL, password: PW, storeId: STORE_ID }),
     });
     const loginData = await loginRes.json();
     // Must be MFA-challenged at this point
@@ -355,9 +395,9 @@ describe('H2: per-challenge MFA verify brute-force lockout', () => {
         passwordHash: await bcrypt.hash(PW, 10),
         firstName: 'H2',
         lastName: 'Test',
-        role: 'super_admin',
+        role: 'customer',
         emailVerified: true,
-        storeId: null,
+        storeId: STORE_ID,
       },
     });
 
@@ -365,7 +405,7 @@ describe('H2: per-challenge MFA verify brute-force lockout', () => {
     const login1Res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: H2_EMAIL, password: PW }),
+      body: JSON.stringify({ email: H2_EMAIL, password: PW, storeId: STORE_ID }),
     });
     expect(login1Res.status).toBe(200);
     const login1 = await login1Res.json();
@@ -392,7 +432,7 @@ describe('H2: per-challenge MFA verify brute-force lockout', () => {
     const login2Res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: H2_EMAIL, password: PW }),
+      body: JSON.stringify({ email: H2_EMAIL, password: PW, storeId: STORE_ID }),
     });
     expect(login2Res.status).toBe(200);
     const login2 = await login2Res.json();
@@ -436,7 +476,7 @@ describe('H2: per-challenge MFA verify brute-force lockout', () => {
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: H2_EMAIL, password: PW }),
+      body: JSON.stringify({ email: H2_EMAIL, password: PW, storeId: STORE_ID }),
     });
     expect(loginRes.status).toBe(200);
     const loginData = await loginRes.json();
@@ -454,5 +494,50 @@ describe('H2: per-challenge MFA verify brute-force lockout', () => {
     const verifyBody = await verifyRes.json();
     expect(verifyBody.data.accessToken).toBeTruthy();
     expect(verifyBody.data.user.email).toBe(H2_EMAIL);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The new rule: no Store-side password/MFA session for identity-managed roles
+// ---------------------------------------------------------------------------
+
+describe('identity-managed roles cannot use the Store MFA flow (Rulings ID-1/ID-2)', () => {
+  const ID_EMAIL = `mfa-idm-${Date.now()}@example.test`;
+
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { email: ID_EMAIL } });
+  });
+
+  it('a super_admin with MFA enrolled gets 409 USE_IDENTITY_SERVICE from /auth/login (no challenge token) and from /auth/mfa/enroll/begin', async () => {
+    const u = await prisma.user.create({
+      data: {
+        email: ID_EMAIL,
+        passwordHash: await bcrypt.hash(PW, 10),
+        firstName: 'Idm',
+        lastName: 'Admin',
+        role: 'super_admin',
+        emailVerified: true,
+        storeId: null,
+        mfaEnabled: true,
+        mfaSecret: 'enc:test-mfa-secret',
+      },
+    });
+
+    const loginRes = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: ID_EMAIL, password: PW }),
+    });
+    expect(loginRes.status).toBe(409);
+    const loginBody = await loginRes.json();
+    expect(loginBody.error.code).toBe('USE_IDENTITY_SERVICE');
+    expect(loginBody.data?.challengeToken).toBeUndefined();
+
+    const beginRes = await fetch(`${API}/auth/mfa/enroll/begin`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await identityTokenFor(u.id)}` },
+    });
+    expect(beginRes.status).toBe(409);
+    expect((await beginRes.json()).error.code).toBe('USE_IDENTITY_SERVICE');
   });
 });

@@ -89,12 +89,26 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { sendCartRecoveredToCi } from '../lib/ci/emit';
 import { assertOrderAllowed, noteOrderCreated } from './plan-limit.service';
 import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
-import { assertStockHoldCapNotExceeded, HOLD_CAPPED_PAYMENT_METHODS } from '../lib/stock-hold-cap';
+import {
+  assertStockHoldCapNotExceeded,
+  HOLD_CAPPED_PAYMENT_METHODS,
+  openUnpaidGatewayHoldCap,
+  openUnpaidHoldCap,
+  openUnpaidHoldIpCap,
+} from '../lib/stock-hold-cap';
+import {
+  storeDb,
+  storeMoney,
+  storeRepo,
+  type CreateOrderArgs,
+  type MoneyClient,
+} from '../lib/repo-factory';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -355,6 +369,31 @@ export function orderNumberFromScan(input: string): string | null {
   return n.startsWith('ORD-') ? n : null;
 }
 
+/**
+ * The OR arms of the order search for a DO store (Ruling CF-R4-1): the same three arms as the indexed Postgres path (order
+ * number, registered customers by `customer_id`, guest orders by id), their ids resolved inside the StoreDO from its derived
+ * search index (Arabic-folded names, any phone form, email, the guest contact snapshot). There is no relation fallback on a
+ * DO, so a term so broad that a cap is hit is refused loudly rather than answered with a short list.
+ */
+async function orderSearchArmsOnDo(
+  money: MoneyClient,
+  search: string
+): Promise<Prisma.OrderWhereInput[]> {
+  const r = await money.searchOrders({ search });
+  if (r.truncated)
+    throw new AppError(
+      422,
+      'ORDER_SEARCH_TOO_BROAD',
+      'That search matches too many orders: add more of the name, number or phone'
+    );
+  const arms: Prisma.OrderWhereInput[] = [];
+  if (r.numberIds.length) arms.push({ id: { in: r.numberIds } });
+  if (r.userIds.length) arms.push({ customerId: { in: r.userIds } });
+  if (r.guestOrderIds.length) arms.push({ id: { in: r.guestOrderIds } });
+  if (arms.length === 0) arms.push({ id: { in: [] } });
+  return arms;
+}
+
 export async function orderSearchWhere(
   storeId: string,
   search: string,
@@ -370,6 +409,9 @@ export async function orderSearchWhere(
   // Still store-scoped: callers AND this with their own `storeId`.
   const scanned = orderNumberFromScan(search);
   if (scanned) return [{ orderNumber: scanned }];
+  // A store on its Durable Object answers from the DO's own search index (Ruling CF-R4-1); the Postgres code below is untouched.
+  const money = await storeMoney(storeId);
+  if (money) return orderSearchArmsOnDo(money, search);
   const contains = { contains: search, mode: 'insensitive' as const };
   const customerMatch: Prisma.UserWhereInput[] = [
     { firstName: contains },
@@ -438,6 +480,36 @@ export async function orderSearchWhere(
   // Nothing matched anywhere: an explicit match-nothing arm (an empty OR is easy to misread).
   if (arms.length === 0) arms.push({ id: { in: [] } });
   return arms;
+}
+
+/**
+ * An order read for a store on its Durable Object (Ruling CF-R2-1). `Order.customer` is a `User` on the platform database,
+ * which the DO cannot join: the DO read leaves the relation out of the include and the customers are attached here, with the
+ * same select and the same visibility the Postgres relation join had under `ebda_app` (a customer registered on THIS store).
+ */
+async function attachCustomers<T extends { customerId: string | null }>(
+  storeId: string,
+  rows: T[],
+  select: Prisma.UserSelect
+): Promise<T[]> {
+  const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
+  const users = ids.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ids }, storeId },
+        select: { id: true, ...select },
+      })
+    : [];
+  const byId = new Map(users.map(u => [u.id, u]));
+  return rows.map(r => ({
+    ...r,
+    customer: r.customerId ? (byId.get(r.customerId) ?? null) : null,
+  }));
+}
+/** The include of an order read: on a DO store without the `customer` relation (see `attachCustomers`). */
+function forBackend<const I extends { customer?: unknown }>(onDo: boolean, include: I): I {
+  if (!onDo) return include;
+  const { customer: _external, ...rest } = include;
+  return rest as I;
 }
 
 export class OrderService {
@@ -524,11 +596,13 @@ export class OrderService {
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
     const where = await OrderService.listWhere(storeId, options);
 
     const baseFindManyArgs = {
       where,
-      include: {
+      include: forBackend(onDo, {
         // `phone` is included so the admin customers page can surface
         // it without doing a second query. Stays nullable on the User
         // record itself.
@@ -538,7 +612,7 @@ export class OrderService {
         items: true,
         payments: { select: { provider: true, status: true } },
         _count: { select: { items: true } },
-      },
+      }),
       // `id` is the tiebreaker, and it is load-bearing rather than tidiness.
       // Keyset pagination is only stable when the ORDER BY uniquely identifies
       // the cursor row, and createdAt is not unique — bulk-imported or
@@ -553,10 +627,18 @@ export class OrderService {
       ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1, take: limit + 1 }
       : { ...baseFindManyArgs, skip, take: limit };
 
-    const [ordersRaw, total] = await Promise.all([
-      prisma.order.findMany(findManyArgs),
-      prisma.order.count({ where }),
+    const [found, total] = await Promise.all([
+      repo.db.order.findMany(findManyArgs),
+      repo.db.order.count({ where }),
     ]);
+    const ordersRaw = onDo
+      ? await attachCustomers(storeId, found, {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+        })
+      : found;
 
     const orders = cursor && ordersRaw.length > limit ? ordersRaw.slice(0, limit) : ordersRaw;
     const nextCursor =
@@ -575,9 +657,11 @@ export class OrderService {
   }
 
   static async getById(storeId: string, orderId: string) {
-    const order = await prisma.order.findFirst({
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.order.findFirst({
       where: { id: orderId, storeId, deletedAt: null },
-      include: {
+      include: forBackend(onDo, {
         customer: {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
@@ -597,12 +681,21 @@ export class OrderService {
         // columns already returned by `include`) so admin/customer order
         // views can show the promotion's name, not just its opaque id.
         appliedPromotion: { select: { id: true, name: true, nameAr: true } },
-      },
+      }),
     });
 
-    if (!order) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
+    const order = onDo
+      ? (
+          await attachCustomers(storeId, [found], {
+            email: true,
+            firstName: true,
+            lastName: true,
+          })
+        )[0]
+      : found;
 
     // InstaPay (SP6a): what the merchant needs to match the transfer against their
     // InstaPay app: the reference the customer entered and the hold deadline. A
@@ -617,7 +710,7 @@ export class OrderService {
       };
     } = order;
     if (order.payments?.some(p => p.provider === 'instapay')) {
-      const ip = await prisma.payment.findFirst({
+      const ip = await repo.db.payment.findFirst({
         where: { orderId, provider: 'instapay' },
         orderBy: { createdAt: 'desc' },
         select: { metadata: true },
@@ -637,6 +730,7 @@ export class OrderService {
 
   /** The order a previous request with this checkout key created, in the shape `create` returns; null when none. */
   static async findCheckoutReplay(storeId: string, idemHash: string, reqHash: string) {
+    // (a DO store's keyed retry is answered by its engine, which keys on `idempotency_key`: see `createOnDo`)
     const found = await prisma.order.findFirst({
       where: { storeId, checkoutIdempotencyKey: idemHash },
       select: { id: true, checkoutRequestHash: true },
@@ -647,22 +741,30 @@ export class OrderService {
     return OrderService.loadCreatedOrder(storeId, found.id);
   }
 
-  private static loadCreatedOrder(storeId: string, orderId: string) {
-    return prisma.order.findFirst({
+  private static async loadCreatedOrder(storeId: string, orderId: string) {
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.order.findFirst({
       where: { id: orderId, storeId },
-      include: {
+      include: forBackend(onDo, {
         items: true,
         customer: { select: { id: true, email: true, firstName: true, lastName: true } },
-      },
+      }),
     });
+    if (!found || !onDo) return found;
+    return (
+      await attachCustomers(storeId, [found], { email: true, firstName: true, lastName: true })
+    )[0];
   }
 
   static async getByOrderNumber(storeId: string, orderNumberOrScan: string) {
     // Accepts the typed number or the scanned barcode digits (Ruling BARCODE-4).
     const orderNumber = orderNumberFromScan(orderNumberOrScan) ?? orderNumberOrScan;
-    const order = await prisma.order.findFirst({
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.order.findFirst({
       where: { orderNumber, storeId, deletedAt: null },
-      include: {
+      include: forBackend(onDo, {
         customer: {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
@@ -678,14 +780,18 @@ export class OrderService {
         },
         payments: { select: ORDER_PAYMENT_SELECT },
         appliedPromotion: { select: { id: true, name: true, nameAr: true } },
-      },
+      }),
     });
 
-    if (!order) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
 
-    return order;
+    return onDo
+      ? (
+          await attachCustomers(storeId, [found], { email: true, firstName: true, lastName: true })
+        )[0]
+      : found;
   }
 
   /**
@@ -797,7 +903,39 @@ export class OrderService {
     const cartBundles = cart.bundles ?? [];
 
     if (cart.items.length === 0 && cartBundles.length === 0) {
+      // A keyed retry of an order the DO already placed: the first request consumed the cart, so the retry finds it empty. The
+      // order is read back by its key (scoped to this cart, like the engine's own replay) instead of failing EMPTY_CART.
+      const idemKey = requestContext?.idempotencyKey;
+      if (idemKey && (await storeMoney(storeId))) {
+        const prior = await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: {
+            storeId,
+            idempotencyKey: `${cart.id}:${checkoutIdempotencyHash(cart.id, idemKey)}`,
+          },
+          select: { id: true },
+        });
+        if (prior) {
+          const replay = await OrderService.loadCreatedOrder(storeId, prior.id);
+          if (replay) return replay;
+        }
+      }
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
+    }
+
+    // Store on its Durable Object (Ruling CF-ORDERS-1): pricing, stock reservation, hold cap, coupon limit, loyalty redeem,
+    // wallet debit and the order rows are ONE section there, in place of the interactive transaction below.
+    const money = await storeMoney(storeId);
+    if (money) {
+      return OrderService.createOnDo(money, {
+        storeId,
+        customerId,
+        data,
+        cart: { id: cart.id, items: cart.items, bundles: cartBundles },
+        referralCode,
+        requestContext,
+      });
     }
 
     // CartService's product select is storefront-safe (T-H2) and omits
@@ -2185,7 +2323,10 @@ export class OrderService {
                 storeId,
                 OR: [
                   { cartId: cart.id },
-                  { customerId: cart.customerId, status: { not: 'recovered' } },
+                  // a guest cart (no customer) matches only its own row: `customerId: null` would match EVERY guest's
+                  ...(cart.customerId
+                    ? [{ customerId: cart.customerId, status: { not: 'recovered' } }]
+                    : []),
                 ],
                 status: { in: ['pending', 'step1_sent', 'step2_sent', 'step3_sent'] },
               },
@@ -2200,6 +2341,8 @@ export class OrderService {
                 },
               });
               logger.info(`Abandoned cart ${abandonedCart.id} recovered by order ${newOrder.id}`);
+              // CI-13: after COMMIT, so the planner sees the recovered row and the order.
+              await sendCartRecoveredToCi(storeId, abandonedCart.id, newOrder.id);
             }
           } catch (err) {
             logger.error({ err }, 'Abandoned cart recovery detection failed');
@@ -2318,6 +2461,280 @@ export class OrderService {
   }
 
   /**
+   * `create` for a store on its Durable Object (Ruling CF-ORDERS-1). The engine prices the lines from the DO's own rows (the
+   * cart is only read for WHAT is being ordered), reserves stock, checks the hold cap and the coupon limit, redeems loyalty
+   * points, debits the wallet and writes the order in one `moneyOp`. The cart and the post-commit effects stay here.
+   * Residuals (documented in docs/cf/orders-on-do.md): the cart claim is not atomic with the order (carts have not moved),
+   * and delivery slots, personalisation notes, affiliate attribution at order time and the fiscal sale document are not
+   * written by the engine (Ruling DO-MONEY-2).
+   */
+  private static async createOnDo(
+    money: MoneyClient,
+    c: {
+      storeId: string;
+      customerId: string | undefined;
+      data: CreateOrderData;
+      cart: {
+        id: string;
+        items: Array<{
+          id: string;
+          productId: string;
+          quantity: number;
+          variantId?: string | null;
+          quotedUnitPrice?: number | null;
+          note?: string | null;
+          product: { personalisation?: unknown };
+        }>;
+        bundles: Array<{ id?: string; bundleId: string; quantity: number }>;
+      };
+      referralCode?: string;
+      requestContext?: {
+        checkoutIp?: string | null;
+        idempotencyKey?: string | null;
+        buyer?: BuyerIdentity;
+        dryRun?: boolean;
+      };
+    }
+  ) {
+    const { storeId, customerId, data } = c;
+    const isQuote = c.requestContext?.dryRun === true;
+    const missingPersonalisation = c.cart.items.filter(
+      i => activePersonalisation(i.product.personalisation as never)?.required
+    );
+    if (missingPersonalisation.length > 0)
+      throw new AppError(
+        400,
+        'PERSONALISATION_REQUIRED',
+        'Personalisation is required for: ' +
+          missingPersonalisation.map(i => i.productId).join(', '),
+        { productIds: missingPersonalisation.map(i => i.productId) }
+      );
+    const [loyaltyOn, backorderOn, wholesale, walletOk] = await Promise.all([
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
+      wholesaleEntitledUncached(storeId),
+      customerId && data.useWallet === true
+        ? WalletService.getCheckoutAvailability(storeId).then(a => a.available)
+        : Promise.resolve(false),
+    ]);
+    let walletAmount = 0;
+    if (customerId && walletOk) {
+      const w = await (
+        await storeDb(storeId)
+      ).customerWallet.findFirst({
+        where: { storeId, customerId },
+        select: { balance: true },
+      });
+      walletAmount = w?.balance ?? 0; // the engine caps it to the order total
+    }
+    // Ruling B4-7 (CF-FINAL-1): the delivery date is validated against the live store row and the cart's longest lead time
+    // (read from the DO's own products) and written as the first line of the order notes, exactly like the Postgres path.
+    // A quote never refuses on it.
+    let orderNotes: string | undefined = data.notes;
+    if (!isQuote) {
+      const storeRow = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
+      );
+      const leads = await (
+        await storeDb(storeId)
+      ).product.findMany({
+        where: { id: { in: c.cart.items.map(i => i.productId) }, storeId },
+        select: { leadTimeDays: true },
+      });
+      const deliveryNoteLine = resolveOrderDeliveryNote({
+        settings: storeRow?.settings as Record<string, unknown> | null | undefined,
+        timeZone: storeRow?.timezone,
+        now: new Date(),
+        maxLeadTimeDays: Math.max(0, ...leads.map(p => p.leadTimeDays ?? 0)),
+        deliveryDate: data.deliveryDate,
+        deliveryWindowId: data.deliveryWindowId,
+        locale: data.locale,
+        enforce: (data.source ?? 'web') === 'web',
+      });
+      if (deliveryNoteLine)
+        orderNotes = data.notes ? `${deliveryNoteLine}\n${data.notes}` : deliveryNoteLine;
+    }
+    const orderArgs: CreateOrderArgs = {
+      // the cart rows live on this DO: the engine claims them in the SAME section as the order (compared by content, deleted
+      // there), so a double submit of one cart is CART_CHANGED 409 and never a second order (Ruling CF-R2-1, closes CF-ORDERS-CART-1)
+      cart: { id: c.cart.id },
+      lines: c.cart.items.map(i => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        ...(i.variantId ? { variantId: i.variantId } : {}),
+        quotedUnitPrice: i.quotedUnitPrice ?? null,
+        ...(i.note ? { note: i.note } : {}),
+      })),
+      bundles: c.cart.bundles.map(b => ({ bundleId: b.bundleId, quantity: b.quantity })),
+      buyer: c.requestContext?.buyer,
+      customerId,
+      couponCode: data.couponCode,
+      walletAmount,
+      pointsToRedeem: customerId ? data.pointsToRedeem : undefined,
+      paymentMethod: data.paymentMethod,
+      idempotencyKey: c.requestContext?.idempotencyKey
+        ? (checkoutIdempotencyHash(c.cart.id, c.requestContext.idempotencyKey) ?? undefined)
+        : undefined,
+      shippingAddress: data.shippingAddress,
+      billingAddress: data.billingAddress,
+      checkoutIp: c.requestContext?.checkoutIp ?? undefined,
+      holdCaps: {
+        manual: openUnpaidHoldCap(),
+        gateway: openUnpaidGatewayHoldCap(),
+        ip: openUnpaidHoldIpCap(),
+      },
+      wholesaleEntitled: wholesale,
+      loyaltyFeatureEnabled: loyaltyOn,
+      backorderEnabled: backorderOn,
+      goldRequireQuote: c.requestContext?.dryRun !== true,
+      expectedTotal: data.expectedTotal,
+      orderNotes,
+      locale: data.locale,
+      smsOptIn: data.smsOptIn === true,
+      source: data.source ?? 'web',
+    };
+    if (isQuote) {
+      const q = await OrderService.translateDoRefusal(() => money.quoteOrder(orderArgs));
+      return {
+        subtotal: q.subtotal,
+        discount: q.discount,
+        shipping: q.shipping,
+        codFee: q.codFee,
+        tax: q.tax,
+        total: q.total,
+        taxIncludedInPrice: q.taxIncludedInPrice,
+        lines: q.lines.map(({ index, ...priced }) => ({
+          itemId: c.cart.items[index].id,
+          ...priced,
+        })),
+      } as never;
+    }
+    const placed = await OrderService.translateDoRefusal(() => money.createOrder(orderArgs));
+    // the engine consumed the cart (its rows were deleted in the order's section)
+    if (!placed.replayed) {
+      if (c.referralCode)
+        await affiliateService
+          .linkOrderToReferral(storeId, placed.orderId, c.referralCode)
+          .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
+      if (data.paymentMethod === 'cod' || placed.paymentStatus === 'paid') {
+        inngest
+          .send({
+            name: 'order/created',
+            data: {
+              orderId: placed.orderId,
+              storeId,
+              paymentMethod: placed.paymentStatus === 'paid' ? 'wallet' : data.paymentMethod,
+              locale: data.locale ?? undefined,
+            },
+          })
+          .catch((err: unknown) =>
+            logger.error({ err, orderId: placed.orderId }, 'Failed to enqueue order/created')
+          );
+        try {
+          socketService.newOrderNotification(storeId, {
+            orderId: placed.orderId,
+            orderNumber: placed.orderNumber,
+            total: placed.total,
+            customerName:
+              `${data.shippingAddress.firstName ?? ''} ${data.shippingAddress.lastName ?? ''}`.trim() ||
+              'Customer',
+          });
+        } catch (notifyError) {
+          logger.error({ err: notifyError }, 'Failed to send order notification');
+        }
+      }
+      const consentPhone = data.shippingAddress?.phone;
+      if (data.smsOptIn === true && typeof consentPhone === 'string' && consentPhone.trim()) {
+        const customerKey = customerKeyOf({ customerId, shippingAddress: data.shippingAddress });
+        if (customerKey) {
+          await withSavepoint(() =>
+            SmsConsentService.recordGrant(storeId, {
+              customerKey,
+              userId: customerId ?? null,
+              phone: consentPhone,
+              source: 'checkout',
+            })
+          ).catch(err =>
+            logger.error({ err, orderId: placed.orderId }, '[Order] SMS consent write failed')
+          );
+        }
+      }
+      await bustProductCaches(storeId);
+      void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
+    }
+    const order = await (
+      await storeDb(storeId)
+    ).order.findFirst({
+      where: { id: placed.orderId, storeId },
+      include: { items: true },
+    });
+    return { ...order, customer: null } as unknown as NonNullable<
+      Awaited<ReturnType<typeof OrderService.loadCreatedOrder>>
+    >;
+  }
+
+  /**
+   * `rollbackForPaymentFailure` for a store on its Durable Object (Ruling CF-R2-1): the cancel (stock, coupon, wallet, the
+   * order's status and note, and the unissued-money fiscal cancellation) is ONE `cancel` section; the cart the shopper finds
+   * waiting is then rebuilt on the DO from the order's lines. Same guards as the Postgres path: an order that is not `pending`,
+   * is cancelled, or already has a payment is left alone.
+   */
+  private static async rollbackOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    sessionId: string
+  ): Promise<void> {
+    const repo = await storeRepo(storeId);
+    const order = await repo.db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true, payments: true },
+    });
+    if (!order) return;
+    if (order.status === 'cancelled') return;
+    if (order.payments.length > 0) return;
+    if (order.status !== 'pending') return;
+
+    await money.cancel({
+      orderId,
+      restoreInventory: true,
+      note: '[auto-cancelled: payment step failed before completion]',
+    });
+
+    const cart =
+      (await repo.db.cart.findFirst({ where: { storeId, sessionId } })) ??
+      (await repo.writer.cart.create({
+        data: { storeId, sessionId, customerId: order.customerId },
+      }));
+    await repo.writer.cartItem.deleteMany({ where: { cartId: cart.id } });
+    await repo.writer.cartBundle.deleteMany({ where: { cartId: cart.id } });
+    const candidateBundleIds = [
+      ...new Set(order.items.map(i => i.bundleId).filter((id): id is string => !!id)),
+    ];
+    const liveBundleIds = new Set(
+      candidateBundleIds.length > 0
+        ? (
+            await repo.db.bundle.findMany({
+              where: { id: { in: candidateBundleIds }, storeId },
+              select: { id: true },
+            })
+          ).map(b => b.id)
+        : []
+    );
+    const restored = restoreCartShape(order.items, liveBundleIds);
+    for (const item of restored.items)
+      await repo.writer.cartItem.create({ data: { cartId: cart.id, ...item } });
+    for (const bundle of restored.bundles)
+      await repo.writer.cartBundle.create({ data: { cartId: cart.id, ...bundle } });
+
+    logger.info(
+      { orderId, storeId },
+      'Order rolled back after payment-create failure (inventory + cart restored)'
+    );
+    await bustProductCaches(storeId);
+  }
+
+  /**
    * Compensating action when /payments/create fails AFTER an order has been
    * committed (cart cleared, inventory decremented, coupon usage incremented).
    *
@@ -2335,6 +2752,8 @@ export class OrderService {
     orderId: string,
     sessionId: string
   ): Promise<void> {
+    const money = await storeMoney(storeId);
+    if (money) return OrderService.rollbackOnDo(money, storeId, orderId, sessionId);
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, storeId },
@@ -2552,8 +2971,27 @@ export class OrderService {
      * the shelf (a return to origin the merchant chose not to restock,
      * ruling MONEYB-5). Every other caller restores stock as before.
      */
-    opts: { restoreInventory?: boolean } = {}
+    opts: { restoreInventory?: boolean; unpaidOnly?: boolean } = {}
   ) {
+    // Cancel on a store's Durable Object (Ruling CF-ORDERS-1): the status flip AND the whole reversal (stock, coupon, loyalty,
+    // wallet, backorders) are one section there. The state machine is checked on the DO's own status first.
+    if (status === 'cancelled') {
+      const money = await storeMoney(storeId);
+      if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
+    }
+    // Refund by status (Ruling CF-PAY-1) and every other status (Ruling CF-FINAL-1) on a Durable Object store.
+    {
+      const money = await storeMoney(storeId);
+      if (money) {
+        if (status === 'refunded') return OrderService.refundOnDo(money, storeId, orderId);
+        return OrderService.advanceOnDo(
+          money,
+          storeId,
+          orderId,
+          status as Exclude<typeof status, 'cancelled'>
+        );
+      }
+    }
     const order = await this.getById(storeId, orderId);
 
     // Validate status transition — shared with the payment-gateway/webhook
@@ -2796,6 +3234,284 @@ export class OrderService {
     return updatedOrder;
   }
 
+  /** The DO engine's refusals under the codes (and statuses) the Postgres path throws, so a client sees one contract. */
+  private static async translateDoRefusal<T>(run: () => Promise<T>): Promise<T> {
+    const MAP: Record<string, [number, string]> = {
+      OUT_OF_STOCK: [400, 'INSUFFICIENT_INVENTORY'],
+      COUPON_EXHAUSTED: [400, 'INVALID_COUPON'],
+      COUPON_USER_LIMIT: [400, 'COUPON_LIMIT_REACHED'],
+      COUPON_INVALID: [400, 'INVALID_COUPON'],
+      PRODUCT_UNAVAILABLE: [409, 'PRODUCT_NO_LONGER_AVAILABLE'],
+      GOLD_PRICE_DRIFT: [409, 'PRICE_CHANGED'],
+      COUPON_EXPIRED: [400, 'INVALID_COUPON'],
+      INSUFFICIENT_WALLET: [409, 'INSUFFICIENT_WALLET_BALANCE'],
+      TOO_MANY_OPEN_ORDERS: [429, 'TOO_MANY_OPEN_HOLDS'],
+    };
+    try {
+      return await run();
+    } catch (err) {
+      const hit = err instanceof AppError ? MAP[err.code] : undefined;
+      if (err instanceof AppError && hit) throw new AppError(hit[0], hit[1], err.message);
+      throw err;
+    }
+  }
+
+  private static async refundOnDo(money: MoneyClient, storeId: string, orderId: string) {
+    const db = await storeDb(storeId);
+    const before = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      select: {
+        status: true,
+        paymentStatus: true,
+        customerId: true,
+        orderNumber: true,
+        payments: { select: { status: true } },
+      },
+    });
+    if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    assertValidTransition(before.status, 'refunded');
+    if (
+      (before.status === 'pending' || before.status === 'cancelled') &&
+      !hasCapturedPayment(before)
+    )
+      throw new AppError(
+        400,
+        'ORDER_NOT_PAID',
+        'This order has no captured payment, so it cannot be marked refunded'
+      );
+    const requestedAt = new Date();
+    const r = await money.refundBook({ orderId, keepPaymentStatus: true });
+    if (!r.replayed) {
+      const hadCapturedPayment = hasCapturedPayment(before);
+      await OrderService.applyRefundEffects(storeId, orderId, {
+        fireRefundNotification: shouldApplyRefundEffects('refunded', before),
+      });
+      await invalidateCustomersCache(storeId).catch(err =>
+        logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+      );
+      inngest
+        .send({
+          name: 'order/status-changed',
+          data: {
+            orderId,
+            storeId,
+            status: 'refunded',
+            hadCapturedPayment,
+            requestedAt: requestedAt.toISOString(),
+          },
+        })
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, 'Failed to enqueue order/status-changed for a DO refund')
+        );
+    }
+    return (await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    })) as never;
+  }
+
+  /** confirmed / processing / shipped / delivered on a Durable Object store: one section there, then the Postgres path's tail. */
+  private static async advanceOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered'
+  ) {
+    const db = await storeDb(storeId);
+    const before = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      select: {
+        status: true,
+        paymentStatus: true,
+        payments: { select: { status: true } },
+      },
+    });
+    if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    const hadCapturedPayment = hasCapturedPayment(before);
+    const r = await OrderService.translateDoStatus(() => money.orderStatus({ orderId, status }));
+    void deferAfterTenantCommit('order.updateStatus.invalidateCustomersCache', () =>
+      invalidateCustomersCache(storeId)
+    ).catch(err =>
+      logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+    );
+    if (r.codSettled) {
+      // Same post-payment fan-out as "Mark paid" (journal posting); its notification half is deduped by orderCreatedNotifiedAt.
+      void deferAfterTenantCommit('order.codCollectedOnDelivery', () =>
+        inngest.send({
+          name: 'order/created',
+          data: { orderId, storeId, paymentMethod: 'cod', locale: undefined },
+        })
+      );
+    }
+    if (status === 'delivered') {
+      inngest
+        .send({ name: 'order/delivered', data: { orderId, storeId } })
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, 'Failed to enqueue order/delivered event')
+        );
+    }
+    inngest
+      .send({
+        name: 'order/status-changed',
+        data: {
+          orderId,
+          storeId,
+          status,
+          hadCapturedPayment,
+          requestedAt: new Date(r.requestedAt).toISOString(),
+        },
+      })
+      .catch((err: unknown) => {
+        logger.error(
+          { err, orderId, status },
+          'Failed to enqueue order/status-changed - running fanout inline as fallback'
+        );
+        handleOrderStatusChanged(orderId, storeId, status, hadCapturedPayment, {
+          run: <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
+        }).catch((e: unknown) =>
+          logger.error(
+            { err: e, orderId, status },
+            'order/status-changed inline fallback also failed'
+          )
+        );
+      });
+    try {
+      if (r.customerId)
+        socketService.orderStatusNotification(r.customerId, {
+          orderNumber: r.orderNumber,
+          status,
+        });
+    } catch (notifyError) {
+      logger.error({ err: notifyError }, 'Failed to send order status notification');
+    }
+    const updated = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    });
+    // the customer lives in the directory database (a DO store has no join to it): attach it as the Postgres include does
+    const customer = r.customerId
+      ? await prisma.customer.findFirst({
+          where: { id: r.customerId, storeId },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      : null;
+    return { ...updated, customer } as never;
+  }
+
+  /** The engine's status refusals under the Postgres codes (the engine already speaks them; a missing order is the 404). */
+  private static async translateDoStatus<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (err) {
+      if (err instanceof AppError && err.code === 'ORDER_NOT_FOUND')
+        throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      throw err;
+    }
+  }
+
+  private static async cancelOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    opts: { restoreInventory?: boolean; unpaidOnly?: boolean }
+  ) {
+    const db = await storeDb(storeId);
+    const before = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      select: {
+        status: true,
+        paymentStatus: true,
+        orderNumber: true,
+        customerId: true,
+        payments: { select: { status: true } },
+      },
+    });
+    if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    assertValidTransition(before.status, 'cancelled');
+    const requestedAt = new Date();
+    const r = await money.cancel({
+      orderId,
+      restoreInventory: opts.restoreInventory !== false,
+      // the auto-cancel sweep: the DO refuses (ORDER_ALREADY_PAID) when a payment landed first, in the same section
+      ...(opts.unpaidOnly ? { unpaidOnly: true } : {}),
+    });
+    if (!r.replayed) {
+      // the same tail as the Postgres path: refund fanout, the status fanout, the customer push
+      const hadCapturedPayment = hasCapturedPayment(before);
+      await OrderService.applyRefundEffects(storeId, orderId, {
+        fireRefundNotification: shouldApplyRefundEffects('cancelled', before),
+        ...(opts.restoreInventory === false ? { restoreInventory: false } : {}),
+      });
+      void deferAfterTenantCommit('order.updateStatus.invalidateCustomersCache', () =>
+        invalidateCustomersCache(storeId)
+      ).catch(err =>
+        logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+      );
+      inngest
+        .send({
+          name: 'order/status-changed',
+          data: {
+            orderId,
+            storeId,
+            status: 'cancelled',
+            hadCapturedPayment,
+            requestedAt: requestedAt.toISOString(),
+          },
+        })
+        .catch((err: unknown) => {
+          logger.error(
+            { err, orderId },
+            'Failed to enqueue order/status-changed - running fanout inline as fallback'
+          );
+          handleOrderStatusChanged(orderId, storeId, 'cancelled', hadCapturedPayment, {
+            run: <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
+          }).catch((e: unknown) =>
+            logger.error({ err: e, orderId }, 'order/status-changed inline fallback also failed')
+          );
+        });
+      try {
+        if (before.customerId)
+          socketService.orderStatusNotification(before.customerId, {
+            orderNumber: before.orderNumber,
+            status: 'cancelled',
+          });
+      } catch (notifyError) {
+        logger.error({ err: notifyError }, 'Failed to send order status notification');
+      }
+    }
+    return (await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    })) as never;
+  }
+
+  /**
+   * The fiscal step of the `order/refunded` fanout (ruling MONEYB-1) for a PARTIAL refund event on a store on its Durable
+   * Object: the credit note keyed on the refund (the amount is the caller's). A WHOLE-order cancel or refund issues its
+   * document inside the DO's reversal section (`settleFiscalOnReversal`), so it cannot be lost between the two.
+   */
+  private static async fiscalOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    partial?: { items: unknown[]; refundKey: string; refundAmount?: number; amountOnly?: boolean }
+  ): Promise<void> {
+    const isPartial = !!partial && (partial.items.length > 0 || partial.amountOnly === true);
+    if (!isPartial) return;
+    const amount = partial?.refundAmount;
+    if (typeof amount !== 'number' || amount <= 0) return;
+    const pay = await (
+      await storeDb(storeId)
+    ).payment.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+      select: { metadata: true },
+    });
+    const meta = pay?.metadata as Record<string, unknown> | null | undefined;
+    const reason = typeof meta?.refundReason === 'string' ? meta.refundReason : null;
+    await money.fiscalRefund({ orderId, refundRef: partial!.refundKey, amount, reason });
+  }
+
   /**
    * Dispatcher for a refund/cancel's money reversals: inventory restore,
    * coupon usage decrement, affiliate-commission reversal, loyalty
@@ -2893,10 +3609,24 @@ export class OrderService {
     // inventory/coupons/loyalty (the stock was reserved) but must NOT claim
     // a refund happened.
     const notify = options.fireRefundNotification ?? true;
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId },
-      select: { id: true },
-    });
+    // A store on its Durable Object: the credit note / refund receipt / cancelled sale document is issued here, through the
+    // DO (the `order/refunded` fanout's `fiscal-document` step reads Postgres and is refused for a DO store, Ruling CF-JOBS-1).
+    // A DO store's order is not in Postgres: its existence is read from the DO, and the arming stamps below (order and
+    // return) were written inside the DO section that completed the money step (Ruling CF-RETURNS-1).
+    const doMoney = await storeMoney(storeId);
+    // The credit note / refund receipt / cancelled sale document is issued through the DO (the fanout step reads Postgres, refused for a DO store, Ruling CF-JOBS-1).
+    if (doMoney) await OrderService.fiscalOnDo(doMoney, storeId, orderId, options.partial);
+    const order = doMoney
+      ? await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: { id: orderId, storeId },
+          select: { id: true },
+        })
+      : await prisma.order.findFirst({
+          where: { id: orderId, storeId },
+          select: { id: true },
+        });
     if (!order) return;
 
     // Arm the stuck-reversal sweep for a WHOLE-order, stock-restoring event,
@@ -3059,6 +3789,127 @@ export class OrderService {
     });
   }
 
+  /**
+   * `createAdminOrder` for a store on its Durable Object (Ruling CF-R4-2). The permission rules for the two overrides (coupon
+   * rules, minimum order quantity) are decided HERE from the verified session, in the Postgres order's wording; the engine
+   * (`do/admin-order.ts`) then prices the lines from the DO's own rows and writes the order, its items, the override events
+   * and the fiscal sale document in one section, with no stock reserved (as on Postgres). The audit rows and the monthly cap
+   * note follow the commit.
+   */
+  private static async createAdminOrderOnDo(
+    money: MoneyClient,
+    storeId: string,
+    adminUserId: string,
+    data: Parameters<typeof OrderService.createAdminOrder>[2],
+    actor: { role?: string },
+    pricingOpts: { buyer?: BuyerIdentity }
+  ) {
+    const moqOverride = data.overrideMoq === true;
+    if (moqOverride) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+        throw new AppError(
+          403,
+          'MOQ_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override the minimum order quantity'
+        );
+      if (!data.moqOverrideReason?.trim())
+        throw new AppError(
+          400,
+          'MOQ_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override the minimum order quantity'
+        );
+    }
+    const overrideCoupon = !!data.couponCode && data.overrideCouponRules === true;
+    const overrideReason = data.couponOverrideReason?.trim() ?? '';
+    if (overrideCoupon) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+        throw new AppError(
+          403,
+          'COUPON_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override coupon rules'
+        );
+      if (!overrideReason)
+        throw new AppError(
+          400,
+          'COUPON_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override coupon rules'
+        );
+    }
+    // the engine already refuses under the Postgres codes (no `translateDoRefusal`: it would rename COUPON_EXPIRED to INVALID_COUPON)
+    const placed = await money.createAdminOrder({
+      lines: data.items.map(i => ({
+        productId: i.productId,
+        ...(i.variantId ? { variantId: i.variantId } : {}),
+        quantity: i.quantity,
+      })),
+      customerId: data.customerId,
+      buyer: pricingOpts.buyer ?? ANONYMOUS_BUYER,
+      wholesaleEntitled: await wholesaleEntitledUncached(storeId),
+      shippingAddress: data.shippingAddress,
+      billingAddress: data.billingAddress,
+      currency: data.currency ?? REGION.currency,
+      notes: data.notes,
+      couponCode: data.couponCode,
+      overrideCouponRules: overrideCoupon,
+      couponOverrideReason: overrideReason,
+      overrideMoq: moqOverride,
+      moqOverrideReason: data.moqOverrideReason?.trim(),
+      shippingOverride: data.shippingOverride,
+      actorId: adminUserId,
+      actorRole: actor.role ?? null,
+    });
+    const found = await (
+      await storeDb(storeId)
+    ).order.findFirst({ where: { id: placed.orderId, storeId }, include: { items: true } });
+    const order = (
+      await attachCustomers(storeId, [found!], {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+      })
+    )[0];
+    await auditLog({
+      action: 'order.admin_created',
+      userId: adminUserId,
+      resourceType: 'order',
+      resourceId: placed.orderId,
+      details: {
+        orderNumber: placed.orderNumber,
+        itemsCount: data.items.length,
+        total: placed.total,
+      },
+    });
+    if (overrideCoupon && data.couponCode)
+      await auditLog({
+        action: COUPON_OVERRIDE_AUDIT_ACTION,
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: placed.orderId,
+        details: {
+          orderNumber: placed.orderNumber,
+          couponCode: order.couponCode,
+          description: overrideReason,
+          discount: placed.discount,
+        },
+      });
+    if (moqOverride)
+      await auditLog({
+        action: 'order.moq_override',
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: placed.orderId,
+        details: {
+          orderNumber: placed.orderNumber,
+          description: data.moqOverrideReason?.trim() ?? '',
+        },
+      });
+    void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
+    return order;
+  }
+
   static async getCustomerOrders(
     storeId: string,
     customerId: string,
@@ -3070,8 +3921,9 @@ export class OrderService {
 
     const where: Prisma.OrderWhereInput = { storeId, customerId, deletedAt: null };
 
+    const repo = await storeRepo(storeId);
     const [orders, total] = await Promise.all([
-      prisma.order.findMany({
+      repo.db.order.findMany({
         where,
         skip,
         take: limit,
@@ -3086,7 +3938,7 @@ export class OrderService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.order.count({ where }),
+      repo.db.order.count({ where }),
     ]);
 
     return {
@@ -3188,6 +4040,19 @@ export class OrderService {
         );
       }
     }
+
+    // A store on its Durable Object prices and writes the order in ONE StoreDO section (Ruling CF-R4-2); the Postgres code
+    // below is untouched.
+    const money = await storeMoney(storeId);
+    if (money)
+      return OrderService.createAdminOrderOnDo(
+        money,
+        storeId,
+        adminUserId,
+        data,
+        actor,
+        pricingOpts
+      );
 
     // Hydrate product + variant prices from the DB. Admin form
     // submits only productId + quantity; we look up the canonical

@@ -148,10 +148,21 @@ export const extraModels = {
       fields: [
         f('kind', 'String', {
           kind: 'enum',
-          enumValues: ['order', 'payment', 'shipment', 'customer', 'return', 'refund', 'webhook'],
+          enumValues: [
+            'order',
+            'payment',
+            'shipment',
+            'customer',
+            'return',
+            'refund',
+            'webhook',
+            'instapay_ref',
+          ],
         }),
         f('id', 'String'),
         f('storeId', 'String'),
+        // the entity that holds a claim-style key (kind `instapay_ref`: the receipt id); null for plain lookups
+        f('claimRef', 'String', { optional: true }),
         f('createdAt', 'DateTime', { default: 'now()' }),
       ],
       uniques: [],

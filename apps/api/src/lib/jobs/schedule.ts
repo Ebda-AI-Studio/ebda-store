@@ -11,7 +11,7 @@ import { matchesLocal, parseCron, tickKey, utcCronsFor } from './cron-expr';
 
 export { matchesLocal, parseCron, tickKey, utcCronsFor };
 import { jobRunsOnCf } from './flag';
-import { jobRunsOnAlarm } from './alarm-flag';
+import { isSweepCron, writesFrozen } from './freeze';
 import { startJob } from './start';
 import type { JobDef } from './types';
 import logger from '../logger';
@@ -43,12 +43,20 @@ export async function runScheduledJobs(
 ): Promise<Array<{ job: string; result: string }>> {
   const at = new Date(scheduledTime);
   const out: Array<{ job: string; result: string }> = [];
+  const frozen = writesFrozen();
   for (const { job, expr } of scheduledJobs()) {
     if (!utcCronsFor(expr).includes(cron)) continue;
     if (!jobRunsOnCf(job.id)) continue;
-    // Run per store by the StoreSchedule alarms instead (cf/store-schedule.ts): no second, global run.
-    if (jobRunsOnAlarm(job.id)) continue;
+    // An alarm-ready job also fires per DO store from StoreSchedule alarms (cf/store-schedule.ts). The cron keeps serving the
+    // Postgres stores: lib/jobs/do-guard.ts hides the DO stores from its sweep, so no store runs twice (Ruling CF-JOBS-1).
     if (!matchesLocal(expr, at)) continue;
+    // Write freeze (Ruling CF-JOBS-2): a sweep's next tick after the window catches up; a rarer job is STARTED and parked
+    // by the run layer (queue re-send / Workflow sleep), never dropped.
+    if (frozen && isSweepCron(expr, scheduledTime)) {
+      logger.warn({ job: job.id, cron }, '[jobs] write freeze: sweep tick skipped');
+      out.push({ job: job.id, result: 'frozen-skipped' });
+      continue;
+    }
     try {
       const result = await startJob(job, {
         id: `cron-${job.id}-${tickKey(expr, at)}`,

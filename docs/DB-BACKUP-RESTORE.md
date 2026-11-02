@@ -277,7 +277,7 @@ to a dump when it isn't. Coordinate with the team before a production cutover.
 
 ## Cloudflare storage (StoreDO + D1): the DR path after the Neon cutover (G8, INFRA-CF-1)
 
-Applies once a store is served from its StoreDO (flag `STORE_DO_ENABLED_IDS`); until then Layers 0 to 2 above are the DR. Three copies on two providers' worth of failure domains:
+Applies once a store is served from its StoreDO (D1 flag `stores.storage_backend`); until then Layers 0 to 2 above are the DR. Three copies on two providers' worth of failure domains:
 
 | Copy               | What                                                                                                                                                    | When                                                                                    | Where                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------- |

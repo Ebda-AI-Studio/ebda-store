@@ -34,9 +34,11 @@ type Via = 'requestStoreReindex' | 'product.upserted';
 
 const REVIEWED: Record<string, { sites: number; via: Via[] }> = {
   // create + update emit product.upserted (consumed by search-product-index); soft delete and
-  // bulkUpdate (`scalarData`, when it carries status) request a reindex (review M5).
+  // bulkUpdate (`scalarData`, when it carries status) request a reindex (review M5). The 5th site is
+  // `updateOnDo`'s product row write: the Durable Object twin of `update`'s transaction, reached only from
+  // `update`, which emits product.upserted after it either way (CF-WRITES-2).
   'apps/api/src/services/product.service.ts': {
-    sites: 4,
+    sites: 5,
     via: ['product.upserted', 'requestStoreReindex'],
   },
   // writeAiFieldsGuarded (fill + balance) and revertProductBalance.

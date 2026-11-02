@@ -41,6 +41,7 @@ const { mockPrisma } = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  currentStoreId: () => '11111111-1111-4111-8111-111111111111',
   RfmSegment: {
     vip: 'vip',
     loyal: 'loyal',
@@ -52,6 +53,8 @@ vi.mock('@ebda/database', () => ({
   },
 }));
 
+// the snapshot reads follow the store's backend (Ruling CF-JOBS-4); a Postgres store reads `prisma`
+vi.mock('@api/lib/repo-factory', () => ({ storeDb: async () => mockPrisma }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };

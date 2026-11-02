@@ -17,6 +17,7 @@ import { prisma } from '@ebda/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { createExpense } from './expense.service';
+import { storeRepo } from '../../lib/repo-factory';
 import { getSystemAccountIdByCode } from './account.service';
 
 import { REGION, roundToMinor } from '@ebda/shared';
@@ -232,6 +233,9 @@ export async function processExpenseReceipt(
   // foreign-currency amount as `originalAmount` and fxRate=1 as a placeholder.
   // The merchant must set the correct fxRate in the expense edit UI before
   // approving, which will re-compute the EGP amount.
+  // A store on its Durable Object stores the OCR metadata in the draft's own atomic section (Ruling CF-JOBS-4B)
+  const onDo = (await storeRepo(storeId)).backend === 'do';
+  const ocrModelVersion = process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest';
   let exp;
   try {
     exp = await createExpense({
@@ -246,6 +250,16 @@ export async function processExpenseReceipt(
       receiptImageUrl: receiptUrl,
       notes,
       createdBy: uploadedBy,
+      ...(onDo
+        ? {
+            ocr: {
+              json: parsed,
+              confidence: parsed.confidence ?? null,
+              modelVersion: ocrModelVersion,
+              processedAtMs: Date.now(),
+            },
+          }
+        : {}),
     });
   } catch (createErr) {
     logger.error({ err: createErr, storeId }, 'expense-ocr: createExpense failed');
@@ -254,15 +268,16 @@ export async function processExpenseReceipt(
 
   // ── 8. Attach OCR metadata ────────────────────────────────────────────────
   try {
-    await prisma.expense.update({
-      where: { id: exp.id, storeId },
-      data: {
-        ocrJson: parsed as any,
-        categoryAiConfidence: parsed.confidence ?? null,
-        ocrModelVersion: process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest',
-        ocrProcessedAt: new Date(),
-      },
-    });
+    if (!onDo)
+      await prisma.expense.update({
+        where: { id: exp.id, storeId },
+        data: {
+          ocrJson: parsed as any,
+          categoryAiConfidence: parsed.confidence ?? null,
+          ocrModelVersion,
+          ocrProcessedAt: new Date(),
+        },
+      });
   } catch (metaErr) {
     // Non-fatal: draft was created, OCR metadata just isn't attached
     logger.warn({ err: metaErr, expenseId: exp.id }, 'expense-ocr: failed to attach ocr metadata');

@@ -60,10 +60,10 @@ that touches the money path of every order (payment amount, COD amount,
 cancellation reversal). The credit/admin/customer-view half is useful on its
 own and can be switched on first.
 
-**Accounting (Ruling W-3):** wallet checkout is refused while the store has
-accounting enabled — the GL has no store-credit liability account yet.
-`accountingEnabled` defaults to true and is on for all three live stores, so in
-practice wallet spending needs the GL follow-up before it is usable there.
+**Accounting (Ruling WALLET-GL-1, amending W-3):** wallet checkout works with
+accounting on. Every movement is journaled on 2150 Customer Wallet Liability
+(goodwill credits on 5950, forfeits and write-offs on 4100, redemption as a
+tender in `postOrderPaymentJournal`). The original W-3 refusal is retired.
 
 ## Data model
 
@@ -160,7 +160,7 @@ branch already does with the provider amount.
   storefront skips `/payments/create` and goes to the success page, and
   `/payments/create` refuses such an order (409) so a replay can never mint a
   gateway invoice for money already paid.
-- Blocked while `store.accountingEnabled` (see Ruling W-3).
+- Works with `store.accountingEnabled` on (Ruling WALLET-GL-1 retired the W-3 block).
 - The debit throws `INSUFFICIENT_WALLET_BALANCE` inside the order tx if a
   concurrent spend drained the balance → the whole order rolls back.
 
@@ -220,3 +220,5 @@ Storefront (copy through `LanguageContext` `t(en, ar)`):
 ## Rulings
 
 Recorded in `docs/RULINGS.md` under 2026-09-25 (W-1 … W-6).
+
+**Update 2026-10-29 (Ruling W-8):** both keys are now in the Growth and Business baselines; the "no baseline" statements above describe the original D1 release.

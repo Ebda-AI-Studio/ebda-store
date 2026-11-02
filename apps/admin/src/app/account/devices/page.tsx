@@ -17,6 +17,7 @@ interface OneSignalDevice {
 }
 
 export default function DevicesPage() {
+  const tc = useT('common');
   const t = useT('orders.devices');
   const locale = useLocale();
   const { error: toastError } = useToast();
@@ -102,7 +103,7 @@ export default function DevicesPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">
-                      {d.deviceLabel || 'Browser'}
+                      {d.deviceLabel || t('browserFallback')}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {t('registered', {
@@ -134,7 +135,7 @@ export default function DevicesPage() {
         title={t('removeConfirmTitle')}
         description={t('removeConfirmDescription')}
         confirmLabel={t('remove')}
-        cancelLabel="Cancel"
+        cancelLabel={tc('cancel')}
         onConfirm={handleRemove}
         onClose={() => setConfirmRemoveId(null)}
       />

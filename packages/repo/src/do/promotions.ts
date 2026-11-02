@@ -137,14 +137,10 @@ export function resolveCustomerContext(
   const group = loadBuyerGroup(db, storeId, buyer);
   const customerGroupId = group?.id ?? null;
 
+  // `orders.customer_id` is the shopper's users.id (Ruling CF-FIX-2), so a session buyer's prior orders are counted by it
+  // directly; the CRM row (its own id) is only the group link.
   let customerId = who.customerId ?? null;
-  if (!customerId && buyer.kind === 'session') {
-    customerId =
-      (db.all('SELECT id FROM customers WHERE store_id = ? AND user_id = ? ORDER BY id LIMIT 1', [
-        storeId,
-        id(buyer.userId, 'userId'),
-      ])[0]?.id as string | undefined) ?? null;
-  }
+  if (!customerId && buyer.kind === 'session') customerId = id(buyer.userId, 'userId');
   if (customerId) {
     const n = db.all(
       `SELECT count(*) AS n FROM orders WHERE store_id = ? AND customer_id = ? AND deleted_at IS NULL AND status <> 'cancelled'`,

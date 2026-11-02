@@ -213,15 +213,31 @@ test('Clinic routine: ordered steps, "add all" adds the real bundle with its liv
   ).toHaveCount(3);
 });
 
+/**
+ * The PDP rating line shows only when the store's `reviewSection` page setting is ON (the `reviews`
+ * feature AND `reviewSection.enabled`; the Jasmine mock-ups show no ratings, so the demo seed leaves it off).
+ * Read the flag the page itself was rendered with and assert the line accordingly.
+ */
+async function reviewSectionOn(page: import('@playwright/test').Page): Promise<boolean> {
+  const html = await page.content();
+  const m = /reviewSection\\?"\s*:\s*\{\\?"enabled\\?"\s*:\s*(true|false)/.exec(html);
+  expect(m, 'the page carries its reviewSection setting').not.toBeNull();
+  return m![1] === 'true';
+}
+
 test('PDP: rating line and bundle saving render and link to their targets; a product with neither shows neither', async ({
   page,
 }) => {
   await open(page, 'jasmine-clinic', 'ar', '/products/niacinamide-serum');
   const rating = page.locator('[data-zone="ratingSummary"]');
-  await expect(rating).toHaveCount(1);
-  await expect(rating).toContainText('4.7');
-  expect((await rating.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await expect(rating).toHaveAttribute('href', '#reviews');
+  if (await reviewSectionOn(page)) {
+    await expect(rating).toHaveCount(1);
+    await expect(rating).toContainText('4.7');
+    expect((await rating.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(rating).toHaveAttribute('href', '#reviews');
+  } else {
+    await expect(rating, 'reviewSection off: no rating line').toHaveCount(0);
+  }
   const saving = page.locator('[data-zone="bundleSaving"]');
   await expect(saving).toContainText('وفّر 15%');
   // a product with no review and no bundle shows neither line
@@ -235,7 +251,9 @@ test('PDP fold at 390: with the rating line, the bundle line and the instalment 
 }) => {
   test.skip((page.viewportSize()?.width ?? 0) > 420, 'fold is a phone measurement');
   await open(page, 'jasmine-clinic', 'ar', '/products/niacinamide-serum');
-  await expect(page.locator('[data-zone="ratingSummary"]')).toHaveCount(1);
+  await expect(page.locator('[data-zone="ratingSummary"]')).toHaveCount(
+    (await reviewSectionOn(page)) ? 1 : 0
+  );
   await expect(page.locator('[data-zone="bundleSaving"]')).toHaveCount(1);
   await expect(page.getByTestId('instalment-line')).toHaveCount(1);
   const vh = page.viewportSize()!.height;
@@ -349,15 +367,16 @@ test('Apothecary on white-background merchant photos: no white rectangle on the 
   ).toBe(true);
 });
 
-test('Arabic-Indic numerals pass: a store that opts in shows Arabic-Indic digits on the PDP price', async ({
+test('Western digits only (Ruling DIGITS-1): a store carrying the retired arabicNumerals flag still shows 0-9 on the PDP price', async ({
   page,
 }) => {
-  await open(page, 'jasmine-edge-light', 'ar', SHADE_PDP);
-  const price = (await page.locator('[data-zone="productPrice"]').first().innerText()).trim();
-  expect(price, 'Arabic-Indic digits').toMatch(/[٠-٩]/);
-  await open(page, 'jasmine-clinic', 'ar', SHADE_PDP);
-  const western = (await page.locator('[data-zone="productPrice"]').first().innerText()).trim();
-  expect(western, 'Western digits by default').toMatch(/[0-9]/);
+  // jasmine-edge-light is seeded with theme.arabicNumerals = true; DIGITS-1 ignores that flag.
+  for (const store of ['jasmine-edge-light', 'jasmine-clinic']) {
+    await open(page, store, 'ar', SHADE_PDP);
+    const price = (await page.locator('[data-zone="productPrice"]').first().innerText()).trim();
+    expect(price, `${store}: Western digits`).toMatch(/[0-9]/);
+    expect(price, `${store}: no Arabic-Indic digits`).not.toMatch(/[٠-٩]/);
+  }
 });
 
 test('slow 3G: the Clinic home paints its content with no layout shift', async ({

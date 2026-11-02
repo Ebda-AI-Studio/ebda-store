@@ -12,10 +12,13 @@
  */
 
 import { prisma, runInTenantContext, Prisma } from '@ebda/database';
+import { storeDb, storeStock } from '../lib/repo-factory';
 import { InventoryService } from './inventory.service';
 import { createAdjustment, postAdjustment } from './accounting/stock-adjustment.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { AppError } from '../middleware/error-handler';
+import { inngest } from '../lib/inngest/client';
+import { insertAuditLog } from '../lib/definer';
 import logger from '../lib/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +85,7 @@ export async function lookupBarcode(
 ): Promise<BarcodeLookupResult | null> {
   const [productMatch, variantMatch] = await Promise.all([
     // Product-level barcode
-    prisma.product.findFirst({
+    (await storeDb(storeId)).product.findFirst({
       where: { storeId, barcode, deletedAt: null },
       select: {
         id: true,
@@ -94,7 +97,7 @@ export async function lookupBarcode(
       },
     }),
     // Variant-level barcode (join through product to enforce store scope)
-    prisma.productVariant.findFirst({
+    (await storeDb(storeId)).productVariant.findFirst({
       where: {
         barcode,
         product: { storeId, deletedAt: null },
@@ -179,6 +182,26 @@ export async function receiveByBarcode(
   // (mirrors the product path's manual_add semantics). Product barcodes still
   // flow through the shared InventoryService path.
   if (lookup.type === 'variant') {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-R7-1): the variant stock and its history row are ONE section.
+      const r = await stock.receiveVariant({
+        productId: lookup.productId,
+        variantId: lookup.variantId as string, // type "variant" always carries it
+        quantity: qtyReceived,
+        reason: 'barcode_receive',
+        reference: reference ?? `barcode:${barcode}`,
+        userId,
+      });
+      await invalidateStoreProductCaches(storeId);
+      return {
+        productId: r.productId,
+        variantId: r.variantId,
+        previousInventory: r.previousInventory,
+        newInventory: r.newInventory,
+        qtyReceived: r.qtyReceived,
+      };
+    }
     const variant = await prisma.productVariant.findFirst({
       where: { id: lookup.variantId },
       select: { inventory: true },
@@ -222,7 +245,9 @@ export async function receiveByBarcode(
 
   const previousInventory =
     (
-      await prisma.product.findFirst({
+      await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: lookup.productId, storeId },
         select: { inventory: true },
       })
@@ -253,6 +278,15 @@ export async function receiveByBarcode(
 // 3. Scan-to-Pick
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Which order line a scan lands on: the first matching line still short of its quantity. */
+export function resolvePickTarget<T extends { pickedQty: number; quantity: number }>(
+  candidates: T[]
+): { kind: 'pick'; item: T } | { kind: 'already_picked' } | { kind: 'not_in_order' } {
+  if (candidates.length === 0) return { kind: 'not_in_order' };
+  const open = candidates.find(c => c.pickedQty < c.quantity);
+  return open ? { kind: 'pick', item: open } : { kind: 'already_picked' };
+}
+
 /**
  * Pick one unit of an order line item identified by barcode scan.
  * Increments pickedQty on the matching OrderItem, sets pickedAt when the
@@ -281,46 +315,88 @@ export async function pickOrderItemByBarcode(
   // loose line plus a bundle component — so take the first line still short of
   // its quantity. A bare findFirst capped every scan at the first line and the
   // order could never reach fully-picked.
-  const candidates = await prisma.orderItem.findMany({
-    where: {
-      orderId,
-      productId: lookup.productId,
-      ...(lookup.variantId ? { variantId: lookup.variantId } : {}),
-      order: { storeId },
-    },
-    select: {
-      id: true,
-      orderId: true,
-      productId: true,
-      variantId: true,
-      productName: true,
-      personalisation: true,
-      quantity: true,
-      pickedQty: true,
-    },
-    orderBy: { id: 'asc' },
-  });
-  const orderItem = candidates.find(c => c.pickedQty < c.quantity) ?? candidates[0];
+  // The quantity check and the increment are ONE statement (conditional UPDATE under a row lock),
+  // so two scanners on the same line can never push it past its quantity: the loser re-evaluates
+  // `picked_qty < quantity` on the committed row, matches nothing, and re-resolves to the next
+  // open line or to ALREADY_PICKED.
+  let orderItem: {
+    id: string;
+    orderId: string;
+    productId: string;
+    variantId: string | null;
+    productName: string;
+    personalisation: string | null;
+    quantity: number;
+  } | null = null;
+  let pickedQtyBefore = 0;
+  let newPickedQty = 0;
+  for (let attempt = 0; attempt < 5 && !orderItem; attempt += 1) {
+    const candidates = await prisma.orderItem.findMany({
+      where: {
+        orderId,
+        productId: lookup.productId,
+        ...(lookup.variantId ? { variantId: lookup.variantId } : {}),
+        order: { storeId },
+      },
+      select: {
+        id: true,
+        orderId: true,
+        productId: true,
+        variantId: true,
+        productName: true,
+        personalisation: true,
+        quantity: true,
+        pickedQty: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+    const target = resolvePickTarget(candidates);
 
-  if (!orderItem) {
-    throw new AppError(
-      404,
-      'ORDER_ITEM_NOT_FOUND',
-      `No matching line item found in order for barcode ${barcode}`
-    );
+    // Mismatch warnings. A real catalogue item that is NOT on this order is the picker grabbing
+    // the wrong thing; an item already at its ordered quantity is a surplus unit. Both are told
+    // apart from "barcode unknown" and neither writes anything.
+    if (target.kind === 'not_in_order') {
+      throw new AppError(409, 'NOT_IN_ORDER', `${lookup.productName} is not in this order`, {
+        productName: lookup.productName,
+        productNameAr: lookup.productNameAr,
+        barcode,
+      });
+    }
+    if (target.kind === 'already_picked') {
+      throw new AppError(409, 'ALREADY_PICKED', `${lookup.productName} is already fully picked`, {
+        productName: lookup.productName,
+        productNameAr: lookup.productNameAr,
+        barcode,
+      });
+    }
+
+    const rows = await prisma.$queryRaw<{ before: number; after: number }[]>`
+      WITH cur AS (
+        SELECT id, picked_qty FROM public.order_items
+        WHERE id = ${target.item.id} AND picked_qty < quantity
+        FOR UPDATE
+      )
+      UPDATE public.order_items oi
+      SET picked_qty = LEAST(oi.picked_qty + ${qtyToPick}::int, oi.quantity),
+          picked_at = CASE WHEN oi.picked_qty + ${qtyToPick}::int >= oi.quantity THEN now() ELSE NULL END
+      FROM cur
+      WHERE oi.id = cur.id
+      RETURNING cur.picked_qty AS before, oi.picked_qty AS after
+    `;
+    if (rows.length === 1) {
+      orderItem = target.item;
+      pickedQtyBefore = Number(rows[0].before);
+      newPickedQty = Number(rows[0].after);
+    }
   }
-
-  const pickedQtyBefore = orderItem.pickedQty;
-  const newPickedQty = Math.min(pickedQtyBefore + qtyToPick, orderItem.quantity);
+  if (!orderItem) {
+    throw new AppError(409, 'ALREADY_PICKED', 'This item was just picked by another scanner', {
+      productName: lookup.productName,
+      productNameAr: lookup.productNameAr,
+      barcode,
+    });
+  }
   const fullyPicked = newPickedQty >= orderItem.quantity;
-
-  await prisma.orderItem.update({
-    where: { id: orderItem.id },
-    data: {
-      pickedQty: newPickedQty,
-      pickedAt: fullyPicked ? new Date() : null,
-    },
-  });
 
   // Check if all items in the order are fully picked.
   // Prisma does not support column-to-column comparisons in a filter,
@@ -373,6 +449,8 @@ export async function openCountSession(
   createdBy: string,
   note?: string
 ): Promise<{ id: string; storeId: string; status: string; note: string | null; createdAt: Date }> {
+  const stock = await storeStock(storeId);
+  if (stock) return stock.openCountSession({ createdBy, note: note ?? null });
   const session = await prisma.countSession.create({
     data: { storeId, createdBy, note: note ?? null, status: 'open' },
     select: { id: true, storeId: true, status: true, note: true, createdAt: true },
@@ -395,6 +473,14 @@ export async function submitCountLine(
   systemQty: number;
   variance: number;
 }> {
+  const stock = await storeStock(storeId);
+  if (stock)
+    return stock.submitCountLine({
+      sessionId,
+      productId: line.productId,
+      variantId: line.variantId ?? null,
+      countedQty: line.countedQty,
+    });
   // Verify session belongs to this store and is open
   const session = await prisma.countSession.findFirst({
     where: { id: sessionId, storeId, status: 'open' },
@@ -476,6 +562,8 @@ export async function closeCountSession(
   storeId: string,
   sessionId: string
 ): Promise<{ id: string; status: string; closedAt: Date | null }> {
+  const stock = await storeStock(storeId);
+  if (stock) return stock.closeCountSession({ sessionId });
   const session = await prisma.countSession.findFirst({
     where: { id: sessionId, storeId },
     select: { status: true },
@@ -504,6 +592,36 @@ export async function reconcileCountSession(
   sessionId: string,
   reconciledBy: string
 ): Promise<{ adjustmentId: string | null; linesReconciled: number; zeroVarianceLines: number }> {
+  const stock = await storeStock(storeId);
+  if (stock) {
+    // Durable Object path (Ruling CF-R7-1): the adjustment, its posting and the session mark are ONE section.
+    const r = await stock.reconcileCountSession({ sessionId, reconciledBy });
+    await invalidateStoreProductCaches(storeId);
+    if (r.adjustmentId) {
+      try {
+        await inngest.send({
+          name: 'stock/adjustment-posted',
+          data: { storeId, adjustmentId: r.adjustmentId },
+        });
+      } catch (err) {
+        logger.error(
+          { err, adjustmentId: r.adjustmentId, storeId },
+          'reconcileCountSession: failed to fire inngest event'
+        );
+      }
+    }
+    logger.info(
+      {
+        storeId,
+        sessionId,
+        adjustmentId: r.adjustmentId,
+        linesReconciled: r.linesReconciled,
+        zeroVarianceLines: r.zeroVarianceLines,
+      },
+      'barcode-scan: reconcile (do)'
+    );
+    return r;
+  }
   const session = await prisma.countSession.findFirst({
     where: { id: sessionId, storeId, status: 'closed' },
     include: {
@@ -519,40 +637,68 @@ export async function reconcileCountSession(
   });
   if (!session) throw new AppError(404, 'SESSION_NOT_FOUND', 'Session not found or not closed');
 
+  // Single claim: two concurrent reconciles (double tap, two devices) must post ONE adjustment.
+  // The loser's updateMany matches no closed row and stops here.
+  const claim = await prisma.countSession.updateMany({
+    where: { id: sessionId, storeId, status: 'closed' },
+    data: { status: 'reconciled', reconciledAt: new Date() },
+  });
+  if (claim.count === 0) {
+    throw new AppError(404, 'SESSION_NOT_FOUND', 'Session not found or not closed');
+  }
+
   const nonZeroLines = session.lines.filter(l => l.variance !== 0);
   const zeroVarianceLines = session.lines.length - nonZeroLines.length;
 
   let adjustmentId: string | null = null;
 
-  if (nonZeroLines.length > 0) {
-    // Build adjustment items: newQty = countedQty (the truth after counting)
-    const adjustment = await runInTenantContext(storeId, () =>
-      createAdjustment({
-        storeId,
-        type: 'cycle_count',
-        reason: `Cycle count reconcile — session ${sessionId}`,
-        createdBy: reconciledBy,
-        items: nonZeroLines.map(l => ({
-          productId: l.productId,
-          variantId: l.variantId ?? undefined,
-          newQty: l.countedQty,
-        })),
-      })
-    );
+  try {
+    if (nonZeroLines.length > 0) {
+      // The adjustment is a DELTA (counted - system at scan time), applied as an atomic increment.
+      // Stock moves ONLY through the
+      // adjustment service: GL journal + InventoryHistory + cache invalidation live there.
+      const adjustment = await runInTenantContext(storeId, () =>
+        createAdjustment({
+          storeId,
+          type: 'cycle_count',
+          reason: `Cycle count reconcile — session ${sessionId}`,
+          createdBy: reconciledBy,
+          items: nonZeroLines.map(l => ({
+            productId: l.productId,
+            variantId: l.variantId ?? undefined,
+            newQty: l.countedQty,
+            // counted - system qty at the moment of the scan: a sale made since is preserved.
+            countDelta: l.variance,
+          })),
+        })
+      );
+      adjustmentId = adjustment.id;
+      await runInTenantContext(storeId, () =>
+        postAdjustment(storeId, adjustment.id, reconciledBy, { relative: true })
+      );
+    }
 
-    await runInTenantContext(storeId, () => postAdjustment(storeId, adjustment.id, reconciledBy));
-
-    adjustmentId = adjustment.id;
+    await prisma.countSession.update({
+      where: { id: sessionId, storeId },
+      data: { adjustmentId: adjustmentId ?? undefined },
+    });
+  } catch (err) {
+    // Compensating rollback: nothing was posted, so hand the session back to the merchant.
+    await prisma.countSession.updateMany({
+      where: { id: sessionId, storeId, status: 'reconciled' },
+      data: { status: 'closed', reconciledAt: null },
+    });
+    throw err;
   }
 
-  // Mark session as reconciled and record the adjustment link
-  await prisma.countSession.update({
-    where: { id: sessionId, storeId },
-    data: {
-      status: 'reconciled',
-      reconciledAt: new Date(),
-      adjustmentId: adjustmentId ?? undefined,
-    },
+  // Audit row: who reconciled which count, and what it moved.
+  await insertAuditLog({
+    action: 'inventory.count.reconciled',
+    userId: reconciledBy,
+    storeId,
+    resourceType: 'count_session',
+    resourceId: sessionId,
+    details: { adjustmentId, linesReconciled: nonZeroLines.length, zeroVarianceLines },
   });
 
   logger.info(
@@ -579,7 +725,9 @@ export async function listCountSessions(
     lineCount: number;
   }[]
 > {
-  const sessions = await prisma.countSession.findMany({
+  const sessions = await (
+    await storeDb(storeId)
+  ).countSession.findMany({
     where: { storeId, ...(opts.status ? { status: opts.status } : {}) },
     orderBy: { createdAt: 'desc' },
     take: opts.limit ?? 50,
@@ -622,7 +770,9 @@ export async function getCountSession(
     scannedAt: Date;
   }[];
 } | null> {
-  const session = await prisma.countSession.findFirst({
+  const session = await (
+    await storeDb(storeId)
+  ).countSession.findFirst({
     where: { id: sessionId, storeId },
     select: {
       id: true,

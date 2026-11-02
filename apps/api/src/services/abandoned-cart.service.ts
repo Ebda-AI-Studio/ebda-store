@@ -16,6 +16,7 @@ import {
   currentStoreId,
   runInStoreScope,
   storeDirectory,
+  withStore,
 } from '@ebda/database';
 import { storefrontOrigin } from '@ebda/shared';
 import { PriceResolver } from './price-resolver.service';
@@ -24,12 +25,15 @@ import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { resolveBundle } from './bundle.service';
 import { featureService } from './feature.service';
+import { storeDb, storeMoney, storeRepo, storeWriter, type StoreReads } from '../lib/repo-factory';
 import {
   sweepCartRecoveryEmails,
   CART_EMAIL_DEFAULT_DELAY_MINUTES,
 } from './cart-recovery-email.service';
 import logger from '../lib/logger';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
+import { CI_CART_REMINDER_EVENT } from '../lib/ci/events';
+import { sendCartRecoveredToCi } from '../lib/ci/emit';
 import crypto from 'crypto';
 import { config } from '../config';
 import type { NotificationData, NotificationEvent } from '@ebda/shared';
@@ -223,41 +227,7 @@ class AbandonedCartService {
         //    0 extra matches, 0 extra work — for every such store.
         // 3. Don't already have an AbandonedCart record
         // 4. Have a customer with email or phone (so we can actually reach them)
-        const carts = await prisma.cart.findMany({
-          where: {
-            storeId,
-            lastActivityAt: { lt: abandonmentCutoff },
-            abandonedCart: null,
-            AND: [
-              { OR: [{ items: { some: {} } }, { bundles: { some: {} } }] },
-              {
-                OR: [
-                  { customer: { OR: [{ email: { not: '' } }, { phone: { not: null } }] } },
-                  // A guest (or any shopper) who ticked the checkout box "email me about my
-                  // cart": reachable by the email channel only. Consent is re-checked at send time.
-                  { guestEmail: { not: null }, guestEmailConsentAt: { not: null } },
-                ],
-              },
-            ],
-          },
-          include: {
-            customer: {
-              select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-            },
-            items: {
-              include: {
-                product: {
-                  include: { images: { take: 1, orderBy: { position: 'asc' } } },
-                },
-                variant: { select: { price: true } },
-              },
-            },
-            // Raw rows only — display fields (name/image) and price come from
-            // `resolveBundle` below, recomputed live, same as every other
-            // cart-bundle read in this codebase (see cart.service.ts).
-            bundles: true,
-          },
-        });
+        const carts = await loadAbandonmentCandidates(storeId, abandonmentCutoff);
 
         // Hoist the per-store config lookup out of the per-cart loop. It's
         // identical for every iteration of this sweep and previously cost
@@ -311,7 +281,11 @@ class AbandonedCartService {
               await Promise.all(
                 cart.bundles.map(async (cb): Promise<CartItemSnapshot | null> => {
                   try {
-                    const resolved = await resolveBundle(prisma, storeId, cb.bundleId);
+                    const resolved = await resolveBundle(
+                      (await storeDb(storeId)) as unknown as typeof prisma,
+                      storeId,
+                      cb.bundleId
+                    );
                     return {
                       productName: resolved.name,
                       productImage: resolved.image,
@@ -349,7 +323,9 @@ class AbandonedCartService {
               (cart.guestEmailConsentAt ? cart.guestEmail : null) ?? cart.customer?.email ?? null;
             const customerPhone = cart.customer?.phone ?? null;
 
-            await prisma.abandonedCart.create({
+            await (
+              await storeWriter(storeId)
+            ).abandonedCart.create({
               data: {
                 storeId,
                 cartId: cart.id,
@@ -397,19 +373,32 @@ class AbandonedCartService {
   async processReminders(correlationId?: string): Promise<void> {
     const now = new Date();
 
-    const pending = await acrossStoresFlat(storeId =>
-      prisma.abandonedCart.findMany({
-        where: {
-          storeId,
-          status: { in: ['pending', 'step1_sent', 'step2_sent'] },
-          nextStepAt: { lte: now },
-        },
-        include: {
-          store: { select: { id: true, name: true, domain: true, slug: true } },
-          customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
-        },
-      })
-    );
+    const pending = await acrossStoresFlat(async storeId => {
+      const where = {
+        storeId,
+        status: { in: ['pending', 'step1_sent', 'step2_sent'] },
+        nextStepAt: { lte: now },
+      };
+      const repo = await storeRepo(storeId);
+      if (repo.backend !== 'do')
+        return prisma.abandonedCart.findMany({
+          where,
+          include: {
+            store: { select: { id: true, name: true, domain: true, slug: true } },
+            customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
+          },
+        });
+      // a DO store: the rows come from its Durable Object, `store` and `customer` (platform tables) are attached
+      const rows = await repo.db.abandonedCart.findMany({ where });
+      if (rows.length === 0) return [];
+      const store = await withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: { id: true, name: true, domain: true, slug: true },
+        })
+      );
+      return (await withCustomers(storeId, rows)).map(r => ({ ...r, store: store! }));
+    });
 
     logger.info(
       { correlationId, count: pending.length },
@@ -455,7 +444,9 @@ class AbandonedCartService {
       const nextEnabledStep = this.findNextEnabledStep(storeConfig, (stepNumber + 1) as 2 | 3 | 4);
       if (nextEnabledStep === null) {
         // No more steps — expire the record
-        await prisma.abandonedCart.update({
+        await (
+          await storeWriter(storeId)
+        ).abandonedCart.update({
           where: { id: abandonedCart.id, storeId },
           data: { status: 'expired', nextStepAt: null },
         });
@@ -531,10 +522,28 @@ class AbandonedCartService {
       // couponId is updated inside generateRecoveryCoupon via separate update
     }
 
-    await prisma.abandonedCart.update({
+    await (
+      await storeWriter(storeId)
+    ).abandonedCart.update({
       where: { id: abandonedCart.id, storeId },
       data: updateData,
     });
+
+    // CI-13: the reminder went out (the dispatcher routes push/SMS/WhatsApp per store). Never fails the sweep.
+    await sendEventAfterCommit(
+      'ci-cart-reminder',
+      {
+        name: CI_CART_REMINDER_EVENT,
+        data: {
+          storeId,
+          abandonedCartId: abandonedCart.id,
+          channel: 'notification',
+          step: stepNumber,
+          at: new Date().toISOString(),
+        },
+      },
+      { ifUnhookable: 'send' }
+    );
   }
 
   // ──────────────────────────────────────────
@@ -561,32 +570,44 @@ class AbandonedCartService {
       const maxDiscountInt =
         storeConfig.couponMaxDiscount !== null ? storeConfig.couponMaxDiscount : undefined;
 
-      const coupon = await prisma.coupon.upsert({
-        where: { storeId_code: { storeId, code } },
-        create: {
-          storeId,
+      const money = await storeMoney(storeId);
+      if (money) {
+        // a DO store: the coupon (a money model) and the cart's link to it are ONE section (Ruling CF-R4-5)
+        await money.recoveryCoupon({
+          abandonedCartId,
           code,
-          name: `Cart Recovery Coupon`,
-          type: 'percentage',
-          value: storeConfig.couponDiscountPercent,
-          maxDiscount: maxDiscountInt,
-          usageLimit: 1,
-          usageLimitPerUser: 1,
-          expiresAt,
-          isActive: true,
-        },
-        update: {
-          // Update expiry and ensure it's active (in case it was previously expired)
-          expiresAt,
-          isActive: true,
-        },
-      });
+          percent: storeConfig.couponDiscountPercent,
+          maxDiscount: maxDiscountInt ?? null,
+          expiresAt: expiresAt.getTime(),
+        });
+      } else {
+        const coupon = await prisma.coupon.upsert({
+          where: { storeId_code: { storeId, code } },
+          create: {
+            storeId,
+            code,
+            name: `Cart Recovery Coupon`,
+            type: 'percentage',
+            value: storeConfig.couponDiscountPercent,
+            maxDiscount: maxDiscountInt,
+            usageLimit: 1,
+            usageLimitPerUser: 1,
+            expiresAt,
+            isActive: true,
+          },
+          update: {
+            // Update expiry and ensure it's active (in case it was previously expired)
+            expiresAt,
+            isActive: true,
+          },
+        });
 
-      // Link coupon to the abandoned cart
-      await prisma.abandonedCart.update({
-        where: { id: abandonedCartId, storeId },
-        data: { couponId: coupon.id },
-      });
+        // Link coupon to the abandoned cart
+        await prisma.abandonedCart.update({
+          where: { id: abandonedCartId, storeId },
+          data: { couponId: coupon.id },
+        });
+      }
 
       logger.info(
         { storeId, abandonedCartId, couponCode: code },
@@ -608,7 +629,9 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   async markRecovered(abandonedCartId: string, orderId: string): Promise<void> {
-    await prisma.abandonedCart.update({
+    await (
+      await storeWriter(currentStoreId())
+    ).abandonedCart.update({
       where: { id: abandonedCartId, storeId: currentStoreId() },
       data: {
         status: 'recovered',
@@ -617,6 +640,7 @@ class AbandonedCartService {
       },
     });
 
+    await sendCartRecoveredToCi(currentStoreId(), abandonedCartId, orderId);
     logger.info({ abandonedCartId, orderId }, '[AbandonedCart] Cart marked as recovered');
   }
 
@@ -625,7 +649,9 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   async getConfig(storeId: string): Promise<AbandonedCartConfigDefaults> {
-    const row = await prisma.abandonedCartConfig.findUnique({
+    const row = await (
+      await storeDb(storeId)
+    ).abandonedCartConfig.findUnique({
       where: { storeId },
     });
 
@@ -653,7 +679,9 @@ class AbandonedCartService {
     storeId: string,
     data: Partial<AbandonedCartConfigDefaults>
   ): Promise<AbandonedCartConfigDefaults> {
-    const row = await prisma.abandonedCartConfig.upsert({
+    const row = await (
+      await storeWriter(storeId)
+    ).abandonedCartConfig.upsert({
       where: { storeId },
       create: {
         storeId,
@@ -710,11 +738,25 @@ class AbandonedCartService {
     recoveryRate: number;
     recoveredRevenue: number;
   }> {
-    const grouped = await prisma.abandonedCart.groupBy({
-      by: ['status'],
-      where: { storeId },
-      _count: { id: true },
-    });
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    // prisma-lite has no groupBy: a DO store counts the rows per status itself (a store's abandoned carts are few)
+    const grouped = onDo
+      ? [
+          ...(
+            await repo.db.abandonedCart.findMany({ where: { storeId }, select: { status: true } })
+          )
+            .reduce(
+              (m, r) => m.set(r.status, (m.get(r.status) ?? 0) + 1),
+              new Map<string, number>()
+            )
+            .entries(),
+        ].map(([status, n]) => ({ status, _count: { id: n } }))
+      : await prisma.abandonedCart.groupBy({
+          by: ['status'],
+          where: { storeId },
+          _count: { id: true },
+        });
 
     const byStatus: Record<string, number> = {};
     let totalAbandoned = 0;
@@ -724,7 +766,9 @@ class AbandonedCartService {
     }
     const totalRecovered = byStatus.recovered ?? 0;
 
-    const revenueRows = await prisma.$queryRaw<Array<{ revenue: bigint | null }>>`
+    const revenueRows = onDo
+      ? [{ revenue: await doRecoveredRevenue(repo.db, storeId) }]
+      : await prisma.$queryRaw<Array<{ revenue: bigint | null }>>`
       SELECT COALESCE(SUM(o.total), 0)::bigint AS revenue
       FROM public.abandoned_carts ac
       JOIN public.orders o ON o.id = ac.recovered_order_id
@@ -760,20 +804,28 @@ class AbandonedCartService {
       where.status = status;
     }
 
-    const [records, total] = await Promise.all([
-      prisma.abandonedCart.findMany({
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const [found, total] = await Promise.all([
+      repo.db.abandonedCart.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          customer: {
-            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-          },
-        },
+        // `customer` is a User on the platform database: for a DO store it is attached below
+        ...(onDo
+          ? {}
+          : {
+              include: {
+                customer: {
+                  select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+                },
+              },
+            }),
       }),
-      prisma.abandonedCart.count({ where }),
+      repo.db.abandonedCart.count({ where }),
     ]);
+    const records = onDo ? await withCustomers(storeId, found) : found;
 
     return {
       records,
@@ -784,6 +836,25 @@ class AbandonedCartService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /** One abandoned cart with its customer (a DO store attaches the platform `User` itself). Null when not this store's. */
+  async getAbandoned(storeId: string, id: string) {
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.abandonedCart.findUnique({
+      where: { id, storeId },
+      ...(onDo
+        ? {}
+        : {
+            include: {
+              customer: {
+                select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+              },
+            },
+          }),
+    });
+    return found && onDo ? (await withCustomers(storeId, [found]))[0] : found;
   }
 
   // ──────────────────────────────────────────
@@ -840,6 +911,115 @@ class AbandonedCartService {
         return 0;
     }
   }
+}
+
+/** The recovered orders' revenue for a DO store: orders that count as revenue elsewhere (the SQL twin above), summed here. */
+async function doRecoveredRevenue(db: StoreReads, storeId: string): Promise<number> {
+  const recovered = await db.abandonedCart.findMany({
+    where: { storeId, status: 'recovered', recoveredOrderId: { not: null } },
+    select: { recoveredOrderId: true },
+  });
+  const ids = recovered.map(r => r.recoveredOrderId).filter((x): x is string => !!x);
+  if (ids.length === 0) return 0;
+  const orders = await db.order.findMany({
+    where: {
+      id: { in: ids },
+      storeId,
+      deletedAt: null,
+      status: { notIn: ['cancelled', 'refunded', 'awaiting_payment_confirmation'] },
+      paymentStatus: { not: 'failed' },
+    },
+    select: { total: true },
+  });
+  return orders.reduce((n, o) => n + o.total, 0);
+}
+
+/** `AbandonedCart.customer` (a platform `User`) for rows read from a DO. */
+async function withCustomers<T extends { customerId: string | null }>(storeId: string, rows: T[]) {
+  const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
+  const users = ids.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ids }, storeId },
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+      })
+    : [];
+  const byId = new Map(users.map(u => [u.id, u]));
+  return rows.map(r => ({
+    ...r,
+    customer: r.customerId ? (byId.get(r.customerId) ?? null) : null,
+  }));
+}
+
+/** What the detection sweep reads for one cart (the shape of the Postgres include). */
+const CANDIDATE_INCLUDE = {
+  items: {
+    include: {
+      product: { include: { images: { take: 1, orderBy: { position: 'asc' } } } },
+      variant: { select: { price: true } },
+    },
+  },
+  // Raw rows only - display fields (name/image) and price come from `resolveBundle`, recomputed live.
+  bundles: true,
+} as const;
+
+/**
+ * Carts idle past the cutoff that have a line or a bundle, no abandoned-cart record yet, and a way to reach the shopper:
+ * a customer with an e-mail or a phone, or a guest who ticked "email me about my cart". The Postgres query is unchanged.
+ * A store on its Durable Object cannot join `User` (a platform table), so it reads the candidates by `customerId` /
+ * consented guest e-mail and keeps the customers that have a contact AFTER attaching them (Ruling CF-R4-5); the result has
+ * the same shape either way.
+ */
+async function loadAbandonmentCandidates(storeId: string, cutoff: Date) {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') {
+    return prisma.cart.findMany({
+      where: {
+        storeId,
+        lastActivityAt: { lt: cutoff },
+        abandonedCart: null,
+        AND: [
+          { OR: [{ items: { some: {} } }, { bundles: { some: {} } }] },
+          {
+            OR: [
+              { customer: { OR: [{ email: { not: '' } }, { phone: { not: null } }] } },
+              // A guest (or any shopper) who ticked the checkout box "email me about my
+              // cart": reachable by the email channel only. Consent is re-checked at send time.
+              { guestEmail: { not: null }, guestEmailConsentAt: { not: null } },
+            ],
+          },
+        ],
+      },
+      include: {
+        customer: {
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+        },
+        ...CANDIDATE_INCLUDE,
+      },
+    });
+  }
+  const found = await repo.db.cart.findMany({
+    where: {
+      storeId,
+      lastActivityAt: { lt: cutoff },
+      abandonedCart: null,
+      AND: [
+        { OR: [{ items: { some: {} } }, { bundles: { some: {} } }] },
+        {
+          OR: [
+            { customerId: { not: null } },
+            { guestEmail: { not: null }, guestEmailConsentAt: { not: null } },
+          ],
+        },
+      ],
+    },
+    include: CANDIDATE_INCLUDE,
+  });
+  const withUser = await withCustomers(storeId, found);
+  return withUser.filter(
+    c =>
+      (c.customer && (c.customer.email !== '' || c.customer.phone !== null)) ||
+      (c.guestEmail !== null && c.guestEmailConsentAt !== null)
+  );
 }
 
 // Singleton

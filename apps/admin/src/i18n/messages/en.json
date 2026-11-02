@@ -70,7 +70,9 @@
       "empty": "No results for “{q}”",
       "error": "Search is unavailable right now. Try again.",
       "count": "{n, plural, one {{n} result} other {{n} results}}"
-    }
+    },
+    "egp": "EGP",
+    "egpParen": "(EGP)"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -441,6 +443,9 @@
         "createFailed": "Failed to create store",
         "generic": "Something went wrong"
       }
+    },
+    "avatar": {
+      "logoAlt": "{name} logo"
     }
   },
   "products": {
@@ -580,7 +585,9 @@
         "selected": "{count} selected",
         "massEdit": "Mass edit",
         "clear": "Clear selection"
-      }
+      },
+      "priceFrom": "From",
+      "selectProduct": "Select {name}"
     },
     "detail": {
       "loading": "Loading...",
@@ -809,7 +816,9 @@
         "maxLength": "Max characters",
         "required": "Required before adding to cart",
         "needLabel": "Personalisation needs a label in Arabic or English.",
-        "invalidMax": "Max characters must be a whole number from 1 to 200."
+        "invalidMax": "Max characters must be a whole number from 1 to 200.",
+        "embroideryNameArSample": "الاسم للتطريز",
+        "embroideryNameEnSample": "Name to embroider"
       },
       "fulfilment": {
         "title": "Fulfilment",
@@ -817,7 +826,19 @@
         "leadTime": "Made-to-order days",
         "placeholder": "Ready to ship",
         "invalid": "Made-to-order days must be a whole number from 0 to {max}."
-      }
+      },
+      "balanceFailed": "Balance failed — try again",
+      "balanceTitle": "Balance languages (name + description EN/AR)",
+      "retryWarn": "⚠ Retry",
+      "balanced": "✓ Balanced",
+      "balanceLanguages": "Balance languages",
+      "revertFailed": "Revert failed — try again",
+      "revertTitle": "Revert balance — restore originals",
+      "revert": "↩ Revert",
+      "faqQuestionEnSample": "e.g. What sizes are available?",
+      "faqQuestionArSample": "مثال: ما الأحجام المتوفرة؟",
+      "faqAnswerEnSample": "e.g. Available in S, M, L, XL.",
+      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL."
     },
     "recommendations": {
       "loading": "Loading...",
@@ -1235,7 +1256,8 @@
         "retry": "Retry",
         "confirmInstapay": "Could not confirm the InstaPay payment"
       },
-      "agentBadge": "Agent"
+      "agentBadge": "Agent",
+      "newOrder": "+ New order"
     },
     "status": {
       "pending": "Pending",
@@ -1615,7 +1637,10 @@
         "successTitle": "AI filled empty kicker + subtitle fields",
         "generating": "Generating…",
         "generateWithAi": "Generate with AI"
-      }
+      },
+      "fontFamilyExample": "e.g. Cairo, Inter, \"Open Sans\"",
+      "fontNameExample": "e.g. \"My Brand Sans\"",
+      "uploadFileSize": "{name} ({kb} KB)"
     },
     "devices": {
       "title": "Notification devices",
@@ -1627,7 +1652,8 @@
       "removeConfirmDescription": "Push notifications will stop arriving on this device. You can re-enable from the same browser.",
       "loading": "Loading devices…",
       "error": "Failed to load devices",
-      "removeError": "Failed to remove device"
+      "removeError": "Failed to remove device",
+      "browserFallback": "Browser"
     },
     "invoice": {
       "title": "Invoice",
@@ -1979,7 +2005,9 @@
       "group": "Wholesale group",
       "empty": "No sales in this period yet.",
       "loadFailed": "Could not load the wholesale split."
-    }
+    },
+    "dateTo": "To",
+    "dateFrom": "From"
   },
   "settings": {
     "page": {
@@ -2974,7 +3002,15 @@
       "addCustomLocationHint": "Add a country, province and area that aren't in the list above.",
       "remove": "Remove",
       "deleteFailed": "Couldn't delete the area",
-      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}"
+      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}",
+      "areaNameEnSample": "Area name",
+      "areaNameArSample": "اسم المنطقة",
+      "countryEnSample": "e.g. Saudi Arabia",
+      "countryArSample": "مثال: المملكة العربية السعودية",
+      "cityEnSample": "e.g. Riyadh",
+      "cityArSample": "مثال: الرياض",
+      "districtEnSample": "e.g. Al Olaya",
+      "districtArSample": "مثال: العليا"
     },
     "returnPolicy": {
       "title": "Return policy",
@@ -3492,7 +3528,18 @@
         "payout_completed": "Payout completed",
         "payout_failed": "Payout failed"
       }
-    }
+    },
+    "subtitle": "Affiliates",
+    "backToAffiliates": "Back to Affiliates",
+    "auditTrail2": "Audit Trail →",
+    "noEventsYet": "No events yet",
+    "eventHistory": "Event History",
+    "orderLabel": "Order:",
+    "commissionLabel": "Commission:",
+    "amountLabel": "Amount:",
+    "via": "via",
+    "eventsTitle": "{name} — Events",
+    "eventsTitleFallback": "Affiliate Events"
   },
   "bulk": {
     "page": {
@@ -3503,7 +3550,8 @@
     "tabs": {
       "ariaLabel": "Bulk operations tabs",
       "import": "Import Products",
-      "export": "Export Products"
+      "export": "Export Products",
+      "catalog": "From photos or PDF"
     },
     "import": {
       "instructionsTitle": "How to Import Products",
@@ -3594,6 +3642,152 @@
     "errors": {
       "network": "Network error. Please try again.",
       "importFailed": "Import failed"
+    },
+    "catalogImport": {
+      "title": "Import products from photos or PDFs",
+      "intro": "Upload photos of a menu, a shelf, a price tag or a price list, or a PDF. We read the products and prices for you to check. Nothing goes live until you publish it.",
+      "choose": "Choose files",
+      "uploading": "Uploading...",
+      "limits": "Up to 4 files, 6 MB each. PDFs up to 10 pages.",
+      "allowance": "{count} pages left this month",
+      "privacyNote": "Phone numbers, emails and links in the photo are not copied into your products. Uploaded files are deleted after 30 days.",
+      "upgradeTitle": "Not included in your plan",
+      "upgradeBody": "Importing products from photos and PDFs is available on paid plans. Upgrade to turn it on.",
+      "jobsTitle": "Your imports",
+      "noJobs": "No imports yet.",
+      "jobLine": "{files} files, {items} products",
+      "reviewLink": "Review",
+      "review": {
+        "pageTitle": "Review imported products",
+        "progress": "{done} of {total} files read",
+        "back": "Back to bulk tools",
+        "processing": "Reading your files. You can review products as they appear.",
+        "creating": "Creating drafts...",
+        "cancel": "Cancel",
+        "fileWaiting": "Waiting for allowance",
+        "fileFailed": "Could not be read",
+        "retry": "Try again",
+        "tabsAria": "Product status",
+        "tab": {
+          "pending": "To review",
+          "accepted": "Accepted",
+          "rejected": "Rejected",
+          "created": "Drafts"
+        },
+        "waiting": "Products will appear here as we read your files.",
+        "empty": "Nothing here.",
+        "selectDraft": "Select this draft",
+        "acceptHigh": "Accept all clear products",
+        "bulkAccepted": "{count} products accepted",
+        "createDrafts": "Create drafts for accepted ({count})",
+        "publishSelected": "Publish selected ({count})",
+        "published": "{published} published, {refused} not ready",
+        "draftsHidden": "{count} drafts. Shoppers cannot see drafts until you publish them.",
+        "confidenceAria": "Confidence: {level}",
+        "band": {
+          "high": "Clear",
+          "medium": "Check",
+          "low": "Unsure"
+        },
+        "flags": {
+          "price_unclear": "Price unclear",
+          "price_range": "Price is a range",
+          "price_from": "Starting price",
+          "price_per_unit": "Price per unit",
+          "currency_mismatch": "Not in EGP",
+          "no_price": "No price",
+          "phone_removed": "Phone number removed",
+          "injection_suspected": "Odd text, check it",
+          "variants_truncated": "Some options cut off",
+          "duplicate_sku": "Same SKU as an existing product",
+          "duplicate_exact": "Looks like an existing product"
+        },
+        "openSource": "Open original",
+        "printedAs": "Printed:",
+        "nameAr": "Name (Arabic)",
+        "nameEn": "Name (English)",
+        "price": "Price (EGP)",
+        "sku": "SKU",
+        "category": "Category",
+        "noCategory": "No category",
+        "noCategoryYet": "Not matched yet",
+        "createCategory": "Create category \"{name}\"",
+        "tags": "Tags (comma separated)",
+        "variants": "{count} options",
+        "variantPrice": "Price of {name}",
+        "moreDetails": "More details (SKU, tags, descriptions)",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionEn": "Description (English)",
+        "checkTitle": "Check before accepting",
+        "check": {
+          "price_from": "I checked: this is a starting price",
+          "price_per_unit": "I checked: this price is per unit",
+          "injection_suspected": "I checked this text",
+          "duplicate_exact": "I checked: add it anyway"
+        },
+        "draftCreated": "Draft created",
+        "undo": "Undo accept",
+        "accept": "Accept",
+        "reject": "Reject",
+        "errors": {
+          "GENERIC": "Could not save. Try again.",
+          "BAD_PRICE": "Enter a price like 150 or 150.50",
+          "BLOCKING_FLAG": "Tick the check box before accepting.",
+          "SKU_CONFLICT": "That SKU is already used.",
+          "PLAN_LIMIT_REACHED": "Your plan's product limit is reached.",
+          "CREATE_FAILED": "Could not create the draft.",
+          "VARIANTS_FAILED": "Could not create the options.",
+          "NAME_MISSING": "Add a name first.",
+          "CATEGORY_NOT_FOUND": "That category no longer exists."
+        }
+      },
+      "open": "Open",
+      "status": {
+        "queued": "Waiting",
+        "processing": "Reading",
+        "review": "Ready to review",
+        "creating": "Creating drafts",
+        "done": "Done",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "GENERIC": "Something went wrong. Try again.",
+        "FEATURE_NOT_AVAILABLE": "Importing from photos is not included in your plan.",
+        "UNSUPPORTED_FILE_TYPE": "Only photos (JPG, PNG, WebP, HEIC) and PDF files are supported.",
+        "FILE_TOO_LARGE": "A file is too large. Keep each file under 6 MB.",
+        "LIMIT_FILE_SIZE": "A file is too large. Keep each file under 6 MB.",
+        "TOO_MANY_FILES": "Too many files. Upload up to 4 at a time.",
+        "LIMIT_UNEXPECTED_FILE": "Too many files. Upload up to 4 at a time.",
+        "TOO_MANY_PAGES": "Too many pages. Keep each PDF to 10 pages and each import to 30.",
+        "UNREADABLE_PDF": "This PDF could not be read. Try exporting it again.",
+        "CATALOG_IMPORT_BUSY": "Finish the imports in progress first.",
+        "CATALOG_IMPORT_DISABLED": "Importing from photos is switched off for now.",
+        "RATE_LIMITED": "Too many imports this hour. Try again later.",
+        "DAILY_LIMIT": "Daily upload limit reached. Try again tomorrow.",
+        "ENQUEUE_FAILED": "We could not start processing. Try again.",
+        "NOT_STARTED": "Processing never started. Try again.",
+        "STUCK": "Processing stopped unexpectedly. Try again.",
+        "JOB_FAILED": "Processing failed. Try again.",
+        "NO_FILES": "None of the files could be read.",
+        "PLAN_PAGES_EXHAUSTED": "You used this month's pages. They renew next month, or upgrade your plan.",
+        "DAILY_PAGES_EXHAUSTED": "Today's page limit is used up. Try again tomorrow.",
+        "AI_QUOTA_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
+        "AI_QUOTA_DAILY_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
+        "AI_QUOTA_MONTHLY_EXCEEDED": "This month's smart-tools limit is used up.",
+        "AI_QUOTA_STORE_DAILY_EXCEEDED": "Today's smart-tools limit for your store is used up. Try again tomorrow.",
+        "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
+        "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
+        "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
+        "AI_BAD_RESPONSE": "Could not read this file. Try again.",
+        "BAD_RESPONSE": "Could not read this file. Try again.",
+        "FILE_UNREADABLE": "This file could not be opened.",
+        "EXTRACTION_FAILED": "Could not read this file. Try again.",
+        "TOO_MANY_RETRIES": "This file was tried too many times. Upload it again.",
+        "DRAFTS_FAILED": "Some drafts could not be created. Check the items and try again.",
+        "NETWORK": "No connection. Try again.",
+        "REQUEST_FAILED": "Something went wrong. Try again."
+      }
     }
   },
   "newsletter": {
@@ -3623,7 +3817,8 @@
       "broadcastCancel": "Cancel",
       "broadcastSent": "Broadcast sent!",
       "broadcastSentCount": "Sent to {sent} of {total} subscriber(s).",
-      "broadcastClose": "Close"
+      "broadcastClose": "Close",
+      "chunksFailed": "{count} chunk(s) failed — check server logs"
     },
     "table": {
       "email": "Email",
@@ -4219,7 +4414,12 @@
         "numbered": "Numbered list",
         "image": "Image",
         "button": "Button"
-      }
+      },
+      "aiFaqNote": "AI-generated FAQ items live in SEO Tools, not here.",
+      "aiHowToNote": "AI-generated How-To guides live in SEO Tools, not here.",
+      "wrapperNote": "This editor controls the static page wrapper (cover image, intro paragraphs, etc.). The accordion content the storefront actually renders comes from a separate surface.",
+      "openFaqInSeo": "Open FAQ items in SEO →",
+      "openHowToInSeo": "Open How-To items in SEO →"
     }
   },
   "pages": {
@@ -4479,7 +4679,8 @@
       "tabs": {
         "settings": "Settings",
         "members": "Members"
-      }
+      },
+      "transactions": "Transactions"
     },
     "stats": {
       "totalMembers": "Total Members",
@@ -5085,7 +5286,10 @@
       "socialRedirectNote": "Social platform links (Instagram, Facebook, TikTok, etc.) are managed in Branding → Social. Edit them there to keep everything in one place.",
       "socialRedirectNoteLinkText": "Go to Branding → Social",
       "redirectsLoadMore": "Load more",
-      "redirectsLoadingMore": "Loading…"
+      "redirectsLoadingMore": "Loading…",
+      "generating": "Generating…",
+      "generateWithAi": "Generate with AI",
+      "stepsCount": "{count, plural, one {{count} step} other {{count} steps}}"
     }
   },
   "language": {
@@ -5160,7 +5364,8 @@
       "wwwAutoAttachedTitle": "www subdomain handled automatically",
       "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain.",
       "copy": "Copy",
-      "copyValueAriaLabel": "Copy {type} value"
+      "copyValueAriaLabel": "Copy {type} value",
+      "ttlAuto": "1 Hour"
     }
   },
   "categories": {
@@ -5197,7 +5402,9 @@
       "bestSellersTileShown": "Best Sellers tile shown",
       "bestSellersTileHidden": "Best Sellers tile hidden",
       "bestSellersCoverUpdated": "Best Sellers cover updated",
-      "bestSellersCoverRemoved": "Best Sellers cover removed"
+      "bestSellersCoverRemoved": "Best Sellers cover removed",
+      "countUnitEnSample": "pieces",
+      "countUnitArSample": "قطعة"
     },
     "form": {
       "editTitle": "Edit Category",
@@ -5375,7 +5582,8 @@
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
       "searchPlaceholder": "Search reviews…"
-    }
+    },
+    "spam": "Spam"
   },
   "audit": {
     "title": "Audit Logs",
@@ -5666,6 +5874,7 @@
     "adminLayout": {
       "navDashboard": "Dashboard",
       "navCatalog": "Catalog",
+      "navEditor": "Editor",
       "navSales": "Sales",
       "navStock": "Inventory",
       "navFinance": "Accounting",
@@ -5731,7 +5940,8 @@
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
-        "wholesaleApplications": "Wholesale applications"
+        "wholesaleApplications": "Wholesale applications",
+        "customerIntelligence": "Smart hints"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -5771,7 +5981,8 @@
       "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)",
-      "wholesalePendingBadge": "{count} wholesale applications waiting"
+      "wholesalePendingBadge": "{count} wholesale applications waiting",
+      "navPlatformCiInsights": "Customer Intelligence"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -5944,7 +6155,8 @@
       "subtitleDefault": "Curated picks",
       "productNamePlaceholder": "Product",
       "addToCartLabel": "Add",
-      "headingSuffix": "{label} heading"
+      "headingSuffix": "{label} heading",
+      "samplePrice": "50.00 EGP"
     },
     "colorContrastPreview": {
       "backgroundLabel": "Background: {label}",
@@ -5960,7 +6172,12 @@
       "notTracked": "Not tracked for guest checkout",
       "registeredOnly": "Registered customers only",
       "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
-    }
+    },
+    "title": "Return Timeline",
+    "noEvents": "No timeline events yet",
+    "by": "by",
+    "reasonLabel": "Reason:",
+    "refundViaLabel": "Refund via:"
   },
   "finance": {
     "accounts": {
@@ -6268,7 +6485,8 @@
         "error": "Import failed.",
         "fileTypesHint": "CSV, Excel (.xlsx), or OFX (max 5 MB)",
         "skippedLabel": "Skipped",
-        "viewReconciliation": "View Reconciliation"
+        "viewReconciliation": "View Reconciliation",
+        "andMore": "…and {count} more"
       },
       "tx": {
         "date": "Date",
@@ -6303,7 +6521,8 @@
         "confirm": "Link",
         "cancel": "Cancel",
         "entryIdHelp": "You can find entry IDs in Finance → Journal.",
-        "confirming": "Linking…"
+        "confirming": "Linking…",
+        "uuidExample": "e.g. 550e8400-e29b-41d4-a716-446655440000"
       },
       "difference": {
         "title": "Reconciliation Difference",
@@ -6354,7 +6573,8 @@
       "colRate": "Rate (EGP)",
       "colDate": "Date",
       "colRecorded": "Recorded",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "rateExample2": "e.g. 50.00"
     }
   },
   "stock": {
@@ -6404,7 +6624,8 @@
       "loadFailed": "Couldn't load products — {error}",
       "filteredLabel": "Filtered:",
       "filterLowStock": "Low stock",
-      "filterOutOfStock": "Out of stock"
+      "filterOutOfStock": "Out of stock",
+      "showingFiltered": "Showing {shown} of {total} products"
     },
     "scan": {
       "title": "Barcode Scan",
@@ -6431,7 +6652,8 @@
       "picking": {
         "success": "Picked {qty} of {name}. Progress: {picked}/{total}.",
         "itemNotFound": "This barcode does not match any item in the order.",
-        "alreadyPicked": "This item is already fully picked.",
+        "notInOrder": "{name} is not in this order. Put it back.",
+        "alreadyPicked": "{name} is already fully picked. Do not add another.",
         "orderComplete": "All items in this order are picked.",
         "errorGeneric": "Failed to record pick. Try again."
       },
@@ -6470,7 +6692,15 @@
       "colItem": "Item",
       "colPicked": "Picked",
       "pickItemsTableLabel": "Order items",
-      "countLinesTableLabel": "Count lines"
+      "countLinesTableLabel": "Count lines",
+      "onHandLabel": "On hand:",
+      "countSession": "Count Session",
+      "linesSuffix": "lines",
+      "systemQtyLabel": "System qty:",
+      "adjustmentLabel": "Adjustment:",
+      "skuLabel": "SKU: {sku}",
+      "linesAdjusted": "{count, plural, one {{count} line adjusted.} other {{count} lines adjusted.}}",
+      "sessionReconciledOn": "Session reconciled on {date}."
     },
     "adjustments": {
       "title": "Stock Adjustments",
@@ -6551,7 +6781,9 @@
         "itemsTableLabel": "Adjustment items"
       },
       "searchPlaceholder": "Search adjustments…",
-      "emptyState": "No stock adjustments yet. Create one with the button above."
+      "emptyState": "No stock adjustments yet. Create one with the button above.",
+      "reasonEnPlaceholder": "Optional reason in English",
+      "reasonArPlaceholder": "Reason in Arabic (optional)"
     },
     "suppliers": {
       "title": "Suppliers",
@@ -6584,7 +6816,13 @@
         "leadTimeDays": "Net lead time (days)",
         "leadTimeDaysTip": "Number of days from placing an order with this supplier until stock arrives. Used by the reorder engine when no per-product rule overrides it."
       },
-      "searchPlaceholder": "Search suppliers…"
+      "searchPlaceholder": "Search suppliers…",
+      "supplierNameEnSample": "e.g. Al-Mutlaq Trading",
+      "supplierNameArPlaceholder": "Supplier name in Arabic",
+      "termsDaysExample": "e.g. 45",
+      "notesEnPlaceholder": "Optional notes in English",
+      "notesArPlaceholder": "Notes in Arabic (optional)",
+      "termsDays": "{count, plural, one {{count} day} other {{count} days}}"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -6648,7 +6886,9 @@
         "VARIANT_REQUIRED_RECEIVE": "This line names no variant, but its product has variants, so it cannot be received. Cancel this purchase order and draft it again per variant."
       },
       "emptyState": "No purchase orders yet. Create one with the button above.",
-      "totalCount": "{total} purchase orders"
+      "totalCount": "{total} purchase orders",
+      "backToPurchaseOrders": "← Back to purchase orders",
+      "notesArPlaceholder": "Notes in Arabic (optional)"
     },
     "backorders": {
       "title": "Open Backorders",
@@ -6750,7 +6990,10 @@
       },
       "validation": {
         "nameCodeRequired": "Name and code are required"
-      }
+      },
+      "warehouseNameEnSample": "Main Warehouse",
+      "warehouseNameArSample": "المستودع الرئيسي",
+      "addressSample": "Shuwaikh Industrial Area, Egypt"
     },
     "warehouseStock": {
       "title": "Warehouse Stock",
@@ -6782,7 +7025,8 @@
       "reconcileHint": "Per-warehouse counts are reconciled from your authoritative product stock.",
       "searchTruncated": "These are the closest matches only. Add a word to narrow the search.",
       "reconcileDone": "Reconciled {reconciled} SKU(s), {failed} failed",
-      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly"
+      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly",
+      "deltaExample": "+10 or -5"
     }
   },
   "insights": {
@@ -6804,7 +7048,9 @@
       "colSku": "SKU",
       "colName": "Name",
       "colSold7d": "Sold 7d",
-      "colVelocity": "Velocity"
+      "colVelocity": "Velocity",
+      "perDay": "/day",
+      "topSegmentCustomers": "{count, plural, one {{count} customer} other {{count} customers}}"
     },
     "cohorts": {
       "title": "Customer Cohorts",
@@ -6818,7 +7064,9 @@
       "ltvByCohortTitle": "Cumulative LTV by Cohort",
       "colTotalRevenue": "Total Revenue (EGP)",
       "colLtvPerCustomer": "LTV / Customer",
-      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time."
+      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time.",
+      "cellTitle": "{active} / {total} customers active",
+      "legendNote": "Cells show % of cohort customers who placed an order in that period. Green = high retention, red = low."
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -7623,7 +7871,8 @@
       "revokeFailed": "Could not revoke the invitation",
       "sentTitle": "Invitation sent",
       "sentDesc": "{email} will get an email to accept. Nothing changes on their account until they do."
-    }
+    },
+    "removeBody": "Remove <b>{name}</b> ({email}) from this store? They will lose access immediately."
   },
   "blog": {
     "page": {
@@ -7675,7 +7924,10 @@
       "cancel": "Cancel",
       "createPost": "Create post",
       "saveChanges": "Save changes",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "titleArPlaceholder": "ما الجديد في متجرك...",
+      "excerptArPlaceholder": "جملة أو اثنتان تظهران في قائمة المدونة...",
+      "bodyArPlaceholder": "اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
     }
   },
   "checkoutDelivery": {
@@ -8011,7 +8263,13 @@
     "savedToast": "Floating widget saved",
     "saveHint": "Changes apply to the live storefront after save.",
     "saving": "Saving…",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save changes",
+    "menuLabelEnSample": "Open menu",
+    "menuLabelArSample": "القائمة",
+    "prefillExample": "Hi! I'd like to ask about…",
+    "handleSampleDemoShop": "demo-shop",
+    "handleSample": "mystore",
+    "emailSubjectExample": "Question about your store"
   },
   "zoneEditor": {
     "resetToDefault": "Reset to default",
@@ -8109,7 +8367,6 @@
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
     "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda Store support to turn it on.",
-    "checkoutAccounting": "Unavailable while accounting is on — the ledger does not yet record store credit as a liability, so wallet payments would be booked as cash.",
     "colCustomer": "Customer",
     "colContact": "Contact",
     "colBalance": "Balance",
@@ -8478,7 +8735,8 @@
         "prefix": "I agree to the ",
         "sep": ", the ",
         "lastSep": " and the "
-      }
+      },
+      "companyWebsite": "Company website"
     },
     "verify": {
       "verifying": "Verifying your email…",
@@ -9490,6 +9748,15 @@
       "resetError": "Could not reset. Try again.",
       "headerLogo": "Logo position",
       "headerSearch": "Header search",
+      "cardHeart": "Wishlist heart on home cards",
+      "cardSwatches": "Colour dots on home cards",
+      "cardTags": "Tag chips on home cards",
+      "gridGutter": "Space between home cards",
+      "headingWeight": "Section heading weight",
+      "priceColour": "Price colour on cards",
+      "tabBar": "Bottom bar on phones",
+      "heroRatio": "Hero height on phones",
+      "headerWordmark": "Store name without a logo",
       "cardBrandBadge": "Store name on cards",
       "cardNewBadge": "\"New\" badge on cards",
       "cardQuickAdd": "Quick add (+) on carousel cards",
@@ -9795,7 +10062,8 @@
       "noteRequired": "Enter a note of at least 3 characters.",
       "cancel": "Cancel",
       "working": "Working…"
-    }
+    },
+    "unknown": "unknown"
   },
   "goldRates": {
     "page": {
@@ -10654,5 +10922,100 @@
     },
     "testNote": "Print one label and scan it with a phone before you print a whole sheet.",
     "loading": "Loading"
+  },
+  "customerIntelligence": {
+    "title": "Smart hints",
+    "subtitle": "Advice from how your own orders were delivered and returned. It only advises: it never holds, delays or cancels an order.",
+    "loadFailed": "Could not load the page.",
+    "retry": "Retry",
+    "saveFailed": "Could not save that change. Try again.",
+    "hints": {
+      "title": "Show smart hints",
+      "body": "A COD risk note on each order, which courier has delivered best to an area, and a shipping-fee suggestion. Every hint shows how many orders it rests on.",
+      "on": "Hints are on for this store.",
+      "off": "Hints are off. Nothing is shown until you switch them on."
+    },
+    "sharing": {
+      "title": "Learn from other stores too",
+      "body": "If you agree, your store's numbers (never a name, phone number, email or address) are counted together with other stores so the hints get more accurate for everyone. Nobody sees your store or any of your customers, and you can stop this at any time. It is off until you switch it on."
+    },
+    "fee": {
+      "title": "Shipping fee suggestion",
+      "suggestion": "COD orders with a shipping fee of {amount} or more come back {rate} of the time ({base} on average, from {n} orders). Think about lowering the shipping fee or asking for an InstaPay deposit on those orders.",
+      "none": "No shipping-fee band is returning clearly more than the rest."
+    },
+    "notEnough": "Not enough data yet. Hints appear once enough orders have been delivered or returned.",
+    "status": {
+      "title": "What the hints are based on",
+      "store": "Your store, data up to",
+      "cohort": "Other stores, data up to",
+      "none": "no data yet"
+    },
+    "shown": {
+      "title": "Hints shown in the last 30 days",
+      "features": {
+        "cod_risk": "COD risk",
+        "courier": "Courier",
+        "fee": "Shipping fee"
+      }
+    },
+    "paused": {
+      "title": "Paused for your store",
+      "item": "{feature}: this hint predicted {predicted} but {actual} actually happened over {resolved} of your orders, so it is paused for your store only. It switches itself back on once your own numbers line up again."
+    },
+    "bands": {
+      "typical": "Typical",
+      "elevated": "Higher than usual",
+      "insufficient": "Not enough data"
+    },
+    "footnote": "Hints are advice only. They never hold, delay or cancel an order, and the final decision is always yours.",
+    "order": {
+      "title": "COD risk",
+      "band": {
+        "typical": "Typical for this area.",
+        "elevated": "Returns are higher than usual here.",
+        "insufficient": "Not enough data yet."
+      },
+      "reason": {
+        "area": "Orders to this area have come back more than average.",
+        "buyer": "This customer has had several returns with your store."
+      },
+      "basedOn": "Based on {n} orders.",
+      "suggest": {
+        "confirm_by_phone": "Confirm by phone before you ship.",
+        "ask_instapay_deposit": "Ask for an InstaPay deposit."
+      },
+      "advisory": "Advice only. The order is not held."
+    },
+    "courier": {
+      "best": "Best delivery record to this area: {carrier} ({rate} delivered, {n} orders). Your selection is unchanged."
+    }
+  },
+  "ciInsights": {
+    "title": "Customer Intelligence",
+    "subtitle": "Findings from the shared numbers of opted-in stores. Nothing changes until a person accepts it.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "Nothing here.",
+    "filter": "Filter by status",
+    "status": {
+      "new": "New",
+      "accepted": "Accepted",
+      "dismissed": "Dismissed"
+    },
+    "evidence": "{n} outcomes across {stores} stores, data up to {date}.",
+    "accept": "Accept",
+    "dismiss": "Dismiss",
+    "gates": {
+      "title": "Hint switches",
+      "body": "Turning one off stops that hint for every store. Calibration only alerts: closing a switch is your decision.",
+      "close": "Turn off",
+      "open": "Turn on",
+      "features": {
+        "cod_risk": "COD risk note",
+        "courier": "Courier suggestion",
+        "fee": "Shipping fee card"
+      }
+    }
   }
 }

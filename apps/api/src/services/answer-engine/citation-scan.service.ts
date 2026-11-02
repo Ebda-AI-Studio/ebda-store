@@ -31,7 +31,8 @@
  *     propagates out of `runCitationScan` — the whole store's scan always
  *     completes.
  */
-import { prisma, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { storeDb, storeWriter } from '../../lib/repo-factory';
 import logger from '../../lib/logger';
 import { isAiQuotaCapError } from '../../lib/ai-quota';
 import { recordUsage } from '../ai.service';
@@ -111,7 +112,9 @@ export async function runCitationScan(
   // store scan, bounded by engines × prompts rows.
   const alreadyChecked = new Set<string>();
   if (opts.runStartedAt) {
-    const prior = await prisma.answerEngineCheck.findMany({
+    const prior = await (
+      await storeDb(storeId)
+    ).answerEngineCheck.findMany({
       where: { storeId, runAt: { gte: opts.runStartedAt } },
       select: { engine: true, promptText: true, locale: true },
     });
@@ -192,8 +195,9 @@ export async function runCitationScan(
         // Savepointed: the scan runs inside `runInTenantContext`'s single
         // transaction and this catch swallows (issue 2215's class) — one
         // failed write must not abort the rest of the scan's writes.
+        const checkWriter = await storeWriter(storeId);
         await withSavepoint(() =>
-          prisma.answerEngineCheck.create({
+          checkWriter.answerEngineCheck.create({
             data: {
               storeId,
               engine: provider.engine,

@@ -28,6 +28,9 @@ export default defineConfig({
     // Workspace packages bundle from source, as in wrangler.jsonc's alias block.
     alias: {
       '@ebda/shared': here('../../packages/shared/src/index.ts'),
+      '@ebda-src/repo': here('../../packages/repo/src/index.ts'),
+      '@ebda-src/cf-schema': here('../../packages/cf-schema/src/store/migrations.generated.ts'),
+      '@ebda-src/prisma-meta': here('../../packages/cf-schema/generated/prisma-meta.json'),
     },
   },
   test: {

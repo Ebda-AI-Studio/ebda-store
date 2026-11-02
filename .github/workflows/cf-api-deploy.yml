@@ -51,6 +51,8 @@ jobs:
       # Cloudflare Images binding for PWA icon resizing (Ruling D1016-ICONS-1); unset = no binding.
       EBDA_IMAGES_BINDING: ${{ vars.EBDA_IMAGES_BINDING }}
       EBDA_KV_CACHE_ID: ${{ vars.EBDA_KV_CACHE_ID }}
+      # D1 ebda-platform (task 2.4): the per-store backend switch; the deploy config refuses to build without it.
+      EBDA_PLATFORM_D1_ID: ${{ vars.EBDA_PLATFORM_D1_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -87,6 +89,9 @@ jobs:
           SMOKE_PG_PORT: ${{ job.services.postgres.ports['5432'] }}
         run: bash scripts/ci/workerd-smoke.sh --config .wrangler.deploy.jsonc
       - name: Apply database migrations
+        # Skipped when repo var EBDA_SKIP_PG_MIGRATE=1 (Ruling CUTOVER-NOW-1): once the stores are on StoreDO + D1, Postgres is
+        # a read-only fallback that must never receive DDL, and while Neon is over its quota this step fails every deploy.
+        if: ${{ vars.EBDA_SKIP_PG_MIGRATE != '1' }}
         # Schema first, Worker second: a failed migrate fails the job, so no deploy runs
         # against a schema the new code does not match. The URL stays in step env (masked
         # by GitHub) and is never echoed. Owner role, direct host: DDL cannot go through
@@ -97,6 +102,11 @@ jobs:
         run: |
           test -n "$DATABASE_URL" || { echo "::error::EBDA_MIGRATE_DATABASE_URL is not set in the production environment"; exit 1; }
           npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+      # Same pattern as cf-accounts-deploy.yml (CF-MIGRATE-1): additive, idempotent (d1_migrations ledger), schema
+      # first. The Worker reads stores.storage_backend, so the column must exist before the new code serves.
+      - name: Apply D1 migrations (ebda-platform)
+        working-directory: apps/api
+        run: npx wrangler d1 migrations apply ebda-platform --remote --config .wrangler.deploy.jsonc
       - name: Record the version serving production (rollback target)
         id: previous
         run: node scripts/ci/deploy-guard.mjs previous --name ebda-api --cwd apps/api --config .wrangler.deploy.jsonc

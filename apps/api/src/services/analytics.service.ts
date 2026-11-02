@@ -1,5 +1,6 @@
-import { prisma, Prisma } from '@ebda/database';
+import { currentStoreId, prisma, Prisma } from '@ebda/database';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
+import { storeDb } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
@@ -248,7 +249,7 @@ export class AnalyticsService {
         this.getPeriodStats(storeId, startDate, endDate),
         this.getPeriodStats(storeId, prevStartDate, prevEndDate),
         this.getAllTimeCustomers(storeId),
-        prisma.product.count({
+        (await storeDb(storeId)).product.count({
           where: { storeId, status: 'active' },
         }),
         this.getViewsConversionRate(storeId, startDate, endDate),
@@ -377,7 +378,9 @@ export class AnalyticsService {
     startDate: Date,
     endDate: Date
   ): Promise<number | null> {
-    const agg = await prisma.funnelSnapshot.aggregate({
+    const agg = await (
+      await storeDb(currentStoreId())
+    ).funnelSnapshot.aggregate({
       where: { storeId, periodDate: { gte: startDate, lte: endDate } },
       _sum: { productViews: true, ordersCompleted: true },
     });
@@ -635,7 +638,9 @@ export class AnalyticsService {
 
     // Fetch product details for the top productIds in a single query
     const productIds = grouped.map(g => g.productId);
-    const products = await prisma.product.findMany({
+    const products = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where: { id: { in: productIds }, storeId },
       select: {
         id: true,
@@ -702,7 +707,9 @@ export class AnalyticsService {
     const productIds = grouped.map(g => g.productId);
     const productRevenueMap = new Map(grouped.map(g => [g.productId, g._sum.total ?? 0]));
 
-    const productCategories = await prisma.productCategory.findMany({
+    const productCategories = await (
+      await storeDb(storeId)
+    ).productCategory.findMany({
       where: { productId: { in: productIds } },
       include: { category: true },
     });

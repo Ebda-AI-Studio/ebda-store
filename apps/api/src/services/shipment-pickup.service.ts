@@ -18,6 +18,7 @@
  *  - Every request and cancel is audit-logged.
  */
 import { prisma, runInTenantContext } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
@@ -57,7 +58,9 @@ function addDays(date: string, days: number): string {
 }
 
 async function loadShipment(storeId: string, shipmentId: string) {
-  const shipment = await prisma.shipment.findFirst({ where: { id: shipmentId, storeId } });
+  const shipment = await (
+    await storeDb(storeId)
+  ).shipment.findFirst({ where: { id: shipmentId, storeId } });
   if (!shipment) throw new AppError(404, 'NOT_FOUND', 'Shipment not found');
   const impl = CARRIER_REGISTRY[shipment.carrier as CarrierCode] as
     | ShippingCarrierProvider

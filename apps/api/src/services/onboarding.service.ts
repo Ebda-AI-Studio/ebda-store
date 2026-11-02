@@ -10,6 +10,8 @@
  * COD payment config, subscription).
  */
 import { recordReferral } from './billing/grants.service';
+import { storeDb, storeUpdate } from '../lib/repo-factory';
+import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
   getLook,
@@ -121,7 +123,9 @@ export class OnboardingService {
     if (store) {
       // products, payment_configs and store_subscriptions are all store-scoped.
       const counts = await readInStoreContext(store.id, async () => ({
-        products: await prisma.product.count({ where: { storeId: store.id, deletedAt: null } }),
+        products: await (
+          await storeDb(store.id)
+        ).product.count({ where: { storeId: store.id, deletedAt: null } }),
         cod: await prisma.paymentConfig.count({
           where: { storeId: store.id, provider: 'cod', isEnabled: true },
         }),
@@ -281,6 +285,7 @@ export class OnboardingService {
             )
           );
         }
+        await sendOnboardingStepToCi(result.store.id, 'store_created');
         // Only a failed look application is reported (the default look is applied like a chosen one).
         const lookApplied = await this.applyChosenLook(result.store.id, look.id, owner.userId);
         return { store: result.store, lookApplied };
@@ -364,6 +369,7 @@ export class OnboardingService {
       });
     }
     await SetupGuideService.setManual(storeId, 'payment', true);
+    await sendOnboardingStepToCi(storeId, 'payment_methods');
     return { cod: methods.cod };
   }
 
@@ -388,9 +394,10 @@ export class OnboardingService {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');
       }
       await withStore(storeId, tx =>
-        tx.store.update({ where: { id: storeId }, data: { status: 'active' } })
+        storeUpdate(tx, { where: { id: storeId }, data: { status: 'active' } })
       );
       await bustStoreCaches(store.id, store.slug, store.domain);
+      await sendOnboardingStepToCi(store.id, 'went_live');
     }
     return {
       id: store.id,

@@ -4,9 +4,12 @@
  * Needs BOTH demo stores seeded locally (seed.mjs for storedemo, seed.mjs --template souq).
  */
 import { test, expect } from '@playwright/test';
-import { open, hostOf } from './helpers';
+import { open, hostOf, fetchVia } from './helpers';
 
 const SOUQ = 'storedemo-souq';
+
+// SOUQ_HOST_BASE (see helpers.ts): the production build uses `localhost-b5.test`, not `.localhost`.
+const HOST_BASE = (process.env.SOUQ_HOST_BASE ?? 'localhost').replace(/\./g, '\\.');
 
 test('storedemo-souq: bar, look switch, persistence, template switch, closed checkout, noindex', async ({
   page,
@@ -58,8 +61,8 @@ test('storedemo-souq: bar, look switch, persistence, template switch, closed che
     .click();
   await expect(page.locator('[data-demo-checkout-notice]').first()).toBeVisible();
   await expect(page.locator('button[type="submit"]')).toHaveCount(0);
-  const robots = await page.request.get(`${hostOf(SOUQ)}/robots.txt`);
-  expect(await robots.text()).not.toMatch(/^Disallow: \/$/m);
+  const robots = await fetchVia(page, `${hostOf(SOUQ)}/robots.txt`);
+  expect(robots.text).not.toMatch(/^Disallow: \/$/m);
 });
 
 test('template switch lands on the Qamar demo host with its look; each catalogue is absent from the other', async ({
@@ -67,15 +70,17 @@ test('template switch lands on the Qamar demo host with its look; each catalogue
 }) => {
   await open(page, SOUQ, 'ar', '/');
   await page.locator('select[data-demo-template]').selectOption('qamar');
-  await page.waitForURL(/\/\/storedemo\.localhost:\d+\/\?look=qamar\./);
+  await page.waitForURL(new RegExp(`//storedemo\\.${HOST_BASE}:\\d+/\\?look=qamar\\.`));
   await expect(page.locator('body')).toHaveAttribute('data-look', /^qamar\./);
   // The Qamar catalogue is not on the Souq demo, and the Souq catalogue is not on Qamar's.
-  expect((await page.request.get(`${hostOf(SOUQ)}/products/linen-abaya`)).status()).toBe(404);
-  expect((await page.request.get(`${hostOf('storedemo')}/products/smartphone-6-7`)).status()).toBe(
+  // a second page: the first must stay on the Qamar demo for the switch back
+  const probe = await page.context().newPage();
+  expect((await fetchVia(probe, `${hostOf(SOUQ)}/products/linen-abaya`)).status).toBe(404);
+  expect((await fetchVia(probe, `${hostOf('storedemo')}/products/smartphone-6-7`)).status).toBe(
     404
   );
   // And back: Souq's first built look comes with the switch.
   await page.locator('select[data-demo-template]').selectOption('souq');
-  await page.waitForURL(/\/\/storedemo-souq\.localhost:\d+\/\?look=souq\./);
+  await page.waitForURL(new RegExp(`//storedemo-souq\\.${HOST_BASE}:\\d+/\\?look=souq\\.`));
   await expect(page.locator('body')).toHaveAttribute('data-look', /^souq\./);
 });

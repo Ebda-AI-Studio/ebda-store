@@ -10,6 +10,8 @@ const pages = [
   '/no-such-page/',
   '/en/no-such-page/',
   '/en/',
+  '/whatsapp/',
+  '/en/whatsapp/',
   '/about/',
   '/en/about/',
   '/legal/',

@@ -42,8 +42,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'cf/store-do/repo.ts': {
     category: 'unrelated',
     reason:
-      'INFRA-CF-1 Phase 0 spike: the StoreDO copy of the demo store prices RETAIL only (no wholesale, no groups); reachable only for a flagged store plus x-ebda-backend: do. The PriceResolver port is Phase 3 (money correctness)',
-    reads: { addCartItem: 3, createOrder: 2 },
+      'INFRA-CF-1 Phase 0 demo operations of the StoreDO: seed writes the demo catalogue and listProducts shows RETAIL prices; both reachable only for a flagged store plus x-ebda-backend: do. The order path no longer prices anything here: createOrder hands the cart to the DO money core (packages/repo placeOrder), which resolves every price',
+    reads: { seed: 2, listProducts: 1 },
   },
   'services/gold-rate/gate.ts': {
     category: 'catalog-read',
@@ -73,8 +73,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/gold-rate/gold-rate.service.ts': {
     category: 'writer',
     reason:
-      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price; it also reads each variant's own price to refuse a fixed variant that has none (B5-36)",
-    reads: { setProductPricing: 6 },
+      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price; it also reads each variant's own price to refuse a fixed variant that has none (B5-36); the Durable Object branch (CF-LAST-1) reads the frozen price once more",
+    reads: { setProductPricing: 7 },
   },
   'services/cart.service.ts': {
     category: 'resolver-input',
@@ -104,8 +104,9 @@ const ALLOW: Record<string, AllowEntry> = {
   },
   'services/abandoned-cart.service.ts': {
     category: 'resolver-input',
-    reason: 'recovery totals via priceCart for the cart owner',
-    reads: { detectNewAbandonments: 5 },
+    reason:
+      'recovery totals via priceCart for the cart owner (the candidate include selects the variant price the resolver is fed)',
+    reads: { detectNewAbandonments: 4, '<module>': 1 },
   },
   'services/price-resolver.service.ts': {
     category: 'resolver-input',
@@ -287,10 +288,21 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'merchant tier writes validate against the current base price (Task 4)',
     reads: { loadProduct: 1, validate: 3, list: 3 },
   },
+  'services/catalog-import.service.ts': {
+    category: 'writer',
+    reason:
+      'publish verifies a catalogue-import DRAFT has a price above zero (a draft cannot be bought); it reads the stored base price to refuse a zero-price publish, never to price a sale',
+    reads: { publishItems: 5 },
+  },
   'services/bulk.service.ts': {
     category: 'writer',
     reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',
-    reads: { createVariantsForProductTx: 1, exportProducts: 2, importProducts: 7 },
+    reads: {
+      buildProductFields: 1,
+      createVariantsForProductTx: 1,
+      exportProducts: 2,
+      importProducts: 6,
+    },
   },
   'routes/bulk.routes.ts': {
     category: 'writer',
@@ -310,7 +322,7 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/variant.service.ts': {
     category: 'writer',
     reason: 'variant price edits',
-    reads: { createVariant: 1, createVariantRow: 1, getProductVariants: 1 },
+    reads: { createVariant: 2, createVariantRow: 1, getProductVariants: 1 },
   },
   'routes/product.routes.ts': {
     category: 'writer',

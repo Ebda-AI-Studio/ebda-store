@@ -27,12 +27,20 @@ import { resolve } from 'path';
 
 const findFirst = vi.fn();
 vi.mock('@ebda/database', () => ({
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn((await import('./helpers/invoice-repo-mock')).platformTx()),
   prisma: {
     fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
     order: { findFirst: (...a: unknown[]) => findFirst(...a) },
     store: { findUnique: vi.fn() },
   },
 }));
+vi.mock('@api/lib/repo-factory', async () =>
+  (await import('./helpers/invoice-repo-mock')).repoFactoryMock()
+);
+vi.mock('@api/lib/jobs/store-db', async () =>
+  (await import('./helpers/invoice-repo-mock')).storeDbMock()
+);
 vi.mock('@api/services/store-mailer.service', () => ({
   StoreMailer: { sendBrandedEmail: vi.fn() },
 }));

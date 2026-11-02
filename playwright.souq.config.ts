@@ -3,9 +3,12 @@ import { defineConfig, devices } from '@playwright/test';
 // Souq looks (Phase B2 Task 7): scenario matrix + demo-bar checks against a LOCAL stack.
 // Needs the seeded stores: scripts/storedemo/seed.mjs --template souq --local-look-stores and
 // scripts/storedemo/scenario-stores.mjs, and the host->store dev proxy on SOUQ_PORT
-// (store hosts are <slug>.localhost:<port>). Not part of CI.
+// (store hosts are <slug>.<SOUQ_HOST_BASE>:<port>, default localhost). Not part of CI.
 const PORT = process.env.SOUQ_PORT ?? '3200';
+const HOST_BASE = process.env.SOUQ_HOST_BASE ?? 'localhost';
 const BASE = process.env.SOUQ_BASE_URL ?? `http://localhost:${PORT}`;
+const hostMap =
+  HOST_BASE !== 'localhost' ? { args: [`--host-resolver-rules=MAP *.${HOST_BASE} 127.0.0.1`] } : {};
 
 export default defineConfig({
   testDir: './tests/souq',
@@ -18,6 +21,7 @@ export default defineConfig({
   use: {
     baseURL: BASE,
     navigationTimeout: 90_000,
+    launchOptions: hostMap,
     // SOUQ_CHANNEL=chrome drives an installed Chrome when no Playwright chromium is cached.
     ...(process.env.SOUQ_CHANNEL ? { channel: process.env.SOUQ_CHANNEL } : {}),
   },

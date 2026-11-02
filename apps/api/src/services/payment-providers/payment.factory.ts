@@ -12,6 +12,8 @@ import {
 } from '../payment-state-claims';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
+import { sendEventAfterCommit } from '../../lib/inngest/send-after-commit';
+import { CI_PAYMENT_FAILED_EVENT } from '../../lib/ci/events';
 import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
 import { CardTestingGuard } from '../card-testing-guard.service';
@@ -72,6 +74,13 @@ import {
 
 import { REGION } from '@ebda/shared';
 import { paymentWebhookUrl } from './webhook-url';
+import {
+  storeDb,
+  storeMoney,
+  storeRepo,
+  type MoneyClient,
+  type DoWebhookInput,
+} from '../../lib/repo-factory';
 // ==========================================
 // Payment Factory
 // Database-driven configuration for payment providers
@@ -168,18 +177,26 @@ class PaymentFactory {
       // There are no platform-level (storeId NULL) configs for the app role: strict RLS
       // hides NULL-store rows and the code-level tenant guard refuses an unscoped read
       // (R-EBDA-007), so the old "fall back to global" read could only ever return nothing.
+      // A store on its Durable Object keeps its provider rows THERE (Ruling CF-JOBS-4): a job or webhook for it must read
+      // that copy, not the sealed Postgres rows. `storeRepo` is the pg proxy for a Postgres store, so that path is unchanged.
+      const repo = storeId === null ? null : await storeRepo(storeId);
       const dbConfigs =
         storeId === null
           ? []
-          : await withStore(storeId, () =>
-              prisma.paymentConfig.findMany({
-                where: {
-                  storeId: storeId,
-                  isEnabled: true,
-                },
+          : repo?.backend === 'do'
+            ? await repo.db.paymentConfig.findMany({
+                where: { storeId, isEnabled: true },
                 orderBy: { provider: 'asc' },
               })
-            );
+            : await withStore(storeId, () =>
+                prisma.paymentConfig.findMany({
+                  where: {
+                    storeId: storeId,
+                    isEnabled: true,
+                  },
+                  orderBy: { provider: 'asc' },
+                })
+              );
 
       // There is NO environment-variable fallback: providers come only from a
       // paymentConfig row the merchant saved in settings (their own keys), so a
@@ -876,7 +893,7 @@ export class PaymentService {
     storeId?: string
   ): Promise<void> {
     try {
-      await PaymentService.recordCreatedPayment(providerName, request, response);
+      await PaymentService.recordCreatedPayment(providerName, request, response, storeId);
     } catch (err) {
       await alertOrphanedProviderInvoice({
         storeId: storeId ?? 'unknown',
@@ -896,8 +913,23 @@ export class PaymentService {
   private static async recordCreatedPayment(
     providerName: string,
     request: CreatePaymentRequest,
-    response: PaymentResponse
+    response: PaymentResponse,
+    storeId?: string
   ): Promise<void> {
+    // Store on its Durable Object (Ruling CF-PAY-1): the payment row, its `created` event and the entity-index rows are ONE section.
+    const orderStore = await PaymentService.doStoreOfOrder(storeId);
+    if (orderStore) {
+      await orderStore.money.paymentCreate({
+        orderId: request.orderId,
+        provider: providerName,
+        amount: request.amount,
+        currency: request.currency,
+        transactionId: response.transactionId ?? null,
+        invoiceId: response.invoiceId ?? null,
+        paymentUrl: response.paymentUrl || null,
+      });
+      return;
+    }
     const payment = await prisma.payment.create({
       data: {
         orderId: request.orderId,
@@ -945,11 +977,15 @@ export class PaymentService {
     provider?: PaymentProvider,
     storeId?: string
   ): Promise<PaymentStatusResponse> {
-    // Try to find the payment in database to get the provider
-    const payment = await prisma.payment.findFirst({
-      where: { transactionId },
-      include: { order: { include: { store: true } } },
-    });
+    // Try to find the payment in database to get the provider. A caller that already names the provider AND the store
+    // (the auto-cancel sweep, for a store on its Durable Object whose payment is not in Postgres) needs no lookup.
+    const payment =
+      provider && storeId
+        ? null
+        : await prisma.payment.findFirst({
+            where: { transactionId },
+            include: { order: { include: { store: true } } },
+          });
 
     const providerName = provider || (payment?.provider as PaymentProvider) || undefined;
     const effectiveStoreId = storeId || payment?.order?.storeId;
@@ -1137,6 +1173,10 @@ export class PaymentService {
 
     // transactionId is not unique (issue 769 / Ruling AMS-2): a collision
     // must never pick an arbitrary row to refund. Read two; refuse on more.
+    if (storeId) {
+      const money = await storeMoney(storeId);
+      if (money) return PaymentService.refundOnDo(money, request, provider, storeId);
+    }
     const refundMatches = await prisma.payment.findMany({
       where: { transactionId: request.transactionId },
       include: { order: { include: { store: true } } },
@@ -1664,6 +1704,13 @@ export class PaymentService {
       storeId,
       rawBody
     );
+
+    // Store on its Durable Object (Ruling CF-PAY-1): lookup, confirm-before-apply, the state claims and the audit rows are
+    // ONE section there; the Worker only does the gateway confirmation and the post-commit work.
+    if (storeId) {
+      const money = await storeMoney(storeId);
+      if (money) return PaymentService.handleWebhookOnDo(money, p, provider, webhookData, storeId);
+    }
 
     // Find and update payment. Include `order.customer` + `order.store` so we
     // can render the customer's name and store name in the post-status
@@ -2435,6 +2482,21 @@ export class PaymentService {
         webhookData.status === 'expired' ||
         webhookData.status === 'cancelled')
     ) {
+      // CI-13: the webhook that won the `unpaid -> failed` claim reports the outcome (never blocks it).
+      await sendEventAfterCommit(
+        'ci-payment-failed',
+        {
+          name: CI_PAYMENT_FAILED_EVENT,
+          data: {
+            storeId: order.storeId,
+            orderId: order.id,
+            paymentId: payment.id,
+            kind: webhookData.status,
+            at: new Date().toISOString(),
+          },
+        },
+        { ifUnhookable: 'send' }
+      );
       // Card-testing bookkeeping (SP5 task 4): only a DECLINE counts, not a
       // customer who cancelled / let the invoice expire. Idempotent per payment
       // (webhooks retry) and never throws.
@@ -2476,6 +2538,440 @@ export class PaymentService {
     }
 
     return { success: true, status: webhookData.status, orderId: payment.orderId };
+  }
+
+  /** The DO money client of the store that owns `request.orderId`, or null (Postgres). The store comes from the request. */
+  private static async doStoreOfOrder(storeId?: string): Promise<{ money: MoneyClient } | null> {
+    const sid = storeId ?? currentStoreIdOrNull();
+    if (!sid) return null;
+    const money = await storeMoney(sid);
+    return money ? { money } : null;
+  }
+
+  /**
+   * A webhook for a store on its Durable Object (Ruling CF-PAY-1). The signature was verified by `verifyWebhookDelivery`.
+   * A gateway whose delivery leaves a money-deciding field unsigned (Kashier) is confirmed server-to-server HERE, outside the
+   * DO, and ONLY the gateway's answer is applied; no answer = 503 and nothing written. The DO applies it in one section and a
+   * replay of the same signed event applies once. External money facts are recorded in full: the engine alerts, it never
+   * rejects a refund the gateway says happened.
+   */
+  private static async handleWebhookOnDo(
+    money: MoneyClient,
+    p: IPaymentProvider,
+    provider: PaymentProvider,
+    delivered: WebhookPayload,
+    storeId: string
+  ): Promise<{ success: boolean; status?: string; orderId?: string }> {
+    let data = delivered;
+    let confirmed: { kind: string; status: string } | null = null;
+    if (p.confirmWebhook) {
+      try {
+        const out = await p.confirmWebhook(delivered);
+        data = out.payload;
+        // the DO folds the gateway record back to SUCCESS / FAILURE / PENDING; the payload it applies is the confirmed one
+        const folded = data.refund ? data.refund.status : data.status;
+        confirmed = {
+          kind: data.refund ? 'refund' : 'payment',
+          status:
+            folded === 'completed'
+              ? 'SUCCESS'
+              : folded === 'failed' || folded === 'expired' || folded === 'cancelled'
+                ? 'FAILURE'
+                : 'PENDING',
+        };
+        if (out.confirmation.mismatch)
+          void sendAlert({
+            level: 'p1',
+            scope: 'store',
+            store: { id: storeId, name: storeId },
+            source: 'payment.webhook.unconfirmed_label',
+            title: `${provider} webhook label disagreed with the gateway - ${data.transactionId}`,
+            body: `A signed ${provider} delivery claimed ${out.confirmation.claimed.kind}/${out.confirmation.claimed.status}, but the gateway's own record says ${out.confirmation.confirmed.kind}/${out.confirmation.confirmed.status}. Only the gateway record was applied.`,
+            context: {
+              provider,
+              storeId,
+              claimed: out.confirmation.claimed,
+              confirmed: out.confirmation.confirmed,
+            },
+          }).catch(() => undefined);
+      } catch (err) {
+        throw new AppError(
+          503,
+          'WEBHOOK_UNCONFIRMED',
+          `The gateway could not confirm this webhook; it was not applied and will be retried (${(err instanceof Error ? err.message : String(err)).slice(0, 200)})`
+        );
+      }
+    }
+    // The signed event identity: deterministic from the verified payload, so a true redelivery collides and a later,
+    // different status of the same payment does not.
+    const eventId = [
+      data.event,
+      data.refund?.refundId ?? '',
+      data.transactionId,
+      data.refund?.status ?? data.status,
+      data.refund?.amount ?? data.amount,
+    ].join(':');
+    const base = {
+      provider,
+      eventId,
+      kind: data.refund ? ('refund' as const) : ('payment' as const),
+      event: data.event,
+      status: data.status,
+      amount: data.amount,
+      currency: data.currency,
+      paidAt: data.paidAt ? data.paidAt.getTime() : null,
+      paymentMethod: data.paymentMethod ?? null,
+      refund: data.refund
+        ? {
+            refundId: data.refund.refundId,
+            status: data.refund.status,
+            amount: data.refund.amount ?? null,
+            refundReference: data.refund.refundReference ?? null,
+          }
+        : undefined,
+      rawPayload: data.rawPayload,
+    } satisfies Omit<DoWebhookInput, 'providerRef'>;
+    let result;
+    try {
+      // The reference the payment was created with: the transaction id, else the invoice id.
+      try {
+        result = await money.paymentWebhook({
+          input: { ...base, providerRef: data.transactionId },
+          confirmed,
+        });
+      } catch (e) {
+        if (!(e instanceof AppError && e.code === 'PAYMENT_NOT_FOUND' && data.invoiceId)) throw e;
+        result = await money.paymentWebhook({
+          input: { ...base, providerRef: data.invoiceId },
+          confirmed,
+        });
+      }
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'PAYMENT_NOT_FOUND') {
+        logger.error(
+          { transactionId: data.transactionId, storeId },
+          '[PAYMENT WEBHOOK] Payment not found in the store Durable Object'
+        );
+        return { success: true, orderId: undefined }; // acknowledged, as on Postgres
+      }
+      throw e;
+    }
+    for (const a of result.alerts)
+      void sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: storeId, name: storeId },
+        source: `payment.webhook.${a.kind}`,
+        title: `${provider} webhook: ${a.kind}`,
+        body: a.body,
+        context: { storeId, paymentId: a.paymentId, orderId: a.orderId, ...(a.context ?? {}) },
+      }).catch(() => undefined);
+    if (result.outcome === 'applied') {
+      await PaymentService.afterWebhookOnDo(storeId, provider, result);
+    }
+    return { success: true, status: result.paymentStatus, orderId: result.orderId };
+  }
+
+  /**
+   * A payment the gateway itself reports CAPTURED, found by a poll rather than a webhook (the auto-cancel sweep), applied to a
+   * store on its Durable Object through the same `paymentWebhook` section a delivered webhook uses (Ruling CF-JOBS-4). The
+   * status came from a server-to-server call, so it is the confirmed gateway record; a replay of the same capture applies once.
+   * Throws the engine's refusal (for example `INVALID_STATUS_TRANSITION` when the order already left pending) for the caller.
+   */
+  static async applyCapturedStatusOnDo(
+    storeId: string,
+    payment: { provider: string; transactionId: string; amount: number; currency?: string },
+    providerStatus: { paidAmount?: number; paidCurrency?: string; currency?: string }
+  ): Promise<{ outcome: string; orderId: string }> {
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(500, 'NOT_A_DO_STORE', 'store is not served by its Durable Object');
+    const result = await money.paymentWebhook({
+      input: {
+        provider: payment.provider,
+        eventId: `status-poll:${payment.transactionId}:completed`,
+        providerRef: payment.transactionId,
+        kind: 'payment',
+        status: 'completed',
+        amount: providerStatus.paidAmount ?? payment.amount,
+        currency:
+          providerStatus.paidCurrency ?? providerStatus.currency ?? payment.currency ?? null,
+        rawPayload: { source: 'auto_cancel_sweep' },
+      },
+      confirmed: { kind: 'payment', status: 'SUCCESS' },
+    });
+    for (const a of result.alerts)
+      void sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: storeId, name: storeId },
+        source: `payment.webhook.${a.kind}`,
+        title: `${payment.provider} status poll: ${a.kind}`,
+        body: a.body,
+        context: { storeId, paymentId: a.paymentId, orderId: a.orderId, ...(a.context ?? {}) },
+      }).catch(() => undefined);
+    if (result.outcome === 'applied')
+      await PaymentService.afterWebhookOnDo(storeId, payment.provider as PaymentProvider, result);
+    return { outcome: result.outcome, orderId: result.orderId };
+  }
+
+  /** The post-commit work of an applied webhook: the same fan-out as the Postgres branch. */
+  private static async afterWebhookOnDo(
+    storeId: string,
+    provider: PaymentProvider,
+    r: Awaited<ReturnType<MoneyClient['paymentWebhook']>>
+  ): Promise<void> {
+    await invalidateCustomersCache(storeId);
+    const order = await (
+      await storeDb(storeId)
+    ).order.findFirst({
+      where: { id: r.orderId, storeId },
+      select: {
+        id: true,
+        orderNumber: true,
+        total: true,
+        currency: true,
+        locale: true,
+        shippingAddress: true,
+      },
+    });
+    if (!order) return;
+    const addr = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+    const customerName =
+      `${addr.firstName ?? ''} ${addr.lastName ?? ''}`.trim() || addr.email || 'Customer';
+    if (r.postCommit.includes('order_paid')) {
+      void recordPaymentSettled({ storeId, provider, paymentId: r.paymentId });
+      inngest
+        .send({
+          name: 'order/created',
+          data: {
+            orderId: order.id,
+            storeId,
+            paymentMethod: provider,
+            locale: order.locale ?? undefined,
+          },
+        })
+        .catch((err: unknown) =>
+          logger.error(
+            { err, orderId: order.id },
+            '[PAYMENT WEBHOOK] Failed to enqueue post-payment order/created'
+          )
+        );
+      try {
+        socketService.newOrderNotification(storeId, {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          customerName,
+        });
+      } catch (err) {
+        logger.error({ err, orderId: order.id }, '[PAYMENT WEBHOOK] Socket emit failed');
+      }
+    }
+    if (r.postCommit.includes('payment_failed')) {
+      if (r.paymentStatus === 'failed')
+        void CardTestingGuard.recordDecline({ storeId, orderId: order.id, paymentId: r.paymentId });
+      OneSignalService.notifyAdminsOfPaymentFailure({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        storeId,
+        storeName: storeId,
+        customerName,
+        total: order.total,
+        currency: order.currency,
+        paymentMethod: provider,
+        reason: r.paymentStatus,
+      }).catch(err =>
+        logger.error(
+          { err, orderId: order.id },
+          '[PAYMENT WEBHOOK] Payment-failure notification failed'
+        )
+      );
+    }
+    if (r.postCommit.includes('order_reversed'))
+      // the money steps ran in the DO section (idempotent); the fan-out sends the GL reversal and the notifications
+      await OrderService.applyRefundEffects(storeId, r.orderId);
+  }
+
+  /**
+   * PaymentService.refund for a store on its Durable Object (Ruling CF-PAY-1): the claim is committed BEFORE the provider
+   * call, the outcome AFTER it, each as one DO section; a double attempt for one refundKey is refused (REFUND_ALREADY_ISSUED)
+   * and a second claim cannot exceed the payment balance (the DO thread replaces the payment row lock).
+   */
+  private static async refundOnDo(
+    money: MoneyClient,
+    request: RefundRequest,
+    provider: PaymentProvider | undefined,
+    storeId: string
+  ): Promise<RefundResponse & { wholeOrderEffectsApplied: boolean }> {
+    if (!request.transactionId) {
+      throw new AppError(
+        400,
+        'PAYMENT_NOT_REFUNDABLE',
+        'This payment has no provider transaction and cannot be refunded at the gateway. Use a manual refund method.'
+      );
+    }
+    const db = await storeDb(storeId);
+    const matches = await db.payment.findMany({
+      where: { transactionId: request.transactionId, order: { storeId } },
+      select: {
+        id: true,
+        orderId: true,
+        provider: true,
+        status: true,
+        amount: true,
+        refundedAmount: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
+    });
+    if (matches.length > 1)
+      throw new AppError(
+        409,
+        'AMBIGUOUS_PAYMENT',
+        'This transaction id matches more than one payment. Refund it from the provider dashboard and contact support.'
+      );
+    const payment = matches[0];
+    if (!payment) throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+    if (payment.provider === 'instapay')
+      throw new AppError(
+        409,
+        'MANUAL_PROVIDER_REFUND',
+        'InstaPay payments are refunded by the merchant outside the system. Use a manual refund.'
+      );
+    if (request.amount != null && request.amount <= 0)
+      throw new AppError(
+        400,
+        'INVALID_REFUND_AMOUNT',
+        'Refund amount must be greater than zero. Omit it to refund the full payment.'
+      );
+    const alreadyRefunded = payment.refundedAmount ?? 0;
+    const refundableRemaining = payment.amount - alreadyRefunded;
+    let claim;
+    try {
+      claim = await money.refundBegin({
+        paymentId: payment.id,
+        amount: request.amount ?? undefined,
+        refundKey: request.refundKey,
+        reason: request.reason,
+        itemLevel: request.itemLevel,
+      });
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'PAYMENT_FULLY_REFUNDED')
+        throw new AppError(
+          400,
+          'ALREADY_REFUNDED',
+          'This payment has already been refunded in full.'
+        );
+      throw e;
+    }
+    const providerName = provider || (payment.provider as PaymentProvider);
+    const release = async (reason: string, err: unknown) => {
+      try {
+        await money.refundRelease({
+          claimId: claim.claimId,
+          reason,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } catch (releaseError) {
+        logger.error(
+          { err: releaseError, paymentId: payment.id, claimId: claim.claimId },
+          '[PAYMENT] failed to release refund claim after a refund that was not sent - balance overstated, manual reconciliation required'
+        );
+      }
+    };
+    let providerImpl: IPaymentProvider;
+    try {
+      providerImpl = await factory.getProvider(providerName, storeId);
+    } catch (resolveError) {
+      await release('provider_unavailable', resolveError);
+      throw resolveError;
+    }
+    let response: RefundResponse;
+    try {
+      response = await providerImpl.refund({
+        transactionId: request.transactionId,
+        reason: request.reason,
+        amount:
+          request.amount == null && alreadyRefunded > 0 ? refundableRemaining : request.amount,
+      });
+    } catch (providerError) {
+      if (providerError instanceof ProviderRejectedError) {
+        await release('provider_rejected', providerError);
+        throw providerError;
+      }
+      await money
+        .refundIndeterminate({
+          claimId: claim.claimId,
+          error: providerError instanceof Error ? providerError.message : String(providerError),
+        })
+        .catch(eventError =>
+          logger.error(
+            { err: eventError, paymentId: payment.id, claimId: claim.claimId },
+            '[PAYMENT] failed to record an indeterminate refund - the claim stands, reconcile manually'
+          )
+        );
+      throw markRefundMayHaveExecuted(
+        new AppError(
+          502,
+          'PROVIDER_REFUND_INDETERMINATE',
+          'The payment provider did not confirm the refund (timeout or server error), so it may have gone through. It is recorded as pending reconciliation - check the provider dashboard before refunding again.'
+        )
+      );
+    }
+    // The provider moved the money: an EXTERNAL fact. Record it; a failure here is told to the caller as "may have executed".
+    try {
+      await money.refundComplete({
+        claimId: claim.claimId,
+        refundId: response.refundId as string,
+        providerStatus: response.status,
+        reason: request.reason,
+      });
+      await invalidateCustomersCache(storeId);
+    } catch (txError) {
+      logger.error(
+        {
+          err: txError,
+          paymentId: payment.id,
+          refundId: response.refundId,
+          refundAmount: claim.amount,
+        },
+        '[PAYMENT] DO section failed AFTER provider refund succeeded - manual reconciliation required'
+      );
+      throw markRefundMayHaveExecuted(txError);
+    }
+    if (claim.flipsOrder) {
+      try {
+        // `refundComplete` already reversed the whole order in its own section (Ruling CF-OPUS-4); this keyed call is an
+        // idempotent no-op that only finishes a claim completed before that change, then the fan-out
+        await money.refundBook({ orderId: payment.orderId, external: true });
+        await OrderService.applyRefundEffects(storeId, payment.orderId);
+      } catch (effectsError) {
+        throw markRefundMayHaveExecuted(effectsError);
+      }
+    } else if (!request.refundKey && response.refundId) {
+      try {
+        await OrderService.recordRefundOutsideReturn(
+          storeId,
+          payment.orderId,
+          { providerRefundId: response.refundId, amount: claim.amount },
+          { sendNow: true }
+        );
+      } catch (sendError) {
+        logger.error(
+          { err: sendError, paymentId: payment.id, orderId: payment.orderId },
+          '[PAYMENT] partial refund outside a return: order/refunded not sent - the GL entry is missing'
+        );
+        await alertUnbookedRefund({
+          kind: 'partial_no_gl',
+          store: { id: storeId, name: storeId },
+          orderRef: payment.orderId,
+          body: `A partial refund of ${claim.amount} piastres was sent to the provider outside a return, but its ledger event could not be queued: book it by hand.`,
+          context: { paymentId: payment.id, orderId: payment.orderId, claimId: claim.claimId },
+        });
+      }
+    }
+    return { ...response, wholeOrderEffectsApplied: claim.flipsOrder };
   }
 
   /**
@@ -2560,5 +3056,14 @@ export class PaymentService {
    */
   static clearCache(storeId?: string): void {
     factory.clearCache(storeId);
+  }
+}
+
+/** The ambient store id, or null outside a store scope (never throws). */
+function currentStoreIdOrNull(): string | null {
+  try {
+    return currentStoreId() || null;
+  } catch {
+    return null;
   }
 }

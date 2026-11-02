@@ -1,4 +1,6 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -95,8 +97,13 @@ const bulkAiTagsFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
@@ -112,11 +119,11 @@ const bulkAiTagsFn = inngest.createFunction(
           where: { id: storeId },
           select: { name: true },
         });
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, status: 'active', deletedAt: null },
           select: { id: true },
         });
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: products.length },
         });
@@ -136,7 +143,7 @@ const bulkAiTagsFn = inngest.createFunction(
         const batchIds = batches[i];
 
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -154,7 +161,7 @@ const bulkAiTagsFn = inngest.createFunction(
 
           // Store-wide tag cache rebuilt fresh for THIS batch — sees every
           // Tag row created by earlier batches (already persisted to DB).
-          const existingTags = await prisma.tag.findMany({
+          const existingTags = await sdb.tag.findMany({
             where: { storeId },
             select: { id: true, name: true },
           });
@@ -162,7 +169,7 @@ const bulkAiTagsFn = inngest.createFunction(
           const existingTagNames = existingTags.map(t => t.name);
 
           // Fresh per-item read — the idempotency re-check.
-          const items = await prisma.product.findMany({
+          const items = await sdb.product.findMany({
             where: { id: { in: batchIds }, storeId },
             select: {
               id: true,
@@ -223,7 +230,9 @@ const bulkAiTagsFn = inngest.createFunction(
                 const key = name.toLowerCase();
                 let tagId = tagByLowerName.get(key);
                 if (!tagId) {
-                  const created = await prisma.tag.create({ data: { storeId, name } });
+                  const created = await (
+                    await storeWriter(storeId)
+                  ).tag.create({ data: { storeId, name } });
                   tagId = created.id;
                   tagByLowerName.set(key, tagId);
                   existingTagNames.push(name);
@@ -236,7 +245,9 @@ const bulkAiTagsFn = inngest.createFunction(
               if (toLink.length === 0) {
                 bSkipped++;
               } else {
-                await prisma.productTag.createMany({
+                await (
+                  await storeWriter(storeId)
+                ).productTag.createMany({
                   data: toLink.map(tagId => ({ productId: product.id, tagId })),
                   skipDuplicates: true,
                 });
@@ -286,7 +297,7 @@ const bulkAiTagsFn = inngest.createFunction(
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
@@ -322,12 +333,12 @@ const bulkAiTagsFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await step.run('finalize', async () => {
-        const finalRow = await prisma.bulkAiJob.findUnique({
+        const finalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',

@@ -11,6 +11,13 @@
  *   6. (C1) store_admin without MFA hits GET /stores (store.routes) → NOT blocked by MFA gate.
  *   7. (C1) enrolled super_admin hits GET /stores → passes (200).
  *
+ * Identity model (Rulings ID-1/ID-2): super admins and merchants no longer log in at the Store, so each user here is a row
+ * plus the ES256 token the identity service would issue (tests/helpers/identity-session.ts). Two assertions of the old file moved:
+ *   - "login -> /auth/mfa/enroll/begin" for a super_admin: enrollment is now managed at the identity service, and the Store
+ *     answers 409 USE_IDENTITY_SERVICE (asserted below); the Store-side gate still reads the mirrored `mfaEnabled` flag.
+ *   - "enroll + login challenge -> /auth/mfa/verify -> token for an enrolled super_admin": the enrolled state is now set on the
+ *     row directly; the Store's TOTP challenge flow itself is covered for customers in mfa.test.ts.
+ *
  * Requires the API running on TEST_API_URL (default http://localhost:4000) and
  * local Postgres + Redis accessible.
  */
@@ -18,24 +25,35 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
-import { encryption } from '../../apps/api/src/services/encryption.service';
-import { MfaService } from '../../apps/api/src/services/mfa.service';
 import { API_BASE } from '../helpers/api-base';
+import { identityTokenFor } from '../helpers/identity-session';
 
 // One knob configures the whole suite; see tests/helpers/api-base.ts for why
-// it is TEST_API_URL rather than the server's own API_URL or API_HOST. The
-// encryption.service import above is exactly the hazard: it runs
-// dotenv.config() before this line, so root-.env values would win.
+// it is TEST_API_URL rather than the server's own API_URL or API_HOST.
 const API = API_BASE;
 const PW = 'Test1234!pw';
 const SUPER_EMAIL = `mfa-enf-super-${Date.now()}@example.test`;
 const STORE_EMAIL = `mfa-enf-store-${Date.now()}@example.test`;
 const ENROLLED_SUPER_EMAIL = `mfa-enf-enrolled-${Date.now()}@example.test`;
 
-// Clean up before AND after the suite. The beforeAll handles stale rows from
-// a previous aborted run or from vitest's retry:1 policy (module-level
-// constants reuse the same email on every retry within the same run).
+async function mkUser(email: string, role: 'super_admin' | 'store_admin', mfa = false) {
+  await prisma.user.deleteMany({ where: { email } });
+  return prisma.user.create({
+    data: {
+      email,
+      passwordHash: await bcrypt.hash(PW, 10),
+      firstName: 'Mfa',
+      lastName: 'Enf',
+      role,
+      emailVerified: true,
+      storeId: null,
+      // Mirrored flag the Store's requireMfaEnrolled gate reads (the secret itself lives at the identity service).
+      ...(mfa ? { mfaEnabled: true, mfaSecret: 'enc:test-mfa-secret' } : {}),
+    },
+  });
+}
+
+// Clean up before AND after the suite (stale rows from an aborted run).
 beforeAll(async () => {
   await prisma.user.deleteMany({
     where: { email: { in: [SUPER_EMAIL, STORE_EMAIL, ENROLLED_SUPER_EMAIL] } },
@@ -49,31 +67,8 @@ afterAll(async () => {
 
 describe('Task 9: super_admin MFA enforcement (admin.routes)', () => {
   it('super_admin without MFA is blocked (403 MFA_SETUP_REQUIRED) on a protected admin route', async () => {
-    // Create super_admin — mfaEnabled defaults false. Delete first for
-    // idempotency under vitest's retry:1 policy.
-    await prisma.user.deleteMany({ where: { email: SUPER_EMAIL } });
-    await prisma.user.create({
-      data: {
-        email: SUPER_EMAIL,
-        passwordHash: await bcrypt.hash(PW, 10),
-        firstName: 'Super',
-        lastName: 'NoMfa',
-        role: 'super_admin',
-        emailVerified: true,
-        storeId: null,
-      },
-    });
-
-    // Login (no MFA enrolled → normal token issued)
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SUPER_EMAIL, password: PW }),
-    });
-    expect(loginRes.status).toBe(200);
-    const { data } = await loginRes.json();
-    const token = data.accessToken as string;
-    expect(token).toBeTruthy();
+    const u = await mkUser(SUPER_EMAIL, 'super_admin');
+    const token = await identityTokenFor(u.id);
 
     // Hit a protected admin route — must be blocked
     const adminRes = await fetch(`${API}/admin/stores`, {
@@ -85,14 +80,8 @@ describe('Task 9: super_admin MFA enforcement (admin.routes)', () => {
   });
 
   it('super_admin without MFA can still reach /auth/me (auth route is exempt)', async () => {
-    // Re-login to get a fresh token for the same user
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SUPER_EMAIL, password: PW }),
-    });
-    const { data } = await loginRes.json();
-    const token = data.accessToken as string;
+    const u = await prisma.user.findFirstOrThrow({ where: { email: SUPER_EMAIL } });
+    const token = await identityTokenFor(u.id);
 
     const meRes = await fetch(`${API}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -101,48 +90,23 @@ describe('Task 9: super_admin MFA enforcement (admin.routes)', () => {
     expect(meRes.status).toBe(200);
   });
 
-  it('super_admin without MFA can still reach /auth/mfa/enroll/begin (enrollment route is exempt)', async () => {
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SUPER_EMAIL, password: PW }),
-    });
-    const { data } = await loginRes.json();
-    const token = data.accessToken as string;
+  it('super_admin without MFA gets 409 USE_IDENTITY_SERVICE on /auth/mfa/enroll/begin (enrollment moved to the identity service, and the route is not MFA-gated)', async () => {
+    const u = await prisma.user.findFirstOrThrow({ where: { email: SUPER_EMAIL } });
+    const token = await identityTokenFor(u.id);
 
     const beginRes = await fetch(`${API}/auth/mfa/enroll/begin`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    // Must succeed (200) — not gated by requireMfaEnrolled
-    expect(beginRes.status).toBe(200);
+    // Not 403 MFA_SETUP_REQUIRED: the enrollment route stays exempt from the gate; it answers with the identity-service rule.
+    expect(beginRes.status).toBe(409);
     const beginBody = await beginRes.json();
-    expect(beginBody.data.secret).toBeTruthy();
+    expect(beginBody.error.code).toBe('USE_IDENTITY_SERVICE');
   });
 
   it('store_admin without MFA is NOT blocked by the MFA gate on /admin/stores', async () => {
-    // Create store_admin — mfaEnabled defaults false. Delete first for idempotency.
-    await prisma.user.deleteMany({ where: { email: STORE_EMAIL } });
-    await prisma.user.create({
-      data: {
-        email: STORE_EMAIL,
-        passwordHash: await bcrypt.hash(PW, 10),
-        firstName: 'Store',
-        lastName: 'Admin',
-        role: 'store_admin',
-        emailVerified: true,
-        storeId: null,
-      },
-    });
-
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: STORE_EMAIL, password: PW }),
-    });
-    expect(loginRes.status).toBe(200);
-    const { data } = await loginRes.json();
-    const token = data.accessToken as string;
+    const u = await mkUser(STORE_EMAIL, 'store_admin');
+    const token = await identityTokenFor(u.id);
 
     const adminRes = await fetch(`${API}/admin/stores`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -167,15 +131,8 @@ describe('Task 9: super_admin MFA enforcement (admin.routes)', () => {
 
 describe('C1: MFA enforcement on store.routes', () => {
   it('un-enrolled super_admin is blocked (403 MFA_SETUP_REQUIRED) on GET /stores', async () => {
-    // Re-use the un-enrolled super_admin created in the block above.
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: SUPER_EMAIL, password: PW }),
-    });
-    expect(loginRes.status).toBe(200);
-    const { data } = await loginRes.json();
-    const token = data.accessToken as string;
+    const u = await prisma.user.findFirstOrThrow({ where: { email: SUPER_EMAIL } });
+    const token = await identityTokenFor(u.id);
 
     const storesRes = await fetch(`${API}/stores`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -186,15 +143,8 @@ describe('C1: MFA enforcement on store.routes', () => {
   });
 
   it('store_admin without MFA is NOT blocked by MFA gate on GET /stores', async () => {
-    // Re-use the store_admin from above.
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: STORE_EMAIL, password: PW }),
-    });
-    expect(loginRes.status).toBe(200);
-    const { data } = await loginRes.json();
-    const token = data.accessToken as string;
+    const u = await prisma.user.findFirstOrThrow({ where: { email: STORE_EMAIL } });
+    const token = await identityTokenFor(u.id);
 
     const storesRes = await fetch(`${API}/stores`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -209,71 +159,9 @@ describe('C1: MFA enforcement on store.routes', () => {
   });
 
   it('enrolled super_admin is NOT blocked on GET /stores', async () => {
-    // Create a fresh super_admin to enroll from scratch. Delete first to keep
-    // this test idempotent under vitest's retry:1 policy (same email reused
-    // per module-load within a single vitest run).
-    await prisma.user.deleteMany({ where: { email: ENROLLED_SUPER_EMAIL } });
-    const user = await prisma.user.create({
-      data: {
-        email: ENROLLED_SUPER_EMAIL,
-        passwordHash: await bcrypt.hash(PW, 10),
-        firstName: 'Enrolled',
-        lastName: 'Super',
-        role: 'super_admin',
-        emailVerified: true,
-        storeId: null,
-      },
-    });
-
-    // Login → get access token (no MFA yet)
-    const loginRes = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: ENROLLED_SUPER_EMAIL, password: PW }),
-    });
-    expect(loginRes.status).toBe(200);
-    const loginData = await loginRes.json();
-    const token = loginData.data.accessToken as string;
-
-    // Begin MFA enrollment
-    const beginRes = await fetch(`${API}/auth/mfa/enroll/begin`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    expect(beginRes.status).toBe(200);
-    const begin = await beginRes.json();
-    const secret = begin.data.secret as string;
-
-    // Confirm enrollment with a valid TOTP code
-    const enrollCode = authenticator.generate(secret);
-    const verifyEnrollRes = await fetch(`${API}/auth/mfa/enroll/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ code: enrollCode }),
-    });
-    expect(verifyEnrollRes.status).toBe(200);
-
-    // Login again → MFA challenge required
-    const login2Res = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: ENROLLED_SUPER_EMAIL, password: PW }),
-    });
-    expect(login2Res.status).toBe(200);
-    const login2 = await login2Res.json();
-    expect(login2.data.mfaRequired).toBe(true);
-    const challengeToken = login2.data.challengeToken as string;
-
-    // Complete MFA → get real access token
-    const mfaCode = authenticator.generate(secret);
-    const mfaVerifyRes = await fetch(`${API}/auth/mfa/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challengeToken, code: mfaCode }),
-    });
-    expect(mfaVerifyRes.status).toBe(200);
-    const mfaVerify = await mfaVerifyRes.json();
-    const enrolledToken = mfaVerify.data.accessToken as string;
+    // Enrolled = the mirrored mfaEnabled flag is set (enrollment itself happens at the identity service).
+    const u = await mkUser(ENROLLED_SUPER_EMAIL, 'super_admin', true);
+    const enrolledToken = await identityTokenFor(u.id);
 
     // Enrolled super_admin must reach /stores without MFA block
     const storesRes = await fetch(`${API}/stores`, {

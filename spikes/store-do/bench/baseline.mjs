@@ -12,13 +12,12 @@ const storeId = arg('store-id');
 const n = Number(arg('n', 200));
 const c = Number(arg('c', 4));
 const cold = process.argv.includes('--cold');
-const viaDo = process.argv.includes('--do'); // send x-ebda-backend: do (flagged demo store only)
+const viaDo = process.argv.includes('--do'); // RETIRED: the x-ebda-backend header is ignored (Ruling CF-BACKEND-1); a store's backend is its D1 flag
 const withOrders = viaDo; // order create is exercised ONLY on the DO copy of the demo store
 if (!storeId) throw new Error('--store-id required');
 const H = {
   'x-store-id': storeId,
   accept: 'application/json',
-  ...(viaDo ? { 'x-ebda-backend': 'do' } : {}),
 };
 const api = `${base}/api/v1/public`;
 

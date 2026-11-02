@@ -210,7 +210,7 @@ export default function FxRatesPage() {
                 step="0.000001"
                 value={formRate}
                 onChange={e => setFormRate(e.target.value)}
-                placeholder="e.g. 50.00"
+                placeholder={t('rateExample2')}
                 className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
               />
             </label>

@@ -98,7 +98,9 @@ describe('marketing nav', () => {
     for (const html of [ar, en]) {
       // the conversion path continues in the SAME tab (audit UI-15): no target, no new-tab note
       expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/login" class="link-login">/);
-      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary">/);
+      expect(html).toMatch(
+        /<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary header-start">/
+      );
     }
     expect(en).toContain('>Log in<');
     expect(en).toContain('>Start now<');

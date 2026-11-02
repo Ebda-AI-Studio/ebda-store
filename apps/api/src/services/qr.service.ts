@@ -8,6 +8,7 @@
  * the table is bounded by the catalogue and a bot cannot grow it with made-up slugs.
  */
 import { SlugEntityType, prisma, withStore } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { waMeLink, regionDayStart } from '@ebda/shared';
 import {
   DEFAULT_QR_SETTINGS,
@@ -54,8 +55,8 @@ export async function resolveQrScan(
   if (!slug || slug.length > 200) throw notFound();
 
   if (kind === 'product') {
-    const find = (s: string) =>
-      prisma.product.findFirst({
+    const find = async (s: string) =>
+      (await storeDb(storeId)).product.findFirst({
         where: { storeId, slug: s, status: 'active', deletedAt: null, audience: 'public' },
         select: { id: true, slug: true },
       });
@@ -68,8 +69,8 @@ export async function resolveQrScan(
     return { kind, ref: product.id, target: `/products/${encodeURIComponent(product.slug)}` };
   }
 
-  const findCat = (s: string) =>
-    prisma.category.findFirst({
+  const findCat = async (s: string) =>
+    (await storeDb(storeId)).category.findFirst({
       where: { storeId, slug: s, isActive: true },
       select: { id: true, slug: true },
     });
@@ -139,13 +140,13 @@ export async function qrStats(storeId: string, days: number): Promise<QrStatRow[
   const categoryIds = rows.filter(r => r.kind === 'category').map(r => r.ref);
   const [products, categories] = await Promise.all([
     productIds.length
-      ? prisma.product.findMany({
+      ? (await storeDb(storeId)).product.findMany({
           where: { storeId, id: { in: productIds } },
           select: { id: true, name: true, nameAr: true },
         })
       : [],
     categoryIds.length
-      ? prisma.category.findMany({
+      ? (await storeDb(storeId)).category.findMany({
           where: { storeId, id: { in: categoryIds } },
           select: { id: true, name: true, nameAr: true },
         })

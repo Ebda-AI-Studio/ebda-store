@@ -1,4 +1,4 @@
-import { prisma, acrossStores } from '@ebda/database';
+import { acrossStoresDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';
@@ -96,7 +96,10 @@ interface StuckClaim {
   claimedAt: string;
 }
 
-export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ stuck: number }> {
+export async function handleStuckRefundClaimSweep(
+  step: SweepStep,
+  event?: { data?: unknown }
+): Promise<{ stuck: number }> {
   const cutoff = Date.now() - STUCK_AFTER_MINUTES * 60_000;
   const floor = new Date(Date.now() - MAX_AGE_MINUTES * 60_000);
 
@@ -114,8 +117,10 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
       // at a time, so the page/limit/budget ceilings stay GLOBAL), each store's
       // paging inside its own tenant scope. A cursor id only exists in one store,
       // so cursors never cross stores.
-      await acrossStores(
-        async storeId => {
+      // PORTED (Ruling CF-JOBS-4): a DO store's alarm scans its own Durable Object's payment timeline.
+      await acrossStoresDb(
+        event,
+        async (storeId, db) => {
           let cursorId: string | null = null;
           let storeWindowExhausted = false;
           for (let page = 0; page < CLAIM_MAX_PAGES && claims.length < CLAIM_SCAN_LIMIT; page++) {
@@ -131,7 +136,7 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
               orderId: string;
               details: unknown;
               occurredAt: Date;
-            }> = await prisma.paymentEvent.findMany({
+            }> = await db.paymentEvent.findMany({
               where: {
                 storeId,
                 eventType: REFUND_CLAIM_EVENT,
@@ -161,7 +166,7 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
             let resCursor: string | null = null;
             for (;;) {
               const resolutionRows: Array<{ id: string; details: unknown }> =
-                await prisma.paymentEvent.findMany({
+                await db.paymentEvent.findMany({
                   where: {
                     storeId,
                     eventType: { in: RESOLVING_EVENTS },

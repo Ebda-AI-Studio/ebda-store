@@ -36,6 +36,7 @@ import { featureService } from '../feature.service';
 import { bustStoreCaches } from '../store.service';
 import { auditLog } from '../../middleware/security';
 import logger from '../../lib/logger';
+import { storeUpdate } from '../../lib/repo-factory';
 
 export const COMP_MIGRATION_TARGET_PLAN = 'growth';
 
@@ -171,7 +172,7 @@ export async function runCompMigration(
         },
       });
       if (hit.count !== 1) return null; // someone else migrated it first: a no-op, not an error
-      await tx.store.update({ where: { id: input.storeId }, data: { plan: growth.featureTier } });
+      await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: growth.featureTier } });
       return s;
     });
   // A payment-reference unique collision (P2002) rolls the whole attempt back, so retrying with a

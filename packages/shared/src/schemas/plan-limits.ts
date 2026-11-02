@@ -46,6 +46,13 @@ export const planLimitsSchema = z
      * (to OFF) - the corrupt-blob fallback in `parseLimits` must never flip a gate open.
      */
     wholesalePricing: z.boolean().default(false),
+    /**
+     * Catalogue import (photos / PDFs -> draft products) page allowance per region month. `null` =
+     * unlimited, `0` = not included. `.default(0)`: a blob written before this key existed parses to
+     * OFF, never to unlimited (Ruling CATIMP-2). Not a gated write: the page ledger
+     * (apps/api/src/lib/catalogue/page-ledger.ts) reads it directly.
+     */
+    catalogImportPagesPerMonth: ceiling.default(0),
     analyticsTier: z.enum(ANALYTICS_TIERS),
     supportTier: z.enum(SUPPORT_TIERS),
   })
@@ -192,6 +199,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: false,
       apiAccess: false,
       wholesalePricing: false,
+      catalogImportPagesPerMonth: 0,
       analyticsTier: 'advanced',
       supportTier: 'email',
     },
@@ -219,6 +227,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: false,
       apiAccess: false,
       wholesalePricing: false,
+      catalogImportPagesPerMonth: 100,
       analyticsTier: 'basic',
       supportTier: 'email',
     },
@@ -246,6 +255,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: true,
       apiAccess: false,
       wholesalePricing: false,
+      catalogImportPagesPerMonth: 400,
       analyticsTier: 'standard',
       supportTier: 'chat',
     },
@@ -274,6 +284,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: true,
       apiAccess: true,
       wholesalePricing: true,
+      catalogImportPagesPerMonth: 1500,
       analyticsTier: 'advanced',
       supportTier: 'priority',
     },
@@ -301,6 +312,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: false,
       apiAccess: false,
       wholesalePricing: false,
+      catalogImportPagesPerMonth: 400,
       analyticsTier: 'advanced',
       supportTier: 'chat',
     },
@@ -328,6 +340,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: false,
       apiAccess: false,
       wholesalePricing: true,
+      catalogImportPagesPerMonth: null,
       analyticsTier: 'advanced',
       supportTier: 'priority',
     },
@@ -357,6 +370,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       brandingRemoval: true,
       apiAccess: true,
       wholesalePricing: false,
+      catalogImportPagesPerMonth: null,
       analyticsTier: 'advanced',
       supportTier: 'priority',
     },

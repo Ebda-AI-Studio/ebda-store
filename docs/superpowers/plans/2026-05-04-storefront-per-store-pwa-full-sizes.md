@@ -193,12 +193,11 @@ Update `apps/admin/src/app/stores/[id]/pwa/_components/PwaManifestPreview.tsx` t
 
 ### Task 7 — Migrate existing 2 stores
 
-One-off script `scripts/backfill-store-pwa-icons.mjs` that walks every store with `pwaEnabled=true` AND `pwaSettings.icon512` (the source they already uploaded), runs `generatePwaIconSet` against the existing 512 image, persists the new URLs. Idempotent (skip if `iconAppleTouch` already populated).
-
-Run from `apps/api/`:
+Done as `scripts/backfill-store-pwa-icons.ts` (Ruling PWA-BACKFILL-1): walks every `pwaEnabled` store, source = `iconSource`, else `icon512`, else `icon192`, else the store logo (a store with none is skipped), resizes with `sharp`, persists the URLs. Dry run unless `--apply`; idempotent (skips a store with all 8 icon keys, re-checks before writing); resumable (`--after <storeId>`, `--limit <n>`). Run from the repo root with the prod `DATABASE_URL`, the R2 storage env and `STORAGE_PUBLIC_URL` exported:
 
 ```bash
-railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.mjs --apply
+npx tsx scripts/backfill-store-pwa-icons.ts                      # dry run
+npx tsx scripts/backfill-store-pwa-icons.ts --apply --limit 25   # then repeat with the printed --after
 ```
 
 ## Verification

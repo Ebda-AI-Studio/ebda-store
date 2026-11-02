@@ -190,7 +190,7 @@ describe('souq header: targets, landmarks, long names, focus', () => {
     expect(row.getAttribute('class')).toContain('grid-cols-[minmax(0,1fr)_auto]');
     expect(row.getAttribute('class')).toContain('md:grid-cols-[auto_minmax(0,1fr)_auto]');
     const logo = container.querySelector('a[href="/"]')!;
-    expect(logo.getAttribute('class')).toContain('max-w-[calc(100%-7rem)]');
+    expect(logo.getAttribute('class')).toContain('max-w-[calc(100%-13rem)]');
     expect(logo.getAttribute('class')).toContain('md:max-w-[16rem]');
     const mark = container.querySelector('[data-zone="storeName"]')!;
     // STOP-2: wraps (2 lines, balanced) instead of ending in an ellipsis; the title keeps the full name.

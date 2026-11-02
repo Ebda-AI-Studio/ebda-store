@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { storeDb } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -129,7 +130,9 @@ async function withCategoryIds(
   if (missing.length === 0) {
     return items.map(i => ({ ...i, categoryIds: i.categoryIds ?? [] }));
   }
-  const products = await prisma.product.findMany({
+  const products = await (
+    await storeDb(storeId)
+  ).product.findMany({
     where: { id: { in: [...new Set(missing)] }, storeId },
     select: { id: true, categories: { select: { categoryId: true } } },
   });

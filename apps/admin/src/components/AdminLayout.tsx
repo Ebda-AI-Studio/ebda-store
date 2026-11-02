@@ -104,6 +104,7 @@ export function AdminLayout({
     // Hub names (sidebar — 9 items)
     dashboard: t('navDashboard'),
     catalog: t('navCatalog'),
+    editor: t('navEditor'),
     sales: t('navSales'),
     stock: t('navStock'),
     finance: t('navFinance'),
@@ -122,6 +123,7 @@ export function AdminLayout({
     platformProviderActivation: t('navPlatformProviderActivation'),
     platformTaxArchive: t('navPlatformTaxArchive'),
     platformPolicyUpdates: t('navPlatformPolicyUpdates'),
+    platformCiInsights: t('navPlatformCiInsights'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
@@ -130,7 +132,6 @@ export function AdminLayout({
   const hubLabels: HubLabels = {
     // Catalog tabs
     products: t('hubTabs.products'),
-    editor: t('hubTabs.editor'),
     content: t('hubTabs.content'),
     blog: t('hubTabs.blog'),
     floatingWidget: t('hubTabs.floatingWidget'),
@@ -149,6 +150,7 @@ export function AdminLayout({
     loyalty: t('hubTabs.loyalty'),
     bundles: t('hubTabs.bundles'),
     wallet: t('hubTabs.wallet'),
+    customerIntelligence: t('hubTabs.customerIntelligence'),
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),
     inventory: t('hubTabs.inventory'),
@@ -403,6 +405,7 @@ export function AdminLayout({
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
         <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
+          {/* i18n-gate-allow: keyboard shortcut keycap */}
           ⌘K
         </kbd>
       </button>

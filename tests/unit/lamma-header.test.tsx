@@ -112,7 +112,9 @@ describe('lamma header', () => {
     const { container } = render(
       <LammaHeader branding={{ ...branding, nameAr: longName }} navigation={nav} />
     );
-    expect(container.querySelector('a[href="/"]')!.getAttribute('class')).toContain('max-w-[65%]');
+    expect(container.querySelector('a[href="/"]')!.getAttribute('class')).toContain(
+      'max-w-[calc(100%-13rem)]'
+    );
     const mark = container.querySelector('[data-zone="storeName"]')!;
     expect(mark.firstElementChild!.getAttribute('class')).toMatch(/\bline-clamp-2\b/);
     expect(mark.getAttribute('title')).toBe(longName);

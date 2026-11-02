@@ -284,7 +284,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             onChange={e => setReason(e.target.value)}
             rows={2}
             className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-            placeholder="Optional reason in English"
+            placeholder={t('reasonEnPlaceholder')}
           />
         </label>
         <label className="space-y-1" dir="rtl">
@@ -295,7 +295,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             rows={2}
             dir="rtl"
             className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-            placeholder="سبب التسوية بالعربية (اختياري)"
+            placeholder={t('reasonArPlaceholder')}
           />
         </label>
       </div>
@@ -721,7 +721,7 @@ export default function NewStockAdjustmentPage() {
                   onChange={e => setReason(e.target.value)}
                   rows={3}
                   className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-                  placeholder="Optional reason in English"
+                  placeholder={t('reasonEnPlaceholder')}
                 />
               </label>
               <label className="space-y-1" dir="rtl">
@@ -732,7 +732,7 @@ export default function NewStockAdjustmentPage() {
                   rows={3}
                   dir="rtl"
                   className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-                  placeholder="سبب التسوية بالعربية (اختياري)"
+                  placeholder={t('reasonArPlaceholder')}
                 />
               </label>
             </div>

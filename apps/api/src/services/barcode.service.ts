@@ -22,6 +22,7 @@ import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { withSavepoint } from '../lib/savepoint';
+import { storeDb, storeMoney } from '../lib/repo-factory';
 
 type Db = Pick<typeof prisma, '$queryRaw' | '$executeRaw'> & {
   product: typeof prisma.product;
@@ -88,10 +89,14 @@ export async function assertBarcodeAvailable(
   storeId: string,
   barcode: string,
   except: { productId?: string; variantId?: string } = {},
-  db: Db = prisma as unknown as Db
+  db?: Db
 ): Promise<void> {
-  await lockStoreBarcodes(db, storeId);
-  const owner = await findBarcodeOwner(storeId, barcode, db);
+  // A store on its Durable Object reads its own rows; the single-threaded actor and the partial unique indexes replace the
+  // advisory lock (Ruling BARCODE-DO-1).
+  const onDo = !db && !!(await storeMoney(storeId));
+  const d = db ?? (onDo ? ((await storeDb(storeId)) as unknown as Db) : (prisma as unknown as Db));
+  if (!onDo) await lockStoreBarcodes(d, storeId);
+  const owner = await findBarcodeOwner(storeId, barcode, d);
   if (!owner) return;
   if (owner.type === 'product' && owner.id === except.productId) return;
   if (owner.type === 'variant' && owner.id === except.variantId) return;
@@ -149,6 +154,9 @@ export async function ensureBarcode(
 ): Promise<string | null> {
   try {
     if (!(await barcodeFeatureOn(storeId))) return null;
+    // A store on its Durable Object allocates and writes in ONE section there (Ruling BARCODE-DO-1).
+    const money = await storeMoney(storeId);
+    if (money) return (await money.barcodeEnsure(target)).code;
     return await withSavepoint(async () => {
       const [code] = await allocateBarcodes(storeId, 1, db);
       if ('variantId' in target) {
@@ -181,6 +189,8 @@ export async function generateMissingBarcodes(
   limit: number = GENERATE_BATCH_MAX
 ): Promise<GenerateResult> {
   const take = Math.min(Math.max(1, limit), GENERATE_BATCH_MAX);
+  const money = await storeMoney(storeId);
+  if (money) return money.barcodeFill({ limit: take });
   return withStore(storeId, async tx => {
     const db = tx as unknown as Db;
     // Lock BEFORE choosing rows: two concurrent calls must not pick the same barcode-less rows.

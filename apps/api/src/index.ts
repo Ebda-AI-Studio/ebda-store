@@ -22,6 +22,7 @@ import logger from './lib/logger';
 import { listenAfterDatabaseRoleGuard, type DatabaseRoleRow } from './lib/database-role-guard';
 import { retryTransientRead } from './lib/db-retry';
 import { assertEmbeddingConfig } from './lib/search/embedding-provider';
+import { installTestIdentity } from './lib/test-identity';
 
 // The Node server shell (Railway, Docker, `npm run dev`). The Express app itself
 // lives in app.ts and is shared with the Cloudflare Worker shell (worker.ts);
@@ -73,6 +74,8 @@ socketService.initialize(httpServer);
 // exits non-zero before a single request is accepted. ALLOW_BYPASSRLS_ROLE=true
 // is still honoured (loudly). See lib/database-role-guard.ts; the Workers shell
 // has its own guard (cf/database-role-guard.ts).
+// Integration tier only (NODE_ENV=test + a test key): the identity-service stand-in. A no-op everywhere else.
+installTestIdentity();
 const server = httpServer;
 void listenAfterDatabaseRoleGuard(
   {

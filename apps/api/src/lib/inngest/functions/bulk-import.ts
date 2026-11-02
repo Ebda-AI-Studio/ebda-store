@@ -1,5 +1,7 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInStoreScope, withStore } from '@ebda/database';
+import { runInStoreScope } from '@ebda/database';
+import { storeWriter } from '../../repo-factory';
+import { readStoreDb } from '../../jobs/store-db';
 import { BulkService } from '../../../services/bulk.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
@@ -60,12 +62,22 @@ export const bulkImportProducts: JobDef = inngest.createFunction(
     // and the job is read inside that store's scope.
     const jobStoreId = event.data.storeId ?? (await getEntityStoreId('bulk_import_job', jobId));
     const job = jobStoreId
-      ? await withStore(jobStoreId, tx =>
-          tx.bulkImportJob.findUnique({ where: { id: jobId, storeId: jobStoreId } })
+      ? await readStoreDb(jobStoreId, db =>
+          db.bulkImportJob.findUnique({ where: { id: jobId, storeId: jobStoreId } })
         )
       : null;
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
+      return;
+    }
+
+    // A second delivery of the same event (an at-least-once queue, a replay) must not import the CSV twice: only a job that
+    // is still `queued` starts. A finished, running or failed job is left as it is (Ruling CF-JOBS-4).
+    if (job.status !== 'queued') {
+      logger.warn(
+        { jobId, status: job.status },
+        'bulk-import/started for a job that already started — skipping'
+      );
       return;
     }
 
@@ -82,7 +94,9 @@ export const bulkImportProducts: JobDef = inngest.createFunction(
     // A store scope holds no long transaction: each query commits on its own,
     // and withMoneyTx batches start with the same store GUC.
     await runInStoreScope(job.storeId, async () => {
-      await prisma.bulkImportJob.update({
+      // the job row follows the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+      const sw = await storeWriter(job.storeId);
+      await sw.bulkImportJob.update({
         where: { id: jobId, storeId: job.storeId },
         data: { status: 'running', startedAt: new Date() },
       });
@@ -108,7 +122,7 @@ export const bulkImportProducts: JobDef = inngest.createFunction(
           await invalidateStoreProductCaches(job.storeId);
         }
 
-        await prisma.bulkImportJob.update({
+        await sw.bulkImportJob.update({
           where: { id: jobId, storeId: job.storeId },
           data: {
             status: 'completed',
@@ -124,7 +138,7 @@ export const bulkImportProducts: JobDef = inngest.createFunction(
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         logger.error({ err, jobId }, 'Bulk import job failed');
-        await prisma.bulkImportJob.update({
+        await sw.bulkImportJob.update({
           where: { id: jobId, storeId: job.storeId },
           data: {
             status: 'failed',

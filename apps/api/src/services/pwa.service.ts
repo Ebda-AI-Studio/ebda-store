@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { sniffImage } from '../lib/upload-sniff';
+import { pngDimensions, sniffImage } from '../lib/upload-sniff';
 import { prisma, Prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
@@ -10,6 +10,7 @@ import { BRAND } from '@ebda/shared';
 import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
 import { redis } from './redis.service';
 import { sendAlert } from './alerts.service';
+import { storeUpdate } from '../lib/repo-factory';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -127,6 +128,31 @@ async function reportResizeFallback(storeId: string, reason: string): Promise<vo
     }).catch(() => undefined);
 }
 
+/** One target rendered by a caller-supplied resizer (see `generatePwaIconSet`'s `resizer`). */
+export type IconResizer = (
+  source: Buffer,
+  target: { size: number; padded: boolean },
+  background: string | undefined
+) => Promise<Buffer>;
+
+async function resizeWith(
+  resizer: IconResizer,
+  source: Buffer,
+  background: string | undefined
+): Promise<Buffer[]> {
+  return Promise.all(
+    ICON_TARGETS.map(async t => {
+      const out = await resizer(source, { size: t.size, padded: t.padded }, background);
+      const dims = pngDimensions(out);
+      if (!dims || dims.width !== t.size || dims.height !== t.size) {
+        const messageEn = `Resizer answered ${dims ? `${dims.width}x${dims.height}` : 'a non-PNG'} for ${t.size}px`;
+        throw new AppError(400, 'ICON_GENERATION_FAILED', messageEn, { messageEn });
+      }
+      return out;
+    })
+  );
+}
+
 /** How long the whole Images resize may take before the set falls back (review M1). */
 export const IMAGES_DEADLINE_MS = 10_000;
 
@@ -188,7 +214,16 @@ export async function generatePwaIconSet(
    * `background`: the maskable icon's padding colour (the store's PWA background).
    * `deadlineMs`: the Images resize deadline (default IMAGES_DEADLINE_MS; tests shorten it).
    */
-  opts: { background?: string; deadlineMs?: number } = {}
+  opts: {
+    background?: string;
+    deadlineMs?: number;
+    /**
+     * Replaces the Images binding: the Node backfill script (scripts/backfill-store-pwa-icons.ts)
+     * has no binding and must not store the 512px source under the 16px favicon key. Every answer
+     * is checked for its exact size; a wrong one aborts the run before any upload.
+     */
+    resizer?: IconResizer;
+  } = {}
 ): Promise<GeneratedPwaIcons> {
   // One version per run, shared by every key (randomUUID: two runs in one millisecond differ).
   const version = randomUUID().slice(0, 8);
@@ -202,7 +237,9 @@ export async function generatePwaIconSet(
     });
   }
   const sourcePng = sourceBuffer;
-  const resized = await resizedTargets(storeId, sourceBuffer, opts.background, opts.deadlineMs);
+  const resized = opts.resizer
+    ? await resizeWith(opts.resizer, sourceBuffer, opts.background)
+    : await resizedTargets(storeId, sourceBuffer, opts.background, opts.deadlineMs);
   const prepared = ICON_TARGETS.map((target, i) => ({
     target,
     buffer: resized ? resized[i] : sourceBuffer,
@@ -345,7 +382,7 @@ export class PWAService {
       : currentSettings;
 
     const store = await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: {
           pwaEnabled: data.pwaEnabled,

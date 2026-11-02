@@ -4,8 +4,9 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
-import { runInTenantContext, prisma } from '@ebda/database';
+import { runInTenantContext } from '@ebda/database';
 import { uniqueViolationTarget } from '../lib/prisma-errors';
+import { storeDb } from '../lib/repo-factory';
 import {
   createAdjustment,
   postAdjustment,
@@ -287,6 +288,8 @@ router.post(
         return out;
       };
 
+      // a store on its Durable Object is looked up there (Ruling CF-R7-1), the same way it is written
+      const sdb = await storeDb(storeId);
       const lookups = await runInTenantContext(storeId, async () => {
         const liveProduct = { storeId, deletedAt: null };
         const variantSelect = {
@@ -305,22 +308,22 @@ router.post(
         } as const;
         const [variantsBySku, productsBySku, variantsByBarcode, productsByBarcode] =
           await Promise.all([
-            prisma.productVariant.findMany({
+            sdb.productVariant.findMany({
               where: { sku: { in: skus }, product: liveProduct },
               select: variantSelect,
               orderBy: { id: 'asc' },
             }),
-            prisma.product.findMany({
+            sdb.product.findMany({
               where: { sku: { in: skus }, ...liveProduct },
               select: productSelect,
               orderBy: { id: 'asc' },
             }),
-            prisma.productVariant.findMany({
+            sdb.productVariant.findMany({
               where: { barcode: { in: barcodes }, product: liveProduct },
               select: variantSelect,
               orderBy: { id: 'asc' },
             }),
-            prisma.product.findMany({
+            sdb.product.findMany({
               where: { barcode: { in: barcodes }, ...liveProduct },
               select: productSelect,
               orderBy: { id: 'asc' },

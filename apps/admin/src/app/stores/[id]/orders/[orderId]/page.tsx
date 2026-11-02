@@ -26,6 +26,7 @@ import type { OrderDetail } from './_components/types';
 import { manualRefundBody, type ManualRefundInput } from '../_components/manualRefundCopy';
 import { ManualRefundModal } from '../../../../../components/ManualRefundModal';
 import { OrderDocumentsCard } from './_components/OrderDocumentsCard';
+import { OrderCodRiskCard } from './_components/OrderCodRiskCard';
 import { OrderEtaCard } from './_components/OrderEtaCard';
 import { useFeatures } from '@/hooks/useFeatures';
 
@@ -288,7 +289,12 @@ export default function OrderDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
                 <DeliveryCard order={order} locale={locale} />
-                <ShipmentCard storeId={storeId} orderId={orderId} onChanged={fetchOrder} />
+                <ShipmentCard
+                  storeId={storeId}
+                  orderId={orderId}
+                  onChanged={fetchOrder}
+                  courierHints={!featuresLoading && isEnabled('customer_intelligence')}
+                />
                 <PaymentCard order={order} userRole={user?.role} />
                 <OrderInstapayPanel
                   order={order}
@@ -305,6 +311,9 @@ export default function OrderDetailPage() {
                 <ItemsCard order={order} previewLimit={5} />
                 <SummaryCard order={order} />
                 <OrderDocumentsCard storeId={storeId} orderId={orderId} />
+                {!featuresLoading && isEnabled('customer_intelligence') ? (
+                  <OrderCodRiskCard storeId={storeId} orderId={orderId} />
+                ) : null}
                 {!featuresLoading && isEnabled('eta_ereceipt') ? (
                   <OrderEtaCard storeId={storeId} orderId={orderId} />
                 ) : null}

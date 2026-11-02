@@ -9,6 +9,7 @@ import { AppError } from '../../middleware/error-handler';
 import { effectiveInventory } from '../../lib/effective-inventory';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import { healBackorderStockDebt } from './backorder-stock-heal';
+import { storeDb, storeStock } from '../../lib/repo-factory';
 
 export interface CreatePoInput {
   storeId: string;
@@ -17,12 +18,31 @@ export interface CreatePoInput {
   notes?: string;
   notesAr?: string;
   createdBy?: string;
+  /** createPoFromSuggestion on a DO store: the suggestion is marked accepted in the same section. */
+  suggestionId?: string;
   items: { productId: string; variantId?: string; qty: number; unitCost: number; notes?: string }[];
 }
 
 export async function createPurchaseOrder(
   input: CreatePoInput
 ): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
+  const stock = await storeStock(input.storeId);
+  if (stock) {
+    // Durable Object path (Ruling CF-R7-1): ownership, variant rules, the number and the rows are ONE section.
+    const r = await stock.createPurchaseOrder({
+      supplierId: input.supplierId,
+      expectedDate: input.expectedDate ?? null,
+      notes: input.notes,
+      notesAr: input.notesAr,
+      createdBy: input.createdBy,
+      suggestionId: input.suggestionId ?? null,
+      items: input.items,
+    });
+    return (await storeDb(input.storeId)).purchaseOrder.findFirstOrThrow({
+      where: { id: r.id, storeId: input.storeId },
+      include: { items: true },
+    });
+  }
   // product/variant/supplier ids all arrive in the request body and were
   // written onto the PO unchecked. requireStoreAccess only proves the caller
   // owns the store in the URL — so a store_admin could plant a competitor's
@@ -189,6 +209,32 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
     estimateUnitCost: number;
     variance: number;
   }> = [];
+
+  const stock = await storeStock(input.storeId);
+  if (stock) {
+    // Durable Object path (Ruling CF-R7-1): the backorder FIFO, the on-hand and weighted-average cost, the history rows and the
+    // PO status are ONE section; the DO is single threaded, so the Postgres row locks are not needed.
+    const r = await stock.receivePurchaseOrder({
+      poId: input.poId,
+      receivedBy: input.receivedBy ?? null,
+      receipts: input.receipts,
+    });
+    await invalidateStoreProductCaches(input.storeId);
+    inngest
+      .send({
+        name: 'stock/po-received',
+        data: { storeId: input.storeId, poId: input.poId, clearedBackorders: r.clearedBackorders },
+      })
+      .catch((err: unknown) =>
+        logger.error({ err, poId: input.poId }, 'Failed to enqueue stock/po-received')
+      );
+    const po = await (
+      await storeDb(input.storeId)
+    ).purchaseOrder.findFirstOrThrow({
+      where: { id: input.poId, storeId: input.storeId },
+    });
+    return { po, clearedBackorders: r.clearedBackorders };
+  }
 
   const po = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
     // Serialise receives of ONE purchase order (M-022): the PO row lock first, the PO read AFTER it, so a double
@@ -501,21 +547,22 @@ export async function listPurchaseOrders(
       { supplier: { name: { contains: opts.q, mode: 'insensitive' } } },
     ];
   }
+  const db = await storeDb(storeId);
   const [items, total] = await Promise.all([
-    prisma.purchaseOrder.findMany({
+    db.purchaseOrder.findMany({
       where,
       include: { supplier: { select: { name: true } }, items: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * perPage,
       take: perPage,
     }),
-    prisma.purchaseOrder.count({ where }),
+    db.purchaseOrder.count({ where }),
   ]);
   return { items, total, page, perPage };
 }
 
 export async function getPurchaseOrder(storeId: string, id: string) {
-  return prisma.purchaseOrder.findFirst({
+  return (await storeDb(storeId)).purchaseOrder.findFirst({
     where: { id, storeId },
     include: {
       supplier: true,
@@ -530,6 +577,11 @@ export async function getPurchaseOrder(storeId: string, id: string) {
 }
 
 export async function cancelPurchaseOrder(storeId: string, id: string) {
+  const stock = await storeStock(storeId);
+  if (stock) {
+    await stock.cancelPurchaseOrder({ id });
+    return (await storeDb(storeId)).purchaseOrder.findFirstOrThrow({ where: { id, storeId } });
+  }
   const po = await prisma.purchaseOrder.findFirst({ where: { id, storeId } });
   if (!po) throw new AppError(404, 'PO_NOT_FOUND', 'Purchase order not found.');
   // ONE conditional update (it row-locks the PO, so a receive that is committing `received` is waited for and then
@@ -561,7 +613,8 @@ export async function createPoFromSuggestion(
   storeId: string,
   createdBy?: string
 ): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
-  const sug = await prisma.reorderSuggestion.findFirst({
+  const sdb = await storeDb(storeId);
+  const sug = await sdb.reorderSuggestion.findFirst({
     where: { id: suggestionId, storeId },
     include: {
       product: {
@@ -592,7 +645,7 @@ export async function createPoFromSuggestion(
       'This suggestion predates per-variant reordering. Run the reorder scan again to get one suggestion per variant.'
     );
 
-  const supplierId = sug.supplierId ?? (await pickLastSupplierForProduct(sug.productId));
+  const supplierId = sug.supplierId ?? (await pickLastSupplierForProduct(sug.productId, storeId));
   if (!supplierId) {
     throw new AppError(
       400,
@@ -616,13 +669,17 @@ export async function createPoFromSuggestion(
       },
     ],
     createdBy,
+    // a DO store accepts the suggestion inside the PO section; Postgres does it right after (below)
+    suggestionId: (await storeStock(storeId)) ? suggestionId : undefined,
     notes: `Auto-drafted from reorder suggestion (urgency ${sug.urgencyDays}d, velocity ${sug.velocity7d.toFixed(2)}/d)`,
   });
 
-  await prisma.reorderSuggestion.update({
-    where: { id: suggestionId, storeId },
-    data: { status: 'accepted', poId: po.id },
-  });
+  if (!(await storeStock(storeId))) {
+    await prisma.reorderSuggestion.update({
+      where: { id: suggestionId, storeId },
+      data: { status: 'accepted', poId: po.id },
+    });
+  }
 
   return po;
 }
@@ -634,8 +691,12 @@ export async function createPoFromSuggestion(
  * Returns the supplier from the most recent PurchaseOrder containing this
  * productId, or null if no PO has ever been placed for it.
  */
-export async function pickLastSupplierForProduct(productId: string): Promise<string | null> {
-  const lastPoItem = await prisma.purchaseOrderItem.findFirst({
+export async function pickLastSupplierForProduct(
+  productId: string,
+  storeId?: string
+): Promise<string | null> {
+  const db = storeId ? await storeDb(storeId) : prisma;
+  const lastPoItem = await db.purchaseOrderItem.findFirst({
     where: { productId },
     select: { po: { select: { supplierId: true } } },
     orderBy: { po: { createdAt: 'desc' } },

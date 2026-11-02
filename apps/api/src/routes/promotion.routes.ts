@@ -4,6 +4,7 @@
  * groups these promotions can target).
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
@@ -234,7 +235,9 @@ router.post(
       // variant with its own price is previewed at the product price, display only). A line priced by a tier or a group
       // price is excluded from the discount basis (Ruling B2B-5); the authoritative discount is recomputed at order creation.
       const buyer = buyerFromRequest(req);
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { id: { in: items.map(i => i.productId) }, storeId },
         select: { id: true, price: true, categories: { select: { categoryId: true } } },
       });

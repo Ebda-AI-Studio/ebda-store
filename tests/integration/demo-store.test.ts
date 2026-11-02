@@ -26,6 +26,7 @@ import { publicNotificationRoutes } from '@api/routes/notification.routes';
 import { inngest } from '@api/lib/inngest/client';
 import { storeHost } from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
+import { configureIdentityClient } from '@api/lib/identity-client';
 import {
   hasDb,
   seedBundleStore,
@@ -341,6 +342,12 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  /** Addresses handed to the (fake) identity service's forgotPassword: a merchant owner's reset lives there now (Ruling ID-2). */
+  const handedOver: string[] = [];
+  beforeAll(() => {
+    configureIdentityClient({ forgotPassword: async email => void handedOver.push(email) });
+  });
+  afterAll(() => configureIdentityClient(undefined));
   const resetRows = (userId: string) =>
     withRlsBypass(tx =>
       tx.refreshToken.count({ where: { userId, token: { startsWith: 'reset:' } } })
@@ -362,7 +369,7 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
     );
   });
 
-  it('the demo owner is never mailed: forgot-password answers the generic 200 and issues no reset token', async () => {
+  it('the demo owner is never mailed: forgot-password answers the generic 200 and is never handed to the identity service', async () => {
     const before = await resetRows(demo.ownerId);
     const res = await request(app)
       .post('/api/v1/auth/forgot-password')
@@ -372,13 +379,18 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
       'If an account exists with this email, a reset link has been sent.'
     );
     expect(await resetRows(demo.ownerId)).toBe(before);
-    // A merchant owner on the same path DOES get a reset token (the skip is demo-specific).
-    const shopBefore = await resetRows(shop.ownerId);
+    await awaitDeferredWork(5000);
+    await new Promise(r => setTimeout(r, 100)); // the hand-over runs in cfWaitUntil, detached outside a Worker
+    expect(handedOver).not.toContain(await ownerEmail(demo.ownerId));
+    // A merchant owner on the same path DOES get a reset (handed to the identity service, which mails the code); the skip is
+    // demo-specific. The Store issues no token of its own for an admin-namespace account.
+    const shopEmail = await ownerEmail(shop.ownerId);
     const shopRes = await request(app)
       .post('/api/v1/auth/forgot-password')
-      .send({ email: await ownerEmail(shop.ownerId) });
+      .send({ email: shopEmail });
     expect(shopRes.status).toBe(200);
-    expect(await resetRows(shop.ownerId)).toBe(shopBefore + 1);
+    await vi.waitFor(() => expect(handedOver).toContain(shopEmail), { timeout: 5000 });
+    expect(await resetRows(shop.ownerId)).toBe(0);
   });
 
   it('the demo owner gets the generic resend answer (nothing about the account)', async () => {

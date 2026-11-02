@@ -50,3 +50,14 @@ export interface SqlRunner {
   /** Optional: run a SYNCHRONOUS unit atomically with no chance of interleaving (DO: `ctx.storage.transactionSync`). Preferred for single writes. */
   transactionSync?<T>(fn: () => T): T;
 }
+
+/**
+ * The write guard of the RPC path (Ruling CF-R7-4), enforced by the EXECUTOR at the point it writes or links a row, so it
+ * reads nested writes exactly the way they run (no second parser to differ from): every model a write reaches, at any
+ * depth and through any nested operation (create, connect, connectOrCreate, set, update, delete...), must be `writable`,
+ * and no stock column of a model may appear in the data written to it.
+ */
+export interface WriteGuard {
+  writable: ReadonlySet<string>;
+  stock: Readonly<Record<string, readonly string[]>>;
+}

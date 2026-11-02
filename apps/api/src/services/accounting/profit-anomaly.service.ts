@@ -23,7 +23,8 @@
  * the same (storeId, metric) in the last 24 hours.
  */
 
-import { prisma, AnomalyScope, AnomalyMetric, AnomalySeverity, withStore } from '@ebda/database';
+import { AnomalyScope, AnomalyMetric, AnomalySeverity, withStore } from '@ebda/database';
+import { storeDb, storeWriter } from '../../lib/repo-factory';
 import logger from '../../lib/logger';
 import { profitAndLoss } from './reports.service';
 import { callGemini } from './gemini-ai.service';
@@ -90,6 +91,9 @@ function classifySeverity(delta: number, direction: 'up' | 'down'): AnomalySever
 // ---------------------------------------------------------------------------
 
 export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnomalyScanResult> {
+  // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+  const db = await storeDb(storeId);
+  const sw = await storeWriter(storeId);
   const now = new Date();
   const window7dStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const window28dStart = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
@@ -127,14 +131,14 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
 
   // ---- 3. Refund spike: count refunded payments in each window ----
   const [refunds7dCount, refundsPriorCount] = await Promise.all([
-    prisma.payment.count({
+    db.payment.count({
       where: {
         order: { storeId },
         status: 'refunded',
         paidAt: { gte: window7dStart },
       },
     }),
-    prisma.payment.count({
+    db.payment.count({
       where: {
         order: { storeId },
         status: 'refunded',
@@ -148,11 +152,11 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // We compare the average unit cost from InventoryHistory in the 7d window
   // vs the prior 21d window (making up the full 28d).
   const [invHistory7d, invHistory21d] = await Promise.all([
-    prisma.inventoryHistory.findMany({
+    db.inventoryHistory.findMany({
       where: { storeId, createdAt: { gte: window7dStart } },
       select: { quantity: true },
     }),
-    prisma.inventoryHistory.findMany({
+    db.inventoryHistory.findMany({
       where: { storeId, createdAt: { gte: window28dStart, lt: window7dStart } },
       select: { quantity: true },
     }),
@@ -289,13 +293,13 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
 
   // ---- 7. Gather context for Gemini explanations ----
   const [recentInventoryChanges, recentRefunds, topCoupons] = await Promise.all([
-    prisma.inventoryHistory.findMany({
+    db.inventoryHistory.findMany({
       where: { storeId, createdAt: { gte: window7dStart } },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { productId: true, type: true, quantity: true },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: {
         order: { storeId },
         status: 'refunded',
@@ -305,7 +309,7 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
       take: 5,
       select: { refundedAmount: true, paidAt: true },
     }),
-    prisma.coupon.findMany({
+    db.coupon.findMany({
       where: { storeId },
       orderBy: { usageCount: 'desc' },
       take: 5,
@@ -353,7 +357,7 @@ Return STRICT JSON: { "explanationEn": "...", "explanationAr": "...", "likelyCau
     }
 
     // ---- 9. Insert ProfitAnomaly row ----
-    await prisma.profitAnomaly.create({
+    await sw.profitAnomaly.create({
       data: {
         storeId,
         scope: AnomalyScope.store,
@@ -376,7 +380,7 @@ Return STRICT JSON: { "explanationEn": "...", "explanationAr": "...", "likelyCau
       const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       // Count p0 anomalies for this (storeId, metric) in last 24h.
       // Our just-inserted row counts as 1 — if count > 1 a duplicate already fired.
-      const p0Count24h = await prisma.profitAnomaly.count({
+      const p0Count24h = await db.profitAnomaly.count({
         where: {
           storeId,
           metric: anomaly.metric,

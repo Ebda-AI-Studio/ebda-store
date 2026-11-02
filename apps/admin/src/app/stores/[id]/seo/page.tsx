@@ -538,7 +538,7 @@ export default function StoreSeoPage() {
             ) : (
               <span aria-hidden>✨</span>
             )}
-            <span>{isGenerating ? 'Generating…' : 'Generate with AI'}</span>
+            <span>{isGenerating ? t('generating') : t('generateWithAi')}</span>
           </button>
           <button
             type="button"
@@ -683,6 +683,7 @@ export default function StoreSeoPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10">
+              {/* i18n-gate-allow: acronym badge */}
               <span className="text-xs font-bold text-primary">AEO</span>
             </div>
             <div>
@@ -799,6 +800,7 @@ export default function StoreSeoPage() {
               </p>
               {settings.googleSiteVerification && (
                 <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  {/* i18n-gate-allow: HTML meta tag sample, code not copy */}
                   {`<meta name="google-site-verification" content="${settings.googleSiteVerification}" />`}
                 </pre>
               )}
@@ -823,7 +825,7 @@ export default function StoreSeoPage() {
                   ))}
                 </select>
                 <span className="bg-muted px-3 py-2 text-sm text-muted-foreground" dir="ltr">
-                  .{'{store}'}@ebda.app
+                  {/* i18n-gate-allow: mail address template token */}.{'{store}'}@ebda.app
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{t('senderPrefixHint')}</p>
@@ -1137,7 +1139,9 @@ export default function StoreSeoPage() {
                         {howto.titleAr}
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">{howto.steps.length} steps</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('stepsCount', { count: howto.steps.length })}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button

@@ -23,7 +23,7 @@
 <div>
 <div>
 <div data-heading-row="true">
-<h2>مجموعات</h2>
+<h2 data-part="section-title">مجموعات</h2>
 </div>
 <div aria-hidden="true">
 </div>
@@ -47,7 +47,7 @@
 <div>
 <div>
 <div data-heading-row="true">
-<h2>جديد</h2>
+<h2 data-part="section-title">جديد</h2>
 <a href="/products">عرض الكل<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
 <path d="m9 6 6 6-6 6">
 </path>
@@ -57,7 +57,7 @@
 <div aria-hidden="true">
 </div>
 </div>
-<div>
+<div data-part="product-grid">
 <div>
 <article data-pack-card="dahab">
 <div>
@@ -253,7 +253,7 @@
 <div>
 <div>
 <div data-heading-row="true">
-<h2>Collections</h2>
+<h2 data-part="section-title">Collections</h2>
 </div>
 <div aria-hidden="true">
 </div>
@@ -277,7 +277,7 @@
 <div>
 <div>
 <div data-heading-row="true">
-<h2>New</h2>
+<h2 data-part="section-title">New</h2>
 <a href="/products">View all<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
 <path d="m9 6 6 6-6 6">
 </path>
@@ -287,7 +287,7 @@
 <div aria-hidden="true">
 </div>
 </div>
-<div>
+<div data-part="product-grid">
 <div>
 <article data-pack-card="dahab">
 <div>

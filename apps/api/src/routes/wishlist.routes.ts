@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { storeDb } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
@@ -170,7 +171,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const { productId } = parsed.data;
 
     // Verify product exists and belongs to this store
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       // B2B-7b: a wholesale-only product cannot be wishlisted from the anonymous storefront (404, no existence oracle)
       where: { id: productId, storeId, audience: 'public' },
     });

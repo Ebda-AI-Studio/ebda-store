@@ -59,8 +59,11 @@ import {
   isPlatformOrigin,
 } from './lib/cors-cache';
 import { healthPayload } from './lib/health-payload';
+import { storageBackendCounts } from './lib/store-backend';
+import { cfBindings } from './cf/bindings';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
+import { repoScope } from './lib/repo-factory';
 assertBillingConfigAtBoot();
 {
   // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
@@ -132,6 +135,11 @@ export const lifecycle = { isShuttingDown: false };
 installClosedTenantTxAlerting();
 setDbHopObserver(recordHop);
 
+// The backend of a store is server-side state only (Ruling CF-BACKEND-1): a client `x-ebda-backend` never reaches a handler.
+app.use((req, _res, next) => {
+  delete req.headers['x-ebda-backend'];
+  next();
+});
 // Request ID for tracing
 app.use(requestId);
 // Cutover read-only window (WRITES_FROZEN=1, docs/runbooks/cutover-cf.md): 503 to every write, reads stay open.
@@ -139,6 +147,8 @@ app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
+// Per-request repo scope (lib/repo-factory.ts, Ruling CF-REPO-1): lets a service ask for its store's backend by store id.
+app.use(repoScope);
 
 // Graceful shutdown middleware
 app.use((_req, res, next) => {
@@ -517,6 +527,8 @@ app.get(
           {} as Record<string, string>
         ),
         emailQueue: emailStats,
+        // Per-backend store counts (runbook cutover-cf s4 row 1); super_admin only, they disclose the store count.
+        storage_backend: await storageBackendCounts(cfBindings()?.PLATFORM_DB),
       },
     });
   }

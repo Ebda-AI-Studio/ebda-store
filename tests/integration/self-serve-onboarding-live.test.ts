@@ -7,30 +7,21 @@
  * product -> payment -> go live -> the storefront answers at `<slug>.ebda.app`
  * (x-store-domain) with the product -> setup guide reflects it.
  *
- * Outside production the server never sends mail: it logs the verification
- * link (`[PLATFORM-MAIL] captured`). The test reads that link from the server
- * log (API_SERVER_LOG, default /tmp/api-server.log - the file ci.yml writes).
- * If the log is unreadable the suite skips rather than faking verification.
+ * Since Stage 3 (Rulings ID-1/ID-2) signup, the verification mail and sign-in belong to the identity service, which the Node
+ * integration server has no Service Binding to. So this file asserts the Store contract for signup (a documented 503
+ * IDENTITY_UNAVAILABLE that creates nothing), then seeds the merchant row directly and presents the ES256 token the identity
+ * service would issue (tests/helpers/identity-session.ts); the signup/verification/sign-in engines are covered by
+ * apps/accounts/test/identity.test.ts and rpc.test.ts. Everything from "create store" onward runs over real HTTP as before.
  *
  * Requires the API on TEST_API_URL (default http://localhost:4000).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { prisma } from '@ebda/database';
 import { defaultNewStoreLook } from '@ebda/shared';
 import { API_BASE } from '../helpers/api-base';
 import { hasDb } from '../helpers/bundle-fixtures';
-
-const LOG = process.env.API_SERVER_LOG ?? '/tmp/api-server.log';
-const logReadable = (() => {
-  try {
-    fs.accessSync(LOG, fs.constants.R_OK);
-    return true;
-  } catch {
-    return false;
-  }
-})();
+import { mintIdentityToken } from '../helpers/identity-session';
 
 const run = crypto.randomUUID().slice(0, 8);
 const email = `live-ob-${run}@test.local`;
@@ -59,23 +50,7 @@ async function call(
   return { status: res.status, body: json };
 }
 
-/** Wait for a verification link to appear in the server log after `fromByte`. */
-async function linkAfter(fromByte: number): Promise<string> {
-  for (let i = 0; i < 50; i++) {
-    // Byte offset: the log holds multibyte (Arabic) text, so slice the Buffer.
-    const text = fs
-      .readFileSync(LOG)
-      .subarray(fromByte)
-      .toString('utf8')
-      .replace(/\x1b\[[0-9;]*m/g, ''); // pino-pretty colours values
-    const m = /link:\s*"(https?:\/\/[^"]+\/verify-email\?token=[0-9a-f]+)"/.exec(text);
-    if (m) return m[1];
-    await new Promise(r => setTimeout(r, 100));
-  }
-  throw new Error('no [PLATFORM-MAIL] verification link appeared in the server log');
-}
-
-describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_app)', () => {
+describe.skipIf(!hasDb)('self-serve onboarding over HTTP (ebda_app)', () => {
   beforeAll(async () => {
     const health = await fetch(API_BASE.replace(/\/api\/v1$/, '/health')).catch(() => null);
     if (!health?.ok) throw new Error(`API not reachable at ${API_BASE}`);
@@ -91,7 +66,6 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
 
   it('signup -> verify -> store -> product -> live, no human', async () => {
     const t0 = Date.now();
-    const logStart = fs.statSync(LOG).size;
 
     // Abuse controls (SP5 task 4): a server-signed form token, held past the
     // minimum fill time, exactly as the signup form does.
@@ -108,25 +82,39 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
         acceptedLegal: true,
       },
     });
-    expect(signup.status).toBe(200);
-    expect(signup.body?.data).toEqual({ emailVerificationSent: true });
+    // The Node server has no ACCOUNTS binding: signup is the documented fail-closed 503 and creates no account.
+    expect(signup.status).toBe(503);
+    expect(signup.body?.error?.code).toBe('IDENTITY_UNAVAILABLE');
+    expect(await prisma.user.count({ where: { email } })).toBe(0);
 
-    // Before verification: can sign in, cannot create a store.
+    // The merchant as the identity service + shadow reconcile would leave them: an UNVERIFIED profile row.
+    const merchant = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: '!identity',
+        firstName: 'Live',
+        lastName: 'Merchant',
+        role: 'store_admin',
+        emailVerified: false,
+      },
+    });
+    const tokenFor = (emailVerified: boolean) =>
+      mintIdentityToken({ userId: merchant.id, email, emailVerified });
+    // The Store's own password login is closed for it (the identity service signs it in).
     const early = await call('POST', '/auth/login', { body: { email, password: PASSWORD } });
-    expect(early.status).toBe(200);
+    expect(early.status).toBe(401);
+
+    // Before verification: a session exists, but no store can be created.
     const denied = await call('POST', '/onboarding/store', {
-      jwt: early.body!.data.accessToken,
+      jwt: await tokenFor(false),
       body: { name: 'Early', slug },
     });
     expect(denied.status).toBe(403);
     expect(denied.body?.error?.code).toBe('EMAIL_NOT_VERIFIED');
 
-    const token = new URL(await linkAfter(logStart)).searchParams.get('token')!;
-    expect((await call('POST', '/auth/verify-email', { body: { token } })).status).toBe(200);
-    expect((await call('POST', '/auth/verify-email', { body: { token } })).status).toBe(400); // single-use
-
-    const login = await call('POST', '/auth/login', { body: { email, password: PASSWORD } });
-    const jwt = login.body!.data.accessToken as string;
+    // Verified at the identity service; the shadow row follows at the next sign-in.
+    await prisma.user.update({ where: { id: merchant.id }, data: { emailVerified: true } });
+    const jwt = await tokenFor(true);
 
     const created = await call('POST', '/onboarding/store', {
       jwt,

@@ -156,28 +156,30 @@ test('slow 3G: each look home loads and its LCP element is the hero image', asyn
     downloadThroughput: 50_000,
     uploadThroughput: 50_000,
   });
+  // Registered ONCE: an init script added inside the loop runs again on every later navigation, so the
+  // Nth store would count its layout shifts N times over (lookbook, the 2nd, read 2 x 0.05 = 0.10).
+  await page.addInitScript(() => {
+    (
+      window as unknown as { __lcp: Array<{ tag?: string; inHero: boolean }>; __cls: number }
+    ).__lcp = [];
+    (window as unknown as { __cls: number }).__cls = 0;
+    new PerformanceObserver(l => {
+      for (const e of l.getEntries()) {
+        const el = (e as PerformanceEntry & { element?: Element }).element;
+        (window as unknown as { __lcp: Array<{ tag?: string; inHero: boolean }> }).__lcp.push({
+          tag: el?.tagName,
+          inHero: !!el?.closest('[data-section="hero"]'),
+        });
+      }
+    }).observe({ type: 'largest-contentful-paint', buffered: true });
+    new PerformanceObserver(l => {
+      for (const e of l.getEntries() as Array<
+        PerformanceEntry & { hadRecentInput?: boolean; value?: number }
+      >)
+        if (!e.hadRecentInput) (window as unknown as { __cls: number }).__cls += e.value ?? 0;
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
   for (const store of LOOK_STORES) {
-    await page.addInitScript(() => {
-      (
-        window as unknown as { __lcp: Array<{ tag?: string; inHero: boolean }>; __cls: number }
-      ).__lcp = [];
-      (window as unknown as { __cls: number }).__cls = 0;
-      new PerformanceObserver(l => {
-        for (const e of l.getEntries()) {
-          const el = (e as PerformanceEntry & { element?: Element }).element;
-          (window as unknown as { __lcp: Array<{ tag?: string; inHero: boolean }> }).__lcp.push({
-            tag: el?.tagName,
-            inHero: !!el?.closest('[data-section="hero"]'),
-          });
-        }
-      }).observe({ type: 'largest-contentful-paint', buffered: true });
-      new PerformanceObserver(l => {
-        for (const e of l.getEntries() as Array<
-          PerformanceEntry & { hadRecentInput?: boolean; value?: number }
-        >)
-          if (!e.hadRecentInput) (window as unknown as { __cls: number }).__cls += e.value ?? 0;
-      }).observe({ type: 'layout-shift', buffered: true });
-    });
     const res = await page.goto(`${hostOf(store)}/`, { waitUntil: 'load', timeout: 240_000 });
     expect(res?.status(), store).toBe(200);
     // The hero photo is the LCP candidate: let it finish on the throttled link, then settle.

@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { recordSlugRedirect } from './slug-redirect.service';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 /**
  * Per-store blog service (Bucket E1, 2026-05-17).
@@ -57,7 +58,8 @@ export class BlogService {
   static async listPublished(storeId: string, options: { limit?: number; offset?: number } = {}) {
     const limit = Math.min(50, Math.max(1, options.limit ?? 20));
     const offset = Math.max(0, options.offset ?? 0);
-    const posts = await prisma.blogPost.findMany({
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    const posts = await db.blogPost.findMany({
       where: { storeId, isPublished: true },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit,
@@ -80,7 +82,8 @@ export class BlogService {
   /** Public-read: single post by slug. Returns null if unpublished. */
   static async getPublishedBySlug(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);
-    const post = await prisma.blogPost.findFirst({
+    const db = await storeDb(storeId);
+    const post = await db.blogPost.findFirst({
       where: { storeId, slug, isPublished: true },
       select: {
         id: true,
@@ -101,7 +104,8 @@ export class BlogService {
 
   /** Admin-read: list all posts (including drafts), newest first. */
   static async listAll(storeId: string) {
-    return prisma.blogPost.findMany({
+    const db = await storeDb(storeId);
+    return db.blogPost.findMany({
       where: { storeId },
       orderBy: [{ createdAt: 'desc' }],
     });
@@ -109,7 +113,8 @@ export class BlogService {
 
   /** Admin-read: single post by id. */
   static async getById(storeId: string, postId: string) {
-    const post = await prisma.blogPost.findFirst({
+    const db = await storeDb(storeId);
+    const post = await db.blogPost.findFirst({
       where: { id: postId, storeId },
     });
     if (!post) throw new AppError(404, 'NOT_FOUND', 'Blog post not found');
@@ -121,14 +126,15 @@ export class BlogService {
     assertValidSlug(slug);
     // Slug uniqueness check up front so the merchant sees a clean error
     // instead of a generic Prisma P2002 unique-violation.
-    const existing = await prisma.blogPost.findUnique({
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+    const existing = await w.blogPost.findUnique({
       where: { storeId_slug: { storeId, slug } },
     });
     if (existing) {
       throw new AppError(409, 'SLUG_TAKEN', 'A blog post with that slug already exists');
     }
     const isPublished = payload.isPublished === true;
-    return prisma.blogPost.create({
+    return w.blogPost.create({
       data: {
         storeId,
         slug,
@@ -154,7 +160,9 @@ export class BlogService {
       newSlug = normalizeSlug(payload.slug);
       assertValidSlug(newSlug);
       if (newSlug !== existing.slug) {
-        const collision = await prisma.blogPost.findUnique({
+        const collision = await (
+          await storeDb(storeId)
+        ).blogPost.findUnique({
           where: { storeId_slug: { storeId, slug: newSlug } },
         });
         if (collision && collision.id !== postId) {
@@ -190,7 +198,9 @@ export class BlogService {
     // via `runInTenantContext`). Calling the proxied `prisma` directly (not a
     // nested `prisma.$transaction`) lets both the update and the capture ride
     // that ambient tx — atomic, and RLS-enforced.
-    const updated = await prisma.blogPost.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).blogPost.update({
       where: { id: postId, storeId },
       data: updateData,
     });
@@ -214,7 +224,7 @@ export class BlogService {
 
   static async remove(storeId: string, postId: string) {
     const existing = await this.getById(storeId, postId);
-    await prisma.blogPost.delete({ where: { id: postId, storeId } });
+    await (await storeWriter(storeId)).blogPost.delete({ where: { id: postId, storeId } });
     if (existing.coverImage) {
       void deleteR2ObjectIfOrphan(existing.coverImage).catch(err =>
         logger.warn({ err, storeId, postId }, '[blog.remove] r2 cleanup failed')

@@ -717,7 +717,8 @@ describe.skipIf(!hasDb)('product embedding indexer (Task 11)', () => {
       })
     );
     expect(r).toMatchObject({ embedded: 0, done: true });
-    expect(steps).toEqual(['plan-0']);
+    // the backend lookup is its own durable step now (jobs-workflow-safety); still no AI call and no write step
+    expect(steps).toEqual(['is-do-store', 'plan-0']);
     expect(f.calls.length).toBe(calls);
   });
 

@@ -19,3 +19,29 @@ export function createDatabaseRoleGuard(): (query: () => Promise<DatabaseRole[]>
     validated = true;
   };
 }
+
+/** The slice of a driver adapter the role query needs (structural: `SqlDriverAdapter` satisfies it). */
+export interface RoleQueryable {
+  queryRaw(q: { sql: string; args: unknown[]; argTypes: unknown[] }): Promise<{
+    columnNames: string[];
+    rows: unknown[][];
+  }>;
+}
+
+/** Is the connection role superuser or BYPASSRLS? Read on the request's own connection. */
+export async function queryDatabaseRole(db: RoleQueryable): Promise<DatabaseRole[]> {
+  const res = await db.queryRaw({
+    sql:
+      'SELECT current_user::text AS "currentUser", (rolbypassrls OR rolsuper) AS bypass ' +
+      'FROM pg_roles WHERE rolname = current_user',
+    args: [],
+    argTypes: [],
+  });
+  const iUser = res.columnNames.indexOf('currentUser');
+  const iBypass = res.columnNames.indexOf('bypass');
+  return res.rows.map(r => ({
+    currentUser: String(r[iUser] ?? ''),
+    // Anything but a literal false (null, a string) is treated as unsafe by the guard.
+    bypass: r[iBypass] as boolean,
+  }));
+}

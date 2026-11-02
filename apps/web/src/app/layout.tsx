@@ -39,7 +39,7 @@ import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
-import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@ebda/shared';
+import { type MarketingPixels, BRAND, lookTraitAttrs, resolveDefaultLanguage } from '@ebda/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { lookHead } from '../lib/look-head';
 import { DemoLookBar } from '../components/demo/DemoLookBar';
@@ -181,6 +181,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // aren't visible to the same response's server components). Cookie
   // fallback covers subsequent navigations within the iframe.
   const headersList = await headers();
+  // The per-request CSP nonce set by middleware.ts: script-src accepts only nonced scripts (Ruling CSP-WEB-1).
+  const nonce = headersList.get('x-nonce') ?? undefined;
   // An old unprefixed URL of a store with language-in-the-URL ON (LOCALE-PATHS-1): the middleware has no store, so it
   // marked the request; here the store's own `settings.defaultLanguage` decides where it goes. Permanent to the default
   // language, temporary to the visitor's cookie language when it differs.
@@ -562,6 +564,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {combinedStyleTag && <style dangerouslySetInnerHTML={{ __html: combinedStyleTag }} />}
         {/* Detect system dark mode preference and apply .dark class before paint */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `
               try {
@@ -600,6 +603,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         }
         // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
         data-look={look?.dataLook}
+        // TEMPLATES-MOCK-2/-6: the merchant's (else the look's) mock traits, read by globals.css; none for a legacy store.
+        {...lookTraitAttrs(effectiveTheme, store.look)}
       >
         {/* Reset scroll to top on every route change — the body is the scroll
             container on browsers without `overflow: clip` (see globals.css, #124), so
@@ -670,6 +675,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                           Object.keys(store.marketingPixels).length > 0 && (
                             <MarketingPixelsProvider
                               pixels={store.marketingPixels as MarketingPixels}
+                              nonce={nonce}
                             />
                           )}
                         {/* PWA is active only when BOTH the store toggle AND the

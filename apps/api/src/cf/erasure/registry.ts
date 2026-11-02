@@ -1,9 +1,16 @@
 /**
- * Which StoreDO tables hold personal data, and how a customer is found in them. Every table in
- * STORE_TABLES MUST be classified here (a unit test fails the PR that adds a table without deciding):
- * that is the contract with the phase-1 schema owner. Column names are SQLite column names.
+ * Which StoreDO tables hold personal data, and how a customer is found in them. Every table the live StoreDO schema
+ * holds MUST be classified here before customer erasure/export may run on it (`unclassifiedTables`; the StoreDO
+ * refuses a customer subject while any table is unclassified, so a missing entry fails CLOSED, never silently skips PII).
+ * Column names are SQLite column names.
+ *
+ * STATE (INFRA-CF-1 PR D1, Ruling CF-ERASE-3): the registry is GENERATED (registry.generated.ts) from
+ * packages/cf-schema/erasure-classification.json and the store migrations by scripts/cf/gen-erasure-registry.mjs; CI runs
+ * it with `--check`, so a schema or classification change that is not regenerated fails the build. Every one of the
+ * 122 tables is classified, and a table the live DO has that the registry lacks still fails customer subjects closed.
  */
-import { STORE_TABLES } from '../store-do/tables';
+
+import { GENERATED_STORE_DO_REGISTRY } from './registry.generated';
 
 export type TableClass =
   | { kind: 'no-pii' }
@@ -12,26 +19,27 @@ export type TableClass =
   | {
       kind: 'customer-pii';
       /** Columns that identify the customer; a row matches when ANY supplied subject key equals ONE of them. */
-      match: { buyerKey?: string; email?: string; phone?: string; userId?: string };
+      match: {
+        buyerKey?: string;
+        email?: string;
+        phone?: string;
+        userId?: string;
+        /** Column holding a `customers.id`: matched through the customers rows the subject resolves to (see store-do-sql). */
+        customerId?: string;
+      };
+      /** The table has no subject column of its own and is reached through its parent (shipments -> orders). */
+      via?: { column: string; table: string };
       /** 'delete' removes the row; 'scrub' keeps it (orders keep money history) and overwrites the columns. */
       action: 'delete' | 'scrub';
       /** For 'scrub': column -> replacement (NOT NULL columns need a string, e.g. '[erased]'). */
       scrub?: Record<string, string | null>;
     };
 
-export const STORE_DO_REGISTRY: Record<string, TableClass> = {
-  stores: { kind: 'store-owned' },
-  products: { kind: 'store-owned' },
-  product_variants: { kind: 'store-owned' },
-  // carts: session_id is a random cookie id, no customer identifier in the phase-0 schema.
-  carts: { kind: 'no-pii' },
-  cart_items: { kind: 'no-pii' },
-  // orders/order_items: no customer columns in phase 0. Phase 1 adds the customer, address and buyer_key
-  // columns and MUST replace this with a 'customer-pii' scrub entry (orders stay, identity goes).
-  orders: { kind: 'no-pii' },
-  order_items: { kind: 'no-pii' },
-};
+export const STORE_DO_REGISTRY: Record<string, TableClass> = GENERATED_STORE_DO_REGISTRY;
 
 export const classifiedTables = (): string[] => Object.keys(STORE_DO_REGISTRY);
-export const unclassifiedTables = (): string[] =>
-  STORE_TABLES.filter(t => !(t in STORE_DO_REGISTRY));
+/** Tables of a live StoreDO (`storeTables(sql)`) that have no registry entry. */
+export const unclassifiedTables = (
+  liveTables: readonly string[],
+  reg: Record<string, TableClass> = STORE_DO_REGISTRY
+): string[] => liveTables.filter(t => !(t in reg));

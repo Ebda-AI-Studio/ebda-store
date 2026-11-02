@@ -8,7 +8,8 @@ import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from '../services/product-
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { importCsvToPlatformCsv } from '../services/csv-import';
 import { buildImportPreview } from '../services/import-preview';
-import { prisma, ProductStatus } from '@ebda/database';
+import { currentStoreId, prisma, ProductStatus } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
@@ -130,7 +131,9 @@ router.get(
         };
       }
 
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where,
         include: {
           images: { orderBy: { position: 'asc' } },
@@ -307,7 +310,9 @@ router.post(
       }
 
       // The store's current prices feed the "looks like piastres" warning.
-      const existing = await prisma.product.findMany({
+      const existing = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, deletedAt: null },
         select: { price: true },
         take: 5000,
@@ -360,7 +365,9 @@ router.post(
       // the same way into the same internal platform CSV. Either way the single BulkService importer does the work.
       const converted = importCsvToPlatformCsv(csvData);
 
-      const job = await prisma.bulkImportJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkImportJob.create({
         data: {
           storeId,
           userId,
@@ -446,7 +453,9 @@ router.post(
         trackInventory: parsedOptions.trackInventory,
       });
 
-      const job = await prisma.bulkImportJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkImportJob.create({
         data: {
           storeId,
           userId,
@@ -492,7 +501,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, jobId } = req.params;
-      const job = await prisma.bulkImportJob.findFirst({
+      const job = await (
+        await storeDb(currentStoreId())
+      ).bulkImportJob.findFirst({
         where: { id: jobId, storeId },
         select: {
           id: true,

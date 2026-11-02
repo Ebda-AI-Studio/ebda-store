@@ -12,9 +12,10 @@
  */
 
 import type { PaymentStatus } from '@ebda/database';
-import { Prisma, prisma } from '@ebda/database';
+import { Prisma, prisma, withStore } from '@ebda/database';
 import logger from '../lib/logger';
 import { withSavepoint } from '../lib/savepoint';
+import { storeMoney } from '../lib/repo-factory';
 
 /** Coarse-grained categorisation so audit UIs can filter quickly. */
 export type PaymentEventType =
@@ -81,6 +82,35 @@ export async function recordPaymentEvent(input: RecordPaymentEventInput): Promis
         toStatus: input.toStatus,
       },
       '[PAYMENT-EVENT] failed to record event'
+    );
+  }
+}
+
+/**
+ * `recordPaymentEvent` for a BACKGROUND JOB that knows only the store (Ruling CF-JOBS-4): a store on its Durable Object
+ * appends the row there (`paymentEventRecord`, in the DO's own timeline), a Postgres store inside its tenant scope as before.
+ * Same contract: never throws.
+ */
+export async function recordPaymentEventForStore(input: RecordPaymentEventInput): Promise<void> {
+  try {
+    const money = await storeMoney(input.storeId);
+    if (money) {
+      await money.paymentEventRecord({
+        paymentId: input.paymentId,
+        orderId: input.orderId,
+        eventType: input.eventType,
+        fromStatus: input.fromStatus ?? null,
+        toStatus: input.toStatus ?? null,
+        provider: input.provider ?? null,
+        details: (input.details ?? {}) as Record<string, unknown>,
+      });
+      return;
+    }
+    await withStore(input.storeId, () => recordPaymentEvent(input));
+  } catch (err) {
+    logger.error(
+      { err, paymentId: input.paymentId, eventType: input.eventType },
+      '[PAYMENT-EVENT] failed to record job event'
     );
   }
 }

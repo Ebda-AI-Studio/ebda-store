@@ -1,3 +1,5 @@
+import pg from 'pg';
+import jwt from 'jsonwebtoken';
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { assertLocalOnly, orderBelongsToRun } from './commerce-b0.guards';
 /**
@@ -19,7 +21,8 @@ import { assertLocalOnly, orderBelongsToRun } from './commerce-b0.guards';
  *
  * Env:
  *   B0_REQUIRE_STACK=1                          fail instead of skip when the stack/credentials are missing
- *   B0_OWNER_EMAIL / B0_OWNER_PASSWORD          REQUIRED, the store owner's login (env only, never a file)
+ *   B0_OWNER_EMAIL / B0_JWT_SECRET / B0_DB_URL  REQUIRED: the owner's email, the LOCAL API's JWT secret and the LOCAL owner DB URL
+ *                                              (merchants sign in at the identity service, so the spec mints the token; env only)
  *   B0_WEB_URL      storefront origin           default http://b0-minimal.localhost:3100
  *   B0_API_URL      API origin + /api/v1        default http://127.0.0.1:4100/api/v1
  *   B0_STORE_SLUG   store slug                  default b0-minimal
@@ -39,10 +42,27 @@ const STORE_SLUG = process.env.B0_STORE_SLUG ?? 'b0-minimal';
 const PRODUCT_SLUG = process.env.B0_PRODUCT_SLUG ?? 'linen-abaya';
 const REQUIRE_STACK = process.env.B0_REQUIRE_STACK === '1';
 
-function ownerCredentials(): { email: string; password: string } | null {
+function ownerCredentials(): { email: string; secret: string; db: string } | null {
   const email = process.env.B0_OWNER_EMAIL;
-  const password = process.env.B0_OWNER_PASSWORD;
-  return email && password ? { email, password } : null;
+  const secret = process.env.B0_JWT_SECRET;
+  const db = process.env.B0_DB_URL;
+  return email && secret && db ? { email, secret, db } : null;
+}
+
+/** The owner's API token, minted like the integration tests do (POST /auth/login answers 409 USE_IDENTITY_SERVICE). */
+async function mintOwnerToken(c: { email: string; secret: string; db: string }): Promise<string> {
+  const client = new pg.Client({ connectionString: c.db });
+  await client.connect();
+  const r = await client.query('select id, role from users where email = $1 and store_id is null', [
+    c.email,
+  ]);
+  await client.end();
+  expect(r.rowCount, 'the owner exists').toBe(1);
+  return jwt.sign({ userId: r.rows[0].id, email: c.email, role: r.rows[0].role, tv: 0 }, c.secret, {
+    expiresIn: '1h',
+    issuer: 'ebda-api',
+    audience: 'ebda-app',
+  });
 }
 
 type Json = Record<string, any>;
@@ -86,15 +106,13 @@ test.describe('commerce b0 flow @local-stack', () => {
         stackUp = false;
         if (REQUIRE_STACK) {
           throw new Error(
-            `B0_REQUIRE_STACK=1 but the local B0 stack is not usable: api=${ping ? ping.status() : 'unreachable'} (${API}), web=${web ? web.status() : 'unreachable'} (${WEB}), credentials=${creds ? 'set' : 'MISSING (B0_OWNER_EMAIL / B0_OWNER_PASSWORD)'}. See tests/smoke/commerce-b0.setup.md.`
+            `B0_REQUIRE_STACK=1 but the local B0 stack is not usable: api=${ping ? ping.status() : 'unreachable'} (${API}), web=${web ? web.status() : 'unreachable'} (${WEB}), credentials=${creds ? 'set' : 'MISSING (B0_OWNER_EMAIL / B0_JWT_SECRET / B0_DB_URL)'}. See tests/smoke/commerce-b0.setup.md.`
           );
         }
         return;
       }
 
-      const login = await request.post(`${API}/auth/login`, { data: creds });
-      expect(login.status(), 'owner login').toBe(200);
-      token = (await login.json()).data.accessToken;
+      token = await mintOwnerToken(creds);
 
       const stores = await adminFetch(request, 'get', '/stores');
       storeId = stores.body.data.stores.find((s: Json) => s.slug === STORE_SLUG)?.id;

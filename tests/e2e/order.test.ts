@@ -14,7 +14,7 @@ import mfaRoutes from '@api/routes/mfa.routes';
 import { CartService } from '@api/services/cart.service';
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { errorHandler } from '@api/middleware/error-handler';
-import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
+import { createSuperAdminWithMfa, loginAsSuperAdmin, mintAccessToken } from './helpers/mfa-login';
 
 // Order routes expect mergeParams so req.params.storeId is accessible inside the router.
 // Mount under /stores/:storeId/orders matching the production route shape.
@@ -75,11 +75,11 @@ describe('Order Flow', () => {
       },
     });
     storeAdminId = storeAdmin.id;
-    const storeAdminLogin = await request(app).post('/auth/login').send({
+    storeAdminToken = mintAccessToken({
+      id: storeAdmin.id,
       email: storeAdminEmail,
-      password: storeAdminPassword,
+      role: 'store_admin',
     });
-    storeAdminToken = storeAdminLogin.body.data?.accessToken;
 
     // Create test store
     const store = await prisma.store.create({

@@ -66,6 +66,8 @@ export interface CodConfirmationInput {
   /** Order total, MINOR units (piastres). */
   totalMinor: number;
   address?: WaMeAddress | null;
+  /** The delivery pick (deliveryLineFromNotes), when the order has one. */
+  deliveryLine?: string | null;
   storeName?: string | null;
 }
 
@@ -80,6 +82,7 @@ export function buildCodConfirmationMessage(i: CodConfirmationInput): string {
       items && `الأصناف: ${items}`,
       `الإجمالي: ${total}`,
       addr && `عنوان التوصيل: ${addr}`,
+      i.deliveryLine && `موعد التوصيل: ${i.deliveryLine}`,
       'رد بـ «نعم» للتأكيد.',
     ]
       .filter(Boolean)
@@ -90,6 +93,7 @@ export function buildCodConfirmationMessage(i: CodConfirmationInput): string {
     items && `Items: ${items}`,
     `Total: ${total}`,
     addr && `Delivery address: ${addr}`,
+    i.deliveryLine && `Delivery: ${i.deliveryLine}`,
     'Reply YES to confirm.',
   ]
     .filter(Boolean)

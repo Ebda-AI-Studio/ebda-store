@@ -5,7 +5,8 @@
 // type-only, so there is no runtime circular dependency back to this file.
 import { deriveBrandRoles } from '../utils/brand-roles';
 import { statusInkVars } from '../utils/status-ink';
-import { colorToHslTriplet } from '../utils/color';
+import { colorToHslTriplet, hexToHsl } from '../utils/color';
+import { accentPriceReads } from '../looks/traits';
 import type {
   Density,
   ImageRatio,
@@ -15,6 +16,13 @@ import type {
   WordmarkSize,
   HeaderLogoPlacement,
   HeaderSearchPlacement,
+  HeaderWordmark,
+  HeroRatio,
+  TabBarMode,
+  HeadingWeight,
+  PriceColour,
+  CardChrome,
+  GridGutter,
   CardCta,
   CardHover,
   CardBadge,
@@ -167,6 +175,21 @@ export interface StoreTheme {
   // Never set by a look: merchant > look chrome > skin default. Absent = the look's own value.
   headerLogoPlacement?: HeaderLogoPlacement;
   headerSearch?: HeaderSearchPlacement;
+  // TEMPLATES-MOCK-3: the designed wordmark lockup for a store without a logo; unset = lockup, `plain` opts out.
+  headerWordmark?: HeaderWordmark;
+  // TEMPLATES-MOCK-4: mobile hero ratio; unset = the look's mock ratio.
+  heroRatio?: HeroRatio;
+  // TEMPLATES-MOCK-5: phone tab bar; unset = `inner` on a look store, `always` otherwise.
+  tabBar?: TabBarMode;
+  // TEMPLATES-MOCK-6: section heading weight and card price colour; unset = the look's own.
+  headingWeight?: HeadingWeight;
+  priceColour?: PriceColour;
+  // TEMPLATES-MOCK-7: card chrome on home grids; unset = off on a look store (the mock's bare cards).
+  cardHeart?: CardChrome;
+  cardSwatches?: CardChrome;
+  cardTags?: CardChrome;
+  // TEMPLATES-MOCK-8: home product grid gutter; unset = the look's own (tight on qamar.atelier, else the old gaps).
+  gridGutter?: GridGutter;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
@@ -1004,7 +1027,14 @@ export function lookCssVars(
   if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
   if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
   if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];
-  Object.assign(v, mockCssVars(lookId));
+  Object.assign(v, mockCssVars(lookId, theme));
+  // TEMPLATES-MOCK-6: the card price in the look's accent, only when the accent itself reads (>= 4.5:1) on the
+  // page AND the card. A look whose accent does not (a pale accent on a light card over a dark page, measured by
+  // axe on qamar.lookbook / souq.night) leaves the var unset and the price keeps the text colour.
+  if (theme.accentColor && accentPriceReads(theme)) {
+    const a = theme.accentColor;
+    v['--look-price-colour'] = a.startsWith('#') ? hexToHsl(a) : a;
+  }
   return v;
 }
 

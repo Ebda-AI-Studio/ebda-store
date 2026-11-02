@@ -141,6 +141,28 @@ async function main() {
   const smokeConfig = path.join(API, '.wrangler.smoke.jsonc');
   writeFileSync(smokeConfig, smokeSource);
 
+  // The config binds the platform D1 (`PLATFORM_DB`, the per-store backend switch); a fresh local one has no `stores` table, so
+  // every store read would 503 (STORE_BACKEND_UNAVAILABLE). Apply its migrations to the same local state `wrangler dev` reads.
+  const d1 = spawnSync(
+    'npx',
+    [
+      'wrangler',
+      'd1',
+      'migrations',
+      'apply',
+      'PLATFORM_DB',
+      '--local',
+      '--config',
+      '.wrangler.smoke.jsonc',
+    ],
+    { cwd: API, encoding: 'utf8' }
+  );
+  if (d1.status !== 0) {
+    rmSync(devVars, { force: true });
+    rmSync(smokeConfig, { force: true });
+    throw new Error(`local D1 migrations failed: ${d1.stderr || d1.stdout}`);
+  }
+
   const logPath = path.join(tmpdir(), `workerd-smoke-${process.pid}.log`);
   const log = createWriteStream(logPath);
   const child = spawn(

@@ -1,3 +1,4 @@
+import { storeDb } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 
 /** Orders looked at, and products returned, by "order again" (Ruling B4-8). */
@@ -50,7 +51,9 @@ export class CustomerReorderService {
       for (const item of order.items)
         if (!ordered.includes(item.productId)) ordered.push(item.productId);
     if (ordered.length === 0) return [];
-    const live = await prisma.product.findMany({
+    const live = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where: { storeId, id: { in: ordered }, status: 'active', deletedAt: null },
       select: { id: true },
     });

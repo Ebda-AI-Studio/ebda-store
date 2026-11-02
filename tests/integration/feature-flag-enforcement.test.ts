@@ -19,13 +19,13 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { API_BASE } from '../helpers/api-base';
+import { identityTokenFor, identityTokenForEmail } from '../helpers/identity-session';
 
 // One knob (TEST_API_URL) points the whole suite at one API, so a run cannot
 // silently talk to whatever holds port 4000 — which on this machine was a
 // different project's dev server for five days. See tests/helpers/api-base.ts.
 const API_URL = API_BASE;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@ebda.app';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // ─── Shared test fixtures ────────────────────────────────────────────────────
 
@@ -67,14 +67,8 @@ function authHeader(token: string) {
 }
 
 beforeAll(async () => {
-  // 1. Log in as super_admin
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-  });
-  const loginData = await loginRes.json();
-  superAdminToken = loginData.data?.accessToken;
+  // 1. Platform admin: signs in at the identity service now, so mint its token (Rulings ID-1/ID-2)
+  superAdminToken = await identityTokenForEmail(ADMIN_EMAIL);
 
   // 2. Create a test store_admin user
   const hashedPw = await bcrypt.hash(STORE_ADMIN_PASSWORD, 10);
@@ -102,14 +96,8 @@ beforeAll(async () => {
   });
   testStoreId = store.id;
 
-  // 4. Log in as store_admin
-  const storeAdminLoginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: STORE_ADMIN_EMAIL, password: STORE_ADMIN_PASSWORD }),
-  });
-  const storeAdminLoginData = await storeAdminLoginRes.json();
-  storeAdminToken = storeAdminLoginData.data?.accessToken;
+  // 4. Merchant token from the identity stand-in (the Store's /auth/login is closed for store_admin)
+  storeAdminToken = await identityTokenFor(adminUser.id);
 });
 
 afterAll(async () => {

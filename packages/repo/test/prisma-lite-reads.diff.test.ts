@@ -188,6 +188,15 @@ run('prisma-lite reads == Prisma reads', () => {
       }),
     ],
     [
+      "order by a relation's row count, Prisma's shape ({ rel: { _count } }), then a tiebreak",
+      'product',
+      () => ({
+        where: { storeId },
+        orderBy: [{ variants: { _count: 'desc' } }, { images: { _count: 'asc' } }, { slug: 'asc' }],
+        select: { slug: true, _count: { select: { variants: true } } },
+      }),
+    ],
+    [
       'category ordered by joined product createdAt',
       'productCategory',
       () => ({

@@ -1,3 +1,4 @@
+import { renewNonce } from './csp-nonce-renew';
 /**
  * Ruling STORE-EDGE-1 (SEO-2 / P14): real merchant storefront HTML from the Cloudflare edge, purged per store on every write.
  *
@@ -170,7 +171,9 @@ function isStorable(res: Response): boolean {
 }
 
 function clientCopy(res: Response, state: string): Response {
-  const out = new Response(res.body, res);
+  // A stored page is served to many visitors: each response gets its own CSP nonce (Ruling CSP-WEB-1).
+  const out =
+    state === 'MISS' ? new Response(res.body, res) : renewNonce(new Response(res.body, res));
   out.headers.set('Cache-Control', 'private, no-store');
   out.headers.set('x-store-edge', state);
   out.headers.delete('vary');

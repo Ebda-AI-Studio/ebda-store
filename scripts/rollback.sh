@@ -30,7 +30,9 @@ if ! git diff --quiet || ! git diff --staged --quiet; then
 fi
 
 # Ebda writes hand-built migrations under packages/database/prisma/migrations/<TS>_<name>/migration.sql
-if git diff HEAD~1 HEAD --name-only | grep -qE "packages/database/prisma/migrations|migration\.sql$"; then
+# capture first: `git diff | grep -q` under pipefail SIGPIPEs git on a large diff and would silently skip this warning
+CHANGED_FILES="$(git diff HEAD~1 HEAD --name-only)"
+if grep -qE "packages/database/prisma/migrations|migration\.sql$" <<<"$CHANGED_FILES"; then
   echo "⚠️  HEAD includes a Prisma migration. Code rollback won't undo schema changes."
   echo "   See docs/ROLLBACK.md → 'C. Data rollback'"
   echo

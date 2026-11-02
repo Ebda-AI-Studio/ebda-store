@@ -346,7 +346,7 @@ export default function PurchaseOrderDetailPage() {
             onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders`)}
             className="text-sm text-muted-foreground underline underline-offset-2 hover:opacity-80"
           >
-            ← Back to purchase orders
+            {t('backToPurchaseOrders')}
           </button>
         </div>
       </div>

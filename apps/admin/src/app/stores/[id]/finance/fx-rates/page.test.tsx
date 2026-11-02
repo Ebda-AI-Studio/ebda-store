@@ -88,7 +88,7 @@ const filterSelect = () => screen.getAllByRole('combobox')[1];
 describe('fx rates — refetch reads the CURRENT filter, latest wins (issue 2443)', () => {
   it('a save resolving after the currency filter changed repaints the CURRENT filter', async () => {
     await loadAll();
-    fireEvent.change(screen.getByPlaceholderText('e.g. 50.00'), { target: { value: '50' } });
+    fireEvent.change(screen.getByPlaceholderText('rateExample2'), { target: { value: '50' } });
     fireEvent.click(screen.getByText('saveRate')); // POST in flight, started under "all"
     await waitFor(() => expect(posts).toHaveLength(1));
     fireEvent.change(filterSelect(), { target: { value: 'USD' } });

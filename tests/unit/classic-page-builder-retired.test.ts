@@ -54,17 +54,26 @@ describe('the classic page builder redirects to the visual editor', () => {
   });
 });
 
-describe('the catalog hub has one editor tab', () => {
-  it('buildTabs lists /builder once and no page-builder tab', async () => {
-    const { HUBS } = await import('../../apps/admin/src/components/admin-layout/hubs');
+describe('the editor is its own sidebar entry (T9), not a catalog tab', () => {
+  it('the editor hub owns /builder and /page-builder, the catalog hub lists neither', async () => {
+    const { HUBS, detectHub } = await import('../../apps/admin/src/components/admin-layout/hubs');
+    const { buildStoreAdminNav } =
+      await import('../../apps/admin/src/components/admin-layout/buildStoreAdminNav');
     const catalog = HUBS.find(h => h.key === 'catalog')!;
     const labels = new Proxy({}, { get: (_t, k) => String(k) }) as never;
     const tabs = catalog.buildTabs('st1', labels);
-    expect(tabs.filter(t => t.href === '/stores/st1/builder')).toHaveLength(1);
-    expect(tabs.filter(t => /page-builder/.test(t.href))).toEqual([]);
-    expect(tabs.find(t => t.href === '/stores/st1/builder')!.label).toBe('editor');
-    // an old /page-builder URL still highlights the catalog hub (redirect target highlighting)
-    expect(catalog.urlPrefixes).toContain('/page-builder');
+    expect(tabs.filter(t => /builder/.test(t.href))).toEqual([]);
+    expect(catalog.urlPrefixes).not.toContain('/builder');
+    expect(catalog.urlPrefixes).not.toContain('/page-builder');
+    // an old /page-builder URL still highlights the editor entry (redirect target highlighting)
+    expect(detectHub('/stores/st1/builder', 'st1')?.key).toBe('editor');
+    expect(detectHub('/stores/st1/page-builder', 'st1')?.key).toBe('editor');
+    expect(detectHub('/stores/st1/blog', 'st1')?.key).toBe('catalog');
+    const items = buildStoreAdminNav('st1', labels);
+    const editor = items.filter(i => i.href === '/stores/st1/builder');
+    expect(editor).toHaveLength(1);
+    expect(editor[0].hubKey).toBe('editor');
+    expect(editor[0].name).toBe('editor');
   });
 });
 

@@ -22,7 +22,7 @@ import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
 import { createServer } from 'node:http';
 import app from './app';
-import { ClientPoolTimeout, createIsolateDb, prisma, type IsolateDb } from '@ebda/database';
+import { ClientPoolTimeout, createIsolateDb, type IsolateDb } from '@ebda/database';
 import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
@@ -30,13 +30,18 @@ import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
+import { parkIfFrozen, type ParkableBatch } from './cf/queue-freeze';
 import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
 import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
 import { routeCutover } from './cf/cutover';
 import { runJobWorkflow } from './lib/jobs/run-workflow';
 import type { JobParams } from './lib/jobs/start';
-import { createDatabaseRoleGuard } from './cf/database-role-guard';
+import {
+  createDatabaseRoleGuard,
+  queryDatabaseRole,
+  type RoleQueryable,
+} from './cf/database-role-guard';
 import { servePublicEdge, stripFillMarker, type CacheLike } from './cf/public-edge-cache';
 import { readEdgeGens } from './lib/edge-gens';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -104,15 +109,15 @@ const validateDatabaseRole = createDatabaseRoleGuard();
 let redisReady: Promise<void> | undefined;
 
 /**
- * The BYPASSRLS guard that index.ts runs at listen() on Node (finding #5): if the
- * connection role bypasses RLS, tenant isolation is off. Validate before application
- * work on this invocation's client; cache only success (a Worker has no boot moment).
+ * The BYPASSRLS guard that index.ts runs at listen() on Node (finding #5): if the connection role
+ * bypasses RLS, tenant isolation is off. LAZY (Ruling ROLE-GUARD-LAZY-1): it runs on a request's own
+ * connection the first time that request actually opens Postgres (`ConnectionScope` onConnect), so a
+ * request served by D1 or a Durable Object never touches Postgres, and one that does still fails
+ * closed. Cache only success (a Worker has no boot moment).
  */
-async function checkRole(): Promise<void> {
+async function checkRoleOnConnect(adapter: RoleQueryable): Promise<void> {
   await validateDatabaseRole(async () => {
-    const rows = await prisma.$queryRaw<Array<{ currentUser: string; bypass: boolean }>>`
-      SELECT current_user::text AS "currentUser", (rolbypassrls OR rolsuper) AS bypass
-      FROM pg_roles WHERE rolname = current_user`;
+    const rows = await queryDatabaseRole(adapter);
     const bypass = rows[0]?.bypass === true;
     logger.info(
       { currentUser: rows[0]?.currentUser, rolbypassrls: bypass },
@@ -120,6 +125,14 @@ async function checkRole(): Promise<void> {
     );
     return rows;
   });
+}
+
+/** Drop a client-supplied `x-ebda-backend` (the retired Phase 0 opt-in) before anything reads the request. */
+export function stripBackendHeader(request: Request): Request {
+  if (!request.headers.has('x-ebda-backend')) return request;
+  const headers = new Headers(request.headers);
+  headers.delete('x-ebda-backend');
+  return new Request(request, { headers });
 }
 
 /** Overwrite X-Forwarded-For with the address Cloudflare saw, so `trust proxy` cannot be spoofed. */
@@ -169,6 +182,7 @@ async function withWorkerContext<T>(
   prepare(env);
   isolateDb ??= createIsolateDb({
     connectionString: env.HYPERDRIVE.connectionString,
+    onConnect: checkRoleOnConnect,
     // Engines (~3.3 MB each) per isolate; a request waits for one when all are leased. Override
     // with the DB_CLIENT_CONCURRENCY / DB_CLIENT_WAIT_MS vars.
     max: Number(env.DB_CLIENT_CONCURRENCY) > 0 ? Number(env.DB_CLIENT_CONCURRENCY) : undefined,
@@ -219,7 +233,6 @@ async function withWorkerContext<T>(
       async () => {
         lease = db.currentLease();
         noteLease(lease);
-        await checkRole();
         return fn();
       },
       {
@@ -316,7 +329,9 @@ async function floodGuard(
   );
 }
 
-async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
+async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
+  // The backend of a store is server-side state only (Ruling CF-BACKEND-1): the retired Phase 0 opt-in header never gets in.
+  const request = stripBackendHeader(incoming);
   const path = new URL(request.url).pathname;
   if (path === '/__dev/stats') {
     const res = devStats(env, isolateDb);
@@ -377,6 +392,9 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
 }
 
 async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promise<void> {
+  // Write freeze (Ruling CF-JOBS-2): park every message of every consumer, drop none.
+  setCfBindings(env);
+  if (await parkIfFrozen(batch as unknown as ParkableBatch, env)) return;
   await withWorkerContext(env, ctx, () =>
     // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
     batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ

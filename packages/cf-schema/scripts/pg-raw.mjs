@@ -187,6 +187,8 @@ export function pgExprToSqlite(expr) {
   e = e.replace(/=\s*true\b/gi, '= 1').replace(/=\s*false\b/gi, '= 0');
   e = e.replace(/\bchar_length\(/gi, 'length(');
   e = e.replace(/\bjsonb_typeof\(/gi, 'json_type(');
+  // text[] columns are TEXT JSON arrays in SQLite, so both array-length spellings are json_array_length.
+  e = e.replace(/\b(?:jsonb_array_length|cardinality)\(/gi, 'json_array_length(');
   e = e.replace(/\bIS DISTINCT FROM\b/gi, 'IS NOT');
   e = e.replace(/::\w+(\[\])?/g, '');
   if (

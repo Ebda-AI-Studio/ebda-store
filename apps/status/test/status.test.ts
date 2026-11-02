@@ -515,3 +515,26 @@ describe('llms.txt (audit M-119)', () => {
     expect(t).toContain('https://status.ebda.app/api/status.json');
   });
 });
+
+describe('HSTS (Ruling HSTS-ALL-1)', () => {
+  const HSTS = 'max-age=31536000; includeSubDomains; preload';
+  it.each([
+    ['/en', 'text/html'],
+    ['/', 'text/html'],
+    ['/healthz', ''],
+    ['/api/status.json', ''],
+    ['/search.json', ''],
+    ['/assets/site-nav.js', ''],
+    ['/assets/typeahead.js', ''],
+    ['/robots.txt', ''],
+    ['/.well-known/security.txt', ''],
+    ['/api/nope', ''],
+    ['/nope', 'text/html'],
+  ])('%s carries the same HSTS policy as the other hosts', async (path, accept) => {
+    const r = await worker.fetch(
+      new Request(`https://status.ebda.app${path}`, accept ? { headers: { accept } } : {}),
+      env
+    );
+    expect(r.headers.get('strict-transport-security')).toBe(HSTS);
+  });
+});

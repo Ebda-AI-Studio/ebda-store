@@ -1,9 +1,9 @@
 /**
  * StoreDO backup: nightly export of every table to R2 (NDJSON + manifest with row counts and sha256), and the
- * restore used by the drill. Phase 0 (Ruling INFRA-CF-1). Serialization is canonical (rows ORDER BY rowid,
+ * restore used by the drill. Phase 0 (Ruling INFRA-CF-1). Serialization is canonical (rows ORDER BY primary key,
  * one JSON array per line of column values) so the checksum of a restored DO equals the manifest's.
  */
-import { STORE_TABLES } from './tables';
+import { exportOrder, storeTables } from './tables';
 
 export interface TableManifest {
   rows: number;
@@ -31,8 +31,8 @@ export const sha256Hex = async (text: string): Promise<string> => {
 /** Synchronous: the whole export is read with no await, so it is one consistent snapshot of the DO. */
 export function dumpTables(sql: SqlLike): Record<string, { columns: string[]; lines: string[] }> {
   const out: Record<string, { columns: string[]; lines: string[] }> = {};
-  for (const t of STORE_TABLES) {
-    const cur = sql.exec(`SELECT * FROM ${t} ORDER BY rowid`);
+  for (const t of storeTables(sql)) {
+    const cur = sql.exec(`SELECT * FROM "${t}" ORDER BY ${exportOrder(sql, t)}`);
     const rows = cur.toArray();
     const columns = rows.length ? Object.keys(rows[0]) : (cur.columnNames ?? []);
     out[t] = { columns, lines: rows.map(r => JSON.stringify(columns.map(c => r[c]))) };
@@ -60,9 +60,10 @@ export async function buildBackup(
 }
 
 /** Load NDJSON files into EMPTY tables (restore target), inside the caller's transaction. */
-export function loadBackup(sql: SqlLike, files: Record<string, string>): void {
-  // Parents first so foreign keys hold.
-  for (const t of STORE_TABLES) {
+export function loadBackup(sql: SqlLike, files: Record<string, string>, tables: string[]): void {
+  // Tables arrive in any order: foreign keys are checked at COMMIT, not per row (the caller's transaction).
+  sql.exec('PRAGMA defer_foreign_keys = ON');
+  for (const t of tables) {
     const body = files[`${t}.ndjson`];
     if (!body) throw new Error(`backup is missing ${t}.ndjson`);
     const [head, ...lines] = body.split('\n').filter(Boolean);
@@ -70,7 +71,7 @@ export function loadBackup(sql: SqlLike, files: Record<string, string>): void {
     const ph = columns.map(() => '?').join(',');
     for (const line of lines)
       sql.exec(
-        `INSERT INTO ${t} (${columns.join(',')}) VALUES (${ph})`,
+        `INSERT INTO "${t}" (${columns.map(c => `"${c}"`).join(',')}) VALUES (${ph})`,
         ...(JSON.parse(line) as unknown[])
       );
   }

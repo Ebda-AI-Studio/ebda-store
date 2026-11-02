@@ -4,6 +4,7 @@ export interface HubDefinition {
   key:
     | 'dashboard'
     | 'catalog'
+    | 'editor'
     | 'sales'
     | 'stock'
     | 'finance'
@@ -19,8 +20,6 @@ export interface HubDefinition {
 export type HubLabels = {
   // Catalog tabs
   products: string;
-  /** The one storefront editor tab (the visual editor). */
-  editor: string;
   content: string;
   blog: string;
   floatingWidget: string;
@@ -39,6 +38,7 @@ export type HubLabels = {
   loyalty: string;
   bundles: string;
   wallet: string;
+  customerIntelligence: string;
   // Stock tabs
   stockDashboard: string;
   inventory: string;
@@ -92,9 +92,6 @@ export const HUBS: HubDefinition[] = [
     key: 'catalog',
     urlPrefixes: [
       '/products',
-      // the retired classic route still redirects here, so it keeps the hub highlighted
-      '/page-builder',
-      '/builder',
       '/content',
       '/blog',
       '/catalog',
@@ -108,11 +105,17 @@ export const HUBS: HubDefinition[] = [
       { label: labels.sizeCharts, href: `/stores/${storeId}/size-charts` },
       // Gold rate pricing sits with the products it prices (B5 Task 13).
       { label: labels.goldRates, href: `/stores/${storeId}/gold-rates` },
-      { label: labels.editor, href: `/stores/${storeId}/builder` },
       { label: labels.content, href: `/stores/${storeId}/content` },
       { label: labels.blog, href: `/stores/${storeId}/blog` },
       { label: labels.floatingWidget, href: `/stores/${storeId}/floating-widget` },
     ],
+  },
+  {
+    // The visual editor is its own sidebar entry (T9): it was a Catalog tab, reachable in practice only
+    // from the branding Theme tab. The retired classic route still redirects here, so it keeps it highlighted.
+    key: 'editor',
+    urlPrefixes: ['/page-builder', '/builder'],
+    buildTabs: () => [],
   },
   {
     key: 'sales',
@@ -130,6 +133,7 @@ export const HUBS: HubDefinition[] = [
       '/loyalty',
       '/bundles',
       '/wallet',
+      '/customer-intelligence',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
@@ -169,6 +173,8 @@ export const HUBS: HubDefinition[] = [
       // at launch, and a new upsell tab appearing for every merchant on deploy
       // is exactly the visible change the launch must not make.
       { label: labels.wallet, href: `/stores/${storeId}/wallet`, featureKey: 'customer_wallet' },
+      // Smart hints (Customer Intelligence). Always listed: the page is where the merchant switches them on.
+      { label: labels.customerIntelligence, href: `/stores/${storeId}/customer-intelligence` },
     ],
   },
   {

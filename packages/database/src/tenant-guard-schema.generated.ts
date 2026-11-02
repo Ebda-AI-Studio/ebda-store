@@ -141,6 +141,9 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       affiliateEvents: 'AffiliateEvent',
       pages: 'StorePage',
       bulkImportJobs: 'BulkImportJob',
+      catalogImportJobs: 'CatalogImportJob',
+      catalogImportFiles: 'CatalogImportFile',
+      catalogImportItems: 'CatalogImportItem',
       aiUsage: 'AiUsage',
       bulkAiJobs: 'BulkAiJob',
       faqs: 'StoreFaq',
@@ -165,6 +168,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       customerRfmSnapshots: 'CustomerRfmSnapshot',
       productDailyViews: 'ProductDailyView',
       qrScanDaily: 'QrScanDaily',
+      ciStoreGates: 'CiStoreGate',
+      ciHintLogs: 'CiHintLog',
       paymentEvents: 'PaymentEvent',
       orderEvents: 'OrderEvent',
       webhookEvents: 'WebhookEvent',
@@ -299,6 +304,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     table: 'categories',
     storeId: true,
     relations: {
+      catalogImportItems: 'CatalogImportItem',
       store: 'Store',
       parent: 'Category',
       children: 'Category',
@@ -345,6 +351,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       embedFailure: 'ProductEmbedFailure',
       priceTiers: 'ProductPriceTier',
       sizeChart: 'SizeChart',
+      catalogImportItems: 'CatalogImportItem',
     },
   },
   {
@@ -585,6 +592,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       affiliateReferrals: 'AffiliateReferral',
       events: 'OrderEvent',
       appliedPromotion: 'Promotion',
+      ciHintLogs: 'CiHintLog',
     },
   },
   {
@@ -1322,6 +1330,29 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     },
   },
   {
+    name: 'CiInsight',
+    table: 'ci_insights',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'CiHintLog',
+    table: 'ci_hint_logs',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      order: 'Order',
+    },
+  },
+  {
+    name: 'CiStoreGate',
+    table: 'ci_store_gates',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
     name: 'GscDailyMetric',
     table: 'gsc_daily_metrics',
     storeId: true,
@@ -1602,6 +1633,38 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     storeId: true,
     relations: {
       store: 'Store',
+    },
+  },
+  {
+    name: 'CatalogImportJob',
+    table: 'catalog_import_jobs',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      files: 'CatalogImportFile',
+      items: 'CatalogImportItem',
+    },
+  },
+  {
+    name: 'CatalogImportFile',
+    table: 'catalog_import_files',
+    storeId: true,
+    relations: {
+      job: 'CatalogImportJob',
+      store: 'Store',
+      items: 'CatalogImportItem',
+    },
+  },
+  {
+    name: 'CatalogImportItem',
+    table: 'catalog_import_items',
+    storeId: true,
+    relations: {
+      job: 'CatalogImportJob',
+      file: 'CatalogImportFile',
+      store: 'Store',
+      category: 'Category',
+      product: 'Product',
     },
   },
 ];

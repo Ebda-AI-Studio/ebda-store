@@ -6,6 +6,8 @@ import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { storefrontOrigin } from '@ebda/shared';
+import { storeDb, storeStock, storeWriter } from '../lib/repo-factory';
+import { notifyCatalogChanged } from '../lib/wa/catalog-state';
 
 interface InventoryAdjustment {
   productId: string;
@@ -278,6 +280,42 @@ export class InventoryService {
     adjustment: InventoryAdjustment,
     userId?: string
   ): Promise<{ product: ProductInventory; history: object }> {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): the check, the write, the history row and the warehouse shadow re-sync are
+      // ONE section in the DO; no read-then-write window.
+      const r = await stock.adjustProduct({ ...adjustment, userId });
+      const db = await storeDb(storeId);
+      const [updatedProduct, history] = await Promise.all([
+        db.product.findUniqueOrThrow({
+          where: { id: adjustment.productId },
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            sku: true,
+            inventory: true,
+            lowStockThreshold: true,
+            trackInventory: true,
+            costPrice: true,
+            status: true,
+          },
+        }),
+        db.inventoryHistory.findUniqueOrThrow({ where: { id: r.historyId } }),
+      ]);
+      await notifyCatalogChanged({ storeId, productIds: [adjustment.productId] });
+      await invalidateStoreProductCaches(storeId);
+      return this.afterAdjust(
+        storeId,
+        adjustment.productId,
+        updatedProduct,
+        history,
+        r.previousStock,
+        r.newStock,
+        false
+      );
+    }
+
     const product = await prisma.product.findFirst({
       where: { id: adjustment.productId, storeId, deletedAt: null },
     });
@@ -343,11 +381,42 @@ export class InventoryService {
       }),
     ]);
 
+    await invalidateStoreProductCaches(storeId);
+    return this.afterAdjust(
+      storeId,
+      adjustment.productId,
+      updatedProduct,
+      history,
+      previousStock,
+      newStock,
+      true
+    );
+  }
+
+  /** Shared tail of adjustInventory: cache bust, response shape, back-in-stock, and (Postgres only) the warehouse shadow re-sync. */
+  private static async afterAdjust(
+    storeId: string,
+    productId: string,
+    updatedProduct: {
+      id: string;
+      name: string;
+      nameAr: string | null;
+      sku: string | null;
+      inventory: number;
+      lowStockThreshold: number;
+      trackInventory: boolean;
+      costPrice: number | null;
+      status: string;
+    },
+    history: object,
+    previousStock: number,
+    newStock: number,
+    reconcileShadow: boolean
+  ): Promise<{ product: ProductInventory; history: object }> {
     // Stock changed — every product/bundle cache keyed on availability
     // must clear (see the class-wide fix on this defect: a bundle's
     // isPurchasable/componentSum depend on component product stock, and
     // this write path bypassed the cache entirely before).
-    await invalidateStoreProductCaches(storeId);
 
     const result = {
       product: {
@@ -371,12 +440,11 @@ export class InventoryService {
 
     // Fire back-in-stock notifications if stock went from 0 to >0
     if (previousStock <= 0 && newStock > 0) {
-      this.fireBackInStockNotifications(storeId, adjustment.productId, updatedProduct.name).catch(
-        err =>
-          logger.error(
-            { err, storeId, productId: adjustment.productId },
-            '[InventoryService] Back-in-stock notification failed'
-          )
+      this.fireBackInStockNotifications(storeId, productId, updatedProduct.name).catch(err =>
+        logger.error(
+          { err, storeId, productId: productId },
+          '[InventoryService] Back-in-stock notification failed'
+        )
       );
     }
 
@@ -388,14 +456,11 @@ export class InventoryService {
     // this already-successful admin request — log and swallow. The
     // no-op fast path makes this ~free for single-/no-warehouse stores.
     try {
-      await WarehouseService.reconcileWarehouseStockToAggregate(
-        storeId,
-        adjustment.productId,
-        null
-      );
+      if (reconcileShadow)
+        await WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null);
     } catch (err) {
       logger.error(
-        { err, storeId, productId: adjustment.productId, variantId: null },
+        { err, storeId, productId: productId, variantId: null },
         '[InventoryService] adjustInventory: warehouse stock reconcile failed (best-effort)'
       );
     }
@@ -434,6 +499,27 @@ export class InventoryService {
 
     if (adjustments.length === 0) {
       return { successful: 0, failed: 0, errors: [] };
+    }
+
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): planned and applied in ONE section; a bad row fails alone.
+      const r = await stock.bulkAdjustProducts({ adjustments, userId });
+      if (r.applied.length > 0) {
+        await notifyCatalogChanged({ storeId, productIds: r.applied.map(p => p.productId) });
+        await invalidateStoreProductCaches(storeId);
+      }
+      for (const p of r.applied) {
+        if (p.previousStock <= 0 && p.newStock > 0) {
+          this.fireBackInStockNotifications(storeId, p.productId, p.name).catch(err =>
+            logger.error(
+              { err, storeId, productId: p.productId },
+              '[InventoryService] Back-in-stock notification failed'
+            )
+          );
+        }
+      }
+      return { successful: r.successful, failed: r.failed, errors: r.errors };
     }
 
     const ids = adjustments.map(a => a.productId);
@@ -541,6 +627,40 @@ export class InventoryService {
     reason?: string,
     userId?: string
   ): Promise<{ product: ProductInventory; history: object }> {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      const r = await stock.setProduct({ productId, quantity: newQuantity, reason, userId });
+      const db = await storeDb(storeId);
+      const [updatedProduct, history] = await Promise.all([
+        db.product.findUniqueOrThrow({
+          where: { id: productId },
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            sku: true,
+            inventory: true,
+            lowStockThreshold: true,
+            trackInventory: true,
+            costPrice: true,
+            status: true,
+          },
+        }),
+        db.inventoryHistory.findUniqueOrThrow({ where: { id: r.historyId } }),
+      ]);
+      await notifyCatalogChanged({ storeId, productIds: [productId] });
+      await invalidateStoreProductCaches(storeId);
+      return this.afterAdjust(
+        storeId,
+        productId,
+        updatedProduct,
+        history,
+        r.previousStock,
+        r.newStock,
+        false
+      );
+    }
+
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
     });
@@ -583,53 +703,16 @@ export class InventoryService {
       }),
     ]);
 
-    // Stock changed — see the same cache-invalidation note in adjustInventory above.
     await invalidateStoreProductCaches(storeId);
-
-    const result = {
-      product: {
-        id: updatedProduct.id,
-        name: updatedProduct.name,
-        nameAr: updatedProduct.nameAr,
-        sku: updatedProduct.sku,
-        inventory: updatedProduct.inventory,
-        lowStockThreshold: updatedProduct.lowStockThreshold,
-        trackInventory: updatedProduct.trackInventory,
-        costPrice: updatedProduct.costPrice,
-        status: updatedProduct.status,
-        stockStatus: this.getStockStatus(
-          updatedProduct.inventory,
-          updatedProduct.lowStockThreshold
-        ),
-        stockValue: updatedProduct.inventory * (updatedProduct.costPrice || 0),
-      },
+    return this.afterAdjust(
+      storeId,
+      productId,
+      updatedProduct,
       history,
-    };
-
-    // Fire back-in-stock notifications if stock went from 0 to >0
-    if (previousStock <= 0 && newQuantity > 0) {
-      this.fireBackInStockNotifications(storeId, productId, updatedProduct.name).catch(err =>
-        logger.error(
-          { err, storeId, productId },
-          '[InventoryService] Back-in-stock notification failed'
-        )
-      );
-    }
-
-    // Re-sync the WarehouseStock shadow to the aggregate we just committed —
-    // same best-effort contract as adjustInventory above (log + swallow,
-    // never fail this already-successful admin request over a shadow
-    // resync). Product-level only, so variantId is always null here.
-    try {
-      await WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null);
-    } catch (err) {
-      logger.error(
-        { err, storeId, productId, variantId: null },
-        '[InventoryService] setInventory: warehouse stock reconcile failed (best-effort)'
-      );
-    }
-
-    return result;
+      previousStock,
+      newQuantity,
+      true
+    );
   }
 
   /**
@@ -640,7 +723,9 @@ export class InventoryService {
     productId: string,
     threshold: number
   ): Promise<ProductInventory> {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
     });
 
@@ -648,7 +733,10 @@ export class InventoryService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    const updated = await prisma.product.update({
+    // The threshold is a plain product column: the write follows the store's backend like the read above (CF-R6B-1).
+    const updated = await (
+      await storeWriter(storeId)
+    ).product.update({
       where: { id: productId, storeId },
       data: { lowStockThreshold: threshold },
       select: {

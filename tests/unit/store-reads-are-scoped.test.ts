@@ -26,6 +26,10 @@ const SCOPES =
 
 /** `file::function` that run only under a caller's scope, with the reason. */
 const ALLOWED: Record<string, string> = {
+  'apps/api/src/services/ci-hints.service.ts::ciOverview':
+    'only called from GET /stores/:storeId/ci/overview, behind requireStoreAccess (the request scope)',
+  'apps/api/src/services/ci-hints.service.ts::setCiSharing':
+    'only called from PUT /stores/:storeId/ci/sharing, behind requireStoreAccess (the request scope)',
   'apps/api/src/services/page-builder.service.ts::publisherNames':
     'only reached from listRevisions, behind the page-builder routes (requireStoreAccess opens the request scope)',
   'apps/api/src/services/store.service.ts::list':

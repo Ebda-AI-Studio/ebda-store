@@ -7,6 +7,7 @@ import { inngest } from '../../lib/inngest/client';
 import { WarehouseService } from '../warehouse.service';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import logger from '../../lib/logger';
+import { storeDb, storeStock } from '../../lib/repo-factory';
 
 // InventoryChangeType mapping for StockAdjustmentType values
 const INVENTORY_TYPE_MAP: Record<
@@ -35,6 +36,13 @@ export interface CreateAdjustmentInput {
     productId: string;
     variantId?: string;
     newQty: number;
+    /**
+     * Cycle-count reconcile: the signed change the count measured (counted minus the system
+     * quantity at scan time). When set, `newQty` is ignored and recomputed as the CURRENT stock plus
+     * this delta, so a sale that landed mid-count is preserved. Pair with postAdjustment's
+     * `{ relative: true }`, which applies it as an atomic increment.
+     */
+    countDelta?: number;
   }>;
 }
 
@@ -51,6 +59,34 @@ export type AdjustmentWithItems = StockAdjustment & {
  * The adjustment sits in status='draft' until postAdjustment is called.
  */
 export async function createAdjustment(input: CreateAdjustmentInput): Promise<AdjustmentWithItems> {
+  const stock = await storeStock(input.storeId);
+  if (stock) {
+    // Durable Object path (Ruling CF-R7-1): ownership, the snapshot, the number and the rows are ONE section.
+    let r: Awaited<ReturnType<typeof stock.createStockAdjustment>>;
+    try {
+      r = await stock.createStockAdjustment({
+        type: input.type,
+        reason: input.reason,
+        reasonAr: input.reasonAr,
+        evidenceUrl: input.evidenceUrl,
+        createdBy: input.createdBy,
+        importKey: input.importKey,
+        items: input.items,
+      });
+    } catch (err) {
+      // the same shape Prisma gives a unique violation, so the CSV route's `isImportKeyConflict` replays the first import
+      if ((err as { code?: unknown } | null)?.code === 'IMPORT_KEY_EXISTS')
+        throw Object.assign(
+          new Error('Unique constraint failed on the fields: (store_id, import_key)'),
+          {
+            code: 'P2002',
+            meta: { target: ['store_id', 'import_key'] },
+          }
+        );
+      throw err;
+    }
+    return getAdjustmentOrThrow(input.storeId, r.id);
+  }
   // Every product/variant id here comes from the request body. requireStoreAccess
   // only proved the caller owns the store in the URL, so without this a
   // store_admin could name a competitor's ids (harvestable from the public
@@ -100,14 +136,14 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
       const match = variant && variant.productId === item.productId ? variant : undefined;
       const previousQty = match?.inventory ?? 0;
       const unitCost = match?.costPrice ?? 0;
-      const deltaQty = item.newQty - previousQty;
-      return { ...item, previousQty, unitCost, deltaQty };
+      const deltaQty = item.countDelta ?? item.newQty - previousQty;
+      return { ...item, newQty: previousQty + deltaQty, previousQty, unitCost, deltaQty };
     }
     const product = productById.get(item.productId);
     const previousQty = product?.inventory ?? 0;
     const unitCost = product?.costPrice ?? 0;
-    const deltaQty = item.newQty - previousQty;
-    return { ...item, previousQty, unitCost, deltaQty };
+    const deltaQty = item.countDelta ?? item.newQty - previousQty;
+    return { ...item, newQty: previousQty + deltaQty, previousQty, unitCost, deltaQty };
   });
 
   const totalValueImpact = snapshots.reduce((sum, s) => sum + s.deltaQty * s.unitCost, 0);
@@ -155,8 +191,24 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
 export async function postAdjustment(
   storeId: string,
   id: string,
-  postedBy?: string
+  postedBy?: string,
+  opts: { relative?: boolean } = {}
 ): Promise<AdjustmentWithItems> {
+  const stock = await storeStock(storeId);
+  if (stock) {
+    // Durable Object path (Ruling CF-R7-1): the claim, the stock, the history and the warehouse shadow are ONE section.
+    await stock.postStockAdjustment({ id, postedBy: postedBy ?? null });
+    await invalidateStoreProductCaches(storeId);
+    try {
+      await inngest.send({ name: 'stock/adjustment-posted', data: { storeId, adjustmentId: id } });
+    } catch (err) {
+      logger.error(
+        { err, adjustmentId: id, storeId },
+        'postAdjustment: failed to fire inngest event'
+      );
+    }
+    return getAdjustmentOrThrow(storeId, id);
+  }
   const adjustment = await prisma.stockAdjustment.findFirst({
     where: { id, storeId },
     include: { items: true },
@@ -191,7 +243,7 @@ export async function postAdjustment(
       if (item.variantId) {
         const res = await tx.productVariant.updateMany({
           where: { id: item.variantId, product: { storeId } },
-          data: { inventory: item.newQty },
+          data: { inventory: opts.relative ? { increment: item.deltaQty } : item.newQty },
         });
         if (res.count !== 1) {
           throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
@@ -199,7 +251,7 @@ export async function postAdjustment(
       } else {
         const res = await tx.product.updateMany({
           where: { id: item.productId, storeId },
-          data: { inventory: item.newQty },
+          data: { inventory: opts.relative ? { increment: item.deltaQty } : item.newQty },
         });
         if (res.count !== 1) {
           throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
@@ -272,7 +324,11 @@ export async function postAdjustment(
     );
   }
 
-  return prisma.stockAdjustment.findFirstOrThrow({
+  return getAdjustmentOrThrow(storeId, id);
+}
+
+async function getAdjustmentOrThrow(storeId: string, id: string): Promise<AdjustmentWithItems> {
+  return (await storeDb(storeId)).stockAdjustment.findFirstOrThrow({
     where: { id, storeId },
     include: {
       items: {
@@ -298,7 +354,7 @@ export async function findAdjustmentByImportKey(
   status: StockAdjustment['status'];
   _count: { items: number };
 } | null> {
-  return prisma.stockAdjustment.findFirst({
+  return (await storeDb(storeId)).stockAdjustment.findFirst({
     where: { storeId, importKey },
     select: { id: true, adjustmentNumber: true, status: true, _count: { select: { items: true } } },
   });
@@ -318,7 +374,7 @@ export async function listAdjustments(
     if (opts.from) where.createdAt.gte = opts.from;
     if (opts.to) where.createdAt.lte = opts.to;
   }
-  return prisma.stockAdjustment.findMany({
+  return (await storeDb(storeId)).stockAdjustment.findMany({
     where,
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -340,7 +396,7 @@ export async function getAdjustment(
   storeId: string,
   id: string
 ): Promise<AdjustmentWithItems | null> {
-  return prisma.stockAdjustment.findFirst({
+  return (await storeDb(storeId)).stockAdjustment.findFirst({
     where: { id, storeId },
     include: {
       items: {

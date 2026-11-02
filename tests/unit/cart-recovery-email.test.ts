@@ -90,6 +90,7 @@ vi.mock('@ebda/database', () => {
       return (await Promise.all(ids.map(fn))).flat();
     },
     runInStoreScope: (_s: string, fn: () => unknown) => fn(),
+    withStore: (_s: string, fn: (tx: unknown) => unknown) => fn(prisma),
     runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   };
 });

@@ -229,6 +229,11 @@ export function ReceiptPrinter({
                 })}
               </Num>
             </MetaRow>
+            {order.deliveryLine && (
+              <MetaRow label={t('Delivery', 'التوصيل')} ar={ar}>
+                <span data-testid="receipt-delivery-pick">{order.deliveryLine}</span>
+              </MetaRow>
+            )}
             {/* S-02: when it arrives, from the store's own zones/settings. A
                     failed payment is not on its way, so it gets no window. */}
             {deliveryWindow && paymentState !== 'failed' && (

@@ -12,13 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 type Line = { id: string; quantity: number; pickedQty: number; personalisation: string | null };
 let lines: Line[] = [];
 let selectSeen: Record<string, boolean> = {};
-const update = vi.fn(
-  async ({ where, data }: { where: { id: string }; data: { pickedQty: number } }) => {
-    const l = lines.find(x => x.id === where.id)!;
-    l.pickedQty = data.pickedQty;
-    return l;
-  }
-);
+const update = vi.fn(async (_a: unknown) => undefined);
 
 vi.mock('@ebda/database', () => ({
   prisma: {
@@ -64,9 +58,17 @@ vi.mock('@ebda/database', () => ({
         })),
       update: (a: never) => update(a),
     },
-    $queryRaw: async () => [
-      { remaining: BigInt(lines.filter(l => l.pickedQty < l.quantity).length) },
-    ],
+    // The atomic conditional UPDATE (id, qty, qty) or the remaining-lines count.
+    $queryRaw: async (strings: TemplateStringsArray, ...vals: unknown[]) => {
+      if (strings.join('?').includes('UPDATE')) {
+        const l = lines.find(x => x.id === vals[0]);
+        if (!l || l.pickedQty >= l.quantity) return [];
+        const before = l.pickedQty;
+        l.pickedQty = Math.min(before + Number(vals[1]), l.quantity);
+        return [{ before, after: l.pickedQty }];
+      }
+      return [{ remaining: BigInt(lines.filter(l => l.pickedQty < l.quantity).length) }];
+    },
   },
   runInTenantContext: vi.fn(),
   Prisma: { sql: () => ({}), join: () => ({}), empty: {} },

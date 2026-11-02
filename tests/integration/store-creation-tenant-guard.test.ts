@@ -11,10 +11,13 @@
  * so they never ran the guard, and the HTTP suite that does runs only on the weekly full lane.
  *
  * Paths, each through its real route or entry point:
- *   1. signup -> verify email -> login -> POST /onboarding/store (self-serve, no tenant context)
+ *   1. merchant profile + identity session -> POST /onboarding/store (self-serve, no tenant context)
  *   2. super_admin POST /admin/stores (ProvisioningService, platform-operator hatch)
  *   3. store_admin POST /stores (StoreService.create, an additional store)
  *   4. ProvisioningService.provisionStore called with no ambient scope at all (jobs, scripts)
+ *
+ * Sessions: merchants and super admins sign in at the identity service (Rulings ID-1/ID-2), so this in-process app installs the
+ * same test identity stand-in as the API server and every user gets the ES256 token the identity service would issue.
  *
  * Mutation proof (run by hand, recorded in the commit body): in provisioning.service.ts replace
  * `scopeTransaction(tx, { userId: owner.id }, () => tx.store.create(...))` with the bare
@@ -29,10 +32,8 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import crypto from 'crypto';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
-import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import authRoutes from '@api/routes/auth.routes';
 import onboardingRoutes from '@api/routes/onboarding.routes';
 import adminRoutes from '@api/routes/admin.routes';
@@ -41,13 +42,9 @@ import { tenantContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 import { ProvisioningService } from '@api/services/provisioning.service';
 import { EmailService } from '@api/services/email.service';
-import { config } from '@api/config';
-import {
-  clearCapturedMail,
-  latestCapturedMailTo,
-  tokenFromCapturedMail,
-} from '@api/services/platform-mailer';
+import { installTestIdentity } from '@api/lib/test-identity';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { identityTokenFor } from '../helpers/identity-session';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -63,7 +60,6 @@ const asApp = <T>(fn: () => Promise<T>) =>
   });
 
 const run = crypto.randomUUID().slice(0, 8);
-const PASSWORD = 'Str0ng!Passw0rd';
 const emails: string[] = [];
 const mkEmail = (tag: string) => {
   const e = `scg-${tag}-${run}-${crypto.randomUUID().slice(0, 4)}@test.local`;
@@ -88,7 +84,6 @@ function buildApp(): Express {
     ).catch(next);
   });
   // Mounted exactly as apps/api/src/routes/index.ts mounts them.
-  app.use('/api/v1/auth/merchant', merchantSignupRoutes);
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/admin', tenantContext, adminRoutes);
   app.use('/api/v1/onboarding', onboardingRoutes);
@@ -99,33 +94,28 @@ function buildApp(): Express {
 
 describe.skipIf(!hasDb)('store creation under the tenant guard + strict RLS (ebda_app)', () => {
   let app: Express;
-  process.env.SIGNUP_MIN_FILL_MS = '0';
-  process.env.SIGNUP_EMAIL_DOMAIN_DAILY_CAP = '100000';
   process.env.STORES_PER_ACCOUNT_PER_DAY = '10';
   const api = () => request(app);
 
+  // Merchants sign up, verify and sign in at the identity service (Rulings ID-1/ID-2); the Store only holds the profile row the
+  // signup writes (role store_admin, storeId NULL, no credential). Write that row, then take the identity token. The signup /
+  // verification mail itself is the identity service's flow (merchant-signup.service createIdentity is unit-tested with a stub).
   async function verifiedMerchant(tag: string) {
     const email = mkEmail(tag);
-    const tok = await api().get('/api/v1/auth/merchant/signup-token');
-    expect(tok.status).toBe(200);
-    const signup = await api()
-      .post('/api/v1/auth/merchant/signup')
-      .send({
+    const user = await prisma.user.create({
+      data: {
         email,
-        password: PASSWORD,
-        name: 'Mona Hassan',
-        phone: `010${crypto.randomInt(10_000_000, 99_999_999)}`,
-        formToken: tok.body.data.token,
-        acceptedLegal: true,
-      });
-    expect(signup.status).toBe(200);
-    const token = tokenFromCapturedMail(latestCapturedMailTo(email));
-    expect(token, 'verification mail captured').toBeTruthy();
-    expect((await api().post('/api/v1/auth/verify-email').send({ token })).status).toBe(200);
-    const login = await api().post('/api/v1/auth/login').send({ email, password: PASSWORD });
-    expect(login.status).toBe(200);
-    const user = await prisma.user.findFirstOrThrow({ where: { email }, select: { id: true } });
-    return { email, id: user.id, jwt: login.body.data.accessToken as string };
+        passwordHash: '!identity',
+        firstName: 'Mona',
+        lastName: 'Hassan',
+        role: 'store_admin',
+        emailVerified: true,
+        storeId: null,
+      },
+      select: { id: true },
+    });
+    // No Store login here (Ruling ID-1; api.test.ts and mfa.test.ts assert the 409): the session comes from the identity service.
+    return { email, id: user.id, jwt: await identityTokenFor(user.id) };
   }
   const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
@@ -137,8 +127,8 @@ describe.skipIf(!hasDb)('store creation under the tenant guard + strict RLS (ebd
   }
 
   beforeAll(() => {
+    expect(installTestIdentity(), 'EBDA_TEST_IDENTITY_JWK + NODE_ENV=test').toBe(true);
     app = buildApp();
-    clearCapturedMail();
   });
 
   afterAll(async () => {
@@ -153,7 +143,7 @@ describe.skipIf(!hasDb)('store creation under the tenant guard + strict RLS (ebd
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
   });
 
-  it('1. a new merchant signs up, verifies, logs in and creates her first store (onboarding)', async () => {
+  it('1. a new merchant (identity session) creates her first store (onboarding)', async () => {
     const m = await verifiedMerchant('onb');
     const slug = mkSlug('onb');
     const res = await api()
@@ -194,11 +184,7 @@ describe.skipIf(!hasDb)('store creation under the tenant guard + strict RLS (ebd
         },
       })
     );
-    const token = jwt.sign(
-      { userId: admin.id, email: adminEmail, role: 'super_admin', tv: 0 },
-      config.jwtSecret,
-      { expiresIn: '10m', issuer: 'ebda-api', audience: 'ebda-app' }
-    );
+    const token = await identityTokenFor(admin.id);
     const ownerEmail = mkEmail('prov-owner');
     const slug = mkSlug('prov');
     // The welcome mail is post-response work: it must still reach the send step (it used to

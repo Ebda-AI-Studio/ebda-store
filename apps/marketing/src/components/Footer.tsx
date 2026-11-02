@@ -64,6 +64,9 @@ export function Footer({ locale }: { locale: Locale }) {
               <Link href={pagePath(locale, 'acceptable-use')}>{c.acceptableUse}</Link>
             </li>
             <li>
+              <Link href={pagePath(locale, 'legal/data-deletion')}>{c.dataDeletion}</Link>
+            </li>
+            <li>
               <Link href={pagePath(locale, 'credits')}>{c.credits}</Link>
             </li>
             <li>

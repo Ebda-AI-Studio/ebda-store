@@ -16,7 +16,8 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma, runInTenantContext, RfmSegment } from '@ebda/database';
+import { currentStoreId, prisma, runInTenantContext, RfmSegment } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireAnalyticsTier } from '../middleware/analytics-tier';
@@ -184,8 +185,8 @@ router.get(
           ),
 
           // Top segment by count + revenue contribution
-          runInTenantContext(storeId, () =>
-            prisma.customerRfmSnapshot.groupBy({
+          runInTenantContext(storeId, async () =>
+            (await storeDb(currentStoreId())).customerRfmSnapshot.groupBy({
               by: ['segment'],
               where: { storeId },
               _count: { id: true },
@@ -196,8 +197,8 @@ router.get(
           ),
 
           // Yesterday funnel snapshot
-          runInTenantContext(storeId, () =>
-            prisma.funnelSnapshot.findFirst({
+          runInTenantContext(storeId, async () =>
+            (await storeDb(currentStoreId())).funnelSnapshot.findFirst({
               where: { storeId },
               orderBy: { periodDate: 'desc' },
             })
@@ -227,8 +228,8 @@ router.get(
       // Enrich top SKUs with product info
       const productIds = topSkus.map(s => s.productId);
       const products = productIds.length
-        ? await runInTenantContext(storeId, () =>
-            prisma.product.findMany({
+        ? await runInTenantContext(storeId, async () =>
+            (await storeDb(storeId)).product.findMany({
               where: { storeId, id: { in: productIds } },
               select: { id: true, name: true, nameAr: true, sku: true },
             })
@@ -344,8 +345,8 @@ router.get(
       const storeId = req.params.storeId;
 
       const [cohorts, narration] = await Promise.all([
-        runInTenantContext(storeId, () =>
-          prisma.customerCohortSnapshot.findMany({
+        runInTenantContext(storeId, async () =>
+          (await storeDb(currentStoreId())).customerCohortSnapshot.findMany({
             where: { storeId },
             orderBy: [{ cohortMonth: 'desc' }, { periodOffset: 'asc' }],
           })
@@ -436,8 +437,8 @@ router.get(
       const storeId = req.params.storeId;
 
       const [rawSegments, narration] = await Promise.all([
-        runInTenantContext(storeId, () =>
-          prisma.customerRfmSnapshot.groupBy({
+        runInTenantContext(storeId, async () =>
+          (await storeDb(currentStoreId())).customerRfmSnapshot.groupBy({
             by: ['segment'],
             where: { storeId },
             _count: { id: true },
@@ -521,7 +522,7 @@ router.get(
 
       const productIds = top30d.map(s => s.productId);
       const [sold7dRows, products] = productIds.length
-        ? await runInTenantContext(storeId, () =>
+        ? await runInTenantContext(storeId, async () =>
             Promise.all([
               prisma.orderItem.groupBy({
                 by: ['productId'],
@@ -531,7 +532,7 @@ router.get(
                 },
                 _sum: { quantity: true },
               }),
-              prisma.product.findMany({
+              (await storeDb(storeId)).product.findMany({
                 where: { id: { in: productIds }, storeId },
                 select: {
                   id: true,
@@ -600,8 +601,8 @@ router.get(
     try {
       const storeId = req.params.storeId;
 
-      const rows = await runInTenantContext(storeId, () =>
-        prisma.customerRfmSnapshot.findMany({
+      const rows = await runInTenantContext(storeId, async () =>
+        (await storeDb(currentStoreId())).customerRfmSnapshot.findMany({
           where: { storeId, isGuest: false },
           select: { customerId: true, segment: true },
         })
@@ -629,8 +630,8 @@ router.get(
     try {
       const { storeId, customerId } = req.params;
 
-      const snapshot = await runInTenantContext(storeId, () =>
-        prisma.customerRfmSnapshot.findUnique({
+      const snapshot = await runInTenantContext(storeId, async () =>
+        (await storeDb(currentStoreId())).customerRfmSnapshot.findUnique({
           where: { storeId_customerId: { storeId, customerId } },
         })
       );

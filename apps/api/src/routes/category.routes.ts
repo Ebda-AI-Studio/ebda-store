@@ -5,11 +5,13 @@ import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma, SlugEntityType } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
 import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
 import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import { recordSlugRedirect } from '../services/slug-redirect.service';
 import logger from '../lib/logger';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -115,7 +117,7 @@ router.put(
       });
       const previous = existing?.bestSellersImage ?? null;
 
-      const store = await prisma.store.update({
+      const store = await storeUpdate(prisma, {
         where: { id: storeId },
         data: { bestSellersImage: data.image },
         select: { bestSellersImage: true },
@@ -160,8 +162,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
 
-      const categories = await prisma.category.findMany({
+      const categories = await w.category.findMany({
         where: { storeId, deletedAt: null },
         // Merchant-defined order first (Category.position), name as the stable
         // tiebreaker so stores that never reordered keep their A→Z look.
@@ -204,10 +207,11 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
       const { orderedIds } = reorderCategoriesSchema.parse(req.body);
-      await prisma.$transaction(
+      await w.$transaction(
         orderedIds.map((id, index) =>
-          prisma.category.updateMany({
+          w.category.updateMany({
             where: { id, storeId, deletedAt: null },
             data: { position: index },
           })
@@ -232,8 +236,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, categoryId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
 
-      const category = await prisma.category.findFirst({
+      const category = await w.category.findFirst({
         where: { id: categoryId, storeId, deletedAt: null },
         select: { id: true, name: true, nameAr: true },
       });
@@ -245,7 +250,7 @@ router.get(
         return;
       }
 
-      const links = await prisma.productCategory.findMany({
+      const links = await w.productCategory.findMany({
         where: { categoryId },
         orderBy: [{ position: 'asc' }, { product: { createdAt: 'desc' } }],
         select: {
@@ -290,10 +295,11 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, categoryId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
       const { orderedProductIds } = reorderCategoryProductsSchema.parse(req.body);
 
       // Verify the category belongs to the store.
-      const category = await prisma.category.findFirst({
+      const category = await w.category.findFirst({
         where: { id: categoryId, storeId, deletedAt: null },
         select: { id: true },
       });
@@ -309,7 +315,7 @@ router.put(
       // `updateMany` scoped to (productId, categoryId) is already safe (it
       // silently ignores IDs not in the category), but we surface an explicit
       // error so callers know when their list is stale.
-      const existing = await prisma.productCategory.findMany({
+      const existing = await w.productCategory.findMany({
         where: { categoryId, productId: { in: orderedProductIds } },
         select: { productId: true },
       });
@@ -327,9 +333,9 @@ router.put(
       }
 
       // Persist positions in a single transaction — set position = index.
-      await prisma.$transaction(
+      await w.$transaction(
         orderedProductIds.map((productId, index) =>
-          prisma.productCategory.updateMany({
+          w.productCategory.updateMany({
             where: { productId, categoryId },
             data: { position: index },
           })
@@ -357,6 +363,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
       const data = createCategorySchema.parse(req.body);
       await assertSizeChartInStore(storeId, data.sizeChartId);
 
@@ -376,7 +383,7 @@ router.post(
       let slug = baseSlug;
       let suffix = 0;
       while (
-        await prisma.category.findFirst({
+        await w.category.findFirst({
           where: { storeId, slug, deletedAt: null },
         })
       ) {
@@ -384,7 +391,7 @@ router.post(
         slug = `${baseSlug}-${suffix}`;
       }
 
-      const category = await prisma.category.create({
+      const category = await w.category.create({
         data: {
           storeId,
           name: data.name,
@@ -452,11 +459,12 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, categoryId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
       const data = updateCategorySchema.parse(req.body);
       await assertSizeChartInStore(storeId, data.sizeChartId);
 
       // Verify category belongs to store
-      const existing = await prisma.category.findFirst({
+      const existing = await w.category.findFirst({
         where: { id: categoryId, storeId, deletedAt: null },
       });
 
@@ -473,7 +481,7 @@ router.put(
         const baseSlug = data.slug;
         let suffix = 0;
         while (
-          await prisma.category.findFirst({
+          await w.category.findFirst({
             where: { storeId, slug: data.slug, deletedAt: null, id: { not: categoryId } },
           })
         ) {
@@ -489,7 +497,7 @@ router.put(
       // set via `runInTenantContext`). Calling the proxied `prisma` directly
       // (not a nested `prisma.$transaction`) lets both the update and the
       // capture ride that ambient tx — atomic, and RLS-enforced.
-      const category = await prisma.category.update({
+      const category = await w.category.update({
         where: { id: categoryId, storeId },
         data: {
           name: data.name,
@@ -586,8 +594,9 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, categoryId } = req.params;
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
 
-      const existing = await prisma.category.findFirst({
+      const existing = await w.category.findFirst({
         where: { id: categoryId, storeId, deletedAt: null },
       });
 
@@ -600,7 +609,7 @@ router.delete(
       }
 
       // Soft delete
-      await prisma.category.update({
+      await w.category.update({
         where: { id: categoryId, storeId },
         data: { deletedAt: new Date() },
       });

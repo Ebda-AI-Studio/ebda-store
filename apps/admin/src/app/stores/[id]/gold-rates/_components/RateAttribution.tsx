@@ -14,6 +14,7 @@ export function RateAttribution({ className }: { className?: string }) {
         rel="noopener noreferrer"
         className="inline-flex min-h-[44px] items-center text-xs text-muted-foreground underline underline-offset-4"
       >
+        {/* i18n-gate-allow: licence-mandated attribution wording, shown verbatim in every locale (Ruling B5-15) */}
         Rates By Exchange Rate API
       </a>
     </p>

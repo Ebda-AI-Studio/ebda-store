@@ -339,6 +339,8 @@ interface Order {
   codFee?: number;
   tax?: number;
   taxIncludedInPrice?: boolean;
+  /** The delivery pick (the first notes line without its prefix); `notes` itself is never sent to a shopper. */
+  deliveryLine?: string | null;
   /** Payment rows (`ORDER_PAYMENT_SELECT`); the receipt names the method. */
   payments?: Array<{ provider: string; method?: string | null }>;
   items: Array<{

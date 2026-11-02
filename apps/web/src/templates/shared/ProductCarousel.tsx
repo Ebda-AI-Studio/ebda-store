@@ -389,6 +389,7 @@ function SharedProductCarousel({
             // 2026-05-17: gap is now driven by the per-store cardGap
             // setting on newArrivals + bestSellers; the previous hard-
             // coded gap-4/6/8 ignored merchant saves entirely.
+            data-part="product-grid"
             className={`-mx-4 flex justify-[safe_center] snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 scroll-smooth`}
             style={{ scrollbarWidth: 'thin' }}
           >

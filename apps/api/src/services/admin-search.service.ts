@@ -1,4 +1,5 @@
 import { prisma, Prisma } from '@ebda/database';
+import { storeMoney } from '../lib/repo-factory';
 import { buildCustomerPatterns, type CustomerPatterns } from '@ebda/shared';
 
 /** Most registered customers / guest orders one admin search resolves (cap + 1 detects "more"). */
@@ -41,6 +42,9 @@ export async function matchingCustomers(
       guestsTruncated: false,
     };
   }
+  // A store on its Durable Object matches against its own customer / guest-contact index (Ruling CF-R6A-1).
+  const money = await storeMoney(storeId);
+  if (money) return money.searchCustomers({ q, userCap, guestCap });
   const rows = await prisma.$queryRaw<Array<{ kind: string; id: string }>>(
     customerSearchIdsSql(storeId, p, userCap, guestCap)
   );

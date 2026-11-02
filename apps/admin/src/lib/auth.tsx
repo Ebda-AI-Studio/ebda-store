@@ -132,6 +132,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (await refreshSession()) === 'refreshed';
   }, []);
 
+  // The mount check can outlive the component (retry delays, a slow /auth/me): a state update after unmount is dropped, and in
+  // a torn-down jsdom it threw 'window is not defined' as an unhandled rejection that failed a whole CI run.
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
   const checkAuth = useCallback(async () => {
     try {
       // checkSessionWithMountRetries owns the full /auth/me -> throttle-retry
@@ -149,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // logout happened meanwhile) leave `user` untouched: only a 401 followed
       // by a rejected refresh signs anyone out (#2096, #2161).
       const result = await checkSessionWithMountRetries(API_URL);
+      if (!aliveRef.current) return;
       if (result.status === 'authenticated') {
         setUser(result.user as User);
       } else if (result.status === 'signed-out') {
@@ -157,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Auth check failed:', error);
     } finally {
-      setIsLoading(false);
+      if (aliveRef.current) setIsLoading(false);
     }
   }, []);
 

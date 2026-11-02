@@ -72,7 +72,7 @@ describe('bulk-ai-aeo.ts: every live write site rejects placeholder output befor
 
   it('bulk-ai-faq-aeo guards StoreFaq.create (question + answer)', () => {
     const body = functionBody(source, 'bulk-ai-faq-aeo');
-    const createIdx = body.indexOf('prisma.storeFaq.create');
+    const createIdx = body.indexOf('sw.storeFaq.create');
     expect(createIdx).toBeGreaterThan(-1);
     const guardIdx = body.lastIndexOf('isPlaceholderText', createIdx);
     expect(guardIdx, 'no isPlaceholderText guard before storeFaq.create').toBeGreaterThan(-1);
@@ -80,7 +80,7 @@ describe('bulk-ai-aeo.ts: every live write site rejects placeholder output befor
 
   it('bulk-ai-howto-aeo guards StoreHowto.create (title + description)', () => {
     const body = functionBody(source, 'bulk-ai-howto-aeo');
-    const createIdx = body.indexOf('prisma.storeHowto.create');
+    const createIdx = body.indexOf('sw.storeHowto.create');
     expect(createIdx).toBeGreaterThan(-1);
     const guardIdx = body.lastIndexOf('isPlaceholderText', createIdx);
     expect(guardIdx, 'no isPlaceholderText guard before storeHowto.create').toBeGreaterThan(-1);

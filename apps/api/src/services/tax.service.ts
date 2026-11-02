@@ -5,6 +5,7 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { TAX_NOT_VERIFIED_CODE } from '@ebda/shared';
 import { TaxProfileService } from './tax-profile.service';
+import { storeUpdate } from '../lib/repo-factory';
 
 /**
  * Issue 2212: `taxRatePercent` (and taxEnabled/taxIncludedInPrice) ride the
@@ -87,7 +88,7 @@ export class TaxService {
       );
     }
     const store = await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: {
           taxEnabled: settings.taxEnabled,

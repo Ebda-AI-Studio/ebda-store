@@ -11,6 +11,7 @@ import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { recordQrScan, resolveQrScan } from '../services/qr.service';
@@ -22,7 +23,6 @@ import {
   rejectImpersonated,
 } from '../middleware/auth';
 import { buyerFromRequest } from '../lib/buyer-identity';
-import { backendFor, storeDo, unwrapDo } from '../lib/store-backend';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
@@ -75,6 +75,7 @@ import {
   CONTACT_HONEYPOT_FIELD,
   normalizeArabicSearch,
   normalizeLegacyTemplate,
+  deliveryLineFromNotes,
 } from '@ebda/shared';
 import {
   assertScalarQuery,
@@ -281,14 +282,6 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const headerTerm = searchQueryFromHeader(req);
     const search = headerTerm ?? req.query.search;
     const storeId = await getStoreIdFromRequest(req);
-    if (backendFor(storeId, req) === 'do') {
-      // Phase 0 spike (Ruling INFRA-CF-1): flagged demo store + opt-in header only. Postgres path below is untouched.
-      const lim = Math.min(Math.max(Number(limit) || 24, 1), 100);
-      const products = unwrapDo(await storeDo(storeId).listProducts(storeId, lim));
-      res.setHeader('x-store-backend', 'do');
-      res.json({ success: true, data: { products } });
-      return;
-    }
     // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
     // to turn an absent param into `featured: false`, which listPublic applied
     // as `WHERE featured = false` on every non-"Featured" listing.
@@ -662,7 +655,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
       // Ruling B5-21 (item 9): does this store sell gold-rate products? Cached WITH the feed inputs (same
       // key, same purge), so a rate write that clears this key also re-reads the flag.
       const hasGold =
-        (await prisma.product.count({
+        (await (
+          await storeDb(storeId)
+        ).product.count({
           where: {
             storeId,
             status: 'active',
@@ -877,14 +872,6 @@ router.post(
 
       const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      if (backendFor(storeId, req) === 'do') {
-        const { cartId } = unwrapDo(
-          await storeDo(storeId).addCartItem(storeId, sessionId, productId, quantity, variantId)
-        );
-        res.setHeader('x-store-backend', 'do');
-        res.json({ success: true, data: { cart: { id: cartId } } });
-        return;
-      }
       const cart = await CartService.addItem(
         storeId,
         sessionId,
@@ -1330,16 +1317,6 @@ router.post(
 
       const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
-      if (backendFor(storeId, req) === 'do') {
-        // Spike order path: stock + order rows in ONE DO transaction. The demo copy only; no payment, no email.
-        const order = unwrapDo(await storeDo(storeId).createOrder(storeId, sessionId));
-        // The order just decremented stock in the Durable Object: every cache layer (KV, the Worker edge cache
-        // through the same generations, the storefront tag) must see it, exactly as the Postgres path does.
-        await invalidateStoreProductCachesAfterOrder(storeId);
-        res.setHeader('x-store-backend', 'do');
-        res.status(201).json({ success: true, data: { order } });
-        return;
-      }
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
       // and storefront origins (api.ebda.app host), so a merchant
@@ -1563,7 +1540,8 @@ router.get(
       void _ip;
       void _notes;
       void _idem;
-      const visible = shopperOrder;
+      // The delivery pick, alone: `notes` stays hidden, but the receipt must show when it arrives.
+      const visible = { ...shopperOrder, deliveryLine: deliveryLineFromNotes(order.notes) };
       // The answer differs by token: never cache it shared.
       res.setHeader('Cache-Control', 'private, no-store');
       res.vary('X-Order-View-Token');
@@ -1990,7 +1968,9 @@ router.post(
 
       // Verify the product belongs to this store (ownership guard).
       // Explicit select to avoid fetching unnecessary columns.
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId, deletedAt: null, audience: 'public' },
         select: { id: true },
       });
@@ -2173,8 +2153,8 @@ async function fetchFooterLocations(store: {
       ? (store.theme as Record<string, unknown>)
       : null;
   if (!store.locationsEnabled || theme?.showBranchesInFooter !== true) return undefined;
-  return readInStoreContext(store.id, () =>
-    prisma.storeLocation.findMany({
+  return readInStoreContext(store.id, async () =>
+    (await storeDb(store.id)).storeLocation.findMany({
       where: { storeId: store.id, isPublished: true },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2327,8 +2307,8 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // Mirror the /store/resolve endpoint: surface explicitly-disabled
       // CMS pages so the storefront footer can hide their links rather
       // than rendering a "Page unavailable" landing on click.
-      const disabledPages = await readInStoreContext(store.id, () =>
-        prisma.storePage.findMany({
+      const disabledPages = await readInStoreContext(store.id, async () =>
+        (await storeDb(store.id)).storePage.findMany({
           where: { storeId: store.id, isPublished: false },
           select: { slug: true },
         })
@@ -2617,7 +2597,10 @@ router.post(
       await assertNotDemoStore(storeId);
       const normalizedEmail = data.email.trim().toLowerCase();
 
-      const existing = await prisma.newsletterSubscriber.findUnique({
+      // the list lives on the store's own backend (Ruling CF-R4-4)
+      const subscribers = await storeDb(storeId);
+      const subscriberWriter = await storeWriter(storeId);
+      const existing = await subscribers.newsletterSubscriber.findUnique({
         where: {
           storeId_email: { storeId, email: normalizedEmail },
         },
@@ -2627,7 +2610,7 @@ router.post(
         // If they had previously unsubscribed, re-activate the row so the
         // admin's send count stays correct.
         if (!existing.isActive) {
-          await prisma.newsletterSubscriber.update({
+          await subscriberWriter.newsletterSubscriber.update({
             where: { id: existing.id, storeId },
             data: {
               isActive: true,
@@ -2645,7 +2628,7 @@ router.post(
         return;
       }
 
-      await prisma.newsletterSubscriber.create({
+      await subscriberWriter.newsletterSubscriber.create({
         data: {
           storeId,
           email: normalizedEmail,
@@ -2730,7 +2713,9 @@ router.get(
       }
 
       // Check no existing review for this (orderId, productId) pair
-      const existing = await prisma.review.findUnique({
+      const existing = await (
+        await storeDb(storeId)
+      ).review.findUnique({
         where: { orderId_productId: { orderId, productId }, storeId },
         select: { id: true },
       });
@@ -2740,7 +2725,9 @@ router.get(
       }
 
       // Load product + store info for the form
-      const product = await prisma.product.findUnique({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findUnique({
         where: { id: productId, storeId },
         select: { id: true, name: true, nameAr: true, images: true, storeId: true },
       });

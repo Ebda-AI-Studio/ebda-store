@@ -27,9 +27,20 @@ function main() {
       throw new Error(`${name} must be a provisioned Cloudflare resource ID`);
     return value;
   });
+  // D1 `ebda-platform` (task 2.4): a UUID, not the 32-hex shape of the two above.
+  const d1Id = process.env.EBDA_PLATFORM_D1_ID || '';
+  const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
+  if (
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(d1Id) ||
+    d1Id === ZERO_UUID
+  )
+    throw new Error('EBDA_PLATFORM_D1_ID must be the provisioned D1 ebda-platform database id');
   const source = readFileSync(new URL('../apps/api/wrangler.jsonc', import.meta.url), 'utf8');
   let i = 0;
-  const config = source.replace(/00000000000000000000000000000000/g, () => ids[i++]);
+  const config = source
+    .replace(/00000000000000000000000000000000/g, () => ids[i++])
+    .replace(new RegExp(ZERO_UUID, 'g'), d1Id);
+  if (config.includes(ZERO_UUID)) throw new Error('D1 placeholder survived substitution');
   if (i !== ids.length)
     throw new Error('Unexpected binding placeholders; review API config before deploying');
   writeFileSync(

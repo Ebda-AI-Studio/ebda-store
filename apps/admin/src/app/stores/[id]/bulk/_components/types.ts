@@ -23,7 +23,7 @@ export interface ImportJob {
   createdAt: string;
 }
 
-export type BulkTab = 'import' | 'export';
+export type BulkTab = 'import' | 'catalog' | 'export';
 export type FileKind = 'csv' | 'xlsx';
 export type DefaultStatus = 'draft' | 'active';
 

@@ -23,6 +23,9 @@ const ACTIONS = {
   __rebase: 'POST',
   __diff: 'POST',
   __status: 'GET',
+  // verify-store.mjs asks every DO for its table list (the DO must hold no table the cutover did not look at); without this
+  // entry the Worker answered 404 and verify refused every store on the deployed API (found live 2026-10-31).
+  __tables: 'GET',
 } as const;
 
 /** Store ids are UUIDs (lowercase); the DO instance name IS the id (lib/store-backend.ts storeDo()). */

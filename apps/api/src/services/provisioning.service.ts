@@ -31,6 +31,7 @@ import {
   defaultNewStoreLook,
   isBuiltSkin,
 } from '@ebda/shared';
+import { storeDb, storeUpdate } from '../lib/repo-factory';
 
 // ==========================================
 // Store Provisioning Service
@@ -421,7 +422,7 @@ export class ProvisioningService {
         await acrossStores(
           async storeId => {
             const [products, orders] = await Promise.all([
-              prisma.product.count({ where: { storeId } }),
+              (await storeDb(storeId)).product.count({ where: { storeId } }),
               prisma.order.count({ where: { storeId } }),
             ]);
             return { products, orders };
@@ -455,7 +456,7 @@ export class ProvisioningService {
 
   private static async readStoreStats(storeId: string) {
     const [productCount, orderCount, customerCount, revenueResult] = await Promise.all([
-      prisma.product.count({ where: { storeId } }),
+      (await storeDb(storeId)).product.count({ where: { storeId } }),
       prisma.order.count({ where: { storeId } }),
       prisma.order
         .groupBy({
@@ -482,7 +483,7 @@ export class ProvisioningService {
    */
   static async updateStoreStatus(storeId: string, status: 'active' | 'inactive' | 'suspended') {
     const store = await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: { status },
       })

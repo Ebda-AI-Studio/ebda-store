@@ -20,6 +20,10 @@ vi.mock('@api/services/feature.service', () => ({
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
+const glPost = vi.hoisted(() => vi.fn(async () => ({ posted: true })));
+vi.mock('@api/services/accounting/posting/wallet-posting', () => ({
+  postWalletMovementJournal: glPost,
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: {},
@@ -161,6 +165,19 @@ describe('WalletService.applyEntry', () => {
     expect(db.entries[0]).toMatchObject({ amount: 5000, balanceAfter: 5000 });
   });
 
+  it('journals every NEW movement on the GL in the same transaction (WALLET-GL-1), a replay never', async () => {
+    glPost.mockClear();
+    const first = await WalletService.applyEntry(credit(2000, 'gl-1'), db.client);
+    expect(glPost).toHaveBeenCalledTimes(1);
+    expect(glPost).toHaveBeenCalledWith({ entry: first.entry, tx: db.client });
+    await WalletService.applyEntry(credit(2000, 'gl-1'), db.client);
+    expect(glPost).toHaveBeenCalledTimes(1);
+  });
+  it('a refused debit journals nothing', async () => {
+    glPost.mockClear();
+    await expect(WalletService.applyEntry(credit(-1, 'gl-2'), db.client)).rejects.toBeTruthy();
+    expect(glPost).not.toHaveBeenCalled();
+  });
   it('refuses a debit that would take the balance below zero, and writes NOTHING', async () => {
     await WalletService.applyEntry(credit(3000, 'k1'), db.client);
     await expect(WalletService.applyEntry(credit(-3001, 'k2'), db.client)).rejects.toMatchObject({

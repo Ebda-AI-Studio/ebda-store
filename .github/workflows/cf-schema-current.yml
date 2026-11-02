@@ -12,6 +12,8 @@ on:
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/**'
       - 'packages/cf-schema/**'
+      - 'scripts/cf/gen-erasure-registry.mjs'
+      - 'apps/api/src/cf/erasure/registry*.ts'
   workflow_dispatch:
 
 permissions:
@@ -39,5 +41,7 @@ jobs:
         run: npm run db:generate
       - name: Generated files match schema.prisma and the migrations
         run: node packages/cf-schema/scripts/generate.mjs --check
+      - name: StoreDO erasure registry matches the classification and the schema (CF-ERASE-3)
+        run: node scripts/cf/gen-erasure-registry.mjs --check
       - name: cf-schema tests
         run: npx vitest run packages/cf-schema --reporter=verbose --retry=0 --maxWorkers=2

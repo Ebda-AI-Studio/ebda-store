@@ -28,6 +28,7 @@ import bcrypt from 'bcryptjs';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { AuthService } from '../../apps/api/src/services/auth.service';
 import { API_BASE } from '../helpers/api-base';
+import { identityTokenFor } from '../helpers/identity-session';
 
 const API = API_BASE;
 const PW = 'Test1234!pw';
@@ -77,32 +78,11 @@ async function login(email: string): Promise<{ token: string; refreshToken: stri
 }
 
 /**
- * Mint a real session for a super_admin actor without going through
- * `requireMfaEnrolled` (out of scope here — these tests are about status/role
- * revocation, not MFA enrollment). `issueSessionFor` is the same helper
- * `/auth/mfa/verify` calls after a real TOTP check, so this is a legitimate
- * way to get a super_admin session, not a bypass of anything under test.
+ * Platform admins and merchants sign in at the identity service, not the Store (Rulings ID-1/ID-2), so the acting
+ * super_admin and the target merchant get the ES256 token the identity service would have issued (test stand-in).
  */
 async function sessionForActor(actor: { id: string; email: string }): Promise<string> {
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: actor.id },
-    select: {
-      id: true,
-      email: true,
-      storeId: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      emailVerified: true,
-      tokenVersion: true,
-      // issueSessionFor re-checks these itself (#1864), so the actor must be
-      // a genuinely active account.
-      status: true,
-      deletedAt: true,
-    },
-  });
-  const session = await AuthService.issueSessionFor(user);
-  return session.accessToken;
+  return identityTokenFor(actor.id);
 }
 
 describe('S3-1: suspended/inactive users are rejected', () => {
@@ -182,7 +162,7 @@ describe('S3-1: suspended/inactive users are rejected', () => {
     // Ruling S11-1) and this fixture user has none; the revocation path is role-agnostic.
     const target = await createUser({ role: 'store_admin' });
     const actorToken = await sessionForActor(actor);
-    const { token: targetToken } = await login(target.email);
+    const targetToken = await identityTokenFor(target.id);
 
     // Confirm the target's session works before the suspension.
     const before = await fetch(`${API}/auth/me`, {
@@ -230,9 +210,11 @@ describe('S3-2: a role change revokes the outstanding token', () => {
 
   it('demoting a user rejects their pre-existing access token on the next request', async () => {
     const actor = await createUser({ role: 'super_admin' });
-    const target = await createUser({ role: 'store_admin' });
+    // A super_admin demoted to store_admin: the one role change the Store's admin API still performs on an identity-managed account
+    // (store_admin -> staff is not in its schema, ->customer is refused below, ->super_admin is OPERATOR_ONLY).
+    const target = await createUser({ role: 'super_admin' });
     const actorToken = await sessionForActor(actor);
-    const { token: targetToken } = await login(target.email);
+    const targetToken = await identityTokenFor(target.id);
 
     const before = await fetch(`${API}/auth/me`, {
       headers: { Authorization: `Bearer ${targetToken}` },
@@ -242,7 +224,7 @@ describe('S3-2: a role change revokes the outstanding token', () => {
     const putRes = await fetch(`${API}/admin/users/${target.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actorToken}` },
-      body: JSON.stringify({ role: 'customer' }),
+      body: JSON.stringify({ role: 'store_admin' }),
     });
     expect(putRes.status).toBe(200);
 
@@ -254,13 +236,34 @@ describe('S3-2: a role change revokes the outstanding token', () => {
     expect(afterBody.error.code).toBe('TOKEN_REVOKED');
   });
 
+  it('demoting an identity-managed account to customer is refused (MANAGED_BY_IDENTITY) and leaves the session live', async () => {
+    // Rulings ID-1/ID-2: a merchant/staff/super_admin account (storeId NULL) cannot be turned into a customer row from the Store.
+    const actor = await createUser({ role: 'super_admin' });
+    const target = await createUser({ role: 'store_admin' });
+    const actorToken = await sessionForActor(actor);
+    const targetToken = await identityTokenFor(target.id);
+
+    const putRes = await fetch(`${API}/admin/users/${target.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actorToken}` },
+      body: JSON.stringify({ role: 'customer' }),
+    });
+    expect(putRes.status).toBe(409);
+    expect((await putRes.json()).error.code).toBe('MANAGED_BY_IDENTITY');
+
+    const after = await fetch(`${API}/auth/me`, {
+      headers: { Authorization: `Bearer ${targetToken}` },
+    });
+    expect(after.status).toBe(200);
+  });
+
   it('a no-op PUT (no status/role change) does NOT revoke the live session', async () => {
     // Negative control — the fix must not revoke on every PUT, only on a
     // real status/role transition.
     const actor = await createUser({ role: 'super_admin' });
     const target = await createUser({ role: 'store_admin' });
     const actorToken = await sessionForActor(actor);
-    const { token: targetToken } = await login(target.email);
+    const targetToken = await identityTokenFor(target.id);
 
     const putRes = await fetch(`${API}/admin/users/${target.id}`, {
       method: 'PUT',

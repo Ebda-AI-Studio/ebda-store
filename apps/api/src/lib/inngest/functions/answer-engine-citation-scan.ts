@@ -21,7 +21,8 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInStoreScope, storeDirectory, withStore } from '@ebda/database';
+import { prisma, runInStoreScope, withStore } from '@ebda/database';
+import { allStoresDirectory } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
@@ -144,12 +145,14 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 2 * * 1' }], // Monday 02:00 UTC
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Cross-tenant cron — the store list comes from the directory definer;
-    // each store is then scanned in its own scope.
+    // each store is then scanned in its own scope. DO stores are listed too and scanned through their Durable Object
+    // (Ruling CF-JOBS-4): one weekly run, one shared provider budget.
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory(
+      allStoresDirectory(
+        event,
         s =>
           s.status === 'active' &&
           s.aiFeaturesEnabled &&

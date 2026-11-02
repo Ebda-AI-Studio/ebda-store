@@ -32,6 +32,10 @@
       "types": "./src/brand/index.ts",
       "default": "./src/brand/index.ts"
     },
+    "./wa-me-messages": {
+      "types": "./src/whatsapp/wa-me-messages.ts",
+      "default": "./src/whatsapp/wa-me-messages.ts"
+    },
     "./legal": {
       "types": "./src/legal/index.ts",
       "default": "./src/legal/index.ts"
@@ -50,14 +54,17 @@
     },
     "./qr": {
       "types": "./src/qr/index.ts",
+      "require": "./dist/qr/index.js",
       "default": "./src/qr/index.ts"
     },
     "./qr/schema": {
       "types": "./src/qr/schema.ts",
+      "require": "./dist/qr/schema.js",
       "default": "./src/qr/schema.ts"
     },
     "./qr/links": {
       "types": "./src/qr/links.ts",
+      "require": "./dist/qr/links.js",
       "default": "./src/qr/links.ts"
     }
   },

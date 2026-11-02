@@ -3,6 +3,7 @@ import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
 import { collectUrlsFromJson, isR2UrlReferenced } from '../lib/r2-references';
+import { collectDoStoreReferencedKeys } from '../lib/r2-do-references';
 import logger from '../lib/logger';
 
 /**
@@ -133,6 +134,10 @@ async function isStillReferenced(url: string, key: string): Promise<boolean> {
       return isR2UrlReferenced(tx, url, key);
     });
     if (referenced) return true;
+    // A store on its Durable Object (Ruling CF-R2-REF-1): its Postgres rows are sealed and stale, so its DO is asked too. A DO that
+    // cannot be read THROWS, and the caller's catch KEEPS the object (a leaked file, never a deleted live one).
+    const doKeys = await collectDoStoreReferencedKeys(id, urlToR2Key, key);
+    if (doKeys?.has(key)) return true;
   }
   return false;
 }

@@ -123,6 +123,24 @@ async function main() {
       ei++;
     }
   }
+  // InstaPay reference claims (Ruling INSTAPAY-DO-1): every receipt that holds a reference seeds its D1 claim, bound to the
+  // receipt, so a store flipped to the Durable Object cannot file a reference a Postgres receipt already holds.
+  {
+    const r = await client.query(
+      `SELECT reference_key AS id, store_id, id AS claim_ref FROM instapay_receipts WHERE reference_key IS NOT NULL`
+    );
+    for (const x of r.rows) {
+      await push(
+        upsert(
+          'entity_index',
+          ['kind', 'id', 'store_id', 'claim_ref'],
+          ['kind', 'id'],
+          ['instapay_ref', x.id, x.store_id, x.claim_ref]
+        )
+      );
+      ei++;
+    }
+  }
   await flush(stmts); // one wrangler call for everything below the size cap (a call costs ~1 s)
   report.tables.push({ table: 'entity_index', rows: ei, ms: Math.round(performance.now() - t2) });
   console.log(

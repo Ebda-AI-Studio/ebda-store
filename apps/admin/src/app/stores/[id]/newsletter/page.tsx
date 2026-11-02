@@ -321,7 +321,7 @@ export default function NewsletterPage() {
                 </p>
                 {broadcastResult.errors && broadcastResult.errors.length > 0 && (
                   <p className="mt-2 text-xs text-destructive-ink">
-                    {broadcastResult.errors.length} chunk(s) failed — check server logs
+                    {tPage('chunksFailed', { count: broadcastResult.errors.length })}
                   </p>
                 )}
                 <Button type="button" variant="outline" onClick={closeBroadcast} className="mt-6">

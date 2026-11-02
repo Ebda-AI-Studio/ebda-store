@@ -26,6 +26,31 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'stock-reorder-scan-cron',
   'warehouse-reconcile-sweep-cron',
   'wholesale-pending-nudge-cron',
+  // Ruling CF-JOBS-4
+  'bulk-import-orphan-cleanup',
+  // money sweeps (Ruling CF-JOBS-4)
+  'payment-reconcile-sweep',
+  'payment-abandonment-sweep',
+  'refund-reversal-stuck-sweep',
+  'order-created-stuck-sweep',
+  'order-auto-cancel-unpaid',
+  'instapay-expiry',
+  'wa-plan-sync',
+  'order-status-fanout-stuck-sweep',
+  // non-money sweeps (Ruling CF-JOBS-4)
+  'wa-plan-sync',
+  // Ruling CF-JOBS-4B (gold rate): alarm per DO store
+  'gold-rate-feed-fetch',
+  'gold-rate-staleness-watch',
+  // Ruling CF-JOBS-4B (data retention): receipts and orders are swept on the DO store's own alarm
+  'instapay-receipt-retention-daily',
+  'order-anonymize-5y-monthly',
+  // Ruling CF-JOBS-4B (queue-depth-watch): BulkAiJob follows the store's backend; a DO store is watched on its alarm
+  'queue-depth-watch',
+  // Ruling CF-JOBS-4B (webhooks): endpoints and the delivery log follow the store's backend; the log purge runs on a DO store's alarm
+  'webhook-delivery-purge-daily',
+  // Ruling CF-JOBS-4B (search): a DO store is indexed from its DO into Vectorize, probed on its own alarm
+  'search-index-backstop',
 ]);
 
 function tokens(): string[] {

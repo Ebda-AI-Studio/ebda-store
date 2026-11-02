@@ -22,6 +22,7 @@
  * persistence + admin-time validation only.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { searchNameIds } from '../services/product-search.service';
@@ -185,7 +186,9 @@ async function resolveBundleLines(
   // Fetched BEFORE the duplicate-component check below (P2-e, scoped
   // re-review) so that check can name the product, not just echo its uuid.
   const productIds = [...new Set(items.map(i => i.productId))];
-  const products = await prisma.product.findMany({
+  const products = await (
+    await storeDb(storeId)
+  ).product.findMany({
     where: { id: { in: productIds }, storeId },
     select: {
       id: true,

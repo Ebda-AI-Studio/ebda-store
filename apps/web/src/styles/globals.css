@@ -1291,6 +1291,10 @@ html {
   html[data-task-bar] [data-bottom-tab-bar] {
     display: none;
   }
+  /* TEMPLATES-MOCK-5: no tab bar on this route (BottomTabBar sets it), so no reserved strip under the footer. */
+  html[data-tab-bar='off'] body:not([data-sticky-atc='1']):not([data-sticky-cart]) {
+    padding-bottom: 0;
+  }
   body[data-sticky-atc='1'],
   body[data-sticky-cart='1'] {
     padding-bottom: calc(8rem + 4.25rem);
@@ -1955,6 +1959,42 @@ html[lang='en'] [data-look] .font-display {
  * hero's own utility classes (HeroBanner, HeroSlider) so no markup changes; without the variables it computes
  * to exactly the utilities' values. Phones only: from 640px the desktop utilities win as before.
  */
+/*
+ * TEMPLATES-MOCK-6 (P4): bold section headings and the card price in the look's accent. Both are scoped to the
+ * `<body>` data attributes `lookTraitAttrs` sets (merchant value, else the look's default; none on a legacy
+ * store), so a store without them is unchanged. A merchant's own heading/price zone is an inline style and
+ * still wins. `--look-price-colour` is the accent already nudged to >= 4.5:1 on the page.
+ */
+[data-look][data-heading-weight='strong'] h2[data-zone='sectionTitle'],
+[data-look][data-heading-weight='strong'] [data-part='section-title'] {
+  font-weight: 700;
+}
+/*
+ * TEMPLATES-MOCK-7 (P5): bare cards on the home page's sections. `lookTraitAttrs` writes data-card-heart /
+ * data-card-swatches / data-card-tags (merchant value, else the look's default 'off'); only elements inside a
+ * home/builder section are hidden, so the product list, product page and wishlist keep their controls.
+ */
+[data-look][data-card-heart='off'] [data-section] [data-card-chrome='heart'],
+[data-look][data-card-swatches='off'] [data-section] [data-card-chrome='swatches'],
+[data-look][data-card-tags='off'] [data-section] [data-card-chrome='tags'] {
+  display: none;
+}
+/*
+ * TEMPLATES-MOCK-8 (P6): the home product grids' gutter. `regular` (and a store with no look) emits no rule, so the
+ * pre-mock Tailwind gaps stand. Home sections only: the product list keeps its own cardGap setting.
+ */
+[data-look][data-grid-gutter='tight'] [data-section] [data-part='product-grid'] {
+  column-gap: 3px;
+  row-gap: 22px;
+}
+[data-look][data-grid-gutter='airy'] [data-section] [data-part='product-grid'] {
+  column-gap: 24px;
+  row-gap: 32px;
+}
+[data-look][data-price-colour='accent'] span[data-zone='productPrice'] {
+  color: hsl(var(--look-price-colour, var(--foreground)));
+}
+
 @media (max-width: 639.98px) {
   [data-look] .aspect-\[var\(--hero-m-aspect\)\].max-h-\[45vh\] {
     aspect-ratio: var(--look-hero-aspect, var(--hero-m-aspect));

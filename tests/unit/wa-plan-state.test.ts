@@ -14,6 +14,7 @@ vi.mock('@ebda/database', async importOriginal => {
     ...actual,
     prisma: { store: { findUnique: h.store } },
     runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+    withStore: (_s: string, fn: (tx: unknown) => unknown) => fn({ store: { findUnique: h.store } }),
   };
 });
 vi.mock('@api/lib/logger', () => ({

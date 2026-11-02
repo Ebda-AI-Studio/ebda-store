@@ -1,0 +1,166 @@
+{
+  "dead": {
+    "apps/api/src/services/inventory.service.ts": {
+      "models": {
+        "product": 2
+      },
+      "methods": ["reduceOnSale", "returnToStock"],
+      "reason": "no caller anywhere in apps/ or packages/ (verified by the test); left in place per CF-R6B-1"
+    }
+  },
+  "baseline": {
+    "apps/api/src/routes/admin.routes.ts": {
+      "kind": "platform",
+      "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
+      "models": {
+        "product": 3
+      }
+    },
+    "apps/api/src/services/abandoned-cart.service.ts": {
+      "kind": "pg-branch",
+      "reason": "processReminders / getStats / candidate load: each Postgres read sits in the `backend !== 'do'` / `onDo` else-branch next to the DO read (CF-R4-5).",
+      "models": {
+        "abandonedCart": 2,
+        "cart": 1
+      }
+    },
+    "apps/api/src/services/accounting/account.service.ts": {
+      "kind": "pg-branch",
+      "reason": "seedCoaForStore / postOpeningBalanceIfNeeded: after the `storeStock()` early return (CF-R7-1: seedCoa runs the chart seed and the opening-balance journal in the DO); the tx body is the Postgres branch.",
+      "models": {
+        "product": 1,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/accounting/assert-store-owns.ts": {
+      "kind": "pg-branch",
+      "reason": "assertStoreOwns takes the client it checks against: assertStoreOwnsInTenantScope hands it the DO read client for a store on its Durable Object (CF-R7-1), so the prisma default is the Postgres branch.",
+      "models": {
+        "product": 1,
+        "productVariant": 1,
+        "category": 1
+      }
+    },
+    "apps/api/src/services/accounting/purchase-order.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createPurchaseOrder / receivePurchaseOrder: after the `storeStock()` early return (CF-R7-1: createPurchaseOrder / receivePurchaseOrder run in the DO); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 4,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/accounting/stock-adjustment.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createAdjustment / postAdjustment: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 1,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/auth.service.ts": {
+      "kind": "platform",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
+      "models": {
+        "campaignRecipient": 1
+      }
+    },
+    "apps/api/src/services/barcode-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "receiveByBarcode (variant) / submitCountLine / reconcileCountSession: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "productVariant": 2,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/barcode.service.ts": {
+      "kind": "pg-branch",
+      "reason": "generateMissingBarcodes: after `if (money) return money.barcodeFill` (BARCODE-DO-1); the withStore body is the Postgres branch.",
+      "models": {
+        "product": 2,
+        "productVariant": 2
+      }
+    },
+    "apps/api/src/services/bulk.service.ts": {
+      "kind": "pg-branch",
+      "reason": "importProducts / importVariants: inside the `else` of `if (money)` (IMPORT-DO-1: a DO store runs money.importBatch / importVariants); the interactive-transaction body is the Postgres branch.",
+      "models": {
+        "productOption": 1,
+        "productVariant": 1,
+        "product": 1
+      }
+    },
+    "apps/api/src/services/gold-rate/gold-rate.service.ts": {
+      "kind": "pg-branch",
+      "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
+      "models": {
+        "product": 4,
+        "productPriceTier": 1
+      }
+    },
+    "apps/api/src/services/gold-rate/repricer.ts": {
+      "kind": "pg-branch",
+      "reason": "repriceStore / repriceProduct are called only from the Postgres branches of gold-rate.service (a DO store reprices inside goldApplyRates).",
+      "guardFile": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "models": {
+        "product": 2
+      }
+    },
+    "apps/api/src/services/inventory.service.ts": {
+      "kind": "pg-branch",
+      "reason": "adjustInventory / bulkAdjustInventory / setInventory: after `if (stock)` early return (CF-STOCK-1); the remaining reads are the Postgres branch.",
+      "models": {
+        "product": 3,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/notification-config.service.ts": {
+      "kind": "pg-branch",
+      "reason": "readFromDb: Postgres arm next to `repo.backend === 'do'` (CF-NOTIFY-1); a DO store reads storeDb.",
+      "models": {
+        "notificationConfig": 1
+      }
+    },
+    "apps/api/src/services/notification-dispatcher.service.ts": {
+      "kind": "pg-branch",
+      "reason": "getEventConfig: Postgres arm next to `repo.backend === 'do'` (CF-NOTIFY-1); a DO store reads storeDb.",
+      "models": {
+        "notificationEventConfig": 1
+      }
+    },
+    "apps/api/src/services/order.service.ts": {
+      "kind": "pg-branch",
+      "reason": "create / rollbackForPaymentFailure / createAdminOrder: after `storeMoney()` early return (CF-ORDERS-1, CF-R4-2); the interactive-transaction body is the Postgres branch.",
+      "models": {
+        "product": 4,
+        "cartItem": 1,
+        "cartBundle": 1,
+        "productVariant": 1,
+        "abandonedCart": 1,
+        "cart": 1
+      }
+    },
+    "apps/api/src/services/product.service.ts": {
+      "kind": "pg-branch",
+      "reason": "update(): the `tx` body is the Postgres transaction path; a DO store takes updateOnDo (CF-WRITES-2).",
+      "models": {
+        "productCategory": 1
+      }
+    },
+    "apps/api/src/services/variant.service.ts": {
+      "kind": "pg-branch",
+      "reason": "bulkUpdateInventory: after `if (stock)` early return (CF-STOCK-1).",
+      "models": {
+        "product": 1,
+        "productVariant": 1
+      }
+    },
+    "apps/api/src/services/warehouse.service.ts": {
+      "kind": "pg-branch",
+      "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1).",
+      "models": {
+        "product": 2,
+        "productVariant": 1
+      }
+    }
+  }
+}

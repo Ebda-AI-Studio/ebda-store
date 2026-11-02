@@ -187,6 +187,7 @@ export const orderConfirmationTemplate = {
       </tfoot>
     </table>
 
+    ${d.deliveryLine ? `<div class="address-box"><strong>Delivery</strong><br>${escapeHtml(d.deliveryLine)}</div>` : ''}
     <div class="address-box">
       <strong>Shipping Address</strong><br>
       ${escapeHtml(d.shippingAddress.firstName)} ${escapeHtml(d.shippingAddress.lastName)}<br>
@@ -229,6 +230,7 @@ export const orderConfirmationTemplate = {
       </tfoot>
     </table>
 
+    ${d.deliveryLine ? `<div class="address-box"><strong>موعد التوصيل</strong><br>${escapeHtml(d.deliveryLine)}</div>` : ''}
     <div class="address-box">
       <strong>عنوان الشحن</strong><br>
       ${escapeHtml(d.shippingAddress.firstName)} ${escapeHtml(d.shippingAddress.lastName)}<br>

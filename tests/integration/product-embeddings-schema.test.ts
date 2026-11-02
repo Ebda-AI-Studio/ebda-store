@@ -16,6 +16,7 @@ import { describe, it, expect, afterAll, vi } from 'vitest';
 import pg from 'pg';
 import { prisma, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { configureIdentityClient } from '@api/lib/identity-client';
 
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: { send: vi.fn(async () => ({ ids: [] })), createFunction: vi.fn(() => ({})) },
@@ -344,7 +345,19 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
       },
     });
     created.userIds.push(operator.id);
-    await StoreService.delete(s, operator.id);
+    // Deleting a store flips its identity-managed owner at the identity service (store.service.ts); the Postgres tier has no
+    // ACCOUNTS binding, so answer as the service would for an active account.
+    configureIdentityClient({
+      getAccountState: async () => ({ status: 'active' }) as never,
+      setStatus: async () => undefined,
+      revokeUser: async () => undefined,
+      deleteStoreClients: async () => ({ clients: 0 }),
+    });
+    try {
+      await StoreService.delete(s, operator.id);
+    } finally {
+      configureIdentityClient(undefined);
+    }
     expect(await prisma.store.count({ where: { id: s } })).toBe(0);
     expect(await embeddingCount({ storeId: s })).toBe(0);
   });

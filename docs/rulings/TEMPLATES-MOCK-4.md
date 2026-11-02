@@ -1,0 +1,3 @@
+# TEMPLATES-MOCK-4
+
+Ruling TEMPLATES-MOCK-4 - P2 hero height. `theme.heroRatio` (`tall` 4:5, `square` 1:1, `wide` = the old landscape crop) is an absent-until-picked key that overrides the look's `heroAspect` on phones through `mockCssVars(lookId, theme)`; unset keeps the look's own mock ratio (the tall default already on main since PR2), so no saved store changes, and a store with no look emits nothing (TEMPLATES-MOCK-3). `wide` restores the pre-mock behaviour exactly. Editor: Theme pane, "Background and rhythm" group, "Hero height on phones". Evidence: `tests/unit/mock-traits.test.ts`, editor-matrix row. Cost if wrong: one revert PR; a merchant who picked a ratio keeps it.

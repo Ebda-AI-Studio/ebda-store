@@ -52,3 +52,56 @@ BEGIN
   UPDATE "store_subscriptions" SET "past_due_since" = NULL WHERE "id" = NEW."id";
 END;
 
+
+-- billing_grants is append-only (FOUNDING-1, Ruling CF-SCHEMA-GRANTS-1, ported INFRA-CF-1 D2b-5, Ruling CF-LAST-2). The same
+-- refusals as the Postgres billing_grants_guard(), one statement per rule: no deletes (not even a cascade: grants have no
+-- parent FK), identity / source / money columns never change, every move is checked whatever the old state, and the allowed
+-- moves are pending -> applied | revoked, applied -> revoked, a revoked grant gets `restored_at` set once.
+CREATE TRIGGER IF NOT EXISTS "billing_grants_guard_delete" BEFORE DELETE ON "billing_grants"
+BEGIN
+  SELECT RAISE(ABORT, 'billing_grants is append-only (delete refused)');
+END;
+
+CREATE TRIGGER IF NOT EXISTS "billing_grants_guard_update" BEFORE UPDATE ON "billing_grants"
+BEGIN
+  SELECT RAISE(ABORT, 'billing_grants is append-only (immutable column changed)')
+  WHERE NEW."kind" IS NOT OLD."kind"
+     OR NEW."beneficiary_id" IS NOT OLD."beneficiary_id"
+     OR NEW."counterpart_id" IS NOT OLD."counterpart_id"
+     OR NEW."months" IS NOT OLD."months"
+     OR NEW."value_minor" IS NOT OLD."value_minor"
+     OR NEW."source_event_id" IS NOT OLD."source_event_id"
+     OR NEW."source_store_id" IS NOT OLD."source_store_id"
+     OR NEW."idempotency_key" IS NOT OLD."idempotency_key"
+     OR NEW."created_at" IS NOT OLD."created_at";
+  SELECT RAISE(ABORT, 'billing_grants: a revoked grant needs revoked_at and revoke_reason')
+  WHERE NEW."status" = 'revoked' AND (NEW."revoked_at" IS NULL OR NEW."revoke_reason" IS NULL);
+  SELECT RAISE(ABORT, 'billing_grants: revoked_at / restored_at belong to a revoked grant only')
+  WHERE NEW."status" <> 'revoked' AND (NEW."revoked_at" IS NOT NULL OR NEW."restored_at" IS NOT NULL);
+  SELECT RAISE(ABORT, 'billing_grants: an applied grant needs its period bookkeeping')
+  WHERE NEW."status" = 'applied'
+    AND (NEW."applied_at" IS NULL OR NEW."period_end_before" IS NULL OR NEW."period_end_after" IS NULL);
+  SELECT RAISE(ABORT, 'billing_grants: a pending grant is revoked without period bookkeeping')
+  WHERE OLD."status" = 'pending' AND NEW."status" = 'revoked'
+    AND (NEW."restored_at" IS NOT NULL OR NEW."applied_at" IS NOT NULL
+         OR NEW."period_end_before" IS NOT NULL OR NEW."period_end_after" IS NOT NULL);
+  SELECT RAISE(ABORT, 'billing_grants: a pending grant has no period bookkeeping')
+  WHERE OLD."status" = 'pending' AND NEW."status" = 'pending'
+    AND (NEW."applied_at" IS NOT NULL OR NEW."period_end_before" IS NOT NULL OR NEW."period_end_after" IS NOT NULL);
+  SELECT RAISE(ABORT, 'billing_grants: an applied grant can only be revoked')
+  WHERE OLD."status" = 'applied'
+    AND (NEW."status" NOT IN ('applied', 'revoked')
+         OR NEW."period_end_before" IS NOT OLD."period_end_before"
+         OR NEW."period_end_after" IS NOT OLD."period_end_after"
+         OR NEW."applied_at" IS NOT OLD."applied_at"
+         OR NEW."restored_at" IS NOT NULL);
+  SELECT RAISE(ABORT, 'billing_grants: a revoked grant is final')
+  WHERE OLD."status" = 'revoked'
+    AND (NEW."status" <> 'revoked'
+         OR NEW."revoked_at" IS NOT OLD."revoked_at"
+         OR NEW."revoke_reason" IS NOT OLD."revoke_reason"
+         OR NEW."period_end_before" IS NOT OLD."period_end_before"
+         OR NEW."period_end_after" IS NOT OLD."period_end_after"
+         OR NEW."applied_at" IS NOT OLD."applied_at"
+         OR (OLD."restored_at" IS NOT NULL AND NEW."restored_at" IS NOT OLD."restored_at"));
+END;

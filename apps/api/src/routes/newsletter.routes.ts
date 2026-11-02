@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { csvField } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -37,8 +38,10 @@ router.get(
       const limitNum = Math.min(200, Math.max(1, parseInt((limit as string) || '50', 10)));
       const skip = (pageNum - 1) * limitNum;
 
+      // the list lives on the store's own backend (Ruling CF-R4-4)
+      const db = await storeDb(storeId);
       const [subscribers, total] = await Promise.all([
-        prisma.newsletterSubscriber.findMany({
+        db.newsletterSubscriber.findMany({
           where: { storeId },
           orderBy: { subscribedAt: 'desc' },
           skip,
@@ -53,7 +56,7 @@ router.get(
             unsubscribedAt: true,
           },
         }),
-        prisma.newsletterSubscriber.count({ where: { storeId } }),
+        db.newsletterSubscriber.count({ where: { storeId } }),
       ]);
 
       res.json({
@@ -90,7 +93,9 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const rows = await prisma.newsletterSubscriber.findMany({
+      const rows = await (
+        await storeDb(storeId)
+      ).newsletterSubscriber.findMany({
         where: { storeId },
         orderBy: { subscribedAt: 'desc' },
         select: {
@@ -140,7 +145,9 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const rows = await prisma.newsletterSubscriber.findMany({
+      const rows = await (
+        await storeDb(storeId)
+      ).newsletterSubscriber.findMany({
         where: { storeId },
         orderBy: { subscribedAt: 'desc' },
         select: {
@@ -247,7 +254,9 @@ router.post(
       };
       if (body.language) where.language = body.language;
 
-      const subscribers = await prisma.newsletterSubscriber.findMany({
+      const subscribers = await (
+        await storeDb(storeId)
+      ).newsletterSubscriber.findMany({
         where,
         select: { id: true, email: true, language: true },
       });

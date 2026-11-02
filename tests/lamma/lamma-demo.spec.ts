@@ -37,6 +37,14 @@ test('storedemo-lamma: bar, look switch, persistence, closed checkout, noindex',
   await page.goto(`${hostOf(LAMMA)}/products/baladi-bread?look=lamma.notebook`, {
     waitUntil: 'networkidle',
   });
+  // The demo store carries a 150 EGP minimum order (scripts/storedemo/seed.mjs) and the checkout's
+  // Continue button stays disabled below it (dcc6751176), so the line must reach the minimum
+  // (6 x 25 EGP) before the closed-ordering notice can be reached.
+  for (let i = 0; i < 5; i++)
+    await page
+      .getByRole('button', { name: /زيادة الكمية|Increase quantity/ })
+      .first()
+      .click();
   await page.getByTestId('pdp-add').first().click();
   await page.waitForTimeout(1500);
   await page.goto(`${hostOf(LAMMA)}/checkout?look=lamma.notebook`, {

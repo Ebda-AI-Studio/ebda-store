@@ -58,7 +58,7 @@ const found = scan();
 
 describe('JOBS_MAP', () => {
   it('finds the registry (a scanner that sees nothing would pass anything)', () => {
-    expect(found.length).toBe(100);
+    expect(found.length).toBe(105);
   });
 
   it('lists exactly the registered functions', () => {

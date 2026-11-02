@@ -58,7 +58,7 @@ harder to land. Cost if wrong: an XSS on an iOS PWA admin reads a 30-minute acce
 long-lived refresh token. Follow-up if wanted: ship the iOS refresh token as a non-extractable
 credential (WebAuthn or a device-bound key), a product change, not a CSP one.
 
-Ruling SEC-4d - the storefront (`apps/web`) is NOT changed: Ahmad 2026-09-02 (`storefront-csp.md`) kept
+Ruling SEC-4d - SUPERSEDED 2026-10-29 by Ruling CSP-WEB-1 (the storefront now ships the same nonce + strict-dynamic policy, `docs/architecture/storefront-csp.md`). Original text: the storefront (`apps/web`) was NOT changed: Ahmad 2026-09-02 (`storefront-csp.md`) kept
 `'unsafe-inline'` because a per-request nonce forces dynamic rendering and forecloses
 `STOREFRONT_TENANT_ROUTING` cacheable routes (and the P14 edge-cache work). Its `'unsafe-eval'` stays
 for the OneSignal v16 page SDK and its ad hosts for the merchant pixels. `script-src-attr 'none'`

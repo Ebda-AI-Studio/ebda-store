@@ -362,7 +362,7 @@ export default function NewPurchaseOrderPage() {
               rows={2}
               dir="rtl"
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder="ملاحظات بالعربية (اختياري)"
+              placeholder={t('notesArPlaceholder')}
             />
           </label>
         </div>

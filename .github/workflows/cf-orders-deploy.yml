@@ -70,7 +70,7 @@ jobs:
       - name: Deploy ebda-orders Worker
         working-directory: apps/orders
         run: |
-          npx wrangler deploy
+          npx wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA
       - name: Verify the live Worker serves THIS build, roll back automatically if not
         # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
         # previous version for a few seconds). Identity: /_next/static/<BUILD_ID>/_buildManifest.js
@@ -86,6 +86,7 @@ jobs:
             --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" --window 120 --resolve-ip "$ip" \
             --probe "https://orders.ebda.app/_next/static/$BUILD_ID/_buildManifest.js|200" \
             --probe "https://orders.ebda.app/login|200" \
+            --probe "https://orders.ebda.app/health|200|commit=$GITHUB_SHA" \
             --rollback-probe "https://orders.ebda.app/login|200"
 
   # OPS-5: a failed deploy used to be silent (the storefront stayed on an old build for days). Alerts the Telegram bridge;

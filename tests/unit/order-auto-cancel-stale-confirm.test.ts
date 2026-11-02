@@ -46,8 +46,10 @@ vi.mock('@api/services/payment-confirm.service', () => ({
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/services/payment-event.service', () => ({
-  recordPaymentEvent: h.recordPaymentEvent,
+  recordPaymentEventForStore: h.recordPaymentEvent,
 }));
+// a Postgres store (no Durable Object money client)
+vi.mock('@api/lib/repo-factory', () => ({ storeMoney: async () => null }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
