@@ -84,39 +84,33 @@ describe('host-lock.sh', () => {
     holder.kill();
   }, 20000);
 
-  it('the WHOLE heavy gate runs inside ONE lock hold: prettier, lint, tsc and unit tests all live in pre-push-gate.sh', () => {
+  it('MAC-LIGHT-1: the pre-push gate runs inside the host lock and keeps only the fast checks', () => {
     const hook = readFileSync(join(__dirname, '../../../.husky/pre-push'), 'utf8');
     const gate = readFileSync(join(__dirname, '../../../scripts/ci/pre-push-gate.sh'), 'utf8');
     expect(hook).toContain('bash scripts/ci/host-lock.sh bash scripts/ci/pre-push-gate.sh');
-    // nothing heavy may run in the hook itself, outside the lock
     for (const heavy of [
       'npm run lint',
-      'format:check',
       'tsc --noEmit',
       'npm run test:unit',
       'npm run build',
       'db:generate',
     ])
-      expect(hook, `${heavy} must not run in the hook outside the lock`).not.toMatch(
+      expect(hook, `${heavy} must not run in the hook`).not.toMatch(
         new RegExp(`^\\s*(npm|npx)[^#\\n]*${heavy}`, 'm')
       );
     for (const heavy of [
       'npm run lint',
-      'npm run format:check',
-      'tsc --noEmit -p apps/api',
-      'tsc --noEmit -p apps/admin',
-      'tsc --noEmit -p apps/web',
+      'tsc --noEmit',
+      'npm run test:unit',
+      'npm run build',
+      'db:generate',
     ])
-      expect(gate).toContain(heavy);
-    expect(gate).toContain('npm run test:unit -- --maxWorkers=50%');
+      expect(gate, `${heavy} belongs to CI, not the Mac`).not.toMatch(
+        new RegExp(`^\\s*(npm|npx)[^#\\n]*${heavy}`, 'm')
+      );
+    expect(gate).toContain('check-action-pins');
+    expect(gate).toContain('gitleaks detect');
     // not re-entrant: a nested lock on the same file would wait on its own parent forever
     expect(gate).not.toMatch(/^\s*(bash\s+)?scripts\/ci\/host-lock\.sh/m);
-    // cheap checks first, expensive ones last
-    const at = (needle: string) => gate.indexOf(needle);
-    expect(at('check-action-pins')).toBeLessThan(at('npm run lint'));
-    // (the full legacy gate; PREPUSH-1's affected-only branch above it runs its own cheap checks first)
-    expect(at('npm run format:check')).toBeLessThan(at('tsc --noEmit -p apps/api'));
-    expect(at('npm run lint\n')).toBeLessThan(at('tsc --noEmit -p apps/api'));
-    expect(at('tsc --noEmit -p apps/api')).toBeLessThan(at('npm run test:unit'));
   });
 });
