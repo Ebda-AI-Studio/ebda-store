@@ -26,9 +26,16 @@ type Page = PageSlug;
 const MORE_KEYS: readonly string[] = ['resources'];
 
 /** The product icon (shared paths from the brand module, so docs/help/status draw the same one). */
-function ProductIcon({ id }: { id: SiteNavProductId }) {
+function ProductIcon({ id, mirror = false }: { id: SiteNavProductId; mirror?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      focusable="false"
+      style={mirror ? { transform: 'scaleX(-1)' } : undefined}
+    >
       {SITE_NAV_ICONS[id].map(p =>
         p.fill ? (
           <path key={p.d} d={p.d} fill="currentColor" />
@@ -127,7 +134,7 @@ export function Header({
                     <li key={p.id}>
                       <Link href={p.href}>
                         <span className="np-ico">
-                          <ProductIcon id={p.id} />
+                          <ProductIcon id={p.id} mirror={locale === 'ar' && p.id === 'whatsapp'} />
                         </span>
                         <span className="np-txt">
                           <b>{p.name}</b>

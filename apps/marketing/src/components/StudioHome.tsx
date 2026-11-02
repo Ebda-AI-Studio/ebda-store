@@ -10,9 +10,16 @@ import { Header } from './Header';
 import { JsonLd } from './JsonLd';
 import { SiteLink } from './SiteLink';
 
-function Icon({ id }: { id: SiteNavProductId }) {
+function Icon({ id, mirror = false }: { id: SiteNavProductId; mirror?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+    <svg
+      viewBox="0 0 24 24"
+      width="28"
+      height="28"
+      aria-hidden="true"
+      focusable="false"
+      style={mirror ? { transform: 'scaleX(-1)' } : undefined}
+    >
       {SITE_NAV_ICONS[id].map(p => (
         <path
           key={p.d}
@@ -71,7 +78,7 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
             </li>
             <li className="studio-card">
               <span className="np-ico">
-                <Icon id="whatsapp" />
+                <Icon id="whatsapp" mirror={rtl} />
               </span>
               <h3>{chat}</h3>
               <p>{c.chat.blurb}</p>

@@ -364,12 +364,16 @@ export const SITE_NAV_ICONS: Record<SiteNavProductId, readonly { d: string; fill
       d: 'M4 9.5 5.5 4h13L20 9.5M4 9.5a2.67 2.67 0 0 0 5.33 0 2.67 2.67 0 0 0 5.34 0 2.67 2.67 0 0 0 5.33 0M5.5 12.6V20h13v-7.4M10 20v-4.6h4V20',
     },
   ],
+  // Ebda Chat (Ruling MKT-HOME-APPROVED-1): two message cards, the customer's behind and the store's reply in front. A conversation, never
+  // WhatsApp's circle bubble with a handset (Meta brand rules). Same grid, 1.7 stroke and round joins as the Store icon. It mirrors in Arabic.
   whatsapp: [
-    { d: 'M12 3.5a8.5 8.5 0 0 0-7.3 12.9L3.5 20.5l4.2-1.1A8.5 8.5 0 1 0 12 3.5Z' },
     {
-      d: 'M9.2 8.6c.2-.4.5-.4.7-.4l.5.1.8 1.8c0 .2 0 .4-.2.6l-.5.6c.6 1.1 1.5 2 2.6 2.6l.6-.6c.2-.2.4-.2.6-.1l1.7.8c.1.3.1.6 0 .9-.3.8-1.3 1.2-2.2 1-2.6-.7-4.5-2.6-5.2-5.2-.1-.6.1-1.5 1-2.1Z',
-      fill: true,
+      d: 'M17 10.5V6.8a2.3 2.3 0 0 0-2.3-2.3H6.8a2.3 2.3 0 0 0-2.3 2.3v6.4a2.3 2.3 0 0 0 2.3 2.3h1.1',
     },
+    {
+      d: 'M10.8 10.5h6.4a2.3 2.3 0 0 1 2.3 2.3v3.4a2.3 2.3 0 0 1-2.3 2.3h-4.4l-2.6 2.1v-2.1a2.3 2.3 0 0 1-2.3-2.3v-3.4a2.3 2.3 0 0 1 2.3-2.3Z',
+    },
+    { d: 'M11.9 14.5h4.8' },
   ],
 };
 
@@ -454,7 +458,7 @@ export function siteWordmarkHtml(p: {
 }
 
 /** The icon as an inline <svg> string (decorative). */
-export function siteNavIconSvg(id: SiteNavProductId): string {
+export function siteNavIconSvg(id: SiteNavProductId, lang?: NavLang): string {
   const paths = SITE_NAV_ICONS[id]
     .map(p =>
       p.fill
@@ -462,7 +466,8 @@ export function siteNavIconSvg(id: SiteNavProductId): string {
         : `<path d="${p.d}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
     )
     .join('');
-  return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">${paths}</svg>`;
+  const mirror = lang === 'ar' && id === 'whatsapp' ? ' style="transform:scaleX(-1)"' : '';
+  return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"${mirror}>${paths}</svg>`;
 }
 
 /** The header nav: desktop link row with the Products disclosure, and the mobile menu (below 1180px it collapses into the menu button; wider, it is its own row under the wordmark, search and language switch). */
@@ -474,7 +479,7 @@ export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
     `<li><a href="${esc(i.href)}"${i.id === active ? ' aria-current="page"' : ''}>${esc(i.label)}</a></li>`;
   // one card per product: icon tile, full name, one-sentence blurb (the marketing header renders the same pieces in React)
   const prod = (p: SiteNavProduct) =>
-    `<li><a href="${esc(p.href)}"><span class="np-ico">${siteNavIconSvg(p.id)}</span><span class="np-txt"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></span></a></li>`;
+    `<li><a href="${esc(p.href)}"><span class="np-ico">${siteNavIconSvg(p.id, lang)}</span><span class="np-txt"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></span></a></li>`;
   return (
     `<nav class="top-nav" aria-label="${esc(t.nav)}">` +
     `<ul class="nav-links"><li class="nav-products"><details><summary>${esc(t.products)}</summary><ul>${products.map(prod).join('')}</ul></details></li>${items.map(link).join('')}</ul>` +
