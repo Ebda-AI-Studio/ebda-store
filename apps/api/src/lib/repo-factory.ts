@@ -34,7 +34,13 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
-import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/database';
+import {
+  afterTxCommit,
+  prisma,
+  withStore,
+  type AppPrismaClient,
+  type Prisma,
+} from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
@@ -1475,15 +1481,18 @@ export async function storeUpdateOnDo(
  * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
  */
 export async function storeUpdateAfterCommit(
+  tx: object,
   storeId: string,
   args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
 ): Promise<any> {
-  const { hasDeferralScope, deferAfterTenantCommit } = await import('./after-tenant-commit.js');
-  if (!hasDeferralScope())
+  // The hook is bound to THIS transaction object (Ruling NZ-D19), not to the ambient tenant scope: a separate money transaction can
+  // roll back while the outer tenant transaction commits. A transaction with no hook registry cannot take it: refused (fail closed).
+  let write: (() => Promise<void>) | undefined;
+  if (!afterTxCommit(tx, () => write?.()))
     throw new AppError(
       501,
       'STORE_TX_WRITE_UNSUPPORTED',
-      'A Store update inside a database transaction has no post-commit hook on this path for a Durable Object store'
+      'A Store update inside this database transaction has no post-commit hook for a Durable Object store'
     );
   const stub = storeDo(storeId) as unknown as QueryStub;
   const { decodeRpc } = await import('@ebda-src/repo');
@@ -1497,12 +1506,12 @@ export async function storeUpdateAfterCommit(
     ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
   });
   if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  await deferAfterTenantCommit('store.update.do', async () => {
+  write = async () => {
     await storeUpdateOnDo(storeId, {
       data,
       ...(args.select ? { select: { id: true } } : {}),
     } as never);
-  });
+  };
   const projected: Record<string, unknown> = { ...current };
   for (const [k, v] of Object.entries(data))
     if (!selected || selected.includes(k)) projected[k] = v;
@@ -1521,7 +1530,7 @@ export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
     // applied after the tx COMMITS (dropped on rollback), and the caller gets the projected row; with no post-commit hook available
     // (a job's own transaction) it is refused, so that caller gets a proper port.
     if ((db as unknown) !== (prisma as unknown))
-      return (await storeUpdateAfterCommit(id, a)) as Prisma.StoreGetPayload<A>;
+      return (await storeUpdateAfterCommit(db as object, id, a)) as Prisma.StoreGetPayload<A>;
     return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
   }
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
@@ -1609,16 +1618,16 @@ export function runInJobRepoScope<T>(fn: () => T): T {
 
 /**
  * ATOMIC money gate + close of a DO store's deletion (Ruling NZ-D17): ONE DO call checks money in flight and sets the closed flag, so
- * nothing can slip in between. Refused -> 409 STORE_HAS_MONEY_IN_FLIGHT with the counts (nothing was changed). `transitioned` says
- * whether THIS call closed the store, i.e. whether a failed delete may reopen it.
+ * nothing can slip in between. Refused -> 409 STORE_HAS_MONEY_IN_FLIGHT with the counts (nothing was changed). `token` is
+ * a closure token when THIS call closed the store (null when it was already closed): only that token can reopen it.
  */
-export async function closeDoIfNoMoney(storeId: string): Promise<{ transitioned: boolean }> {
+export async function closeDoIfNoMoney(storeId: string): Promise<{ token: string | null }> {
   const stub = storeDo(storeId) as unknown as {
     closeIfNoMoneyInFlight(id: string): Promise<
       | {
           ok: true;
           data:
-            | { closed: true; transitioned: boolean }
+            | { closed: true; token: string | null }
             | { refused: true; counts: Record<string, number> };
         }
       | { ok: false; code: string; status: number }
@@ -1633,16 +1642,16 @@ export async function closeDoIfNoMoney(storeId: string): Promise<{ transitioned:
       'This store still has money in flight (paid orders not delivered, transfers awaiting confirmation, open returns, cash on delivery not settled, payments in dispute, unsettled payouts or wallet balances). Settle them before deleting the store.',
       { ...r.data.counts }
     );
-  return { transitioned: r.data.transitioned };
+  return { token: r.data.token };
 }
 
 /** Compensating rollback (Ruling NZ-D17): reopen a DO that THIS delete closed, when the delete then failed. Clears only its own flag. */
-export async function reopenDoAfterFailedDelete(storeId: string): Promise<void> {
+export async function reopenDoAfterFailedDelete(storeId: string, token: string): Promise<void> {
   const stub = storeDo(storeId) as unknown as {
     reopenAfterFailedDelete(
       id: string
     ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
   };
-  const r = await stub.reopenAfterFailedDelete(storeId);
+  const r = await stub.reopenAfterFailedDelete(storeId, token);
   if (!r.ok) throw new AppError(r.status, r.code, `store reopen refused: ${r.code}`);
 }

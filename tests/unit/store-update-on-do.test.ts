@@ -17,6 +17,9 @@ import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
 
 const S = '11111111-1111-4111-8111-111111111111';
 const T = '22222222-2222-4222-8222-222222222222';
+const realHooks = vi.hoisted(() => ({
+  afterTxCommit: (_tx: object, _fn: () => unknown): boolean => false,
+}));
 const h = vi.hoisted(() => ({
   d1: null as unknown,
   doDb: null as unknown,
@@ -32,6 +35,7 @@ vi.mock('@ebda/database', () => {
     withStore: boom,
     withUser: boom,
     withSystemJob: boom,
+    afterTxCommit: (tx: object, fn: () => unknown) => realHooks.afterTxCommit(tx, fn),
     runInTenantContext: async (_id: string, fn: () => unknown) => fn(),
     onClosedTenantTxAccess: () => undefined,
   };
@@ -69,11 +73,18 @@ vi.mock('../../apps/api/src/lib/identity-client', () => ({
 
 import { prisma } from '@ebda/database';
 import { storeUpdate, storeUpdateMany, storeWritesToDo } from '../../apps/api/src/lib/repo-factory';
-import { withDeferredWork } from '../../apps/api/src/lib/after-tenant-commit';
+import { afterTxCommit } from '../../packages/database/src/tx-hooks';
+import { withMoneyTx } from '../../packages/database/src/with-money-tx';
+
+realHooks.afterTxCommit = afterTxCommit;
+/** A fake Prisma whose $transaction runs the callback with a fresh tx object and COMMITS unless it throws. */
+const fakePrisma = {
+  $transaction: async (cb: (tx: object) => unknown) => cb({ id: Math.random() }),
+} as never;
 
 /** The base (non-transaction) client: what a service with no open transaction passes. */
 const BASE = prisma as never;
-const TX = {} as never; // any other client is a transaction client
+const NO_HOOKS = {} as never; // a transaction client with no hook registry
 import { updateStoreThrough } from '../../apps/api/src/services/store.service';
 
 let sqlite: DatabaseSync;
@@ -235,15 +246,14 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
     }
   });
 
-  it('NZ-D18: a billing transaction that updates the plan then ROLLS BACK leaves D1 and the DO unchanged', async () => {
+  it('NZ-D18/19: a billing transaction that updates the plan then ROLLS BACK leaves D1 and the DO unchanged', async () => {
     const before = d1row(S).plan;
     await expect(
-      withDeferredWork({ storeId: S } as never, async () => {
-        const row = await storeUpdate(TX, {
-          where: { id: S },
-          data: { plan: 'professional' },
-          select: { plan: true },
-        } as never);
+      withMoneyTx(fakePrisma, async tx => {
+        const row = await storeUpdate(
+          tx as never,
+          { where: { id: S }, data: { plan: 'professional' }, select: { plan: true } } as never
+        );
         expect((row as { plan: string }).plan).toBe('professional'); // the caller sees the projected row
         expect(d1row(S).plan).toBe(before); // nothing written inside the transaction
         throw new Error('billing tx rolled back');
@@ -252,24 +262,40 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
     expect(d1row(S).plan).toBe(before);
     expect(h.doCalls).toHaveLength(0);
   });
-  it('NZ-D18: the same transaction COMMITTING applies the plan to D1 and the DO after the commit', async () => {
-    await withDeferredWork({ storeId: S } as never, async () => {
-      await storeUpdate(TX, {
-        where: { id: S },
-        data: { plan: 'professional' },
-        select: { plan: true },
-      } as never);
+  it('NZ-D18/19: the same transaction COMMITTING applies the plan to D1 and the DO after the commit', async () => {
+    await withMoneyTx(fakePrisma, async tx => {
+      await storeUpdate(
+        tx as never,
+        { where: { id: S }, data: { plan: 'professional' }, select: { plan: true } } as never
+      );
       expect(d1row(S).plan).not.toBe('professional');
     });
     expect(d1row(S).plan).toBe('professional');
     expect(doProfile(S).plan).toBe('professional');
   });
-  it('NZ-D18: a transaction client with no post-commit hook, and updateMany on a transaction client, are refused 501', async () => {
+  it('NZ-D19: a money tx that ROLLS BACK while the OUTER transaction commits writes nothing (the hook belongs to the tx it was given)', async () => {
+    const before = d1row(S).plan;
+    await withMoneyTx(fakePrisma, async outer => {
+      void outer; // the outer scope commits
+      await expect(
+        withMoneyTx(fakePrisma, async inner => {
+          await storeUpdate(
+            inner as never,
+            { where: { id: S }, data: { plan: 'professional' }, select: { plan: true } } as never
+          );
+          throw new Error('money tx rolled back');
+        })
+      ).rejects.toThrow('money tx rolled back');
+    });
+    expect(d1row(S).plan).toBe(before);
+    expect(h.doCalls).toHaveLength(0);
+  });
+  it('NZ-D19: a transaction client with no hook registry, and updateMany on a transaction client, are refused 501', async () => {
     await expect(
-      storeUpdate(TX, { where: { id: S }, data: { plan: 'professional' } } as never)
+      storeUpdate(NO_HOOKS, { where: { id: S }, data: { plan: 'professional' } } as never)
     ).rejects.toMatchObject({ statusCode: 501 });
     await expect(
-      storeUpdateMany(TX, {
+      storeUpdateMany(NO_HOOKS, {
         where: { id: S, status: 'active' },
         data: { status: 'suspended' },
       } as never)

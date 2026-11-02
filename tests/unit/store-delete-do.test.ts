@@ -142,10 +142,10 @@ describe('the atomic close wrappers (Ruling NZ-D17)', () => {
     vi.resetModules();
     vi.doMock('../../apps/api/src/lib/store-backend', () => ({
       backendFor: async () => 'do',
-      storeDo: () => stubWith({ ok: true, data: { closed: true, transitioned: true } }),
+      storeDo: () => stubWith({ ok: true, data: { closed: true, token: 'tok-1' } }),
     }));
     const b = await import('../../apps/api/src/lib/repo-factory');
-    await expect(b.closeDoIfNoMoney(A)).resolves.toEqual({ transitioned: true });
+    await expect(b.closeDoIfNoMoney(A)).resolves.toEqual({ token: 'tok-1' });
     vi.doUnmock('../../apps/api/src/lib/store-backend');
   });
 });
@@ -161,10 +161,10 @@ describe('StoreService.delete ordering and no wipe (static)', () => {
     const close = d.indexOf('closeDoIfNoMoney(storeId)');
     expect(close).toBeGreaterThan(d.indexOf('STORE_IS_BILLING_PARENT'));
     expect(close).toBeLessThan(d.indexOf('withMoneyTx'));
-    expect(d.indexOf('reopenDoAfterFailedDelete(storeId)')).toBeGreaterThan(
+    expect(d.indexOf('reopenDoAfterFailedDelete(storeId, doClose.token)')).toBeGreaterThan(
       d.indexOf('withMoneyTx')
     );
-    expect(d.indexOf('reopenDoAfterFailedDelete(storeId)')).toBeLessThan(
+    expect(d.indexOf('reopenDoAfterFailedDelete(storeId, doClose.token)')).toBeLessThan(
       d.indexOf('finishStoreDeletion(')
     );
     expect(d.indexOf('finishStoreDeletion(')).toBeGreaterThan(d.indexOf('withMoneyTx'));
@@ -180,6 +180,8 @@ describe('StoreService.delete ordering and no wipe (static)', () => {
   it('the closure module deletes no store data (only its own flag rows)', () => {
     const t = read('packages/repo/src/do/closure.ts');
     expect(t).not.toMatch(/deleteAll|DROP TABLE/);
-    expect([...t.matchAll(/DELETE FROM (\w+)/g)].map(m => m[1])).toEqual(['do_flags']);
+    const targets = [...t.matchAll(/DELETE FROM (\w+)/g)].map(m => m[1]);
+    expect(targets.length).toBeGreaterThan(0);
+    expect(new Set(targets)).toEqual(new Set(['do_flags']));
   });
 });

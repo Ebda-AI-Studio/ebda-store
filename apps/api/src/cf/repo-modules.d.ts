@@ -211,10 +211,10 @@ declare module '@ebda-src/repo' {
   export function isStoreClosed(db: SyncSql): boolean;
   export function closeStore(db: SyncSql): void;
   export type CloseResult =
-    | { closed: true; transitioned: boolean }
+    | { closed: true; token: string | null }
     | { refused: true; counts: DoMoneyInFlight };
   export function closeIfNoMoneyInFlight(db: SyncSql): CloseResult;
-  export function reopenAfterFailedDelete(db: SyncSql): { reopened: boolean };
+  export function reopenAfterFailedDelete(db: SyncSql, token: string): { reopened: boolean };
   export function readStoreRecord(
     sql: SqlRunner,
     meta: Meta,

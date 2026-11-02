@@ -122,7 +122,7 @@ describe('closeIfNoMoneyInFlight: atomic gate + close (Ruling NZ-D17)', () => {
   });
   it('close lands first: the closed store REFUSES the order (410), and it is never both', () => {
     const { db, sql } = rig();
-    expect(closeIfNoMoneyInFlight(sql)).toEqual({ closed: true, transitioned: true });
+    expect(closeIfNoMoneyInFlight(sql)).toEqual({ closed: true, token: expect.any(String) });
     expect(placeOrder(db, sql, 'o2')).toBe('refused-410');
     expect((db.prepare('SELECT count(*) n FROM orders').get() as { n: number }).n).toBe(0);
   });
@@ -131,25 +131,32 @@ describe('closeIfNoMoneyInFlight: atomic gate + close (Ruling NZ-D17)', () => {
     const failing = {
       ...sql,
       run: (q: string, p: unknown[]) => {
-        if (/closed_by_delete/.test(q)) throw new Error('boom');
+        if (/INSERT INTO do_flags \(name, value\) VALUES \(\?, 1\)/.test(q))
+          throw new Error('boom');
         return sql.run(q, p);
       },
     };
     expect(() => closeIfNoMoneyInFlight(failing)).toThrow('boom');
     expect(isStoreClosed(sql)).toBe(false);
   });
-  it('an already closed store: closed, transitioned false', () => {
+  it('an already closed store: closed, no token', () => {
     const { sql } = rig();
     closeStore(sql);
-    expect(closeIfNoMoneyInFlight(sql)).toEqual({ closed: true, transitioned: false });
+    expect(closeIfNoMoneyInFlight(sql)).toEqual({ closed: true, token: null });
   });
-  it('reopenAfterFailedDelete clears only the flags the close set; a store closed earlier stays closed', () => {
+  it('reopenAfterFailedDelete(token) clears only a closure its own token still stands for', () => {
     const { sql } = rig();
-    expect(closeIfNoMoneyInFlight(sql)).toMatchObject({ transitioned: true });
-    expect(reopenAfterFailedDelete(sql)).toEqual({ reopened: true });
+    const r = closeIfNoMoneyInFlight(sql) as { closed: true; token: string };
+    expect(reopenAfterFailedDelete(sql, r.token)).toEqual({ reopened: true });
     expect(isStoreClosed(sql)).toBe(false);
-    closeStore(sql); // closed by something else
-    expect(reopenAfterFailedDelete(sql)).toEqual({ reopened: false });
+    expect(reopenAfterFailedDelete(sql, r.token)).toEqual({ reopened: false }); // a second compensation is a no-op
+    expect(reopenAfterFailedDelete(sql, 'never-issued')).toEqual({ reopened: false });
+  });
+  it('NZ-D19: delete closes -> erasure closes -> the delete compensation runs -> the store STAYS closed', () => {
+    const { sql } = rig();
+    const del = closeIfNoMoneyInFlight(sql) as { closed: true; token: string };
+    closeStore(sql); // merchant erasure (or an admin suspension) closes the store afterwards: revokes the delete's token
+    expect(reopenAfterFailedDelete(sql, del.token)).toEqual({ reopened: false });
     expect(isStoreClosed(sql)).toBe(true);
   });
 });

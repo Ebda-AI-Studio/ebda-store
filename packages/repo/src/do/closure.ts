@@ -66,8 +66,13 @@ export function isStoreClosed(db: SyncSql): boolean {
   }
 }
 
-/** Idempotent. Writes ONE flag row; deletes nothing. */
+/**
+ * Close the store. Idempotent. Deletes no store data. It also REVOKES every closure token (`closed_by:<token>` rows): a later closer
+ * (merchant erasure, an admin suspension) overwrites whoever closed the store before, so an earlier delete's compensation can never
+ * reopen a closure it did not make (Ruling NZ-D19).
+ */
 export function closeStore(db: SyncSql): void {
+  db.run(`DELETE FROM do_flags WHERE name LIKE 'closed_by:%'`, []);
   db.run(
     `INSERT INTO do_flags (name, value) VALUES ('closed', 1) ON CONFLICT (name) DO UPDATE SET value = 1`,
     []
@@ -75,37 +80,36 @@ export function closeStore(db: SyncSql): void {
 }
 
 export type CloseResult =
-  | { closed: true; transitioned: boolean }
+  | { closed: true; token: string | null }
   | { refused: true; counts: DoMoneyInFlight };
 
 /**
  * ATOMIC gate + close (Ruling NZ-D17). The check and the flag write are ONE `transactionSync` section of the single-threaded DO, so an
  * order or payment cannot start between them: it lands before (the check sees it and the close is REFUSED) or after (the write sees
- * `closed` and is refused 410), never both. `transitioned` is true only when THIS call moved the store from open to closed, so a
- * compensating `reopenAfterFailedDelete` clears only the flag it set (a store closed earlier stays closed).
+ * `closed` and is refused 410), never both. `token` is a random closure token stored as `closed_by:<token>` ONLY when THIS call moved
+ * the store from open to closed (null when it was already closed): the compensating `reopenAfterFailedDelete(token)` clears the
+ * closure only while that token still stands, so any other closer in between makes the compensation a no-op (Ruling NZ-D19).
  */
 export function closeIfNoMoneyInFlight(db: SyncSql): CloseResult {
   return db.transactionSync(() => {
-    if (isStoreClosed(db)) return { closed: true as const, transitioned: false };
+    if (isStoreClosed(db)) return { closed: true as const, token: null };
     const counts = moneyInFlightOnDo(db);
     if (totalInFlight(counts) > 0) return { refused: true as const, counts };
     closeStore(db);
-    db.run(
-      `INSERT INTO do_flags (name, value) VALUES ('closed_by_delete', 1) ON CONFLICT (name) DO UPDATE SET value = 1`,
-      []
-    );
-    return { closed: true as const, transitioned: true };
+    const token = crypto.randomUUID();
+    db.run(`INSERT INTO do_flags (name, value) VALUES (?, 1)`, [`closed_by:${token}`]);
+    return { closed: true as const, token };
   });
 }
 
-/** Compensating rollback of `closeIfNoMoneyInFlight`: clears the two flags it set, and ONLY if it set them. */
-export function reopenAfterFailedDelete(db: SyncSql): { reopened: boolean } {
+/** Compensating rollback of `closeIfNoMoneyInFlight`: reopens ONLY while its own closure token still stands. */
+export function reopenAfterFailedDelete(db: SyncSql, token: string): { reopened: boolean } {
   return db.transactionSync(() => {
     const mine = db
-      .all(`SELECT value FROM do_flags WHERE name = 'closed_by_delete'`, [])
+      .all(`SELECT value FROM do_flags WHERE name = ?`, [`closed_by:${token}`])
       .some(r => Number(r.value) === 1);
     if (!mine) return { reopened: false };
-    db.run(`DELETE FROM do_flags WHERE name IN ('closed', 'closed_by_delete')`, []);
+    db.run(`DELETE FROM do_flags WHERE name = ? OR name = 'closed'`, [`closed_by:${token}`]);
     return { reopened: true };
   });
 }

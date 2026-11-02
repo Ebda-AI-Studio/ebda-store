@@ -922,8 +922,8 @@ export class StoreService {
       });
     } catch (err) {
       // Compensating rollback (Ruling NZ-D17): the Postgres delete failed, so the DO this call closed is reopened (only its own flag).
-      if (doClose?.transitioned) {
-        await reopenDoAfterFailedDelete(storeId).catch(e =>
+      if (doClose?.token) {
+        await reopenDoAfterFailedDelete(storeId, doClose.token).catch(e =>
           sendAlert({
             level: 'p1',
             scope: 'platform',

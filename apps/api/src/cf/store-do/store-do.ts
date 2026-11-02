@@ -212,7 +212,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     if (isStoreClosed(this.sync)) throw new StoreError('STORE_CLOSED', 410);
   }
 
-  /** ATOMIC money gate + close in one DO call (Ruling NZ-D17): {closed, transitioned} or {refused, counts}. Deletes nothing. */
+  /** ATOMIC money gate + close in one DO call (Ruling NZ-D17): {closed, token} or {refused, counts}. Deletes nothing. */
   closeIfNoMoneyInFlight(storeId: string): Result<CloseResult> {
     return run(() => {
       this.bind(storeId);
@@ -221,10 +221,10 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /** Compensating rollback of a close that this delete made, when the delete then failed (Ruling NZ-D17). */
-  reopenAfterFailedDelete(storeId: string): Result<{ reopened: boolean }> {
+  reopenAfterFailedDelete(storeId: string, token: string): Result<{ reopened: boolean }> {
     return run(() => {
       this.bind(storeId);
-      return reopenAfterFailedDelete(this.sync);
+      return reopenAfterFailedDelete(this.sync, token);
     });
   }
 
