@@ -38,6 +38,9 @@ import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/data
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
+import { platformDb, requirePlatformDb } from './platform-db';
+import { d1StorePatch } from './store-columns';
+import { getAccountState } from './identity-client';
 
 type WriteOp =
   | 'create'
@@ -997,6 +1000,13 @@ const NO_REQUEST: RequestLike = { headers: {} };
 
 /** The StoreDO stub's read entry point (lib/store-backend.ts types the rest of the stub). */
 interface QueryStub {
+  storeRecord(
+    storeId: string,
+    fields?: string[]
+  ): Promise<
+    | { ok: true; data: { json: string; missing: string[] } }
+    | { ok: false; code: string; status?: number }
+  >;
   mutate(
     storeId: string,
     m: { key?: string; ops: Array<{ model: string; op: string; args?: Record<string, unknown> }> }
@@ -1156,6 +1166,78 @@ export function makeMoneyClient(
   };
 }
 
+/**
+ * `db.store` for a store served by its Durable Object (NEON-ZERO-1). `Store` is split (D1 directory columns, DO profile +
+ * config), so no table serves a whole `Store` read. This delegate answers the shape every storefront and gate read uses:
+ * `findUnique|findFirst({ where: { id, ...scalar equality }, select })` with scalar `select` fields. The DO supplies the
+ * profile/config/mirror columns in ONE RPC; D1-only columns (domain verification, billing suspension, deletedAt, ...)
+ * come from the platform D1 client in one more read, only when asked for. A relation, `include`, an unknown filter shape or
+ * another store's id is refused loudly (the other store's id is `null`, never a read): the caller is a port that needs a
+ * dedicated accessor, not a silent Postgres fallback.
+ */
+export function doStoreDelegate(
+  storeId: string,
+  stub: QueryStub,
+  decodeRpc: (t: string) => unknown
+) {
+  const matches = (rec: Record<string, any>, filter: Record<string, any>): boolean =>
+    Object.entries(filter).every(([k, cond]) => {
+      const v = rec[k];
+      if (cond === null || typeof cond !== 'object' || cond instanceof Date) {
+        return cond instanceof Date ? v?.getTime?.() === cond.getTime() : v === cond;
+      }
+      const keys = Object.keys(cond);
+      if (keys.length === 1 && keys[0] === 'in') return (cond.in as unknown[]).includes(v);
+      if (keys.length === 1 && keys[0] === 'not') return v !== cond.not;
+      throw new AppError(
+        501,
+        'STORE_FILTER_UNSUPPORTED',
+        `Store filter on ${k} is not served by the DO`
+      );
+    });
+
+  const read = async (args: any): Promise<any | null> => {
+    const a = args ?? {};
+    if (a.include)
+      throw new AppError(501, 'STORE_READ_UNSUPPORTED', 'Store include is not served by the DO');
+    const { id, ...rest } = (a.where ?? {}) as Record<string, any>;
+    if (id !== undefined && id !== storeId) return null;
+    const selected: string[] | undefined = a.select
+      ? Object.keys(a.select).filter(k => a.select[k])
+      : undefined;
+    const need = selected ? [...new Set([...selected, ...Object.keys(rest)])] : undefined;
+    const r = await stub.storeRecord(storeId, need);
+    if (!r.ok) {
+      if (r.code === 'STORE_NOT_FOUND') return null;
+      throw new AppError(r.status ?? 502, r.code, `store record refused: ${r.code}`);
+    }
+    const rec = decodeRpc(r.data.json) as Record<string, any>;
+    if (r.data.missing.length) {
+      const platform = await requirePlatformDb();
+      const d1 = await platform.store.findUnique({
+        where: { id: storeId },
+        select: Object.fromEntries(r.data.missing.map(f => [f, true])),
+      });
+      if (!d1) return null; // directory row gone: the store does not exist
+      Object.assign(rec, d1);
+    }
+    if (!matches(rec, rest)) return null;
+    if (!selected) return rec;
+    return Object.fromEntries(selected.map(k => [k, rec[k]]));
+  };
+  const orThrow = async (args: any) => {
+    const row = await read(args);
+    if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    return row;
+  };
+  return {
+    findUnique: read,
+    findFirst: read,
+    findUniqueOrThrow: orThrow,
+    findFirstOrThrow: orThrow,
+  };
+}
+
 async function doClients(
   storeId: string
 ): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient; money: MoneyClient }> {
@@ -1176,11 +1258,21 @@ async function doClients(
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
     // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
-    db: createDoClient(send as never) as unknown as StoreReads,
+    db: withStoreDelegate(
+      createDoClient(send as never) as unknown as StoreReads,
+      doStoreDelegate(storeId, stub, decodeRpc as never)
+    ),
     writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
   };
+}
+
+/** The DO read client plus the split-aware `store` delegate (the DO tables have no `Store`). */
+function withStoreDelegate(base: StoreReads, store: object): StoreReads {
+  return new Proxy(base as object, {
+    get: (t, prop, recv) => (prop === 'store' ? store : Reflect.get(t, prop, recv)),
+  }) as StoreReads;
 }
 
 /** pg writer: the `prisma` proxy, minus the DO-only second argument of `$transaction`. */
@@ -1263,9 +1355,13 @@ export async function copyStoreSettings(
 ): Promise<void> {
   // Hotfix N-22: every authoritative Store write also lands its directory columns in D1, which lookups read: read back from
   // the COMMITTED row after the surrounding transaction commits (dropped on rollback), never the caller's patch.
-  await scheduleStoreDirectorySync(storeId, fields);
+  // A store on its Durable Object is the OPPOSITE direction: D1 + the DO are authoritative (storeUpdateOnDo wrote D1 first), and a
+  // mirror from the stale Postgres row would overwrite them (plan N-22), so `do` stores are never mirrored from Postgres.
   const repo = await storeRepo(storeId);
-  if (repo.backend !== 'do') return;
+  if (repo.backend !== 'do') {
+    await scheduleStoreDirectorySync(storeId, fields);
+    return;
+  }
   const stub = storeDo(storeId) as unknown as {
     applySettings(
       storeId: string,
@@ -1292,13 +1388,98 @@ type StoreUpdateManyClient = {
   store: { updateMany: (args: any) => PromiseLike<{ count: number }> };
 };
 
+/**
+ * The AUTHORITATIVE Store update for a store served by its Durable Object (Ruling NZ-D8, single writer): the D1 `stores`
+ * row owns the directory + mirror columns, the StoreDO owns profile + config. D1 is written FIRST (its unique indexes refuse
+ * a slug / domain taken by another store before anything else changes), then the whole patch goes to the DO
+ * (`applySettings` stores what it carries and reports the D1-only rest). Not atomic across the two: a DO failure leaves D1
+ * ahead and fails the request loudly (502); the retry is idempotent and converges. No Postgres.
+ * Relation writes (`credentials`, `owner`, ...) and Prisma update operators are refused (501): the caller needs its own port.
+ */
+/**
+ * True when a Store write must go to D1 + the DO instead of Postgres: the store is on its DO AND the platform D1 is bound (every
+ * deployed Worker). Where D1 is unbound (Node, unit / integration tests, local dev; `backendFor` only returns `do` there from
+ * the non-production env list) the legacy path stays: Postgres is authoritative and the DO gets the write-through copy.
+ */
+export async function storeWritesToDo(storeId: string): Promise<boolean> {
+  return (await storeRepo(storeId)).backend === 'do' && !!(await platformDb());
+}
+
+export async function storeUpdateOnDo(
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<any> {
+  const data = Object.fromEntries(Object.entries(args.data).filter(([, v]) => v !== undefined));
+  for (const [k, v] of Object.entries(data)) {
+    const isOperator =
+      v !== null &&
+      typeof v === 'object' &&
+      !(v instanceof Date) &&
+      !Array.isArray(v) &&
+      Object.keys(v).length === 1 &&
+      [
+        'set',
+        'increment',
+        'decrement',
+        'multiply',
+        'divide',
+        'push',
+        'upsert',
+        'create',
+        'connect',
+        'update',
+      ].includes(Object.keys(v)[0]);
+    if (isOperator)
+      throw new AppError(
+        501,
+        'STORE_WRITE_UNSUPPORTED',
+        `Store.${k}: update operators and relation writes are not served by the DO`
+      );
+  }
+  const d1 = d1StorePatch(data);
+  if (Object.keys(d1).length > 0) {
+    const platform = await requirePlatformDb();
+    await platform.store.update({ where: { id: storeId }, data: d1, select: { id: true } });
+  } else {
+    // no D1 column in the patch: still prove the store exists in the directory (fail closed, never a blind DO write)
+    const platform = await requirePlatformDb();
+    const found = await platform.store.findUnique({ where: { id: storeId }, select: { id: true } });
+    if (!found) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  }
+  await copyStoreSettings(storeId, data);
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const row = await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+    where: { id: storeId },
+    ...(args.select ? { select: args.select } : {}),
+  });
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (args.include?.owner) {
+    const ownerId = (row.ownerId ??
+      (
+        await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+          where: { id: storeId },
+          select: { ownerId: true },
+        })
+      )?.ownerId) as string;
+    const acc = await getAccountState(ownerId);
+    row.owner = acc
+      ? { id: acc.id, email: acc.email, firstName: acc.firstName, lastName: acc.lastName }
+      : null;
+  }
+  return row;
+}
+
 export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
   db: StoreUpdateClient,
   args: Prisma.SelectSubset<A, Prisma.StoreUpdateArgs>
 ): Promise<Prisma.StoreGetPayload<A>> {
   const a = args as Prisma.StoreUpdateArgs;
+  const id = a.where.id as string;
+  if (await storeWritesToDo(id))
+    return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
-  await copyStoreSettings(a.where.id as string, a.data as Record<string, unknown>);
+  await copyStoreSettings(id, a.data as Record<string, unknown>);
   return row;
 }
 
@@ -1306,6 +1487,34 @@ export async function storeUpdateMany(
   db: StoreUpdateManyClient,
   args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
 ): Promise<Prisma.BatchPayload> {
+  if (await storeWritesToDo(args.where.id)) {
+    // Compare-and-set stays ONE atomic D1 statement: the filter may name only D1 columns (id + directory / mirror fields); a
+    // filter on a DO-only column is refused. The DO copy follows only when the row matched.
+    const filter = args.where as Record<string, unknown>;
+    const foreign = Object.keys(filter).filter(
+      k => k !== 'id' && Object.keys(d1StorePatch({ [k]: filter[k] })).length === 0
+    );
+    if (foreign.length)
+      throw new AppError(
+        501,
+        'STORE_WRITE_UNSUPPORTED',
+        `Store.updateMany filter on ${foreign.join(', ')} is not served by the DO`
+      );
+    const data = Object.fromEntries(
+      Object.entries(args.data as object).filter(([, v]) => v !== undefined)
+    );
+    const platform = await requirePlatformDb();
+    const patch = d1StorePatch(data);
+    const res =
+      Object.keys(patch).length > 0
+        ? ((await platform.store.updateMany({
+            where: args.where,
+            data: patch,
+          })) as Prisma.BatchPayload)
+        : { count: (await platform.store.count({ where: args.where })) as number };
+    if (res.count > 0) await copyStoreSettings(args.where.id, data);
+    return res;
+  }
   const res = await db.store.updateMany(args);
   if (res.count > 0) await copyStoreSettings(args.where.id, args.data as Record<string, unknown>);
   return res;

@@ -7,7 +7,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
 
-const pg = vi.hoisted(() => ({ rows: new Map<string, Record<string, unknown>>() }));
+const pg = vi.hoisted(() => ({
+  rows: new Map<string, Record<string, unknown>>(),
+  backend: 'pg' as 'pg' | 'do',
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {},
   runInTenantContext: async (_id: string, fn: () => unknown) => fn(),
@@ -16,7 +19,7 @@ vi.mock('@ebda/database', () => ({
     fn({ store: { findUnique: async () => pg.rows.get(id) ?? null } }),
 }));
 vi.mock('../../apps/api/src/lib/store-backend', () => ({
-  backendFor: async () => 'pg',
+  backendFor: async () => pg.backend,
   storeDo: () => ({}),
 }));
 
@@ -103,6 +106,7 @@ beforeEach(() => {
       .join('\n')
   );
   pg.rows.clear();
+  pg.backend = 'pg';
   setCfBindings({ PLATFORM_DB: asD1() } as never);
 });
 
@@ -298,5 +302,54 @@ describe('every creating path mirrors', () => {
   });
   it('the reconciler is on the hourly cron', () => {
     expect(fs.readFileSync('apps/api/src/cf/cron.ts', 'utf8')).toMatch(/store-directory-reconcile/);
+  });
+});
+
+describe('a store on its Durable Object is never mirrored from Postgres (plan N-22)', () => {
+  beforeEach(async () => {
+    writes.length = 0;
+    commit({});
+    await syncStoreDirectoryFromPg(A);
+    sqlite.prepare("UPDATE stores SET storage_backend='do', status='suspended' WHERE id=?").run(A);
+    commit({ status: 'active' }); // stale Postgres row
+    writes.length = 0;
+  });
+  it('copyStoreSettings does not schedule a mirror for a do store', async () => {
+    pg.backend = 'do';
+    await copyStoreSettings(A, { status: 'active' }).catch(() => undefined); // the DO stub is absent in this test
+    expect(d1Writes()).toBe(0);
+    expect(d1Status()).toBe('suspended');
+  });
+  it('the full-row sync leaves a do row alone', async () => {
+    await syncStoreDirectoryFromPg(A);
+    expect(d1Writes()).toBe(0);
+    expect(d1Status()).toBe('suspended');
+  });
+  it('the reconciler skips do rows (no overwrite, no delete of a row Postgres does not know)', async () => {
+    sqlite
+      .prepare(
+        "INSERT INTO stores (id, name, slug, owner_id, storage_backend) VALUES ('d-only','d','d-only','o','do')"
+      )
+      .run();
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: false,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      alert: () => undefined,
+    });
+    expect(r.corrected).toEqual([]);
+    expect(r.keptRestrictive).toEqual([]);
+    expect(d1Status()).toBe('suspended');
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM stores WHERE id='d-only'").get()).toMatchObject({
+      n: 1,
+    });
   });
 });

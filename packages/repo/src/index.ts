@@ -1,4 +1,6 @@
 export { createPrismaLite, expandUnique } from './prisma-lite/client';
+export { createD1Client, type D1Like } from './prisma-lite/d1';
+export { withEntropy, type Entropy } from './prisma-lite/entropy';
 export { Engine } from './prisma-lite/engine';
 export { WriteEngine, mapDbError, knownError } from './prisma-lite/writes';
 export type { Meta, SqlRunner } from './prisma-lite/types';
@@ -30,7 +32,7 @@ export {
   type DoMutation,
   type WriteOp,
 } from './rpc/writes';
-export { applyStoreSettings } from './rpc/settings';
+export { applyStoreSettings, readStoreRecord } from './rpc/settings';
 export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } from './do/stock-ops';
 export { answerStockOp, type StockAnswer } from './rpc/stock';
 export { runMoneyOp, ensureMoneyOpsSchema, MONEY_OP_NAMES, type MoneyOpName } from './do/money-ops';

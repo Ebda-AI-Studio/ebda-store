@@ -4,6 +4,8 @@ import { config } from '../config';
 import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
+import { getAccountState } from '../lib/identity-client';
+import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
@@ -115,9 +117,11 @@ async function resolveTokenVersionAndStatus(
   // `users` is under strict RLS and the caller is not scoped to anyone yet, so
   // this exact-id read goes through the `ebda_user_state` definer.
   const u = await getUserState(userId);
-  const currentTv = u?.tokenVersion ?? 0;
-  await redis.setUserTokenVersion(userId, currentTv);
-  return { tokenVersion: currentTv, blocked: u ? u.status !== 'active' : false };
+  // Ruling NZ-D2: an UNKNOWN user is BLOCKED, never "tokenVersion 0", and nothing is cached for it (a miss answered by a
+  // backend that does not know the user must not become the authoritative value for the next request).
+  if (!u) return { tokenVersion: 0, blocked: true };
+  await redis.setUserTokenVersion(userId, u.tokenVersion);
+  return { tokenVersion: u.tokenVersion, blocked: u.status !== 'active' || !!u.deletedAt };
 }
 
 /**
@@ -147,7 +151,15 @@ export function accountsUser(c: AccountsClaims, profileRole?: string): AuthPaylo
 /** Verify an identity-service token and its session. Throws AppError on any failure. */
 export async function authenticateAccounts(
   token: string,
-  opts: { allowMissingProfile?: boolean } = {}
+  opts: {
+    /** Kept for the one caller that mints the Store session (`POST /auth/session`); the identity service is the authority now. */
+    allowMissingProfile?: boolean;
+    /**
+     * `true` (default): ask the identity service for revocation + account state NOW (every write, bulk / sensitive read,
+     * refresh). `false`: trust the signed claims (plain reads; tokens live <= 5 minutes). Ruling NZ-D2.
+     */
+    live?: boolean;
+  } = {}
 ): Promise<{ user: AuthPayload; claims: AccountsClaims }> {
   let claims: AccountsClaims;
   try {
@@ -156,8 +168,7 @@ export async function authenticateAccounts(
     throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token');
   }
   // A platform admin's power needs a FRESH login (Ruling ID-15): at most 12 h since the interactive login that created the
-  // session. A token without `auth_time` cannot prove it, so it is refused too. (The identity service stops minting `pa` for an
-  // older session as well; this is the Store's own check.)
+  // session. A token without `auth_time` cannot prove it, so it is refused too.
   if (claims.pa === 'super_admin') {
     const age = Date.now() / 1000 - (claims.authTime ?? 0);
     if (!claims.authTime || age > SUPER_ADMIN_MAX_AUTH_AGE_SECONDS) {
@@ -168,29 +179,27 @@ export async function authenticateAccounts(
       );
     }
   }
+  if (opts.live === false) return { user: accountsUser(claims), claims };
+
+  // LIVE: ONE source for revocation + existence + status (the identity service). Postgres is not consulted.
   let revoked: boolean;
+  let account: Awaited<ReturnType<typeof getAccountState>>;
   try {
-    revoked = await sessionRevoked(claims.sid);
+    [revoked, account] = await Promise.all([
+      sessionRevoked(claims.sid),
+      getAccountState(claims.sub),
+    ]);
   } catch (err) {
     // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
-    logger.error({ err: (err as Error).message }, '[auth] identity revocation check failed');
+    logger.error({ err: (err as Error).message }, '[auth] identity live check failed');
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
   if (revoked) throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
-
-  // Defence in depth (NEVER-stale class: account status / existence, no cache): the Store's own profile row must also exist, be
-  // live and be active. Every Store path that suspends, deletes or revokes a user also calls the identity service, but a path
-  // that missed it must not leave a valid 15 minute token working. A missing row is refused here; only `POST /auth/session`
-  // (allowMissingProfile) may create one, and only from an identity that still exists.
-  const st = await getUserState(claims.sub);
-  if (!st) {
-    if (!opts.allowMissingProfile) throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
-  } else if (st.deletedAt) {
-    throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
-  } else if (st.status !== 'active') {
+  // Unknown (or erased) user = BLOCKED, never a default (Ruling NZ-D2).
+  if (!account) throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
+  if (account.status !== 'active')
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
-  }
-  return { user: accountsUser(claims, st?.role), claims };
+  return { user: accountsUser(claims, account.role), claims };
 }
 
 export async function authenticate(
@@ -207,7 +216,7 @@ export async function authenticate(
   // Identity-service (ES256) token: merchants, staff and super admins. Customer and impersonation tokens stay HS256.
   if (isAccountsToken(token)) {
     try {
-      const { user, claims } = await authenticateAccounts(token);
+      const { user, claims } = await authenticateAccounts(token, { live: needsLiveIdentity(req) });
       req.user = user;
       (req as any).tokenJti = claims.jti;
       (req as any).accountsSid = claims.sid;

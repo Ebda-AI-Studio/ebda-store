@@ -9,7 +9,14 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
-import { copyStoreSettings, storeDb, storeRepo, syncStoreFields } from '../lib/repo-factory';
+import {
+  copyStoreSettings,
+  storeDb,
+  storeRepo,
+  storeUpdateOnDo,
+  storeWritesToDo,
+  syncStoreFields,
+} from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -59,6 +66,7 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
+import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
   assertPlanAllows,
@@ -91,8 +99,14 @@ import { startSignupTrial } from './billing/trial';
 export async function bustStoreCaches(
   storeId: string,
   slug: string | null,
-  domain?: string | null
+  domain?: string | null,
+  /** The values BEFORE a slug / domain change: the old address must stop resolving to this store. */
+  previous: { slug?: string | null; domain?: string | null } = {}
 ): Promise<void> {
+  // NEON-SCALE-1 rule 1: the cached store directory (slug / domain / id -> status) is event-invalidated here, BEFORE the
+  // payload caches are busted (so a refill cannot read a stale directory entry) and AGAIN at the end (a refill that raced
+  // the first pass is dropped).
+  await invalidateStoreDirectory(storeId, slug, domain, previous);
   await invalidateCached(`public:store:${storeId}`);
   if (slug) {
     await invalidateCached(`public:store:${slug}`);
@@ -113,6 +127,7 @@ export async function bustStoreCaches(
   // layout (`GET /public/stores/:id/layout`); without it a layout save could not
   // reach the Next data cache and stayed stale for the 60s revalidate window.
   revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`] });
+  await invalidateStoreDirectory(storeId, slug, domain, previous);
 }
 
 /**
@@ -120,10 +135,34 @@ export async function bustStoreCaches(
  * did, then copies the changed fields to the Durable Object's settings copy for a store served by its DO. On Postgres the
  * copy is a no-op. The patch is captured from the `tx.store.update({ data })` call itself, so no call site restates it.
  */
-async function updateStoreThrough<T>(
+export async function updateStoreThrough<T>(
   storeId: string,
   run: (tx: Parameters<Parameters<typeof withStore>[1]>[0]) => Promise<T>
 ): Promise<T> {
+  // Ruling NZ-D8: a store on its Durable Object is written by D1 + the DO, never Postgres. `run` sees a transaction-shaped
+  // stand-in that serves ONLY `store.update` / `store.findUnique`; any other model throws 501 (that caller needs its own port).
+  if (await storeWritesToDo(storeId)) {
+    const unsupported = (what: string) => {
+      throw new AppError(
+        501,
+        'STORE_TX_UNSUPPORTED',
+        `${what} is not served for a Durable Object store`
+      );
+    };
+    const doTx = new Proxy({} as object, {
+      get(_t, prop) {
+        if (prop !== 'store') return unsupported(`tx.${String(prop)}`);
+        return {
+          update: (args: { data: Record<string, unknown> }) =>
+            storeUpdateOnDo(storeId, args as never),
+          findUnique: async (args: any) => (await storeDb(storeId)).store.findUnique(args),
+          findUniqueOrThrow: async (args: any) =>
+            (await storeDb(storeId)).store.findUniqueOrThrow(args),
+        };
+      },
+    });
+    return run(doTx as never);
+  }
   let patch: Record<string, unknown> | undefined;
   const result = await withStore(storeId, tx => {
     const watched = new Proxy(tx as object, {
@@ -550,6 +589,8 @@ export class StoreService {
 
     // Hotfix N-22: the new store must resolve (lookups read D1). The creating write committed above, so read it back and mirror it.
     await syncStoreDirectoryFromPg(store.id);
+    // A slug probed before this store existed is negatively cached in the directory: clear it so the new store resolves at once.
+    await invalidateStoreDirectory(store.id, store.slug, store.domain);
 
     return { ...store, owner };
   }
@@ -666,7 +707,10 @@ export class StoreService {
       );
     }
 
-    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain, {
+      slug: store.slug,
+      domain: store.domain,
+    });
 
     if (data.heroImage !== undefined && previousHeroImage && previousHeroImage !== data.heroImage) {
       void deleteR2ObjectIfOrphan(previousHeroImage).catch(err =>

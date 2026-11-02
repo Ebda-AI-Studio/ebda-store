@@ -31,6 +31,14 @@ vi.mock('../../apps/api/src/lib/definer', () => ({
   getUserState: async (id: string) => rows.get(id) ?? null,
 }));
 
+vi.mock('../../apps/api/src/lib/identity-client', () => ({
+  // The identity service is the ONE authority for existence + status (Ruling NZ-D2); `rows` stands in for it here.
+  getAccountState: async (id: string) => {
+    const r = rows.get(id);
+    return r && !r.deletedAt ? { id, role: r.role, status: r.status } : null;
+  },
+}));
+
 const { authenticate, optionalAuthenticate, accountsUser } =
   await import('../../apps/api/src/middleware/auth');
 const { configureAccountsVerifier, configureRevocationCheck, isAccountsToken } =
@@ -98,11 +106,24 @@ async function mint(
     .sign(over.key ?? keys.privateKey);
 }
 
-const reqWith = (token?: string): Request =>
+const reqWith = (
+  token?: string,
+  method = 'POST',
+  originalUrl = '/api/v1/stores/store-1/orders'
+): Request =>
   ({
+    method,
+    originalUrl,
     headers: token ? { authorization: `Bearer ${token}` } : {},
     cookies: {},
   }) as unknown as Request;
+
+async function runWith(method: string, url: string, token: string) {
+  const req = reqWith(token, method, url);
+  const next = vi.fn();
+  await authenticate(req, {} as Response, next as unknown as NextFunction);
+  return { req, err: next.mock.calls[0]?.[0] as { statusCode?: number } | undefined };
+}
 
 async function run(fn: typeof authenticate, token?: string) {
   const req = reqWith(token);
@@ -251,13 +272,67 @@ describe('the Store profile row is checked on every request (defence in depth fo
     expect((await run(optionalAuthenticate, await mint())).req.user).toBeUndefined();
   });
 
-  it('only the session exchange may proceed without a profile row (it creates it from a live identity)', async () => {
+  it('an UNKNOWN user is blocked everywhere, including the session exchange (Ruling NZ-D2: never a default)', async () => {
     rows.delete('user-1');
     const { authenticateAccounts } = await import('../../apps/api/src/middleware/auth');
     await expect(authenticateAccounts(await mint())).rejects.toMatchObject({ statusCode: 401 });
     await expect(
       authenticateAccounts(await mint(), { allowMissingProfile: true })
-    ).resolves.toBeTruthy();
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('live vs claims-only identity (Ruling NZ-D2)', () => {
+  it('an allowlisted read (NZ-D10) trusts the signed claims: no identity call, even for a session revoked a moment ago', async () => {
+    revoked.add('sid-1');
+    const res = await runWith('GET', '/api/v1/stores/store-1/typography', await mint());
+    expect(res.err).toBeUndefined();
+    expect(res.req.user?.userId).toBe('user-1');
+  });
+  it('an unclassified GET is live by default (NZ-D10): a revoked session reading products is refused', async () => {
+    revoked.add('sid-1');
+    expect(
+      (await runWith('GET', '/api/v1/stores/store-1/products', await mint())).err?.statusCode
+    ).toBe(401);
+  });
+  it('every state change is live: revoked, suspended and unknown are refused', async () => {
+    revoked.add('sid-1');
+    expect(
+      (await runWith('POST', '/api/v1/stores/store-1/products', await mint())).err?.statusCode
+    ).toBe(401);
+    revoked.clear();
+    rows.get('user-1')!.status = 'suspended';
+    expect(
+      (await runWith('PUT', '/api/v1/stores/store-1/settings', await mint())).err?.statusCode
+    ).toBe(403);
+    rows.delete('user-1');
+    expect(
+      (await runWith('DELETE', '/api/v1/stores/store-1/products/p1', await mint())).err?.statusCode
+    ).toBe(401);
+  });
+  it.each([
+    '/api/v1/stores/store-1/customers',
+    '/api/v1/stores/store-1/customers/export?format=csv',
+    '/api/v1/stores/store-1/staff',
+    '/api/v1/stores/store-1/billing/invoices',
+    '/api/v1/stores/store-1/settings',
+    '/api/v1/admin/stores',
+    '/api/v1/stores/store-1/payouts',
+  ])('the sensitive read %s is live', async path => {
+    revoked.add('sid-1');
+    expect((await runWith('GET', path, await mint())).err?.statusCode).toBe(401);
+  });
+  it('an unreachable identity service on a live check is a 503, never an allow', async () => {
+    revocationDown = true;
+    expect(
+      (await runWith('POST', '/api/v1/stores/store-1/orders', await mint())).err?.statusCode
+    ).toBe(503);
+  });
+  it('a removed staff member keeps no write access: the very next write is refused', async () => {
+    rows.delete('user-1'); // identity deleted the account (staff removal revokes via the identity service in the same handler)
+    expect(
+      (await runWith('POST', '/api/v1/stores/store-1/orders', await mint())).err?.statusCode
+    ).toBe(401);
   });
 });
 

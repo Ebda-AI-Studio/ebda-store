@@ -67,6 +67,7 @@ import {
 } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
+import { lookupStoreCached } from '../lib/store-directory';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
 import {
@@ -2200,13 +2201,13 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // stores (`deletedAt` set) are also excluded.
       // `stores` is under RLS (R-EBDA-005): resolve through the lookup definer, then read
       // the row inside that store's own scope.
-      const hit = await lookupStore(isUuid ? { id: slugOrId } : { slug: slugOrId }, [
+      const hit = await lookupStoreCached(isUuid ? { id: slugOrId } : { slug: slugOrId }, [
         'active',
         'suspended',
       ]);
       const store = hit
-        ? await withStore(hit.id, tx =>
-            tx.store.findUnique({
+        ? await readInStoreContext(hit.id, async () =>
+            (await storeDb(hit.id)).store.findUnique({
               where: { id: hit.id },
               select: {
                 id: true,
@@ -2420,7 +2421,10 @@ router.get(
         // stay hidden — those should still 404.
         // `stores` is under RLS (R-EBDA-005): resolve through the lookup definer, then read
         // the row inside that store's own scope.
-        const hit = await lookupStore(
+        // The public path (no expected id) reads the cached directory (Ruling NZ-D1: reads only); the editor preview is
+        // never cached and always asks D1.
+        const resolve = expectedStoreId ? lookupStore : lookupStoreCached;
+        const hit = await resolve(
           lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain },
           statuses
         );
@@ -2429,8 +2433,8 @@ router.get(
           throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
         }
         const store = hit
-          ? await withStore(hit.id, tx =>
-              tx.store.findUnique({
+          ? await readInStoreContext(hit.id, async () =>
+              (await storeDb(hit.id)).store.findUnique({
                 where: { id: hit.id },
                 select: {
                   id: true,

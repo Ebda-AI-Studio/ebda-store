@@ -339,7 +339,7 @@ export class DomainClaimService {
       bustCorsCache(newDomain);
       void invalidateCached(`public:store:resolve:${newDomain}`);
     }
-    await bustStoreCaches(storeId, slug, newDomain);
+    await bustStoreCaches(storeId, slug, newDomain, { domain: oldDomain });
   }
 
   /**

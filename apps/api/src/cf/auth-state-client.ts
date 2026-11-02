@@ -39,8 +39,22 @@ export function shardKey(key: string): string {
  */
 export const CACHEGEN_SHARD = -1;
 
+/**
+ * Store-scoped generations are spread over this many instances (Ruling NZ-D3): a name that carries a store id
+ * (`public:products:<storeId>:...`) lives on `cachegen-s<n>`, n = fnv1a(storeId) mod 64, so one viral store's invalidations
+ * and fills never queue behind another store's, and nothing funnels through a single object. Names with no store id (the
+ * root, `public:`, `public:products:` prefix generations) stay on the base instance. Shard ids: -1 base, -2-n store shard n.
+ */
+export const CACHEGEN_STORE_SHARDS = 64;
+const UUID_IN_NAME = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+
 export function shardOf(key: string): number {
-  if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD;
+  if (key.startsWith(CACHEGEN_PREFIX)) {
+    const rest = key.slice(CACHEGEN_PREFIX.length);
+    // the store STATUS generation is keyed by host (`public:store:resolve:<host>`): its own shard per host, never the base one
+    const id = rest.match(UUID_IN_NAME)?.[0] ?? rest.match(/^public:store:resolve:(.+)$/)?.[1];
+    return id ? CACHEGEN_SHARD - 1 - (fnv1a(id) % CACHEGEN_STORE_SHARDS) : CACHEGEN_SHARD;
+  }
   return fnv1a(shardKey(key)) % AUTH_STATE_SHARDS;
 }
 
@@ -69,8 +83,9 @@ export function cachegenPlacement(env: Record<string, string | undefined> = proc
 function stub(shard: number): AuthStateStub {
   const ns = cfBindings()?.AUTH_STATE;
   if (!ns) throw new Error('AUTH_STATE Durable Object binding is not configured');
-  if (shard === CACHEGEN_SHARD) {
-    const { name, hint } = cachegenPlacement();
+  if (shard <= CACHEGEN_SHARD) {
+    const { name: base, hint } = cachegenPlacement();
+    const name = shard === CACHEGEN_SHARD ? base : `${base}-s${CACHEGEN_SHARD - 1 - shard}`;
     return ns.get(
       ns.idFromName(name),
       hint ? { locationHint: hint } : undefined

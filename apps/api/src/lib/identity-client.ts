@@ -2,7 +2,7 @@
  * The Store's client for the shared identity service (Service Binding `ACCOUNTS`, Rulings ID-1/ID-2).
  * Every call fails CLOSED: a missing binding or a failed call is an AppError 503, never a silent "allowed".
  */
-import { cfBindings, type AccountsRpc, type AccountState } from '../cf/bindings';
+import { cfBindings, type AccountBrief, type AccountsRpc, type AccountState } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { getUserState } from './definer';
 
@@ -30,6 +30,17 @@ async function call<T>(
     if (e instanceof AppError) throw e;
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
+}
+
+/** Display facts for many accounts in ONE identity call (chunks of 100). Unknown / erased ids are absent from the result. */
+export async function getAccountsBrief(userIds: string[]): Promise<AccountBrief[]> {
+  const unique = [...new Set(userIds)];
+  const out: AccountBrief[] = [];
+  for (let i = 0; i < unique.length; i += 100)
+    out.push(
+      ...(await call('getAccountsBrief', r => r.getAccountsBrief?.(unique.slice(i, i + 100))))
+    );
+  return out;
 }
 
 export const getAccountState = (userId: string): Promise<AccountState | null> =>
