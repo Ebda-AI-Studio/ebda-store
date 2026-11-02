@@ -270,6 +270,18 @@ describe('DemoLookBar: template, then look', () => {
     expect(screen.getByRole('option', { name: 'لوك بوك' })).toBeTruthy();
   });
 
+  it('both selects reserve room for their arrow at the inline end, so the text never sits under it (RTL chevron overlap)', () => {
+    expect(DEMO_BAR_SELECT_CLASS).toMatch(/\bappearance-none\b/);
+    expect(DEMO_BAR_SELECT_CLASS).toMatch(/\bpe-8\b/);
+    expect(DEMO_BAR_SELECT_CLASS).toMatch(/\bps-2\b/);
+    expect(DEMO_BAR_SELECT_CLASS).toMatch(/\brtl:\[background-position:/);
+    expect(DEMO_BAR_SELECT_CLASS).not.toMatch(/\b(px|pl|pr)-\d/);
+    lang = 'ar';
+    render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
+    for (const s of document.querySelectorAll('select'))
+      expect(s.className).toBe(DEMO_BAR_SELECT_CLASS);
+  });
+
   it('the select boundary is >= 3:1 against the bar on every look (WCAG 1.4.11)', () => {
     // The bar is bg-foreground (the look's ink); the border is the page colour at N% over it.
     const alpha = Number(/\bborder-background\/(\d+)\b/.exec(DEMO_BAR_SELECT_CLASS)?.[1]) / 100;
