@@ -18,6 +18,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [ENVIRONMENT.md](ENVIRONMENT.md) - Environment variables — all apps
 - [HANDOFF-2026-06-01.md](HANDOFF-2026-06-01.md) - Ebda AI Studio — Session Handoff (2026-05-29 → 2026-06-01)
 - [INCIDENT.md](INCIDENT.md) - Incident Response — Ebda Store
+- [load-testing.md](load-testing.md) - Load testing (k6 on GitHub-hosted runners)
 - [RETENTION.md](RETENTION.md) - Data retention policy
 - [ROLLBACK.md](ROLLBACK.md) - Production rollback — Ebda
 - [RULINGS.md](RULINGS.md) - Rulings ledger (moved)
