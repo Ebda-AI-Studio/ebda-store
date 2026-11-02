@@ -39,6 +39,8 @@ import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { requirePlatformDb } from './platform-db';
+import { d1StorePatch } from './store-columns';
+import { getAccountState } from './identity-client';
 
 type WriteOp =
   | 'create'
@@ -1382,13 +1384,89 @@ type StoreUpdateManyClient = {
   store: { updateMany: (args: any) => PromiseLike<{ count: number }> };
 };
 
+/**
+ * The AUTHORITATIVE Store update for a store served by its Durable Object (Ruling NZ-D8, single writer): the D1 `stores`
+ * row owns the directory + mirror columns, the StoreDO owns profile + config. D1 is written FIRST (its unique indexes refuse
+ * a slug / domain taken by another store before anything else changes), then the whole patch goes to the DO
+ * (`applySettings` stores what it carries and reports the D1-only rest). Not atomic across the two: a DO failure leaves D1
+ * ahead and fails the request loudly (502); the retry is idempotent and converges. No Postgres.
+ * Relation writes (`credentials`, `owner`, ...) and Prisma update operators are refused (501): the caller needs its own port.
+ */
+export async function storeUpdateOnDo(
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<any> {
+  const data = Object.fromEntries(Object.entries(args.data).filter(([, v]) => v !== undefined));
+  for (const [k, v] of Object.entries(data)) {
+    const isOperator =
+      v !== null &&
+      typeof v === 'object' &&
+      !(v instanceof Date) &&
+      !Array.isArray(v) &&
+      Object.keys(v).length === 1 &&
+      [
+        'set',
+        'increment',
+        'decrement',
+        'multiply',
+        'divide',
+        'push',
+        'upsert',
+        'create',
+        'connect',
+        'update',
+      ].includes(Object.keys(v)[0]);
+    if (isOperator)
+      throw new AppError(
+        501,
+        'STORE_WRITE_UNSUPPORTED',
+        `Store.${k}: update operators and relation writes are not served by the DO`
+      );
+  }
+  const d1 = d1StorePatch(data);
+  if (Object.keys(d1).length > 0) {
+    const platform = await requirePlatformDb();
+    await platform.store.update({ where: { id: storeId }, data: d1, select: { id: true } });
+  } else {
+    // no D1 column in the patch: still prove the store exists in the directory (fail closed, never a blind DO write)
+    const platform = await requirePlatformDb();
+    const found = await platform.store.findUnique({ where: { id: storeId }, select: { id: true } });
+    if (!found) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  }
+  await copyStoreSettings(storeId, data);
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const row = await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+    where: { id: storeId },
+    ...(args.select ? { select: args.select } : {}),
+  });
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (args.include?.owner) {
+    const ownerId = (row.ownerId ??
+      (
+        await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+          where: { id: storeId },
+          select: { ownerId: true },
+        })
+      )?.ownerId) as string;
+    const acc = await getAccountState(ownerId);
+    row.owner = acc
+      ? { id: acc.id, email: acc.email, firstName: acc.firstName, lastName: acc.lastName }
+      : null;
+  }
+  return row;
+}
+
 export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
   db: StoreUpdateClient,
   args: Prisma.SelectSubset<A, Prisma.StoreUpdateArgs>
 ): Promise<Prisma.StoreGetPayload<A>> {
   const a = args as Prisma.StoreUpdateArgs;
+  const id = a.where.id as string;
+  if ((await storeRepo(id)).backend === 'do')
+    return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
-  await copyStoreSettings(a.where.id as string, a.data as Record<string, unknown>);
+  await copyStoreSettings(id, a.data as Record<string, unknown>);
   return row;
 }
 
@@ -1396,6 +1474,34 @@ export async function storeUpdateMany(
   db: StoreUpdateManyClient,
   args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
 ): Promise<Prisma.BatchPayload> {
+  if ((await storeRepo(args.where.id)).backend === 'do') {
+    // Compare-and-set stays ONE atomic D1 statement: the filter may name only D1 columns (id + directory / mirror fields); a
+    // filter on a DO-only column is refused. The DO copy follows only when the row matched.
+    const filter = args.where as Record<string, unknown>;
+    const foreign = Object.keys(filter).filter(
+      k => k !== 'id' && Object.keys(d1StorePatch({ [k]: filter[k] })).length === 0
+    );
+    if (foreign.length)
+      throw new AppError(
+        501,
+        'STORE_WRITE_UNSUPPORTED',
+        `Store.updateMany filter on ${foreign.join(', ')} is not served by the DO`
+      );
+    const data = Object.fromEntries(
+      Object.entries(args.data as object).filter(([, v]) => v !== undefined)
+    );
+    const platform = await requirePlatformDb();
+    const patch = d1StorePatch(data);
+    const res =
+      Object.keys(patch).length > 0
+        ? ((await platform.store.updateMany({
+            where: args.where,
+            data: patch,
+          })) as Prisma.BatchPayload)
+        : { count: (await platform.store.count({ where: args.where })) as number };
+    if (res.count > 0) await copyStoreSettings(args.where.id, data);
+    return res;
+  }
   const res = await db.store.updateMany(args);
   if (res.count > 0) await copyStoreSettings(args.where.id, args.data as Record<string, unknown>);
   return res;
