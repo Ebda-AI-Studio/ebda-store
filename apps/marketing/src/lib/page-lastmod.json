@@ -1,70 +1,74 @@
 {
   "home": {
-    "hash": "fed7d7ba86a70523",
+    "hash": "34348f2d4fb6d665",
+    "date": "2026-11-02"
+  },
+  "store": {
+    "hash": "8249a7efdc3795d7",
     "date": "2026-11-02"
   },
   "features": {
-    "hash": "1665bcd8e643001a",
+    "hash": "e0225e39fa37ebaf",
     "date": "2026-11-02"
   },
   "whatsapp": {
-    "hash": "87df010a8737a9ef",
+    "hash": "45d913c629f4cd77",
     "date": "2026-11-02"
   },
   "compare/zid": {
-    "hash": "ddb332c6d974bdbc",
+    "hash": "07e397f3d4dca264",
     "date": "2026-11-02"
   },
   "compare/shopify": {
-    "hash": "3569ce714b8f5dd3",
+    "hash": "3e239dc818d718b1",
     "date": "2026-11-02"
   },
   "compare/wuilt": {
-    "hash": "9d47934702b3f346",
+    "hash": "12726b7fe1661f4d",
     "date": "2026-11-02"
   },
   "compare/youcan": {
-    "hash": "db8d756131473b44",
+    "hash": "0bae4bf2d0669156",
     "date": "2026-11-02"
   },
   "compare/easyorders": {
-    "hash": "989ba45ef1c89925",
+    "hash": "c69303425136e009",
     "date": "2026-11-02"
   },
   "compare/expandcart": {
-    "hash": "927667c263cbe6b0",
+    "hash": "83001474696976c9",
     "date": "2026-11-02"
   },
   "for/fashion": {
-    "hash": "eb1f590fdb02b239",
+    "hash": "96f3a16d7eb58f75",
     "date": "2026-11-02"
   },
   "for/electronics": {
-    "hash": "31ed44fe1c857886",
+    "hash": "3ffaeebce072dfad",
     "date": "2026-11-02"
   },
   "for/beauty": {
-    "hash": "40d31462daf3fd97",
+    "hash": "517d49692067777c",
     "date": "2026-11-02"
   },
   "for/food": {
-    "hash": "3b5b1cbaecda8544",
+    "hash": "8246905fc93431b7",
     "date": "2026-11-02"
   },
   "for/jewellery": {
-    "hash": "907f3a049492a59d",
+    "hash": "a7e305add2cac12e",
     "date": "2026-11-02"
   },
   "about": {
-    "hash": "374f23565ec2820a",
+    "hash": "189e9a1ee12fb270",
     "date": "2026-11-02"
   },
   "contact": {
-    "hash": "27fe3e5b24a25e9d",
+    "hash": "d997db45fc15b380",
     "date": "2026-11-02"
   },
   "credits": {
-    "hash": "05092e8e807b05bd",
+    "hash": "e2b695aa0243e4ca",
     "date": "2026-11-02"
   }
 }
