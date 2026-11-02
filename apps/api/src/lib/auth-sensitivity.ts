@@ -1,27 +1,41 @@
 /**
- * Which requests need a LIVE identity check (Ruling NZ-D2, NEON-SCALE-1 rule 2).
+ * Which authenticated requests may skip the LIVE identity check (Ruling NZ-D2, flipped to deny-by-default by NZ-D10).
  *
- * A normal request trusts the signed token claims (merchant / staff / admin access tokens live <= 5 minutes). A request
- * that changes state, or reads data that is bulk or sensitive, asks the identity service (strongly consistent) whether the
- * session is revoked and the account still exists and is active. Revocation (logout-all, password change, suspension,
- * staff removal) therefore bites immediately on every write, export and PII list, and within one token lifetime on a plain read.
+ * Merchant / staff / admin access tokens (aud=store) live <= 5 minutes. EVERY authenticated request asks the identity
+ * service (revocation + account state, one call) EXCEPT a GET/HEAD/OPTIONS whose exact path is listed in
+ * {@link NON_SENSITIVE_GET}. A new route, a renamed route, a path with a suffix (`.json`, `.xlsx`, a trailing segment) or any
+ * state change is therefore live by default: the failure mode of forgetting to classify a route is one extra identity call,
+ * never a revoked session reading data. tests/unit/auth-sensitivity-routes.test.ts walks the real router table and fails when
+ * an allowlist entry matches no route, or when a route the allowlist does not name would skip the check.
  *
- * Cost if wrong (a sensitive read missing from the list): a removed or suspended staff member sees that page for <= 5 minutes.
- * Add the path here, with a test; the default for a state change is always live.
+ * Add a path ONLY if it returns no personal data, money figure, credential or other store's data (store content the
+ * merchant is editing, own-profile basics). Cost if wrong: a removed staff member can read that one path for <= 5 minutes.
  */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-/** Bulk / sensitive READ areas: customer PII lists, exports, payouts, staff, billing, settings, keys, webhooks, finance. */
-const SENSITIVE_READ =
-  /\/(customers|exports?|payouts?|remittances?|staff|staff-invites|billing|settings|payment-settings|merchant-key|api-keys|webhooks|merchant-webhooks|finance|returns|reports|audit-logs?|mfa|passkeys?|sessions|admin)(\/|$|\?)/i;
+/** Exact paths (without the `/api/v1` prefix, `:id` = one path segment). */
+export const NON_SENSITIVE_GET: readonly RegExp[] = [
+  /^\/auth\/me$/, // own profile basics
+  /^\/onboarding\/slug-check$/, // availability probe before a store exists
+  /^\/stores\/[^/]+\/typography$/, // theme font settings
+  /^\/admin\/stores\/[^/]+\/layout$/, // storefront layout the merchant is editing
+  /^\/admin\/stores\/[^/]+\/builder\/pages\/[^/]+$/, // page-builder draft content
+];
+
+/** Request path normalised for matching: no query / hash, no `/api/v1` prefix, no trailing slash. */
+export function normalisedPath(req: { originalUrl?: string; url?: string }): string {
+  const raw = (req.originalUrl ?? req.url ?? '').split(/[?#]/)[0];
+  const p = raw.replace(/^\/api\/v1(?=\/|$)/, '').replace(/\/+$/, '');
+  return p === '' ? '/' : p;
+}
 
 export function needsLiveIdentity(req: {
-  method: string;
+  method?: string;
   originalUrl?: string;
   url?: string;
 }): boolean {
-  // an unknown method is treated as a state change: the default is LIVE
+  // an unknown method is a state change: the default is LIVE
   if (!SAFE_METHODS.has((req.method ?? 'POST').toUpperCase())) return true;
-  const path = (req.originalUrl ?? req.url ?? '').split('#')[0];
-  return SENSITIVE_READ.test(path);
+  const path = normalisedPath(req);
+  return !NON_SENSITIVE_GET.some(re => re.test(path));
 }
