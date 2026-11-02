@@ -2,6 +2,7 @@ import { buildIdentity } from './build-identity';
 import { cfBindings } from '../cf/bindings';
 import { storageBackendCounts } from './store-backend';
 import { buyerKeyVector } from './wa/health-vector';
+import { isWorkers } from './runtime';
 
 /**
  * The public GET /health body: status, time, which build is running and, when the suite buyer-key secret is
@@ -15,13 +16,21 @@ export async function healthPayload(
     buyerKeyVector(env.SUITE_BUYER_KEY_SECRET).catch(() => null),
     storageBackendCounts(cfBindings()?.PLATFORM_DB),
   ]);
+  // Fail loud at boot (multi-service env rule): a DEPLOYED Worker without the platform D1 would silently serve the legacy
+  // Postgres paths (backendFor defaults to `pg`, store writes keep the Postgres route). `status: degraded` makes the deploy-guard
+  // probe (`status === 'ok'` + commit) fail, so the deploy rolls back instead of degrading.
+  const platformUnbound = isWorkers && backends === undefined;
   return {
-    status: 'ok',
+    status: platformUnbound ? 'degraded' : 'ok',
     timestamp: new Date().toISOString(),
     ...buildIdentity(),
     ...(vector ? { buyerKeyVector: vector } : {}),
     // Public: reachability only. The per-backend store COUNTS disclose the store count, so they are served only by
     // the super_admin GET /api/v1/health (app.ts).
-    ...(backends !== undefined ? { platform_db: backends === null ? 'unavailable' : 'ok' } : {}),
+    ...(backends !== undefined
+      ? { platform_db: backends === null ? 'unavailable' : 'ok' }
+      : platformUnbound
+        ? { platform_db: 'unbound' }
+        : {}),
   };
 }
