@@ -99,3 +99,7 @@ CSP again. Cost if wrong: a response that bypasses middleware has no CSP; the ma
   body, so the protection is the CSP, not the storage location.
 - NOT verified: behaviour on OpenNext/Workers (only `next start` was run), signed-in screens, and the
   OneSignal push-subscribe flow without `'unsafe-eval'`.
+
+## connect-src and the identity service (Ruling CSP-ACCOUNTS-1)
+
+Admin and Orders sign in from the browser against the shared identity service (`apps/*/src/lib/accounts.ts` fetches `NEXT_PUBLIC_ACCOUNTS_URL`, default `https://accounts.ebda.app`, with credentials). Both CSP builders therefore name exactly that one origin in `connect-src` (`accountsOrigin()` in each `lib/csp.ts`, https or loopback only, no wildcard). `tests/unit/csp-connect-src-covers-browser-clients.test.ts` fails when an app reads a `NEXT_PUBLIC_*_URL/ORIGIN/HOST` base that is not decided in its table, or whose origin is missing from that app's `connect-src`.
