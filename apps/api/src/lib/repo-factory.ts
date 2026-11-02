@@ -1172,7 +1172,11 @@ export function makeMoneyClient(
  * another store's id is refused loudly (the other store's id is `null`, never a read): the caller is a port that needs a
  * dedicated accessor, not a silent Postgres fallback.
  */
-function doStoreDelegate(storeId: string, stub: QueryStub, decodeRpc: (t: string) => unknown) {
+export function doStoreDelegate(
+  storeId: string,
+  stub: QueryStub,
+  decodeRpc: (t: string) => unknown
+) {
   const matches = (rec: Record<string, any>, filter: Record<string, any>): boolean =>
     Object.entries(filter).every(([k, cond]) => {
       const v = rec[k];

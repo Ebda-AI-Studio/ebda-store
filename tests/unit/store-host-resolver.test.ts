@@ -86,6 +86,10 @@ vi.mock('@ebda/database', () => ({
       },
     }),
   prisma: {
+    // `storeDb(id).store` on the Postgres path is the request `prisma` proxy (NEON-ZERO-1: the route reads the row through it)
+    store: {
+      findUnique: async ({ where }: { where: { id: string } }) => storeRowById(where.id),
+    },
     // The faqs + howtos + disabled-pages triple is one raw round trip (fetchStoreExtras).
     $queryRaw: vi.fn().mockResolvedValue([{ faqs: [], howtos: [], disabled: [] }]),
     storePage: { findMany: vi.fn().mockResolvedValue([]) },
