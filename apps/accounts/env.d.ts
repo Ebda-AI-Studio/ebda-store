@@ -30,6 +30,11 @@ export interface MailerRpc {
   }): Promise<void>;
 }
 
+/** Service Binding RPC surface of ebda-wa (its `PlatformOtp` entrypoint, src/index.ts in ebda-whatsapp): sends from the PLATFORM number, no store id. Anything but `ok` means: fall back to the email. */
+export interface WhatsAppOtpRpc {
+  sendCode(phone: string, code: string): Promise<{ ok: true } | { ok: false; reason: string }>;
+}
+
 declare global {
   namespace Cloudflare {
     interface Env {
@@ -60,6 +65,10 @@ declare global {
       CLIENT_SECRET_PEPPER?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
+      /** ebda-wa `PlatformOtp`. Absent = the WhatsApp channel is off (fail closed); the email path never depends on it. */
+      WHATSAPP_OTP?: WhatsAppOtpRpc;
+      /** 'true' turns the WhatsApp channel on. Default OFF until the platform number exists (Ruling WA-OTP-SENDER-1). */
+      WHATSAPP_OTP_ENABLED?: string;
       TEST_MIGRATIONS?: D1Migration[];
     }
   }
