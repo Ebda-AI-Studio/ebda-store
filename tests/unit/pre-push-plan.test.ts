@@ -3,7 +3,6 @@
  * planner cannot narrow (lockfile, config, shared core) runs the full gate; docs-only runs only the cheap checks.
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import path, { join } from 'node:path';
 // @ts-expect-error plain .mjs without types
 import { plan } from '../../scripts/ci/pre-push-plan.mjs';
