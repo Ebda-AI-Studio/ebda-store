@@ -43,7 +43,7 @@ import {
   type RoleQueryable,
 } from './cf/database-role-guard';
 import { servePublicEdge, stripFillMarker, type CacheLike } from './cf/public-edge-cache';
-import { readEdgeGens } from './lib/edge-gens';
+import { readEdgeGensForHit } from './lib/edge-gens';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   sendCodeMail,
@@ -384,7 +384,7 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
       readGens: async names => {
         prepare(env);
         await redisReady;
-        return readEdgeGens(names);
+        return readEdgeGensForHit(names);
       },
     });
   }

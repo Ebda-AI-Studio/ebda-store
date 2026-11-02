@@ -46,6 +46,11 @@ function firstArg(src: string, open: number): string {
 const TENANT_TOKEN = /storeId|store\.id|slugOrId|cacheHost|lookup\./;
 /** Key builders that take the store id as their argument (checked at their definition). */
 const KEY_BUILDERS = new Set(['bundlesCacheKey', 'customersCacheKey']);
+/**
+ * lib/store-directory.ts (NEON-SCALE-1 rule 1): the platform store DIRECTORY, keyed by the id / slug / verified domain that
+ * resolves to exactly ONE store. Not store data, so it carries no storeId; its builder is pinned below.
+ */
+const DIRECTORY_BUILDERS = new Set(['directoryCacheKey']);
 
 interface Finding {
   file: string;
@@ -90,7 +95,10 @@ describe('API cache keys are tenant-scoped', () => {
 
   it('every getCached / getCachedAnalytics key carries a tenant token', () => {
     const unkeyed = findings.filter(
-      f => !KEY_BUILDERS.has(f.key.split('(')[0]) && !TENANT_TOKEN.test(f.key)
+      f =>
+        !KEY_BUILDERS.has(f.key.split('(')[0]) &&
+        !DIRECTORY_BUILDERS.has(f.key.split('(')[0]) &&
+        !TENANT_TOKEN.test(f.key)
     );
     expect(unkeyed).toEqual([]);
   });

@@ -4,7 +4,7 @@
  * are reported as not stored, never a refusal; an unknown name is still refused.
  */
 import { describe, expect, it } from 'vitest';
-import { applyStoreSettings } from '../src/rpc/settings';
+import { applyStoreSettings, readStoreRecord } from '../src/rpc/settings';
 import { META, openSqlite } from './diff-harness';
 import { nodeSqlRunner } from './node-sql';
 
@@ -51,5 +51,51 @@ describe('applyStoreSettings', () => {
     expect(() => applyStoreSettings(sql, META as never, 's1', { nope: 1 })).toThrow(
       /unknown Store field/
     );
+  });
+});
+
+describe('readStoreRecord (NEON-ZERO-1)', () => {
+  it('returns profile + config columns as typed Prisma Store fields, and reports D1-only fields as missing', () => {
+    const { sql } = rig();
+    applyStoreSettings(sql, META as never, 's1', {
+      taxEnabled: true,
+      theme: { showBranchesInFooter: true },
+      heroTitle: 'Hi',
+      locationsEnabled: true,
+    });
+    const out = readStoreRecord(sql, META as never, 's1', [
+      'id',
+      'name',
+      'slug',
+      'taxEnabled',
+      'theme',
+      'heroTitle',
+      'locationsEnabled',
+      'domainStatus',
+    ])!;
+    expect(out.record).toMatchObject({
+      id: 's1',
+      name: 'n',
+      taxEnabled: true,
+      theme: { showBranchesInFooter: true },
+      heroTitle: 'Hi',
+      locationsEnabled: true,
+    });
+    expect(out.missing).toEqual(['domainStatus']);
+  });
+  it('null for a store without a profile row, throws on an unknown field or a relation', () => {
+    const { sql } = rig();
+    expect(readStoreRecord(sql, META as never, 'nope')).toBeNull();
+    expect(() => readStoreRecord(sql, META as never, 's1', ['nope'])).toThrow(
+      /unknown Store field/
+    );
+    expect(() => readStoreRecord(sql, META as never, 's1', ['credentials'])).toThrow(/relation/);
+  });
+  it('without a field list it returns every scalar the DO carries', () => {
+    const { sql } = rig();
+    const out = readStoreRecord(sql, META as never, 's1')!;
+    expect(out.missing).toEqual([]);
+    expect(out.record).toHaveProperty('slug', 'n');
+    expect(out.record).toHaveProperty('taxEnabled', false);
   });
 });

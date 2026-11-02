@@ -307,3 +307,17 @@ describe('Accounts RPC for the Store', () => {
     void env;
   });
 });
+
+describe('getAccountsBrief (NEON-ZERO-1: one identity read for a member list)', () => {
+  it('returns display facts for known ids only, never a credential or phone, and caps the batch at 100', async () => {
+    const a = await seedUser();
+    const b = await seedUser();
+    const out = await rpc().getAccountsBrief([a.id, b.id, crypto.randomUUID()]);
+    expect(out.map(u => u.id).sort()).toEqual([a.id, b.id].sort());
+    expect(JSON.stringify(out)).not.toMatch(/password|phone|token|secret/i);
+    expect(await rpc().getAccountsBrief([])).toEqual([]);
+    await expect(
+      rpc().getAccountsBrief(Array.from({ length: 101 }, () => crypto.randomUUID()))
+    ).rejects.toBeTruthy();
+  });
+});

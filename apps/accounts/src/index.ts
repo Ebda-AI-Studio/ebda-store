@@ -117,6 +117,51 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     };
   }
 
+  /**
+   * Display facts for MANY accounts in one call (staff lists, member pickers): ONE D1 statement, at most 100 ids, no credential,
+   * no phone. Unknown or erased ids are simply absent. The Store calls it so a list of N members costs one identity read, not N.
+   */
+  async getAccountsBrief(userIds: string[]): Promise<
+    Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      status: 'active' | 'inactive' | 'suspended';
+      role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+      lastLoginAt: string | null;
+      createdAt: string;
+    }>
+  > {
+    const ids = z.array(z.string().uuid()).max(100).parse(userIds);
+    if (ids.length === 0) return [];
+    const marks = ids.map((_, i) => `?${i + 1}`).join(',');
+    const { results } = await this.env.DB.prepare(
+      `SELECT id, email, first_name, last_name, status, role, last_login_at, created_at FROM users WHERE id IN (${marks}) AND deleted_at IS NULL`
+    )
+      .bind(...ids)
+      .all<{
+        id: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        status: 'active' | 'inactive' | 'suspended';
+        role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+        last_login_at: string | null;
+        created_at: string;
+      }>();
+    return (results ?? []).map(u => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.first_name,
+      lastName: u.last_name,
+      status: u.status,
+      role: u.role,
+      lastLoginAt: u.last_login_at,
+      createdAt: u.created_at,
+    }));
+  }
+
   /** Suspend / reactivate an account (a Store super-admin action). Leaving 'active' ends every session. */
   async setStatus(
     userId: string,

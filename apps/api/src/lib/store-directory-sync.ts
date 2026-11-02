@@ -22,7 +22,10 @@ import { AppError } from '../middleware/error-handler';
 import { STORE_D1_ONLY_FIELDS, STORE_MIRROR_FIELDS, d1StorePatch } from './store-columns';
 
 interface D1Stmt {
-  bind(...v: unknown[]): { run(): Promise<{ meta?: { changes?: number } }> };
+  bind(...v: unknown[]): {
+    run(): Promise<{ meta?: { changes?: number } }>;
+    first<T>(): Promise<T | null>;
+  };
 }
 interface D1Like {
   prepare(sql: string): D1Stmt;
@@ -86,6 +89,12 @@ export async function syncStoreDirectoryFromPg(storeId: string): Promise<void> {
   const db = d1();
   if (!db) return;
   try {
+    // D1 + the DO own a `do` store (plan N-22): never overwrite it from the stale Postgres row.
+    const current = await db
+      .prepare('SELECT "storage_backend" AS b FROM "stores" WHERE "id" = ?')
+      .bind(storeId)
+      .first<{ b: string }>();
+    if (current?.b === 'do') return;
     const select = Object.fromEntries(ALL_FIELDS.map(n => [n, true]));
     const row = (await withStore(storeId, tx =>
       tx.store.findUnique({ where: { id: storeId }, select })

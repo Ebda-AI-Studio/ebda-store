@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { Engine, MAX_PARAMS } from './engine';
 import { encode } from './codec';
 import { expandUnique } from './unique';
+import { newNow, newUuid } from './entropy';
 import { enumRankSql } from './enum-order';
 import type { ModelMeta, RelationField, ScalarField, WriteGuard } from './types';
 
@@ -127,7 +128,7 @@ export class WriteEngine extends Engine {
   private defaultValue(f: ScalarField, now: Date): { has: boolean; value?: unknown } {
     const d = f.default;
     if (d === undefined) return { has: false };
-    if (d === 'uuid()' || d === 'cuid()') return { has: true, value: crypto.randomUUID() };
+    if (d === 'uuid()' || d === 'cuid()') return { has: true, value: newUuid() };
     if (d === 'now()') return { has: true, value: now };
     if (d === 'autoincrement()') return { has: false };
     if (d === 'true' || d === 'false') return { has: true, value: d === 'true' };
@@ -196,7 +197,7 @@ export class WriteEngine extends Engine {
   private insert(model: string, m: ModelMeta, data: Row, parentFk: Row | undefined): Row {
     this.allow(model, data);
     if (parentFk) this.assertNoFkInData(m, data, Object.keys(parentFk));
-    const now = new Date();
+    const now = newNow();
     const values: Row = {};
     const afterRel: [string, RelationField, any][] = [];
     for (const [k, v] of Object.entries(data)) {
@@ -526,7 +527,7 @@ export class WriteEngine extends Engine {
       (sets.length > 0 || nested.length > 0)
     ) {
       sets.push(`${q((hasUpdatedAt[1] as ScalarField).column)} = ?`);
-      binds.push(encode(hasUpdatedAt[1] as ScalarField, new Date()));
+      binds.push(encode(hasUpdatedAt[1] as ScalarField, newNow()));
     }
     if (sets.length) {
       const where = m.pk.map(p => `${q(this.scalar(m, p).column)} = ?`).join(' AND ');

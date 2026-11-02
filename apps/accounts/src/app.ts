@@ -17,7 +17,7 @@ import {
 } from './data';
 import { AUDIENCE_SCOPES } from './client-scopes';
 import {
-  ACCESS_TTL_SECONDS,
+  accessTtlFor,
   mintAccessToken,
   mintClientToken,
   verifyOwnAccessToken,
@@ -181,7 +181,7 @@ async function mintFor(
   return {
     access_token: token,
     token_type: 'Bearer',
-    expires_in: ACCESS_TTL_SECONDS,
+    expires_in: accessTtlFor(aud),
     expires_at: expiresAt,
   };
 }
