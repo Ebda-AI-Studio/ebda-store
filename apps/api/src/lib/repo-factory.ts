@@ -1355,9 +1355,13 @@ export async function copyStoreSettings(
 ): Promise<void> {
   // Hotfix N-22: every authoritative Store write also lands its directory columns in D1, which lookups read: read back from
   // the COMMITTED row after the surrounding transaction commits (dropped on rollback), never the caller's patch.
-  await scheduleStoreDirectorySync(storeId, fields);
+  // A store on its Durable Object is the OPPOSITE direction: D1 + the DO are authoritative (storeUpdateOnDo wrote D1 first), and a
+  // mirror from the stale Postgres row would overwrite them (plan N-22), so `do` stores are never mirrored from Postgres.
   const repo = await storeRepo(storeId);
-  if (repo.backend !== 'do') return;
+  if (repo.backend !== 'do') {
+    await scheduleStoreDirectorySync(storeId, fields);
+    return;
+  }
   const stub = storeDo(storeId) as unknown as {
     applySettings(
       storeId: string,

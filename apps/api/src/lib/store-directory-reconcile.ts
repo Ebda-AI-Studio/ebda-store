@@ -7,6 +7,7 @@
  * Rules, per store (Postgres = committed truth, D1 = what lookups read):
  *   - in Postgres, missing from D1            -> sync it in (corrected)
  *   - in D1, gone from Postgres               -> delete the D1 row (corrected)
+ *   - `storage_backend = 'do'` rows are SKIPPED: D1 + the DO own them and Postgres is stale by design
  *   - differs in slug / status / plan / has-domain / has-pending-domain / deleted:
  *       D1 LESS restrictive than Postgres (e.g. D1 active, Postgres suspended or deleted) -> sync from Postgres (corrected)
  *       D1 MORE restrictive than Postgres (D1 suspended or deleted, Postgres active)    -> KEEP D1 (a store is never
@@ -27,6 +28,7 @@ interface D1Row {
   has_domain: number;
   has_pending_domain: number;
   deleted: number;
+  backend: string;
 }
 interface D1Like {
   prepare(sql: string): {
@@ -93,7 +95,7 @@ export async function reconcileStoreDirectory(
   const { results } = await d1
     .prepare(
       `SELECT id, slug, status, plan, (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain,
-              (deleted_at IS NOT NULL) AS deleted FROM stores`
+              (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend FROM stores`
     )
     .bind()
     .all<D1Row>();
@@ -104,6 +106,7 @@ export async function reconcileStoreDirectory(
   for (const s of all) {
     const pgDeleted = !liveIds.has(s.id);
     const row = d1ById.get(s.id);
+    if (row?.backend === 'do') continue; // D1 + the DO own it (plan N-22): Postgres is stale by design
     if (!row) {
       await sync(s.id);
       report.corrected.push({ id: s.id, why: 'missing from D1' });
@@ -133,7 +136,7 @@ export async function reconcileStoreDirectory(
     });
   }
   for (const [id] of d1ById) {
-    if (pgIds.has(id)) continue;
+    if (pgIds.has(id) || d1ById.get(id)?.backend === 'do') continue;
     await d1.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(id).run();
     report.corrected.push({ id, why: 'in D1, gone from Postgres' });
   }
