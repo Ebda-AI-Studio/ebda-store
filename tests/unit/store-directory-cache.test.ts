@@ -18,11 +18,26 @@ vi.mock('../../apps/api/src/lib/public-cache', () => ({
   invalidateCached: async (key: string) => void kv.delete(key),
 }));
 vi.mock('../../apps/api/src/lib/definer', () => ({
-  lookupStore: async (match: Record<string, unknown>) => {
+  lookupStore: async (match: Record<string, unknown>, statuses: string[] = ['active']) => {
     d1Calls.push(match);
     const k = String(match.id ?? match.slug ?? match.domain);
-    return rows[k] ?? null;
+    const r = rows[k];
+    return r && statuses.includes(r.status) ? r : null;
   },
+}));
+vi.mock('@ebda/database', () => ({
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({
+      store: {
+        findUnique: async () => ({
+          id: ID,
+          name: 'n',
+          slug: 'alpha',
+          currency: 'EGP',
+          domain: null,
+        }),
+      },
+    }),
 }));
 
 import {
@@ -83,6 +98,37 @@ describe('lookupStoreCached', () => {
   });
 });
 
+describe('slug and domain moves (security review 2026-11-02)', () => {
+  const A = ID;
+  const B = '22222222-2222-4222-8222-222222222222';
+  it('a domain moved from store A to store B resolves to B, never A, after the write', async () => {
+    rows['shop.example.com'] = { id: A, status: 'active' };
+    expect((await lookupStoreCached({ domain: 'shop.example.com' }))?.id).toBe(A);
+    rows['shop.example.com'] = { id: B, status: 'active' }; // A released it, B verified it
+    await invalidateStoreDirectory(A, 'alpha', null, { domain: 'shop.example.com' }); // A's clear (oldDomain)
+    await invalidateStoreDirectory(B, 'beta', 'shop.example.com'); // B's activation
+    expect((await lookupStoreCached({ domain: 'shop.example.com' }))?.id).toBe(B);
+  });
+  it('the OLD slug 404s after a rename (previous value is invalidated)', async () => {
+    expect((await lookupStoreCached({ slug: 'alpha' }))?.id).toBe(A);
+    delete rows.alpha;
+    rows.renamed = { id: A, status: 'active' };
+    await invalidateStoreDirectory(A, 'renamed', null, { slug: 'alpha' });
+    expect(await lookupStoreCached({ slug: 'alpha' })).toBeNull();
+    expect((await lookupStoreCached({ slug: 'renamed' }))?.id).toBe(A);
+  });
+});
+
+describe('MCP is authoritative (Ruling NZ-D1: writes never ride the cache)', () => {
+  it('suspended in D1 but active in the cache: the MCP resolver refuses', async () => {
+    expect((await lookupStoreCached({ slug: 'alpha' }, ['active']))?.id).toBe(ID); // warm the cache as active
+    rows.alpha = { id: ID, status: 'suspended' }; // suspended in D1; the KV entry is still the stale active one
+    expect(await lookupStoreCached({ slug: 'alpha' }, ['active'])).not.toBeNull(); // the cache is stale on purpose (reads)
+    const { resolveStoreBySlug } = await import('../../apps/api/src/mcp/resolve-store');
+    await expect(resolveStoreBySlug('alpha')).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
 describe('write paths do not use the cache (Ruling NZ-D1)', () => {
   it('only read routes import lookupStoreCached', async () => {
     const { execFileSync } = await import('node:child_process');
@@ -94,7 +140,6 @@ describe('write paths do not use the cache (Ruling NZ-D1)', () => {
       .sort();
     expect(out).toEqual([
       'apps/api/src/lib/store-directory.ts',
-      'apps/api/src/mcp/resolve-store.ts',
       'apps/api/src/routes/public-store-layout.routes.ts',
       'apps/api/src/routes/public.routes.ts',
     ]);

@@ -830,7 +830,7 @@ router.put(
         await withStore(store.id, tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
         await featureService.invalidateCache(store.id);
       }
-      await bustStoreCaches(store.id, store.slug, store.domain);
+      await bustStoreCaches(store.id, store.slug, store.domain, { slug: before?.slug });
       if (before?.slug && before.slug !== store.slug) {
         await invalidateCached(`public:store:${before.slug}`);
       }

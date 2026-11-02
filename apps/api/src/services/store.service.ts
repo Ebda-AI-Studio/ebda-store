@@ -91,10 +91,14 @@ import { startSignupTrial } from './billing/trial';
 export async function bustStoreCaches(
   storeId: string,
   slug: string | null,
-  domain?: string | null
+  domain?: string | null,
+  /** The values BEFORE a slug / domain change: the old address must stop resolving to this store. */
+  previous: { slug?: string | null; domain?: string | null } = {}
 ): Promise<void> {
-  // NEON-SCALE-1 rule 1: the cached store directory (slug / domain / id -> status) is event-invalidated here.
-  await invalidateStoreDirectory(storeId, slug, domain);
+  // NEON-SCALE-1 rule 1: the cached store directory (slug / domain / id -> status) is event-invalidated here, BEFORE the
+  // payload caches are busted (so a refill cannot read a stale directory entry) and AGAIN at the end (a refill that raced
+  // the first pass is dropped).
+  await invalidateStoreDirectory(storeId, slug, domain, previous);
   await invalidateCached(`public:store:${storeId}`);
   if (slug) {
     await invalidateCached(`public:store:${slug}`);
@@ -115,6 +119,7 @@ export async function bustStoreCaches(
   // layout (`GET /public/stores/:id/layout`); without it a layout save could not
   // reach the Next data cache and stayed stale for the 60s revalidate window.
   revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`] });
+  await invalidateStoreDirectory(storeId, slug, domain, previous);
 }
 
 /**
@@ -668,7 +673,10 @@ export class StoreService {
       );
     }
 
-    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain, {
+      slug: store.slug,
+      domain: store.domain,
+    });
 
     if (data.heroImage !== undefined && previousHeroImage && previousHeroImage !== data.heroImage) {
       void deleteR2ObjectIfOrphan(previousHeroImage).catch(err =>
