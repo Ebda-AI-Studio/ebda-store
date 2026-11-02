@@ -1,4 +1,4 @@
-import { encode } from '../prisma-lite/codec';
+import { decode, encode } from '../prisma-lite/codec';
 import type { Meta, ScalarField, SqlRunner } from '../prisma-lite/types';
 
 /**
@@ -72,4 +72,52 @@ export function applyStoreSettings(
   if (sql.transactionSync) sql.transactionSync(run);
   else run();
   return out;
+}
+
+/**
+ * The StoreDO's read of the Store record (NEON-ZERO-1): `store_profile` (mirror + profile columns) joined with
+ * `store_config` (config columns), as Prisma `Store` field values. ONE statement-pair, no D1 and no Postgres. `fields`
+ * limits the result to those Prisma field names (default: every scalar the two tables carry). A name with no column in
+ * either table (the D1-only directory columns) is returned in `missing` for the caller to read from D1; an unknown name
+ * throws. Returns `null` when the store has no profile row.
+ */
+export function readStoreRecord(
+  sql: SqlRunner,
+  meta: Meta,
+  storeId: string,
+  fields?: string[]
+): { record: Record<string, unknown>; missing: string[] } | null {
+  const store = meta.models.Store;
+  if (!store) throw new Error('Store is not in the model metadata');
+  const profile = sql.all('SELECT * FROM "store_profile" WHERE "store_id" = ?', [storeId])[0];
+  if (!profile) return null;
+  // A store that never had a config write has no config row: materialise the all-defaults row (what the first config write
+  // would create anyway) so every config column reads its schema default, never a missing key.
+  let config = sql.all('SELECT * FROM "store_config" WHERE "store_id" = ?', [storeId])[0];
+  if (!config) {
+    sql.run('INSERT OR IGNORE INTO "store_config" ("store_id") VALUES (?)', [storeId]);
+    config = sql.all('SELECT * FROM "store_config" WHERE "store_id" = ?', [storeId])[0] ?? {};
+  }
+  const names = fields ?? Object.keys(store.fields);
+  const record: Record<string, unknown> = {};
+  const missing: string[] = [];
+  for (const name of names) {
+    const f = Object.prototype.hasOwnProperty.call(store.fields, name)
+      ? store.fields[name]
+      : undefined;
+    if (!f) throw new Error(`unknown Store field: ${name}`);
+    if (f.kind === 'relation') {
+      if (fields) throw new Error(`Store.${name} is a relation: not served by the DO record`);
+      continue;
+    }
+    const sf = f as ScalarField;
+    if (name === 'id') record.id = storeId;
+    else if (Object.prototype.hasOwnProperty.call(profile, sf.column))
+      record[name] = decode(sf, profile[sf.column]);
+    else if (Object.prototype.hasOwnProperty.call(config, sf.column))
+      record[name] = decode(sf, config[sf.column]);
+    else if (!fields) continue;
+    else missing.push(name);
+  }
+  return { record, missing };
 }

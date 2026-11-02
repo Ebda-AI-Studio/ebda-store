@@ -38,6 +38,7 @@ import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/data
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
+import { requirePlatformDb } from './platform-db';
 
 type WriteOp =
   | 'create'
@@ -997,6 +998,13 @@ const NO_REQUEST: RequestLike = { headers: {} };
 
 /** The StoreDO stub's read entry point (lib/store-backend.ts types the rest of the stub). */
 interface QueryStub {
+  storeRecord(
+    storeId: string,
+    fields?: string[]
+  ): Promise<
+    | { ok: true; data: { json: string; missing: string[] } }
+    | { ok: false; code: string; status?: number }
+  >;
   mutate(
     storeId: string,
     m: { key?: string; ops: Array<{ model: string; op: string; args?: Record<string, unknown> }> }
@@ -1156,6 +1164,74 @@ export function makeMoneyClient(
   };
 }
 
+/**
+ * `db.store` for a store served by its Durable Object (NEON-ZERO-1). `Store` is split (D1 directory columns, DO profile +
+ * config), so no table serves a whole `Store` read. This delegate answers the shape every storefront and gate read uses:
+ * `findUnique|findFirst({ where: { id, ...scalar equality }, select })` with scalar `select` fields. The DO supplies the
+ * profile/config/mirror columns in ONE RPC; D1-only columns (domain verification, billing suspension, deletedAt, ...)
+ * come from the platform D1 client in one more read, only when asked for. A relation, `include`, an unknown filter shape or
+ * another store's id is refused loudly (the other store's id is `null`, never a read): the caller is a port that needs a
+ * dedicated accessor, not a silent Postgres fallback.
+ */
+function doStoreDelegate(storeId: string, stub: QueryStub, decodeRpc: (t: string) => unknown) {
+  const matches = (rec: Record<string, any>, filter: Record<string, any>): boolean =>
+    Object.entries(filter).every(([k, cond]) => {
+      const v = rec[k];
+      if (cond === null || typeof cond !== 'object' || cond instanceof Date) {
+        return cond instanceof Date ? v?.getTime?.() === cond.getTime() : v === cond;
+      }
+      const keys = Object.keys(cond);
+      if (keys.length === 1 && keys[0] === 'in') return (cond.in as unknown[]).includes(v);
+      if (keys.length === 1 && keys[0] === 'not') return v !== cond.not;
+      throw new AppError(
+        501,
+        'STORE_FILTER_UNSUPPORTED',
+        `Store filter on ${k} is not served by the DO`
+      );
+    });
+
+  const read = async (args: any): Promise<any | null> => {
+    const a = args ?? {};
+    if (a.include)
+      throw new AppError(501, 'STORE_READ_UNSUPPORTED', 'Store include is not served by the DO');
+    const { id, ...rest } = (a.where ?? {}) as Record<string, any>;
+    if (id !== undefined && id !== storeId) return null;
+    const selected: string[] | undefined = a.select
+      ? Object.keys(a.select).filter(k => a.select[k])
+      : undefined;
+    const need = selected ? [...new Set([...selected, ...Object.keys(rest)])] : undefined;
+    const r = await stub.storeRecord(storeId, need);
+    if (!r.ok) {
+      if (r.code === 'STORE_NOT_FOUND') return null;
+      throw new AppError(r.status ?? 502, r.code, `store record refused: ${r.code}`);
+    }
+    const rec = decodeRpc(r.data.json) as Record<string, any>;
+    if (r.data.missing.length) {
+      const platform = await requirePlatformDb();
+      const d1 = await platform.store.findUnique({
+        where: { id: storeId },
+        select: Object.fromEntries(r.data.missing.map(f => [f, true])),
+      });
+      if (!d1) return null; // directory row gone: the store does not exist
+      Object.assign(rec, d1);
+    }
+    if (!matches(rec, rest)) return null;
+    if (!selected) return rec;
+    return Object.fromEntries(selected.map(k => [k, rec[k]]));
+  };
+  const orThrow = async (args: any) => {
+    const row = await read(args);
+    if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    return row;
+  };
+  return {
+    findUnique: read,
+    findFirst: read,
+    findUniqueOrThrow: orThrow,
+    findFirstOrThrow: orThrow,
+  };
+}
+
 async function doClients(
   storeId: string
 ): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient; money: MoneyClient }> {
@@ -1176,11 +1252,21 @@ async function doClients(
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
     // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
-    db: createDoClient(send as never) as unknown as StoreReads,
+    db: withStoreDelegate(
+      createDoClient(send as never) as unknown as StoreReads,
+      doStoreDelegate(storeId, stub, decodeRpc as never)
+    ),
     writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
   };
+}
+
+/** The DO read client plus the split-aware `store` delegate (the DO tables have no `Store`). */
+function withStoreDelegate(base: StoreReads, store: object): StoreReads {
+  return new Proxy(base as object, {
+    get: (t, prop, recv) => (prop === 'store' ? store : Reflect.get(t, prop, recv)),
+  }) as StoreReads;
 }
 
 /** pg writer: the `prisma` proxy, minus the DO-only second argument of `$transaction`. */

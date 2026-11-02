@@ -33,6 +33,8 @@ import {
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
+  readStoreRecord,
+  encodeRpc,
   decodeRpc,
   ensureStockOpsSchema,
   type StockAnswer,
@@ -252,6 +254,26 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
       const err = e as { code?: string };
       return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  /**
+   * The Store record for the API Worker (NEON-ZERO-1): profile + config as Prisma `Store` fields, wire-encoded. ONE
+   * call per request (NEON-SCALE-1 rule 9); a refusal is an ANSWER. `missing` lists D1-only fields the caller reads from D1.
+   */
+  async storeRecord(
+    storeId: string,
+    fields?: string[]
+  ): Promise<Result<{ json: string; missing: string[] }>> {
+    try {
+      this.bind(storeId);
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const out = readStoreRecord(doSqlRunner(this.ctx.storage), meta, storeId, fields);
+      if (!out) return { ok: false, code: 'STORE_NOT_FOUND', status: 404 };
+      return { ok: true, data: { json: encodeRpc(out.record), missing: out.missing } };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      return { ok: false, code: 'STORE_RECORD_REFUSED', status: 400 };
     }
   }
 
