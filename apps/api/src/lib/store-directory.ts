@@ -79,10 +79,21 @@ export async function lookupStoreCached(
 export async function invalidateStoreDirectory(
   storeId: string,
   slug: string | null,
-  domain?: string | null
+  domain?: string | null,
+  previous: { slug?: string | null; domain?: string | null } = {}
 ): Promise<void> {
+  // The OLD slug / domain must stop resolving to this store, and a domain that MOVED from another store must resolve to its
+  // new owner: entries are keyed by VALUE, so clearing the old and the new value covers both.
+  const slugs = new Set(
+    [slug, previous.slug].filter((s): s is string => !!s).map(s => s.toLowerCase())
+  );
+  const domains = new Set(
+    [domain, previous.domain].filter((d): d is string => !!d).map(d => d.toLowerCase())
+  );
   await invalidateCached(keyOf.id(storeId));
-  if (slug) await invalidateCached(keyOf.slug(slug.toLowerCase()));
-  if (slug) await invalidateCached(keyOf.domain(storeHost(slug)));
-  if (domain) await invalidateCached(keyOf.domain(domain.toLowerCase()));
+  for (const s of slugs) {
+    await invalidateCached(keyOf.slug(s));
+    await invalidateCached(keyOf.domain(storeHost(s)));
+  }
+  for (const d of domains) await invalidateCached(keyOf.domain(d));
 }

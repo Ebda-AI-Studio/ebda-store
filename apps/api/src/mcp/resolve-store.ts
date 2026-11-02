@@ -1,5 +1,5 @@
 import { withStore } from '@ebda/database';
-import { lookupStoreCached } from '../lib/store-directory';
+import { lookupStore } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 
 export interface McpStore {
@@ -25,9 +25,11 @@ export interface McpStore {
  * off/unentitled" (capability leak). Do not give this a distinct code.
  */
 export async function resolveStoreBySlug(slug: string): Promise<McpStore> {
+  // NEON-ZERO-1 / Ruling NZ-D1: AUTHORITATIVE (D1 primary), never the cached directory. The MCP endpoints carry cart,
+  // checkout and merchant-admin WRITES, so a suspended store must be refused at once, not after the KV window.
   // `stores` is under RLS (R-EBDA-005): the slug resolves through the definer (active,
   // not deleted), then the row is read inside that store's own scope.
-  const hit = await lookupStoreCached({ slug }, ['active']);
+  const hit = await lookupStore({ slug }, ['active']);
   const store = hit
     ? await withStore(hit.id, tx =>
         tx.store.findUnique({
