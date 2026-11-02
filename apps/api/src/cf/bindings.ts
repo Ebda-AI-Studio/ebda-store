@@ -75,6 +75,8 @@ export interface AccountsRpc {
     reason: string
   ): Promise<void>;
   getAccountState?(userId: string): Promise<AccountState | null>;
+  /** Display facts for up to 100 accounts in one call (apps/accounts `getAccountsBrief`). */
+  getAccountsBrief?(userIds: string[]): Promise<AccountBrief[]>;
   resendVerification?(email: string): Promise<void>;
   /** Store deletion: remove the store's integrator clients, secrets and trail (idempotent). */
   deleteStoreClients?(storeId: string): Promise<{ clients: number }>;
@@ -108,6 +110,17 @@ export interface AccountsRpc {
     phone?: string;
     language?: 'en' | 'ar';
   }): Promise<{ id: string } | null>;
+}
+
+export interface AccountBrief {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: 'active' | 'inactive' | 'suspended';
+  role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+  lastLoginAt: string | null;
+  createdAt: string;
 }
 
 export interface AccountState {
