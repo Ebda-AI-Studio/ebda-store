@@ -1,4 +1,5 @@
 import { currentTenantGucs, runInTenantContext } from '@ebda/database';
+import { storeRepo } from './repo-factory';
 
 /**
  * Run `fn` scoped to `storeId` under RLS, whether or not the caller already
@@ -32,7 +33,10 @@ import { currentTenantGucs, runInTenantContext } from '@ebda/database';
  * until the cutover and correct after it. Never use it for work that spans
  * stores — that is `withRlsBypass`.
  */
-export function readInStoreContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+export async function readInStoreContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
   if (currentTenantGucs()?.storeId === storeId) return fn();
+  // NEON-ZERO-1: a store on its Durable Object has no RLS and no Postgres: `fn` reads through `storeDb`, which routes to the DO.
+  // Opening a tenant transaction here would acquire a Postgres connection the request does not need (and cannot get).
+  if ((await storeRepo(storeId)).backend === 'do') return fn();
   return runInTenantContext(storeId, fn);
 }

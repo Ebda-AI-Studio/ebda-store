@@ -197,6 +197,12 @@ declare module '@ebda-src/repo' {
     m: DoMutation
   ): Promise<DoQueryResult>;
   export function ensureIdempotencySchema(sql: SqlRunner): void;
+  export function readStoreRecord(
+    sql: SqlRunner,
+    meta: Meta,
+    storeId: string,
+    fields?: string[]
+  ): { record: Record<string, unknown>; missing: string[] } | null;
   export function applyStoreSettings(
     sql: SqlRunner,
     meta: Meta,
