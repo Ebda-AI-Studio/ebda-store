@@ -2206,8 +2206,8 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         'suspended',
       ]);
       const store = hit
-        ? await withStore(hit.id, tx =>
-            tx.store.findUnique({
+        ? await readInStoreContext(hit.id, async () =>
+            (await storeDb(hit.id)).store.findUnique({
               where: { id: hit.id },
               select: {
                 id: true,
@@ -2433,8 +2433,8 @@ router.get(
           throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
         }
         const store = hit
-          ? await withStore(hit.id, tx =>
-              tx.store.findUnique({
+          ? await readInStoreContext(hit.id, async () =>
+              (await storeDb(hit.id)).store.findUnique({
                 where: { id: hit.id },
                 select: {
                   id: true,

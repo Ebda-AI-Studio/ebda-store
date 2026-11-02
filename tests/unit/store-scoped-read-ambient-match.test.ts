@@ -11,11 +11,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({
   gucs: undefined as { storeId?: string; userId?: string } | undefined,
   runInTenantContext: vi.fn(),
+  backend: 'pg' as 'pg' | 'do',
 }));
 
 vi.mock('@ebda/database', () => ({
   currentTenantGucs: () => h.gucs,
   runInTenantContext: h.runInTenantContext,
+}));
+
+vi.mock('../../apps/api/src/lib/repo-factory', () => ({
+  storeRepo: async () => ({ backend: h.backend }),
 }));
 
 import { readInStoreContext } from '../../apps/api/src/lib/store-scoped-read';
@@ -25,6 +30,7 @@ const STORE_B = '22222222-2222-4222-8222-222222222222';
 
 describe('readInStoreContext — ambient store must match (issue 2041)', () => {
   beforeEach(() => {
+    h.backend = 'pg';
     h.runInTenantContext
       .mockReset()
       .mockImplementation(async (_s: string, fn: () => unknown) => fn());
@@ -52,5 +58,12 @@ describe('readInStoreContext — ambient store must match (issue 2041)', () => {
     h.gucs = undefined;
     await readInStoreContext(STORE_B, async () => 1);
     expect(h.runInTenantContext).toHaveBeenCalledWith(STORE_B, expect.any(Function));
+  });
+
+  it('a store on its Durable Object never opens a Postgres transaction (NEON-ZERO-1)', async () => {
+    h.gucs = undefined;
+    h.backend = 'do';
+    await expect(readInStoreContext(STORE_B, async () => 9)).resolves.toBe(9);
+    expect(h.runInTenantContext).not.toHaveBeenCalled();
   });
 });
