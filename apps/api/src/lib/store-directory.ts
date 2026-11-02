@@ -31,10 +31,14 @@ const HOST_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ALL_LIVE: readonly StoreStatusName[] = ['active', 'inactive', 'suspended'];
 
+/** Cache key of one directory entry. The value (an id, a slug or a verified domain) resolves to EXACTLY ONE store, so the key is tenant-scoped by construction. */
+export function directoryCacheKey(kind: 'id' | 'slug' | 'domain', value: string): string {
+  return `dir:${kind}:${value}`;
+}
 const keyOf = {
-  id: (id: string) => `dir:id:${id}`,
-  slug: (slug: string) => `dir:slug:${slug}`,
-  domain: (domain: string) => `dir:domain:${domain}`,
+  id: (id: string) => directoryCacheKey('id', id),
+  slug: (slug: string) => directoryCacheKey('slug', slug),
+  domain: (domain: string) => directoryCacheKey('domain', domain),
 };
 
 /**
@@ -49,28 +53,36 @@ export async function lookupStoreCached(
   if (keys.length === 0) return null;
   if (keys.length !== 1) return lookupStore(match, statuses);
 
-  let key: string;
+  let kind: 'id' | 'slug' | 'domain';
+  let value: string;
   let fill: Match;
   if (match.id) {
     if (!UUID_RE.test(match.id)) return null;
-    key = keyOf.id(match.id);
+    kind = 'id';
+    value = match.id;
     fill = { id: match.id };
   } else if (match.slug) {
     const slug = match.slug.toLowerCase();
     if (!SLUG_RE.test(slug) || isReservedSlug(slug)) return null;
-    key = keyOf.slug(slug);
+    kind = 'slug';
+    value = slug;
     fill = { slug };
   } else {
     const domain = match.domain!.toLowerCase();
     if (!HOST_RE.test(domain)) return null;
-    key = keyOf.domain(domain);
+    kind = 'domain';
+    value = domain;
     fill = { domain };
   }
 
-  const entry = await getCached<Entry>(key, DIRECTORY_TTL_SECONDS, async () => {
-    const hit = await lookupStore(fill, ALL_LIVE);
-    return hit ? { id: hit.id, status: hit.status as StoreStatusName } : { none: true };
-  });
+  const entry = await getCached<Entry>(
+    directoryCacheKey(kind, value),
+    DIRECTORY_TTL_SECONDS,
+    async () => {
+      const hit = await lookupStore(fill, ALL_LIVE);
+      return hit ? { id: hit.id, status: hit.status as StoreStatusName } : { none: true };
+    }
+  );
   if ('none' in entry) return null;
   return statuses.includes(entry.status) ? { id: entry.id, status: entry.status } : null;
 }

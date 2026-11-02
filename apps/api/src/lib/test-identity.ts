@@ -17,6 +17,7 @@ import type { AccountsRpc } from '../cf/bindings';
 import logger from './logger';
 import { configureAccountsVerifier, configureRevocationCheck } from './accounts-token';
 import { configureIdentityClient } from './identity-client';
+import { getUserState } from './definer';
 
 /** sid = `t.<userId>.<issuedAtMs>.<rand>`: revoking a user revokes every session issued up to that instant. */
 export function testSessionId(userId: string, issuedAtMs: number, rand: string): string {
@@ -47,6 +48,25 @@ export function installTestIdentity(env: NodeJS.ProcessEnv = process.env): boole
     setStatus: async () => undefined,
     setRole: async () => true,
     deleteStoreClients: async () => ({ clients: 0 }),
+    // The live identity check (Ruling NZ-D2) asks the identity service for account state. In the Postgres integration tier the
+    // users table IS the identity store, so answer from it: unknown / erased -> null (blocked), same as the real service.
+    getAccountState: async userId => {
+      const u = await getUserState(userId);
+      if (!u || u.deletedAt) return null;
+      return {
+        id: u.id,
+        email: '',
+        emailVerified: true,
+        mfaEnabled: false,
+        mfaEnrolledAt: null,
+        status: u.status as 'active' | 'inactive' | 'suspended',
+        role: u.role as 'customer' | 'store_admin' | 'super_admin' | 'staff',
+        firstName: '',
+        lastName: '',
+        phone: null,
+        language: 'en',
+      };
+    },
   };
   configureIdentityClient(rpc);
   logger.warn('[test-identity] integration identity stand-in installed (NODE_ENV=test only)');
