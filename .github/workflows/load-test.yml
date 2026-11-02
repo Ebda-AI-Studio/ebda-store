@@ -1,5 +1,5 @@
 name: load-test
-# Reusable k6 load test on GitHub-hosted runners (never the Mac). Ruling SCALE-READY-1 #7 / NEON-FOLD-1.
+# Reusable k6 load test on GitHub-hosted runners (never the Mac); runs-on follows the repo-wide EBDA_RUNS_ON switch (CI-UMBRA-1). Ruling SCALE-READY-1 #7 / NEON-FOLD-1.
 # Docs: docs/load-testing.md. Checkout scenarios stop BEFORE payment and never place an order.
 on:
   workflow_dispatch:
@@ -76,7 +76,7 @@ concurrency:
 
 jobs:
   k6:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
