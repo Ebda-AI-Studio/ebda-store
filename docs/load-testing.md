@@ -1,7 +1,7 @@
 # Load testing (k6 on GitHub-hosted runners)
 
 Ruling SCALE-READY-1 #7 (NEON-FOLD-1). Load tests never run on the Mac. Use the `load-test` workflow
-(`.github/workflows/load-test.yml`, `EBDA_RUNS_ON` switch, hosted when unset, k6 pinned to 2.3.0) via Actions > load-test > Run workflow,
+(`.github/workflows/load-test.yml`, `EBDA_RUNS_ON` switch (unset = ubuntu-24.04 hosted), k6 pinned to 2.3.0) via Actions > load-test > Run workflow,
 or call it from another workflow with `uses: ./.github/workflows/load-test.yml`.
 
 | Input                  | Meaning                                                                                                                             |
