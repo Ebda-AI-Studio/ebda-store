@@ -41,6 +41,13 @@ export interface CorsCacheEntry {
   lastResolvedAt?: number;
 }
 
+/**
+ * STALENESS CLASS (Ruling NZ-D9): BOUNDED-stale, residual <= 2 minutes per isolate. `bustCorsCache` clears only the isolate
+ * that took the write; another isolate keeps its answer until the TTL. Accepted because this cache only decides whether a
+ * browser may read a cross-origin response: it grants no access, and every write (cart, checkout, order, payment, account,
+ * admin) re-checks store status authoritatively. Cost if wrong: a just-suspended or just-removed custom domain is still
+ * allowed to make credentialed cross-origin READS for <= 2 minutes.
+ */
 export const corsDomainCache = new BoundedMap<string, CorsCacheEntry>(5000);
 export const CORS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 export const CORS_LOOKUP_FAILURE_TTL_MS = 5 * 1000; // 5 seconds
