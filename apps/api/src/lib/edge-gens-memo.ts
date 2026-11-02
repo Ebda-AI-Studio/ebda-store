@@ -16,7 +16,7 @@ const MAX_ENTRIES = 5000;
 
 interface Slot {
   at: number;
-  value: Promise<string | null>;
+  value: Promise<string[] | null>;
 }
 const memo = new Map<string, Slot>();
 
@@ -26,9 +26,9 @@ export function dropEdgeGensMemo(): void {
 
 export function memoisedGens(
   names: string[],
-  read: (names: string[]) => Promise<string | null>,
+  read: (names: string[]) => Promise<string[] | null>,
   now: number = Date.now()
-): Promise<string | null> {
+): Promise<string[] | null> {
   const key = names.join('\u0000');
   const hit = memo.get(key);
   if (hit && now - hit.at < EDGE_GENS_MEMO_MS) return hit.value;
