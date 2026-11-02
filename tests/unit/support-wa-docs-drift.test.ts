@@ -4,21 +4,21 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * The Ebda WhatsApp developer docs on docs.ebda.app/whatsapp/ equal their source (ebda-whatsapp docs/site/{ar,en}/whatsapp,
+ * The Ebda Chat developer docs on docs.ebda.app/whatsapp/ equal their source (ebda-whatsapp docs/site/{ar,en}/whatsapp,
  * vendored verbatim in apps/docs/wa-source/ by `node apps/docs/scripts/import-wa-docs.mjs <docs/site>`). PINNED_SHA256 pins
  * each vendored file to the version the WhatsApp session published: when they ship new text, re-import and update the
  * hashes together. The word comparison fails if a published page differs from its source (link targets and the dropped H1 aside).
  */
 const DOCS = path.resolve(__dirname, '../../apps/docs');
 const PINNED_SHA256: Record<string, string> = {
-  'ar/api.mdx': 'c56429bc7663e9de2295fb91fc3935c4980cefe18522249234e9e765d22357a8',
-  'ar/connect-your-number.mdx': '3f08b05f660be0db53df72dfff6d5acd5a487f981547aecaf26a47a710c06c21',
-  'ar/overview.mdx': '29894ec202e7c3f66347a2deb13ba0c61d0f0b67ca6e07eb0c5ef0e20402a526',
-  'ar/webhooks.mdx': '6b070449f61a1ec173dbc698c09e3b6685e3cf15aa4670ff2e280418ce8d6b4d',
-  'en/api.mdx': '8e8b1dbf7a56a0725ea728420aa2403bba8039c5cfa5d44e61e7a930930d4a7f',
-  'en/connect-your-number.mdx': 'dc41046d439ec409e2f6eba83c8b483d0fe41247db540fa10db408184481a1d8',
-  'en/overview.mdx': 'fbaa765f2c8ed45ba054b1e4331d582c1e0511baeb38fd51b20a94c4cadbe5fb',
-  'en/webhooks.mdx': 'aa42abcc4c45e6ba197271311b3294e46971ce29aeccaff3f7d3d6310f5e63d5',
+  'ar/api.mdx': '92238e84525e4af151dc576a2f9e063defbfafb770fd67ccb2f87eb7ac9a7c6c',
+  'ar/connect-your-number.mdx': '08ae3ec6abf3b5a60cfb44cc02b4cfbc718ec243a483fb9404fd5a2b65ed15ec',
+  'ar/overview.mdx': '8b56c065ec55fabdf5e7a7eb58f301f5bdefcbd70ada336374ae1863fc7bd38f',
+  'ar/webhooks.mdx': 'd002b89f7a7b019b70ddca09e3ee20159b9b0018e5587ff5890037594eb485e4',
+  'en/api.mdx': 'fad209f2aa8995a685038427c32590ddd063595ef45b374a90450d58a0e76760',
+  'en/connect-your-number.mdx': '94ae67eb9e43bf8cd4fe482604460b5a129c63cead2096b525557b3a0029d9e2',
+  'en/overview.mdx': 'af31b0a9bc02396aad4d1afc3f77016ad086ce4fb94c4fd6a9001bfaa99d1e93',
+  'en/webhooks.mdx': 'ae6add9b2e9b41bf71f31db1b581bdcc1198fecc1ebeebd0f33e8fd3cf3a52a0',
 };
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];
 const noTargets = (t: string) => t.replace(/\]\([^)]*\)/g, ']');
@@ -26,7 +26,7 @@ const body = (t: string) => t.replace(/^---\n[\s\S]*?\n---\n/, '').replace(/^\s*
 // the importer labels an empty table header cell, which adds exactly one word per such table
 const HEAD_LABEL = /^\| (Option|الخيار) \|/m;
 
-describe('Ebda WhatsApp docs equal their vendored source', () => {
+describe('Ebda Chat docs equal their vendored source', () => {
   it('every vendored file is exactly the pinned version, and none is unpinned', () => {
     const found: string[] = [];
     for (const lang of ['ar', 'en'])

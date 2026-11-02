@@ -1,6 +1,6 @@
 /**
  * The exact words shown beside the checkout's WhatsApp marketing opt-in tick (WA-CONSENT-1), one source
- * for the storefront and for the proof sent to Ebda WhatsApp (`customer.consent_changed.wording`,
+ * for the storefront and for the proof sent to Ebda Chat (`customer.consent_changed.wording`,
  * contract v1.5). The wording a buyer ticked is the wording we can show later, so it lives in ONE place:
  * change a sentence here and the proof changes with it (bump nothing else, but know that rows ticked
  * under the old words are re-announced with the new ones until a per-row wording is stored).

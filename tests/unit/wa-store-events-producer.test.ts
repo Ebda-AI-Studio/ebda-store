@@ -1,5 +1,5 @@
 /**
- * Store -> Ebda WhatsApp producer (contract 2026-10-24 section 4): the events, their envelope, the
+ * Store -> Ebda Chat producer (contract 2026-10-24 section 4): the events, their envelope, the
  * buyer key, idempotent ids, and the "not linked / no phone: send nothing" rules.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -371,7 +371,7 @@ describe('store/plan-changed', () => {
     });
     expect(storeEventSchema.safeParse(sent()[0]).success).toBe(true);
   });
-  it('a store Ebda WhatsApp has never heard of gets nothing', async () => {
+  it('a store Ebda Chat has never heard of gets nothing', async () => {
     h.linkRow.mockResolvedValue(false);
     expect(await emitStoreEventsFor(ev)).toBe(0);
     expect(h.send).not.toHaveBeenCalled();
@@ -456,7 +456,7 @@ describe('account/erased (customer.erased)', () => {
     data: { storeId: STORE, buyerKey: KEY, userId: 'u1' },
   };
 
-  it('sends ONLY the hashed key, for any store Ebda WhatsApp knows, linked or not', async () => {
+  it('sends ONLY the hashed key, for any store Ebda Chat knows, linked or not', async () => {
     h.linked.mockResolvedValue(false);
     expect(await emitStoreEventsFor(ev)).toBe(1);
     expect(sent()[0]).toMatchObject({

@@ -138,7 +138,7 @@ export interface ResolvedStore {
    * store's plan has abandoned-cart recovery AND the merchant turned the email channel on.
    */
   cartEmailOptIn?: boolean;
-  /** Ebda WhatsApp is linked: show the WhatsApp marketing-consent box (Ruling WA-CONSENT-1). */
+  /** Ebda Chat is linked: show the WhatsApp marketing-consent box (Ruling WA-CONSENT-1). */
   whatsappMarketingOptIn?: boolean;
 
   // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.

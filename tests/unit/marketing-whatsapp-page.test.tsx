@@ -1,5 +1,5 @@
 /**
- * The Ebda WhatsApp product page (/whatsapp, /en/whatsapp): the product named in full, the two calls to action,
+ * The Ebda Chat product page (/whatsapp, /en/whatsapp): the product named in full, the two calls to action,
  * the facts that must be on it, and the package prices (WA-PRICE-1): the constant is pinned to the approved numbers, and
  * the rendered cards and the JSON-LD offers both equal the constant (never a second copy of a number). Also: the Products menu lists the two live products in both locales.
  */
@@ -21,15 +21,19 @@ import {
 /** What renderToStaticMarkup does to text. */
 const esc = (t: string) => t.replace(/'/g, '&#x27;');
 
-describe('Ebda WhatsApp page', () => {
+describe('Ebda Chat page', () => {
   for (const l of LOCALES) {
     const html = renderToStaticMarkup(<WhatsAppPage locale={l} />);
-    const name = l === 'ar' ? 'ابدأ واتساب' : 'Ebda WhatsApp';
-    it(`${l}: names the product, links sign-up and the app, states the facts, invents no price`, () => {
+    const name = l === 'ar' ? 'ابدأ شات' : 'Ebda Chat';
+    it(`${l}: names the product, links the Chat app (no Store CTA, no infra host), states the facts, invents no price`, () => {
       expect(html).toContain(name);
-      expect(html).toContain('href="https://store.ebda.app/signup"');
       expect(html).toContain('href="https://wa.ebda.app"');
-      expect(html).toContain('accounts.ebda.app');
+      expect(html).not.toContain('store.ebda.app');
+      expect(html).not.toContain('accounts.ebda.app');
+      expect(html).not.toMatch(/href="(\/en)?\/#(story|looks|faq)"/);
+      expect(html).not.toMatch(
+        /ابدأ ستور — منتج|Ebda Store — a product|ابدأ ستور منتج من|Ebda Store is a product/
+      );
       expect(html).toContain('0%'); // no margin on Meta's fees at the moment (WA-MARGIN-1)
       expect(html).not.toMatch(/orange|#ff6e01/i);
     });
@@ -67,7 +71,28 @@ describe('Ebda WhatsApp page', () => {
         expect(o.priceSpecification.billingDuration).toBe(p.periodMonths === 12 ? 'P1Y' : 'P1M');
       }
     });
-    it(`${l}: the header Products menu lists Ebda Store and Ebda WhatsApp`, () => {
+    it(`${l}: the hero and FAQ carry the WA-COPY-1 wording`, () => {
+      const p = WHATSAPP_PAGE[l];
+      expect(p.h1).toBe(
+        l === 'ar'
+          ? 'ابدأ شات — بيع ورد على عملائك على واتساب'
+          : 'Ebda Chat — sell and support your customers on WhatsApp'
+      );
+      expect(p.lead).toContain(
+        l === 'ar'
+          ? 'أكّد الطلبات وابعت الحملات لعملائك على واتساب من مكان واحد'
+          : 'Confirm orders and send campaigns to your customers on WhatsApp, all in one place'
+      );
+      expect(p.lead).toContain(
+        l === 'ar'
+          ? 'بيشتغل على منصة واتساب للأعمال الرسمية من Meta'
+          : 'Works with the WhatsApp Business Platform'
+      );
+      expect(p.faq[p.faq.length - 2].q).toBe(
+        l === 'ar' ? 'هل ابدأ شات تبع واتساب؟' : 'Is Ebda Chat part of WhatsApp?'
+      );
+    });
+    it(`${l}: the header Products menu lists Ebda Store and Ebda Chat`, () => {
       const h = renderToStaticMarkup(<Header locale={l} page="whatsapp" />);
       const menu = /<li class="nav-products">.*?<\/details>/s.exec(h)![0];
       expect(menu).toContain(l === 'ar' ? '<b>ابدأ ستور</b>' : '<b>Ebda Store</b>');

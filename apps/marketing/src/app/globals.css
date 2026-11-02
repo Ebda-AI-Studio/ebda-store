@@ -158,7 +158,7 @@ html[lang='en'] .wm-name {
 .nav {
   flex: 1;
 }
-/* Products menu (BRAND-ARCH-1): a details disclosure, one card per live product (Ebda Store, Ebda WhatsApp) */
+/* Products menu (BRAND-ARCH-1): a details disclosure, one card per live product (Ebda Store, Ebda Chat) */
 .nav-products summary {
   cursor: pointer;
   list-style: none;

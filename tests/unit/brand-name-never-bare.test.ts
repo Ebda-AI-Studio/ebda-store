@@ -4,7 +4,7 @@ import path from 'node:path';
 
 /**
  * Ruling BRAND-NAME-1 (Ahmad, 2026-10-23): never write "Ebda" (or the Arabic brand ابدأ/إبدأ) ALONE. Always the full
- * name: Ebda Store, Ebda WhatsApp, Ebda CRM, Ebda ERP, or Ebda AI Studio (the company). The Arabic VERB ابدأ ("start",
+ * name: Ebda Store, Ebda Chat, Ebda CRM, Ebda ERP, or Ebda AI Studio (the company). The Arabic VERB ابدأ ("start",
  * as in «ابدأ متجرك») is NOT the brand and stays.
  *
  * Scans UI strings, emails, help/docs content, alt text, OG/JSON-LD sources and the storefront badge under apps/ and
@@ -40,7 +40,7 @@ const EN_ALLOW: RegExp[] = [
   /Ebda own ads/,
 ];
 
-const EN_BARE = /\bEbda\b(?! (?:Store|AI Studio|WhatsApp|CRM|ERP)\b)/g;
+const EN_BARE = /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP)\b)/g;
 const AR_BRAND = '(?:ابدأ|إبدأ|إبدا)';
 const AR_LETTER = '[\\u0621-\\u064A\\u0671-\\u06D3]';
 const AR_NEXT_OK = `(?!\\s*(?:ستور|استوديو|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;

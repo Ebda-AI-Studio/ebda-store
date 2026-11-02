@@ -10,7 +10,7 @@ import {
 import { COPY } from '../lib/content';
 import { egp } from '../lib/demo-stores';
 import { whatsappJsonLd } from '../lib/seo';
-import { HOME, SIGNUP_URL, pagePath, type Locale } from '../lib/site';
+import { HOME, pagePath, type Locale } from '../lib/site';
 import { WHATSAPP_APP_URL, WHATSAPP_PAGE, WHATSAPP_YEARLY_SAVING_PCT } from '../lib/whatsapp-page';
 import { Footer } from './Footer';
 import { Header } from './Header';
@@ -127,7 +127,7 @@ function Pricing({ locale }: { locale: Locale }) {
   );
 }
 
-/** The Ebda WhatsApp product page: /whatsapp (Arabic, default) and /en/whatsapp. Facts: lib/whatsapp-page.ts. */
+/** The Ebda Chat product page: /whatsapp (Arabic, default) and /en/whatsapp. Facts: lib/whatsapp-page.ts. */
 export function WhatsAppPage({ locale }: { locale: Locale }) {
   const p = WHATSAPP_PAGE[locale];
   const help = `https://${BRAND.domains.help}/${locale === 'ar' ? '' : 'en/'}`;
@@ -144,18 +144,15 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
             <h1>{p.h1}</h1>
             <p className="lead">{p.lead}</p>
             <p className="actions">
-              <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
+              <SiteLink href={WHATSAPP_APP_URL} locale={locale} className="btn btn-primary btn-lg">
                 {p.ctaStart}
-              </SiteLink>
-              <SiteLink href={WHATSAPP_APP_URL} locale={locale} className="btn btn-ghost btn-lg">
-                {p.ctaApp}
               </SiteLink>
             </p>
           </div>
           <WaChatVisual locale={locale} />
         </header>
 
-        <section className="page-sec" aria-labelledby="wa-feats-h">
+        <section className="page-sec" aria-labelledby="wa-feats-h" id="features">
           <h2 id="wa-feats-h">{p.featuresH}</h2>
           <ul className="wa-feats">
             {p.features.map(f => (
@@ -221,7 +218,7 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
           <p className="wa-prose">{p.account}</p>
         </section>
 
-        <section className="page-sec" aria-labelledby="wa-faq-h">
+        <section className="page-sec" aria-labelledby="wa-faq-h" id="faq">
           <h2 id="wa-faq-h">{p.faqH}</h2>
           <div className="faq">
             {p.faq.map(i => (
@@ -237,11 +234,8 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
           <h2 id="wa-close-h">{p.closeH}</h2>
           <p className="wa-prose">{p.closeP}</p>
           <p className="actions">
-            <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
+            <SiteLink href={WHATSAPP_APP_URL} locale={locale} className="btn btn-primary btn-lg">
               {p.ctaStart}
-            </SiteLink>
-            <SiteLink href={WHATSAPP_APP_URL} locale={locale} className="btn btn-ghost btn-lg">
-              {p.ctaApp}
             </SiteLink>
           </p>
           <p className="muted small">
@@ -253,12 +247,12 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
           </p>
         </section>
       </main>
-      <Footer locale={locale} />
+      <Footer locale={locale} page="whatsapp" />
     </>
   );
 }
 
-/** A short block that points to the Ebda WhatsApp page (home, below the capability line; /features, above the comparisons). */
+/** A short block that points to the Ebda Chat page (home, below the capability line; /features, above the comparisons). */
 export function WhatsAppTeaser({ locale }: { locale: Locale }) {
   const t = WHATSAPP_PAGE[locale].teaser;
   return (

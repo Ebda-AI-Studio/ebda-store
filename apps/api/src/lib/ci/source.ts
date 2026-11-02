@@ -72,7 +72,7 @@ export interface CiStoreSetupFacts {
 export interface CiSource {
   order(storeId: string, orderId: string): Promise<CiOrderFacts | null>;
   shipment(storeId: string, shipmentId: string): Promise<CiShipmentFacts | null>;
-  /** Did a WhatsApp COD answer already drive this order (Ebda WhatsApp emitted that outcome itself)? */
+  /** Did a WhatsApp COD answer already drive this order (Ebda Chat emitted that outcome itself)? */
   hasWhatsAppCodOutcome(storeId: string, orderId: string): Promise<boolean>;
   /** Earlier orders by the same buyer in THIS store (a point count on (store, buyerKey)), or null if unknown. */
   priorOrdersByBuyer(

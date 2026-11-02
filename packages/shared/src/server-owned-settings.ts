@@ -3,7 +3,7 @@
  * the store owner through the store create/update routes with arbitrary keys, so anything that is an
  * entitlement or a link state must never live in there: a merchant could switch it on.
  *
- * `ebdaWhatsApp` was the (never shipped) home of the Ebda WhatsApp link flag; the link now lives in
+ * `ebdaWhatsApp` was the (never shipped) home of the Ebda Chat link flag; the link now lives in
  * the server-only `store_whatsapp_links` table. The key stays reserved so no client can plant it and
  * no old reader can be fooled by it. (The legacy bridge's receiver-URL key was reserved here too until
  * the bridge was deleted, Ruling WA-LEGACY-1; nothing reads it any more.) Swept 2026-10-25:

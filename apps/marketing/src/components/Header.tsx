@@ -1,15 +1,19 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { NavBehavior } from './NavBehavior';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
+import { WHATSAPP_APP_URL } from '../lib/whatsapp-page';
 import { HeaderSearch } from './HeaderSearch';
 import {
   HOME,
   LOGIN_URL,
-  NAV_ANCHORS,
   SIGNUP_URL,
+  NAV_ANCHORS,
+  WA_NAV_ANCHORS,
+  productOfPage,
   pagePath,
   type Locale,
   type PageSlug,
@@ -56,9 +60,14 @@ export function Header({
   const c = COPY[locale];
   const other: Locale = locale === 'ar' ? 'en' : 'ar';
   const home = HOME[locale];
+  /** Ebda Chat's own chrome (MKT-WA-CHROME-1): its sections, its sign-in, its page behind the wordmark. */
+  const wa = productOfPage(page) === 'whatsapp';
+  const waBase = pagePath(locale, 'whatsapp');
+  const startUrl = wa ? WHATSAPP_APP_URL : SIGNUP_URL;
+  const loginUrl = wa ? WHATSAPP_APP_URL : LOGIN_URL;
   /** The master brand (BRAND-ARCH-1): the studio lockup, never a bare product or a bare Ebda. */
   const studio = locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
-  /** The Products menu: Ebda Store, then Ebda WhatsApp (the same two entries as docs, help and status; BRAND-ARCH-1). */
+  /** The Products menu: Ebda Store, then Ebda Chat (the same two entries as docs, help and status; BRAND-ARCH-1). */
   const products = [
     {
       id: 'store' as const,
@@ -82,19 +91,23 @@ export function Header({
     ) : (
       <a href={anchor(n.target)}>{c.nav[n.key]}</a>
     );
+  const waAnchor = (id: string) => `${waBase === '/' ? '' : waBase}/#${id}`;
+  const anchors: readonly { key: keyof typeof c.nav; node: ReactNode }[] = wa
+    ? WA_NAV_ANCHORS.map(n => ({
+        key: n.key,
+        node: <a href={waAnchor(n.target)}>{c.nav[n.key]}</a>,
+      }))
+    : NAV_ANCHORS.map(n => ({ key: n.key, node: navLink(n) }));
   /** Secondary destinations live in one "More" menu so the top row stays on one line at every desktop width. */
   const moreItems = [
-    ...NAV_ANCHORS.filter(n => MORE_KEYS.includes(n.key)).map(n => ({
-      key: n.key,
-      node: navLink(n),
-    })),
+    ...anchors.filter(n => MORE_KEYS.includes(n.key)),
     { key: 'about', node: <Link href={pagePath(locale, 'about')}>{c.nav.about}</Link> },
     { key: 'contact', node: <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link> },
   ];
   return (
     <header className="site-header">
       <div className="wrap header-row">
-        <Link href={home} className="wordmark" aria-label={studio}>
+        <Link href={wa ? waBase : home} className="wordmark" aria-label={studio}>
           <img src="/icon.svg" alt="" width={28} height={28} />
           <span className="wm-name">{studio}</span>
         </Link>
@@ -120,9 +133,11 @@ export function Header({
                 </ul>
               </details>
             </li>
-            {NAV_ANCHORS.filter(n => !MORE_KEYS.includes(n.key)).map(n => (
-              <li key={n.key}>{navLink(n)}</li>
-            ))}
+            {anchors
+              .filter(n => !MORE_KEYS.includes(n.key))
+              .map(n => (
+                <li key={n.key}>{n.node}</li>
+              ))}
             <li className="nav-products nav-more">
               <details>
                 <summary>{c.nav.more}</summary>
@@ -158,8 +173,8 @@ export function Header({
                   ))}
                 </ul>
               </li>
-              {NAV_ANCHORS.map(n => (
-                <li key={n.key}>{navLink(n)}</li>
+              {anchors.map(n => (
+                <li key={n.key}>{n.node}</li>
               ))}
               <li>
                 <Link href={pagePath(locale, 'about')}>{c.nav.about}</Link>
@@ -176,12 +191,12 @@ export function Header({
                 </Link>
               </li>
               <li className="menu-start">
-                <SiteLink href={SIGNUP_URL} locale={locale}>
+                <SiteLink href={startUrl} locale={locale}>
                   {c.nav.start}
                 </SiteLink>
               </li>
               <li className="menu-login">
-                <SiteLink href={LOGIN_URL} locale={locale}>
+                <SiteLink href={loginUrl} locale={locale}>
                   {c.nav.login}
                 </SiteLink>
               </li>
@@ -199,11 +214,11 @@ export function Header({
           >
             {c.nav.switchTo}
           </Link>
-          <SiteLink href={LOGIN_URL} locale={locale} className="link-login">
+          <SiteLink href={loginUrl} locale={locale} className="link-login">
             {c.nav.login}
           </SiteLink>
           <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} compact />
-          <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary header-start">
+          <SiteLink href={startUrl} locale={locale} className="btn btn-primary header-start">
             {c.nav.start}
           </SiteLink>
         </div>

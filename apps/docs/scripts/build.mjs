@@ -27,7 +27,7 @@ const url = slug => (slug === 'index' ? '/' : `/${slug}/`);
 
 const SECTIONS = ['Start', 'Concepts', 'Reference'];
 /** Further products (BRAND-ARCH-1, LAUNCH-SUITE-1): content/<folder>/{en,ar}/<slug>.mdx -> /<folder>/<slug>/ (en) and /ar/<folder>/<slug>/ (ar). */
-const WA = { folder: 'whatsapp', section: 'Ebda WhatsApp', sectionAr: 'ابدأ واتساب' };
+const WA = { folder: 'whatsapp', section: 'Ebda Chat', sectionAr: 'ابدأ شات' };
 /** The products this site documents (BRAND-ARCH-1). A product is added when it ships; never a placeholder. */
 const PRODUCT = BRAND.product.nameEn;
 const EN = {
@@ -199,7 +199,7 @@ for (const p of pages) {
   });
 }
 
-// Ebda WhatsApp section (English at /whatsapp/<slug>/, Arabic at /ar/whatsapp/<slug>/).
+// Ebda Chat section (English at /whatsapp/<slug>/, Arabic at /ar/whatsapp/<slug>/).
 for (const p of waEn) {
   const { html, headings } = await renderMdx(p.body, { tableLabel: p.data.title });
   enPage({

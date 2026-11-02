@@ -520,7 +520,7 @@ model Store {
 /// on first write (`credentials: { upsert: ... }`). Every value is AES-256-GCM ciphertext from
 /// apps/api/src/services/encryption.service.ts; the client omits all three by default, so a
 /// reader names the field it needs in a `select`.
-/// Server-owned link state of Ebda WhatsApp for a store (Store <-> WhatsApp contract 2026-10-24).
+/// Server-owned link state of Ebda Chat for a store (Store <-> WhatsApp contract 2026-10-24).
 /// Written ONLY by WhatsAppLinkService (the `store.linked` / `store.unlinked` path), never by a
 /// merchant-facing route or the merchant-writable `stores.settings` JSON, which is where a flag
 /// would let a store owner switch the integration on. Read by lib/wa/link.ts together with the
@@ -530,7 +530,7 @@ model StoreWhatsAppLink {
   linked      Boolean   @default(false)
   ownerUserId String?   @map("owner_user_id")
   linkedAt    DateTime? @map("linked_at")
-  /// The messaging package's standing, from Ebda WhatsApp's `whatsapp.entitlement_changed` (bought
+  /// The messaging package's standing, from Ebda Chat's `whatsapp.entitlement_changed` (bought
   /// there, included by the plan, or assigned by an operator). `entitlementVersion` only goes up:
   /// an event that is not newer is ignored. Server-side only, like the link itself.
   entitlementVersion    Int       @default(0) @map("entitlement_version")
@@ -546,7 +546,7 @@ model StoreWhatsAppLink {
 
 /// A buyer's WhatsApp MARKETING consent for one store (Ruling WA-CONSENT-1: cart reminders are marketing,
 /// PDPL needs prior consent). Keyed by `buyerKey` (the suite HMAC of the E.164 phone, NEVER the phone), so
-/// it lines up with Ebda WhatsApp's own keys and holds no raw number. Unticked by default; revocable.
+/// it lines up with Ebda Chat's own keys and holds no raw number. Unticked by default; revocable.
 /// Order, COD and shipping messages are transactional and do not read this.
 model StoreWhatsAppConsent {
   storeId     String    @map("store_id")

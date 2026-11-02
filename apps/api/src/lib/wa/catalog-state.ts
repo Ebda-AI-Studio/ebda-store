@@ -2,7 +2,7 @@
  * `catalog.product_upserted` / `catalog.product_deleted` (contract section 4) on ANY product or
  * variant write: price, stock, availability, gold reprice, bulk import, soft delete. Like the plan
  * events this hangs off the ONE database observer (lib/wa/observers.ts), so no write path (a
- * service, a job, the repricer, an import) can be missed; Ebda WhatsApp then reads the details over
+ * service, a job, the repricer, an import) can be missed; Ebda Chat then reads the details over
  * the bridge.
  */
 import { ambientScope, type ModelWriteEvent } from '@ebda/database';
@@ -84,7 +84,7 @@ export function catalogChangeFrom(
   return { storeId, productIds };
 }
 
-// A tiny per-isolate cache of "does Ebda WhatsApp know this store": most stores never link, and a
+// A tiny per-isolate cache of "does Ebda Chat know this store": most stores never link, and a
 // bulk import must not enqueue a job per product for them. A stale `false` for at most the TTL only
 // delays the first catalog event of a store that just linked; the link flow resyncs the catalog.
 const KNOWN_TTL_MS = 30_000;

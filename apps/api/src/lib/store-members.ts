@@ -1,5 +1,5 @@
 /**
- * Store membership for Ebda WhatsApp (identity contract v1.4, Ruling WA-PRICE-1a).
+ * Store membership for Ebda Chat (identity contract v1.4, Ruling WA-PRICE-1a).
  *
  * Membership lives in the Store (Store.ownerId and StoreStaff); the identity service has no second table. So the read is
  * served by the Store worker, to the one Worker wired to it (ebda-whatsapp's service binding to `WhatsAppBridge`), and every

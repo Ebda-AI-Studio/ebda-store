@@ -1,7 +1,7 @@
 /**
  * `store.plan_changed` (contract section 4): the plan a store is on, whether it includes the Ebda
  * WhatsApp package, and its standing (`status`, `periodEnd`), so a dunning suspension, a cancellation
- * or an expiry reaches Ebda WhatsApp's package gate. Entitlement is a NEVER-stale class: it is
+ * or an expiry reaches Ebda Chat's package gate. Entitlement is a NEVER-stale class: it is
  * sent on EVERY write of a plan or subscription (one observer on the database client, see
  * `installWaWriteObservers`), with an 12-hourly reconciliation as the backstop.
  */
@@ -69,7 +69,7 @@ export function planChangeStoreId(e: ModelWriteEvent): string | null {
   return null;
 }
 
-/** Ask the job to re-read this store's plan state and tell Ebda WhatsApp. Never throws. */
+/** Ask the job to re-read this store's plan state and tell Ebda Chat. Never throws. */
 export async function notifyPlanChanged(storeId: string): Promise<void> {
   await sendEventAfterCommit(
     'wa-plan-changed',

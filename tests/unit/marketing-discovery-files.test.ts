@@ -36,7 +36,7 @@ describe('discovery files', () => {
     expect(t).not.toMatch(
       /Cloudflare|Gemini|Neon|Railway|Vercel|Inngest|Postgres|OpenAI|Anthropic/i
     );
-    expect(t).not.toMatch(/Ebda(?! (Store|AI Studio|WhatsApp))\b/);
+    expect(t).not.toMatch(/Ebda(?! (Store|AI Studio|Chat))\b/);
   });
 
   it('/llm.txt is a 301 alias of /llms.txt', () => {

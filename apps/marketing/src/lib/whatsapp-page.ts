@@ -3,7 +3,7 @@ import { PLANS } from './plans';
 import type { Locale } from './site';
 
 /**
- * Copy of the Ebda WhatsApp product page (/whatsapp, /en/whatsapp). Every fact here is taken from the Ebda WhatsApp
+ * Copy of the Ebda Chat product page (/whatsapp, /en/whatsapp). Every fact here is taken from the Ebda Chat
  * repo (docs/help, docs/site, docs/billing.md) or the program register; nothing is invented. Package prices, seats
  * and AI credits are NOT typed here: the pricing section reads WHATSAPP_PACKAGES (Ruling WA-PRICE-1), and the copy
  * below only supplies labels.
@@ -13,7 +13,6 @@ export interface WhatsAppPage {
   h1: string;
   lead: string;
   ctaStart: string;
-  ctaApp: string;
   featuresH: string;
   features: { t: string; p: string }[];
   storeH: string;
@@ -43,7 +42,7 @@ const STORE_AR = BRAND.product.nameAr;
 const STORE_EN = BRAND.product.nameEn;
 const STUDIO_AR = BRAND.company.shortNameAr;
 const STUDIO_EN = BRAND.company.shortNameEn;
-/** The plan that carries the Ebda WhatsApp Store package (WA-PKG-1), named from the plan catalogue. */
+/** The plan that carries the Ebda Chat Store package (WA-PKG-1), named from the plan catalogue. */
 const BIZ = PLANS.find(p => p.id === 'business')!.name;
 
 export interface WhatsAppPricingCopy {
@@ -81,13 +80,12 @@ export interface WhatsAppPricingCopy {
 export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
   ar: {
     meta: {
-      title: 'واتساب لمتجرك: صندوق وارد وطلبات وحملات',
+      title: `${AR}: بيع ورد على عملائك على واتساب`,
       desc: `${AR} من ${STUDIO_AR}: صندوق وارد مشترك، وتأكيد طلبات ودفع عند الاستلام مربوط بمتجرك، وحملات بموافقة العميل، ومساعد ذكي بيرد بالمصري.`,
     },
-    h1: 'واتساب شغلك كله في مكان واحد.',
-    lead: `${AR} من ${STUDIO_AR} بيخلّيك تكلّم عملاءك على واتساب من شاشة واحدة، ومربوط بمتجرك على ${STORE_AR}. بيشتغل على واجهة واتساب للأعمال الرسمية من Meta، وبتدخله بنفس حسابك على ${STUDIO_AR}.`,
+    h1: `${AR} — بيع ورد على عملائك على واتساب`,
+    lead: `أكّد الطلبات وابعت الحملات لعملائك على واتساب من مكان واحد، ومربوط بمتجرك على ${STORE_AR}. بيشتغل على منصة واتساب للأعمال الرسمية من Meta.`,
     ctaStart: 'ابدأ دلوقتي',
-    ctaApp: `افتح ${AR}`,
     featuresH: 'اللي هتلاقيه جوّه',
     features: [
       {
@@ -176,7 +174,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       'Meta بتحاسب على الرسايل حسب نوعها (تسويق، معاملات، مصادقة، خدمة). على رقمك الخاص بتحاسب كارتك إنت مباشرةً. على الرقم المشترك بتتخصم من محفظة بالجنيه بتشحنها، بنفس سعر Meta.',
     ],
     accountH: 'حساب واحد',
-    account: `بتدخل ${AR} بنفس حساب ${STUDIO_AR} اللي بتدخل بيه ${STORE_AR}، من خلال ${BRAND.domains.accounts}. مفيش حساب تاني ولا باسورد تاني.`,
+    account: `بتدخل ${AR} بنفس حساب ${STUDIO_AR} اللي بتدخل بيه ${STORE_AR}، من غير حساب تاني ولا باسورد تاني.`,
     faqH: 'أسئلة شائعة',
     faq: [
       {
@@ -190,6 +188,10 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       {
         q: 'أقدر أبعث لأي حد؟',
         a: 'التسويق بيتبعت بس للعملاء اللي وافقوا عليه، وبقالب معتمد من Meta. اللي بيبعت STOP بيتشال من الحملات. والرد الحر على العميل بيكون جوه 24 ساعة من آخر رسالة منه.',
+      },
+      {
+        q: `هل ${AR} تبع واتساب؟`,
+        a: `لأ، ${AR} منتج من ${STUDIO_AR}، وبيشتغل على منصة واتساب للأعمال الرسمية من Meta.`,
       },
       {
         q: 'المساعد الذكي بيرد إمتى؟',
@@ -207,13 +209,12 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
   },
   en: {
     meta: {
-      title: 'WhatsApp for your store: inbox, orders, campaigns',
+      title: `${EN}: sell and support your customers on WhatsApp`,
       desc: `${EN} by ${STUDIO_EN}: a shared inbox, order and COD confirmations linked to ${STORE_EN}, consent-based campaigns and an AI agent in Egyptian Arabic.`,
     },
-    h1: 'All your WhatsApp, in one place.',
-    lead: `${EN} by ${STUDIO_EN} lets you talk to your customers on WhatsApp from one screen, linked to ${STORE_EN}. It runs on Meta's official WhatsApp Business Platform, and you sign in with the same ${STUDIO_EN} account.`,
+    h1: `${EN} — sell and support your customers on WhatsApp`,
+    lead: `Confirm orders and send campaigns to your customers on WhatsApp, all in one place, linked to ${STORE_EN}. Works with the WhatsApp Business Platform.`,
     ctaStart: 'Start now',
-    ctaApp: `Open ${EN}`,
     featuresH: "What's inside",
     features: [
       {
@@ -250,7 +251,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
     ],
     numbersH: 'Your own number or the shared number',
     numbersLead:
-      'Connect your own business number, or start quickly on the shared number. If you already use the WhatsApp Business app on that number, you can keep using it next to Ebda WhatsApp without losing anything.',
+      'Connect your own business number, or start quickly on the shared number. If you already use the WhatsApp Business app on that number, you can keep using it next to Ebda Chat without losing anything.',
     table: {
       cols: ['Item', 'Your own number', 'Shared number'],
       rows: [
@@ -306,7 +307,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       "Meta charges per message by category (marketing, utility, authentication, service). On your own number, Meta bills your card directly. On the shared number the charge comes out of a prepaid EGP wallet you top up, at Meta's price.",
     ],
     accountH: 'One account',
-    account: `You sign in to ${EN} with the same ${STUDIO_EN} account you use for ${STORE_EN}, through ${BRAND.domains.accounts}. No second account, no second password.`,
+    account: `You sign in to ${EN} with the same ${STUDIO_EN} account you use for ${STORE_EN}, with no second account and no second password.`,
     faqH: 'Questions',
     faq: [
       {
@@ -320,6 +321,10 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       {
         q: 'Can I message anyone?',
         a: 'Marketing goes only to customers who agreed to it, using a Meta-approved template. Anyone who sends STOP is removed from campaigns. A free-text reply to a customer is allowed within 24 hours of their last message.',
+      },
+      {
+        q: `Is ${EN} part of WhatsApp?`,
+        a: `No. ${EN} is a product of ${STUDIO_EN}, built on Meta's official WhatsApp Business Platform.`,
       },
       {
         q: 'When does the AI agent answer?',

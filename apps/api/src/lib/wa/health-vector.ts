@@ -1,7 +1,7 @@
 import { BUYER_KEY_PROBE_INPUT, MIN_PROBE_SECRET_LENGTH, buyerKeyProbe } from '@ebda/shared';
 
 /**
- * `buyerKeyVector` on GET /health: lets Ebda WhatsApp (and anyone with the secret) prove both Workers hold
+ * `buyerKeyVector` on GET /health: lets Ebda Chat (and anyone with the secret) prove both Workers hold
  * the SAME SUITE_BUYER_KEY_SECRET without ever sending it. It is the first 16 hex chars of
  * HMAC-SHA256(key = the secret as UTF-8, message = "suite-buyer-key-probe:v1"). The probe message is a
  * constant, so the value is NOT derived from any phone, order or customer, and 64 bits of an HMAC output
@@ -18,6 +18,6 @@ export { MIN_PROBE_SECRET_LENGTH };
 
 export async function buyerKeyVector(secret: string | undefined): Promise<string | null> {
   if (!secret || secret.length < MIN_PROBE_SECRET_LENGTH) return null;
-  // The derivation is the foundation's (vendored): the same function Ebda WhatsApp runs.
+  // The derivation is the foundation's (vendored): the same function Ebda Chat runs.
   return buyerKeyProbe(secret);
 }

@@ -3,13 +3,13 @@ import { readStoreDb } from '../jobs/store-db';
 import { getAutomationFlags } from '../../services/plan-entitlements';
 
 /**
- * Is Ebda WhatsApp linked AND entitled for this store? Both must hold; anything unknown fails closed.
+ * Is Ebda Chat linked AND entitled for this store? Both must hold; anything unknown fails closed.
  *
  *  - Link state: the server-only `store_whatsapp_links` row, written ONLY by `WhatsAppLinkService`
  *    (the connect / disconnect route). It is NOT a flag in `stores.settings`, which the store owner
  *    writes through the update routes (reserved key, see SERVER_OWNED_SETTINGS_KEYS).
- *  - Entitlement (contract + Ebda WhatsApp session, 2026-10-25): the store's EFFECTIVE plan includes
- *    the package (`whatsappAutomation`) OR Ebda WhatsApp reported an active entitlement
+ *  - Entitlement (contract + Ebda Chat session, 2026-10-25): the store's EFFECTIVE plan includes
+ *    the package (`whatsappAutomation`) OR Ebda Chat reported an active entitlement
  *    (`whatsapp.entitlement_changed`: automation on, status trialing|active, validUntil in the
  *    future), stored on the same server-only row. A downgrade, a lapsed subscription or an expired
  *    package stops all events at once, with no event needed.
@@ -56,7 +56,7 @@ export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
   return (await entitled(storeId, link)).plan;
 }
 
-/** Does Ebda WhatsApp know this store (a link row exists: linked now, unlinked, or entitlement only)? */
+/** Does Ebda Chat know this store (a link row exists: linked now, unlinked, or entitlement only)? */
 export async function hasWhatsAppLinkRow(storeId: string): Promise<boolean> {
   const row = await readStoreDb(storeId, db =>
     db.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })

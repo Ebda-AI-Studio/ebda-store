@@ -1,7 +1,7 @@
 /**
  * `customer.consent_changed` (envelope v1.1): emitted on EVERY write of a buyer's WhatsApp marketing
  * consent (checkout tick, account settings, admin change, STOP, erasure -> false), by ONE database
- * observer like `store.plan_changed`, so no write path can change consent without Ebda WhatsApp
+ * observer like `store.plan_changed`, so no write path can change consent without Ebda Chat
  * hearing of it. The observer only names the (store, buyer); the job re-reads the CURRENT row, so
  * the message always carries the truth and a retry cannot send a stale value.
  */

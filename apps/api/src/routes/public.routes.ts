@@ -1013,8 +1013,8 @@ router.post(
 // caller must be a logged-in customer with a cart in THIS session; consent is recorded against the
 // number on their own account (the number the reminder goes to), source 'checkout', audited with the
 // cart id. A guest, another session or a body-supplied phone cannot opt anyone in or out. Rate-limited
-// per IP+session and per store. Only offered on a store that has Ebda WhatsApp linked.
-/** Show the WhatsApp marketing box only where Ebda WhatsApp is linked; a lookup failure fails CLOSED (hidden). */
+// per IP+session and per store. Only offered on a store that has Ebda Chat linked.
+/** Show the WhatsApp marketing box only where Ebda Chat is linked; a lookup failure fails CLOSED (hidden). */
 async function whatsappOptInAvailable(storeId: string): Promise<boolean> {
   try {
     return await isWhatsAppLinked(storeId);

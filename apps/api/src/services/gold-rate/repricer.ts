@@ -216,7 +216,7 @@ async function writePlan(tx: Tx, storeId: string, plan: Plan): Promise<number> {
     repricerHooks.afterChunk?.(plan.products.length + Math.min(i + CHUNK, plan.variants.length));
   }
   // A reprice changes prices of many products at once: raw SQL bypasses the db write observer, so
-  // Ebda WhatsApp is told here (whole catalog of the store).
+  // Ebda Chat is told here (whole catalog of the store).
   if (plan.products.length + plan.variants.length > 0) {
     await notifyCatalogChanged({ storeId, productIds: null });
   }

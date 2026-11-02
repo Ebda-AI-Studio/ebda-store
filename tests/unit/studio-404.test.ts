@@ -14,8 +14,8 @@ describe('studio pages on hosts nobody serves', () => {
   it.each([
     ['crm.ebda.app', 'Ebda CRM is coming soon.'],
     ['erp.ebda.app', 'Ebda ERP is coming soon.'],
-    ['wa.ebda.app', 'Ebda WhatsApp is coming soon.'],
-    ['whatsapp.ebda.app', 'Ebda WhatsApp is coming soon.'],
+    ['wa.ebda.app', 'Ebda Chat is coming soon.'],
+    ['whatsapp.ebda.app', 'Ebda Chat is coming soon.'],
     ['hub.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
     ['id.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
   ])('%s: 200 coming soon, noindex, search box, live links', async (host, line) => {

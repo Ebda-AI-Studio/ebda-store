@@ -1,5 +1,5 @@
 /**
- * WHATSAPP-OFF-1 (2026-10-14): the `whatsapp` feature (the separate Ebda WhatsApp
+ * WHATSAPP-OFF-1 (2026-10-14): the `whatsapp` feature (the separate Ebda Chat
  * product, wa.ebda.app; the legacy in-Store bridge was deleted by WA-LEGACY-1) is
  * flagged OFF for every store. No plan baseline contains the key, the registry
  * entry is hidden, and only a super-admin StoreFeature override turns it on for

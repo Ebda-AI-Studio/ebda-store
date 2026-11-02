@@ -14,7 +14,7 @@ export const dynamic = 'force-static';
 
 const abs = (p: string) => (p === '/' ? `${SITE_URL}/` : `${SITE_URL}${p}/`);
 
-/** Product pages (features, Ebda WhatsApp, comparisons) rank above the legal pages. */
+/** Product pages (features, Ebda Chat, comparisons) rank above the legal pages. */
 const marketing = (page: string) =>
   page === 'features' || page === 'whatsapp' || page.startsWith('compare/');
 

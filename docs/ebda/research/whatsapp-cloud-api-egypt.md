@@ -6,7 +6,7 @@ Researched: 2026-10-03
 
 ## Answer
 
-Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-01), not per 24-hour conversation, priced by recipient country and category: marketing, utility, authentication, and (new from 2026-10-01) service. Per search summaries of Meta's notice, since 2026-10-01 service messages and utility templates sent inside the 24-hour customer-service window are no longer free: service messages are free only for the first 1,000 per business phone number per month, then billed at the country's utility rate; messages within the 72-hour free-entry-point window (click-to-WhatsApp ads, Facebook page CTA) stay free. For Egypt, the most consistently reported Meta rates (effective 2026-07-01) are marketing $0.0644, utility $0.0036, authentication $0.0036 per message, excluding 14% VAT, though another source lists higher figures, so treat all as **unverified**. Ebda should ship a free wa.me click-to-chat tier first (no API, no cost) and later sell a metered "Ebda WhatsApp platform" tier that passes Meta's per-message cost through at cost plus a small disclosed platform margin.
+Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-01), not per 24-hour conversation, priced by recipient country and category: marketing, utility, authentication, and (new from 2026-10-01) service. Per search summaries of Meta's notice, since 2026-10-01 service messages and utility templates sent inside the 24-hour customer-service window are no longer free: service messages are free only for the first 1,000 per business phone number per month, then billed at the country's utility rate; messages within the 72-hour free-entry-point window (click-to-WhatsApp ads, Facebook page CTA) stay free. For Egypt, the most consistently reported Meta rates (effective 2026-07-01) are marketing $0.0644, utility $0.0036, authentication $0.0036 per message, excluding 14% VAT, though another source lists higher figures, so treat all as **unverified**. Ebda should ship a free wa.me click-to-chat tier first (no API, no cost) and later sell a metered "Ebda Chat platform" tier that passes Meta's per-message cost through at cost plus a small disclosed platform margin.
 
 ## Decision table
 
@@ -86,7 +86,7 @@ Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-0
 
 Source: [Qualimero](https://qualimero.com/en/blog/whatsapp-link), [Unipile](https://www.unipile.com/api-whatsapp-link/), [Quadlayers](https://quadlayers.com/how-to-create-a-whatsapp-link-wa-me-with-a-pre-filled-message/) (search summaries, 2026-10-03). Implementation note: URL-encode text or it truncates at the first space.
 
-## Recommendation: what the paid "Ebda WhatsApp platform" tier should pass through
+## Recommendation: what the paid "Ebda Chat platform" tier should pass through
 
 1. Pass through Meta's per-message charge by category and country at actual rate, shown on an itemised usage statement; no markup on the Meta portion (competitive norm per Chatmaxima). Ebda earns via a separate platform fee (monthly subscription add-on and/or per-message fee), numbers to be set by Ahmad.
 2. Prepaid EGP wallet: merchants top up in EGP; Ebda holds USD exposure. Add an FX buffer or reprice the wallet rate periodically, since Meta bills USD and EGP moved within about 1% over 7 days but has been volatile historically. Disclose that VAT (14%) applies.

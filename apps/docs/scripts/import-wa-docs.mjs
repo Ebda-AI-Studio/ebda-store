@@ -1,4 +1,4 @@
-// Imports the Ebda WhatsApp developer docs (docs/site/{ar,en}/whatsapp/*.mdx in the ebda-whatsapp repo) read-only:
+// Imports the Ebda Chat developer docs (docs/site/{ar,en}/whatsapp/*.mdx in the ebda-whatsapp repo) read-only:
 //   node apps/docs/scripts/import-wa-docs.mjs <path-to>/docs/site
 // 1) vendors each source file verbatim into apps/docs/wa-source/{ar,en}/ (prettier-ignored; sha256-pinned by
 //    tests/unit/support-wa-docs-drift.test.ts);

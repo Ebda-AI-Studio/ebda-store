@@ -2,7 +2,7 @@ import type { LegalDoc } from './legal-types';
 
 /**
  * The refund and cancellation policy (/refund/, BIZ-25 / M-034): it RESTATES what the Terms of Service (sections 4, 13)
- * and the Merchant Agreement (section 11) already say about Ebda's own subscriptions, and points at the Ebda WhatsApp
+ * and the Merchant Agreement (section 11) already say about Ebda's own subscriptions, and points at the Ebda Chat
  * terms for the wallet. It adds no new promise. It is published visibly provisional until counsel has read it
  * (the pending-review rule of docs/runbooks/legal-policy-change.md); change it together with the Terms, never alone.
  */
@@ -38,9 +38,9 @@ export const REFUND_EN: LegalDoc = {
       ],
     },
     {
-      h: '5. Ebda WhatsApp wallet',
+      h: '5. Ebda Chat wallet',
       p: [
-        'Wallet balances and refunds of Ebda WhatsApp follow section 6.5 of the Ebda WhatsApp Terms of Service (https://ebda.app/legal/whatsapp-terms/). [Provisional, under legal review] That clause is still under legal review and may change.',
+        'Wallet balances and refunds of Ebda Chat follow section 6.5 of the Ebda Chat Terms of Service (https://ebda.app/legal/whatsapp-terms/). [Provisional, under legal review] That clause is still under legal review and may change.',
       ],
     },
     {
@@ -88,9 +88,9 @@ export const REFUND_AR: LegalDoc = {
       ],
     },
     {
-      h: '5. محفظة ابدأ واتساب',
+      h: '5. محفظة ابدأ شات',
       p: [
-        'أرصدة محفظة ابدأ واتساب واستردادها وفق البند 6.5 من شروط خدمة ابدأ واتساب (https://ebda.app/legal/whatsapp-terms/). [مبدئي، قيد المراجعة القانونية] وهذا البند ما زال قيد المراجعة القانونية وقد يتغير.',
+        'أرصدة محفظة ابدأ شات واستردادها وفق البند 6.5 من شروط خدمة ابدأ شات (https://ebda.app/legal/whatsapp-terms/). [مبدئي، قيد المراجعة القانونية] وهذا البند ما زال قيد المراجعة القانونية وقد يتغير.',
       ],
     },
     {

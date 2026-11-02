@@ -1,5 +1,5 @@
 /**
- * Store membership for Ebda WhatsApp (Ruling WA-PRICE-1a, identity contract v1.4): the Store owns membership (Store.ownerId and
+ * Store membership for Ebda Chat (Ruling WA-PRICE-1a, identity contract v1.4): the Store owns membership (Store.ownerId and
  * StoreStaff), so the read lives on the Store worker (`WhatsAppBridge`), authorised by the CALLING USER at call time.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

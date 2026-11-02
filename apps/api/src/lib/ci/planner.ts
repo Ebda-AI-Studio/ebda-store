@@ -6,7 +6,7 @@
  * yield the SAME eventId.
  *
  * What is deliberately NOT emitted here: a COD confirmed/refused/no-reply that arrived from WhatsApp.
- * Ebda WhatsApp already emitted that outcome itself (contract section 8, #218); emitting it again would
+ * Ebda Chat already emitted that outcome itself (contract section 8, #218); emitting it again would
  * double every row. Detected by the `order.cod_outcome` audit row the WhatsApp consumer writes.
  */
 import { buyerKeyFor } from '@ebda/shared';

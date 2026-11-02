@@ -132,7 +132,7 @@
 
   "queues": {
     "producers": [
-      // Store -> Ebda WhatsApp events (contract 2026-10-24; lib/wa/events.ts). Ebda WhatsApp consumes it.
+      // Store -> Ebda Chat events (contract 2026-10-24; lib/wa/events.ts). Ebda Chat consumes it.
       { "binding": "WA_EVENTS_QUEUE", "queue": "ebda-wa-events" },
       { "binding": "JOBS_QUEUE", "queue": "ebda-jobs" },
       // Customer Intelligence capture (lib/ci/port.ts): validated commerce_outcomes envelopes.

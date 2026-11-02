@@ -78,7 +78,7 @@ assertBillingConfigAtBoot();
   }
 }
 
-// Every plan / subscription / catalog write anywhere tells Ebda WhatsApp (lib/wa/observers.ts).
+// Every plan / subscription / catalog write anywhere tells Ebda Chat (lib/wa/observers.ts).
 installWaWriteObservers();
 
 const app = express();

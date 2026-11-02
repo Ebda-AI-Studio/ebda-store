@@ -458,7 +458,7 @@ export class StoreDirectory extends WorkerEntrypoint<CfBindings> {
   }
 }
 /**
- * Service Binding RPC for Ebda WhatsApp (identity contract v1.4). Wired ONLY in ebda-whatsapp's wrangler config. Each method is
+ * Service Binding RPC for Ebda Chat (identity contract v1.4). Wired ONLY in ebda-whatsapp's wrangler config. Each method is
  * authorised by the calling USER against live membership (never token claims) and fails closed.
  */
 export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {

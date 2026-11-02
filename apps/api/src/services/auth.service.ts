@@ -2052,7 +2052,7 @@ export class AuthService {
       )
     ).map(s => s.playerId);
 
-    // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
+    // The suite buyer key of this person's phone (Ebda Chat contract `customer.erased`), taken
     // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
     const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
@@ -2396,7 +2396,7 @@ export class AuthService {
         },
       });
       // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
-      // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
+      // account. The consent observer announces the resulting `false` to Ebda Chat.
       // (the proof, `eraseProvenBuyerKey`, was computed at the START of this transaction, before the order scrub)
       await WhatsAppConsentService.eraseForAccount(tx, consentStoreId, userId, eraseProvenBuyerKey);
 
@@ -2528,7 +2528,7 @@ export class AuthService {
     void deferAfterTenantCommit('auth.eraseAccount.propagate', async () => {
       await inngest.send({
         name: 'account/erased',
-        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
+        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda Chat erase the
         // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
         data: {
           userId,

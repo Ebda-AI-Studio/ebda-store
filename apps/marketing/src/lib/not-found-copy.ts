@@ -64,7 +64,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
       {
         title: 'قريباً',
         links: [
-          { href: '', label: 'ابدأ واتساب', soon: true },
+          { href: '', label: 'ابدأ شات', soon: true },
           { href: '', label: 'ابدأ CRM', soon: true },
           { href: '', label: 'ابدأ ERP', soon: true },
         ],
@@ -110,7 +110,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
       {
         title: 'Coming soon',
         links: [
-          { href: '', label: 'Ebda WhatsApp', soon: true },
+          { href: '', label: 'Ebda Chat', soon: true },
           { href: '', label: 'Ebda CRM', soon: true },
           { href: '', label: 'Ebda ERP', soon: true },
         ],

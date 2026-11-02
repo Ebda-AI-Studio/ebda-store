@@ -83,7 +83,7 @@ export async function revokeForAccount(
 /**
  * The ONE consent upsert. Runs on the caller's current transaction (no scope of its own), so a caller
  * that needs a lock held across check + write can do both in one tenant transaction.
- * Every write is seen by the database observer (consent-state.ts), which tells Ebda WhatsApp
+ * Every write is seen by the database observer (consent-state.ts), which tells Ebda Chat
  * (customer.consent_changed), so no path can change consent unannounced.
  */
 async function writeConsent(storeId: string, buyerKey: string, input: ConsentInput): Promise<void> {

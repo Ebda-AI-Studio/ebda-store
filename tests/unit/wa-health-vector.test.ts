@@ -1,7 +1,7 @@
 /**
  * WA-HEALTH-VECTOR-1: GET /health proves both Workers hold the same SUITE_BUYER_KEY_SECRET without sending
  * it, never carries anything phone-derived, and is emitted only for a strong (>= 64 char) secret.
- * The vector comes from the shared file Ebda WhatsApp vendors too (tests/vectors/ebda-wa/buyer-key-probe.json).
+ * The vector comes from the shared file Ebda Chat vendors too (tests/vectors/ebda-wa/buyer-key-probe.json).
  */
 import { describe, expect, it } from 'vitest';
 import { createHash, createHmac } from 'node:crypto';

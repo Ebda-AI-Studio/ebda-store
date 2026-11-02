@@ -45,7 +45,7 @@ const STARTER_CORE: FeatureKey[] = [
   'shipping_carriers',
   'bulk_operations',
   'abandoned_cart',
-  // `whatsapp` (the Ebda WhatsApp product, wa.ebda.app) is deliberately in NO
+  // `whatsapp` (the Ebda Chat product, wa.ebda.app) is deliberately in NO
   // baseline. Flagged OFF 2026-10-14 (Ruling WHATSAPP-OFF-1; the legacy in-Store
   // bridge was deleted by WA-LEGACY-1): no merchant sees it until it launches.
   // A super-admin StoreFeature `whatsapp` override (enabled=true) turns it on

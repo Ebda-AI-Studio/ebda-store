@@ -3,7 +3,7 @@
  *
  * A `wa.me` link only OPENS a chat with text prefilled; nothing is sent until
  * the person presses send. There is no WhatsApp API, no webhook and no
- * delivery tracking here — the paid "Ebda WhatsApp platform" (Cloud API) is a
+ * delivery tracking here — the paid "Ebda Chat platform" (Cloud API) is a
  * separate tier. Pure functions only: no I/O, no `fetch`.
  */
 

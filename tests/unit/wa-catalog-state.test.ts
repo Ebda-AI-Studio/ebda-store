@@ -127,7 +127,7 @@ describe('notifyCatalogChanged', () => {
     h.known.mockReset().mockResolvedValue(true);
   });
 
-  it('sends after commit for a store Ebda WhatsApp knows', async () => {
+  it('sends after commit for a store Ebda Chat knows', async () => {
     await notifyCatalogChanged({ storeId: S, productIds: ['p1'] });
     expect(h.send).toHaveBeenCalledWith(
       'wa-catalog-changed',

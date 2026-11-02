@@ -737,7 +737,7 @@ export class WarehouseService {
             RETURNING quantity
           `;
 
-    // Stock changed: Ebda WhatsApp must see availability (raw SQL bypasses the db write observer).
+    // Stock changed: Ebda Chat must see availability (raw SQL bypasses the db write observer).
     await notifyCatalogChanged({ storeId: args.storeId, productIds: [args.productId] });
     return rows[0].quantity;
   }

@@ -4,7 +4,7 @@
  * based on feature flags, per-event config, and available credentials.
  *
  * WhatsApp is intentionally NOT a dispatcher channel (it is the separate
- * Ebda WhatsApp product).
+ * Ebda Chat product).
  *
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.
  */

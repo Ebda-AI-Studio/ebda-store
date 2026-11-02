@@ -88,7 +88,7 @@ describe('deploy workflows (production only, verified after deploy)', () => {
   }
 });
 
-describe('docs.ebda.app Ebda WhatsApp section (LAUNCH-SUITE-1)', () => {
+describe('docs.ebda.app Ebda Chat section (LAUNCH-SUITE-1)', () => {
   it('four pages build in English at /whatsapp/<slug>/ and Arabic at /ar/whatsapp/<slug>/, linked and listed', () => {
     const slugs = ['overview', 'connect-your-number', 'api', 'webhooks'];
     const out = (...p: string[]) => path.join(ROOT, 'apps/docs/out', ...p);
@@ -99,9 +99,7 @@ describe('docs.ebda.app Ebda WhatsApp section (LAUNCH-SUITE-1)', () => {
     const ar = readFileSync(out('ar', 'whatsapp', 'api', 'index.html'), 'utf8');
     expect(ar).toContain('dir="rtl"');
     expect(ar).toContain('hreflang="en" href="https://docs.ebda.app/whatsapp/api/"');
-    expect(readFileSync(out('whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
-      'Ebda WhatsApp'
-    );
+    expect(readFileSync(out('whatsapp', 'overview', 'index.html'), 'utf8')).toContain('Ebda Chat');
     const map = readFileSync(out('sitemap.xml'), 'utf8');
     expect(map).toContain('https://docs.ebda.app/whatsapp/webhooks/');
     expect(map).toContain('https://docs.ebda.app/ar/whatsapp/webhooks/');
@@ -113,14 +111,14 @@ describe('docs.ebda.app Ebda WhatsApp section (LAUNCH-SUITE-1)', () => {
 });
 
 describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
-  it('Ebda WhatsApp guides build at /whatsapp/<slug>/ in both locales, with a sidebar group and a home section', () => {
+  it('Ebda Chat guides build at /whatsapp/<slug>/ in both locales, with a sidebar group and a home section', () => {
     const ar = readdirSync(path.join(ROOT, 'apps/help/content/ar/whatsapp')).filter(f =>
       f.endsWith('.mdx')
     );
     const en = readdirSync(path.join(ROOT, 'apps/help/content/en/whatsapp')).filter(f =>
       f.endsWith('.mdx')
     );
-    expect(ar.length).toBe(13);
+    expect(ar.length).toBe(14);
     expect(ar).toEqual(en); // parity: same slugs in both locales
     const out = (...p: string[]) => path.join(ROOT, 'apps/help/out', ...p);
     for (const f of ar) {
@@ -129,7 +127,7 @@ describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
       expect(existsSync(out('en', 'whatsapp', slug, 'index.html')), `en ${slug}`).toBe(true);
     }
     const page = readFileSync(out('en', 'whatsapp', 'ai-agent', 'index.html'), 'utf8');
-    expect(page).toContain('Ebda WhatsApp'); // eyebrow + sidebar group
+    expect(page).toContain('Ebda Chat'); // eyebrow + sidebar group
     expect(readFileSync(out('index.html'), 'utf8')).toContain('id="p-whatsapp"');
     expect(readFileSync(out('sitemap.xml'), 'utf8')).toContain(
       'https://help.ebda.app/whatsapp/ai-agent/'

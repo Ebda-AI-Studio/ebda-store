@@ -506,7 +506,7 @@ export default function CheckoutClient() {
   const cartEmailRecorded = useRef(false);
   const showSmsOptIn = store?.smsMarketingOptIn === true;
   // "Send me offers and reminders on WhatsApp": MARKETING consent (Ruling WA-CONSENT-1). Unticked by
-  // default, shown only when the store has Ebda WhatsApp linked. Ticking records consent against
+  // default, shown only when the store has Ebda Chat linked. Ticking records consent against
   // the phone (server stores only the hashed buyer key); unticking withdraws it.
   const [whatsAppOptIn, setWhatsAppOptIn] = useState(false);
   // Needs an account: the number comes from the account, never from this form (security review).

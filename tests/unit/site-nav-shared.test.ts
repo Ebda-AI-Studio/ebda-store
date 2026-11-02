@@ -71,7 +71,7 @@ describe('shared header nav on docs, help and status', () => {
           const desktop = links(nav.slice(0, nav.indexOf('<details class="nav-menu">')));
           const prods = siteNavProducts(lang);
           expect(prods.map(p => p.label)).toEqual(
-            lang === 'ar' ? ['ابدأ ستور', 'ابدأ واتساب'] : ['Ebda Store', 'Ebda WhatsApp']
+            lang === 'ar' ? ['ابدأ ستور', 'ابدأ شات'] : ['Ebda Store', 'Ebda Chat']
           );
           expect(
             desktop.map(l => l.href),

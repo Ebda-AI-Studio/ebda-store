@@ -282,12 +282,12 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'WhatsApp Notifications',
     nameAr: 'إشعارات واتساب',
     description:
-      'Send order confirmation, shipping, and delivery updates via the Ebda WhatsApp Business Platform bridge. The merchant connects their WABA on the WhatsApp Notifications page and picks an approved Meta template per event.',
+      'Send order confirmation, shipping, and delivery updates via the WhatsApp Business Platform bridge in Ebda Chat. The merchant connects their WABA on the WhatsApp Notifications page and picks an approved Meta template per event.',
     descriptionAr:
       'إرسال تأكيدات الطلب وتحديثات الشحن والتسليم عبر منصة ابدأ WhatsApp للواتساب التجاري. يربط التاجر حساب الواتساب التجاري الخاص به في صفحة إشعارات الواتساب ويختار قالب Meta معتمد لكل حدث.',
     category: 'marketing',
     tier: 'addon',
-    // hidden (case 1: not launched). The key gates the separate Ebda WhatsApp product
+    // hidden (case 1: not launched). The key gates the separate Ebda Chat product
     // (wa.ebda.app). The legacy in-Store WhatsApp API bridge was deleted (Ruling
     // WA-LEGACY-1); the key stays for the Store-side contract. In NO plan
     // baseline, so no store resolves it ON, and out of the feature matrix. A
