@@ -55,18 +55,18 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
 
   // Ruling CI-UMBRA-1 (Ahmad 2026-10-07): Ebda MAY run on the Umbra org runner
   // when the repo variable EBDA_RUNS_ON is set; with the variable unset every job
-  // falls back to GitHub-hosted `ubuntu-latest`. This is the ONLY allowed form,
+  // falls back to GitHub-hosted `ubuntu-24.04`. This is the ONLY allowed form,
   // so deleting the variable is the single switch back to hosted runners.
-  const ALLOWED = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}`;
-  it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-latest fallback', () => {
+  const ALLOWED = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-24.04 fallback', () => {
     // Ruling OFFMACHINE-1: the off-machine database backup must NOT depend on the Umbra fleet (the Mac and the CI guest are
     // exactly what it protects against), so db-backup.yml alone pins the literal GitHub-hosted runner.
     const bad = runsOnValues().filter(
-      r => r.value !== ALLOWED && !(r.file === 'db-backup.yml' && r.value === 'ubuntu-latest')
+      r => r.value !== ALLOWED && !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
     );
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
-      'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-latest)'
+      'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-24.04)'
     ).toEqual([]);
   });
 });

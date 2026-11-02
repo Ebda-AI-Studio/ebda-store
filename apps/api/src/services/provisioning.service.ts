@@ -12,6 +12,7 @@ import {
 } from '@ebda/database';
 import { ensureAdminUser, storeIdByDomain, storeIdBySlug } from '../lib/definer';
 import { bustStoreCaches } from './store.service';
+import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial, type TrialChoice } from './billing/trial';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
@@ -324,6 +325,10 @@ export class ProvisioningService {
       }
       throw error;
     }
+
+    // Hotfix N-22: lookups read D1, so the committed store must be mirrored there or it 404s. A failure is loud (the store
+    // exists in Postgres; the retry of the idempotent mirror converges).
+    await syncStoreDirectoryFromPg(result.store.id);
 
     // Self-serve (signup trial): start the lifecycle-emails run (setup nudges, trial recap). The
     // transaction has committed; an enqueue failure is logged, never fails the provisioning.

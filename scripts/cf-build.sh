@@ -64,5 +64,6 @@ node "$ROOT/scripts/ci/patch-opennext-preview-props.mjs"
 echo "cf-build: building apps/$APP for Cloudflare..."
 OPEN_NEXT_CLOUDFLARE=1 "$BIN" build
 
+if [ "$APP" = web ]; then node "$ROOT/scripts/ci/assert-web-middleware.mjs" "$APP_DIR"; fi
 echo "cf-build: ✓ apps/$APP built -> apps/$APP/.open-next/worker.js"
 echo "cf-build: deploy with -> (cd apps/$APP && npx wrangler deploy)"

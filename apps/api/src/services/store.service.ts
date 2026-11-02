@@ -58,6 +58,7 @@ import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
+import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import {
   assertOwnerMayCreateStore,
   assertPlanAllows,
@@ -546,6 +547,9 @@ export class StoreService {
         select: { id: true, email: true, firstName: true, lastName: true },
       })
     );
+
+    // Hotfix N-22: the new store must resolve (lookups read D1). The creating write committed above, so read it back and mirror it.
+    await syncStoreDirectoryFromPg(store.id);
 
     return { ...store, owner };
   }

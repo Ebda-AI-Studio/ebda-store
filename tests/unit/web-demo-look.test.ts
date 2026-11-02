@@ -61,6 +61,37 @@ describe('parseDemoLook', () => {
 });
 
 describe('middleware: ?look=', () => {
+  it('rewrites a prefixed /ar|/en URL with ?look= (no 404) and keeps it private no-store', () => {
+    vi.stubEnv('STOREFRONT_LOCALE_PATHS', 'true');
+    vi.stubEnv('STOREFRONT_LOCALE_PATHS_STORES', 'all');
+    try {
+      for (const [path, rewritten] of [
+        ['/ar?look=qamar.vitrine', '/'],
+        ['/en/products?look=qamar.atelier', '/products'],
+      ]) {
+        const res = middleware(at('storedemo.ebda.app', path));
+        expect(res.headers.get('x-middleware-rewrite')).toContain(`${rewritten}?look=`);
+        expect(forwarded(res, 'x-demo-look')).toMatch(/^qamar\./);
+        expect(res.headers.get('cache-control')).toBe('private, no-store');
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('marks an old unprefixed /?look= link for the language redirect, query kept, no-store', () => {
+    vi.stubEnv('STOREFRONT_LOCALE_PATHS', 'true');
+    vi.stubEnv('STOREFRONT_LOCALE_PATHS_STORES', 'all');
+    try {
+      const res = middleware(at('storedemo.ebda.app', '/?look=qamar.vitrine'));
+      expect(forwarded(res, 'x-locale-pending')).toBe('1');
+      expect(forwarded(res, 'x-locale-search')).toBe('?look=qamar.vitrine');
+      expect(res.headers.get('cache-control')).toBe('private, no-store');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('forwards a well-formed look as x-demo-look, private no-store', () => {
     const res = middleware(at('storedemo.ebda.app', '/products?look=qamar.atelier'));
     expect(forwarded(res, 'x-demo-look')).toBe('qamar.atelier');

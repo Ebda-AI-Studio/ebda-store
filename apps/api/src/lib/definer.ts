@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { prisma, withSystemJob, type Prisma } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
+import {
+  d1LookupStore,
+  d1PublicStorePage,
+  d1StoreIdByDomain,
+  d1StoreIdBySlug,
+  d1StoreIdsClaimingDomain,
+  platformDb,
+} from './platform-directory';
 import { backendFor, doStoreIdList } from './store-backend';
 
 /**
@@ -785,6 +793,9 @@ export async function lookupStore(
   statuses: readonly StoreStatusName[] = ['active']
 ): Promise<{ id: string; status: string } | null> {
   if (!match.id && !match.slug && !match.domain) return null;
+  // NEON-ZERO-1: a deployed Worker resolves from D1 only; an unknown store is null (404), never a Postgres fallback.
+  const d1 = platformDb();
+  if (d1) return d1LookupStore(d1, match, statuses);
   const rows = await prisma.$queryRaw<Array<{ id: string; status: string }>>`
     SELECT id, status FROM public.ebda_store_lookup(
       ${match.id ?? null}, ${match.slug ?? null}, ${match.domain ?? null}, ${[...statuses]}::text[])`;
@@ -793,6 +804,8 @@ export async function lookupStore(
 
 /** The id of the store holding `slug` (any status, deleted included: the unique index does). */
 export async function storeIdBySlug(slug: string): Promise<string | null> {
+  const d1 = platformDb();
+  if (d1) return d1StoreIdBySlug(d1, slug);
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_store_id_by_slug(${slug}) AS id`;
   return rows[0]?.id ?? null;
@@ -800,6 +813,8 @@ export async function storeIdBySlug(slug: string): Promise<string | null> {
 
 /** The id of the store whose VERIFIED domain is `domain` (any status). */
 export async function storeIdByDomain(domain: string): Promise<string | null> {
+  const d1 = platformDb();
+  if (d1) return d1StoreIdByDomain(d1, domain);
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_store_id_by_domain(${domain}) AS id`;
   return rows[0]?.id ?? null;
@@ -807,6 +822,8 @@ export async function storeIdByDomain(domain: string): Promise<string | null> {
 
 /** The ids of every store with a PENDING claim on `domain`. */
 export async function storeIdsClaimingDomain(domain: string): Promise<string[]> {
+  const d1 = platformDb();
+  if (d1) return d1StoreIdsClaimingDomain(d1, domain);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT ebda_store_ids_claiming_domain AS id FROM public.ebda_store_ids_claiming_domain(${domain})`;
   return rows.map(r => r.id);
@@ -844,6 +861,8 @@ export async function publicStorePage(
   skip: number,
   take: number
 ): Promise<{ ids: string[]; total: number }> {
+  const d1 = platformDb();
+  if (d1) return d1PublicStorePage(d1, skip, take);
   const rows = await prisma.$queryRaw<Array<{ id: string | null; total: bigint }>>`
     SELECT id, total FROM public.ebda_public_store_page(${skip}::int, ${take}::int)`;
   // An empty page still returns one row carrying the total, with id NULL.

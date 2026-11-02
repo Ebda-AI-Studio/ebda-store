@@ -186,7 +186,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // An old unprefixed URL of a store with language-in-the-URL ON (LOCALE-PATHS-1): the middleware has no store, so it
   // marked the request; here the store's own `settings.defaultLanguage` decides where it goes. Permanent to the default
   // language, temporary to the visitor's cookie language when it differs.
-  if (headersList.get(LOCALE_PENDING_HEADER) === '1') {
+  // Not for the unresolved-store sentinel (`id: 'demo'`, an unknown host) or a transient resolve failure: those must
+  // fall through to the page's own 404 / retry body, never a redirect (the deploy probe expects 404 on an unknown host).
+  if (
+    headersList.get(LOCALE_PENDING_HEADER) === '1' &&
+    store.id !== 'demo' &&
+    !store.transientResolveFailure
+  ) {
     const target = pendingRedirect({
       rest: headersList.get(LOCALE_REST_HEADER) || '/',
       search: headersList.get(LOCALE_SEARCH_HEADER) || '',
