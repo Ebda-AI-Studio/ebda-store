@@ -639,7 +639,10 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
       ),
       commission: same(
         'The paid subscription plans show $0 in transaction fees. The fees (cash on delivery 0.5% and online payment 1% on the first $5K, then 0.25% and 0.5% above $5K) apply only to its separate pay-as-you-go option, which has no monthly price. Plans also cap monthly sales, from up to $50K to unlimited.',
-        'باقات الاشتراك المدفوعة مكتوب عندها 0$ رسوم معاملات. الرسوم (0.5% على الدفع عند الاستلام و1% على الدفع الأونلاين لأول 5 آلاف دولار، وبعدها 0.25% و0.5%) بتنطبق بس على خيار الدفع حسب الاستخدام المنفصل عندهم، وده من غير سعر شهري. والباقات ليها حد مبيعات شهري من 50 ألف دولار لحد غير محدود.',
+        'باقات الاشتراك المدفوعة مكتوب عندها 0$ رسوم معاملات. الرسوم (0.5% على الدفع عند الاستلام و1% على الدفع الأونلاين لأول 5 آلاف دولار، وبعدها 0.25% و0.5%) بتنطبق بس على خيار الدفع حسب الاستخدام المنفصل عندهم، وده من غير سعر شهري. والباقات ليها حد مبيعات شهري من 50 ألف دولار لحد غير محدود.'
+      ),
+      arabic: same(
+        'The language menu lists English, French and Arabic.',
         'قايمة اللغات فيها الإنجليزي والفرنسي والعربي.'
       ),
       payments: same(
