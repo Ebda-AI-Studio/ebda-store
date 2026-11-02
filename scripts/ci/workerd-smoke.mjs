@@ -163,6 +163,29 @@ async function main() {
     throw new Error(`local D1 migrations failed: ${d1.stderr || d1.stdout}`);
   }
 
+  // NEON-ZERO-1: with PLATFORM_DB bound the store directory (slug -> id) is read from D1 only, never Postgres, so the
+  // seeded Postgres stores must also exist in the local D1 directory (the cutover copies them there in production).
+  const dir = spawnSync(
+    'npx',
+    [
+      'wrangler',
+      'd1',
+      'execute',
+      'PLATFORM_DB',
+      '--local',
+      '--config',
+      '.wrangler.smoke.jsonc',
+      '--command',
+      "INSERT OR REPLACE INTO stores (id, name, slug, owner_id, storage_backend) VALUES ('11111111-1111-4111-8111-111111111111', 'Alpha Store', 'alpha', '99999999-9999-4999-8999-999999999999', 'pg'), ('22222222-2222-4222-8222-222222222222', 'Bravo Store', 'bravo', '99999999-9999-4999-8999-999999999999', 'pg')",
+    ],
+    { cwd: API, encoding: 'utf8' }
+  );
+  if (dir.status !== 0) {
+    rmSync(devVars, { force: true });
+    rmSync(smokeConfig, { force: true });
+    throw new Error(`local D1 directory seed failed: ${dir.stderr || dir.stdout}`);
+  }
+
   const logPath = path.join(tmpdir(), `workerd-smoke-${process.pid}.log`);
   const log = createWriteStream(logPath);
   const child = spawn(
