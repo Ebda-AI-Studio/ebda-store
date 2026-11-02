@@ -13,6 +13,9 @@ export {
   totalInFlight,
   isStoreClosed,
   closeStore,
+  closeIfNoMoneyInFlight,
+  reopenAfterFailedDelete,
+  type CloseResult,
   type DoMoneyInFlight,
 } from './do/closure';
 export { ensureSearchIndex } from './do/search';

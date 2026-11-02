@@ -400,4 +400,78 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
     });
     expect(alerts).toHaveLength(1);
   });
+
+  it('NZ-D18: a domain moved A -> B (both flags stay true) is detected by VALUE and re-synced for a Postgres store', async () => {
+    sqlite.prepare("UPDATE stores SET storage_backend='pg', status='active' WHERE id=?").run(A);
+    commit({ domain: 'a.example.com', domainStatus: 'active' });
+    await syncStoreDirectoryFromPg(A);
+    commit({ domain: 'b.example.com', domainStatus: 'active' }); // Postgres moved it; the D1 mirror never ran
+    const alerts: string[] = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: true,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      pgDomains: async () => ({ domain: 'B.Example.com', pendingDomain: null }),
+      alert: t => void alerts.push(t),
+    });
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(r.corrected[0].why).toMatch(/domain values/);
+    expect((await lookupStore({ domain: 'b.example.com' }))?.id).toBe(A);
+    expect(await lookupStore({ domain: 'a.example.com' })).toBeNull();
+    expect(alerts).toHaveLength(1);
+  });
+  it('NZ-D18: equal domains (case-insensitive) are not drift', async () => {
+    sqlite.prepare("UPDATE stores SET storage_backend='pg' WHERE id=?").run(A);
+    commit({ domain: 'a.example.com', domainStatus: 'active' });
+    await syncStoreDirectoryFromPg(A);
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: true,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      pgDomains: async () => ({ domain: 'A.EXAMPLE.COM', pendingDomain: null }),
+      alert: () => undefined,
+    });
+    expect(r.corrected).toEqual([]);
+  });
+  it('NZ-D18: a do store whose domain differs from Postgres is ALERT-ONLY (D1 authoritative, nothing re-opened or copied)', async () => {
+    sqlite
+      .prepare("UPDATE stores SET domain='mine.example.com', domain_status='active' WHERE id=?")
+      .run(A);
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: true,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      pgDomains: async () => ({ domain: 'stale.example.com', pendingDomain: null }),
+      alert: () => undefined,
+    });
+    expect(r.alertOnly.map(a => a.id)).toEqual([A]);
+    expect(r.corrected).toEqual([]);
+    expect(sqlite.prepare('SELECT domain FROM stores WHERE id=?').get(A)).toMatchObject({
+      domain: 'mine.example.com',
+    });
+  });
 });

@@ -73,3 +73,39 @@ export function closeStore(db: SyncSql): void {
     []
   );
 }
+
+export type CloseResult =
+  | { closed: true; transitioned: boolean }
+  | { refused: true; counts: DoMoneyInFlight };
+
+/**
+ * ATOMIC gate + close (Ruling NZ-D17). The check and the flag write are ONE `transactionSync` section of the single-threaded DO, so an
+ * order or payment cannot start between them: it lands before (the check sees it and the close is REFUSED) or after (the write sees
+ * `closed` and is refused 410), never both. `transitioned` is true only when THIS call moved the store from open to closed, so a
+ * compensating `reopenAfterFailedDelete` clears only the flag it set (a store closed earlier stays closed).
+ */
+export function closeIfNoMoneyInFlight(db: SyncSql): CloseResult {
+  return db.transactionSync(() => {
+    if (isStoreClosed(db)) return { closed: true as const, transitioned: false };
+    const counts = moneyInFlightOnDo(db);
+    if (totalInFlight(counts) > 0) return { refused: true as const, counts };
+    closeStore(db);
+    db.run(
+      `INSERT INTO do_flags (name, value) VALUES ('closed_by_delete', 1) ON CONFLICT (name) DO UPDATE SET value = 1`,
+      []
+    );
+    return { closed: true as const, transitioned: true };
+  });
+}
+
+/** Compensating rollback of `closeIfNoMoneyInFlight`: clears the two flags it set, and ONLY if it set them. */
+export function reopenAfterFailedDelete(db: SyncSql): { reopened: boolean } {
+  return db.transactionSync(() => {
+    const mine = db
+      .all(`SELECT value FROM do_flags WHERE name = 'closed_by_delete'`, [])
+      .some(r => Number(r.value) === 1);
+    if (!mine) return { reopened: false };
+    db.run(`DELETE FROM do_flags WHERE name IN ('closed', 'closed_by_delete')`, []);
+    return { reopened: true };
+  });
+}

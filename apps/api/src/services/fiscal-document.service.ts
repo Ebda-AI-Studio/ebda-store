@@ -1,4 +1,5 @@
 import { prisma, type Prisma } from '@ebda/database';
+import { RETENTION_YEARS } from '../config/retention';
 import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -44,7 +45,7 @@ export const FISCAL_NUMBER_PREFIX: Record<
 };
 
 /** 6 years: UTPL Art. 38 (5 years after the tax period) + Art. 44 (6 for evasion). */
-export const FISCAL_RETENTION_YEARS = 6;
+export const FISCAL_RETENTION_YEARS = RETENTION_YEARS; // Ruling RETENTION-1: one constant (config/retention.ts)
 
 export function fiscalNumber(docType: keyof typeof FISCAL_NUMBER_PREFIX, serial: number): string {
   return `${FISCAL_NUMBER_PREFIX[docType]}-${String(serial).padStart(6, '0')}`;

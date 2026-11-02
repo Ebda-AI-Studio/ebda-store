@@ -5,7 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import { openSqlite, insertSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
-import { closeStore, isStoreClosed, moneyInFlightOnDo, totalInFlight } from '../src/do/closure';
+import {
+  closeIfNoMoneyInFlight,
+  closeStore,
+  isStoreClosed,
+  moneyInFlightOnDo,
+  reopenAfterFailedDelete,
+  totalInFlight,
+} from '../src/do/closure';
 
 const S = 's1';
 const order = (id: string, over: Record<string, unknown> = {}) => ({
@@ -90,5 +97,59 @@ describe('closeStore', () => {
       fiscal: count('fiscal_documents'),
     }).toEqual(before);
     expect(count('do_flags')).toBe(1);
+  });
+});
+
+describe('closeIfNoMoneyInFlight: atomic gate + close (Ruling NZ-D17)', () => {
+  /** A write path as the DO runs it: refused once the store is closed, otherwise it lands. */
+  const placeOrder = (
+    db: ReturnType<typeof rig>['db'],
+    sql: ReturnType<typeof rig>['sql'],
+    id: string
+  ) => {
+    if (isStoreClosed(sql)) return 'refused-410';
+    insertSqlite(db, 'Order', [order(id, { status: 'processing' })]); // paid, not delivered = money in flight
+    return 'landed';
+  };
+
+  it('order lands first: the close is REFUSED, the store stays open, nothing is flagged', () => {
+    const { db, sql } = rig();
+    expect(placeOrder(db, sql, 'o1')).toBe('landed');
+    const r = closeIfNoMoneyInFlight(sql);
+    expect(r).toMatchObject({ refused: true, counts: { paidUndelivered: 1 } });
+    expect(isStoreClosed(sql)).toBe(false);
+    expect((db.prepare('SELECT count(*) n FROM do_flags').get() as { n: number }).n).toBe(0);
+  });
+  it('close lands first: the closed store REFUSES the order (410), and it is never both', () => {
+    const { db, sql } = rig();
+    expect(closeIfNoMoneyInFlight(sql)).toEqual({ closed: true, transitioned: true });
+    expect(placeOrder(db, sql, 'o2')).toBe('refused-410');
+    expect((db.prepare('SELECT count(*) n FROM orders').get() as { n: number }).n).toBe(0);
+  });
+  it('the check and the flag are ONE transaction: a failure after the check rolls the close back', () => {
+    const { db, sql } = rig();
+    const failing = {
+      ...sql,
+      run: (q: string, p: unknown[]) => {
+        if (/closed_by_delete/.test(q)) throw new Error('boom');
+        return sql.run(q, p);
+      },
+    };
+    expect(() => closeIfNoMoneyInFlight(failing)).toThrow('boom');
+    expect(isStoreClosed(sql)).toBe(false);
+  });
+  it('an already closed store: closed, transitioned false', () => {
+    const { sql } = rig();
+    closeStore(sql);
+    expect(closeIfNoMoneyInFlight(sql)).toEqual({ closed: true, transitioned: false });
+  });
+  it('reopenAfterFailedDelete clears only the flags the close set; a store closed earlier stays closed', () => {
+    const { sql } = rig();
+    expect(closeIfNoMoneyInFlight(sql)).toMatchObject({ transitioned: true });
+    expect(reopenAfterFailedDelete(sql)).toEqual({ reopened: true });
+    expect(isStoreClosed(sql)).toBe(false);
+    closeStore(sql); // closed by something else
+    expect(reopenAfterFailedDelete(sql)).toEqual({ reopened: false });
+    expect(isStoreClosed(sql)).toBe(true);
   });
 });

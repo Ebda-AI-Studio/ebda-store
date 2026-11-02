@@ -16,7 +16,7 @@
  *       re-opened by a repair), record it as `keptRestrictive` and alert for a human to rule on
  * Every correction and every kept-restrictive case is logged and alerted.
  */
-import { storeDirectory } from '@ebda/database';
+import { storeDirectory, withStore } from '@ebda/database';
 import logger from './logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from '../cf/bindings';
@@ -27,6 +27,8 @@ interface D1Row {
   slug: string;
   status: string;
   plan: string;
+  domain: string | null;
+  pending_domain: string | null;
   has_domain: number;
   has_pending_domain: number;
   deleted: number;
@@ -86,6 +88,8 @@ export async function reconcileStoreDirectory(
     >;
     pgLive?: () => Promise<Array<{ id: string }>>;
     sync?: (id: string) => Promise<void>;
+    /** Postgres domain / pending_domain VALUES of one store, read back only for a store that has one (Ruling NZ-D18). */
+    pgDomains?: (id: string) => Promise<{ domain: string | null; pendingDomain: string | null }>;
     alert?: (title: string, body: string) => Promise<unknown> | unknown;
   } = {}
 ): Promise<ReconcileReport> {
@@ -110,12 +114,27 @@ export async function reconcileStoreDirectory(
         hasDomain: s.hasDomain,
         hasPendingDomain: s.hasPendingDomain,
       })));
+  const pgDomains =
+    deps.pgDomains ??
+    (async (id: string) => {
+      const r = await withStore(id, tx =>
+        tx.store.findUnique({ where: { id }, select: { domain: true, pendingDomain: true } })
+      );
+      return { domain: r?.domain ?? null, pendingDomain: r?.pendingDomain ?? null };
+    });
+  const lc = (v: string | null | undefined) => (v ? v.toLowerCase() : null);
+  /** The directory definer only says WHETHER a store has a domain, so a domain moved A -> B keeps both flags: compare the VALUES. */
+  const domainsDiffer = async (id: string, row: D1Row, pgHas: boolean): Promise<boolean> => {
+    if (!pgHas && !row.domain && !row.pending_domain) return false;
+    const pd = await pgDomains(id);
+    return lc(pd.domain) !== lc(row.domain) || lc(pd.pendingDomain) !== lc(row.pending_domain);
+  };
   const pgLive = deps.pgLive ?? (async () => storeDirectory());
   const [all, live] = await Promise.all([pgAll(), pgLive()]);
   const liveIds = new Set(live.map(s => s.id));
   const { results } = await d1
     .prepare(
-      `SELECT id, slug, status, plan, (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain,
+      `SELECT id, slug, status, plan, lower(domain) AS domain, lower(pending_domain) AS pending_domain, (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain,
               (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend FROM stores`
     )
     .bind()
@@ -136,6 +155,12 @@ export async function reconcileStoreDirectory(
           why: `do store closed to match Postgres (${pgDeleted ? 'deleted' : s.status})`,
         });
       }
+      // Postgres is stale by design for a do store, so a domain difference is reported, never copied (and never re-opens anything).
+      if (await domainsDiffer(s.id, row, s.hasDomain || s.hasPendingDomain))
+        report.alertOnly.push({
+          id: s.id,
+          why: 'do store domain differs from Postgres (D1 is authoritative; check it)',
+        });
       continue;
     }
     if (!row) {
@@ -150,7 +175,8 @@ export async function reconcileStoreDirectory(
       !!row.has_domain === s.hasDomain &&
       !!row.has_pending_domain === s.hasPendingDomain &&
       !!row.deleted === pgDeleted;
-    if (same) continue;
+    const domainDrift = await domainsDiffer(s.id, row, s.hasDomain || s.hasPendingDomain);
+    if (same && !domainDrift) continue;
     const d1R = restrictiveness(row.status, !!row.deleted);
     const pgR = restrictiveness(s.status, pgDeleted);
     if (d1R > pgR) {
@@ -163,7 +189,7 @@ export async function reconcileStoreDirectory(
     await sync(s.id);
     report.corrected.push({
       id: s.id,
-      why: `differed (status ${row.status} -> ${s.status}, deleted ${!!row.deleted} -> ${pgDeleted})`,
+      why: `differed (status ${row.status} -> ${s.status}, deleted ${!!row.deleted} -> ${pgDeleted}${domainDrift ? ', domain values' : ''})`,
     });
   }
   for (const [id] of d1ById) {

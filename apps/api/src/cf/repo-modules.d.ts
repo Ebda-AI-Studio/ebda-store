@@ -210,6 +210,11 @@ declare module '@ebda-src/repo' {
   export function totalInFlight(f: DoMoneyInFlight): number;
   export function isStoreClosed(db: SyncSql): boolean;
   export function closeStore(db: SyncSql): void;
+  export type CloseResult =
+    | { closed: true; transitioned: boolean }
+    | { refused: true; counts: DoMoneyInFlight };
+  export function closeIfNoMoneyInFlight(db: SyncSql): CloseResult;
+  export function reopenAfterFailedDelete(db: SyncSql): { reopened: boolean };
   export function readStoreRecord(
     sql: SqlRunner,
     meta: Meta,

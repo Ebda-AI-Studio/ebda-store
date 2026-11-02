@@ -1470,14 +1470,60 @@ export async function storeUpdateOnDo(
   return row;
 }
 
+/**
+ * Defer a DO store's update to the commit of the surrounding transaction (Ruling NZ-D18). Returns the PROJECTED row (the current
+ * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
+ */
+export async function storeUpdateAfterCommit(
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<any> {
+  const { hasDeferralScope, deferAfterTenantCommit } = await import('./after-tenant-commit.js');
+  if (!hasDeferralScope())
+    throw new AppError(
+      501,
+      'STORE_TX_WRITE_UNSUPPORTED',
+      'A Store update inside a database transaction has no post-commit hook on this path for a Durable Object store'
+    );
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const delegate = doStoreDelegate(storeId, stub, decodeRpc as never);
+  const data = Object.fromEntries(Object.entries(args.data).filter(([, v]) => v !== undefined));
+  const selected = args.select
+    ? Object.keys(args.select as object).filter(k => (args.select as any)[k])
+    : undefined;
+  const current = await delegate.findUnique({
+    where: { id: storeId },
+    ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
+  });
+  if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  await deferAfterTenantCommit('store.update.do', async () => {
+    await storeUpdateOnDo(storeId, {
+      data,
+      ...(args.select ? { select: { id: true } } : {}),
+    } as never);
+  });
+  const projected: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(data))
+    if (!selected || selected.includes(k)) projected[k] = v;
+  return projected;
+}
+
 export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
   db: StoreUpdateClient,
   args: Prisma.SelectSubset<A, Prisma.StoreUpdateArgs>
 ): Promise<Prisma.StoreGetPayload<A>> {
   const a = args as Prisma.StoreUpdateArgs;
   const id = a.where.id as string;
-  if (await storeWritesToDo(id))
+  if (await storeWritesToDo(id)) {
+    // Ruling NZ-D18: a D1 / DO write is NOT in the caller's Postgres transaction. Called with a TRANSACTION client (a billing / money
+    // tx), applying it now would leave a plan or entitlement change that a later rollback never undoes (a free upgrade). So it is
+    // applied after the tx COMMITS (dropped on rollback), and the caller gets the projected row; with no post-commit hook available
+    // (a job's own transaction) it is refused, so that caller gets a proper port.
+    if ((db as unknown) !== (prisma as unknown))
+      return (await storeUpdateAfterCommit(id, a)) as Prisma.StoreGetPayload<A>;
     return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
+  }
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
   await copyStoreSettings(id, a.data as Record<string, unknown>);
   return row;
@@ -1488,6 +1534,14 @@ export async function storeUpdateMany(
   args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
 ): Promise<Prisma.BatchPayload> {
   if (await storeWritesToDo(args.where.id)) {
+    // Ruling NZ-D18: a compare-and-set returns its count NOW, so it cannot be deferred past a transaction's commit: refused for a
+    // transaction client (the caller ports it), allowed for the base client.
+    if ((db as unknown) !== (prisma as unknown))
+      throw new AppError(
+        501,
+        'STORE_TX_WRITE_UNSUPPORTED',
+        'Store.updateMany inside a database transaction is not served for a Durable Object store'
+      );
     // Compare-and-set stays ONE atomic D1 statement: the filter may name only D1 columns (id + directory / mirror fields); a
     // filter on a DO-only column is refused. The DO copy follows only when the row matched.
     const filter = args.where as Record<string, unknown>;
@@ -1554,31 +1608,41 @@ export function runInJobRepoScope<T>(fn: () => T): T {
 }
 
 /**
- * Money in flight inside a DO store's own tables (Ruling NZ-D15): the deletion gate for a store whose Postgres copy is stale.
+ * ATOMIC money gate + close of a DO store's deletion (Ruling NZ-D17): ONE DO call checks money in flight and sets the closed flag, so
+ * nothing can slip in between. Refused -> 409 STORE_HAS_MONEY_IN_FLIGHT with the counts (nothing was changed). `transitioned` says
+ * whether THIS call closed the store, i.e. whether a failed delete may reopen it.
  */
-export async function doMoneyInFlight(storeId: string): Promise<Record<string, number>> {
+export async function closeDoIfNoMoney(storeId: string): Promise<{ transitioned: boolean }> {
   const stub = storeDo(storeId) as unknown as {
-    moneyInFlight(
-      id: string
-    ): Promise<
-      { ok: true; data: Record<string, number> } | { ok: false; code: string; status: number }
+    closeIfNoMoneyInFlight(id: string): Promise<
+      | {
+          ok: true;
+          data:
+            | { closed: true; transitioned: boolean }
+            | { refused: true; counts: Record<string, number> };
+        }
+      | { ok: false; code: string; status: number }
     >;
   };
-  const r = await stub.moneyInFlight(storeId);
-  if (!r.ok) throw new AppError(r.status, r.code, `money-in-flight check refused: ${r.code}`);
-  return r.data;
+  const r = await stub.closeIfNoMoneyInFlight(storeId);
+  if (!r.ok) throw new AppError(r.status, r.code, `store close refused: ${r.code}`);
+  if ('refused' in r.data)
+    throw new AppError(
+      409,
+      'STORE_HAS_MONEY_IN_FLIGHT',
+      'This store still has money in flight (paid orders not delivered, transfers awaiting confirmation, open returns, cash on delivery not settled, payments in dispute, unsettled payouts or wallet balances). Settle them before deleting the store.',
+      { ...r.data.counts }
+    );
+  return { transitioned: r.data.transitioned };
 }
 
-/**
- * CLOSE a deleted store's Durable Object (Ruling NZ-D15): one flag row; every write is refused afterwards (410 STORE_CLOSED) and
- * reads, exports and backups keep working. NOTHING is deleted: payments, refunds and fiscal documents are retained records.
- */
-export async function closeDoStore(storeId: string): Promise<void> {
+/** Compensating rollback (Ruling NZ-D17): reopen a DO that THIS delete closed, when the delete then failed. Clears only its own flag. */
+export async function reopenDoAfterFailedDelete(storeId: string): Promise<void> {
   const stub = storeDo(storeId) as unknown as {
-    closeStoreForDeletion(
+    reopenAfterFailedDelete(
       id: string
     ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
   };
-  const r = await stub.closeStoreForDeletion(storeId);
-  if (!r.ok) throw new AppError(r.status, r.code, `store close refused: ${r.code}`);
+  const r = await stub.reopenAfterFailedDelete(storeId);
+  if (!r.ok) throw new AppError(r.status, r.code, `store reopen refused: ${r.code}`);
 }

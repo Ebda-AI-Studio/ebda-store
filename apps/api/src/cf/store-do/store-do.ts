@@ -44,6 +44,9 @@ import {
   moneyInFlightOnDo,
   isStoreClosed,
   closeStore,
+  closeIfNoMoneyInFlight,
+  reopenAfterFailedDelete,
+  type CloseResult,
   type DoMoneyInFlight,
   ensureSearchIndex,
   purgeErasureLedger,
@@ -68,6 +71,7 @@ import {
 } from '../erasure/store-do-sql';
 import { unclassifiedTables } from '../erasure/registry';
 import type { Subject } from '../erasure/types';
+import { eraseMerchantAtomically } from '../erasure/merchant-anonymise';
 import {
   buildBackup,
   dumpTables,
@@ -208,20 +212,19 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     if (isStoreClosed(this.sync)) throw new StoreError('STORE_CLOSED', 410);
   }
 
-  /** Money in flight, read from THIS DO (the Postgres copy of a DO store is stale): the deletion gate (Ruling NZ-D15). */
-  moneyInFlight(storeId: string): Result<DoMoneyInFlight> {
+  /** ATOMIC money gate + close in one DO call (Ruling NZ-D17): {closed, transitioned} or {refused, counts}. Deletes nothing. */
+  closeIfNoMoneyInFlight(storeId: string): Result<CloseResult> {
     return run(() => {
       this.bind(storeId);
-      return moneyInFlightOnDo(this.sync);
+      return closeIfNoMoneyInFlight(this.sync);
     });
   }
 
-  /** Close the store: ONE flag row, idempotent, deletes nothing (Ruling NZ-D15). */
-  closeStoreForDeletion(storeId: string): Result<{ closed: true }> {
+  /** Compensating rollback of a close that this delete made, when the delete then failed (Ruling NZ-D17). */
+  reopenAfterFailedDelete(storeId: string): Result<{ reopened: boolean }> {
     return run(() => {
       this.bind(storeId);
-      closeStore(this.sync);
-      return { closed: true as const };
+      return reopenAfterFailedDelete(this.sync);
     });
   }
 
@@ -518,7 +521,11 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /** Merchant: wipe the whole DO (rows, alarm). Customer: delete/scrub the registry rows that match. */
-  async eraseSubject(s: Subject): Promise<{ erased: Record<string, number>; remaining: number }> {
+  async eraseSubject(s: Subject): Promise<{
+    erased: Record<string, number>;
+    remaining: number;
+    refused?: Record<string, number>;
+  }> {
     const sqlx = this.ctx.storage.sql;
     if (s.kind === 'customer') {
       this.assertRegistryCoversSchema();
@@ -530,15 +537,21 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       });
       return { erased, remaining: countCustomerRows(sqlx, s) };
     }
-    const erased = this.rowCounts();
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
-    const left = sqlx
-      .exec(
-        "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
-      )
-      .one().n as number;
-    return { erased, remaining: left };
+    // MERCHANT erasure = ANONYMISATION in ONE transaction with the money gate (Rulings NZ-D16, NZ-D17, RETENTION-1): refused while
+    // money is in flight; otherwise buyer data is anonymised, account / cart / consent / marketing data deleted, the merchant's own
+    // contact and actor ids anonymised, fiscal / payment / VAT / ETA rows KEPT, and the store closed. No deleteAll.
+    this.assertRegistryCoversSchema();
+    return eraseMerchantAtomically(
+      {
+        sql: sqlx,
+        sync: this.sync,
+        transactionSync: fn => this.ctx.storage.transactionSync(fn),
+        scrubReceipts: orderIds => scrubReceiptsForOrders(this.sync, { orderIds }),
+        moneyInFlight: db => moneyInFlightOnDo(db) as unknown as Record<string, number>,
+        closeStore: db => closeStore(db),
+      },
+      s.requestId
+    );
   }
 
   /** PITR bookmark for "now" (SQLite-backed DOs, 30 days). Returned so the drill can record availability. */

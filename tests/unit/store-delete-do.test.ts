@@ -23,7 +23,6 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
 
 import { lookupStore } from '../../apps/api/src/lib/definer';
 import { finishStoreDeletion } from '../../apps/api/src/lib/store-delete-post-commit';
-import { assertNoMoneyInFlightOnDo } from '../../apps/api/src/services/store-closure.service';
 
 const A = '11111111-1111-4111-8111-111111111111';
 let sqlite: DatabaseSync;
@@ -80,32 +79,21 @@ const row = () =>
     | { status: string; deleted_at: number | null }
     | undefined;
 
-describe('finishStoreDeletion (Ruling NZ-D15: never wipes a DO)', () => {
-  it('a do store: the D1 row is MARKED deleted (kept), it stops resolving, and the StoreDO is CLOSED', async () => {
+describe('finishStoreDeletion (Rulings NZ-D15, NZ-D17)', () => {
+  it('a do store: the D1 row is MARKED deleted (kept) and stops resolving; staff rows stay', async () => {
     expect(await lookupStore({ slug: 'alpha' })).toEqual({ id: A, status: 'active' });
-    const closed: string[] = [];
-    const r = await finishStoreDeletion(
-      { storeId: A, wasOnDo: true },
-      { closeDo: async id => void closed.push(id) }
-    );
-    expect(r).toEqual({ directory: true, closed: true });
+    const r = await finishStoreDeletion({ storeId: A, wasOnDo: true });
+    expect(r).toEqual({ directory: true });
     expect(await lookupStore({ slug: 'alpha' })).toBeNull();
     expect(await lookupStore({ id: A }, ['active', 'inactive', 'suspended'])).toBeNull();
-    expect(row()?.deleted_at).not.toBeNull(); // retained, not removed
+    expect(row()?.deleted_at).not.toBeNull();
     expect(row()?.status).toBe('inactive');
     expect(
       sqlite.prepare('SELECT COUNT(*) n FROM store_staff WHERE store_id=?').get(A)
     ).toMatchObject({ n: 1 });
-    expect(closed).toEqual([A]);
   });
-  it('a Postgres store (already hard-deleted there): the D1 row is removed, no DO call', async () => {
-    const closed: string[] = [];
-    const r = await finishStoreDeletion(
-      { storeId: A, wasOnDo: false },
-      { closeDo: async id => void closed.push(id) }
-    );
-    expect(r).toEqual({ directory: true, closed: null });
-    expect(closed).toEqual([]);
+  it('a Postgres store (already hard-deleted there): the D1 row is removed', async () => {
+    expect(await finishStoreDeletion({ storeId: A, wasOnDo: false })).toEqual({ directory: true });
     expect(row()).toBeUndefined();
   });
   it('a D1 failure is retried, and a persistent one is a P1 alert (the store would keep resolving)', async () => {
@@ -124,18 +112,8 @@ describe('finishStoreDeletion (Ruling NZ-D15: never wipes a DO)', () => {
     );
     expect(alert).toHaveBeenCalledTimes(1);
   });
-  it('a DO that will not close is retried then alerted', async () => {
-    const alert = vi.fn();
-    const closeDo = vi.fn(async () => {
-      throw new Error('do down');
-    });
-    const r = await finishStoreDeletion({ storeId: A, wasOnDo: true }, { alert, closeDo });
-    expect(r.closed).toBe(false);
-    expect(closeDo).toHaveBeenCalledTimes(3);
-    expect(alert).toHaveBeenCalledTimes(1);
-  });
   it('a deleted DO store leaves the DO job list (deleted_at IS NULL) but its row remains', async () => {
-    await finishStoreDeletion({ storeId: A, wasOnDo: true }, { closeDo: async () => undefined });
+    await finishStoreDeletion({ storeId: A, wasOnDo: true });
     expect(fs.readFileSync('apps/api/src/lib/store-backend.ts', 'utf8')).toContain(
       "storage_backend = 'do' AND deleted_at IS NULL"
     );
@@ -147,49 +125,61 @@ describe('finishStoreDeletion (Ruling NZ-D15: never wipes a DO)', () => {
   });
 });
 
-describe('money in flight is read from the DO (Ruling NZ-D15)', () => {
-  it('any money in flight refuses the deletion with 409 and the counts', async () => {
-    await expect(
-      assertNoMoneyInFlightOnDo(A, async () => ({ paidUndelivered: 1, walletBalances: 0 }))
-    ).rejects.toMatchObject({
+describe('the atomic close wrappers (Ruling NZ-D17)', () => {
+  const stubWith = (answer: unknown) => ({ closeIfNoMoneyInFlight: async () => answer });
+  it('refused -> 409 STORE_HAS_MONEY_IN_FLIGHT with the counts; closed -> transitioned flag', async () => {
+    vi.resetModules();
+    vi.doMock('../../apps/api/src/lib/store-backend', () => ({
+      backendFor: async () => 'do',
+      storeDo: () =>
+        stubWith({ ok: true, data: { refused: true, counts: { paidUndelivered: 2 } } }),
+    }));
+    const a = await import('../../apps/api/src/lib/repo-factory');
+    await expect(a.closeDoIfNoMoney(A)).rejects.toMatchObject({
       statusCode: 409,
       code: 'STORE_HAS_MONEY_IN_FLIGHT',
     });
-  });
-  it('a clean DO passes', async () => {
-    await expect(
-      assertNoMoneyInFlightOnDo(A, async () => ({ paidUndelivered: 0, walletBalances: 0 }))
-    ).resolves.toBeUndefined();
+    vi.resetModules();
+    vi.doMock('../../apps/api/src/lib/store-backend', () => ({
+      backendFor: async () => 'do',
+      storeDo: () => stubWith({ ok: true, data: { closed: true, transitioned: true } }),
+    }));
+    const b = await import('../../apps/api/src/lib/repo-factory');
+    await expect(b.closeDoIfNoMoney(A)).resolves.toEqual({ transitioned: true });
+    vi.doUnmock('../../apps/api/src/lib/store-backend');
   });
 });
 
-describe('no code path wipes a DO on delete', () => {
+describe('StoreService.delete ordering and no wipe (static)', () => {
   const read = (f: string) => fs.readFileSync(f, 'utf8');
-  it('StoreService.delete checks the DO BEFORE the Postgres transaction and finishes AFTER it', () => {
+  const del = () => {
     const src = read('apps/api/src/services/store.service.ts');
-    const del = src.slice(src.indexOf('static async delete('));
-    const check = del.indexOf('assertNoMoneyInFlightOnDo(storeId');
-    expect(check).toBeGreaterThan(-1);
-    expect(check).toBeLessThan(del.indexOf('withMoneyTx'));
-    expect(del.indexOf('finishStoreDeletion(')).toBeGreaterThan(del.indexOf('withMoneyTx'));
+    return src.slice(src.indexOf('static async delete('));
+  };
+  it('closes the DO FIRST (after the billing-parent refusal), before the Postgres transaction; reopens in the catch; finishes after', () => {
+    const d = del();
+    const close = d.indexOf('closeDoIfNoMoney(storeId)');
+    expect(close).toBeGreaterThan(d.indexOf('STORE_IS_BILLING_PARENT'));
+    expect(close).toBeLessThan(d.indexOf('withMoneyTx'));
+    expect(d.indexOf('reopenDoAfterFailedDelete(storeId)')).toBeGreaterThan(
+      d.indexOf('withMoneyTx')
+    );
+    expect(d.indexOf('reopenDoAfterFailedDelete(storeId)')).toBeLessThan(
+      d.indexOf('finishStoreDeletion(')
+    );
+    expect(d.indexOf('finishStoreDeletion(')).toBeGreaterThan(d.indexOf('withMoneyTx'));
   });
   it('the delete flow never calls deleteAll / eraseSubject / a teardown', () => {
     for (const f of [
       'apps/api/src/lib/store-delete-post-commit.ts',
       'apps/api/src/services/store-closure.service.ts',
-    ]) {
-      const t = read(f);
-      expect(t, f).not.toMatch(/deleteAll|eraseSubject|tearDown|__unseal/);
-    }
-    const del = read('apps/api/src/services/store.service.ts');
-    const body = del.slice(
-      del.indexOf('static async delete('),
-      del.indexOf('static async delete(') + 12000
-    );
-    expect(body).not.toMatch(/deleteAll|eraseSubject|tearDown/);
+    ])
+      expect(read(f), f).not.toMatch(/deleteAll|eraseSubject|tearDown|__unseal/);
+    expect(del().slice(0, 14000)).not.toMatch(/deleteAll|eraseSubject|tearDown/);
   });
-  it('the StoreDO closes with one flag and exposes no wipe for it', () => {
+  it('the closure module deletes no store data (only its own flag rows)', () => {
     const t = read('packages/repo/src/do/closure.ts');
-    expect(t).not.toMatch(/deleteAll|DELETE FROM|DROP TABLE/);
+    expect(t).not.toMatch(/deleteAll|DROP TABLE/);
+    expect([...t.matchAll(/DELETE FROM (\w+)/g)].map(m => m[1])).toEqual(['do_flags']);
   });
 });

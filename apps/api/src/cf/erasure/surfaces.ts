@@ -230,12 +230,19 @@ export function storeDoSurface(
     async eraseSubject(s) {
       let erased = 0;
       let remaining = 0;
+      let refused = false;
       for (const storeId of await storesOf(s)) {
         const r = await stubFor(storeId).eraseSubject(s);
         erased += Object.values(r.erased).reduce((a, b) => a + b, 0);
         remaining += r.remaining;
+        if (r.refused) refused = true;
       }
-      return { surface: 'store-do', erased, remaining };
+      return {
+        surface: 'store-do',
+        erased,
+        remaining,
+        ...(refused ? { note: 'refused: money in flight (settle it, then retry)' } : {}),
+      };
     },
   };
 }

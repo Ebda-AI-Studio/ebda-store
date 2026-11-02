@@ -177,24 +177,3 @@ export async function archiveFiscalRecords(
   logger.info({ storeId, orders, billingEvents }, '[STORE_DELETE] fiscal records archived');
   return { orders, billingEvents };
 }
-
-/**
- * The deletion gate for a store on its Durable Object (Ruling NZ-D15): money in flight is read from the DO itself (open orders
- * paid but undelivered, transfers awaiting confirmation, returns, COD, payments mid-refund or disputed, unsettled payouts, wallet
- * balances), because the Postgres copy of such a store is stale. Refuses with the same 409 as the Postgres check.
- */
-export async function assertNoMoneyInFlightOnDo(
-  storeId: string,
-  read: (id: string) => Promise<Record<string, number>>
-): Promise<void> {
-  const flight = await read(storeId);
-  const total = Object.values(flight).reduce((n, v) => n + v, 0);
-  if (total > 0) {
-    throw new AppError(
-      409,
-      'STORE_HAS_MONEY_IN_FLIGHT',
-      'This store still has money in flight (paid orders not delivered, transfers awaiting confirmation, open returns, cash on delivery not settled, payments in dispute, unsettled payouts or wallet balances). Settle them before deleting the store.',
-      { ...flight }
-    );
-  }
-}
