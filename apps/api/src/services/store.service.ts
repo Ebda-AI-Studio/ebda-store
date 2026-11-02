@@ -9,7 +9,13 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
-import { copyStoreSettings, storeDb, storeRepo, syncStoreFields } from '../lib/repo-factory';
+import {
+  copyStoreSettings,
+  storeDb,
+  storeRepo,
+  storeUpdateOnDo,
+  syncStoreFields,
+} from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -127,10 +133,34 @@ export async function bustStoreCaches(
  * did, then copies the changed fields to the Durable Object's settings copy for a store served by its DO. On Postgres the
  * copy is a no-op. The patch is captured from the `tx.store.update({ data })` call itself, so no call site restates it.
  */
-async function updateStoreThrough<T>(
+export async function updateStoreThrough<T>(
   storeId: string,
   run: (tx: Parameters<Parameters<typeof withStore>[1]>[0]) => Promise<T>
 ): Promise<T> {
+  // Ruling NZ-D8: a store on its Durable Object is written by D1 + the DO, never Postgres. `run` sees a transaction-shaped
+  // stand-in that serves ONLY `store.update` / `store.findUnique`; any other model throws 501 (that caller needs its own port).
+  if ((await storeRepo(storeId)).backend === 'do') {
+    const unsupported = (what: string) => {
+      throw new AppError(
+        501,
+        'STORE_TX_UNSUPPORTED',
+        `${what} is not served for a Durable Object store`
+      );
+    };
+    const doTx = new Proxy({} as object, {
+      get(_t, prop) {
+        if (prop !== 'store') return unsupported(`tx.${String(prop)}`);
+        return {
+          update: (args: { data: Record<string, unknown> }) =>
+            storeUpdateOnDo(storeId, args as never),
+          findUnique: async (args: any) => (await storeDb(storeId)).store.findUnique(args),
+          findUniqueOrThrow: async (args: any) =>
+            (await storeDb(storeId)).store.findUniqueOrThrow(args),
+        };
+      },
+    });
+    return run(doTx as never);
+  }
   let patch: Record<string, unknown> | undefined;
   const result = await withStore(storeId, tx => {
     const watched = new Proxy(tx as object, {
