@@ -381,15 +381,21 @@ describe('middleware: language in the URL', () => {
     }
   });
 
-  it('leaves POST, the admin preview iframe and the demo look preview alone', () => {
+  it('leaves POST and the admin preview iframe alone', () => {
     on();
-    for (const r of [
-      sub('/products', { method: 'POST' }),
-      sub('/products?_preview=1'),
-      sub('/products?look=qamar.atelier'),
-    ]) {
+    for (const r of [sub('/products', { method: 'POST' }), sub('/products?_preview=1')]) {
       expect(r && fwd(middleware(r), 'x-locale-pending')).toBeNull();
     }
+  });
+
+  it('a demo look preview takes the prefix rules too (/ar?look= must not 404), private no-store', () => {
+    on();
+    const old = middleware(sub('/products?look=qamar.atelier'));
+    expect(fwd(old, 'x-locale-pending')).toBe('1');
+    expect(old.headers.get('cache-control')).toBe('private, no-store');
+    const prefixed = middleware(sub('/ar?look=qamar.atelier'));
+    expect(prefixed.headers.get('x-middleware-rewrite')).toContain('look=qamar.atelier');
+    expect(prefixed.headers.get('cache-control')).toBe('private, no-store');
   });
 
   it('with the tenant tree on too, a prefixed URL goes to the tree in the URL language, not the cookie', () => {

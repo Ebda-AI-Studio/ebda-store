@@ -393,8 +393,9 @@ function handleStoreHost(
   }
 
   // Language in the URL (Ruling LOCALE-PATHS-1): only for a store that opted in, never inside the admin preview
-  // iframe, never for a demo-look preview. See `src/lib/locale-paths.ts` for the rules.
-  const localePaths = !isPreviewIframe && !demoLook && localePathsOn(storeKey);
+  // iframe. A demo-look preview (`?look=`) DOES take the prefix rules (skipping them left `/ar?look=x` unrewritten = 404),
+  // but never the shared tenant-tree and always `private, no-store`. See `src/lib/locale-paths.ts` for the rules.
+  const localePaths = !isPreviewIframe && localePathsOn(storeKey);
   if (localePaths) {
     const decision = decideLocalePath({
       pathname: request.nextUrl.pathname,
@@ -428,13 +429,15 @@ function handleStoreHost(
       requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
       requestHeaders.set(LOCALE_REST_HEADER, decision.rest);
       let target: URL;
-      if (isTenantTreeEligible(decision.rest, isPreviewIframe, storeKey)) {
+      if (!demoLook && isTenantTreeEligible(decision.rest, isPreviewIframe, storeKey)) {
         target = buildStoreTreeUrl(request, host, decision.rest, storeKey, decision.locale);
       } else {
         target = request.nextUrl.clone();
         target.pathname = decision.rest;
       }
-      const response = NextResponse.rewrite(target, { request: { headers: requestHeaders } });
+      const response = uncacheableForDemoLook(
+        NextResponse.rewrite(target, { request: { headers: requestHeaders } })
+      );
       response.headers.set('x-store-domain', host);
       // The URL decides the language; keep the cookie in step so the unprefixed pages (cart, checkout) match.
       if (request.cookies.get('force-language')?.value !== decision.locale) {
