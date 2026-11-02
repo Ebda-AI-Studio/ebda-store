@@ -161,7 +161,7 @@ const ent = (over: object = {}) => ({
   ...over,
 });
 
-describe('planChangedInput (the state sent to Ebda WhatsApp)', () => {
+describe('planChangedInput (the state sent to Ebda Chat)', () => {
   beforeEach(() => {
     h.ent.mockReset().mockResolvedValue(ent());
     h.store.mockReset().mockResolvedValue({ ownerId: 'owner-1' });

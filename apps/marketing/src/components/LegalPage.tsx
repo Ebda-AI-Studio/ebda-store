@@ -109,7 +109,7 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
           </article>
         </div>
       </main>
-      <Footer locale={locale} />
+      <Footer locale={locale} page={page} />
     </>
   );
 }

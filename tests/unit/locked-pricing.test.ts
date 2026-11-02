@@ -36,7 +36,7 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
       expect(planLimitsSchema.parse(p.limits).platformFeeBps).toBe(0);
       expect(p.limits.customDomain).toBe(true);
       expect(p.limits.maxProducts).toBeNull();
-      // wa.me only, EXCEPT Business, which includes the Ebda WhatsApp package (Ruling WA-PKG-1,
+      // wa.me only, EXCEPT Business, which includes the Ebda Chat package (Ruling WA-PKG-1,
       // Ahmad 2026-10-24; migration 20261104000200 and its pin below).
       expect(p.limits.whatsappAutomation).toBe(p.code === 'business');
     }
@@ -109,7 +109,7 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
   });
 });
 
-describe('Business includes the Ebda WhatsApp package (Ruling WA-PKG-1)', () => {
+describe('Business includes the Ebda Chat package (Ruling WA-PKG-1)', () => {
   it('a later migration flips only Business, idempotently', () => {
     const sql = readFileSync(
       join(

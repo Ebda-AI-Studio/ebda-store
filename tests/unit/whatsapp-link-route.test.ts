@@ -1,5 +1,5 @@
 /**
- * POST/DELETE /stores/:storeId/whatsapp-link: the merchant connects Ebda WhatsApp in Store admin.
+ * POST/DELETE /stores/:storeId/whatsapp-link: the merchant connects Ebda Chat in Store admin.
  * The only request path that writes the server-owned link; entitlement-gated; emits store.linked /
  * store.unlinked (contract section 4); an enqueue failure fails the request.
  */
@@ -86,7 +86,7 @@ describe('POST /whatsapp-link', () => {
       data: { ownerUserId: 'owner-1' },
     });
     expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'whatsapp.linked' }));
-    // Ebda WhatsApp learns the plan state right after it learns the store
+    // Ebda Chat learns the plan state right after it learns the store
     expect(h.notify).toHaveBeenCalledWith(STORE);
     // ...and the whole catalog once
     expect(h.catalog).toHaveBeenCalledWith({ storeId: STORE, productIds: null });

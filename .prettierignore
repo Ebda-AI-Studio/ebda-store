@@ -38,7 +38,7 @@ docs/ebda/templates/editor-matrix.md
 docs/ebda/templates/editor-matrix.json
 scripts/editor-audit/baseline.json
 scripts/editor-audit/parity-baseline.json
-# Vendored byte-for-byte from Ebda WhatsApp (sha256 pinned by tests/unit/wa-contract-pin.test.ts)
+# Vendored byte-for-byte from Ebda Chat (sha256 pinned by tests/unit/wa-contract-pin.test.ts)
 apps/api/src/contracts/wa-v1.ts
 
 # Byte-for-byte goldens: tests compare the API serializer output (JSON.stringify, 2 spaces) to these files, so
@@ -47,7 +47,7 @@ tests/integration/__golden__/
 # vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/marketing-wa-legal-drift.test.ts)
 apps/marketing/legal-source
 
-# Vendored byte-for-byte from Ebda WhatsApp (vectors/*.json at 3f7878d; sha256 in SHA256SUMS)
+# Vendored byte-for-byte from Ebda Chat (vectors/*.json at 3f7878d; sha256 in SHA256SUMS)
 tests/vectors/ebda-wa/
 # vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/marketing-wa-legal-drift.test.ts)
 apps/marketing/legal-source

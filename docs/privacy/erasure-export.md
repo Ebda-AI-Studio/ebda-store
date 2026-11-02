@@ -25,7 +25,7 @@ Analytics Engine holds no buyer key and no order id by design (CI plan 1.5), so 
 3. **Email owner (G6):** implement `SuppressionPort` over the suppression table (tombstone = HMAC of the lower-cased address with `SUITE_BUYER_KEY_SECRET`-class secret, status kept).
 4. **CI owner (DONE, CI-1):** the layout in the CI plan (store-first prefixes and the buyer index) is what the CI surface reads, and the writer (`apps/api/src/lib/ci/sink.ts`) maintains the index (index first, compare-and-set; Ruling CI-5). `tests/unit/ci-sink.test.ts` and `apps/api/workers-do/ci-capture.test.ts` run the real writer and then this real surface. On the Postgres path (until cutover) `AuthService.eraseAccount` collects every buyer key on the shopper's orders and the `account/erased` job erases them from R2 (`eraseCiOutcomes`), the export bundle carries `customerIntelligence`, and `orders.buyer_key` / `area_key` are nulled.
    4b. **At cutover (Ruling CI-8):** the customer-erase trigger must call `apps/api/src/lib/ci/erase.ts` (`eraseCiForOrders`, `eraseCiBuyerInStore`), not `ciSurface.eraseSubject`, whose buyer-key-wide, tombstone-less erase is unsafe for a typed phone.
-5. **WhatsApp:** emit `customer.erased { buyerKey }` on the `ebda-wa-events` queue when a customer erase completes, so Ebda WhatsApp deletes the contact and messages (contract section on `customer.erased`). Wiring lives with the trigger below.
+5. **WhatsApp:** emit `customer.erased { buyerKey }` on the `ebda-wa-events` queue when a customer erase completes, so Ebda Chat deletes the contact and messages (contract section on `customer.erased`). Wiring lives with the trigger below.
 
 ## Trigger (not wired, on purpose)
 

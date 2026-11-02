@@ -7,7 +7,7 @@ const d = BRAND.domains;
 
 /**
  * The products the page groups components under (BRAND-ARCH-1: components per product). A product is listed here
- * when it is LIVE; Ebda WhatsApp / CRM / ERP get a group (and their probes) the day they ship, never a placeholder.
+ * when it is LIVE; Ebda Chat / CRM / ERP get a group (and their probes) the day they ship, never a placeholder.
  */
 export const PRODUCTS: readonly { id: string; name: Localized }[] = [
   { id: 'store', name: { en: BRAND.product.nameEn, ar: BRAND.product.nameAr } },

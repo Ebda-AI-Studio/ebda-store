@@ -33,7 +33,7 @@ export const brandLine = () =>
 export const shortBrand = (locale: Locale) =>
   `${productLabel(locale)} (${BRAND.domains.marketing})`;
 
-/** The Ebda WhatsApp product page: its own name in the title tail, the OG site name, the brand line and the OG image. */
+/** The Ebda Chat product page: its own name in the title tail, the OG site name, the brand line and the OG image. */
 export type PageProduct = 'store' | 'whatsapp';
 const WA_OG_IMAGE = {
   url: '/og-whatsapp.png',
@@ -230,7 +230,7 @@ export function jsonLd(
 }
 
 /**
- * JSON-LD of the Ebda WhatsApp page: the studio (publisher), the product as a brand under it, a SoftwareApplication
+ * JSON-LD of the Ebda Chat page: the studio (publisher), the product as a brand under it, a SoftwareApplication
  * and the page FAQ. Offers come from WHATSAPP_PACKAGES (WA-PRICE-1), the same constant the pricing section renders.
  */
 export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: string }[]) {
@@ -271,7 +271,7 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         brand: { '@id': brand },
         featureList: p.features.map(f => f.t),
         url: WHATSAPP_APP_URL,
-        installUrl: SIGNUP_URL,
+        installUrl: WHATSAPP_APP_URL,
         publisher: { '@id': org },
         inLanguage: ['ar', 'en'],
         // one Offer per PRICED package id in WHATSAPP_PACKAGES (WA-PRICE-1; store-included has no price, there is no free plan): EGP for the package's period (1 or 12 months), Meta fees excluded

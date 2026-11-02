@@ -2,9 +2,10 @@ import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { CookieSettingsButton } from './CookieSettingsButton';
-import { SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
+import { SECURITY_EMAIL, pagePath, productOfPage, type Locale, type PageSlug } from '../lib/site';
 
-export function Footer({ locale }: { locale: Locale }) {
+export function Footer({ locale, page = '' }: { locale: Locale; page?: PageSlug }) {
+  const wa = productOfPage(page) === 'whatsapp';
   const c = COPY[locale].footer;
   const k = COPY[locale].contact;
   return (
@@ -15,7 +16,7 @@ export function Footer({ locale }: { locale: Locale }) {
             <img src="/icon.svg" alt="" className="footer-mark" width={28} height={28} />
             <span>{locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}</span>
           </p>
-          <p className="footer-credit">{c.product}</p>
+          <p className="footer-credit">{wa ? c.waProduct : c.product}</p>
           <p className="footer-h">{k.title}</p>
           <dl className="footer-contact">
             <div>
@@ -77,7 +78,7 @@ export function Footer({ locale }: { locale: Locale }) {
         </nav>
       </div>
       <div className="wrap footer-legal">
-        <p className="muted small">{c.ownership}</p>
+        <p className="muted small">{wa ? c.waOwnership : c.ownership}</p>
       </div>
     </footer>
   );

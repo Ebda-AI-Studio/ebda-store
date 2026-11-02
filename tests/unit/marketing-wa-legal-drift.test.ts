@@ -5,7 +5,7 @@ import path from 'node:path';
 import { COPY } from '../../apps/marketing/src/lib/content';
 
 /**
- * LEGAL-1: the published Ebda WhatsApp legal pages must equal their source (ebda-whatsapp docs/legal) minus the
+ * LEGAL-1: the published Ebda Chat legal pages must equal their source (ebda-whatsapp docs/legal) minus the
  * review-pending comments and markdown markup. The source is vendored verbatim in apps/marketing/legal-source/ by
  * `node apps/marketing/scripts/import-wa-legal.mjs <docs/legal>` (re-run it whenever the source changes; it also
  * regenerates src/lib/legal-wa-*.ts). The comparison is on the word sequence, so a clause edited or dropped in
@@ -19,12 +19,12 @@ const DOCS = [
   ['dpa', 'waDpa'],
 ] as const;
 const PINNED_SHA256: Record<string, string> = {
-  'ar/whatsapp-terms': '4038e770687b89d5d0b7005b33c48812d2e595860efb194c72b0bcb2e8e4e3e8',
-  'ar/whatsapp-privacy': '93cc40cde3913d7f0c31bcbe5c93a1b63e5676250528b282b8ff45a9f4e59cc8',
-  'ar/whatsapp-dpa': '43dfa98c3dc681bc047ff7f04738279a326d6e71d80d9c1afbb75bb2c0975e51',
-  'en/whatsapp-terms': '155f31f7b3a46b80d2cc8b7980193ff3b9a4704ae04e4306b004cbaebf7c325a',
-  'en/whatsapp-privacy': '139b5484f759014a0245ebbbf90b3a504aebf324717f98bbd3426397ade7008a',
-  'en/whatsapp-dpa': '8cfe9328d4478c1150c2c445835b0761c4a7f90849301d69dbe4e777b7f4a65a',
+  'ar/whatsapp-terms': '619e3006dd2a546ce1eca8dfd0c05a289a4c9b642748bb92a24ca71f8a2ffbfe',
+  'ar/whatsapp-privacy': '74f928d590d12b99afca3e31f1f12a7db97072943a4abab2f3d8f57c6cb54a95',
+  'ar/whatsapp-dpa': 'f14f2ae4a578ab9a2ba0ddece99562358653436d1585eb622a55580816a019a7',
+  'en/whatsapp-terms': '1710565cf245d8e01cebc2f127ce8c8a88af2900965c5a5c1a37998190d947d7',
+  'en/whatsapp-privacy': '490d07bd087229ad7b9edeade7aa340c3d83e445dcf6e679da34bf10b57f4d2c',
+  'en/whatsapp-dpa': '802870620cf528c6179124df7916231f5c1aa4956f76829b7091be507c33c1c9',
 };
 const PREVAILS = /^(Arabic version prevails\.|النسخة العربية هي الحاكمة\.)$/;
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -39,7 +39,7 @@ function sourceTokens(raw: string): string[] {
   );
 }
 
-describe('published Ebda WhatsApp legal pages equal their vendored source', () => {
+describe('published Ebda Chat legal pages equal their vendored source', () => {
   for (const lang of ['ar', 'en'] as const)
     for (const [file, key] of DOCS) {
       it(`${lang} whatsapp-${file}`, () => {

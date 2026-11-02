@@ -16,7 +16,7 @@ import { WhatsAppConsentService } from '../../wa/consent';
 import { CONSENT_CHANGED_EVENT, consentChangedInput } from '../../wa/consent-state';
 
 /**
- * Store -> Ebda WhatsApp events (contract 2026-10-24, section 4): order created, COD confirmation
+ * Store -> Ebda Chat events (contract 2026-10-24, section 4): order created, COD confirmation
  * requested, order status changed, shipment updated. One function, three source events, so the
  * emit sites in the order and carrier services stay a one-line `inngest.send` and the producer
  * gets the job layer's retries and failure alerts.
@@ -269,7 +269,7 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   ];
 }
 
-/** `customer.erased` (PDPL): Ebda WhatsApp deletes the contact and its messages. Only the hashed key travels. */
+/** `customer.erased` (PDPL): Ebda Chat deletes the contact and its messages. Only the hashed key travels. */
 async function erasedEvent(event: SourceEvent): Promise<Planned[]> {
   const { storeId, buyerKey } = (event.data ?? {}) as { storeId?: string; buyerKey?: string };
   if (!storeId || !buyerKey) return [];
@@ -413,7 +413,7 @@ export async function resendConsentFor(storeId: string, sinceMs: number): Promis
 export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
   if (!storeId) return 0;
-  // An erasure goes to Ebda WhatsApp for any store it knows (a link row), linked or not: the
+  // An erasure goes to Ebda Chat for any store it knows (a link row), linked or not: the
   // contact may outlive an unlink, and it must be deleted either way.
   if (event.name === 'account/erased') {
     if (!(await hasWhatsAppLinkRow(storeId))) return 0;
@@ -422,7 +422,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     await sendStoreEvents(events);
     return events.length;
   }
-  // Plan state goes to Ebda WhatsApp for every store it knows (it holds a link row), including a
+  // Plan state goes to Ebda Chat for every store it knows (it holds a link row), including a
   // store that was unlinked or downgraded: that is exactly when the gate must hear about it.
   if (event.name === PLAN_CHANGED_EVENT) {
     if (!(await hasWhatsAppLinkRow(storeId))) return 0;
@@ -431,7 +431,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     await sendStoreEvents(events);
     return events.length;
   }
-  // Consent state goes to Ebda WhatsApp for every store it knows (a link row), also when unlinked:
+  // Consent state goes to Ebda Chat for every store it knows (a link row), also when unlinked:
   // an opt-out must reach it either way.
   if (event.name === CONSENT_CHANGED_EVENT) {
     const buyerKey = (event.data as { buyerKey?: string }).buyerKey;
@@ -466,7 +466,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
 export const waStoreEvents: JobDef = inngest.createFunction(
   {
     id: 'wa-store-events',
-    name: 'Store -> Ebda WhatsApp events',
+    name: 'Store -> Ebda Chat events',
     retries: 4,
     triggers: [
       { event: 'order/created' },
@@ -494,7 +494,7 @@ export const waStoreEvents: JobDef = inngest.createFunction(
 export const waPlanSync: JobDef = inngest.createFunction(
   {
     id: 'wa-plan-sync',
-    name: 'Ebda WhatsApp: plan state reconcile (12-hourly)',
+    name: 'Ebda Chat: plan state reconcile (12-hourly)',
     retries: 2,
     concurrency: { limit: 1 },
     triggers: [{ cron: '41 */12 * * *' }],

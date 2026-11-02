@@ -275,7 +275,7 @@ type AccountErasedEvent = EventPayload & {
      *  always empty for customer erasures — see the caveat in
      *  privacy-propagation.service.ts. */
     oneSignalPlayerIds: string[];
-    /** The erased customer's store and hashed phone, for Ebda WhatsApp's `customer.erased`. */
+    /** The erased customer's store and hashed phone, for Ebda Chat's `customer.erased`. */
     storeId?: string;
     buyerKey?: string;
     /** Buyer keys of a phone the account PROVED it holds, and the store that proof was made in: erased in THAT store only. */

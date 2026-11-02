@@ -1,4 +1,4 @@
-// Imports the Ebda WhatsApp help guides (docs/help/{ar,en}/NN-slug.md in the ebda-whatsapp repo) read-only:
+// Imports the Ebda Chat help guides (docs/help/{ar,en}/NN-slug.md in the ebda-whatsapp repo) read-only:
 //   node apps/help/scripts/import-wa-help.mjs <path-to>/docs/help
 // 1) vendors each source file verbatim into apps/help/wa-source/{ar,en}/ (sha256-pinned by
 //    tests/unit/support-wa-help-drift.test.ts; prettier-ignored so the bytes stay identical);
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const src = process.argv[2];
 if (!src) throw new Error('usage: import-wa-help.mjs <docs/help dir>');
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SECTION = { ar: 'ابدأ واتساب', en: 'Ebda WhatsApp' };
+const SECTION = { ar: 'ابدأ شات', en: 'Ebda Chat' };
 const q = s => `'${s.replace(/'/g, "''")}'`;
 const desc = s => (s.length <= 162 ? s : s.slice(0, 161).trimEnd() + '…');
 const clean = s => s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');

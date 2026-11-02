@@ -1,6 +1,6 @@
 /**
- * The Ebda WhatsApp link is server-owned and entitlement-gated: linked by the server writer AND
- * (the effective plan includes WhatsApp OR Ebda WhatsApp reported an active package), otherwise NOT
+ * The Ebda Chat link is server-owned and entitlement-gated: linked by the server writer AND
+ * (the effective plan includes WhatsApp OR Ebda Chat reported an active package), otherwise NOT
  * linked (fail closed). Nothing a merchant can write (settings JSON) is consulted.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';

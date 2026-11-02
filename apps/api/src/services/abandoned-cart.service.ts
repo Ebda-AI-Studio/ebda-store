@@ -341,7 +341,7 @@ class AbandonedCartService {
               },
             });
 
-            // Ebda WhatsApp (contract section 4 `cart.abandoned`): the rule just fired for this cart.
+            // Ebda Chat (contract section 4 `cart.abandoned`): the rule just fired for this cart.
             // The job drops it unless the store linked WhatsApp; the envelope id is seeded by the cart.
             if (customerPhone) {
               await sendEventAfterCommit(

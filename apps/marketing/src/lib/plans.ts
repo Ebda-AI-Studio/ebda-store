@@ -164,7 +164,7 @@ export function comparisonRows(locale: Locale): { label: string; cells: Cell[] }
       ar ? 'رجّع العملاء اللي سابوا السلة' : 'Win back shoppers who left their cart',
       p => p.limits.abandonedCartAutomation
     ),
-    // WA-PKG-1: the Ebda WhatsApp Store package comes with the plan whose limits say so (Business, in the catalogue).
+    // WA-PKG-1: the Ebda Chat Store package comes with the plan whose limits say so (Business, in the catalogue).
     row(
       ar
         ? `حزمة المتجر من ${BRAND.productWhatsapp.nameAr}`

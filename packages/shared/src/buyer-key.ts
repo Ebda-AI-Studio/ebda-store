@@ -1,5 +1,5 @@
 /**
- * The suite-wide buyer key (Ebda Store <-> Ebda WhatsApp contract, section 6; CI-1): a lowercase-hex
+ * The suite-wide buyer key (Ebda Store <-> Ebda Chat contract, section 6; CI-1): a lowercase-hex
  * HMAC-SHA256 of the buyer's E.164 phone, keyed with SUITE_BUYER_KEY_SECRET (the same secret in
  * every suite Worker). The raw phone never enters analytics or CI; only this key does.
  *

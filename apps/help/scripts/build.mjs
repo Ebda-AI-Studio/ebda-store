@@ -94,7 +94,7 @@ writeSiteCss(out);
 const PRODUCT_FOLDERS = [
   {
     id: 'whatsapp',
-    name: { ar: 'ابدأ واتساب', en: 'Ebda WhatsApp' },
+    name: { ar: 'ابدأ شات', en: 'Ebda Chat' },
   },
 ];
 const PRODUCT_NAME = {

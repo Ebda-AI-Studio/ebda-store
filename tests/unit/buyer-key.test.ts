@@ -1,5 +1,5 @@
 /**
- * Suite buyer key (contract section 6). The pinned vector is identical in the Ebda WhatsApp repo:
+ * Suite buyer key (contract section 6). The pinned vector is identical in the Ebda Chat repo:
  * if either side's normaliser or hash drifts, this fails first.
  */
 import { describe, it, expect } from 'vitest';

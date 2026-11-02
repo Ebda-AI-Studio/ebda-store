@@ -4,7 +4,7 @@ import path from 'node:path';
 
 /**
  * Ruling BRAND-NAME-1 (Ahmad, 2026-10-23): never write "Ebda" (or the Arabic brand ابدأ/إبدأ) ALONE. Always the full
- * name: Ebda Store, Ebda WhatsApp, Ebda CRM, Ebda ERP, or Ebda AI Studio (the company). The Arabic VERB ابدأ ("start",
+ * name: Ebda Store, Ebda Chat, Ebda CRM, Ebda ERP, or Ebda AI Studio (the company). The Arabic VERB ابدأ ("start",
  * as in «ابدأ متجرك») is NOT the brand and stays.
  *
  * Scans UI strings, emails, help/docs content, alt text, OG/JSON-LD sources and the storefront badge under apps/ and

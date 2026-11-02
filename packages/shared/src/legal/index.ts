@@ -70,29 +70,29 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
   legal: doc(
     firstVersion(),
     v11(false, {
-      ar: 'بريد مستقل لطلبات الخصوصية وحماية البيانات، وروابط إلى صفحة حذف البيانات ووثائق ابدأ واتساب.',
-      en: 'A separate address for privacy and data-protection requests, and links to the data deletion page and the Ebda WhatsApp documents.',
+      ar: 'بريد مستقل لطلبات الخصوصية وحماية البيانات، وروابط إلى صفحة حذف البيانات ووثائق ابدأ شات.',
+      en: 'A separate address for privacy and data-protection requests, and links to the data deletion page and the Ebda Chat documents.',
     })
   ),
   privacy: doc(
     firstVersion(),
     v11(true, {
-      ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ واتساب، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
-      en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda WhatsApp is used, 72-hour breach notice, and a link to the data deletion page.',
+      ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ شات، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
+      en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda Chat is used, 72-hour breach notice, and a link to the data deletion page.',
     })
   ),
   terms: doc(
     firstVersion(),
     v11(true, {
-      ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ واتساب.',
-      en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda WhatsApp terms.',
+      ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ شات.',
+      en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda Chat terms.',
     })
   ),
   acceptableUse: doc(
     firstVersion(),
     v11(true, {
-      ar: 'منتجات ممنوعة عبر ابدأ واتساب وفق سياسة التجارة في واتساب من Meta.',
-      en: "Products that may not be sold through Ebda WhatsApp, following Meta's WhatsApp Commerce Policy.",
+      ar: 'منتجات ممنوعة عبر ابدأ شات وفق سياسة التجارة في واتساب من Meta.',
+      en: "Products that may not be sold through Ebda Chat, following Meta's WhatsApp Commerce Policy.",
     })
   ),
   merchant: doc(

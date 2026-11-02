@@ -1,5 +1,5 @@
 /**
- * Configuration of the Store <-> Ebda WhatsApp link (contract 2026-10-24, sections 3 and 6).
+ * Configuration of the Store <-> Ebda Chat link (contract 2026-10-24, sections 3 and 6).
  * Secrets come from the environment only (a Worker secret), never from code or wrangler vars.
  */
 import type { CfBindings } from '../../cf/bindings';

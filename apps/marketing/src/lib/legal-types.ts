@@ -2,7 +2,7 @@ export interface LegalDoc {
   title: string;
   /**
    * Own version and publish date, for documents that are not Ebda Store acceptance documents (the data deletion
-   * page and the Ebda WhatsApp documents). Store documents take theirs from LEGAL_POLICIES.
+   * page and the Ebda Chat documents). Store documents take theirs from LEGAL_POLICIES.
    */
   meta?: { version: string; publishedAt: string };
   /** A visible note under the title (a document with clauses still under legal review says so). */

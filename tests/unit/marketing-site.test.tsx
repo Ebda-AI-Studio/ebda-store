@@ -71,10 +71,10 @@ describe('marketing nav', () => {
     expect(pos.every(p => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   });
-  it('header: the master brand lockup plus a Products menu naming only the live products, Ebda Store and Ebda WhatsApp (BRAND-ARCH-1)', () => {
+  it('header: the master brand lockup plus a Products menu naming only the live products, Ebda Store and Ebda Chat (BRAND-ARCH-1)', () => {
     for (const [html, studio, store, wa, soon] of [
-      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ واتساب', /قريب/],
-      [en, 'Ebda AI Studio', 'Ebda Store', 'Ebda WhatsApp', /coming soon/i],
+      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ شات', /قريب/],
+      [en, 'Ebda AI Studio', 'Ebda Store', 'Ebda Chat', /coming soon/i],
     ] as const) {
       const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
       expect(wm).toContain(`>${studio}</span>`);

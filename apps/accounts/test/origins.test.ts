@@ -1,4 +1,4 @@
-/** Ebda WhatsApp (https://wa.ebda.app) is an allow-listed origin, matched EXACTLY (no wildcard, no look-alike, https only). */
+/** Ebda Chat (https://wa.ebda.app) is an allow-listed origin, matched EXACTLY (no wildcard, no look-alike, https only). */
 import { describe, it, expect } from 'vitest';
 import { call, login, seedUser } from './helpers';
 

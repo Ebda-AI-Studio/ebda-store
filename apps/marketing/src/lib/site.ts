@@ -37,7 +37,7 @@ export const LEGAL_SLUGS = [
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
 /**
  * Legal pages that are not Ebda Store acceptance documents (they have no row in LEGAL_POLICIES): the data
- * deletion page and the three Ebda WhatsApp documents. They are legal pages for every other purpose (sitemap
+ * deletion page and the three Ebda Chat documents. They are legal pages for every other purpose (sitemap
  * date, layout, tests); their own version and date live in legal-extra-*.ts.
  */
 export const LEGAL_EXTRA_SLUGS = [
@@ -121,6 +121,17 @@ export const SECTION_ORDER = [
   'start',
 ] as const;
 export type SectionId = (typeof SECTION_ORDER)[number];
+
+/** Which product a page belongs to (MKT-WA-CHROME-1): the Ebda Chat page and its legal documents get Chat's own chrome. */
+export const productOfPage = (page: string): 'store' | 'whatsapp' =>
+  page === 'whatsapp' || page.startsWith('legal/whatsapp-') ? 'whatsapp' : 'store';
+
+/** Ebda Chat nav items: sections of its own page (MKT-WA-CHROME-1), labelled with the shared nav copy. */
+export const WA_NAV_ANCHORS = [
+  { key: 'features', target: 'features' },
+  { key: 'pricing', target: 'pricing' },
+  { key: 'resources', target: 'faq' },
+] as const;
 
 /** Top-nav items other than the wordmark and the account actions, in page order. */
 export const NAV_ANCHORS = [

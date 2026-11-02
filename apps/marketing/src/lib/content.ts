@@ -141,7 +141,7 @@ export interface Copy {
     /** The Products menu (BRAND-ARCH-1): one entry per LIVE product; the others are added when they ship. */
     products: string;
     storeBlurb: string;
-    /** The Ebda WhatsApp entry of the same menu (LAUNCH-SUITE-1). */
+    /** The Ebda Chat entry of the same menu (LAUNCH-SUITE-1). */
     whatsappBlurb: string;
     contact: string;
     /** The header's "More" menu (FAQ, About, Contact): keeps the top row to one line. */
@@ -269,6 +269,9 @@ export interface Copy {
   };
   footer: {
     product: string;
+    /** The Ebda Chat pages' credit and ownership lines (MKT-WA-CHROME-1: a product page never credits another product). */
+    waProduct: string;
+    waOwnership: string;
     legalNav: string;
     legal: string;
     privacy: string;
@@ -694,6 +697,8 @@ export const COPY: Record<Locale, Copy> = {
     },
     footer: {
       product: `ابدأ ستور — منتج من ${CO.shortNameAr}`,
+      waProduct: `ابدأ شات — منتج من ${CO.shortNameAr}`,
+      waOwnership: `ابدأ شات منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
       legalNav: 'روابط قانونية',
       legal: 'الإشعار القانوني',
       privacy: 'الخصوصية',
@@ -1124,6 +1129,8 @@ export const COPY: Record<Locale, Copy> = {
     },
     footer: {
       product: `Ebda Store — a product of ${CO.shortNameEn}`,
+      waProduct: `Ebda Chat — a product of ${CO.shortNameEn}`,
+      waOwnership: `Ebda Chat is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
       legalNav: 'Legal links',
       legal: 'Legal notice',
       privacy: 'Privacy',

@@ -560,7 +560,7 @@ router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 // Self-serve lifecycle emails: the merchant's log (admin) and the login-free unsubscribe link (store from the signed token).
 router.use('/stores/:storeId/lifecycle-emails', tenantContext, lifecycleEmailsRoutes);
-// Ebda WhatsApp connect / disconnect (the only request path that writes the server-owned link).
+// Ebda Chat connect / disconnect (the only request path that writes the server-owned link).
 router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 

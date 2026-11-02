@@ -133,15 +133,9 @@ describe('every page exports metadata with a canonical', () => {
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
       expect(meta, `${rel} must export metadata`).toBeTruthy();
       // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher. The /whatsapp page is
-      // the second product (Ebda WhatsApp): its own name, brand line and OG image, never the Store's.
+      // the second product (Ebda Chat): its own name, brand line and OG image, never the Store's.
       const wa = page === 'whatsapp';
-      const product = wa
-        ? isEn
-          ? 'Ebda WhatsApp'
-          : 'ابدأ واتساب'
-        : isEn
-          ? 'Ebda Store'
-          : 'ابدأ ستور';
+      const product = wa ? (isEn ? 'Ebda Chat' : 'ابدأ شات') : isEn ? 'Ebda Store' : 'ابدأ ستور';
       expect(meta.title).toContain(product);
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
@@ -149,7 +143,7 @@ describe('every page exports metadata with a canonical', () => {
       // description; inner titles end in the short tail and stay SERP-length
       expect(meta.openGraph.description).toContain(
         wa
-          ? 'Ebda WhatsApp — ابدأ واتساب, by Ebda AI Studio (ebda.app)'
+          ? 'Ebda Chat — ابدأ شات, by Ebda AI Studio (ebda.app)'
           : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
       );
       if (page) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
