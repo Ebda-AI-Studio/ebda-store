@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { newCspNonce } from '@ebda/shared';
-import { adminApiOrigin, buildAdminCsp } from './lib/csp';
+import { accountsOrigin, adminApiOrigin, buildAdminCsp } from './lib/csp';
 
 /**
  * Admin middleware: the per-request Content-Security-Policy nonce (SEC-4 / M-067).
@@ -22,6 +22,7 @@ export function middleware(request: NextRequest) {
     nonce,
     pathname: request.nextUrl.pathname,
     apiOrigin: adminApiOrigin(process.env.NEXT_PUBLIC_API_URL),
+    accountsOrigin: accountsOrigin(process.env.NEXT_PUBLIC_ACCOUNTS_URL),
     defaultFrameSrc: process.env.ADMIN_DEFAULT_FRAME_SRC,
   });
 

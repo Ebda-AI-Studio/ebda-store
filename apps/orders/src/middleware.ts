@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { newCspNonce } from '@ebda/shared';
-import { buildOrdersCsp } from './lib/csp';
+import { accountsOrigin, buildOrdersCsp } from './lib/csp';
 
 /**
  * Orders PWA middleware: the per-request Content-Security-Policy nonce (SEC-4 / M-067). Mints a
@@ -11,7 +11,7 @@ import { buildOrdersCsp } from './lib/csp';
  */
 export function middleware(request: NextRequest) {
   const nonce = newCspNonce();
-  const csp = buildOrdersCsp(nonce);
+  const csp = buildOrdersCsp(nonce, accountsOrigin(process.env.NEXT_PUBLIC_ACCOUNTS_URL));
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);

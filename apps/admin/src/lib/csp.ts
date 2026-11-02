@@ -35,6 +35,8 @@ export interface AdminCspInput {
   pathname: string;
   /** Origin of the API, e.g. https://api.ebda.app (NEXT_PUBLIC_API_URL). */
   apiOrigin: string;
+  /** Origin of the identity service (NEXT_PUBLIC_ACCOUNTS_URL); defaults to https://accounts.ebda.app. */
+  accountsOrigin?: string;
   /** frame-src for every route except the builder preview. */
   defaultFrameSrc?: string;
 }
@@ -43,6 +45,7 @@ export function buildAdminCsp({
   nonce,
   pathname,
   apiOrigin,
+  accountsOrigin: accounts = 'https://accounts.ebda.app',
   defaultFrameSrc = 'https://ebda.app https://*.ebda.app',
 }: AdminCspInput): string {
   const api = `${apiOrigin} ${apiOrigin.replace(/^http/, 'ws')}`;
@@ -59,7 +62,7 @@ export function buildAdminCsp({
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
-    `connect-src 'self' ${api} https://media.ebda.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
+    `connect-src 'self' ${api} ${accounts} https://media.ebda.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
     `frame-src https://onesignal.com https://*.onesignal.com ${framesForRoute}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
@@ -73,6 +76,20 @@ export function adminApiOrigin(raw: string | undefined): string {
   const loopback = u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname);
   if (u.protocol !== 'https:' && !loopback) {
     throw new Error('NEXT_PUBLIC_API_URL must use HTTPS or a loopback development origin');
+  }
+  return u.origin;
+}
+
+/**
+ * The identity service (accounts.ebda.app, Rulings ID-1/ID-2) the browser signs in against: `src/lib/accounts.ts`
+ * fetches it with credentials, so connect-src MUST name its origin (Ruling CSP-ACCOUNTS-1; without it sign-in fails
+ * with "Failed to fetch"). Exactly one origin, from the same env var the client reads; https or loopback only.
+ */
+export function accountsOrigin(raw: string | undefined): string {
+  const u = new URL(raw || 'https://accounts.ebda.app');
+  const loopback = u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname);
+  if (u.protocol !== 'https:' && !loopback) {
+    throw new Error('NEXT_PUBLIC_ACCOUNTS_URL must use HTTPS or a loopback development origin');
   }
   return u.origin;
 }
