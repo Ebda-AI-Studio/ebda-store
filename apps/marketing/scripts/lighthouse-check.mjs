@@ -5,6 +5,6 @@ import { runLighthouse } from '@ebda/site-kit/gates/lighthouse';
 
 await runLighthouse({
   root: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'out'),
-  pages: ['/', '/en/'],
+  pages: ['/', '/en/', '/store/', '/en/store/'],
   name: 'marketing',
 });

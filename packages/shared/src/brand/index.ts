@@ -413,7 +413,7 @@ export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
   return [
     {
       id: 'store',
-      href: marketing(lang),
+      href: `${marketing(lang)}store/`,
       label: lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
       blurb: L(lang, 'متجرك أونلاين في دقايق', 'Your online store in minutes'),
     },

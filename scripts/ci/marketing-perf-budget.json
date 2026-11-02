@@ -24,10 +24,10 @@
       "htmlGzipKb": 26
     },
     "/terms": {
-      "htmlGzipKb": 21.5
+      "htmlGzipKb": 22
     },
     "/merchant-agreement": {
-      "htmlGzipKb": 21.2
+      "htmlGzipKb": 21.5
     },
     "/en": {
       "jsGzipKb": 207.5,
@@ -45,11 +45,15 @@
     "/en/legal/whatsapp-terms": {
       "htmlGzipKb": 26
     },
-    "/terms": {
-      "htmlGzipKb": 22
+    "/store": {
+      "jsGzipKb": 207.5,
+      "htmlGzipKb": 52.5,
+      "maxScripts": 13
     },
-    "/merchant-agreement": {
-      "htmlGzipKb": 21.5
+    "/en/store": {
+      "jsGzipKb": 207.5,
+      "htmlGzipKb": 51.5,
+      "maxScripts": 13
     }
   },
   "lcpMs": 2500,

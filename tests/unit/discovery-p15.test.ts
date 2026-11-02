@@ -108,14 +108,14 @@ describe('marketing redirects (audit M-164)', () => {
     .map(l => l.trim().split(/\s+/));
   const from = new Set(rules.map(r => r[0]));
   it.each([
-    ['/pricing', '/#pricing'],
-    ['/pricing/', '/#pricing'],
-    ['/en/pricing', '/en/#pricing'],
-    ['/en/pricing/', '/en/#pricing'],
-    ['/compare', '/#pricing'],
-    ['/compare/', '/#pricing'],
-    ['/en/compare', '/en/#pricing'],
-    ['/en/compare/', '/en/#pricing'],
+    ['/pricing', '/store#pricing'],
+    ['/pricing/', '/store#pricing'],
+    ['/en/pricing', '/en/store#pricing'],
+    ['/en/pricing/', '/en/store#pricing'],
+    ['/compare', '/store#pricing'],
+    ['/compare/', '/store#pricing'],
+    ['/en/compare', '/en/store#pricing'],
+    ['/en/compare/', '/en/store#pricing'],
   ])('%s -> %s in one permanent hop', (src, dest) => {
     expect(rules.find(r => r[0] === src)).toEqual([src, dest, '301']);
     // one hop: the destination (without its fragment) is never itself a redirect source
