@@ -110,6 +110,8 @@ describe('host-lock.sh', () => {
       );
     expect(gate).toContain('check-action-pins');
     expect(gate).toContain('gitleaks detect');
+    expect(gate).toContain('vitest related');
+    expect(gate).not.toContain('npm run test:unit');
     // not re-entrant: a nested lock on the same file would wait on its own parent forever
     expect(gate).not.toMatch(/^\s*(bash\s+)?scripts\/ci\/host-lock\.sh/m);
   });
