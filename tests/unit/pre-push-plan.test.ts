@@ -3,7 +3,6 @@
  * planner cannot narrow (lockfile, config, shared core) runs the full gate; docs-only runs only the cheap checks.
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import path, { join } from 'node:path';
 // @ts-expect-error plain .mjs without types
 import { plan } from '../../scripts/ci/pre-push-plan.mjs';
@@ -51,15 +50,6 @@ describe('pre-push plan', () => {
     expect(r.mode).toBe('docs');
     expect(r.related).toEqual([]);
     expect(r.lint).toEqual([]);
-  });
-
-  it('the gate script is wired to the plan, falls back to the full gate, and never takes the host lock itself', () => {
-    const g = readFileSync(join(__dirname, '../../scripts/ci/pre-push-gate.sh'), 'utf8');
-    expect(g).toContain('pre-push-plan.mjs');
-    expect(g).toContain('vitest related');
-    expect(g).toContain('gitleaks detect');
-    expect(g).toContain('npm run test:unit');
-    expect(g).not.toMatch(/^[^#\n]*host-lock\.sh/m);
   });
 });
 
@@ -110,13 +100,6 @@ describe('pre-push plan: unit tier only (PREPUSH-2)', () => {
       }
     }
   );
-
-  it('the gate passes every exclude glob to vitest related', () => {
-    const g = readFileSync(join(__dirname, '../../scripts/ci/pre-push-gate.sh'), 'utf8');
-    expect(g).toMatch(/--exclude "\$g"/);
-    expect(g).toContain('field exclude');
-    expect(g).toMatch(/vitest related[^\n]*"\$\{EXCLUDE_ARGS\[@\]\}"/);
-  });
 
   it('behaviour: vitest related over a shared file runs the unit test and NOT the integration test', () => {
     const dir = mkdtempSync(join(tmpdir(), 'prepush2-'));

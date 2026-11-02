@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Pre-push CI gate (active while GitHub Actions billing is suspended).
-# Runs lint + typecheck + unit tests locally; blocks the push on failure.
+# Pre-push gate, MAC-LIGHT-1: light. Runs only the fast checks (action pins, gitleaks on the push range, prettier on
+# changed files) via scripts/ci/pre-push-gate.sh; lint/typecheck/tests run in GitHub CI.
 # Also runs the existing DB backup on main (non-blocking, preserved).
 
 set -e
@@ -27,7 +27,7 @@ if [ "$current_branch" = "main" ]; then
   fi
 fi
 
-echo "-> Ebda pre-push CI gate: cheap checks + affected lint/typecheck/related tests, full gate when the planner cannot narrow (one at a time, host-wide)"
+echo "-> Ebda pre-push light gate (MAC-LIGHT-1): secret scan + format only; CI runs lint/typecheck/tests"
 
 # Worktrees created by new-task-worktree.sh have no node_modules of their own, so
 # every command below exits 127 ("command not found") and husky aborts the push
