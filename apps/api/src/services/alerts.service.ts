@@ -3,6 +3,7 @@ import { BRAND } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { redis } from './redis.service';
+import { timedFetch } from '../lib/fetch-with-timeout';
 
 /**
  * Out-of-band alerting channel (iceberg item #12 / CLAUDE.md rule #6).
@@ -295,7 +296,7 @@ async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
     try {
-      const res = await fetch(url, {
+      const res = await timedFetch('alerts.webhook')(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

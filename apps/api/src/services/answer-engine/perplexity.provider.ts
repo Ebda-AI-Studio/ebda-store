@@ -29,6 +29,7 @@
  */
 import logger from '../../lib/logger';
 import type { AnswerEngineProvider, EngineAnswer } from './provider';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 const ENDPOINT = 'https://api.perplexity.ai/chat/completions';
 const MODEL = process.env.ANSWER_ENGINE_PERPLEXITY_MODEL || 'sonar';
@@ -44,7 +45,7 @@ export class PerplexityAnswerEngineProvider implements AnswerEngineProvider {
   async query(_storeId: string, prompt: string): Promise<EngineAnswer> {
     let res: Response;
     try {
-      res = await fetch(ENDPOINT, {
+      res = await timedFetch('perplexity.answer', 'ai')(ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -9,6 +9,7 @@
 // Output shape measured 2026-10-16 on the Whisky account through the binding:
 // `{ shape: [2, 1024], data: [[...1024], [...1024]], pooling: 'cls' }` for two texts.
 import { cfBindings } from '../../cf/bindings';
+import { timedFetch } from '../fetch-with-timeout';
 
 export const EMBED_MODEL = '@cf/baai/bge-m3';
 /** Must equal the `halfvec(N)` of `product_embeddings.embedding` (asserted by a unit test). */
@@ -178,7 +179,7 @@ const restProvider = (): EmbeddingProvider | null => {
   const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(creds.acct)}/ai/run/${EMBED_MODEL}`;
   return batched(
     async (texts, signal) => {
-      const res = await fetch(url, {
+      const res = await timedFetch('embedding', 'ai')(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${creds.token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: texts }),

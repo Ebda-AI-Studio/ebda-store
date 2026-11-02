@@ -68,6 +68,7 @@ import {
   type WebhookEventV2,
   type WebhookHeaders,
 } from './types';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 export const FAWRY_BASE_URLS: BaseUrls = {
   // Staging host from Fawry's developer portal; live host from Fawry's integration pages.
@@ -275,7 +276,8 @@ function parsePaymentTime(v: unknown): Date | undefined {
 }
 
 export function createFawryProvider(options: GatewayAdapterOptions = {}): PaymentProviderV2 {
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
+  const fetchImpl: FetchLike =
+    options.fetchImpl ?? ((url, init) => timedFetch('fawry', 'payment')(url, init));
   const created = new IdempotencyCache<CreatePaymentV2Result>();
   const refunds = new IdempotencyCache<RefundV2Result>();
 

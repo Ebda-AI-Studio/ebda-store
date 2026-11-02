@@ -5,6 +5,7 @@
 
 import logger from '../lib/logger';
 import { maskPhone } from '../lib/pii-mask';
+import { timedFetch } from '../lib/fetch-with-timeout';
 
 const UNIFONIC_BASE = 'https://el.cloud.unifonic.com/rest';
 const UNIFONIC_API = `${UNIFONIC_BASE}/SMS/messages`;
@@ -58,7 +59,7 @@ class SmsService {
 
     let response: Response;
     try {
-      response = await fetch(UNIFONIC_ACCOUNT_INFO_API, {
+      response = await timedFetch('sms.account')(UNIFONIC_ACCOUNT_INFO_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString(),
@@ -121,7 +122,7 @@ class SmsService {
       Body: message,
     });
 
-    const response = await fetch(UNIFONIC_API, {
+    const response = await timedFetch('sms.send')(UNIFONIC_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

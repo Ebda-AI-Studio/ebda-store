@@ -79,6 +79,7 @@ import {
   kashierTransactionDetailsPath,
   type KashierConfirmedTxn,
 } from './kashier-confirm';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 export const KASHIER_SIGNATURE_HEADER = 'x-kashier-signature';
 
@@ -227,7 +228,8 @@ const present = (v: unknown): v is string | number =>
   typeof v === 'string' || typeof v === 'number';
 
 export function createKashierProvider(options: GatewayAdapterOptions = {}): PaymentProviderV2 {
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
+  const fetchImpl: FetchLike =
+    options.fetchImpl ?? ((url, init) => timedFetch('kashier', 'payment')(url, init));
   const created = new IdempotencyCache<CreatePaymentV2Result>();
   const refunds = new IdempotencyCache<RefundV2Result>();
 

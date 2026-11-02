@@ -23,6 +23,7 @@
  * rejected at subscribe time as well.
  */
 import { DurableObject } from 'cloudflare:workers';
+import { timedFetch } from '../lib/fetch-with-timeout';
 
 const PING_INTERVAL_MS = 25_000;
 const PING_TIMEOUT_MS = 60_000;
@@ -147,7 +148,7 @@ export class StoreRealtime extends DurableObject<RealtimeEnv> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (att.token) headers.authorization = `Bearer ${att.token}`;
     else if (att.cookie) headers.cookie = att.cookie;
-    return fetch(`${base}/api/v1/realtime${path}`, { headers });
+    return timedFetch('realtime.api')(`${base}/api/v1/realtime${path}`, { headers });
   }
 
   private async onConnect(ws: WebSocket, att: Attachment, raw: string): Promise<void> {

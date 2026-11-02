@@ -37,6 +37,7 @@
 
 import logger from '../lib/logger';
 import { config } from '../config';
+import { timedFetch } from '../lib/fetch-with-timeout';
 
 const ONESIGNAL_PLAYERS_ENDPOINT = 'https://onesignal.com/api/v1/players';
 
@@ -132,7 +133,7 @@ export async function deleteOneSignalPlayers(playerIds: string[]): Promise<void>
 
   const results = await Promise.allSettled(
     playerIds.map(async playerId => {
-      const res = await fetch(
+      const res = await timedFetch('privacy.posthog')(
         `${ONESIGNAL_PLAYERS_ENDPOINT}/${encodeURIComponent(playerId)}?app_id=${encodeURIComponent(appId)}`,
         {
           method: 'DELETE',
@@ -254,7 +255,7 @@ export async function deletePostHogPerson(userId: string): Promise<void> {
   // resolves once a future `posthog.identify(userId)` call links the two
   // (see caveat above). An unmatched distinct_id returns zero results,
   // which is treated as "nothing to delete", not an error.
-  const searchRes = await fetch(
+  const searchRes = await timedFetch('privacy.search')(
     `${posthogHost}/api/projects/${encodeURIComponent(projectId)}/persons/?distinct_id=${encodeURIComponent(userId)}`,
     { headers: authHeader }
   );
@@ -274,7 +275,7 @@ export async function deletePostHogPerson(userId: string): Promise<void> {
   // ?delete_events=true so the person's captured behavioural events are purged
   // too — deleting only the person shell leaves the events, which re-materialize
   // the person on the next ingested event (incomplete GDPR Art.17 erasure).
-  const deleteRes = await fetch(
+  const deleteRes = await timedFetch('privacy.delete')(
     `${posthogHost}/api/projects/${encodeURIComponent(projectId)}/persons/${encodeURIComponent(person.id)}/?delete_events=true`,
     { method: 'DELETE', headers: authHeader }
   );

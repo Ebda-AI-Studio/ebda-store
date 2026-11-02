@@ -4,6 +4,8 @@
  * ingest host, the project id (the DSN path, not a secret), the status and a short response head.
  * The key and the full DSN are never returned or logged.
  */
+import { timedFetch } from '../fetch-with-timeout';
+
 export interface SentryProbeResult {
   host: string;
   project: string;
@@ -41,7 +43,7 @@ export interface DirectSentryEvent {
 
 export async function probeSentry(
   dsn: string | undefined,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = timedFetch('sentry.probe'),
   real?: DirectSentryEvent
 ): Promise<SentryProbeResult | { error: string }> {
   const p = dsn ? parseDsn(dsn) : null;

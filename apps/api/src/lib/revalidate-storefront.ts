@@ -1,6 +1,7 @@
 import { storeHost } from '@ebda/shared';
 import logger from './logger';
 import { cfBindings } from '../cf/bindings';
+import { timedFetch } from './fetch-with-timeout';
 
 /**
  * Fire-and-forget storefront cache purge. After a store mutation (theme,
@@ -88,7 +89,9 @@ export async function revalidateStorefrontNow(opts: RevalidateOptions): Promise<
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 4000);
 
-  const send = binding ? binding.fetch.bind(binding) : fetch;
+  const send = binding
+    ? binding.fetch.bind(binding)
+    : timedFetch('storefront.revalidate', 'default', 4000);
   return send(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

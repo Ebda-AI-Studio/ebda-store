@@ -47,6 +47,7 @@ import {
   type RefundV2Result,
   type WebhookEventV2,
 } from './types';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 /** Egypt host. Geidea documents no separate sandbox host: test keys on the same host (UNVERIFIED). */
 export const GEIDEA_BASE_URLS: BaseUrls = {
@@ -99,7 +100,8 @@ interface GeideaSessionResponse {
 const HPP_ENV = 'GEIDEA_HPP_BASE_URL';
 
 export function createGeideaProvider(options: GatewayAdapterOptions = {}): PaymentProviderV2 {
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
+  const fetchImpl: FetchLike =
+    options.fetchImpl ?? ((url, init) => timedFetch('geidea', 'payment')(url, init));
   const created = new IdempotencyCache<CreatePaymentV2Result>();
   const scope = (c: ProviderCredentials) => credentialScope([c.merchantId, c.apiKey, c.mode]);
   const base = (c: ProviderCredentials) =>

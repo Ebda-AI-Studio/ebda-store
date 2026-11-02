@@ -25,6 +25,7 @@ import {
   type EbdaAttribution,
 } from '@ebda/shared';
 import logger from '../lib/logger';
+import { timedFetch } from '../lib/fetch-with-timeout';
 
 // ─── Stored shape ────────────────────────────────────────────────────────────
 
@@ -264,7 +265,7 @@ export async function sendEbdaCapiEvent(
   });
   if (cfg.testEventCode) form.set('test_event_code', cfg.testEventCode);
 
-  const res = await (deps.fetchImpl ?? fetch)(
+  const res = await (deps.fetchImpl ?? timedFetch('meta.capi'))(
     `https://graph.facebook.com/${META_API_VERSION}/${cfg.pixelId}/events`,
     {
       method: 'POST',
@@ -299,7 +300,7 @@ export async function capturePostHogServer(
   const key = env.EBDA_POSTHOG_KEY?.trim() || env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
   if (!key) return false;
   const host = env.NEXT_PUBLIC_POSTHOG_HOST?.trim() || 'https://eu.i.posthog.com';
-  const res = await (deps.fetchImpl ?? fetch)(`${host}/capture/`, {
+  const res = await (deps.fetchImpl ?? timedFetch('posthog.capture'))(`${host}/capture/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

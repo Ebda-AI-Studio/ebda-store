@@ -15,6 +15,7 @@
 import crypto from 'node:crypto';
 import { safeFetch } from './safe-fetch';
 import { CarrierError } from '../services/carriers/types';
+import { timedFetch } from './fetch-with-timeout';
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -73,7 +74,7 @@ export async function carrierRequest<T = Record<string, unknown>>(
   opts: CarrierHttpOptions & { acceptStatus?: number[] } = {}
 ): Promise<CarrierResponse<T>> {
   const fetchImpl: FetchLike =
-    opts.fetchImpl ?? (base.stubbed ? (u, i) => globalThis.fetch(u, i) : safeFetch);
+    opts.fetchImpl ?? (base.stubbed ? timedFetch('carrier.stub') : safeFetch);
   const ms = opts.timeoutMs ?? timeoutMs();
   const ctrl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -180,7 +181,7 @@ export async function carrierRequestBinary(
   opts: CarrierHttpOptions & { acceptStatus?: number[] } = {}
 ): Promise<{ status: number; bytes: Buffer }> {
   const fetchImpl: FetchLike =
-    opts.fetchImpl ?? (base.stubbed ? (u, i) => globalThis.fetch(u, i) : safeFetch);
+    opts.fetchImpl ?? (base.stubbed ? timedFetch('carrier.stub') : safeFetch);
   const ms = opts.timeoutMs ?? timeoutMs();
   const ctrl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -239,7 +240,7 @@ export async function carrierRequestText(
   opts: CarrierHttpOptions & { acceptStatus?: number[] } = {}
 ): Promise<{ status: number; text: string }> {
   const fetchImpl: FetchLike =
-    opts.fetchImpl ?? (base.stubbed ? (u, i) => globalThis.fetch(u, i) : safeFetch);
+    opts.fetchImpl ?? (base.stubbed ? timedFetch('carrier.stub') : safeFetch);
   const ms = opts.timeoutMs ?? timeoutMs();
   const ctrl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;

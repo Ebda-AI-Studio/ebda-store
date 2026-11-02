@@ -66,6 +66,7 @@ import {
   type WebhookEventV2,
   type WebhookHeaders,
 } from './types';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 /** The header the webhook route copies Paymob's `?hmac=` query parameter into. */
 export const PAYMOB_HMAC_HEADER = 'x-paymob-hmac';
@@ -242,7 +243,8 @@ const isTrue = (v: unknown): boolean => v === true || v === 'true';
 const KIOSK_SOURCE = /kiosk|aggregator/i;
 
 export function createPaymobProvider(options: PaymobAdapterOptions = {}): PaymobProvider {
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
+  const fetchImpl: FetchLike =
+    options.fetchImpl ?? ((url, init) => timedFetch('paymob', 'payment')(url, init));
   const created = new IdempotencyCache<CreatePaymentV2Result>();
   const refunds = new IdempotencyCache<RefundV2Result>();
 

@@ -23,6 +23,7 @@ import {
   type WebhookEventType,
 } from '@ebda/shared';
 import { assertPublicHttpUrl } from './safe-fetch';
+import { timedFetch } from './fetch-with-timeout';
 
 const hmacHex = (secret: string, t: number, body: string) =>
   createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
@@ -117,7 +118,7 @@ export async function postWebhook(args: {
       error: `blocked: ${msg.replace(/^(WEBHOOK_URL|SSRF)_BLOCKED:\s*/, '').slice(0, 80)}`,
     });
   }
-  const doFetch = args.fetchImpl ?? fetch;
+  const doFetch = args.fetchImpl ?? timedFetch('webhook.deliver');
   try {
     const res = await doFetch(args.url, {
       method: 'POST',

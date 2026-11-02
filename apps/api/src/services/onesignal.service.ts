@@ -19,6 +19,7 @@ import { config } from '../config';
 import logger from '../lib/logger';
 
 import { minorToDecimalString } from '@ebda/shared';
+import { timedFetch } from '../lib/fetch-with-timeout';
 const ENDPOINT = 'https://onesignal.com/api/v1/notifications';
 
 interface NotifyOrderInput {
@@ -258,7 +259,7 @@ export class OneSignalService {
 
     const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
       try {
-        const res = await fetch(ENDPOINT, {
+        const res = await timedFetch('onesignal.send')(ENDPOINT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -364,7 +365,7 @@ export class OneSignalService {
     };
 
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await timedFetch('onesignal.send')(ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -481,7 +482,7 @@ export class OneSignalService {
 
     const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
       try {
-        const res = await fetch(ENDPOINT, {
+        const res = await timedFetch('onesignal.send')(ENDPOINT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -580,7 +581,7 @@ export class OneSignalService {
 
     const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
       try {
-        const res = await fetch(ENDPOINT, {
+        const res = await timedFetch('onesignal.send')(ENDPOINT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -673,7 +674,7 @@ export class OneSignalService {
 
     const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
       try {
-        const res = await fetch(ENDPOINT, {
+        const res = await timedFetch('onesignal.send')(ENDPOINT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -765,7 +766,7 @@ export class OneSignalService {
 
     const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
       try {
-        const res = await fetch(ENDPOINT, {
+        const res = await timedFetch('onesignal.send')(ENDPOINT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -851,7 +852,7 @@ export class OneSignalService {
         : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
     };
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await timedFetch('onesignal.send')(ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -909,7 +910,7 @@ export class OneSignalService {
         : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
     };
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await timedFetch('onesignal.send')(ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -966,7 +967,7 @@ export class OneSignalService {
         : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
     };
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await timedFetch('onesignal.send')(ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1089,7 +1090,7 @@ export class OneSignalService {
       body.url = input.url;
     }
 
-    const res = await fetch(ENDPOINT, {
+    const res = await timedFetch('onesignal.send')(ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1138,7 +1139,7 @@ export class OneSignalService {
       config.onesignalAppId
     )}&limit=${fetchLimit}&kind=0`;
 
-    const res = await fetch(url, {
+    const res = await timedFetch('onesignal.send')(url, {
       method: 'GET',
       headers: {
         Authorization: `Key ${config.onesignalRestApiKey}`,

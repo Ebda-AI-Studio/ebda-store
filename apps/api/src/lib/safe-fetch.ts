@@ -21,6 +21,7 @@
  * proportionate, standard mitigation for the merchant-URL threat model.
  */
 import { isWorkers } from './runtime';
+import { fetchWithTimeout, timedFetch } from './fetch-with-timeout';
 
 const MAX_REDIRECTS = 3;
 
@@ -51,7 +52,7 @@ const DOH_ENDPOINT = 'https://cloudflare-dns.com/dns-query';
 /** A (1) and AAAA (28) answers for a name, through Cloudflare's DoH JSON API. */
 export async function resolveViaDoh(
   host: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = timedFetch('safe-fetch.doh', 'default', 4000)
 ): Promise<Array<{ address: string }>> {
   const query = async (type: 'A' | 'AAAA'): Promise<string[]> => {
     const res = await fetchImpl(`${DOH_ENDPOINT}?name=${encodeURIComponent(host)}&type=${type}`, {
@@ -254,7 +255,11 @@ export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Res
   let currentInit = init;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const validated = await assertPublicHttpUrl(current);
-    const res = await fetch(current, { ...currentInit, redirect: 'manual' });
+    const res = await fetchWithTimeout(
+      current,
+      { ...currentInit, redirect: 'manual' },
+      { label: 'safe-fetch' }
+    );
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get('location');
       if (!loc) return res;

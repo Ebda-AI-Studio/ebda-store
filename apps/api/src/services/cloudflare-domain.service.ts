@@ -1,6 +1,7 @@
 import { config } from '../config';
 import logger from '../lib/logger';
 import type { DomainProvider, DomainStatus } from './domain-provider';
+import { timedFetch } from '../lib/fetch-with-timeout';
 
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 
@@ -45,7 +46,7 @@ export class CloudflareDomainService {
   /** Enroll ONE hostname as a Cloudflare-for-SaaS custom hostname. */
   private static async addHostname(hostname: string): Promise<CfCustomHostname | null> {
     try {
-      const res = await fetch(this.base(), {
+      const res = await timedFetch('cf.hostname.create')(this.base(), {
         method: 'POST',
         headers: this.headers(),
         body: JSON.stringify({
@@ -96,10 +97,13 @@ export class CloudflareDomainService {
   }
 
   private static async findByHostname(domain: string): Promise<CfCustomHostname | null> {
-    const res = await fetch(`${this.base()}?hostname=${encodeURIComponent(domain)}`, {
-      headers: this.headers(),
-      signal: AbortSignal.timeout(CF_FETCH_TIMEOUT_MS),
-    });
+    const res = await timedFetch('cf.hostname.get')(
+      `${this.base()}?hostname=${encodeURIComponent(domain)}`,
+      {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(CF_FETCH_TIMEOUT_MS),
+      }
+    );
     const json = (await res.json()) as { success: boolean; result?: CfCustomHostname[] };
     if (!res.ok || !json.success || !json.result?.length) return null;
     return json.result[0];
@@ -135,7 +139,7 @@ export class CloudflareDomainService {
   private static async removeHostname(hostname: string): Promise<boolean> {
     const ch = await this.findByHostname(hostname);
     if (!ch) return true; // already gone
-    const res = await fetch(`${this.base()}/${ch.id}`, {
+    const res = await timedFetch('cf.hostname.delete')(`${this.base()}/${ch.id}`, {
       method: 'DELETE',
       headers: this.headers(),
       signal: AbortSignal.timeout(CF_FETCH_TIMEOUT_MS),

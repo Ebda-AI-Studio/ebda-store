@@ -29,6 +29,7 @@ import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 
 import { fromMinor, REGION } from '@ebda/shared';
+import { timedFetch } from '../lib/fetch-with-timeout';
 // ─── Hashing helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -194,7 +195,7 @@ async function sendMetaCAPI(
   });
   if (payload.test_event_code) form.set('test_event_code', payload.test_event_code);
 
-  const response = await fetch(url, {
+  const response = await timedFetch('pixels.capi')(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form.toString(),
@@ -295,7 +296,7 @@ async function sendTikTokCAPI(
     payload.test_event_code = testEventCode;
   }
 
-  const response = await fetch(TIKTOK_EVENTS_URL, {
+  const response = await timedFetch('pixels.tiktok')(TIKTOK_EVENTS_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

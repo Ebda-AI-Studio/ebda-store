@@ -42,6 +42,7 @@ import {
   KASHIER_TRANSACTION_DETAILS_SOURCE,
   kashierTransactionDetailsPath,
 } from '../payment-providers/kashier-confirm';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 export interface KashierConfig {
   baseUrl: string;
@@ -155,7 +156,7 @@ export class KashierBillingProvider implements BillingProvider {
   constructor(cfg: KashierConfig) {
     this.cfg = {
       timeoutMs: 15_000,
-      fetchImpl: (...a) => fetch(...a),
+      fetchImpl: (...a) => timedFetch('kashier.billing', 'payment')(...a),
       ...cfg,
       baseUrl: (cfg.baseUrl || KASHIER_SANDBOX_URL).replace(/\/+$/, ''),
     } as KashierBillingProvider['cfg'];

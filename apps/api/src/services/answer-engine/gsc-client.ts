@@ -39,6 +39,7 @@
  */
 import jwt from 'jsonwebtoken';
 import logger from '../../lib/logger';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const GSC_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
@@ -135,7 +136,7 @@ async function mintAccessToken(creds: ServiceAccountCreds): Promise<string> {
     { algorithm: 'RS256' }
   );
 
-  const res = await fetch(TOKEN_ENDPOINT, {
+  const res = await timedFetch('gsc.token')(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -170,7 +171,7 @@ async function postSearchAnalytics(
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await timedFetch('gsc.query')(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

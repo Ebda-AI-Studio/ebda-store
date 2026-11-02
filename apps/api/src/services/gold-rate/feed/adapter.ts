@@ -13,6 +13,7 @@ import { GOLD_KARATS, goldRateJumpBps, type GoldKarat } from '@ebda/shared';
 import { fetchXauUsdMicro, type FetchLike } from './gold-api';
 import { fetchUsdEgpMicro } from './er-api';
 import { fetchEgpPerXau } from './currency-api';
+import { timedFetch } from '../../../lib/fetch-with-timeout';
 
 /** Troy ounce in grams x 10^7 (31.1034768 g). */
 const OZ_GRAMS_E7 = BigInt(311034768);
@@ -91,7 +92,8 @@ export interface FeedDeps {
 }
 
 export function goldFeed(deps: FeedDeps = {}): GoldFeedAdapter {
-  const fetchImpl: FetchLike = deps.fetchImpl ?? ((url, init) => fetch(url, init));
+  const fetchImpl: FetchLike =
+    deps.fetchImpl ?? ((url, init) => timedFetch('gold-rate.feed')(url, init));
   const nowFn = deps.now ?? (() => new Date());
   return {
     async fetch(signal: AbortSignal): Promise<GoldFeedResult> {

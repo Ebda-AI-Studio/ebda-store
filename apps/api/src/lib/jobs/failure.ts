@@ -4,6 +4,7 @@ import { sendAlert } from '../../services/alerts.service';
 import { JOBS_MAP } from './jobs-map';
 import { probeSentry, type SentryProbeResult } from './sentry-probe';
 import type { JobDef, JobEvent } from './types';
+import { timedFetch } from '../fetch-with-timeout';
 
 /** The `inngest/function.failed` event Inngest emits; alerts-failure-watch subscribes to it. */
 export function failedEvent(
@@ -97,7 +98,7 @@ export async function reportJobFailure(
     if (!report.sentryFlushed) {
       // The SDK client is not active in this step (measured: flush false while the ingest endpoint
       // answers 200), so its event never leaves. Send the real failure straight to the ingest endpoint.
-      const direct = await probeSentry(process.env.SENTRY_DSN, fetch, {
+      const direct = await probeSentry(process.env.SENTRY_DSN, timedFetch('sentry.direct'), {
         message: `job failed: ${def.id}`,
         errorName: error.name,
         errorMessage: message,

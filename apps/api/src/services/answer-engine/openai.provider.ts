@@ -50,6 +50,7 @@
  */
 import logger from '../../lib/logger';
 import type { AnswerEngineProvider, EngineAnswer } from './provider';
+import { timedFetch } from '../../lib/fetch-with-timeout';
 
 const ENDPOINT = 'https://api.openai.com/v1/responses';
 const MODEL = process.env.ANSWER_ENGINE_OPENAI_MODEL || 'gpt-4o-mini';
@@ -69,7 +70,7 @@ export class OpenAiAnswerEngineProvider implements AnswerEngineProvider {
   async query(_storeId: string, prompt: string): Promise<EngineAnswer> {
     let res: Response;
     try {
-      res = await fetch(ENDPOINT, {
+      res = await timedFetch('openai.answer', 'ai')(ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
