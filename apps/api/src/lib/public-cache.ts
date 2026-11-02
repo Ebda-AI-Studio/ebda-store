@@ -4,6 +4,7 @@ import { BoundedMap } from './bounded-map';
 import { revalidateStorefront } from './revalidate-storefront';
 import { retryTransientRead } from './db-retry';
 import { isWorkers } from './runtime';
+import { dropEdgeGensMemo } from './edge-gens-memo';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -102,6 +103,7 @@ async function readSharedGens(names: string[]): Promise<string | null> {
 
 async function bumpGeneration(name: string): Promise<void> {
   localGens.set(name, ++localGenSeq);
+  dropEdgeGensMemo(); // the isolate that took the write must not serve its own stale edge copy (Ruling NZ-D3)
   try {
     await redis.bumpCacheGeneration(name, GEN_TTL_SECONDS);
   } catch {

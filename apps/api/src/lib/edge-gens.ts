@@ -2,6 +2,7 @@ import type { Request } from 'express';
 import { generationNamesFor } from './public-cache';
 import { redis } from '../services/redis.service';
 import { storeLookupForHost } from './store-host';
+import { memoisedGens } from './edge-gens-memo';
 
 /**
  * Edge-cache validity stamp (SEO-3 / P14).
@@ -54,6 +55,10 @@ export async function readEdgeGens(names: string[]): Promise<string | null> {
     return null;
   }
 }
+
+/** Hit validation: `readEdgeGens` memoised per isolate for 2 s (Ruling NZ-D3; lib/edge-gens-memo.ts). Never used for a fill. */
+export const readEdgeGensForHit = (names: string[]): Promise<string | null> =>
+  memoisedGens(names, readEdgeGens);
 
 const SNAPSHOT = Symbol('ebda.edgeSnapshot');
 
