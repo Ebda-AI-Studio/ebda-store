@@ -38,7 +38,7 @@ import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/data
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
-import { requirePlatformDb } from './platform-db';
+import { platformDb, requirePlatformDb } from './platform-db';
 import { d1StorePatch } from './store-columns';
 import { getAccountState } from './identity-client';
 
@@ -1396,6 +1396,15 @@ type StoreUpdateManyClient = {
  * ahead and fails the request loudly (502); the retry is idempotent and converges. No Postgres.
  * Relation writes (`credentials`, `owner`, ...) and Prisma update operators are refused (501): the caller needs its own port.
  */
+/**
+ * True when a Store write must go to D1 + the DO instead of Postgres: the store is on its DO AND the platform D1 is bound (every
+ * deployed Worker). Where D1 is unbound (Node, unit / integration tests, local dev; `backendFor` only returns `do` there from
+ * the non-production env list) the legacy path stays: Postgres is authoritative and the DO gets the write-through copy.
+ */
+export async function storeWritesToDo(storeId: string): Promise<boolean> {
+  return (await storeRepo(storeId)).backend === 'do' && !!(await platformDb());
+}
+
 export async function storeUpdateOnDo(
   storeId: string,
   args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
@@ -1467,7 +1476,7 @@ export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
 ): Promise<Prisma.StoreGetPayload<A>> {
   const a = args as Prisma.StoreUpdateArgs;
   const id = a.where.id as string;
-  if ((await storeRepo(id)).backend === 'do')
+  if (await storeWritesToDo(id))
     return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
   await copyStoreSettings(id, a.data as Record<string, unknown>);
@@ -1478,7 +1487,7 @@ export async function storeUpdateMany(
   db: StoreUpdateManyClient,
   args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
 ): Promise<Prisma.BatchPayload> {
-  if ((await storeRepo(args.where.id)).backend === 'do') {
+  if (await storeWritesToDo(args.where.id)) {
     // Compare-and-set stays ONE atomic D1 statement: the filter may name only D1 columns (id + directory / mirror fields); a
     // filter on a DO-only column is refused. The DO copy follows only when the row matched.
     const filter = args.where as Record<string, unknown>;

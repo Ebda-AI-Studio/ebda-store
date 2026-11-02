@@ -174,10 +174,16 @@ describe('NZ-D10: authenticated requests are live-checked unless explicitly allo
     expect(needsLiveIdentity({ method: 'GET', originalUrl: path + '?format=csv' })).toBe(true);
   });
   it('the allowlisted reads skip the check, with a query string and trailing slash', () => {
-    expect(needsLiveIdentity({ method: 'GET', originalUrl: '/api/v1/auth/me?x=1' })).toBe(false);
+    expect(
+      needsLiveIdentity({ method: 'GET', originalUrl: '/api/v1/stores/s1/typography?x=1' })
+    ).toBe(false);
     expect(needsLiveIdentity({ method: 'GET', originalUrl: '/api/v1/stores/s1/typography/' })).toBe(
       false
     );
-    expect(needsLiveIdentity({ method: 'POST', originalUrl: '/api/v1/auth/me' })).toBe(true);
+    expect(needsLiveIdentity({ method: 'POST', originalUrl: '/api/v1/stores/s1/typography' })).toBe(
+      true
+    );
+    // the session-validity probe clients poll must see a logout / suspension at once
+    expect(needsLiveIdentity({ method: 'GET', originalUrl: '/api/v1/auth/me' })).toBe(true);
   });
 });

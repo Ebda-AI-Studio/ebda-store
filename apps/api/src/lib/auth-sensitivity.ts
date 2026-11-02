@@ -9,13 +9,12 @@
  * an allowlist entry matches no route, or when a route the allowlist does not name would skip the check.
  *
  * Add a path ONLY if it returns no personal data, money figure, credential or other store's data (store content the
- * merchant is editing, own-profile basics). Cost if wrong: a removed staff member can read that one path for <= 5 minutes.
+ * merchant is editing). Cost if wrong: a removed staff member can read that one path for <= 5 minutes.
  */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /** Exact paths (without the `/api/v1` prefix, `:id` = one path segment). */
 export const NON_SENSITIVE_GET: readonly RegExp[] = [
-  /^\/auth\/me$/, // own profile basics
   /^\/onboarding\/slug-check$/, // availability probe before a store exists
   /^\/stores\/[^/]+\/typography$/, // theme font settings
   /^\/admin\/stores\/[^/]+\/layout$/, // storefront layout the merchant is editing

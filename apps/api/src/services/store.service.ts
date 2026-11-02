@@ -14,6 +14,7 @@ import {
   storeDb,
   storeRepo,
   storeUpdateOnDo,
+  storeWritesToDo,
   syncStoreFields,
 } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
@@ -140,7 +141,7 @@ export async function updateStoreThrough<T>(
 ): Promise<T> {
   // Ruling NZ-D8: a store on its Durable Object is written by D1 + the DO, never Postgres. `run` sees a transaction-shaped
   // stand-in that serves ONLY `store.update` / `store.findUnique`; any other model throws 501 (that caller needs its own port).
-  if ((await storeRepo(storeId)).backend === 'do') {
+  if (await storeWritesToDo(storeId)) {
     const unsupported = (what: string) => {
       throw new AppError(
         501,

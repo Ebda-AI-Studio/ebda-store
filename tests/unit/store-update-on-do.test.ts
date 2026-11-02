@@ -57,12 +57,15 @@ vi.mock('../../apps/api/src/lib/store-backend', () => ({
     },
   }),
 }));
-vi.mock('../../apps/api/src/lib/platform-db', () => ({ requirePlatformDb: async () => h.d1 }));
+vi.mock('../../apps/api/src/lib/platform-db', () => ({
+  requirePlatformDb: async () => h.d1,
+  platformDb: async () => h.d1,
+}));
 vi.mock('../../apps/api/src/lib/identity-client', () => ({
   getAccountState: async (id: string) => ({ id, email: 'o@x.com', firstName: 'O', lastName: 'W' }),
 }));
 
-import { storeUpdate, storeUpdateMany } from '../../apps/api/src/lib/repo-factory';
+import { storeUpdate, storeUpdateMany, storeWritesToDo } from '../../apps/api/src/lib/repo-factory';
 import { updateStoreThrough } from '../../apps/api/src/services/store.service';
 
 let sqlite: DatabaseSync;
@@ -219,5 +222,16 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
     await expect(
       updateStoreThrough(S, async tx => (tx as any).taxRate.create({}))
     ).rejects.toMatchObject({ statusCode: 501 });
+  });
+
+  it('writes go to D1 + the DO only when the platform D1 is bound (Node / tests keep the legacy Postgres path)', async () => {
+    expect(await storeWritesToDo(S)).toBe(true);
+    const bound = h.d1;
+    h.d1 = undefined;
+    try {
+      expect(await storeWritesToDo(S)).toBe(false);
+    } finally {
+      h.d1 = bound;
+    }
   });
 });
