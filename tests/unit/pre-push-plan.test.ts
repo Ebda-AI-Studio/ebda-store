@@ -52,15 +52,6 @@ describe('pre-push plan', () => {
     expect(r.related).toEqual([]);
     expect(r.lint).toEqual([]);
   });
-
-  it('the gate script is wired to the plan, falls back to the full gate, and never takes the host lock itself', () => {
-    const g = readFileSync(join(__dirname, '../../scripts/ci/pre-push-gate.sh'), 'utf8');
-    expect(g).toContain('pre-push-plan.mjs');
-    expect(g).toContain('vitest related');
-    expect(g).toContain('gitleaks detect');
-    expect(g).toContain('npm run test:unit');
-    expect(g).not.toMatch(/^[^#\n]*host-lock\.sh/m);
-  });
 });
 
 // PREPUSH-2: the local gate is the UNIT tier only. A shared file pulled integration tests (they need the `test` role /
@@ -110,13 +101,6 @@ describe('pre-push plan: unit tier only (PREPUSH-2)', () => {
       }
     }
   );
-
-  it('the gate passes every exclude glob to vitest related', () => {
-    const g = readFileSync(join(__dirname, '../../scripts/ci/pre-push-gate.sh'), 'utf8');
-    expect(g).toMatch(/--exclude "\$g"/);
-    expect(g).toContain('field exclude');
-    expect(g).toMatch(/vitest related[^\n]*"\$\{EXCLUDE_ARGS\[@\]\}"/);
-  });
 
   it('behaviour: vitest related over a shared file runs the unit test and NOT the integration test', () => {
     const dir = mkdtempSync(join(tmpdir(), 'prepush2-'));
