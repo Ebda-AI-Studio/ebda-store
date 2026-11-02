@@ -71,7 +71,7 @@ describe('db-backup.yml', () => {
   });
   it('runs nightly on a GitHub-hosted runner (survives the Mac and the CI guest) and alerts on failure', () => {
     expect(wf).toMatch(/schedule:\s*\n\s*- cron: '\d+ \d+ \* \* \*'/);
-    expect(wf).toContain('runs-on: ubuntu-latest');
+    expect(wf).toContain('runs-on: ubuntu-24.04');
     expect(wf).toContain('notify-failure');
     expect(wf).toContain('scripts/ops/verify-db-dump.sh');
   });

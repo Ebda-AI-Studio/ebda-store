@@ -97,7 +97,8 @@ jobs:
   changes:
     name: Detect affected workspaces
     if: github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    # ubuntu-latest became 26.04 (2026-11); Playwright 1.60 unsupported — Ruling CI-HOSTED-2
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     outputs:
       code: ${{ steps.affected.outputs.code }}
@@ -140,7 +141,9 @@ jobs:
   # every main push, so it has no `needs` and no `if`.
   guards:
     name: Repo guards
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    # Ruling CI-HOSTED-1: deliberately NO `if` here (the always-on PR check; tests/unit/ci-lean-structure and
+    # merge-gate derive the required list from it). Residual: ~1.5 hosted min per scheduled run.
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -220,7 +223,7 @@ jobs:
     name: Lint
     needs: [changes]
     if: needs.changes.outputs.lint != ''
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -263,7 +266,7 @@ jobs:
     name: Type Check
     needs: [changes]
     if: needs.changes.outputs.typecheck != ''
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -314,7 +317,7 @@ jobs:
     name: Unit Tests (affected)
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
     # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
     timeout-minutes: 35
@@ -387,7 +390,7 @@ jobs:
   builder-e2e:
     name: Builder E2E (ar/en x 390/820/1280)
     needs: [build]
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -431,7 +434,7 @@ jobs:
     name: Worker dry-run (${{ matrix.app }})
     needs: [changes]
     if: needs.changes.outputs.has_workers == 'true'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -554,7 +557,7 @@ jobs:
     name: App build (${{ matrix.app }})
     needs: [changes]
     if: needs.changes.outputs.has_build_apps == 'true'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -604,7 +607,7 @@ jobs:
     name: App builds (affected)
     needs: [changes, app-build]
     if: always() && github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:
       - name: Require every affected app build to have passed
@@ -624,7 +627,7 @@ jobs:
   api-workerd-smoke:
     name: API Worker boots on workerd
     if: github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     services:
       postgres:
@@ -681,7 +684,7 @@ jobs:
     name: Integration on local workerd (DO + D1 + R2)
     needs: [changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.has_workers == 'true'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
     timeout-minutes: 30
     steps:
@@ -716,8 +719,10 @@ jobs:
   build:
     name: Build
     # FULL lane: Sunday cron or manual dispatch.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    # Ruling CI-HOSTED-1 (2026-11-02): a scheduled run is a no-op unless a self-hosted runner is configured
+    # (EBDA_RUNS_ON set); manual dispatch still runs on hosted.
+    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')) && (github.event_name != 'schedule' || vars.EBDA_RUNS_ON != '')
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -766,7 +771,7 @@ jobs:
 
   test-unit:
     name: Unit Tests
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     needs: [build]
     steps:
@@ -873,7 +878,7 @@ jobs:
     # any file present in the first set but not the second. A gate that cannot
     # fail must not report success — this one can, and does today if a colocated
     # test lands outside every job's glob again.
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     needs: [build]
     steps:
@@ -986,7 +991,7 @@ jobs:
       always() && !cancelled() && (
         (github.event_name != 'pull_request' && needs.build.result == 'success') ||
         (github.event_name == 'pull_request' && needs.changes.outputs.integration == 'true'))
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     needs: [build, changes]
     services:
@@ -1222,8 +1227,10 @@ jobs:
   test-rls-ebda-app:
     name: RLS ebda_app Strict-Policy Proof
     # NIGHTLY lane (every cron) and manual dispatch; independent of `build`.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && (github.event_name != 'schedule' || vars.EBDA_RUNS_ON != '')
+    # Ruling CI-HOSTED-1 (2026-11-02): a scheduled run is a no-op unless a self-hosted runner is configured
+    # (EBDA_RUNS_ON set); manual dispatch still runs on hosted.
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     services:
       postgres:
@@ -1334,7 +1341,7 @@ jobs:
 
   test-rls-payload-parity:
     name: RLS Payload Parity (owner vs ebda_app)
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 10
     needs: [build]
     services:
@@ -1413,7 +1420,7 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     needs: [build]
     services:
@@ -1504,8 +1511,10 @@ jobs:
   security:
     name: Security Audit
     # FULL lane: Sunday cron or manual dispatch.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    # Ruling CI-HOSTED-1 (2026-11-02): a scheduled run is a no-op unless a self-hosted runner is configured
+    # (EBDA_RUNS_ON set); manual dispatch still runs on hosted.
+    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')) && (github.event_name != 'schedule' || vars.EBDA_RUNS_ON != '')
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 18: the budget is the SUM of the worst cases, not the audit alone — 3
     # bounded audit attempts (~5.8 min, #1520) + a COLD `npm ci` + checkout and
     # trufflehog. tests/unit/audit-report-verdict.test.ts asserts this sum.
@@ -1560,8 +1569,10 @@ jobs:
   #     integration tier needs Postgres and is run by hand with --tier=all.
   mutation:
     name: Mutation tests
-    if: (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    # Ruling CI-HOSTED-1 (2026-11-02): a scheduled run is a no-op unless a self-hosted runner is configured
+    # (EBDA_RUNS_ON set); manual dispatch still runs on hosted.
+    if: ((github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)) && (github.event_name != 'schedule' || vars.EBDA_RUNS_ON != '')
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1608,7 +1619,7 @@ jobs:
 
   notify-failure:
     name: Notify on failure (main and nightly)
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     needs:
       [
