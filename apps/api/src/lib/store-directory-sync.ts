@@ -6,16 +6,20 @@
  * suspension) still lands in Postgres. Without this module a suspended or deleted store stays resolvable (fail OPEN) and a
  * new store 404s. Postgres stays authoritative until N-18 (Store create on D1/DO); this mirrors the directory columns into D1
  * in the same path as every Postgres write:
- *   - `mirrorStoreDirectory(storeId, patch)`: the patch of an update (called by `copyStoreSettings`, the one chokepoint behind
- *     storeUpdate / storeUpdateMany / updateStoreThrough). One UPDATE; a store with no D1 row is a loud 503.
- *   - `syncStoreDirectoryFromPg(storeId)`: a full-row upsert read from Postgres AFTER the creating transaction committed.
- * Both throw on a D1 failure: the Postgres write already committed, the request fails, the idempotent retry converges
- * (failing closed beats leaving a suspension un-mirrored). D1 `storage_backend` is never written here (D1 owns it).
+ *   - `syncStoreDirectoryFromPg(storeId)`: a full-row upsert READ BACK FROM THE COMMITTED Postgres row. Never the caller's
+ *     patch, never before commit: a transaction that rolls back leaves D1 untouched (security review of #384).
+ *   - `scheduleStoreDirectorySync(storeId)`: called by `copyStoreSettings` (the one chokepoint behind storeUpdate /
+ *     storeUpdateMany / updateStoreThrough). Inside a request it is DEFERRED until the tenant transaction commits and DROPPED on
+ *     rollback (`deferAfterTenantCommit`); the creating paths call `syncStoreDirectoryFromPg` after their own commit.
+ *   - `reconcileStoreDirectory()` (lib/store-directory-reconcile.ts, hourly cron) repairs any drift fail-closed.
+ * A failed post-commit sync is an error log plus an alert (deferred work is loud) and is repaired by the next reconcile.
+ * D1 `storage_backend` is never written here (D1 owns it).
  * No-op when PLATFORM_DB is unbound (Node, unit tests, local dev).
  */
 import { withStore } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
+import { deferAfterTenantCommit } from './after-tenant-commit';
 import { STORE_D1_ONLY_FIELDS, STORE_MIRROR_FIELDS, d1StorePatch } from './store-columns';
 
 interface D1Stmt {
@@ -62,28 +66,18 @@ const unavailable = (e: unknown) => {
   return new AppError(503, 'STORE_DIRECTORY_UNAVAILABLE', 'Store directory write failed');
 };
 
-/** Mirror an update patch to D1. Only D1-owned fields are written; nothing to do when the patch has none. */
-export async function mirrorStoreDirectory(
+/**
+ * Mirror this store's directory row to D1 once the surrounding tenant transaction has committed (dropped if it rolls back).
+ * Only a patch that touches a D1-owned column triggers it. Outside a request scope it runs inline (callers that wrap
+ * `storeUpdate` in their own still-open transaction are repaired by the reconciler).
+ */
+export async function scheduleStoreDirectorySync(
   storeId: string,
   patch: Record<string, unknown>
 ): Promise<void> {
-  const db = d1();
-  if (!db) return;
-  const d1Patch = d1StorePatch(patch);
-  const names = Object.keys(d1Patch);
-  if (names.length === 0) return;
-  try {
-    const cols = await columnOf();
-    const set = names.map(n => `"${cols[n]}" = ?`).join(', ');
-    const res = await db
-      .prepare(`UPDATE "stores" SET ${set} WHERE "id" = ?`)
-      .bind(...names.map(n => encode(n, d1Patch[n])), storeId)
-      .run();
-    if ((res.meta?.changes ?? 0) === 0)
-      throw new AppError(503, 'STORE_DIRECTORY_MISSING', 'Store has no directory row');
-  } catch (e) {
-    throw unavailable(e);
-  }
+  if (!d1()) return;
+  if (Object.keys(d1StorePatch(patch)).length === 0) return;
+  await deferAfterTenantCommit('store.directory.sync', () => syncStoreDirectoryFromPg(storeId));
 }
 
 /** Full-row upsert of the directory columns from Postgres (the authoritative row), after the creating transaction committed. */

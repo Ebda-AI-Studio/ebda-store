@@ -37,7 +37,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
-import { mirrorStoreDirectory } from './store-directory-sync';
+import { scheduleStoreDirectorySync } from './store-directory-sync';
 
 type WriteOp =
   | 'create'
@@ -1261,8 +1261,9 @@ export async function copyStoreSettings(
   storeId: string,
   fields: Record<string, unknown>
 ): Promise<void> {
-  // Hotfix N-22: every authoritative Store write (all backends) also lands its directory columns in D1, which lookups read.
-  await mirrorStoreDirectory(storeId, fields);
+  // Hotfix N-22: every authoritative Store write also lands its directory columns in D1, which lookups read: read back from
+  // the COMMITTED row after the surrounding transaction commits (dropped on rollback), never the caller's patch.
+  await scheduleStoreDirectorySync(storeId, fields);
   const repo = await storeRepo(storeId);
   if (repo.backend !== 'do') return;
   const stub = storeDo(storeId) as unknown as {

@@ -21,6 +21,7 @@ import { doStoreIdList } from '../lib/store-backend';
 import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
 import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
 import type { LegacyCronMessage } from '../lib/jobs/start';
 
@@ -33,7 +34,11 @@ export interface CronJob {
 
 export const CRON_SCHEDULE: Record<string, CronJob[]> = {
   // Per-store job alarms (cf/store-schedule.ts): arm every live store's schedule, hourly.
-  '0 * * * *': [{ name: 'store-schedule-sync', run: () => syncStoreSchedules() }],
+  '0 * * * *': [
+    { name: 'store-schedule-sync', run: () => syncStoreSchedules() },
+    // Hotfix N-22: repair any Postgres -> D1 store-directory drift, fail-closed (lib/store-directory-reconcile.ts).
+    { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
+  ],
   // Abandoned-cart reminder emails (was every 15 min).
   '*/15 * * * *': [{ name: 'abandoned-cart', run: () => abandonedCartService.process() }],
   // Carrier tracking poll (was every 30 min).

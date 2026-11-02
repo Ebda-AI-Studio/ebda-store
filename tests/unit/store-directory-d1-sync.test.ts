@@ -10,6 +10,8 @@ import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
 const pg = vi.hoisted(() => ({ rows: new Map<string, Record<string, unknown>>() }));
 vi.mock('@ebda/database', () => ({
   prisma: {},
+  runInTenantContext: async (_id: string, fn: () => unknown) => fn(),
+  onClosedTenantTxAccess: () => undefined,
   withStore: async (id: string, fn: (tx: unknown) => unknown) =>
     fn({ store: { findUnique: async () => pg.rows.get(id) ?? null } }),
 }));
@@ -24,18 +26,24 @@ import {
   storeIdByDomain,
   storeIdsClaimingDomain,
 } from '../../apps/api/src/lib/definer';
-import {
-  mirrorStoreDirectory,
-  syncStoreDirectoryFromPg,
-} from '../../apps/api/src/lib/store-directory-sync';
+import { syncStoreDirectoryFromPg } from '../../apps/api/src/lib/store-directory-sync';
+import { reconcileStoreDirectory } from '../../apps/api/src/lib/store-directory-reconcile';
+import { withDeferredWork } from '../../apps/api/src/lib/after-tenant-commit';
 import { copyStoreSettings } from '../../apps/api/src/lib/repo-factory';
 
 let sqlite: DatabaseSync;
+const d1Backend = () =>
+  (
+    sqlite.prepare('SELECT storage_backend FROM stores WHERE id=?').get(A) as {
+      storage_backend: string;
+    }
+  ).storage_backend;
 const asD1 = () => ({
   prepare: (sql: string) => ({
     bind: (...v: unknown[]) => {
       const run = async () => {
         await Promise.resolve();
+        if (!/^\s*select/i.test(sql)) writes.push(sql);
         if (/^\s*select/i.test(sql)) return { results: sqlite.prepare(sql).all(...(v as never[])) };
         return { meta: { changes: Number(sqlite.prepare(sql).run(...(v as never[])).changes) } };
       };
@@ -98,80 +106,77 @@ beforeEach(() => {
   setCfBindings({ PLATFORM_DB: asD1() } as never);
 });
 
+/** Postgres commit is modelled by writing `pg.rows`; D1 must only ever follow a COMMITTED row. */
+const commit = (over: Record<string, unknown>) => pg.rows.set(A, base(over));
+const d1Status = () =>
+  (sqlite.prepare('SELECT status FROM stores WHERE id=?').get(A) as { status: string }).status;
+const d1Writes = () => writes.length;
+const writes: string[] = [];
+
 describe('directory dual-write (Postgres authoritative -> D1 lookups)', () => {
+  beforeEach(() => {
+    writes.length = 0;
+  });
   it('create: a new store is resolvable by slug and id after the full-row sync (and 404 before)', async () => {
     expect(await lookupStore({ slug: 'alpha' })).toBeNull();
     pg.rows.set(A, base());
     await syncStoreDirectoryFromPg(A);
     expect(await lookupStore({ slug: 'alpha' })).toEqual({ id: A, status: 'active' });
     expect(await storeIdBySlug('alpha')).toBe(A);
-    expect(
-      (
-        sqlite.prepare('SELECT storage_backend FROM stores WHERE id=?').get(A) as {
-          storage_backend: string;
-        }
-      ).storage_backend
-    ).toBe('pg');
+    expect(d1Backend()).toBe('pg');
   });
-  it('suspend and activate reach D1 through the storeUpdate chokepoint', async () => {
-    pg.rows.set(A, base());
+  it('suspend and activate: D1 equals the COMMITTED row (read back, not the patch)', async () => {
+    commit({});
     await syncStoreDirectoryFromPg(A);
+    commit({ status: 'suspended' });
     await copyStoreSettings(A, { status: 'suspended' });
     expect(await lookupStore({ slug: 'alpha' }, ['active'])).toBeNull();
     expect(await lookupStore({ slug: 'alpha' }, ['active', 'suspended'])).toEqual({
       id: A,
       status: 'suspended',
     });
+    commit({ status: 'active' });
     await copyStoreSettings(A, { status: 'active' });
     expect(await lookupStore({ slug: 'alpha' })).toEqual({ id: A, status: 'active' });
   });
-  it('soft delete: a deleted store never resolves', async () => {
-    pg.rows.set(A, base());
+  it('the mirror copies what Postgres committed, not what the caller asked for', async () => {
+    commit({});
     await syncStoreDirectoryFromPg(A);
+    commit({ status: 'suspended' }); // the committed truth differs from the patch the caller passed
+    await copyStoreSettings(A, { status: 'active' });
+    expect(d1Status()).toBe('suspended');
+  });
+  it('soft delete, slug change, domain claim / verify / release', async () => {
+    commit({});
+    await syncStoreDirectoryFromPg(A);
+    commit({ deletedAt: new Date() });
     await copyStoreSettings(A, { deletedAt: new Date() });
     expect(await lookupStore({ id: A }, ['active', 'inactive', 'suspended'])).toBeNull();
-  });
-  it('slug change: the old slug 404s, the new one resolves', async () => {
-    pg.rows.set(A, base());
-    await syncStoreDirectoryFromPg(A);
+    commit({ slug: 'renamed' });
     await copyStoreSettings(A, { slug: 'renamed' });
     expect(await lookupStore({ slug: 'alpha' })).toBeNull();
     expect((await lookupStore({ slug: 'renamed' }))?.id).toBe(A);
-  });
-  it('domain claim, verify and release', async () => {
-    pg.rows.set(A, base());
-    await syncStoreDirectoryFromPg(A);
-    await copyStoreSettings(A, {
-      pendingDomain: 'shop.example.com',
-      domainStatus: 'pending',
-      domainClaimedAt: new Date(),
-    });
+    commit({ slug: 'renamed', pendingDomain: 'shop.example.com', domainStatus: 'pending' });
+    await copyStoreSettings(A, { pendingDomain: 'shop.example.com' });
     expect(await storeIdsClaimingDomain('shop.example.com')).toEqual([A]);
-    expect(await lookupStore({ domain: 'shop.example.com' })).toBeNull(); // unverified never resolves
-    await copyStoreSettings(A, {
-      domain: 'shop.example.com',
-      domainStatus: 'active',
-      pendingDomain: null,
-      domainVerifiedAt: new Date(),
-    });
+    expect(await lookupStore({ domain: 'shop.example.com' })).toBeNull();
+    commit({ slug: 'renamed', domain: 'shop.example.com', domainStatus: 'active' });
+    await copyStoreSettings(A, { domain: 'shop.example.com' });
     expect((await lookupStore({ domain: 'shop.example.com' }))?.id).toBe(A);
     expect(await storeIdByDomain('shop.example.com')).toBe(A);
-    await copyStoreSettings(A, { domain: null, domainStatus: null, domainVerifiedAt: null });
+    commit({ slug: 'renamed', domain: null, domainStatus: null });
+    await copyStoreSettings(A, { domain: null });
     expect(await lookupStore({ domain: 'shop.example.com' })).toBeNull();
   });
-  it('a patch with no D1 column writes nothing; a store missing from D1 is a loud 503; an operator value is refused', async () => {
-    await expect(copyStoreSettings(A, { theme: { a: 1 } })).resolves.toBeUndefined();
-    await expect(mirrorStoreDirectory(A, { status: 'suspended' })).rejects.toMatchObject({
-      statusCode: 503,
-    });
-    pg.rows.set(A, base());
+  it('a patch with no D1 column touches nothing', async () => {
+    commit({});
     await syncStoreDirectoryFromPg(A);
-    await expect(mirrorStoreDirectory(A, { name: { set: 'x' } })).rejects.toMatchObject({
-      statusCode: 500,
-    });
+    writes.length = 0;
+    await copyStoreSettings(A, { theme: { a: 1 } });
+    expect(d1Writes()).toBe(0);
   });
   it('a store gone from Postgres is removed from D1; unbound D1 is a no-op', async () => {
-    pg.rows.set(A, base());
+    commit({});
     await syncStoreDirectoryFromPg(A);
     pg.rows.delete(A);
     await syncStoreDirectoryFromPg(A);
@@ -180,18 +185,106 @@ describe('directory dual-write (Postgres authoritative -> D1 lookups)', () => {
     await expect(syncStoreDirectoryFromPg(A)).resolves.toBeUndefined();
   });
   it('the D1 backend flag is never written by the mirror (D1 owns it)', async () => {
-    pg.rows.set(A, base());
+    commit({});
     await syncStoreDirectoryFromPg(A);
     sqlite.prepare("UPDATE stores SET storage_backend='do' WHERE id=?").run(A);
-    await syncStoreDirectoryFromPg(A);
+    commit({ name: 'x' });
     await copyStoreSettings(A, { name: 'x' });
-    expect(
-      (
-        sqlite.prepare('SELECT storage_backend FROM stores WHERE id=?').get(A) as {
-          storage_backend: string;
-        }
-      ).storage_backend
-    ).toBe('do');
+    expect(d1Backend()).toBe('do');
+  });
+});
+
+describe('transaction boundary (security review of #384)', () => {
+  beforeEach(() => {
+    writes.length = 0;
+  });
+  const ctx = { storeId: A } as never;
+  it('a transaction that ROLLS BACK leaves D1 untouched', async () => {
+    commit({});
+    await syncStoreDirectoryFromPg(A);
+    writes.length = 0;
+    await expect(
+      withDeferredWork(ctx, async () => {
+        commit({ status: 'suspended' }); // visible only inside the doomed tx in real life
+        await copyStoreSettings(A, { status: 'suspended' });
+        throw new Error('rollback');
+      })
+    ).rejects.toThrow('rollback');
+    expect(d1Writes()).toBe(0);
+    expect(d1Status()).toBe('active');
+  });
+  it('a transaction that COMMITS mirrors the committed row, and only after the commit', async () => {
+    commit({});
+    await syncStoreDirectoryFromPg(A);
+    writes.length = 0;
+    await withDeferredWork(ctx, async () => {
+      commit({ status: 'suspended' });
+      await copyStoreSettings(A, { status: 'suspended' });
+      expect(d1Writes()).toBe(0); // deferred, not run inside the transaction
+    });
+    expect(d1Status()).toBe('suspended');
+    expect(await lookupStore({ slug: 'alpha' })).toBeNull();
+  });
+});
+
+describe('reconciler (fail-closed)', () => {
+  const alerts: string[] = [];
+  const dirOf = () =>
+    [...pg.rows.values()].map(r => ({
+      id: r.id as string,
+      slug: r.slug as string,
+      status: r.status as string,
+      plan: r.plan as string,
+      hasDomain: !!r.domain,
+      hasPendingDomain: !!r.pendingDomain,
+    }));
+  const run = () =>
+    reconcileStoreDirectory({
+      pgAll: async () => dirOf(),
+      pgLive: async () => dirOf().filter(d => !pg.rows.get(d.id)!.deletedAt),
+      alert: t => void alerts.push(t),
+    });
+  beforeEach(async () => {
+    alerts.length = 0;
+    commit({});
+    await syncStoreDirectoryFromPg(A);
+  });
+  it('no drift: nothing corrected, no alert', async () => {
+    const r = await run();
+    expect(r).toMatchObject({ checked: 1, corrected: [], keptRestrictive: [] });
+    expect(alerts).toEqual([]);
+  });
+  it('D1 less restrictive than Postgres (seeded drift): corrected to Postgres, alerted', async () => {
+    commit({ status: 'suspended' }); // a mirror that never ran
+    const r = await run();
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(await lookupStore({ slug: 'alpha' })).toBeNull();
+    expect(alerts).toHaveLength(1);
+  });
+  it('Postgres deleted, D1 live: D1 becomes deleted', async () => {
+    commit({ deletedAt: new Date() });
+    await run();
+    expect(await lookupStore({ id: A }, ['active', 'inactive', 'suspended'])).toBeNull();
+  });
+  it('D1 MORE restrictive than Postgres: kept (a repair never re-opens a store) and alerted', async () => {
+    sqlite.prepare("UPDATE stores SET status='suspended' WHERE id=?").run(A);
+    const r = await run();
+    expect(r.keptRestrictive.map(c => c.id)).toEqual([A]);
+    expect(d1Status()).toBe('suspended');
+    expect(alerts).toHaveLength(1);
+  });
+  it('missing from D1 is inserted; a D1 row with no Postgres store is deleted', async () => {
+    sqlite.prepare('DELETE FROM stores WHERE id=?').run(A);
+    sqlite
+      .prepare("INSERT INTO stores (id, name, slug, owner_id) VALUES ('ghost','g','ghost','o')")
+      .run();
+    const r = await run();
+    expect(r.corrected.map(c => c.why).sort()).toEqual([
+      'in D1, gone from Postgres',
+      'missing from D1',
+    ]);
+    expect((await lookupStore({ slug: 'alpha' }))?.id).toBe(A);
+    expect(await lookupStore({ id: 'ghost' })).toBeNull();
   });
 });
 
@@ -202,5 +295,8 @@ describe('every creating path mirrors', () => {
       'apps/api/src/services/provisioning.service.ts',
     ])
       expect(fs.readFileSync(f, 'utf8')).toContain('syncStoreDirectoryFromPg(');
+  });
+  it('the reconciler is on the hourly cron', () => {
+    expect(fs.readFileSync('apps/api/src/cf/cron.ts', 'utf8')).toMatch(/store-directory-reconcile/);
   });
 });
