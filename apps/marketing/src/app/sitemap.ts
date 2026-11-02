@@ -16,7 +16,7 @@ const abs = (p: string) => (p === '/' ? `${SITE_URL}/` : `${SITE_URL}${p}/`);
 
 /** Product pages (features, Ebda Chat, comparisons) rank above the legal pages. */
 const marketing = (page: string) =>
-  page === 'features' || page === 'whatsapp' || page.startsWith('compare/');
+  page === 'store' || page === 'features' || page === 'whatsapp' || page.startsWith('compare/');
 
 /**
  * <lastmod> is real: non-legal pages take the date recorded in page-lastmod.json, which is tied to a hash of the

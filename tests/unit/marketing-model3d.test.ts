@@ -106,8 +106,8 @@ describe('desktop QR codes', () => {
     for (const t of qrTargets()) {
       expect(readFileSync(pub(t.path), 'utf8')).toBe(await renderQr(t.url));
     }
-    expect(arPageUrl('ar', 'souq')).toBe('https://ebda.app/?m=souq#model3d');
-    expect(arPageUrl('en', 'qamar')).toBe('https://ebda.app/en/?m=qamar#model3d');
+    expect(arPageUrl('ar', 'souq')).toBe('https://ebda.app/store/?m=souq#model3d');
+    expect(arPageUrl('en', 'qamar')).toBe('https://ebda.app/en/store/?m=qamar#model3d');
     expect(qrPath('en', 'lamma')).toBe('/3d/qr/lamma-en.svg');
   });
 });

@@ -44,11 +44,11 @@ const en = renderToStaticMarkup(<Home locale="en" />);
 
 describe('marketing nav', () => {
   it('names the product (not the studio) in both marketing page titles', () => {
-    expect(pageMetadata('ar', '').title).toContain('ابدأ ستور');
-    expect(pageMetadata('en', '').title).toContain('Ebda Store');
+    expect(pageMetadata('ar', 'store').title).toContain('ابدأ ستور');
+    expect(pageMetadata('en', 'store').title).toContain('Ebda Store');
     // the product leads and the studio is not named in the title (the brand line is in OG + JSON-LD)
     for (const l of ['ar', 'en'] as const) {
-      const t = String(pageMetadata(l, '').title);
+      const t = String(pageMetadata(l, 'store').title);
       expect(t.length).toBeLessThanOrEqual(60);
       expect(t).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
     }
@@ -107,8 +107,10 @@ describe('marketing nav', () => {
     expect(ar).toContain('>ابدأ دلوقتي<');
   });
   it('has a language toggle between / and /en', () => {
-    expect(ar).toMatch(/href="\/en\/?"[^>]*hrefLang="en"|hrefLang="en"[^>]*href="\/en\/?"/i);
-    expect(en).toMatch(/href="\/"[^>]*hrefLang="ar"|hrefLang="ar"[^>]*href="\/"/i);
+    expect(ar).toMatch(
+      /href="\/en\/store\/?"[^>]*hrefLang="en"|hrefLang="en"[^>]*href="\/en\/store\/?"/i
+    );
+    expect(en).toMatch(/href="\/store"[^>]*hrefLang="ar"|hrefLang="ar"[^>]*href="\/store"/i);
   });
 });
 
@@ -528,9 +530,12 @@ describe('marketing honesty', () => {
 
 describe('marketing SEO and trust surface', () => {
   it('emits hreflang alternates + canonical per locale', () => {
-    const a = pageMetadata('ar', '').alternates!;
-    expect(a.languages).toEqual({ ar: '/', en: '/en', 'x-default': '/' });
-    expect(a.canonical).toBe('/');
+    const a = pageMetadata('ar', 'store').alternates!;
+    expect(a.languages).toEqual({ ar: '/store', en: '/en/store', 'x-default': '/store' });
+    expect(a.canonical).toBe('/store');
+    const h = pageMetadata('ar', '', 'x', 'y', 'studio').alternates!;
+    expect(h.languages).toEqual({ ar: '/', en: '/en', 'x-default': '/' });
+    expect(h.canonical).toBe('/');
     expect(pageMetadata('en', 'privacy').alternates!.languages).toMatchObject({
       ar: '/privacy',
       en: '/en/privacy',

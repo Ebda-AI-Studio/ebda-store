@@ -89,7 +89,7 @@ describe('JSON-LD', () => {
       expect(brand.alternateName).toContain('ابدأ ستور');
       expect(brand.alternateName).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
       expect(brand['@id']).toBe('https://ebda.app/#store');
-      expect(brand.url).toBe('https://ebda.app/#store');
+      expect(brand.url).toBe(`https://ebda.app/${locale === 'en' ? 'en/' : ''}store/`);
       expect(byType.SoftwareApplication.brand['@id']).toBe(brand['@id']);
       expect(byType.SoftwareApplication.featureList.length).toBeGreaterThan(10);
       const product = locale === 'ar' ? 'ابدأ ستور' : 'Ebda Store';
@@ -135,19 +135,33 @@ describe('every page exports metadata with a canonical', () => {
       // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher. The /whatsapp page is
       // the second product (Ebda Chat): its own name, brand line and OG image, never the Store's.
       const wa = page === 'whatsapp';
-      const product = wa ? (isEn ? 'Ebda Chat' : 'ابدأ شات') : isEn ? 'Ebda Store' : 'ابدأ ستور';
+      // the studio home (/) is the Ebda AI Studio's own page (Ruling MKT-HOME-1); /store is the Store landing
+      const studio = page === '';
+      const landing = page === '' || page === 'store';
+      const product = wa
+        ? isEn
+          ? 'Ebda Chat'
+          : 'ابدأ شات'
+        : studio
+          ? isEn
+            ? 'Ebda AI Studio'
+            : 'ابدأ استوديو للذكاء الاصطناعي'
+          : isEn
+            ? 'Ebda Store'
+            : 'ابدأ ستور';
       expect(meta.title).toContain(product);
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
       // brand disambiguation (not ebda3i.com or any other "Ebda"): the one brand line is in the OG
       // description; inner titles end in the short tail and stay SERP-length
-      expect(meta.openGraph.description).toContain(
-        wa
-          ? 'Ebda Chat — ابدأ شات, by Ebda AI Studio (ebda.app)'
-          : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
-      );
-      if (page) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
-      expect(meta.title.length).toBeLessThanOrEqual(page ? 90 : 60);
+      if (!studio)
+        expect(meta.openGraph.description).toContain(
+          wa
+            ? 'Ebda Chat — ابدأ شات, by Ebda AI Studio (ebda.app)'
+            : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
+        );
+      if (!landing) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
+      expect(meta.title.length).toBeLessThanOrEqual(landing ? 60 : 90);
       expect(meta.twitter.title).toBe(meta.title);
       expect(meta.openGraph.siteName).toBe(product);
       expect(meta.description).toBeTruthy();

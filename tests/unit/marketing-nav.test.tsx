@@ -7,19 +7,20 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Home } from '../../apps/marketing/src/components/Home';
+import { StudioHomePage } from '../../apps/marketing/src/components/StudioHome';
 import { FeaturesPage } from '../../apps/marketing/src/components/FeaturesPage';
 import { ComparePage } from '../../apps/marketing/src/components/ComparePage';
 import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
 import { CreditsPage } from '../../apps/marketing/src/components/CreditsPage';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
-import { COMPARE_SLUGS, HOME, LOCALES, pagePath } from '../../apps/marketing/src/lib/site';
+import { COMPARE_SLUGS, LOCALES, STORE_HOME, pagePath } from '../../apps/marketing/src/lib/site';
 
 const APP = path.resolve(__dirname, '../../apps/marketing/src/app');
 const LEGAL = ['legal', 'privacy', 'terms', 'merchant-agreement', 'acceptable-use'] as const;
 
 function pagesFor(l: 'ar' | 'en'): Record<string, string> {
   const out: Record<string, string> = {
-    home: renderToStaticMarkup(<Home locale={l} />),
+    store: renderToStaticMarkup(<Home locale={l} />),
     features: renderToStaticMarkup(<FeaturesPage locale={l} />),
     about: renderToStaticMarkup(<AboutPage locale={l} />),
     credits: renderToStaticMarkup(<CreditsPage locale={l} />),
@@ -39,7 +40,7 @@ const hrefs = (html: string, re: RegExp) =>
 describe('header nav and footer links', () => {
   for (const l of LOCALES) {
     const pages = pagesFor(l);
-    const homeIds = new Set([...pages.home.matchAll(/ id="([^"]+)"/g)].map(m => m[1]));
+    const homeIds = new Set([...pages.store.matchAll(/ id="([^"]+)"/g)].map(m => m[1]));
     for (const [name, html] of Object.entries(pages)) {
       it(`${l} ${name}: nav labels are unique and every nav + footer href resolves`, () => {
         const nav = hrefs(html, /<ul class="nav-links">.*?<\/ul>(?=<details class="nav-menu">)/s);
@@ -58,15 +59,15 @@ describe('header nav and footer links', () => {
         for (const { href } of [...nav, ...menu, ...footer]) {
           if (href.startsWith('mailto:') || /^https?:/.test(href)) continue;
           if (href.startsWith('#')) {
-            // an in-page anchor only works on the page that has the id: the home
-            expect(name, `${href} on ${name}`).toBe('home');
+            // an in-page anchor only works on the page that has the id: the Store landing (/store)
+            expect(name, `${href} on ${name}`).toBe('store');
             expect(homeIds.has(href.slice(1)), href).toBe(true);
             continue;
           }
           const [route, hash] = href.split('#');
           if (hash !== undefined) {
-            expect(route.replace(/\/$/, ''), href).toBe(HOME[l].replace(/\/$/, ''));
-            expect(homeIds.has(hash), `${href} id exists on the home`).toBe(true);
+            expect(route.replace(/\/$/, ''), href).toBe(STORE_HOME[l]);
+            expect(homeIds.has(hash), `${href} id exists on the Store landing`).toBe(true);
             continue;
           }
           const rel = route
@@ -82,5 +83,23 @@ describe('header nav and footer links', () => {
         }
       });
     }
+  }
+});
+
+describe('studio home (Ruling MKT-HOME-1)', () => {
+  for (const l of LOCALES) {
+    const html = renderToStaticMarkup(<StudioHomePage locale={l} />);
+    it(`${l}: Ebda Store first with its own sign-up, then Ebda Chat with its app; no CRM/ERP; no Store sections in the nav`, () => {
+      const store = html.indexOf('studio-card-store');
+      const chat = html.indexOf('wa.ebda.app');
+      expect(store).toBeGreaterThan(-1);
+      expect(chat).toBeGreaterThan(store);
+      expect(html).toContain('href="https://store.ebda.app/signup"');
+      expect(html).toContain(`href="${STORE_HOME[l]}"`);
+      expect(html).toContain(`href="${pagePath(l, 'whatsapp')}"`);
+      expect(html).not.toMatch(/CRM|ERP/);
+      expect(html).not.toMatch(/href="(\/en)?\/?#(story|looks|pricing|faq)"/);
+      expect(html).toContain('/hash-forward.js');
+    });
   }
 });

@@ -10,7 +10,7 @@ import {
 import { COPY } from '../lib/content';
 import { egp } from '../lib/demo-stores';
 import { whatsappJsonLd } from '../lib/seo';
-import { HOME, pagePath, type Locale } from '../lib/site';
+import { STORE_HOME, pagePath, type Locale } from '../lib/site';
 import { WHATSAPP_APP_URL, WHATSAPP_PAGE, WHATSAPP_YEARLY_SAVING_PCT } from '../lib/whatsapp-page';
 import { Footer } from './Footer';
 import { Header } from './Header';
@@ -100,7 +100,7 @@ function Pricing({ locale }: { locale: Locale }) {
                 </ul>
                 {included ? (
                   <Link
-                    href={`${HOME[locale] === '/' ? '' : HOME[locale]}/#pricing`}
+                    href={`${STORE_HOME[locale]}#pricing`}
                     className="btn btn-ghost"
                     data-plan-cta={p.id}
                   >

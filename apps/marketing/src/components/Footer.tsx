@@ -2,10 +2,19 @@ import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { CookieSettingsButton } from './CookieSettingsButton';
-import { SECURITY_EMAIL, pagePath, productOfPage, type Locale, type PageSlug } from '../lib/site';
+import {
+  SECURITY_EMAIL,
+  STORE_HOME,
+  pagePath,
+  productOfPage,
+  type Locale,
+  type PageSlug,
+} from '../lib/site';
 
 export function Footer({ locale, page = '' }: { locale: Locale; page?: PageSlug }) {
-  const wa = productOfPage(page) === 'whatsapp';
+  const kind = productOfPage(page);
+  const wa = kind === 'whatsapp';
+  const studio = kind === 'studio';
   const c = COPY[locale].footer;
   const k = COPY[locale].contact;
   return (
@@ -16,7 +25,7 @@ export function Footer({ locale, page = '' }: { locale: Locale; page?: PageSlug 
             <img src="/icon.svg" alt="" className="footer-mark" width={28} height={28} />
             <span>{locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}</span>
           </p>
-          <p className="footer-credit">{wa ? c.waProduct : c.product}</p>
+          <p className="footer-credit">{wa ? c.waProduct : studio ? c.studioProduct : c.product}</p>
           <p className="footer-h">{k.title}</p>
           <dl className="footer-contact">
             <div>
@@ -35,6 +44,13 @@ export function Footer({ locale, page = '' }: { locale: Locale; page?: PageSlug 
         </div>
         <nav aria-label={c.legalNav}>
           <ul className="footer-links">
+            {studio && (
+              <li>
+                <Link href={STORE_HOME[locale]}>
+                  {locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
+                </Link>
+              </li>
+            )}
             <li>
               <Link href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</Link>
             </li>
@@ -78,7 +94,9 @@ export function Footer({ locale, page = '' }: { locale: Locale; page?: PageSlug 
         </nav>
       </div>
       <div className="wrap footer-legal">
-        <p className="muted small">{wa ? c.waOwnership : c.ownership}</p>
+        <p className="muted small">
+          {wa ? c.waOwnership : studio ? c.studioOwnership : c.ownership}
+        </p>
       </div>
     </footer>
   );

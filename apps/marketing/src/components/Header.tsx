@@ -12,6 +12,7 @@ import {
   LOGIN_URL,
   SIGNUP_URL,
   NAV_ANCHORS,
+  STORE_HOME,
   WA_NAV_ANCHORS,
   productOfPage,
   pagePath,
@@ -61,7 +62,9 @@ export function Header({
   const other: Locale = locale === 'ar' ? 'en' : 'ar';
   const home = HOME[locale];
   /** Ebda Chat's own chrome (MKT-WA-CHROME-1): its sections, its sign-in, its page behind the wordmark. */
-  const wa = productOfPage(page) === 'whatsapp';
+  const kind = productOfPage(page);
+  const wa = kind === 'whatsapp';
+  const studioHome = kind === 'studio';
   const waBase = pagePath(locale, 'whatsapp');
   const startUrl = wa ? WHATSAPP_APP_URL : SIGNUP_URL;
   const loginUrl = wa ? WHATSAPP_APP_URL : LOGIN_URL;
@@ -71,7 +74,7 @@ export function Header({
   const products = [
     {
       id: 'store' as const,
-      href: home,
+      href: STORE_HOME[locale],
       name: locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
       blurb: c.nav.storeBlurb,
     },
@@ -82,8 +85,9 @@ export function Header({
       blurb: c.nav.whatsappBlurb,
     },
   ];
-  const anchor = (id: string) =>
-    page === '' && !offHome ? `#${id}` : `${home === '/' ? '' : home}/#${id}`;
+  /** The Store landing's sections (Ruling MKT-HOME-1: they live at /store, not at the studio home). */
+  const storeHome = STORE_HOME[locale];
+  const anchor = (id: string) => (page === 'store' && !offHome ? `#${id}` : `${storeHome}#${id}`);
   /** "Features" is the real /features/ page; every other item is a home section, absolute off the home. */
   const navLink = (n: (typeof NAV_ANCHORS)[number]) =>
     n.key === 'features' ? (
@@ -97,7 +101,9 @@ export function Header({
         key: n.key,
         node: <a href={waAnchor(n.target)}>{c.nav[n.key]}</a>,
       }))
-    : NAV_ANCHORS.map(n => ({ key: n.key, node: navLink(n) }));
+    : studioHome
+      ? []
+      : NAV_ANCHORS.map(n => ({ key: n.key, node: navLink(n) }));
   /** Secondary destinations live in one "More" menu so the top row stays on one line at every desktop width. */
   const moreItems = [
     ...anchors.filter(n => MORE_KEYS.includes(n.key)),

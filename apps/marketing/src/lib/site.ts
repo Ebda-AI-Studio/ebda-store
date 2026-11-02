@@ -26,6 +26,8 @@ export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
 /** Home path per locale. Arabic is the default and lives at the root. */
 export const HOME: Record<Locale, string> = { ar: '/', en: '/en' };
+/** The Ebda Store landing (Ruling MKT-HOME-1): `/` is the Ebda AI Studio home, the Store landing lives here, unchanged. */
+export const STORE_HOME: Record<Locale, string> = { ar: '/store', en: '/en/store' };
 
 export const LEGAL_SLUGS = [
   'legal',
@@ -69,6 +71,7 @@ export type PageSlug =
   | 'contact'
   | 'credits'
   | 'features'
+  | 'store'
   | 'whatsapp'
   | ComparePage
   | ForPage
@@ -83,6 +86,7 @@ export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
 /** Every public marketing page (same set in both locales). The sitemap is generated from this. */
 export const SITE_PAGES = [
   '',
+  'store',
   'features',
   'whatsapp',
   ...COMPARE_PAGES,
@@ -123,8 +127,12 @@ export const SECTION_ORDER = [
 export type SectionId = (typeof SECTION_ORDER)[number];
 
 /** Which product a page belongs to (MKT-WA-CHROME-1): the Ebda Chat page and its legal documents get Chat's own chrome. */
-export const productOfPage = (page: string): 'store' | 'whatsapp' =>
-  page === 'whatsapp' || page.startsWith('legal/whatsapp-') ? 'whatsapp' : 'store';
+export const productOfPage = (page: string): 'studio' | 'store' | 'whatsapp' =>
+  page === 'whatsapp' || page.startsWith('legal/whatsapp-')
+    ? 'whatsapp'
+    : page === ''
+      ? 'studio'
+      : 'store';
 
 /** Ebda Chat nav items: sections of its own page (MKT-WA-CHROME-1), labelled with the shared nav copy. */
 export const WA_NAV_ANCHORS = [
@@ -135,6 +143,7 @@ export const WA_NAV_ANCHORS = [
 
 /** Top-nav items other than the wordmark and the account actions, in page order. */
 export const NAV_ANCHORS = [
+  // targets are sections of the Store landing (STORE_HOME)
   { key: 'solutions', target: 'story' },
   { key: 'looks', target: 'looks' },
   { key: 'features', target: 'features' },

@@ -272,6 +272,9 @@ export interface Copy {
     /** The Ebda Chat pages' credit and ownership lines (MKT-WA-CHROME-1: a product page never credits another product). */
     waProduct: string;
     waOwnership: string;
+    /** The studio home's credit and ownership lines (Ruling MKT-HOME-1). */
+    studioProduct: string;
+    studioOwnership: string;
     legalNav: string;
     legal: string;
     privacy: string;
@@ -699,6 +702,8 @@ export const COPY: Record<Locale, Copy> = {
       product: `ابدأ ستور — منتج من ${CO.shortNameAr}`,
       waProduct: `ابدأ شات — منتج من ${CO.shortNameAr}`,
       waOwnership: `ابدأ شات منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
+      studioProduct: `ابدأ ستور وابدأ شات — منتجات من ${CO.shortNameAr}`,
+      studioOwnership: `© 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
       legalNav: 'روابط قانونية',
       legal: 'الإشعار القانوني',
       privacy: 'الخصوصية',
@@ -1131,6 +1136,8 @@ export const COPY: Record<Locale, Copy> = {
       product: `Ebda Store — a product of ${CO.shortNameEn}`,
       waProduct: `Ebda Chat — a product of ${CO.shortNameEn}`,
       waOwnership: `Ebda Chat is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
+      studioProduct: `Ebda Store and Ebda Chat — products of ${CO.shortNameEn}`,
+      studioOwnership: `© 2026 ${CO.shortNameEn}. All rights reserved.`,
       legalNav: 'Legal links',
       legal: 'Legal notice',
       privacy: 'Privacy',
