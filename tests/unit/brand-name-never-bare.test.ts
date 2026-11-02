@@ -40,7 +40,7 @@ const EN_ALLOW: RegExp[] = [
   /Ebda own ads/,
 ];
 
-const EN_BARE = /\bEbda\b(?! (?:Store|AI Studio|WhatsApp|CRM|ERP)\b)/g;
+const EN_BARE = /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP)\b)/g;
 const AR_BRAND = '(?:ابدأ|إبدأ|إبدا)';
 const AR_LETTER = '[\\u0621-\\u064A\\u0671-\\u06D3]';
 const AR_NEXT_OK = `(?!\\s*(?:ستور|استوديو|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;
