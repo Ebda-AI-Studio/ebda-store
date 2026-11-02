@@ -197,6 +197,10 @@ declare module '@ebda-src/repo' {
     m: DoMutation
   ): Promise<DoQueryResult>;
   export function ensureIdempotencySchema(sql: SqlRunner): void;
+  export interface D1Like {
+    prepare(sql: string): { bind(...v: unknown[]): unknown };
+  }
+  export function createD1Client(meta: Meta, d1: D1Like): Record<string, any>;
   export function applyStoreSettings(
     sql: SqlRunner,
     meta: Meta,
