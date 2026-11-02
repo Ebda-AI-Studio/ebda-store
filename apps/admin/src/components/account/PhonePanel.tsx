@@ -115,7 +115,7 @@ export function PhonePanel({ mfaEnabled }: { mfaEnabled: boolean }) {
           </>
         )}
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-destructive-ink">
             {error}
           </p>
         )}
