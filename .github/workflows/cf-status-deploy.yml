@@ -21,7 +21,8 @@ env:
 jobs:
   # Ruling CI-BUDGET-2: skip the whole deploy (seconds, not a build) when nothing this app is built from changed -
   # a workflow-only edit, a shared script another app uses, a lockfile entry this app does not depend on.
-  # workflow_dispatch and `[force-deploy]` in the head commit message always deploy. scripts/ci/deploy-plan.mjs.
+  # workflow_dispatch and `[force-deploy]` in the head commit SUBJECT always deploy.
+  # scripts/ci/deploy-plan.mjs.
   plan:
     name: Does this push change status?
     if: github.ref == 'refs/heads/main'

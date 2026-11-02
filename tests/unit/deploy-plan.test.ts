@@ -11,6 +11,7 @@ import {
   triggerPaths,
   lockClosure,
   lockAffects,
+  wantsForce,
 } from '../../scripts/ci/deploy-plan.mjs';
 
 const WF = path.resolve(__dirname, '../../.github/workflows');
@@ -41,6 +42,15 @@ describe('deploy-plan: which apps a push deploys', () => {
         force: true,
       }).deploy
     ).toBe(true);
+  });
+
+  it('[force-deploy] forces only in the commit subject, never in the body', () => {
+    expect(wantsForce('ci: redeploy web [force-deploy]\n\nbody')).toBe(true);
+    expect(wantsForce('fix: x\n\nbody\n\n[force-deploy]\nCo-Authored-By: a')).toBe(false);
+    expect(
+      wantsForce('ci: a push deploys\n\nworkflow_dispatch and [force-deploy] always deploy.')
+    ).toBe(false);
+    expect(wantsForce('fix: plain subject')).toBe(false);
   });
 
   it('an app code edit deploys that app only', () => {

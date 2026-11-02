@@ -5,7 +5,7 @@
  * workflow runs this on the pushed range and skips the real deploy job, in seconds, when the app's deployable output
  * cannot have changed. The workflow's own `paths:` list stays the single source of what an app is built from; this
  * only refines it:
- *   - a file under `.github/` never deploys (config-only); a deploy is forced by workflow_dispatch or `[force-deploy]` in
+ *   - a file under `.github/` never deploys (config-only); a deploy is forced by workflow_dispatch or `[force-deploy]` in the SUBJECT of
  *     the head commit message;
  *   - `scripts/ci/deploy-guard.mjs` and `scripts/ci/workerd-smoke.*` are the deploy's own checks, not bundle inputs;
  *   - `package-lock.json` deploys the app only if a lock entry its dependency closure reaches changed;
@@ -19,6 +19,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOCK = 'package-lock.json';
+/** Ruling CI-BUDGET-2a: `[force-deploy]` counts only in the SUBJECT (first line) of the head commit message. A squash
+ * message carries every commit body, so a body mention (CI-BUDGET-2's own did) must never force a deploy. */
+export const wantsForce = message => /\[force-deploy\]/.test(String(message).split('\n')[0]);
+
 const NOT_BUNDLE_INPUTS = [/^scripts\/ci\/deploy-guard\.mjs$/, /^scripts\/ci\/workerd-smoke\./];
 
 /** The `push.paths` globs of a workflow's text (the `- '...'` items under `paths:`), minus the workflow's own file. */
@@ -156,10 +160,7 @@ function main(argv) {
   const paths = triggerPaths(text);
   let result;
   try {
-    if (
-      event === 'workflow_dispatch' ||
-      /\[force-deploy\]/.test(git('log', '-1', '--format=%B', sha))
-    ) {
+    if (event === 'workflow_dispatch' || wantsForce(git('log', '-1', '--format=%B', sha))) {
       result = planDeploy({ paths, files: [], force: true });
     } else if (!before || /^0+$/.test(before)) {
       result = { deploy: true, reason: 'no previous commit to diff against; deploying' };
