@@ -203,6 +203,10 @@ declare module '@ebda-src/repo' {
     storeId: string,
     fields?: string[]
   ): { record: Record<string, unknown>; missing: string[] } | null;
+  export interface D1Like {
+    prepare(sql: string): { bind(...v: unknown[]): unknown };
+  }
+  export function createD1Client(meta: Meta, d1: D1Like, opts?: object): Record<string, any>;
   export function applyStoreSettings(
     sql: SqlRunner,
     meta: Meta,

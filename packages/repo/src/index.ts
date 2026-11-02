@@ -1,4 +1,6 @@
 export { createPrismaLite, expandUnique } from './prisma-lite/client';
+export { createD1Client, type D1Like } from './prisma-lite/d1';
+export { withEntropy, type Entropy } from './prisma-lite/entropy';
 export { Engine } from './prisma-lite/engine';
 export { WriteEngine, mapDbError, knownError } from './prisma-lite/writes';
 export type { Meta, SqlRunner } from './prisma-lite/types';
