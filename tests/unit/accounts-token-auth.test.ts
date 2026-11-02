@@ -283,11 +283,17 @@ describe('the Store profile row is checked on every request (defence in depth fo
 });
 
 describe('live vs claims-only identity (Ruling NZ-D2)', () => {
-  it('a plain read trusts the signed claims: no identity call, even for a session revoked a moment ago', async () => {
+  it('an allowlisted read (NZ-D10) trusts the signed claims: no identity call, even for a session revoked a moment ago', async () => {
     revoked.add('sid-1');
-    const res = await runWith('GET', '/api/v1/stores/store-1/products', await mint());
+    const res = await runWith('GET', '/api/v1/stores/store-1/typography', await mint());
     expect(res.err).toBeUndefined();
     expect(res.req.user?.userId).toBe('user-1');
+  });
+  it('an unclassified GET is live by default (NZ-D10): a revoked session reading products is refused', async () => {
+    revoked.add('sid-1');
+    expect(
+      (await runWith('GET', '/api/v1/stores/store-1/products', await mint())).err?.statusCode
+    ).toBe(401);
   });
   it('every state change is live: revoked, suspended and unknown are refused', async () => {
     revoked.add('sid-1');
