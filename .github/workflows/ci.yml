@@ -141,9 +141,8 @@ jobs:
   # every main push, so it has no `needs` and no `if`.
   guards:
     name: Repo guards
-    # Ruling CI-HOSTED-1 (2026-11-02): a scheduled run is a no-op unless a self-hosted runner is configured
-    # (EBDA_RUNS_ON set); manual dispatch still runs on hosted.
-    if: (github.event_name != 'schedule' || vars.EBDA_RUNS_ON != '')
+    # Ruling CI-HOSTED-1: deliberately NO `if` here (the always-on PR check; tests/unit/ci-lean-structure and
+    # merge-gate derive the required list from it). Residual: ~1.5 hosted min per scheduled run.
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
