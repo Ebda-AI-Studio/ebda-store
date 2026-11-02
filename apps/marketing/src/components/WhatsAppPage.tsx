@@ -15,7 +15,6 @@ import { WHATSAPP_APP_URL, WHATSAPP_PAGE, WHATSAPP_YEARLY_SAVING_PCT } from '../
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { Reveal } from './Motion';
-import { WaChatVisual } from './WaChatVisual';
 import { JsonLd } from './JsonLd';
 import { SiteLink } from './SiteLink';
 
@@ -149,7 +148,17 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
               </SiteLink>
             </p>
           </div>
-          <WaChatVisual locale={locale} />
+          <figure className="wa-visual wa-art-hero">
+            <img
+              src={`/chat/chat-hero-${locale}.svg`}
+              alt={p.art.hero}
+              width={640}
+              height={600}
+              fetchPriority="high"
+              decoding="async"
+            />
+            <figcaption className="muted small">{p.art.caption}</figcaption>
+          </figure>
         </header>
 
         <section className="page-sec" aria-labelledby="wa-feats-h" id="features">
@@ -162,6 +171,24 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
               </li>
             ))}
           </ul>
+          <div className="wa-art">
+            <img
+              src={`/chat/chat-inbox-${locale}.svg`}
+              alt={p.art.inbox}
+              width={640}
+              height={444}
+              loading="lazy"
+              decoding="async"
+            />
+            <img
+              src={`/chat/chat-campaign-${locale}.svg`}
+              alt={p.art.campaign}
+              width={640}
+              height={420}
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
         </section>
 
         <section className="page-sec" aria-labelledby="wa-store-h">
