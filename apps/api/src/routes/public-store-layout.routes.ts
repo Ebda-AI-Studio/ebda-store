@@ -7,7 +7,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma, withStore } from '@ebda/database';
-import { lookupStore } from '../lib/definer';
+import { lookupStoreCached } from '../lib/store-directory';
 import { isSectionPageKind, normalizeLegacyTemplate, resolveLayoutSettings } from '@ebda/shared';
 import { redis } from '../services/redis.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
@@ -53,7 +53,7 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     // a second round-trip.
     // `stores` is under RLS (R-EBDA-005): an ACTIVE store with this id through the lookup
     // definer, then its row inside its own scope.
-    const hit = await lookupStore({ id: storeId }, ['active']);
+    const hit = await lookupStoreCached({ id: storeId }, ['active']);
     const store = hit
       ? await withStore(hit.id, tx =>
           tx.store.findUnique({
@@ -167,7 +167,7 @@ router.get(
         return;
       }
       // `stores` is under RLS: only an ACTIVE store resolves, through the lookup definer.
-      const hit = await lookupStore({ id: storeId }, ['active']);
+      const hit = await lookupStoreCached({ id: storeId }, ['active']);
       if (!hit) {
         res
           .status(404)

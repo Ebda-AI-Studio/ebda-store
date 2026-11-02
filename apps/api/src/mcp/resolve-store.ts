@@ -1,5 +1,5 @@
 import { withStore } from '@ebda/database';
-import { lookupStore } from '../lib/definer';
+import { lookupStoreCached } from '../lib/store-directory';
 import { AppError } from '../middleware/error-handler';
 
 export interface McpStore {
@@ -27,7 +27,7 @@ export interface McpStore {
 export async function resolveStoreBySlug(slug: string): Promise<McpStore> {
   // `stores` is under RLS (R-EBDA-005): the slug resolves through the definer (active,
   // not deleted), then the row is read inside that store's own scope.
-  const hit = await lookupStore({ slug }, ['active']);
+  const hit = await lookupStoreCached({ slug }, ['active']);
   const store = hit
     ? await withStore(hit.id, tx =>
         tx.store.findUnique({

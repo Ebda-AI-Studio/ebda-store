@@ -59,6 +59,7 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
+import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
   assertPlanAllows,
@@ -93,6 +94,8 @@ export async function bustStoreCaches(
   slug: string | null,
   domain?: string | null
 ): Promise<void> {
+  // NEON-SCALE-1 rule 1: the cached store directory (slug / domain / id -> status) is event-invalidated here.
+  await invalidateStoreDirectory(storeId, slug, domain);
   await invalidateCached(`public:store:${storeId}`);
   if (slug) {
     await invalidateCached(`public:store:${slug}`);
@@ -550,6 +553,8 @@ export class StoreService {
 
     // Hotfix N-22: the new store must resolve (lookups read D1). The creating write committed above, so read it back and mirror it.
     await syncStoreDirectoryFromPg(store.id);
+    // A slug probed before this store existed is negatively cached in the directory: clear it so the new store resolves at once.
+    await invalidateStoreDirectory(store.id, store.slug, store.domain);
 
     return { ...store, owner };
   }
