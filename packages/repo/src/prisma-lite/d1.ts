@@ -22,8 +22,18 @@ import { createPrismaLite } from './client';
 import { withEntropy, type Entropy } from './entropy';
 import type { Meta, SqlRunner } from './types';
 
+/** A D1 session (Sessions API): same prepare surface plus the bookmark of the last read / write it served. */
+export interface D1SessionLike {
+  prepare: D1Like['prepare'];
+  getBookmark?(): string | null;
+}
+
 /** The slice of a D1 database this client uses. */
 export interface D1Like {
+  /** Sessions API (read replication). Absent on a database without it; replica reads then fall back to the primary. */
+  withSession?(constraint?: string): D1SessionLike;
+  /** Atomic batch of independent statements, one round trip. */
+  batch?(stmts: unknown[]): Promise<unknown[]>;
   prepare(sql: string): {
     bind(...v: unknown[]): {
       all<T = Record<string, unknown>>(): Promise<{ results?: T[]; meta?: { changes?: number } }>;
@@ -49,13 +59,45 @@ type Entry =
 const bindable = (v: unknown): unknown =>
   v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v;
 
+const WRITE_OPS = new Set([
+  'create',
+  'createMany',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany',
+]);
+
 /** Max statements one operation may issue: a runaway replay loop is a bug, not a retry. */
 const MAX_STATEMENTS = 64;
 
-export function createD1Client(meta: Meta, d1: D1Like) {
-  async function execute(n: Need): Promise<Entry> {
+export interface D1ClientOptions {
+  /**
+   * Replica-safe reads (rule 6 of NEON-SCALE-1): SELECTs go through `d1.withSession(bookmark ?? 'first-unconstrained')`
+   * and may be served by a read replica; every write, and every statement of an operation that writes, stays on the
+   * primary. Never set it for auth, billing state or the directory miss path.
+   */
+  replicaReads?: boolean;
+  /** Bookmark from a previous response (`x-d1-bookmark`) so a client never reads older data than it saw. */
+  bookmark?: string;
+  /** Called once per statement that really reaches D1 (call-count tests, per-request budget counters). */
+  onStatement?: (e: { kind: 'all' | 'run' | 'batch'; sql: string; replica: boolean }) => void;
+}
+
+export function createD1Client(meta: Meta, d1: D1Like, opts: D1ClientOptions = {}) {
+  let session: D1SessionLike | undefined;
+  /** The bookmark to hand back to the caller after replica reads (null when none was used). */
+  const bookmark = (): string | null => session?.getBookmark?.() ?? null;
+
+  async function execute(n: Need, writing: boolean): Promise<Entry> {
     try {
-      const stmt = d1.prepare(n.sql).bind(...n.params.map(bindable));
+      const replica = !!opts.replicaReads && !writing && n.kind === 'all' && !!d1.withSession;
+      opts.onStatement?.({ kind: n.kind, sql: n.sql, replica });
+      const target: D1SessionLike = replica
+        ? (session ??= d1.withSession!(opts.bookmark ?? 'first-unconstrained'))
+        : d1;
+      const stmt = target.prepare(n.sql).bind(...n.params.map(bindable));
       if (n.kind === 'all') {
         const r = await stmt.all();
         return { ok: true, rows: r.results ?? [], changes: 0 };
@@ -68,7 +110,7 @@ export function createD1Client(meta: Meta, d1: D1Like) {
   }
 
   /** Run one delegate call to completion against a fresh journal. */
-  async function journaled<T>(call: (client: any) => PromiseLike<T>): Promise<T> {
+  async function journaled<T>(call: (client: any) => PromiseLike<T>, writes: boolean): Promise<T> {
     const journal: Entry[] = [];
     const uuids: string[] = [];
     let nowMs: number | undefined;
@@ -109,7 +151,7 @@ export function createD1Client(meta: Meta, d1: D1Like) {
         if (!(e instanceof Need)) throw e;
         if (journal.length >= MAX_STATEMENTS)
           throw new Error(`prisma-lite d1: operation exceeded ${MAX_STATEMENTS} statements`);
-        journal.push(await execute(e));
+        journal.push(await execute(e, writes));
       }
     }
   }
@@ -146,6 +188,16 @@ export function createD1Client(meta: Meta, d1: D1Like) {
       get(_t, prop: string | symbol) {
         if (typeof prop === 'symbol' || prop === 'then') return undefined;
         if (prop === '$transaction') return () => Promise.reject(refusal());
+        if (prop === '$bookmark') return bookmark;
+        if (prop === '$batch')
+          return async (stmts: Array<{ sql: string; params?: unknown[] }>) => {
+            if (!d1.batch) throw new Error('prisma-lite d1: this D1 binding has no batch()');
+            for (const st of stmts)
+              opts.onStatement?.({ kind: 'batch', sql: st.sql, replica: false });
+            return d1.batch(
+              stmts.map(st => d1.prepare(st.sql).bind(...(st.params ?? []).map(bindable)))
+            );
+          };
         if (prop === '$connect' || prop === '$disconnect') return async () => undefined;
         if (!models.has(prop)) throw new Error(`prisma-lite d1: no model delegate "${prop}" in D1`);
         return new Proxy(
@@ -153,9 +205,13 @@ export function createD1Client(meta: Meta, d1: D1Like) {
           {
             get(_d, op: string | symbol) {
               if (typeof op === 'symbol' || op === 'then') return undefined;
+              const writes = WRITE_OPS.has(op);
               return (args?: unknown) =>
                 lazyCall(() =>
-                  journaled(c => (c[prop][op] as (a?: unknown) => PromiseLike<unknown>)(args))
+                  journaled(
+                    c => (c[prop][op] as (a?: unknown) => PromiseLike<unknown>)(args),
+                    writes
+                  )
                 );
             },
           }

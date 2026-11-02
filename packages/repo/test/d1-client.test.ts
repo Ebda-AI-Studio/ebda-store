@@ -132,3 +132,54 @@ describe('D1 client', () => {
     expect(log).toHaveLength(0);
   });
 });
+
+describe('D1 client: sessions, batch, call counting', () => {
+  it('onStatement counts every statement that reaches D1 and flags replica reads', async () => {
+    const { db, d1 } = rig();
+    const seen: Array<{ kind: string; replica: boolean }> = [];
+    const sessions: string[] = [];
+    const withSession = (c?: string) => (
+      sessions.push(c ?? ''),
+      { prepare: d1.prepare, getBookmark: () => 'bm1' }
+    );
+    const client = createD1Client(
+      META,
+      { ...d1, withSession },
+      { replicaReads: true, onStatement: e => seen.push(e) }
+    );
+    db.prepare(
+      "INSERT INTO plans (id, code, name_en, name_ar, limits) VALUES ('p','c','n','n','{}')"
+    ).run();
+    await client.plan.findMany({});
+    expect(seen).toEqual([{ kind: 'all', sql: expect.any(String), replica: true }]);
+    expect(sessions).toEqual(['first-unconstrained']);
+    expect(client.$bookmark()).toBe('bm1');
+    seen.length = 0;
+    await client.plan.update({ where: { code: 'c' }, data: { sort: 2 } }); // a write op never touches a replica
+    expect(seen.every(s => s.replica === false)).toBe(true);
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a read-only client without the Sessions API falls back to the primary', async () => {
+    const { d1 } = rig();
+    const seen: boolean[] = [];
+    const client = createD1Client(META, d1, {
+      replicaReads: true,
+      onStatement: e => seen.push(e.replica),
+    });
+    await client.plan.count();
+    expect(seen).toEqual([false]);
+  });
+
+  it('$batch runs independent statements in one d1.batch call', async () => {
+    const { d1, db } = rig();
+    let batches = 0;
+    const client = createD1Client(META, {
+      ...d1,
+      batch: async stmts => (batches++, stmts.map(() => ({}))),
+    });
+    await client.$batch([{ sql: 'SELECT 1' }, { sql: 'SELECT 2' }]);
+    expect(batches).toBe(1);
+    void db;
+  });
+});
