@@ -53,7 +53,7 @@ describe('discovery', () => {
 });
 
 describe('login and the access token contract', () => {
-  it('mints an ES256 at+jwt with the contract claims, 15 minute life, and a hardened host-only cookie', async () => {
+  it('mints an ES256 at+jwt with the contract claims, 5 minute life, and a hardened host-only cookie', async () => {
     const u = await seedUser();
     fakes.stores = [
       { id: 's1', role: 'owner' },
@@ -72,7 +72,7 @@ describe('login and the access token contract', () => {
     ]);
     expect(typeof payload.sid).toBe('string');
     expect(typeof payload.jti).toBe('string');
-    expect(payload.exp! - payload.iat!).toBe(15 * 60);
+    expect(payload.exp! - payload.iat!).toBe(5 * 60); // Ruling NZ-D2: store-audience tokens live <= 5 minutes
     expect(payload.nbf).toBe(payload.iat);
     expect(payload.pa).toBeUndefined();
     const set = res.headers.getSetCookie().find(c => c.startsWith('__Host-ebda_rt='))!;
