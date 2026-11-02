@@ -36,6 +36,8 @@ vi.mock('@ebda/database', () => {
     withUser: boom,
     withSystemJob: boom,
     afterTxCommit: (tx: object, fn: () => unknown) => realHooks.afterTxCommit(tx, fn),
+    afterTenantTxCommit: (fn: () => unknown) =>
+      realHooks.ambient ? (realHooks.ambient.push(fn), true) : false,
     runInTenantContext: async (_id: string, fn: () => unknown) => fn(),
     onClosedTenantTxAccess: () => undefined,
   };
@@ -67,13 +69,18 @@ vi.mock('../../apps/api/src/lib/platform-db', () => ({
   requirePlatformDb: async () => h.d1,
   platformDb: async () => h.d1,
 }));
+vi.mock('../../apps/api/src/services/alerts.service', () => ({
+  sendAlert: vi.fn(async () => undefined),
+}));
 vi.mock('../../apps/api/src/lib/identity-client', () => ({
   getAccountState: async (id: string) => ({ id, email: 'o@x.com', firstName: 'O', lastName: 'W' }),
 }));
 
 import { prisma } from '@ebda/database';
+import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
+import { applyStoreUpdateRetry } from '../../apps/api/src/lib/store-update-retry';
 import { storeUpdate, storeUpdateMany, storeWritesToDo } from '../../apps/api/src/lib/repo-factory';
-import { afterTxCommit } from '../../packages/database/src/tx-hooks';
+import { afterTxCommit, runCommitHooks } from '../../packages/database/src/tx-hooks';
 import { withMoneyTx } from '../../packages/database/src/with-money-tx';
 
 realHooks.afterTxCommit = afterTxCommit;
@@ -118,6 +125,10 @@ beforeEach(() => {
             await Promise.resolve();
             if (/^\s*select/i.test(sql))
               return { results: sqlite.prepare(sql).all(...(v as never[])) };
+            if (realHooks.failD1Writes > 0) {
+              realHooks.failD1Writes--;
+              throw new Error('d1 down');
+            }
             return {
               meta: { changes: Number(sqlite.prepare(sql).run(...(v as never[])).changes) },
             };
@@ -138,6 +149,8 @@ beforeEach(() => {
       )
       .run(id, slug, slug);
   h.doCalls.length = 0;
+  realHooks.ambient = null;
+  realHooks.failD1Writes = 0;
 });
 
 const d1row = (id: string) =>
@@ -301,5 +314,72 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
       } as never)
     ).rejects.toMatchObject({ statusCode: 501 });
     expect(d1row(S).plan).not.toBe('professional');
+  });
+
+  describe('entitlement changes through the base client (withStore callers) follow the AMBIENT transaction (NZ-D19)', () => {
+    const run = async (commit: boolean, patch: Record<string, unknown>) => {
+      const ambient: Array<() => unknown> = [];
+      realHooks.ambient = ambient;
+      await storeUpdate(BASE, {
+        where: { id: S },
+        data: patch,
+        select: { plan: true, theme: true },
+      } as never);
+      if (commit) await runCommitHooks(ambient);
+      realHooks.ambient = null;
+    };
+    it('plan changed in an ambient tx that ROLLS BACK: nothing written; COMMITS: written after the commit', async () => {
+      const before = d1row(S).plan;
+      await run(false, { plan: 'professional' });
+      expect(d1row(S).plan).toBe(before);
+      await run(true, { plan: 'professional' });
+      expect(d1row(S).plan).toBe('professional');
+      expect(doProfile(S).plan).toBe('professional');
+    });
+    it('a non-entitlement field, and a write with no ambient transaction, are applied immediately', async () => {
+      await run(false, { theme: { a: 1 } });
+      expect(JSON.parse(doProfile(S).theme as string)).toEqual({ a: 1 });
+      await storeUpdate(BASE, {
+        where: { id: S },
+        data: { plan: 'enterprise' },
+        select: { plan: true },
+      } as never);
+      expect(d1row(S).plan).toBe('enterprise');
+    });
+    it('a post-commit D1 failure is ALERTED, a retry is queued, and the retry converges (D1 and the DO match)', async () => {
+      const sent: unknown[] = [];
+      setCfBindings({ JOBS_QUEUE: { send: async (m: unknown) => void sent.push(m) } } as never);
+      const { sendAlert } = await import('../../apps/api/src/services/alerts.service');
+      (sendAlert as ReturnType<typeof vi.fn>).mockClear();
+      const ambient: Array<() => unknown> = [];
+      realHooks.ambient = ambient;
+      await storeUpdate(BASE, {
+        where: { id: S },
+        data: { plan: 'professional' },
+        select: { plan: true },
+      } as never);
+      realHooks.failD1Writes = 1; // the post-commit write hits a D1 outage
+      await runCommitHooks(ambient);
+      realHooks.ambient = null;
+      expect(d1row(S).plan).not.toBe('professional');
+      expect(sendAlert).toHaveBeenCalledTimes(1);
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        kind: 'store-update-retry',
+        storeId: S,
+        data: { plan: 'professional' },
+      });
+      // the queue redelivers: D1 is back, the retry applies it
+      const { storeUpdateOnDo } = await import('../../apps/api/src/lib/repo-factory');
+      const out = await applyStoreUpdateRetry(sent[0] as never, {
+        apply: async (id, data) =>
+          void (await storeUpdateOnDo(id, { data, select: { id: true } } as never)),
+        updatedAt: async () => null,
+      });
+      expect(out).toBe('done');
+      expect(d1row(S).plan).toBe('professional');
+      expect(doProfile(S).plan).toBe('professional');
+      clearCfBindings();
+    });
   });
 });

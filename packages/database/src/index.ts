@@ -525,7 +525,7 @@ export { prisma as db };
 // Money-safe transaction wrapper (Neon pgbouncer P2028 guard). Use for every
 // interactive $transaction call site. See ./with-money-tx.ts.
 export { withMoneyTx } from './with-money-tx';
-export { afterTxCommit } from './tx-hooks';
+export { afterTxCommit, setCommitHookErrorReporter } from './tx-hooks';
 
 // Set RLS settings on a caller-opened transaction. See ./tenant-gucs.ts.
 export { setTenantGucs, type TenantGucs } from './tenant-gucs';

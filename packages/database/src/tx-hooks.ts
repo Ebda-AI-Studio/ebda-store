@@ -21,13 +21,29 @@ export function afterTxCommit(tx: object, fn: () => unknown): boolean {
   return true;
 }
 
-/** Run and clear a committed transaction's hooks. A throw is swallowed: the transaction already committed. */
+let reporter: (err: unknown) => void = err =>
+  // eslint-disable-next-line no-console
+  console.error('[tx-hooks] an after-commit hook FAILED (the transaction already committed)', err);
+
+/** The app installs its logger / alerting here; the default logs to the console. NEVER a silent swallow (Ruling NZ-D19). */
+export function setCommitHookErrorReporter(fn: (err: unknown) => void): void {
+  reporter = fn;
+}
+
+/**
+ * Run and clear a committed transaction's hooks. One failing hook must not stop the others and cannot undo the commit, but it is
+ * REPORTED (logged by default, the app's logger / alert when installed), never swallowed.
+ */
 export async function runCommitHooks(hooks: Array<() => unknown>): Promise<void> {
   for (const hook of hooks.splice(0)) {
     try {
       await hook();
-    } catch {
-      // the hook owns its own error reporting
+    } catch (err) {
+      try {
+        reporter(err);
+      } catch {
+        // a throwing reporter must not break the remaining hooks
+      }
     }
   }
 }

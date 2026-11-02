@@ -35,6 +35,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import {
+  afterTenantTxCommit,
   afterTxCommit,
   prisma,
   withStore,
@@ -46,6 +47,7 @@ import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
 import { d1StorePatch } from './store-columns';
+import { reportAndRetryStoreUpdate } from './store-update-retry';
 import { getAccountState } from './identity-client';
 
 type WriteOp =
@@ -1480,6 +1482,50 @@ export async function storeUpdateOnDo(
  * Defer a DO store's update to the commit of the surrounding transaction (Ruling NZ-D18). Returns the PROJECTED row (the current
  * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
  */
+/**
+ * The post-commit D1 / DO write of a deferred update. Postgres has already committed, so a failure here is never swallowed: it is
+ * logged, alerted and put on the jobs queue for a durable retry (lib/store-update-retry.ts).
+ */
+async function applyPostCommit(storeId: string, patch: Record<string, unknown>): Promise<void> {
+  try {
+    await storeUpdateOnDo(storeId, { data: patch, select: { id: true } } as never);
+  } catch (err) {
+    await reportAndRetryStoreUpdate(storeId, patch, err);
+  }
+}
+
+/** Fields whose rollback must not leave a D1 / DO change behind: plan (entitlements), billing suspension, lifecycle status. */
+const ENTITLEMENT_FIELDS = [
+  'plan',
+  'billingSuspendedReason',
+  'billingSuspendedAt',
+  'status',
+  'deletedAt',
+];
+const touchesEntitlement = (data: Record<string, unknown>): boolean =>
+  ENTITLEMENT_FIELDS.some(f => data[f] !== undefined);
+
+/** The row an update WILL produce (current record with the patch laid over it), read without writing. */
+async function projectStoreUpdate(
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<Record<string, unknown>> {
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const selected = args.select
+    ? Object.keys(args.select as object).filter(k => (args.select as any)[k])
+    : undefined;
+  const current = await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+    where: { id: storeId },
+    ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
+  });
+  if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  const projected: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(args.data))
+    if (v !== undefined && (!selected || selected.includes(k))) projected[k] = v;
+  return projected;
+}
+
 export async function storeUpdateAfterCommit(
   tx: object,
   storeId: string,
@@ -1506,12 +1552,7 @@ export async function storeUpdateAfterCommit(
     ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
   });
   if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  write = async () => {
-    await storeUpdateOnDo(storeId, {
-      data,
-      ...(args.select ? { select: { id: true } } : {}),
-    } as never);
-  };
+  write = () => applyPostCommit(storeId, data);
   const projected: Record<string, unknown> = { ...current };
   for (const [k, v] of Object.entries(data))
     if (!selected || selected.includes(k)) projected[k] = v;
@@ -1531,6 +1572,21 @@ export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
     // (a job's own transaction) it is refused, so that caller gets a proper port.
     if ((db as unknown) !== (prisma as unknown))
       return (await storeUpdateAfterCommit(db as object, id, a)) as Prisma.StoreGetPayload<A>;
+    // The base `prisma` proxy writes into the AMBIENT tenant transaction (`withStore` hands callers `prisma` itself, not a registered
+    // tx object). An ENTITLEMENT / lifecycle change (plan, billing suspension, status) made there must not outlive that transaction's
+    // rollback (a free upgrade, a re-activation): it applies after the AMBIENT transaction commits, when one with a hook registry
+    // exists. Every other field, and a write with no ambient transaction, is applied now (like every other DO write in a request).
+    if (touchesEntitlement(a.data as Record<string, unknown>)) {
+      let write: (() => Promise<void>) | undefined;
+      if (afterTenantTxCommit(() => write?.())) {
+        const projected = await projectStoreUpdate(id, a);
+        const patch = Object.fromEntries(
+          Object.entries(a.data as object).filter(([, v]) => v !== undefined)
+        );
+        write = () => applyPostCommit(id, patch);
+        return projected as Prisma.StoreGetPayload<A>;
+      }
+    }
     return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
   }
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
