@@ -6,7 +6,7 @@ import { nonceScriptSrc } from '@ebda/shared';
  * It lives here, not in next.config.js, because a nonce differs on every request and
  * `headers()` is evaluated once at build time. `script-src` is nonce + 'strict-dynamic': Next
  * stamps the nonce on its own scripts when the request carries it, and anything those scripts
- * load (OneSignal, PostHog) is trusted through them. No 'unsafe-inline' for scripts.
+ * load (PostHog) is trusted through them. No 'unsafe-inline' for scripts.
  *
  * The ad / pixel hosts (connect.facebook.net, www.facebook.com) are NOT here: the admin never
  * loads a marketing pixel (those run on storefronts).
@@ -17,9 +17,6 @@ export const BUILDER_PREVIEW_PATH = /^\/stores\/[^/]+\/builder$/;
 const PREVIEW_FRAME_SRC = 'https:';
 
 const SCRIPT_HOSTS = [
-  'https://cdn.onesignal.com',
-  'https://*.onesignal.com',
-  'https://onesignal.com',
   'https://us-assets.i.posthog.com',
   'https://us.i.posthog.com',
   'https://eu-assets.i.posthog.com',
@@ -27,7 +24,7 @@ const SCRIPT_HOSTS = [
   'https://static.cloudflareinsights.com',
 ] as const;
 
-/** OneSignal's v16 page SDK needs eval at runtime (vendor CSP doc); see docs/architecture/admin-csp.md. */
+/** No admin dependency needs eval at runtime (the push SDK that did is gone from the admin); see docs/architecture/admin-csp.md. */
 export const ADMIN_NEEDS_UNSAFE_EVAL = false;
 
 export interface AdminCspInput {
@@ -58,12 +55,12 @@ export function buildAdminCsp({
     nonceScriptSrc(nonce, { hosts: SCRIPT_HOSTS, unsafeEval: ADMIN_NEEDS_UNSAFE_EVAL }),
     // Inline event-handler attributes never run (React binds handlers in JS).
     "script-src-attr 'none'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
-    `connect-src 'self' ${api} ${accounts} https://media.ebda.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
-    `frame-src https://onesignal.com https://*.onesignal.com ${framesForRoute}`,
+    `connect-src 'self' ${api} ${accounts} https://media.ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
+    `frame-src ${framesForRoute}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "frame-ancestors 'none'",

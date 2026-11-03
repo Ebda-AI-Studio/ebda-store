@@ -8,7 +8,7 @@
 # Static fallback CSP for assets that can carry script (an SVG opened directly). Page responses get the
 # nonce CSP from src/middleware.ts instead; NOT set via next.config headers(): OpenNext lets config
 # headers win over middleware headers (or emits both), which would break the nonce policy on Workers.
-# Deliberately not on /*: sw.js and OneSignalSDKWorker.js are workers and need importScripts/fetch.
+# Deliberately not on /*: sw.js is a worker and need importScripts/fetch.
 /*.svg
   Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'; frame-ancestors 'none'
 /icons/*

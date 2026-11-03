@@ -96,9 +96,13 @@ describe('middleware matcher (Opus review SEC-4)', () => {
       '/health',
       '/manifest.webmanifest',
       '/sw.js',
-      '/OneSignalSDKWorker.js',
     ])
       expect(re.test(p), p).toBe(false);
+  });
+
+  it('admin no longer carves out the OneSignal worker path (the SDK is gone from the admin)', () => {
+    expect(toRe(adminMatcher.matcher[0]).test('/OneSignalSDKWorker.js')).toBe(true);
+    expect(toRe(ordersMatcher.matcher[0]).test('/OneSignalSDKWorker.js')).toBe(false);
   });
 
   it.each(['admin', 'orders'])(
