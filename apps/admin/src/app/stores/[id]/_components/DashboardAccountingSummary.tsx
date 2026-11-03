@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '../../../../lib/api';
+import { apiGetQuiet } from '../../../../lib/api';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 import { formatMoney, REGION } from '@ebda/shared';
 interface FinanceDashboard {
@@ -54,20 +55,27 @@ export function DashboardAccountingSummary({ storeId }: Props) {
   const [stock, setStock] = useState<StockSnapshot | null>(null);
   const [topSegment, setTopSegment] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  // Entitlements first (audit G-3): a store without accounting never fires the finance call just to get a 403.
+  const hasAccounting = isEnabled('accounting.basic');
 
   useEffect(() => {
+    if (featuresLoading) return;
     let cancelled = false;
     Promise.all([
-      apiGet<FinanceDashboard>(`/api/v1/stores/${storeId}/finance/dashboard`).catch(() => ({
+      (hasAccounting
+        ? apiGetQuiet<FinanceDashboard>(`/api/v1/stores/${storeId}/finance/dashboard`)
+        : Promise.resolve({ data: null, error: null })
+      ).catch(() => ({
         data: null,
         error: null,
       })),
-      apiGet<StockSnapshot>(`/api/v1/stores/${storeId}/analytics/stock-snapshot`).catch(() => ({
+      apiGetQuiet<StockSnapshot>(`/api/v1/stores/${storeId}/analytics/stock-snapshot`).catch(() => ({
         data: null,
         error: null,
       })),
       // Fetch top RFM segment — graceful no-op if rollup hasn't run yet
-      apiGet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`).catch(
+      apiGetQuiet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`).catch(
         () => ({ data: null, error: null })
       ),
     ])
@@ -91,7 +99,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [storeId, t]);
+  }, [storeId, t, hasAccounting, featuresLoading]);
 
   if (error) return null; // silent failure — the existing StatsGrid still shows
   if (!fin && !stock) return null;

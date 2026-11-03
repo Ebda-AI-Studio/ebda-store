@@ -46,9 +46,11 @@ function buildUpgradeMailto(storeId: string, featureName: string): string {
 interface Props {
   featureKey: string;
   storeId: string;
+  /** The screen the merchant opened, when it differs from the feature that unlocks it (e.g. AI tools need Bulk Operations). */
+  pageTitle?: string;
 }
 
-export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
+export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
   const t = useTranslations('featureUpgrade');
   const locale = useLocale();
   const isAr = locale === 'ar';
@@ -93,7 +95,7 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
   // bare card here unmounted the sidebar, hub tabs and topbar — a store_admin
   // on a gated page had no navigation left but the browser's back button.
   return (
-    <AdminLayout title={featureName}>
+    <AdminLayout title={pageTitle ?? featureName}>
       <div className="flex items-center justify-center min-h-[60vh] px-4 py-12">
         <div className="w-full max-w-lg">
           {/* Card */}
@@ -128,8 +130,13 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
                 className="text-2xl font-bold tracking-tight text-foreground mb-2"
                 dir={isAr ? 'rtl' : 'ltr'}
               >
-                {featureName}
+                {pageTitle ?? featureName}
               </h1>
+              {pageTitle && pageTitle !== featureName && (
+                <p className="mb-3 text-sm font-medium text-foreground/80" dir={isAr ? 'rtl' : 'ltr'}>
+                  {t('requiresFeature', { feature: featureName })}
+                </p>
+              )}
 
               {/* Feature description (value proposition) */}
               {featureDescription && (

@@ -7341,6 +7341,7 @@
     "upgradeCta": "الترقية إلى {plan}",
     "seePlansCta": "شوف الباقات",
     "contactCta": "تواصل معنا",
+    "requiresFeature": "يحتاج ميزة «{feature}».",
     "alsoIncluded": "مشمول أيضًا في هذه الخطة"
   },
   "aiTools": {

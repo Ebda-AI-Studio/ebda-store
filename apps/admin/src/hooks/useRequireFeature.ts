@@ -33,7 +33,10 @@ import { FeatureUpgradeGate } from '../components/FeatureUpgradeGate';
  * The hook still returns `enabled` and `isLoading` so pages can use them
  * for their own loading spinners and logic.
  */
-export function useRequireFeature(featureKey: string): {
+export function useRequireFeature(
+  featureKey: string,
+  opts?: { pageTitle?: string }
+): {
   enabled: boolean;
   isLoading: boolean;
   /**
@@ -62,7 +65,7 @@ export function useRequireFeature(featureKey: string): {
   // Use createElement so this .ts file (no JSX transform) can return a React
   // element without needing the .tsx extension.
   const gate: ReactNode | null = showGate
-    ? createElement(FeatureUpgradeGate, { featureKey, storeId: storeId! })
+    ? createElement(FeatureUpgradeGate, { featureKey, storeId: storeId!, pageTitle: opts?.pageTitle })
     : null;
 
   return { enabled, isLoading, gate };

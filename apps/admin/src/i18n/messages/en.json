@@ -7341,6 +7341,7 @@
     "upgradeCta": "Upgrade to {plan}",
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
+    "requiresFeature": "Requires the “{feature}” feature.",
     "alsoIncluded": "Also included in this plan"
   },
   "aiTools": {

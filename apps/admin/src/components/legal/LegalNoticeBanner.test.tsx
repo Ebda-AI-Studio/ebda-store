@@ -200,7 +200,13 @@ describe('LegalNoticeBanner', () => {
 describe('store layout mounts the banner (M13)', () => {
   it('renders LegalNoticeBanner for the store in the URL, next to the billing banner', async () => {
     vi.resetModules();
-    vi.doMock('next/navigation', () => ({ useParams: () => ({ id: 'store-9' }) }));
+    vi.doMock('next/navigation', () => ({
+      useParams: () => ({ id: 'store-9' }),
+      usePathname: () => '/stores/store-9/orders',
+    }));
+    vi.doMock('../PlanGate', () => ({
+      PlanGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    }));
     vi.doMock('../../hooks/useFeatures', () => ({
       AdminFeatureProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     }));

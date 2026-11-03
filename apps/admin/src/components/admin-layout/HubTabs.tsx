@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useT } from '@/i18n/useT';
@@ -23,6 +24,8 @@ export interface HubTab {
    * (B2B review I5); the badge renders only while the count is above 0 and the store is on the plan.
    */
   badgeKey?: 'wholesalePending';
+  /** Draws a thin divider before this tab so a long strip reads as groups (audit 2.4 / M-2). */
+  groupStart?: boolean;
 }
 
 interface Props {
@@ -57,15 +60,25 @@ export function HubTabs({ items }: Props) {
     return best;
   }, null);
 
+  // A long strip must never open with the current tab clipped at an edge (audit M-2): bring it into view.
+  const activeRef = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [active]);
+
   return (
     <div className="border-b border-border bg-background sticky top-0 z-10">
       <nav
-        className="flex gap-1 overflow-x-auto px-4 py-1 text-sm"
+        className="flex items-center gap-1 overflow-x-auto px-4 py-1 text-sm [mask-image:linear-gradient(to_right,transparent,#000_12px,#000_calc(100%-12px),transparent)] [scroll-padding-inline:2rem]"
         aria-label={tr('hubSectionsAriaLabel')}
       >
         {items.map(t => (
+          <Fragment key={t.href}>
+          {t.groupStart ? (
+            <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
+          ) : null}
           <Link
-            key={t.href}
+            ref={active === t.href ? activeRef : undefined}
             href={t.href}
             className={
               /* min-h-11 = 44px satisfies Apple HIG / WCAG 2.5.5 touch target on mobile;
@@ -92,6 +105,7 @@ export function HubTabs({ items }: Props) {
               </span>
             ) : null}
           </Link>
+          </Fragment>
         ))}
       </nav>
     </div>
