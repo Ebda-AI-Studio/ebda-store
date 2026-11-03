@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyStateKit } from '../../components/EmptyStateKit';
 import { useState, useEffect, useLayoutEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from '../../components/StoreLink';
@@ -456,35 +457,24 @@ function SearchContent() {
 
           {/* No results */}
           {!isLoading && !error && committedQuery && products.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-3">
-                {t('No products found for', 'ملقيناش منتجات لـ')} &quot;{committedQuery}
-                &quot;
-                {categoryFilter
-                  ? t(
-                      ' in the selected category',
-                      ' \u0641\u064a \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629'
-                    )
-                  : ''}
-              </p>
+            <EmptyStateKit
+              title={`${t('No products found for', 'ملقيناش منتجات لـ')} "${committedQuery}"${
+                categoryFilter ? t(' in the selected category', ' في الفئة المحددة') : ''
+              }`}
+              body={t(
+                'Check the spelling, try a shorter word, or pick from below.',
+                'اتأكد من الكتابة، جرّب كلمة أقصر، أو اختار من تحت.'
+              )}
+            >
               {categoryFilter && (
                 <button
                   onClick={() => handleCategoryChange('')}
-                  className="block mx-auto mb-3 text-sm text-primary hover:underline"
+                  className="inline-flex h-12 items-center rounded-[var(--radius)] border border-input px-6 text-base"
                 >
-                  {t(
-                    'Clear category filter',
-                    '\u0645\u0633\u062d \u0641\u0644\u062a\u0631 \u0627\u0644\u0641\u0626\u0629'
-                  )}
+                  {t('Clear category filter', 'مسح فلتر الفئة')}
                 </button>
               )}
-              <Link href={storeUrl('/products')} className="text-primary hover:underline text-sm">
-                {t(
-                  'Browse all products',
-                  '\u062a\u0635\u0641\u062d \u0643\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-                )}
-              </Link>
-            </div>
+            </EmptyStateKit>
           )}
 
           {/* Empty state when no query entered yet */}
