@@ -106,7 +106,9 @@ export async function doStoreIdList(): Promise<string[]> {
   }
   try {
     const rows = (
-      await d1.prepare("SELECT id FROM stores WHERE storage_backend = 'do'").all<{ id?: unknown }>()
+      await d1
+        .prepare("SELECT id FROM stores WHERE storage_backend = 'do' AND deleted_at IS NULL")
+        .all<{ id?: unknown }>()
     ).results;
     return (rows ?? []).map(r => r.id).filter((id): id is string => typeof id === 'string' && !!id);
   } catch {

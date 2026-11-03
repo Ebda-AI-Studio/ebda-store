@@ -232,15 +232,19 @@ describe('surface: store-do (customer rows, registry driven)', () => {
       ).toBe('2 Nile St');
     });
   });
-  it('merchant erase wipes the whole DO: rows, tables and alarm', async () => {
+  it('merchant erase ANONYMISES and keeps the records (Rulings NZ-D16, RETENTION-1): nothing wiped, store closed, backup alarm kept', async () => {
     await seed('er-store');
     const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-store'));
     await stub.ensureBackupAlarm();
+    const before = await stub.rowCounts();
     const r = await stub.eraseSubject(merchant());
-    expect(r.erased.products).toBe(1);
     expect(r.remaining).toBe(0);
+    expect(r.refused).toBeUndefined();
+    const after = await stub.rowCounts();
+    expect(after.products).toBe(before.products); // not personal data: kept
+    expect(Object.keys(after)).toEqual(Object.keys(before)); // no table dropped
     await runInDurableObject(stub, async (_i, state) =>
-      expect(await state.storage.getAlarm()).toBeNull()
+      expect(await state.storage.getAlarm()).not.toBeNull()
     );
   });
   it('the surface fans out over the subject stores and sums the stub results', async () => {

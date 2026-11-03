@@ -28,6 +28,8 @@ vi.mock('@ebda/database', () => ({
   withStore: () => undefined,
 }));
 vi.mock('@ebda/shared', async () => await import('../../shared/src/region'));
+// repo-factory -> store-update-retry statically imports the alert sender (an I/O edge that loads the whole API config).
+vi.mock('../../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
 vi.mock('../../../apps/api/src/middleware/error-handler', () => ({
   AppError: class extends Error {},
 }));

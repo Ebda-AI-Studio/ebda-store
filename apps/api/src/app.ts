@@ -33,7 +33,7 @@ import billingWebhookRoutes from './routes/billing-webhook.routes';
 import { assertBillingConfigAtBoot, billingProviderUnsetWarning } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
-import { prisma, setDbHopObserver } from '@ebda/database';
+import { prisma, setCommitHookErrorReporter, setDbHopObserver } from '@ebda/database';
 import { lookupStore } from './lib/definer';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
@@ -134,6 +134,18 @@ export const lifecycle = { isShuttingDown: false };
 // See lib/after-tenant-commit.ts.
 installClosedTenantTxAlerting();
 setDbHopObserver(recordHop);
+// An after-commit hook that throws is REPORTED through the app logger, never swallowed (Ruling NZ-D19). A partial `@ebda/database`
+// mock (unit tests) has no setter; the real package always does.
+try {
+  setCommitHookErrorReporter(err =>
+    logger.error(
+      { err },
+      '[tx-hooks] an after-commit hook failed (the transaction already committed)'
+    )
+  );
+} catch {
+  /* test double */
+}
 
 // The backend of a store is server-side state only (Ruling CF-BACKEND-1): a client `x-ebda-backend` never reaches a handler.
 app.use((req, _res, next) => {
