@@ -164,9 +164,15 @@ export const sectionDividers = z
 
 // Per-section layout knobs (padding / max-width / visibility breakpoint) —
 // item #6 of the page-builder gap fill. Mixed into every section schema below.
+const sectionSpacingPreset = z.enum(['none', 'tight', 'normal', 'loose', 'xloose', 'xxloose']);
 export const sectionPaddingMaxWidthVisibility = {
-  paddingTop: z.enum(['none', 'tight', 'normal', 'loose', 'xloose']).optional(),
-  paddingBottom: z.enum(['none', 'tight', 'normal', 'loose', 'xloose']).optional(),
+  paddingTop: sectionSpacingPreset.optional(),
+  paddingBottom: sectionSpacingPreset.optional(),
+  // Per-device spacing (Ruling SP-1): projected to `responsive.<tablet|mobile>.settings` by the adapter.
+  paddingTopTablet: sectionSpacingPreset.optional(),
+  paddingTopMobile: sectionSpacingPreset.optional(),
+  paddingBottomTablet: sectionSpacingPreset.optional(),
+  paddingBottomMobile: sectionSpacingPreset.optional(),
   maxWidth: z.enum(['contained', 'full']).optional(),
   hideOnMobile: z.boolean().optional(),
   hideOnDesktop: z.boolean().optional(),

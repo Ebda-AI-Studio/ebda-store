@@ -4,6 +4,7 @@
 // Ebda-only path, self-contained so it can be ported upstream later (list in docs/architecture/page-definition.md).
 export * from './section-keys';
 export * from './viewports';
+export * from './section-spacing';
 export * from './schema';
 export * from './theme-draft';
 export * from './chrome-draft';

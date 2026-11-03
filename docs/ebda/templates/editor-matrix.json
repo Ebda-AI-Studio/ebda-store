@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1443,
+    "wired": 1458,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -1178,6 +1178,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -2989,6 +3015,19 @@
       "evidence": "static (traits.ts)"
     },
     {
+      "id": "dahab|theme|density",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "dahab|theme|fontFamily",
       "skin": "dahab",
       "looks": [
@@ -4727,6 +4766,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:hero|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:hero|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -6863,6 +6928,19 @@
       "evidence": "static (traits.ts)"
     },
     {
+      "id": "jasmine|theme|density",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "jasmine|theme|fontFamily",
       "skin": "jasmine",
       "looks": [
@@ -8627,6 +8705,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:hero|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:hero|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -10763,6 +10867,19 @@
       "evidence": "static (traits.ts)"
     },
     {
+      "id": "lamma|theme|density",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "lamma|theme|fontFamily",
       "skin": "lamma",
       "looks": [
@@ -12514,6 +12631,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:hero|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:hero|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -14650,6 +14793,19 @@
       "evidence": "static (traits.ts)"
     },
     {
+      "id": "qamar|theme|density",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "qamar|theme|fontFamily",
       "skin": "qamar",
       "looks": [
@@ -16401,6 +16557,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:hero|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:hero|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -18535,6 +18717,19 @@
       "control": "cardTags",
       "status": "wired",
       "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|density",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|theme|fontFamily",

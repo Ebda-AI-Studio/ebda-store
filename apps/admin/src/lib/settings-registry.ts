@@ -949,6 +949,13 @@ export const SETTINGS: SettingEntry[] = [
         'فاصل خط زخرفة سطر',
       ],
       [
+        'builder.section-spacing',
+        'builder.search.spacing',
+        'select=hero',
+        'spacing padding margin gap above below tablet mobile desktop device',
+        'مسافات مسافة فوق تحت تابلت موبايل كمبيوتر جهاز',
+      ],
+      [
         'builder.video',
         'builder.search.video',
         'select=hero&block=slide',
@@ -1015,7 +1022,7 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/ai-usage': 0, // the switch is a component (components/ai/AiSwitchCard), anchored ai.switch
   '/branding': 43,
-  '/builder': 28, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
+  '/builder': 29, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
   '/shipping': 20,
   '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments

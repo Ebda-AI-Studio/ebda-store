@@ -24,7 +24,7 @@ import {
   resolveColor,
   sectionToLegacy,
 } from '@ebda/shared';
-import { EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
+import { EmptyHeroSlideHint, EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
 import { ImageTextSection, type ImageTextSettings } from '../sections/ImageTextSection';
 import { NewsletterSection, type NewsletterSettings } from '../sections/NewsletterSection';
 import {
@@ -57,6 +57,7 @@ import { CategoryRail } from '../../templates/shared/CategoryRail';
 import { CategoryTiles } from '../../templates/shared/CategoryTiles';
 import { CompactHeroBand } from '../../templates/shared/CompactHeroBand';
 import {
+  sectionMarginClasses,
   sectionSpacingClasses,
   sectionVisibilityClass,
 } from '../../templates/shared/section-spacing';
@@ -649,16 +650,24 @@ export function PageRenderer({
         // ── Per-section JSX nodes ─────────────────────────────────────────
 
         // Hero — toggleable + mode-aware. bgColor overrides the theme bg when set.
-        // Spacing: paddingTop/paddingBottom don't apply to the hero wrapper because
-        // hero components (HeroSlider/HeroBanner/T.Hero) manage their own internal
-        // layout and aspect ratio. Only visibility (hideOnMobile/hideOnDesktop) applies.
-        const heroVisClass = sectionVisibilityClass(layout.hero);
+        // Spacing: the hero manages its own aspect-driven height, so Top / Bottom spacing is an
+        // OUTER margin on this wrapper (Ruling SP-3), never padding; unset adds nothing.
+        const heroVisClass =
+          [sectionVisibilityClass(layout.hero), sectionMarginClasses(layout.hero)]
+            .filter(Boolean)
+            .join(' ') || undefined;
         const heroJSX = (
           <div
             data-section="hero"
             style={sectionBgStyle(layout.hero.bgColor, store.theme)}
             className={heroVisClass}
           >
+            {editorMode &&
+              layout.hero.enabled &&
+              heroSlides.length > 0 &&
+              heroSlidesWithImage(heroSlides).length === 0 && (
+                <EmptyHeroSlideHint blockId={heroBlockIds[0]} />
+              )}
             {collageEligible && (
               <HeroCollage
                 slides={heroSlidesWithImage(heroSlides)}

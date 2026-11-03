@@ -129,9 +129,32 @@ const PACKAGED = DEFAULT_LAYOUT_SETTINGS as unknown as Record<
 
 const ALL: readonly Viewport[] = VIEWPORTS;
 
-export type SectionDefInput = Parameters<typeof def>[0];
+type DefInput = Parameters<typeof defBase>[0];
+export type SectionDefInput = DefInput;
 
-function def(
+/**
+ * `responsive.settings` is declared once, on the setting (`responsive: ['mobile']`); the section
+ * lists are derived from it, plus any explicit list the definition passes (kept for categories).
+ */
+function withDerivedResponsive(
+  settings: readonly SettingDefinition[],
+  explicit: SectionDefinition['responsive']
+): SectionDefinition['responsive'] {
+  const out: Partial<Record<Viewport, string[]>> = {};
+  for (const v of VIEWPORTS) out[v] = [...(explicit.settings[v] ?? [])];
+  for (const st of settings)
+    for (const v of st.responsive ?? []) if (!out[v]!.includes(st.id)) out[v]!.push(st.id);
+  const settingsByVp: Partial<Record<Viewport, readonly string[]>> = {};
+  for (const v of VIEWPORTS) if (out[v]!.length > 0) settingsByVp[v] = out[v]!;
+  return { hidden: explicit.hidden, settings: settingsByVp };
+}
+
+function def(d: DefInput): SectionDefinition {
+  const r = defBase(d);
+  return { ...r, responsive: withDerivedResponsive(r.settings, r.responsive) };
+}
+
+function defBase(
   d: Omit<
     SectionDefinition,
     | 'propsSchema'
@@ -270,7 +293,8 @@ const CATEGORY_CARD_LOOK: ShownFor = [
   { ...NOT_DAHAB, variants: { layout: ['horizontal'] } },
 ];
 const NO_WIDTH = ['maxWidth'] as const;
-const NO_HERO_SPACING = ['paddingTop', 'paddingBottom', 'maxWidth'] as const;
+/** The hero is aspect-driven: no Width. Its Top / Bottom spacing is an outer margin (Ruling SP-3). */
+const NO_HERO_SPACING = ['maxWidth'] as const;
 
 const carouselLimit = (max: number) => s.range('limit', 'Products to show', 'عدد المنتجات', 1, max);
 

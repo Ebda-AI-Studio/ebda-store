@@ -1732,6 +1732,19 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.section-spacing",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Section spacing, per device",
+    "ar": "مسافات القسم لكل جهاز",
+    "synEn": "spacing padding margin gap above below tablet mobile desktop device",
+    "synAr": "مسافات مسافة فوق تحت تابلت موبايل كمبيوتر جهاز",
+    "query": "select=hero",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.video",
     "kind": "setting",
     "route": "/builder",

@@ -9611,7 +9611,7 @@
     },
     "tabs": {
       "sections": "Sections",
-      "theme": "Theme",
+      "theme": "Colours and fonts",
       "history": "History",
       "ai": "Ask AI"
     },
@@ -9758,7 +9758,28 @@
       "editProducts": "Edit products",
       "editReviews": "Open reviews",
       "editBundles": "Open bundles",
-      "editCategories": "Edit categories"
+      "editCategories": "Edit categories",
+      "spacing": {
+        "title": "Spacing",
+        "sameOnAll": "Same on all devices",
+        "devices": "Device",
+        "differs": "Different on this device",
+        "top": "Above",
+        "bottom": "Below",
+        "px": "{px}px",
+        "preset": {
+          "none": "None",
+          "tight": "Tight",
+          "normal": "Normal",
+          "loose": "Wide",
+          "xloose": "Wider",
+          "xxloose": "Widest"
+        },
+        "resetDefault": "Back to default",
+        "resetInherit": "Same as desktop",
+        "hint": "The gap between two sections is the bottom of one plus the top of the next."
+      },
+      "advanced": "Advanced: text styles and dividers"
     },
     "theme": {
       "smartPalette": "Smart Palette",
@@ -9787,11 +9808,33 @@
       "cardQuickAdd": "Quick add (+) on carousel cards",
       "cardEvenImages": "Even product image sizes",
       "cardSaleCorner": "Keep the old sale badge corner",
-      "inherit": "Same as the look"
+      "inherit": "Same as the look",
+      "search": "Search settings",
+      "quick": "Quick look",
+      "presets": "Colour palettes",
+      "corner": {
+        "square": "Square",
+        "soft": "Soft",
+        "round": "Round"
+      },
+      "tier": {
+        "header": "Header and navigation",
+        "cards": "Buttons and cards",
+        "images": "Images",
+        "colors": "All colours"
+      },
+      "advanced": "Advanced: fonts, text styles and more",
+      "changedDot": "Has changes",
+      "resetAll": "Reset all changes",
+      "resetAllConfirm": "Reset every change to the look?",
+      "resetAllYes": "Reset",
+      "cancel": "Cancel",
+      "searchEmpty": "Nothing matches that search.",
+      "draftNote": "Changes stay a draft until you publish."
     },
     "revisions": {
       "error": "History could not be loaded.",
-      "empty": "No saved versions yet.",
+      "empty": "No saved versions yet. Each time you publish the page, a version is saved that you can go back to.",
       "rev": "Version {rev}",
       "status": {
         "draft": "draft",
@@ -9824,7 +9867,7 @@
       "open": "Page settings"
     },
     "look": {
-      "open": "Look",
+      "open": "Change template",
       "title": "Change the look",
       "intro": "Pick a look and preview it on your own page. Nothing changes until you apply it.",
       "design": "Colours, fonts and spacing",
@@ -9858,7 +9901,8 @@
       "sectionTypography": "Section text style",
       "dividers": "Section dividers",
       "video": "Background video",
-      "pageSwitcher": "Switch the page you edit"
+      "pageSwitcher": "Switch the page you edit",
+      "spacing": "Section spacing, per device"
     },
     "aiPatch": {
       "tab": "Ask AI",
@@ -9888,7 +9932,7 @@
       "added": "Add section",
       "removed": "Remove section",
       "moved_to": "Move to position {pos}",
-      "theme": "Theme",
+      "theme": "Colours and fonts",
       "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
       "on": "on",
       "off": "off"
