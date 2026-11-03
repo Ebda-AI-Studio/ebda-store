@@ -3380,12 +3380,13 @@ body:has(.studio-home) {
 .sh-head::before {
   content: '';
   position: absolute;
-  inset: -32px -48px;
+  inset: -48px -80px;
   z-index: -1;
+  /* the calm zone: the lattice is hidden behind the kicker, headline and paragraph and returns in the open areas */
   background: radial-gradient(
     closest-side,
-    color-mix(in srgb, var(--canvas) 55%, transparent) 55%,
-    transparent
+    color-mix(in srgb, var(--canvas) 96%, transparent) 62%,
+    transparent 100%
   );
 }
 .sh-eyebrow {
@@ -3424,6 +3425,10 @@ html[lang='en'] .studio-home h1 {
 .sh-steps p {
   text-wrap: pretty;
 }
+/* the steps sit on the tessellation watermark: darker body text keeps 4.5:1 against its gold lines */
+.sh-steps p {
+  color: color-mix(in srgb, var(--fg) 78%, transparent);
+}
 .sh-lead {
   margin: 0;
   max-width: 38ch;
@@ -3446,12 +3451,15 @@ html[lang='en'] .studio-home h1 {
   position: relative;
   border: 1px solid var(--sh-rule);
   border-top: 0;
-  background: var(--canvas); /* the window is cut into the field: opaque paper under its own lattice */
+  background: var(
+    --canvas
+  ); /* the window is cut into the field: opaque paper under its own lattice */
   clip-path: var(--arch-poly-56);
 }
 .sh-win-art {
   position: absolute;
   inset: 0;
+  opacity: 0.75; /* with the wash over it the inner lattice sits near 12% strength so the text reads cleanly */
 }
 .sh-win-in {
   position: relative;
@@ -3512,8 +3520,10 @@ html[lang='en'] .studio-home h1 {
 }
 .sh-label {
   margin: 0;
-  font-size: 0.9375rem;
+  /* 16px at 390 up to about 19px at 1440; accent-text on the ivory ground is 5.3:1 */
+  font-size: clamp(1rem, 0.6rem + 0.9vw, 1.2rem);
   font-weight: 600;
+  line-height: 1.4;
   color: var(--accent-text);
 }
 html[lang='en'] .sh-label {

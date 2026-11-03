@@ -69,9 +69,9 @@
 .sh-label::after {
   content: '';
   display: block;
-  width: 120px;
-  height: 12px;
-  margin-top: 14px;
+  width: 168px;
+  height: 17px;
+  margin-top: 16px;
   background: url(/motifs/orn.svg) center / contain no-repeat;
 }
 .studio-home #start::after {
@@ -227,42 +227,23 @@ body:has(.wa-head) #features::after {
   background: url(/motifs/arch-cap.svg) 0 0 / 100% 100% no-repeat;
 }
 
-/* ---------- calligraphy texture of our own name (Ruling MKT-SCRIPT-1): static SVG outlines, silver, very low contrast ---------- */
-.sh-hero::before,
-#studio::after,
-#trust::after,
-body:has(main > .hero) #ainative::after,
-body:has(main > .hero) #start::after,
-body:has(.wa-head) .wa-head::before,
-body:has(.wa-head) .wa-close::after {
+/* ---------- the official Arabic wordmark as a soft watermark (Ruling MKT-SCRIPT-1): ONE placement, the hero's empty side, never repeated, rotated or over copy ---------- */
+.sh-hero::before {
   content: '';
+  display: none;
   position: absolute;
-  inset: 0;
   z-index: -2;
   pointer-events: none;
-  background: url(/motifs/script.svg) center / cover no-repeat;
-  opacity: 0.8;
+  width: clamp(260px, 22vw, 340px);
+  aspect-ratio: 1.111;
+  inset-block-start: 6%;
+  inset-inline-end: clamp(48px, 6vw, 96px);
+  background: url(/motifs/mark-studio.svg) center / contain no-repeat;
 }
-.sh-hero::before {
-  -webkit-mask-image: linear-gradient(to right, #000, transparent 24%, transparent 76%, #000);
-  mask-image: linear-gradient(to right, #000, transparent 24%, transparent 76%, #000);
-}
-#studio::after,
-body:has(main > .hero) #ainative::after,
-body:has(.wa-head) .wa-head::before {
-  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 70% 40%, #000, transparent 85%);
-  mask-image: radial-gradient(ellipse 80% 80% at 70% 40%, #000, transparent 85%);
-}
-#trust::after,
-body:has(main > .hero) #start::after,
-body:has(.wa-head) .wa-close::after {
-  background-position: 30% 60%;
-  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 30% 60%, #000, transparent 85%);
-  mask-image: radial-gradient(ellipse 80% 80% at 30% 60%, #000, transparent 85%);
-}
-.wa-head {
-  position: relative;
-  isolation: isolate;
+@media (min-width: 1360px) {
+  .sh-hero::before {
+    display: block;
+  }
 }
 
 /* ---------- worn gold-foil (Ruling MKT-FOIL-1): used sparingly on a few headings and the hero hairlines; flat gold stays elsewhere ---------- */
