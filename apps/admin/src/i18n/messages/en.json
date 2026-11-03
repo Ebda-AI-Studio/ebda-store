@@ -6203,7 +6203,7 @@
     },
     "orderAlertsPrompt": {
       "title": "Never miss an order",
-      "body": "Turn on alerts on this device and we'll tell you the moment a new order arrives.",
+      "body": "Turn on alerts and we'll tell you the moment a new order arrives.",
       "cta": "Turn on alerts",
       "enabling": "Turning on alerts…",
       "later": "Later",

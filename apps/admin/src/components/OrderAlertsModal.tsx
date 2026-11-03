@@ -66,10 +66,10 @@ export function OrderAlertsModal({
       >
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-[120px] bg-[url('/motifs/tess8.svg')] opacity-[.06] [mask-image:linear-gradient(to_bottom,#000,transparent)]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[200px] bg-[url('/motifs/tess8.svg')] opacity-[.11] [mask-image:linear-gradient(to_bottom,#000,transparent)]"
         />
-        <span aria-hidden="true" className="relative mx-auto block h-16 w-16">
-          <svg viewBox="0 0 44 44" width="64" height="64" fill="none" strokeLinejoin="round">
+        <span aria-hidden="true" className="relative mx-auto block h-20 w-20">
+          <svg viewBox="0 0 44 44" width="80" height="80" fill="none" strokeLinejoin="round">
             <circle cx="22" cy="22" r="20.5" stroke="#B08D57" strokeOpacity=".35" />
             <path
               d="M37 22L28.5 24.7L32.6 32.6L24.7 28.5L22 37L19.3 28.5L11.4 32.6L15.5 24.7L7 22L15.5 19.3L11.4 11.4L19.3 15.5L22 7L24.7 15.5L32.6 11.4L28.5 19.3Z"
@@ -90,13 +90,13 @@ export function OrderAlertsModal({
         </span>
         <h2
           id="order-alerts-prompt-title"
-          className="relative mt-5 text-balance text-[22px] font-bold leading-tight text-[#f1f5f3]"
+          className="relative mt-5 text-balance text-[22px] font-bold sm:text-[26px] leading-tight text-[#f1f5f3]"
         >
           {t('title')}
         </h2>
         <p
           id="order-alerts-prompt-body"
-          className="relative mx-auto mt-2 max-w-[32ch] text-balance text-[15px] leading-[1.6] text-[#a6b0ac]"
+          className="relative mx-auto mt-2 max-w-[40ch] text-balance text-[15px] leading-[1.6] text-[#a6b0ac]"
         >
           {t('body')}
         </p>
