@@ -15,6 +15,7 @@ import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { PasskeysPanel } from '../../../components/account/PasskeysPanel';
+import { PhonePanel } from '../../../components/account/PhonePanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -683,6 +684,7 @@ export default function SecurityPage() {
             onSignInAgain={() => void logout()}
           />
         )}
+        {status && <PhonePanel mfaEnabled={status.mfaEnabled} />}
         <LegalAcceptancesPanel />
       </div>
     </AdminLayout>

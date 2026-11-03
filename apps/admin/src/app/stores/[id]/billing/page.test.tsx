@@ -331,12 +331,55 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     render(<StoreBillingPage />);
     expect(await screen.findByText('trial.title')).toBeTruthy();
     expect(screen.getByText('Growth · intervalYearly')).toBeTruthy();
+    // InstaPay: a payment is DUE (never "next charge"), with the interval next to the amount (BILLING-NONE-COPY-1).
     expect(
       screen.getByText(
-        'trial.nextChargeLine:{"amount":"EGP 31,410.00","plan":"Growth","date":"20 November 2026"}'
+        'trial.instapayDueLine:{"amount":"EGP 31,410.00","interval":"intervalYearly","plan":"Growth","date":"20 November 2026"}'
       )
     ).toBeTruthy();
+    expect(screen.getByText('trial.returnsToFree')).toBeTruthy();
+    expect(screen.queryByText('trial.nextCharge')).toBeNull();
     expect(screen.getAllByText('status.trialing').length).toBeGreaterThan(0);
+  });
+
+  it('BILLING_PROVIDER=none: no screen calls the trial-end payment a (card) next charge', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: null,
+          cardBilling: false,
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('trial.instapayDue')).toBeTruthy();
+    expect(screen.getByText(/^trial\.instapayDueLine:/)).toBeTruthy();
+    expect(screen.getByText('trial.returnsToFree')).toBeTruthy();
+    expect(screen.queryByText('trial.nextCharge')).toBeNull();
+    expect(screen.queryByText(/^trial\.nextChargeLine/)).toBeNull();
+  });
+
+  it('a card store still says next charge, now with the interval beside the amount', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: 'card',
+          cardBilling: true,
+          billingInterval: 'monthly',
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 349000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('trial.nextCharge')).toBeTruthy();
+    expect(screen.getByText(/^trial\.nextChargeLine:.*"interval":"intervalMonthly"/)).toBeTruthy();
   });
 
   it('card on file: shows •••• 4242 and Replace card starts a billing-origin card setup', async () => {

@@ -194,6 +194,7 @@ const publicUser = (u: UserRow) => ({
   role: u.role,
   emailVerified: !!u.email_verified,
   language: u.language,
+  phone: u.phone,
   mfaEnabled: !!u.mfa_enabled,
 });
 
@@ -1210,6 +1211,35 @@ export function createApp() {
       .bind(user.id)
       .run();
     return c.json({ success: true, data: { enabled: false } });
+  });
+
+  // ---- account phone (Ruling PHONE-CHANGE-1) ----
+  // The phone is the WhatsApp reset-code destination (ID-WA-OTP-1), so changing it is a recovery-channel change: a stolen
+  // access token alone must not be enough. Same step-up as /mfa/disable: the current password, plus a TOTP code when the
+  // account has a second factor, and a per-user throttle. Interim: the new number is NOT proven by a code sent to it (the
+  // WhatsApp channel is flag-off); the re-authentication is the proof. Send the code to the new number here when it is on.
+  app.post('/phone', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(
+      c,
+      z.object({
+        phone: z
+          .string()
+          .trim()
+          .regex(/^\+?[0-9][0-9 ()-]{6,19}$/)
+          .transform(v => v.replace(/[ ()-]/g, '')),
+        password: z.string(),
+        code: z.string().optional(),
+      })
+    );
+    if (!(await hit(c.env.DB, user.id, 'n/a', PER_EMAIL('phone-change', 5))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
+    await requirePassword(c, user, body.password);
+    await requireSecondFactor(c, user, body.code);
+    await c.env.DB.prepare(`UPDATE users SET phone = ?2, updated_at = ?3 WHERE id = ?1`)
+      .bind(user.id, body.phone, iso())
+      .run();
+    return c.json({ success: true, data: { phone: body.phone } });
   });
 
   // ---- passkeys ----
