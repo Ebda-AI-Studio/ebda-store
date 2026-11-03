@@ -16,6 +16,8 @@ interface StoreDetailsCardProps {
   onClearFieldError: (field: keyof StoreFormErrors) => void;
   onSave: () => void;
   onCancel: () => void;
+  /** Opens the edit form on the status field: an inactive store gets a visible way to go live (audit D-1). */
+  onActivate?: () => void;
 }
 
 export function StoreDetailsCard({
@@ -28,6 +30,7 @@ export function StoreDetailsCard({
   onClearFieldError,
   onSave,
   onCancel,
+  onActivate,
 }: StoreDetailsCardProps) {
   const t = useT('stores.dashboard.details');
   const statusLabel = {
@@ -132,9 +135,14 @@ export function StoreDetailsCard({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('status')}</p>
-              <Badge variant={statusColors[store.status]} className="mt-1">
-                {statusLabel}
-              </Badge>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Badge variant={statusColors[store.status]}>{statusLabel}</Badge>
+                {store.status === 'inactive' && onActivate && (
+                  <Button type="button" size="sm" variant="outline" onClick={onActivate}>
+                    {t('activateCta')}
+                  </Button>
+                )}
+              </div>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('created')}</p>

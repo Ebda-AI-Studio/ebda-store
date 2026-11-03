@@ -229,7 +229,8 @@
           "slugTooShort": "Slug must be at least 3 characters",
           "slugTooLong": "Slug must be less than 50 characters",
           "slugTaken": "This slug is already in use"
-        }
+        },
+        "activateCta": "Activate store"
       },
       "owner": {
         "title": "Store Owner",

@@ -159,6 +159,7 @@ export default function StoreDetailPage() {
             setIsEditing(false);
             resetEditForm();
           }}
+          onActivate={() => setIsEditing(true)}
         />
         <div className="space-y-6">
           <StoreOwnerCard owner={store.owner} />

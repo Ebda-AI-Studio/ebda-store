@@ -54,7 +54,8 @@ export function BrandingTabs({ activeTab, onTabChange }: BrandingTabsProps) {
   }
 
   return (
-    <div role="tablist" aria-label={t('ariaLabel')} className="flex gap-2 border-b border-border">
+    <div role="tablist" aria-label={t('ariaLabel')} className="flex max-w-full gap-2 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {TABS.map((tab, index) => {
         const isActive = activeTab === tab.id;
         return (
@@ -69,7 +70,8 @@ export function BrandingTabs({ activeTab, onTabChange }: BrandingTabsProps) {
             tabIndex={isActive ? 0 : -1}
             onClick={() => onTabChange(tab.id)}
             onKeyDown={e => handleKeyDown(e, index)}
-            className={`px-4 py-2 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center text-sm font-medium border-b-2 -mb-px transition-colors ${
+            onFocus={e => e.currentTarget.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })}
+            className={`shrink-0 whitespace-nowrap px-4 py-2 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center text-sm font-medium border-b-2 -mb-px transition-colors ${
               isActive
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
