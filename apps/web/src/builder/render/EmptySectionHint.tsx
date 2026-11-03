@@ -37,6 +37,36 @@ const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   giftFinder: 'Add an occasion or a budget and your gift finder will appear here.',
 };
 
+/** The admin page that fills a data-driven section, when there is one. */
+const FILL_TARGET: Partial<Record<EmptySectionKind, 'products' | 'categories'>> = {
+  categories: 'categories',
+  newArrivals: 'products',
+  bestSellers: 'products',
+};
+const FILL_LABEL = {
+  products: 'Add products',
+  categories: 'Add categories',
+} as const;
+
+/**
+ * Editor canvas only. A hero whose slides all lack a picture draws nothing on the storefront (the
+ * slider skips a slide without an image), so the canvas shows this instead of an empty slide.
+ * `blockId` is the first slide, so a click selects it and its image field is one step away.
+ */
+export function EmptyHeroSlideHint({ blockId }: { blockId?: string }) {
+  const { t } = useLanguage();
+  const msg = 'Add a picture to this slide' as const;
+  return (
+    <div
+      data-empty-section="hero"
+      data-builder-block={blockId}
+      className="flex aspect-[4/3] w-full items-center justify-center border border-dashed border-border bg-muted px-4 text-center text-sm text-muted-foreground sm:aspect-[1920/700]"
+    >
+      <p>{t(msg, translations[msg])}</p>
+    </div>
+  );
+}
+
 export function EmptySectionHint({ kind }: { kind: EmptySectionKind }) {
   const { t } = useLanguage();
   const key = HINT_KEY[kind];
@@ -49,6 +79,17 @@ export function EmptySectionHint({ kind }: { kind: EmptySectionKind }) {
     >
       <p>{t(key, translations[key])}</p>
       <p className="mt-1 text-xs">{t(note, translations[note])}</p>
+      {FILL_TARGET[kind] && (
+        // The canvas intercepts this click and asks the admin to open the page (protocol `open-admin`).
+        <button
+          type="button"
+          data-builder-action="open-admin"
+          data-builder-target={FILL_TARGET[kind]}
+          className="mt-3 inline-flex min-h-11 items-center rounded-[var(--radius)] border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          {t(FILL_LABEL[FILL_TARGET[kind]!], translations[FILL_LABEL[FILL_TARGET[kind]!]])}
+        </button>
+      )}
     </div>
   );
 }

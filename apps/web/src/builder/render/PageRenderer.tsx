@@ -24,7 +24,7 @@ import {
   resolveColor,
   sectionToLegacy,
 } from '@ebda/shared';
-import { EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
+import { EmptyHeroSlideHint, EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
 import { ImageTextSection, type ImageTextSettings } from '../sections/ImageTextSection';
 import { NewsletterSection, type NewsletterSettings } from '../sections/NewsletterSection';
 import {
@@ -662,6 +662,12 @@ export function PageRenderer({
             style={sectionBgStyle(layout.hero.bgColor, store.theme)}
             className={heroVisClass}
           >
+            {editorMode &&
+              layout.hero.enabled &&
+              heroSlides.length > 0 &&
+              heroSlidesWithImage(heroSlides).length === 0 && (
+                <EmptyHeroSlideHint blockId={heroBlockIds[0]} />
+              )}
             {collageEligible && (
               <HeroCollage
                 slides={heroSlidesWithImage(heroSlides)}

@@ -9586,7 +9586,7 @@
     },
     "tabs": {
       "sections": "Sections",
-      "theme": "Theme",
+      "theme": "Colours and fonts",
       "history": "History",
       "ai": "Ask AI"
     },
@@ -9809,7 +9809,7 @@
     },
     "revisions": {
       "error": "History could not be loaded.",
-      "empty": "No saved versions yet.",
+      "empty": "No saved versions yet. Each time you publish the page, a version is saved that you can go back to.",
       "rev": "Version {rev}",
       "status": {
         "draft": "draft",
@@ -9842,7 +9842,7 @@
       "open": "Page settings"
     },
     "look": {
-      "open": "Look",
+      "open": "Change template",
       "title": "Change the look",
       "intro": "Pick a look and preview it on your own page. Nothing changes until you apply it.",
       "design": "Colours, fonts and spacing",
@@ -9907,7 +9907,7 @@
       "added": "Add section",
       "removed": "Remove section",
       "moved_to": "Move to position {pos}",
-      "theme": "Theme",
+      "theme": "Colours and fonts",
       "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
       "on": "on",
       "off": "off"
