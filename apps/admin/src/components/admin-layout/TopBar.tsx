@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@ebda/ui';
 import { NotificationBell } from '../NotificationBell';
@@ -29,6 +30,20 @@ export function TopBar({
   viewStoreUrl,
 }: TopBarProps) {
   const t = useT('components.adminLayout');
+  // One h1 per page (audit G-7): when the page body renders its own h1, the bar title is a plain paragraph so a
+  // screen reader does not get the same heading twice. Pages without an h1 keep this one.
+  const [pageHasOwnH1, setPageHasOwnH1] = useState(false);
+  useEffect(() => {
+    const main = document.getElementById('admin-main-content');
+    if (!main) return;
+    const check = () =>
+      setPageHasOwnH1(Array.from(main.querySelectorAll('h1')).some(h => !h.closest('header')));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [title]);
+  const TitleTag = pageHasOwnH1 ? 'p' : 'h1';
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/50 bg-card/80 backdrop-blur-md">
@@ -80,7 +95,9 @@ export function TopBar({
             </button>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold text-foreground lg:text-lg">{title}</h1>
+            <TitleTag className="truncate text-base font-bold text-foreground lg:text-lg">
+              {title}
+            </TitleTag>
             {/* Subtitle hides on mobile — repeats info that's already
                 clear from the page context and ate header height when
                 actions had to share the row. */}

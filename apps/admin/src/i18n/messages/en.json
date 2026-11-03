@@ -460,7 +460,8 @@
         "bulkImport": "Bulk Import",
         "backToStore": "Back to Store",
         "orderNewArrivals": "Order New Arrivals",
-        "orderBestSellers": "Order Best Sellers"
+        "orderBestSellers": "Order Best Sellers",
+        "more": "More"
       },
       "filters": {
         "ariaLabel": "Filter products by status",
@@ -497,10 +498,11 @@
         "delete": "Delete"
       },
       "empty": {
-        "title": "No products found",
-        "description": "Add your first product to get started.",
-        "descriptionFiltered": "Try adjusting your search or filters.",
-        "addProduct": "Add Product"
+        "title": "No products yet",
+        "description": "Add your first product to start selling.",
+        "descriptionFiltered": "No results. Try changing the search or filters.",
+        "addProduct": "Add Product",
+        "titleFiltered": "No matching products"
       },
       "pagination": {
         "showing": "Showing {from} to {to} of {total} products",

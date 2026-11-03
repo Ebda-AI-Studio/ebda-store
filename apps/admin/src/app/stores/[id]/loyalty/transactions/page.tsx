@@ -10,6 +10,7 @@ import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { localDayRange, reportRangeParams, withNumerals } from '@ebda/shared';
+import { uiIntlTag } from '@/lib/format';
 
 interface LoyaltyTransaction {
   id: string;
@@ -174,7 +175,7 @@ export default function LoyaltyTransactionsPage() {
       header: t('colDate'),
       cell: tx => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(tx.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}
+          {new Date(tx.createdAt).toLocaleDateString(uiIntlTag(), { dateStyle: 'medium' })}
         </span>
       ),
     },
@@ -216,7 +217,7 @@ export default function LoyaltyTransactionsPage() {
       cell: tx => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           {tx.expiresAt
-            ? new Date(tx.expiresAt).toLocaleDateString('en-US', { dateStyle: 'medium' })
+            ? new Date(tx.expiresAt).toLocaleDateString(uiIntlTag(), { dateStyle: 'medium' })
             : '—'}
         </span>
       ),

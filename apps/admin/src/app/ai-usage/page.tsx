@@ -23,6 +23,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { useT } from '../../i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
+import { uiIntlTag } from '@/lib/format';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ interface SummaryResponse {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-GB', {
+  return new Date(iso).toLocaleString(uiIntlTag('en-GB'), {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',

@@ -36,7 +36,9 @@ export function EmptyProductsState({
           />
         </svg>
       </div>
-      <p className="font-semibold text-foreground">{t('title')}</p>
+      <p className="font-semibold text-foreground">
+        {hasActiveFilters ? t('titleFiltered') : t('title')}
+      </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasActiveFilters ? t('descriptionFiltered') : t('description')}
       </p>
