@@ -54,7 +54,7 @@ describe('OneSignal loads only after the explicit opt-in click', () => {
     ]);
     for (const f of callers) {
       const body = readFileSync(f, 'utf8');
-      expect(body, rel(f)).toMatch(/onClick=\{enable\}/);
+      expect(body, rel(f)).toMatch(/(onClick|onEnable)=\{enable\}/);
       // the only call sits inside the click handler, never inside an effect
       expect(body.match(/enableOrderAlerts\(/g)?.length, rel(f)).toBe(1);
       expect(body, rel(f)).toMatch(/async function enable\(\) \{[\s\S]*?await enableOrderAlerts\(/);
@@ -92,5 +92,14 @@ describe('CSP: onesignal hosts only on the opt-in routes', () => {
     expect(c).toMatch(/script-src[^;]*https:\/\/cdn\.onesignal\.com/);
     expect(c).toMatch(/connect-src[^;]*https:\/\/onesignal\.com/);
     expect(c).toMatch(/frame-src https:\/\/onesignal\.com/);
+  });
+});
+
+describe('dev-only order-alerts preview is inert outside next dev', () => {
+  it('the page 404s unless NODE_ENV is development, and the public-path bypass is dev-only', () => {
+    const page = readFileSync(join(src, 'app/dev-preview/order-alerts/page.tsx'), 'utf8');
+    expect(page).toMatch(/NODE_ENV !== 'development'\) notFound\(\)/);
+    const auth = readFileSync(join(src, 'lib/auth.tsx'), 'utf8');
+    expect(auth).toMatch(/NODE_ENV === 'development' \? \['\/dev-preview\/order-alerts'\] : \[\]/);
   });
 });

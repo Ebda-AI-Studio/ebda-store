@@ -114,8 +114,13 @@ export const PUBLIC_PATHS: readonly string[] = [
   '/reset-password',
 ];
 
+/** Dev-only visual previews (no session needed). Empty in production builds. */
+export const DEV_PREVIEW_PATHS: readonly string[] =
+  process.env.NODE_ENV === 'development' ? ['/dev-preview/order-alerts'] : [];
+
 export function isPublicPath(pathname: string | null | undefined): boolean {
-  return !!pathname && PUBLIC_PATHS.includes(pathname.replace(/\/+$/, '') || '/');
+  const p = pathname ? pathname.replace(/\/+$/, '') || '/' : '';
+  return !!p && (PUBLIC_PATHS.includes(p) || DEV_PREVIEW_PATHS.includes(p));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
