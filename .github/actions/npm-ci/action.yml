@@ -1,0 +1,10 @@
+name: Install dependencies (npm ci)
+description: Install dependencies with npm ci, reusing a runner-local node_modules store when EBDA_RUNS_ON is set (Ruling CI-NODE-MODULES-1)
+runs:
+  using: composite
+  steps:
+    - name: npm ci (runner-local node_modules store when EBDA_RUNS_ON is set)
+      shell: bash
+      env:
+        EBDA_RUNS_ON: ${{ vars.EBDA_RUNS_ON }}
+      run: bash scripts/ci/npm-ci-reuse.sh
