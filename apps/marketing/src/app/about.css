@@ -133,3 +133,14 @@ html[dir='rtl'] .ab-h2::after {
   padding-block: 32px;
   border-top: 1px solid var(--line);
 }
+
+/* the office block (BRAND.office): address, map link, how we meet. Used on About, Contact and the legal notice. */
+.office address {
+  font-style: normal;
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+.office h3 {
+  margin: 0 0 8px;
+  font-size: 1.0625rem;
+}

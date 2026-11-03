@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
-import { BRAND, WHATSAPP_PACKAGES, type WhatsAppBasePackageId } from '@ebda/shared/brand';
+import {
+  BRAND,
+  WHATSAPP_PACKAGES,
+  officePostalAddress,
+  type WhatsAppBasePackageId,
+} from '@ebda/shared/brand';
 import { CAPABILITIES } from './capabilities';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
@@ -179,6 +184,8 @@ export function jsonLd(
         alternateName: BRAND.company.shortNameAr,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         // No verified public profiles yet; add real ones only (never a guessed handle).
         sameAs: [] as string[],
@@ -270,6 +277,8 @@ export function studioJsonLd(locale: Locale) {
         alternateName: BRAND.company.shortNameAr,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
       },
@@ -323,6 +332,8 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         alternateName: BRAND.company.shortNameAr,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
       },

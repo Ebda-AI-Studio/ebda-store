@@ -6,10 +6,12 @@ import {
   whatsappDisplay,
   whatsappUrl,
 } from '@ebda/shared/brand';
+import { formatLegalDate } from '@ebda/shared/legal';
 import { COPY } from '../lib/content';
 import { pagePath, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { OfficeBlock } from './OfficeBlock';
 import { SiteLink } from './SiteLink';
 import { JsonLd } from './JsonLd';
 import { studioJsonLd } from '../lib/seo';
@@ -33,6 +35,12 @@ export function AboutPage({ locale }: { locale: Locale }) {
           <p className="ab-eyebrow">{p.eyebrow}</p>
           <h1>{p.title}</h1>
           <p className="ab-lead">{p.lead}</p>
+          <p className="ab-founded muted">
+            {p.foundedLabel}{' '}
+            <time dateTime={BRAND.company.foundedOn}>
+              {formatLegalDate(BRAND.company.foundedOn, locale)}
+            </time>
+          </p>
           <p className="about-line" lang={locale}>
             {p.brandLine}
           </p>
@@ -117,6 +125,7 @@ export function AboutPage({ locale }: { locale: Locale }) {
                 {whatsappDisplay()}
               </SiteLink>
             </p>
+            <OfficeBlock locale={locale} />
             <p className="muted">{p.contactHelp}</p>
             <p>
               <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link>

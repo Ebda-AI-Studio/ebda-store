@@ -22,6 +22,7 @@ describe('BRAND', () => {
       legalNameEn: 'Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing',
       shortNameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
       shortNameEn: 'Ebda AI Studio',
+      foundedOn: '2026-09-11',
       url: 'https://ebda.app',
     });
     expect(BRAND.colors).toEqual({ night: '#0A0B0C', gold: '#B08D57', lift: '#CBA873' });

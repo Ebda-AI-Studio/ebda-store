@@ -181,6 +181,8 @@ export interface Copy {
     /** The lead: what the studio is and what it makes today (AI, software, digital marketing; two products; one account). */
     eyebrow: string;
     lead: string;
+    /** «اتأسست في» / "Founded": followed by the date (BRAND.company.foundedOn through formatLegalDate). */
+    foundedLabel: string;
     doH: string;
     doItems: { t: string; d: string }[];
     productsH: string;
@@ -644,6 +646,7 @@ export const COPY: Record<Locale, Copy> = {
       desc: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي، بيبني أدوات بسيطة لأصحاب الشغل في مصر: ابدأ ستور وابدأ شات.',
       brandLine: 'ابدأ ستوديو — بابك لبدء مشروعك.',
       eyebrow: 'ستوديو مصري',
+      foundedLabel: 'اتأسست في',
       lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين.',
       doH: 'بنشتغل في إيه',
       doItems: [
@@ -1092,6 +1095,7 @@ export const COPY: Record<Locale, Copy> = {
       desc: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing that builds simple tools for merchants in Egypt: Ebda Store and Ebda Chat.',
       brandLine: 'Ebda AI Studio — Your doorway to business.',
       eyebrow: 'An Egyptian studio',
+      foundedLabel: 'Founded',
       lead: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both.',
       doH: 'What we do',
       doItems: [

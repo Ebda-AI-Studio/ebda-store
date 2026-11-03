@@ -8,10 +8,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { formatLegalDate } from '../../packages/shared/src/legal';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { acquireSiteBuildLock } from '../helpers/site-build-lock';
 import {
+  BRAND,
   SITE_FOOTER_CSS,
+  officeInfo,
   siteFooter,
   siteFooterHtml,
   siteNavCta,
@@ -28,7 +31,13 @@ import { Header } from '../../apps/marketing/src/components/Header';
 import { Footer } from '../../apps/marketing/src/components/Footer';
 import { ContactPage } from '../../apps/marketing/src/components/ContactPage';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
-import { pageMetadata } from '../../apps/marketing/src/lib/seo';
+import {
+  jsonLd,
+  pageMetadata,
+  studioJsonLd,
+  whatsappJsonLd,
+} from '../../apps/marketing/src/lib/seo';
+import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
 import { productOfPage, SITE_PAGES } from '../../apps/marketing/src/lib/site';
 import type { Snapshot } from '../../apps/status/src/types';
 
@@ -451,5 +460,65 @@ describe('redirects (audit section 4)', () => {
     expect(read('apps/marketing/public/hash-forward.js')).toContain(
       "'/store/' + location.search + h"
     );
+  });
+});
+
+describe('the office (BRAND.office): About, Contact and the legal notice show it; the footer does not; JSON-LD carries a PostalAddress', () => {
+  for (const lang of ['ar', 'en'] as const) {
+    const o = officeInfo(lang);
+    it(`${lang}: address, map link and the by-appointment meeting line come from BRAND`, () => {
+      for (const [name, html] of [
+        ['about', renderToStaticMarkup(<AboutPage locale={lang} />)],
+        ['contact', renderToStaticMarkup(<ContactPage locale={lang} />)],
+        ['legal notice', renderToStaticMarkup(<LegalPage locale={lang} page="legal" />)],
+      ] as const) {
+        const text = html.replace(/<[^>]+>/g, '');
+        expect(text, name).toContain(o.address);
+        expect(text, name).toContain(o.meeting);
+        expect(html, name).toContain(`href="${o.mapUrl}"`);
+        // a virtual office: nothing implies walk-in hours
+        expect(text, name).not.toMatch(
+          /walk-in|opening hours|office hours|ساعات (?:العمل|الزيارة)/i
+        );
+      }
+      expect(o.meeting).toMatch(lang === 'ar' ? /بميعاد سابق/ : /by appointment only/);
+      // the footer keeps email and WhatsApp only
+      expect(renderToStaticMarkup(<Footer locale={lang} />)).not.toContain(o.address);
+      expect(siteFooterHtml(lang, '', 2026)).not.toContain(o.address);
+    });
+  }
+  it('Organization JSON-LD (studio home, Store, Chat) has a PostalAddress in Cairo, EG and the founding date', () => {
+    for (const lang of ['ar', 'en'] as const) {
+      const graphs = [studioJsonLd(lang), jsonLd(lang), whatsappJsonLd(lang, [])].flatMap(
+        g => g['@graph'] as Record<string, unknown>[]
+      );
+      const orgs = graphs.filter(n => n['@id'] === 'https://ebda.app/#organization');
+      expect(orgs.length).toBe(3);
+      for (const org of orgs) {
+        expect(org.address).toMatchObject({
+          '@type': 'PostalAddress',
+          streetAddress: BRAND.office.addressEn,
+          addressLocality: 'Cairo',
+          addressRegion: 'Cairo',
+          addressCountry: 'EG',
+        });
+        expect(org.foundingDate).toBe('2026-09-11');
+      }
+    }
+  });
+});
+
+describe('the founding date (BRAND.company.foundedOn)', () => {
+  it('About shows it through the site date formatter, Western digits, ar and en', () => {
+    expect(BRAND.company.foundedOn).toBe('2026-09-11');
+    const ar = renderToStaticMarkup(<AboutPage locale="ar" />);
+    const en = renderToStaticMarkup(<AboutPage locale="en" />);
+    expect(ar.replace(/<[^>]+>/g, '')).toContain(
+      `اتأسست في ${formatLegalDate('2026-09-11', 'ar')}`
+    );
+    expect(en.replace(/<[^>]+>/g, '')).toContain(`Founded ${formatLegalDate('2026-09-11', 'en')}`);
+    expect(formatLegalDate('2026-09-11', 'ar')).toMatch(/^11 .*2026$/);
+    expect(formatLegalDate('2026-09-11', 'en')).toBe('11 September 2026');
+    expect(ar + en).toContain('dateTime="2026-09-11"');
   });
 });

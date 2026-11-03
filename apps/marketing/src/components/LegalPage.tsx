@@ -5,6 +5,7 @@ import { HOME, pagePath, type LegalExtraSlug, type LegalSlug, type Locale } from
 import type { LegalPages } from '../lib/legal-types';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { OfficeBlock } from './OfficeBlock';
 
 type StoreDocKey = keyof Pick<
   LegalPages,
@@ -90,6 +91,11 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
                   {COPY[locale].footer.dataDeletion}
                 </Link>
               </p>
+            )}
+            {page === 'legal' && (
+              <section id="s-office" aria-labelledby="s-office-h">
+                <OfficeBlock locale={locale} headingId="s-office-h" />
+              </section>
             )}
             {page === 'legal' && (
               <section id="s-more" aria-labelledby="s-more-h">
