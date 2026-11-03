@@ -140,6 +140,8 @@ jobs:
         id: previous
         run: node scripts/ci/deploy-guard.mjs previous --name ebda-api --cwd apps/api --config .wrangler.deploy.jsonc
       - name: Deploy reviewed API
+        # Ruling DEPLOY-TIMEOUT-1: a hung wrangler/OpenNext R2 populate must fail the step, not hold the runner.
+        timeout-minutes: 10
         id: deploy
         working-directory: apps/api
         run: npx wrangler deploy --config .wrangler.deploy.jsonc --var BUILD_COMMIT_SHA:$GITHUB_SHA
