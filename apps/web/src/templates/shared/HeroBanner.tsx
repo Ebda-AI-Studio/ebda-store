@@ -1,5 +1,6 @@
 'use client';
 
+import { storefrontText } from '@ebda/shared';
 import type React from 'react';
 import Image from 'next/image';
 import Link from '../../components/StoreLink';
@@ -83,8 +84,11 @@ export function HeroBanner({
     '--hero-m-aspect': `${HERO_MOBILE.width} / ${HERO_MOBILE.height}`,
   } as React.CSSProperties;
 
-  const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
-  const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
+  const text = storefrontText(isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr), !!isRtl);
+  const subtitleText = storefrontText(
+    isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr),
+    !!isRtl
+  );
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);
   const showOverlay = !!(text || subtitleText || cta);
   const styles = getPackStyles(pack);
