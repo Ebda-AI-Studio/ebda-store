@@ -131,6 +131,47 @@ describe('npm-ci-reuse.sh behaviour (fake npm)', () => {
     expect(r.status).toBe(0);
     expect(npmCalls(d)).toEqual(['ci', 'ls', 'ci']);
   });
+  it('NZ-D21: main never reuses a tree a PR job saved or touched (separate lane keys)', () => {
+    const d = project();
+    const pr = {
+      EBDA_RUNS_ON: 'x',
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_REF: 'refs/pull/1/merge',
+    };
+    const main = { EBDA_RUNS_ON: 'x', GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' };
+    run(d, pr);
+    const rm = () =>
+      spawnSync('rm', [
+        '-rf',
+        path.join(d, 'proj/node_modules'),
+        path.join(d, 'proj/apps/web/node_modules'),
+      ]);
+    rm();
+    expect(run(d, main).stdout).not.toMatch(/restored from store/); // PR tree is invisible to main
+    expect(npmCalls(d)).toEqual(['ci', 'ci']);
+    rm();
+    expect(run(d, main).stdout).toMatch(/restored from store/); // main reuses its own lane
+    rm();
+    expect(run(d, pr).stdout).toMatch(/restored from store/);
+  });
+  it('NZ-D21: the save claims the key with an atomic mkdir (no test-then-mv race, no nested tree)', () => {
+    const s = readFileSync(SCRIPT, 'utf8');
+    expect(s).toMatch(/mkdir "\$DIR" 2>\/dev\/null \|\| \{ rm -rf "\$TMP"; return 0; \}/);
+    expect(s).not.toMatch(/if \[ -d "\$DIR" \]; then rm -rf "\$TMP"; else mv/);
+  });
+  it('NZ-D21: a key another job already claimed is left alone and the loser tree is dropped', () => {
+    const d = project();
+    const env = { EBDA_RUNS_ON: 'x' };
+    run(d, env);
+    const key = readdirSync(path.join(d, 'store')).filter(k => !k.startsWith('.'))[0];
+    spawnSync('rm', ['-f', path.join(d, 'store', key, '.complete')]); // key exists but is not usable yet
+    writeFileSync(path.join(d, 'store', key, 'marker'), 'winner');
+    // a concurrent saver finds the key taken: no nesting inside it
+    const r = run(d, env);
+    expect(r.status).toBe(0);
+    expect(existsSync(path.join(d, 'store', key, `.tmp-${key}`))).toBe(false);
+    expect(readdirSync(path.join(d, 'store')).filter(k => k.startsWith('.tmp-'))).toEqual([]);
+  });
   it('keeps at most EBDA_NM_KEEP keys', () => {
     const d = project();
     const env = { EBDA_RUNS_ON: 'x', EBDA_NM_KEEP: '2' };

@@ -52,10 +52,13 @@ const restrictiveness = (status: string, deleted: boolean): number =>
 async function closeDoRow(
   d1: D1Like,
   id: string,
-  status: string,
+  pgStatus: string,
+  d1Status: string,
   pgDeleted: boolean,
   d1Deleted: boolean
 ): Promise<void> {
+  // never loosen: a deleted Postgres row can still say `active`, which must not overwrite a suspended D1 status (NZ-D21)
+  const status = (RANK[pgStatus] ?? 99) >= (RANK[d1Status] ?? 99) ? pgStatus : d1Status;
   const deletedAt = pgDeleted && !d1Deleted ? Date.now() : null;
   await d1
     .prepare(
@@ -149,18 +152,13 @@ export async function reconcileStoreDirectory(
     if (row?.backend === 'do') {
       // D1 + the DO own it (plan N-22): never overwritten from Postgres, but a stricter Postgres state is applied (NZ-D14).
       if (restrictiveness(s.status, pgDeleted) > restrictiveness(row.status, !!row.deleted)) {
-        await closeDoRow(d1, s.id, s.status, pgDeleted, !!row.deleted);
+        await closeDoRow(d1, s.id, s.status, row.status, pgDeleted, !!row.deleted);
         report.corrected.push({
           id: s.id,
           why: `do store closed to match Postgres (${pgDeleted ? 'deleted' : s.status})`,
         });
       }
-      // Postgres is stale by design for a do store, so a domain difference is reported, never copied (and never re-opens anything).
-      if (await domainsDiffer(s.id, row, s.hasDomain || s.hasPendingDomain))
-        report.alertOnly.push({
-          id: s.id,
-          why: 'do store domain differs from Postgres (D1 is authoritative; check it)',
-        });
+      // Domains of a do store live in D1 only (Postgres is stale by design): never compared, never read from Postgres (NZ-D21).
       continue;
     }
     if (!row) {
