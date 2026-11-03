@@ -14,12 +14,13 @@ export function SignInBrand({
 }: {
   size?: 'sm' | 'lg';
   /** The product line under the studio lockup: Ebda Store by default, Ebda Chat when the person came from Chat. */
-  product?: 'store' | 'chat';
+  product?: 'store' | 'chat' | null;
 }) {
   const isAr = useLocale() === 'ar';
   const studio = isAr ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
   const p = which === 'chat' ? BRAND.productWhatsapp : BRAND.product;
-  const product = isAr ? p.nameAr : p.nameEn;
+  // `null` = not resolved yet: no product line (the height is reserved) rather than a wrong one.
+  const product = which === null ? '' : isAr ? p.nameAr : p.nameEn;
   const h = size === 'lg' ? 40 : 32;
   return (
     <div className="flex flex-col items-center text-center">
@@ -42,7 +43,7 @@ export function SignInBrand({
         />
         <span className="text-sm font-medium text-primary-ink">{studio}</span>
       </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight text-foreground">{product}</p>
+      <p className="mt-3 min-h-8 text-2xl font-bold tracking-tight text-foreground">{product}</p>
     </div>
   );
 }

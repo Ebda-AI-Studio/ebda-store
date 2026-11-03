@@ -18,12 +18,15 @@ const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 export default function LoginPage() {
   const t = useT('auth.login');
   // Which product sent the person here (?product=chat from Ebda Chat); anything else is the Store (Ruling SIGNIN-RETURN-1).
-  const [product, setProduct] = useState<SignInProduct>('store');
+  // `null` until the query is read: the first render is neutral, so a Chat visitor never sees the Store's name first.
+  const [product, setProduct] = useState<SignInProduct | null>(null);
   useEffect(() => {
     setProduct(signInProduct(new URLSearchParams(window.location.search).get('product')));
   }, []);
-  const tp = (key: 'title' | 'subtitle' | 'footer' | 'brandTitle' | 'brandSubtitle') =>
-    t(product === 'chat' ? (`${key}Chat` as const) : key);
+  const tp = (key: 'title' | 'subtitle' | 'footer' | 'brandTitle' | 'brandSubtitle') => {
+    if (product === null) return key === 'title' ? t('title') : '';
+    return t(product === 'chat' ? (`${key}Chat` as const) : key);
+  };
   const tSignup = useT('onboarding.signup');
   const router = useRouter();
   const {
@@ -185,7 +188,10 @@ export default function LoginPage() {
 
             <form className="mt-8 space-y-6" onSubmit={handleMfaSubmit}>
               {error && (
-                <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
+                <div
+                  role="alert"
+                  className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink"
+                >
                   {error}
                 </div>
               )}
@@ -297,7 +303,10 @@ export default function LoginPage() {
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
+              <div
+                role="alert"
+                className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink"
+              >
                 {error}
               </div>
             )}
@@ -404,12 +413,15 @@ export default function LoginPage() {
             </div>
           )}
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {tSignup('noAccount')}{' '}
-            <Link href="/signup" className="text-primary-ink underline underline-offset-4">
-              {tSignup('createStore')}
-            </Link>
-          </p>
+          {/* Store sign-up copy names the Store: shown only once the product is known to be the Store. */}
+          {product === 'store' && (
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              {tSignup('noAccount')}{' '}
+              <Link href="/signup" className="text-primary-ink underline underline-offset-4">
+                {tSignup('createStore')}
+              </Link>
+            </p>
+          )}
 
           <p className="mt-8 text-center text-xs text-muted-foreground">{tp('footer')}</p>
         </div>
