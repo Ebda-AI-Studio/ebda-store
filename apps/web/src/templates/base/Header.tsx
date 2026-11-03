@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useId } from 'react';
+import { useState, useEffect, useRef, useId, type CSSProperties } from 'react';
 import Link from '../../components/StoreLink';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
@@ -129,20 +129,22 @@ export default function MinimalHeader({
           // face, a stacked Latin line) would hang out of the bar. Reserve its height on the row.
           style={
             lockup && !displayLogo
-              ? {
-                  minHeight: Math.ceil(
+              ? ({
+                  // an inline lockup stacks below md (StoreLockup), so a phone reserves the stacked height
+                  '--lh-md': `${Math.ceil(
                     lockup.size * 1.4 + (lockup.layout === 'stack' ? lockup.latinSize + 4 : 0) + 24
-                  ),
-                }
+                  )}px`,
+                  '--lh-sm': `${Math.ceil(lockup.size * 1.4 + lockup.latinSize + 4 + 24)}px`,
+                } as CSSProperties)
               : undefined
           }
-          className={
+          className={`${
             isCentre
               ? 'relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center py-3'
               : isProminent
                 ? 'relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-x-4'
                 : 'relative flex items-center justify-between py-3'
-          }
+          }${lockup && !displayLogo ? ' min-h-[var(--lh-sm)] md:min-h-[var(--lh-md)]' : ''}`}
         >
           {/* Logo — absolute-centered on mobile (visual middle of the
               row regardless of asymmetric hamburger/actions widths),

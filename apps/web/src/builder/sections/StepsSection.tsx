@@ -264,9 +264,12 @@ export function StepsSection({
                   {s.product ? (
                     <Link
                       href={storeUrl(`/products/${s.product.slug}`)}
-                      className="mt-2 flex min-h-[44px] items-center justify-between gap-3 text-sm text-foreground underline decoration-primary underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="group/row mt-2 flex min-h-[44px] items-center justify-between gap-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <span className="min-w-0 line-clamp-2">{name}</span>
+                      {/* PREMIUM-35: a product row is a card, not a text link: no underline across name and price */}
+                      <span className="min-w-0 line-clamp-2 transition-colors group-hover/row:text-primary">
+                        {name}
+                      </span>
                       {showPrice && price && (
                         <span className="flex shrink-0 flex-col items-end whitespace-nowrap text-end font-medium">
                           <span>
