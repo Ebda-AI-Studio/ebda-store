@@ -62,3 +62,7 @@ Mixes are data (`packages/shared/src/looks/registry.ts`); a section the incoming
 ## Status of the build (Phase B2)
 
 Built: skin id, tokens and gates, the search-first header, the dense-card pack, four platform variants (`rail`, `tiles`, `stage`, `on_sale`), the section mixes, the PDP instalment line, the `storedemo-souq` demo, the scenario matrix (`tests/souq/`, `playwright.souq.config.ts`, `scripts/storedemo/scenario-stores.mjs --template souq`) and the purchase-path pack (`scripts/taste/shoot-purchase-path.mjs --template souq`). STOP-2 fix wave 1 (B2-23, B2-24): auto-fill listing grid (`chrome.plp`), Night green throughout (`chrome.listing`), compact title band for a look store without a hero photo, sticky-header focus offset, per-product stage control names. Rulings B2-1 to B2-24 are in `docs/RULINGS.md`.
+
+## Storefront audit 2026-11-03 (PREMIUM-33)
+
+Night souq's hero action is the brass primary pair like the card actions; the header lockup follows PREMIUM-30.

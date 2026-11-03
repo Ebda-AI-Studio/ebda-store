@@ -1753,6 +1753,25 @@ html[dir='rtl'] [data-look='lamma.notebook'],
   img {
   mix-blend-mode: multiply;
 }
+/* PREMIUM-33 (audit 2026-11-03 b, souq): every action on Night souq is brass (Ruling B2-18) except the hero's
+   white photo button, which read as the odd one out. The hero action takes the same brass pair as the cards. */
+[data-look='souq.night'] a[data-cta='button'],
+[data-look='souq.night'] a[data-cta='button']:hover {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+[data-look='souq.night'] a[data-cta='button']:hover {
+  filter: brightness(1.08);
+}
+/* PREMIUM-34 (audit 2026-11-03 b, jasmine): merchant photos are shot on white, and on Bloom's white card the white
+   photo read as a second white frame inside the first. The photo area gets a blush matte (the pink page mixed
+   toward white) and the photo multiplies into it, so the card is one white frame around one pink-toned tile. */
+[data-look='jasmine.bloom'] [data-part='card-image'] {
+  background-color: color-mix(in srgb, hsl(var(--background)) 62%, white);
+}
+[data-look='jasmine.bloom'] [data-part='card-image'] img {
+  mix-blend-mode: multiply;
+}
 /* Clinic's featured active (fix wave 1): a finished clinical panel, not a grey tile beside floating
    text. The photo sits on a white panel with a hairline, the
    copy column gets a larger name and price, and an eyebrow ("Active of the week"). */

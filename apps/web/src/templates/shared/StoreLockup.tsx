@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react';
+'use client';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { lockupLatin, type Lockup } from '@ebda/shared';
 
 const COLOR: Record<'ink' | 'muted' | 'primary' | 'accent', string> = {
@@ -37,6 +38,20 @@ export function StoreLockup({
   // the Latin line only accompanies an Arabic name (in English the name IS the Latin form)
   const latin = isRtl && nameAr ? lockupLatin(lockup, name) : null;
   const stack = lockup.layout === 'stack';
+  // PREMIUM-30: the Latin line may never end in an ellipsis. It is measured; when the slot cannot hold the
+  // whole word it is dropped (collapsed, still measured so it returns when the slot widens).
+  const latinRef = useRef<HTMLSpanElement>(null);
+  const [latinFits, setLatinFits] = useState(true);
+  useLayoutEffect(() => {
+    const el = latinRef.current;
+    if (!el) return;
+    const measure = () => setLatinFits(el.scrollWidth <= el.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [latin]);
   // On a phone the logo may use about 134 px (the bar keeps room for cart and language on one side), so a
   // long name steps its display size down instead of wrapping into a column that hangs out of the bar.
   const phoneSize = Math.max(
@@ -49,8 +64,11 @@ export function StoreLockup({
     fontFamily: 'var(--font-display)',
     fontWeight: lockup.weight,
     // The display faces (Lalezar, Reem Kufi...) draw Arabic marks well above and below a 1.1 line box and
-    // `line-clamp` clips at it: a 1.4 line keeps them whole (Qamar lookbook's name was cut at the page top).
+    // `line-clamp` clips at its padding box: a 1.4 line plus 0.3em padding (cancelled by a negative margin, so the
+    // layout does not move) keeps the dots whole (Qamar lookbook's name was still cut at the page top, PREMIUM-30).
     lineHeight: 1.4,
+    paddingBlock: '0.3em',
+    marginBlock: '-0.3em',
     color: COLOR[lockup.color],
     letterSpacing: 'normal',
   };
@@ -61,12 +79,17 @@ export function StoreLockup({
     letterSpacing: `${lockup.latinTracking}em`,
     lineHeight: 1,
     color: lockup.latinColor === 'none' ? undefined : COLOR[lockup.latinColor],
-    // the tracking adds trailing space after the last letter: pull it back so the line stays optically centred
-    marginInlineEnd: stack ? `calc(${lockup.latinTracking}em * -1)` : undefined,
+    // the tracking adds trailing space after the last letter: balance it with the same space at the start so the
+    // line stays optically centred WITHOUT shrinking the box (a negative end margin made the box 4px narrower than
+    // the word, which is what produced the ellipsis, PREMIUM-30)
+    paddingInlineStart: `${lockup.latinTracking}em`,
+    // a dropped line collapses; it stays in the flow so it can be measured again
+    ...(latinFits ? null : { height: 0, opacity: 0, marginBlockStart: stack ? -4 : 0 }),
   };
   return (
     <span
-      className={`inline-flex max-w-full items-center justify-center ${stack ? 'flex-col gap-1' : 'flex-row gap-2.5'}`}
+      // an inline lockup stacks on a phone: the 134 px slot cannot hold the name and the Latin word side by side
+      className={`inline-flex max-w-full items-center justify-center ${stack ? 'flex-col gap-1' : 'flex-col gap-1 md:flex-row md:gap-2.5'}`}
       data-zone="storeName"
       data-lockup={lockup.layout}
       translate="no"
@@ -80,11 +103,14 @@ export function StoreLockup({
       </span>
       {latin && (
         <span
+          ref={latinRef}
           aria-hidden="true"
           // PREMIUM-10: the Latin line is LTR text inside an RTL header; without dir=ltr the
           // ellipsis landed at the START ("…MAR"). dir=ltr truncates at the end and keeps the word whole.
           dir="ltr"
-          className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap uppercase"
+          // lang=en keeps the Latin word's own tracking: the Arabic-page reset (`:lang(ar) *`) is for Arabic joining
+          lang="en"
+          className="block max-w-full overflow-hidden whitespace-nowrap uppercase"
           style={latinStyle}
         >
           {latin}
