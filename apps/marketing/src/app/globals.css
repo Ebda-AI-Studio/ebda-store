@@ -2367,7 +2367,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   .m3d-wrap {
     grid-template-columns: minmax(0, 1fr) 380px;
     gap: 72px;
-    align-items: center;
+    align-items: start;
   }
 }
 .m3d-side .lead {
@@ -2414,6 +2414,19 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 .m3d-phone {
   width: min(100%, 380px);
   margin-inline: auto;
+  /* a closed frame: a bottom bezel as deep as the top one, with the home indicator in it */
+  padding-bottom: 30px;
+}
+.m3d-phone::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 12px;
+  width: 104px;
+  height: 4px;
+  margin-inline: auto;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.4);
 }
 .m3d-screen {
   display: flex;
@@ -2540,6 +2553,15 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   background: var(--ink);
   color: var(--bg);
   border-color: var(--ink);
+}
+.m3d-swatch[aria-pressed='true']::after {
+  content: '\2713' / '';
+  font-weight: 700;
+}
+.m3d-swatch[aria-pressed='true'] .m3d-dot {
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 0 0 4px var(--bg);
 }
 .m3d-swatch:focus-visible {
   outline: 3px solid var(--ink);
