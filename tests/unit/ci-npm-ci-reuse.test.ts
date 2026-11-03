@@ -33,7 +33,9 @@ describe('workflow wiring', () => {
   });
   it('the action passes EBDA_RUNS_ON and calls the script', () => {
     const a = readFileSync(path.join(ROOT, '.github/actions/npm-ci/action.yml'), 'utf8');
-    expect(a).toMatch(/EBDA_RUNS_ON: \$\{\{ vars\.EBDA_RUNS_ON \}\}/);
+    // Composite actions cannot read the `vars` context (runner rejects the file); derive from runner type.
+    expect(a).not.toMatch(/\$\{\{[^}]*\bvars\./);
+    expect(a).toMatch(/EBDA_RUNS_ON: \$\{\{ runner\.environment == 'self-hosted'/);
     expect(a).toMatch(/bash scripts\/ci\/npm-ci-reuse\.sh/);
   });
   it('no actions/cache anywhere; setup-node cache is hosted-only', () => {

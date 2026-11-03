@@ -6,5 +6,6 @@ runs:
     - name: npm ci (runner-local node_modules store when EBDA_RUNS_ON is set)
       shell: bash
       env:
-        EBDA_RUNS_ON: ${{ vars.EBDA_RUNS_ON }}
+        # Composite actions cannot read the `vars` context; the runner type is the same fact (EBDA_RUNS_ON set <=> Umbra self-hosted).
+        EBDA_RUNS_ON: ${{ runner.environment == 'self-hosted' && 'umbra' || '' }}
       run: bash scripts/ci/npm-ci-reuse.sh
