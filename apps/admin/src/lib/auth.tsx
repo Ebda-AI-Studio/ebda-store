@@ -20,6 +20,7 @@ import {
   readStoredRefreshToken,
   markSessionEvidence,
   clearStoredSession,
+  rememberGrant,
 } from './api';
 import {
   isIosWebkit,
@@ -32,6 +33,7 @@ import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { passkeyAssertion, type PasskeyMode } from './passkeys';
 import { signInMessageKey } from './sign-in-error';
 import { safeSignInReturn } from './sign-in-return';
+import { PUBLIC_PATHS } from './public-paths';
 import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
 
 interface User {
@@ -100,19 +102,7 @@ export function goAfterSignIn(
   else router[how](dest);
 }
 
-/**
- * Pages reachable with no session. `/login` plus the self-serve funnel
- * (`/signup`, `/verify-email`) and password recovery (`/forgot-password`,
- * `/reset-password`): a visitor must be able to create an account, recover
- * one, and open the emailed links before any session exists.
- */
-export const PUBLIC_PATHS: readonly string[] = [
-  '/login',
-  '/signup',
-  '/verify-email',
-  '/forgot-password',
-  '/reset-password',
-];
+export { PUBLIC_PATHS } from './public-paths';
 
 /** Dev-only visual previews (no session needed). Empty in production builds. */
 export const DEV_PREVIEW_PATHS: readonly string[] =
@@ -273,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Exchange an identity-service access token for the Store session and finish signing in. */
   async function finishSignIn(accessToken: string, enrollSecondFactor = false): Promise<void> {
     const user = await establishApiSession<User>(accessToken);
+    rememberGrant({ access_token: accessToken });
     // Check if user is admin or staff
     const adminRoles = ['super_admin', 'store_admin', 'staff'];
     if (!adminRoles.includes(user.role)) {

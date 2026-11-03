@@ -5618,6 +5618,7 @@
   },
   "auth": {
     "login": {
+      "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
       "subtitle": "Sign in and get back to your store.",
       "email": "Email address",

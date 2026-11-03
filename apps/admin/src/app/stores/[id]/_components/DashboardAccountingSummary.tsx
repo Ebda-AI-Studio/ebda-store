@@ -1,5 +1,6 @@
 'use client';
 
+import { isRefusedThisSession, rememberRefusal } from '../../../../lib/plan-refusal-memo';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
@@ -77,9 +78,15 @@ export function DashboardAccountingSummary({ storeId }: Props) {
         })
       ),
       // Fetch top RFM segment — graceful no-op if rollup hasn't run yet
-      apiGetQuiet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`).catch(
-        () => ({ data: null, error: null })
-      ),
+      isRefusedThisSession('segments', storeId)
+        ? Promise.resolve({ data: null, error: null })
+        : apiGetQuiet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`)
+            .then(res => {
+              const status = (res.error as { status?: number } | null)?.status;
+              if (status === 402 || status === 403) rememberRefusal('segments', storeId);
+              return res;
+            })
+            .catch(() => ({ data: null, error: null })),
     ])
       .then(([fRes, sRes, segRes]) => {
         if (cancelled) return;

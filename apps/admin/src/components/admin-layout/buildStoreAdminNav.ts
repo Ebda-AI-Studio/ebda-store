@@ -159,6 +159,8 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
  * moved — all existing URLs continue to work.
  */
 export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[] {
+  // No store id yet (first render): a link built now would be `/stores//...`, which the router prefetches as a 404.
+  if (!storeId) return [];
   return [
     {
       name: labels.dashboard,

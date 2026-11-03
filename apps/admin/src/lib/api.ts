@@ -28,6 +28,8 @@ import {
   isPlanGateError,
 } from './route-feature-gates';
 import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
+import { armProactiveRefresh, disarmProactiveRefresh, grantExpiryMs } from './proactive-refresh';
+import { handleSessionEnded } from './session-ended';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -196,6 +198,23 @@ function claimSessionProbe(): boolean {
   }
 }
 
+let lastGrant: { token: string; expiresAt: number } | null = null;
+
+/** Remember the newest grant and schedule the next renewal ~60 s before it expires (P0 logout audit). */
+export function rememberGrant(grant: { access_token: string; expires_at?: number }): void {
+  const expiresAt = grantExpiryMs(grant);
+  lastGrant = { token: grant.access_token, expiresAt };
+  if (typeof window !== 'undefined') {
+    armProactiveRefresh(expiresAt, { refresh: () => refreshAccessToken() });
+  }
+}
+
+/** A token with at least `minTtlMs` left: the cached one, else a refresh. null = the session is gone. */
+export async function getFreshAccessToken(minTtlMs = 60_000): Promise<string | null> {
+  if (lastGrant && lastGrant.expiresAt - Date.now() > minTtlMs) return lastGrant.token;
+  return refreshAccessToken();
+}
+
 export function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
 
@@ -208,8 +227,14 @@ export function refreshAccessToken(): Promise<string | null> {
       const grant = await accountsToken();
       await establishApiSession(grant.access_token);
       markSessionEvidence();
+      rememberGrant(grant);
       return grant.access_token;
     } catch (error) {
+      // 401 NO_SESSION: the session is gone for good (password changed, signed out elsewhere). Say so and leave once,
+      // instead of a burst of failing calls and a silent logout. A no-op on public pages.
+      if (error instanceof AccountsError && error.status === 401 && error.code === 'NO_SESSION') {
+        handleSessionEnded();
+      }
       // A throttle is not "signed out": it must reach the caller or the credential-clear fires anyway.
       if (error instanceof AccountsError && error.status === 429) throw new RefreshThrottledError();
       // 401 NO_SESSION (signed out / revoked) and every other refusal mean there is no session to keep.
@@ -253,6 +278,8 @@ export async function refreshSession(): Promise<RefreshOutcome> {
  */
 export function clearStoredSession(): void {
   if (typeof window === 'undefined') return;
+  disarmProactiveRefresh();
+  lastGrant = null;
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   // The session is over: nothing is left to refresh, so the next anonymous
@@ -672,6 +699,8 @@ export async function apiRequest<T = unknown>(
       // every protected route. Send them straight to the enrollment page instead
       // of surfacing a dead "failed to load" error. The /account/security page
       // only calls non-gated routes (/auth/me, /auth/mfa/*) so this can't loop.
+      // The session was revoked server-side (password change, signed out elsewhere): end it visibly, once.
+      if (typeof window !== 'undefined' && errCode === 'TOKEN_REVOKED') handleSessionEnded();
       if (
         typeof window !== 'undefined' &&
         errCode === 'MFA_SETUP_REQUIRED' &&

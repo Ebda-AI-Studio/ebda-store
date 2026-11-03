@@ -12,6 +12,7 @@ import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
 import { SignInBrand } from '@/components/SignInBrand';
 import { signInProduct, type SignInProduct } from '../../lib/sign-in-return';
 import { DocumentTitle } from '@/components/DocumentTitle';
+import { consumeSessionEnded } from '../../lib/session-ended';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
@@ -41,6 +42,16 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // A revoked session sends people here with ?ended=1 (and the flag): say why, calmly, once.
+  const [sessionEnded, setSessionEnded] = useState(false);
+  useEffect(() => {
+    const flagged = consumeSessionEnded();
+    const queried =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('ended') === '1';
+    if (flagged || queried) setSessionEnded(true);
+  }, []);
 
   // On mount: prefill email + check box if a remembered email exists.
   useEffect(() => {
@@ -302,6 +313,14 @@ export default function LoginPage() {
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            {sessionEnded && !error && (
+              <div
+                role="status"
+                className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground"
+              >
+                {t('sessionEnded')}
+              </div>
+            )}
             {error && (
               <div
                 role="alert"
