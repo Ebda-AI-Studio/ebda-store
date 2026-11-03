@@ -5654,7 +5654,12 @@
       "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
       "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue.",
       "invalidCredentials": "The email or password is not right. Check them and try again.",
-      "invalidCode": "That code is wrong or has expired. Try again."
+      "invalidCode": "That code is wrong or has expired. Try again.",
+      "titleChat": "Sign in to Ebda Chat",
+      "subtitleChat": "Sign in and carry on in Ebda Chat.",
+      "footerChat": "Ebda Chat",
+      "brandTitleChat": "Ebda Chat",
+      "brandSubtitleChat": "Reply to your customers on WhatsApp from one place, with your whole team."
     },
     "forgot": {
       "title": "Reset your password",

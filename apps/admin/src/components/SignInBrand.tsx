@@ -8,10 +8,18 @@ import { BRAND } from '@ebda/shared';
  * The one sign-in lockup for every Ebda surface: the studio first (mark + "Ebda AI Studio"), then the product name.
  * Night + Ebda gold only, no orange. The same markup lives in apps/orders (separate app, no shared UI package).
  */
-export function SignInBrand({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
+export function SignInBrand({
+  size = 'lg',
+  product: which = 'store',
+}: {
+  size?: 'sm' | 'lg';
+  /** The product line under the studio lockup: Ebda Store by default, Ebda Chat when the person came from Chat. */
+  product?: 'store' | 'chat';
+}) {
   const isAr = useLocale() === 'ar';
   const studio = isAr ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
-  const product = isAr ? BRAND.product.nameAr : BRAND.product.nameEn;
+  const p = which === 'chat' ? BRAND.productWhatsapp : BRAND.product;
+  const product = isAr ? p.nameAr : p.nameEn;
   const h = size === 'lg' ? 40 : 32;
   return (
     <div className="flex flex-col items-center text-center">

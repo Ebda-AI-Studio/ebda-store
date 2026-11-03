@@ -670,6 +670,14 @@ export async function registerPending(
 
 const STORE_SIGN_IN_URL = 'https://store.ebda.app/login';
 
+/** The Store sign-in URL carrying the caller's `product` (chat | store) and a bounded https `return`. */
+export function signInEntryUrl(product: string | undefined, ret: string | undefined): string {
+  const url = new URL(STORE_SIGN_IN_URL);
+  if (product === 'chat' || product === 'store') url.searchParams.set('product', product);
+  if (ret && ret.length <= 2048 && /^https:\/\//i.test(ret)) url.searchParams.set('return', ret);
+  return url.toString();
+}
+
 export function createApp() {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -777,8 +785,11 @@ export function createApp() {
   // This host is API-only (no UI by design, Ruling ID-1): the sign-in form is the Store app's /login, which posts to this
   // service. A person who types the bare host, /login or /sign-in lands there instead of a 404 (Ruling ACCOUNTS-ENTRY-1).
   // Cost if wrong: when a dedicated accounts UI ships, point these three at it.
+  // Ebda Chat arrives as /login?product=chat&return=<https url>: both survive the hop (Ruling SIGNIN-RETURN-1). Only
+  // those two keys travel, `product` only from the known set and `return` only as a bounded https URL; the Store
+  // sign-in page re-validates `return` against its host allowlist, which is the actual open-redirect boundary.
   for (const path of ['/', '/login', '/sign-in']) {
-    app.get(path, c => c.redirect(STORE_SIGN_IN_URL, 302));
+    app.get(path, c => c.redirect(signInEntryUrl(c.req.query('product'), c.req.query('return')), 302));
   }
 
   // ---- discovery ----

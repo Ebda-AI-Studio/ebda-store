@@ -4,18 +4,26 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
-import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
+import { useAuth, postLoginDestination, goAfterSignIn, type MfaChallenge } from '../../lib/auth';
 import { isPasskeyCancel, passkeyAutofillSupported, passkeysSupported } from '../../lib/passkeys';
 import { useT } from '@/i18n/useT';
 import { NileNight } from './_components/NileNight';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
 import { SignInBrand } from '@/components/SignInBrand';
+import { signInProduct, type SignInProduct } from '../../lib/sign-in-return';
 import { DocumentTitle } from '@/components/DocumentTitle';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
 export default function LoginPage() {
   const t = useT('auth.login');
+  // Which product sent the person here (?product=chat from Ebda Chat); anything else is the Store (Ruling SIGNIN-RETURN-1).
+  const [product, setProduct] = useState<SignInProduct>('store');
+  useEffect(() => {
+    setProduct(signInProduct(new URLSearchParams(window.location.search).get('product')));
+  }, []);
+  const tp = (key: 'title' | 'subtitle' | 'footer' | 'brandTitle' | 'brandSubtitle') =>
+    t(product === 'chat' ? (`${key}Chat` as const) : key);
   const tSignup = useT('onboarding.signup');
   const router = useRouter();
   const {
@@ -49,7 +57,7 @@ export default function LoginPage() {
   // a login form they don't need.
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace(postLoginDestination());
+      goAfterSignIn(router, postLoginDestination(), 'replace');
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -166,9 +174,9 @@ export default function LoginPage() {
             <div className="mb-6 flex justify-end">
               <AdminLanguageSwitcher />
             </div>
-            <DocumentTitle title={t('title')} />
+            <DocumentTitle title={tp('title')} />
             <div className="text-center">
-              <SignInBrand />
+              <SignInBrand product={product} />
               <h1 className="mt-6 text-3xl font-bold text-foreground">{t('mfaRequired')}</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 {useBackupCode ? t('mfaBackupSubtitle') : t('mfaSubtitle')}
@@ -242,7 +250,7 @@ export default function LoginPage() {
               </div>
             </form>
 
-            <p className="mt-8 text-center text-xs text-muted-foreground">{t('footer')}</p>
+            <p className="mt-8 text-center text-xs text-muted-foreground">{tp('footer')}</p>
           </div>
         </div>
 
@@ -252,9 +260,9 @@ export default function LoginPage() {
             <NileNight />
             <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
             <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-              <p className="text-4xl font-bold">{t('brandTitle')}</p>
+              <p className="text-4xl font-bold">{tp('brandTitle')}</p>
               <p className="mt-4 text-lg text-white/85 text-center max-w-md">
-                {t('brandSubtitle')}
+                {tp('brandSubtitle')}
               </p>
             </div>
           </div>
@@ -280,11 +288,11 @@ export default function LoginPage() {
           <div className="mb-6 flex justify-end">
             <AdminLanguageSwitcher />
           </div>
-          <DocumentTitle title={t('title')} />
+          <DocumentTitle title={tp('title')} />
           <div className="text-center">
-            <SignInBrand />
-            <h1 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>
+            <SignInBrand product={product} />
+            <h1 className="mt-6 text-3xl font-bold text-foreground">{tp('title')}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{tp('subtitle')}</p>
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -403,7 +411,7 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">{t('footer')}</p>
+          <p className="mt-8 text-center text-xs text-muted-foreground">{tp('footer')}</p>
         </div>
       </div>
 
@@ -413,8 +421,8 @@ export default function LoginPage() {
           <NileNight />
           <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
           <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-            <p className="text-4xl font-bold">{t('brandTitle')}</p>
-            <p className="mt-4 text-lg text-white/85 text-center max-w-md">{t('brandSubtitle')}</p>
+            <p className="text-4xl font-bold">{tp('brandTitle')}</p>
+            <p className="mt-4 text-lg text-white/85 text-center max-w-md">{tp('brandSubtitle')}</p>
           </div>
         </div>
       </div>
