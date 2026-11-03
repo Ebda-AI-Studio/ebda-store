@@ -7,5 +7,5 @@ runs:
       shell: bash
       env:
         # Composite actions cannot read the `vars` context; the runner type is the same fact (EBDA_RUNS_ON set <=> Umbra self-hosted).
-        EBDA_RUNS_ON: ${{ runner.environment == 'self-hosted' && 'umbra' || '' }}
+        EBDA_RUNS_ON: ${{ runner.environment == 'self-hosted' && '1' || '' }}
       run: bash scripts/ci/npm-ci-reuse.sh
