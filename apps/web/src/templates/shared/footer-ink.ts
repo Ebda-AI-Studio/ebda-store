@@ -39,6 +39,14 @@ const hex = (c: { r: number; g: number; b: number }) =>
     )
     .join('');
 
+/** Every colour stop of a paint (solid or gradient), as RGB; empty when unparseable. */
+export function parseBgStops(bg: string | undefined): { r: number; g: number; b: number }[] {
+  if (!bg) return [];
+  return (bg.match(STOP_RE) ?? [])
+    .map(parseStop)
+    .filter((c): c is { r: number; g: number; b: number } => c !== null);
+}
+
 export interface FooterInk {
   fg: '#ffffff' | '#000000';
   /** Solid colour (no alpha) for muted text, >= 4.5:1 on every stop. */

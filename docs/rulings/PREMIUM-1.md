@@ -1,0 +1,5 @@
+# PREMIUM-1
+
+> Section: 2026-11-03 - Storefront premium defaults (PREMIUM-\*)
+
+Ruling PREMIUM-1 - section tone contract. A section painted with ANY colour (merchant pick, every look, every template) re-scopes the ink tokens to its own paint when the theme ink does not reach 4.5:1 for body AND muted text on every gradient stop (`templates/shared/section-ink.ts`, called from `sectionBgStyle`, the one funnel every section paints through). Ink is chosen from page colour, theme foreground, white, black in that order; cards/fields blend into the band; a brand primary that fails 4.5:1 as price text is swapped alone. The band colour itself stays the merchant's, verbatim. Evidence: QA home navy `#1F2A44` painted 1.28:1; `section-ink.test.tsx` renders 16 themes x 10 bands (light, dark, mid-tone, brand orange, gradient) and asserts >= 4.5:1. A gradient that spans a dark and a light stop cannot be satisfied by any single ink and is not asserted. Cost if wrong: a band that already read at 4.4:1 gets re-inked (white/black instead of the brand ink) - a style change, never an unreadable one.
