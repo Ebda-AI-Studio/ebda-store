@@ -281,31 +281,9 @@ export interface Copy {
     cta: string;
     login: string;
   };
-  footer: {
-    product: string;
-    /** The Ebda Chat pages' credit and ownership lines (MKT-WA-CHROME-1: a product page never credits another product). */
-    waProduct: string;
-    waOwnership: string;
-    /** The studio home's credit and ownership lines (Ruling MKT-HOME-1). */
-    studioProduct: string;
-    studioOwnership: string;
-    legalNav: string;
-    legal: string;
-    privacy: string;
-    cookies: string;
-    terms: string;
-    merchant: string;
-    acceptableUse: string;
-    /** Footer link to /legal/data-deletion. */
-    dataDeletion: string;
-    contact: string;
-    legalVersion: string;
-    about: string;
-    /** Footer link to /credits. */
-    credits: string;
-    /** Ownership + copyright line (company names come from BRAND.company). */
-    ownership: string;
-  };
+  /** The footer's links and labels come from the brand module (`siteFooter`); only the legal-update line is marketing's own. */
+  footer: { legalVersion: string; dataDeletion: string };
+
   legalPages: LegalPages;
 }
 
@@ -744,24 +722,8 @@ export const COPY: Record<Locale, Copy> = {
       login: 'عندك متجر؟ ادخل',
     },
     footer: {
-      product: `ابدأ ستور — منتج من ${CO.shortNameAr}`,
-      waProduct: `ابدأ شات — منتج من ${CO.shortNameAr}`,
-      waOwnership: `ابدأ شات منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
-      studioProduct: `ابدأ ستور وابدأ شات — منتجات من ${CO.shortNameAr}`,
-      studioOwnership: `© 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
-      legalNav: 'روابط قانونية',
-      legal: 'الإشعار القانوني',
-      privacy: 'الخصوصية',
-      cookies: 'إعدادات الكوكيز',
-      terms: 'الشروط',
-      merchant: 'اتفاقية التاجر',
-      acceptableUse: 'الاستخدام المقبول',
       dataDeletion: 'حذف البيانات',
-      contact: 'تواصل: ahlan@ebda.app',
       legalVersion: `آخر تحديث للوثائق القانونية: ${formatLegalDate(LEGAL_UPDATED, 'ar')}.`,
-      about: 'عن ابدأ ستوديو للذكاء الاصطناعي',
-      credits: 'حقوق الصور والموديلات',
-      ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
     },
     legalPages: LEGAL_AR,
   },
@@ -1212,24 +1174,8 @@ export const COPY: Record<Locale, Copy> = {
       login: 'Have a store? Log in',
     },
     footer: {
-      product: `Ebda Store — a product of ${CO.shortNameEn}`,
-      waProduct: `Ebda Chat — a product of ${CO.shortNameEn}`,
-      waOwnership: `Ebda Chat is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
-      studioProduct: `Ebda Store and Ebda Chat — products of ${CO.shortNameEn}`,
-      studioOwnership: `© 2026 ${CO.shortNameEn}. All rights reserved.`,
-      legalNav: 'Legal links',
-      legal: 'Legal notice',
-      privacy: 'Privacy',
-      cookies: 'Cookie settings',
-      terms: 'Terms',
-      merchant: 'Merchant agreement',
-      acceptableUse: 'Acceptable use',
       dataDeletion: 'Data deletion',
-      contact: 'Contact: ahlan@ebda.app',
       legalVersion: `Legal documents updated ${formatLegalDate(LEGAL_UPDATED, 'en')}.`,
-      about: 'About Ebda AI Studio',
-      credits: 'Credits',
-      ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
     },
     legalPages: LEGAL_EN,
   },

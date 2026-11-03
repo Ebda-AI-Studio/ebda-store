@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { siteFooter, type NavLink } from '@ebda/shared/brand';
-import '@/app/chrome.css';
+import { SiteLink } from './SiteLink';
 import { CookieSettingsButton } from './CookieSettingsButton';
 import type { Locale, PageSlug } from '../lib/site';
 
@@ -14,7 +14,13 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
   const f = siteFooter(locale);
   const year = new Date().getUTCFullYear();
   const A = ({ l }: { l: NavLink }) =>
-    l.path ? <Link href={l.path}>{l.label}</Link> : <a href={l.href}>{l.label}</a>;
+    l.path ? (
+      <Link href={l.path}>{l.label}</Link>
+    ) : (
+      <SiteLink href={l.href} locale={locale}>
+        {l.label}
+      </SiteLink>
+    );
   return (
     <footer className="site-footer band-dark sf">
       <div className="wrap">
@@ -30,9 +36,13 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
                 <div key={c.id}>
                   <dt>{c.label}</dt>
                   <dd>
-                    <a href={c.href} dir={c.id === 'whatsapp' ? 'ltr' : undefined}>
+                    <SiteLink
+                      href={c.href}
+                      locale={locale}
+                      dir={c.id === 'whatsapp' ? 'ltr' : undefined}
+                    >
                       {c.value}
-                    </a>
+                    </SiteLink>
                   </dd>
                 </div>
               ))}

@@ -198,7 +198,7 @@ describe('llms.txt and llms-full.txt', () => {
         expect(llms).toContain(`https://ebda.app${pagePath(locale, `compare/${s}` as never)}/`);
     }
     expect(llms).toContain('https://ebda.app/llms-full.txt');
-    expect(llms).toMatch(/^# Ebda Store/);
+    expect(llms).toMatch(/^# Ebda AI Studio/);
     expect(llms).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
     expect(llms).toMatch(/## Not there yet/);
     expect(llms).not.toMatch(BAD);

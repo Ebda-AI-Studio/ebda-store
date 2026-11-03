@@ -4,13 +4,7 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  BRAND,
-  BRAND_STORE_APP_URL,
-  BRAND_MARKETING_URL,
-  siteMedalHtml,
-  siteNavMap,
-} from '@ebda/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, siteMedalHtml, siteNavMap } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,

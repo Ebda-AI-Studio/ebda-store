@@ -14,10 +14,10 @@ import {
 } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { NavBehavior } from './NavBehavior';
+import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import { HeaderSearch } from './HeaderSearch';
 import { productOfPage, pagePath, type Locale, type PageSlug } from '../lib/site';
-import '@/app/chrome.css';
 
 type Page = PageSlug;
 
@@ -27,10 +27,12 @@ type Page = PageSlug;
  */
 function NavA({
   l,
+  locale,
   current = false,
   className,
 }: {
   l: NavLink;
+  locale: Locale;
   current?: boolean;
   className?: string;
 }) {
@@ -40,9 +42,9 @@ function NavA({
       {l.label}
     </Link>
   ) : (
-    <a href={l.href} className={className} {...aria}>
+    <SiteLink href={l.href} locale={locale} className={className} {...aria}>
       {l.label}
-    </a>
+    </SiteLink>
   );
 }
 
@@ -92,7 +94,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
   const products = siteNavProducts(lang);
   const resources = siteNavResources(lang);
   const studio = siteNavStudio(lang);
-  const login = siteNavLogin(lang);
+  const login = siteNavLogin(lang, kind);
   const cta = siteNavCta(lang);
   const bar = kind === 'studio' ? null : productBar(kind, lang);
   const here = pagePath(locale, page).replace(/\/?$/, '/');
@@ -132,7 +134,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 <ul>
                   {resources.map(r => (
                     <li key={r.id}>
-                      <NavA l={r} />
+                      <NavA locale={locale} l={r} />
                     </li>
                   ))}
                 </ul>
@@ -140,7 +142,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
             </li>
             {studio.map(s => (
               <li key={s.id}>
-                <NavA l={s} current={cur(s)} />
+                <NavA locale={locale} l={s} current={cur(s)} />
               </li>
             ))}
           </ul>
@@ -163,7 +165,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 <ul>
                   {products.map(p => (
                     <li key={p.id}>
-                      <NavA l={p} />
+                      <NavA locale={locale} l={p} />
                     </li>
                   ))}
                 </ul>
@@ -173,7 +175,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 <ul>
                   {resources.map(r => (
                     <li key={r.id}>
-                      <NavA l={r} />
+                      <NavA locale={locale} l={r} />
                     </li>
                   ))}
                 </ul>
@@ -183,7 +185,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 <ul>
                   {studio.map(s => (
                     <li key={s.id}>
-                      <NavA l={s} current={cur(s)} />
+                      <NavA locale={locale} l={s} current={cur(s)} />
                     </li>
                   ))}
                 </ul>
@@ -193,7 +195,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 <ul>
                   {login.items.map(i => (
                     <li key={i.id}>
-                      <NavA l={i} />
+                      <NavA locale={locale} l={i} />
                     </li>
                   ))}
                 </ul>
@@ -207,7 +209,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 </Link>
               </li>
               <li className="menu-start">
-                <NavA l={bar ? bar.cta : cta} className="nav-cta" />
+                <NavA locale={locale} l={bar ? bar.cta : cta} className="nav-cta" />
               </li>
             </ul>
           </details>
@@ -223,20 +225,28 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
           >
             {c.nav.switchTo}
           </Link>
-          <div className="nav-products login-menu">
-            <details>
-              <summary>{login.label}</summary>
-              <ul>
-                {login.items.map(i => (
-                  <li key={i.id}>
-                    <NavA l={i} />
-                  </li>
-                ))}
-              </ul>
-            </details>
-          </div>
+          {login.items.length === 1 ? (
+            <NavA
+              locale={locale}
+              l={{ ...login.items[0], label: login.label }}
+              className="link-login"
+            />
+          ) : (
+            <div className="nav-products login-menu">
+              <details>
+                <summary>{login.label}</summary>
+                <ul>
+                  {login.items.map(i => (
+                    <li key={i.id}>
+                      <NavA locale={locale} l={i} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </div>
+          )}
           <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} compact />
-          {!bar && <NavA l={cta} className="btn btn-primary header-start" />}
+          {!bar && <NavA locale={locale} l={cta} className="btn btn-primary header-start" />}
         </div>
       </div>
       {bar && (
@@ -252,11 +262,11 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
             <ul className="product-links">
               {bar.links.map(l => (
                 <li key={l.id}>
-                  <NavA l={l} current={cur(l)} />
+                  <NavA locale={locale} l={l} current={cur(l)} />
                 </li>
               ))}
             </ul>
-            <NavA l={bar.cta} className="btn btn-primary btn-sm product-cta" />
+            <NavA locale={locale} l={bar.cta} className="btn btn-primary btn-sm product-cta" />
           </div>
         </div>
       )}

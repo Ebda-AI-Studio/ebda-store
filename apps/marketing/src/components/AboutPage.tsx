@@ -10,9 +10,9 @@ import { COPY } from '../lib/content';
 import { pagePath, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { SiteLink } from './SiteLink';
 import { JsonLd } from './JsonLd';
 import { studioJsonLd } from '../lib/seo';
-import '@/app/about.css';
 
 /**
  * The About page, a STUDIO page: what Ebda AI Studio is (an Egyptian studio for AI, software and digital marketing), what
@@ -113,9 +113,9 @@ export function AboutPage({ locale }: { locale: Locale }) {
               {' · '}
               <a href={`mailto:${BRAND_SECURITY_EMAIL}`}>{BRAND_SECURITY_EMAIL}</a>
               {' · '}
-              <a href={whatsappUrl()} dir="ltr">
+              <SiteLink href={whatsappUrl()} locale={locale} dir="ltr">
                 {whatsappDisplay()}
-              </a>
+              </SiteLink>
             </p>
             <p className="muted">{p.contactHelp}</p>
             <p>

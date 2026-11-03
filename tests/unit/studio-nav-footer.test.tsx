@@ -50,6 +50,7 @@ const anchors = (html: string) =>
     return {
       href: href.replace(/\/(#|$)/, '$1'),
       label: m[2]
+        .replace(/<span class="sr-only">[^<]*<\/span>/g, '') // SiteLink's hidden new-tab note
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim(),
@@ -274,6 +275,22 @@ describe('support sites: identical footer, language-correct links, no dead inter
       true
     );
   });
+});
+
+describe('Log in is product-specific on a product page (MKT-WA-CHROME-1)', () => {
+  for (const lang of ['ar', 'en'] as const) {
+    it(`${lang}: a Chat page never links the Store app, a Store page never links the Chat app, the studio lists both`, () => {
+      const chat = renderToStaticMarkup(<Header locale={lang} page="legal/whatsapp-terms" />);
+      const store = renderToStaticMarkup(<Header locale={lang} page="features" />);
+      const studio = renderToStaticMarkup(<Header locale={lang} page="about" />);
+      expect(chat).not.toContain('store.ebda.app');
+      expect(chat).toContain('href="https://wa.ebda.app"');
+      expect(store).not.toContain('wa.ebda.app');
+      expect(store).toContain('https://store.ebda.app/login');
+      expect(studio).toContain('https://store.ebda.app/login');
+      expect(studio).toContain('wa.ebda.app');
+    });
+  }
 });
 
 describe('page kinds (NAV-PRODUCT-OF-PAGE-1)', () => {

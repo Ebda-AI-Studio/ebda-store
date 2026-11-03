@@ -3,7 +3,7 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_MARKETING_URL, siteMedalHtml, siteNavMap } from '@ebda/shared/brand';
+import { BRAND, siteMedalHtml, siteNavMap } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,

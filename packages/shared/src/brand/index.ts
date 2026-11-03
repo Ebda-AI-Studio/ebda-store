@@ -480,21 +480,26 @@ export function siteNavMap(lang: NavLang): NavLink[] {
 }
 
 /** Log in: one label, and one labelled entry per product until the shared accounts sign-in has its own page (audit P1-6). */
-export function siteNavLogin(lang: NavLang): { label: string; items: NavLink[] } {
+export function siteNavLogin(
+  lang: NavLang,
+  kind: NavKind = 'studio'
+): { label: string; items: NavLink[] } {
+  const items: NavLink[] = [
+    {
+      id: 'store',
+      label: L(lang, 'دخول ابدأ ستور', 'Log in to Ebda Store'),
+      href: `${BRAND_STORE_APP_URL}/login`,
+    },
+    {
+      id: 'whatsapp',
+      label: L(lang, 'دخول ابدأ شات', 'Log in to Ebda Chat'),
+      href: brandUrl(BRAND.domains.whatsappApp),
+    },
+  ];
+  // a product page logs in to its own product only (MKT-WA-CHROME-1: a Chat page never sends a visitor to the Store app)
   return {
     label: L(lang, 'دخول', 'Log in'),
-    items: [
-      {
-        id: 'store',
-        label: L(lang, 'دخول ابدأ ستور', 'Log in to Ebda Store'),
-        href: `${BRAND_STORE_APP_URL}/login`,
-      },
-      {
-        id: 'whatsapp',
-        label: L(lang, 'دخول ابدأ شات', 'Log in to Ebda Chat'),
-        href: brandUrl(BRAND.domains.whatsappApp),
-      },
-    ],
+    items: kind === 'store' ? [items[0]] : kind === 'chat' ? [items[1]] : items,
   };
 }
 

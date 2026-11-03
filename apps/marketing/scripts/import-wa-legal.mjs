@@ -28,8 +28,7 @@ for (const lang of ['ar', 'en']) {
       ([key, d]) =>
         `  ${key}: ${JSON.stringify(
           {
-            // P2-1 (audit 2026-11-03): an Arabic page title names the product in Arabic («ابدأ شات»), the body keeps the source text
-            title: lang === 'ar' ? d.title.replace(/Ebda Chat/g, 'ابدأ شات') : d.title,
+            title: d.title,
             meta: { version: '1.0', publishedAt: d.updated },
             ...(d.provisional ? { note: PROVISIONAL_NOTE[lang] } : {}),
             sections: d.sections,

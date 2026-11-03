@@ -400,9 +400,6 @@ html[lang='en'] .wm-name {
 .nav-menu summary {
   white-space: nowrap;
 }
-.nav-more > details > ul {
-  width: min(220px, calc(100vw - 32px));
-}
 @media (min-width: 1200px) {
   .nav-links {
     display: flex;
@@ -435,12 +432,6 @@ html[lang='en'] .wm-name {
   }
   .nav-menu a {
     display: flex;
-    align-items: center;
-    min-height: 44px;
-  }
-  .footer-links a,
-  .footer-links .link-button {
-    display: inline-flex;
     align-items: center;
     min-height: 44px;
   }
@@ -1826,66 +1817,6 @@ html[lang='ar'] .price {
 .site-footer {
   background: var(--canvas);
   color: var(--fg);
-  padding-block: 48px 40px;
-  margin-top: 0;
-}
-.footer-credit {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-.footer-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  justify-content: space-between;
-}
-.footer-links {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin: 0 0 8px;
-}
-.footer-links .link-button {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-}
-.footer-brand {
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.footer-mark {
-  height: 28px;
-  width: auto;
-}
-.footer-h {
-  margin: 16px 0 6px;
-  font-weight: 700;
-}
-.footer-contact {
-  margin: 0;
-  display: grid;
-  gap: 6px;
-}
-.footer-contact div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-}
-.footer-contact dt {
-  color: var(--muted);
-}
-.footer-contact dd {
-  margin: 0;
 }
 .sr-only {
   position: absolute;
@@ -2745,14 +2676,6 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 }
 
 /* ---------- footer ownership line ---------- */
-.footer-legal {
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-.footer-legal p {
-  margin: 0;
-}
 
 /* /credits: one card per third-party model */
 .credit-list {
