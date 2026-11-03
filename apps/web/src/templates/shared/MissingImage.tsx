@@ -63,7 +63,7 @@ export function MissingImage({
         // leak into the parent's textContent (search rows, link names, tests that read them).
         <span
           data-monogram={letter}
-          className={`relative select-none leading-none text-foreground/20 before:content-[attr(data-monogram)] ${text}`}
+          className={`relative select-none leading-none text-primary/20 before:content-[attr(data-monogram)] ${text}`}
           style={{ fontFamily: 'var(--font-display, inherit)' }}
         />
       )}
