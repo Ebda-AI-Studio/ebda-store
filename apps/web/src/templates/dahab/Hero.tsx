@@ -20,6 +20,7 @@ import { resolveBannerLink } from '../shared/hero-banner-link-utils';
 import { HeroVideo } from '../../components/commerce/HeroVideo';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DAHAB_BTN_PRIMARY, DAHAB_CONTAINER, cx, pick } from './ui';
+import { imageSrcSet } from '../../lib/image-loader';
 
 function Slide({
   slide,
@@ -46,10 +47,16 @@ function Slide({
   const posterPicture = (
     <picture>
       {imageMobile && imageMobile !== image && (
-        <source media="(max-width: 1023px)" srcSet={imageMobile} />
+        <source
+          media="(max-width: 1023px)"
+          srcSet={imageSrcSet(imageMobile, 1280) ?? imageMobile}
+          sizes="100vw"
+        />
       )}
       <img
         src={image}
+        srcSet={imageSrcSet(image, 1920)}
+        sizes="100vw"
         alt={slide.alt || headline || ''}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
@@ -98,7 +105,7 @@ function Slide({
         >
           <div className="max-w-[34rem]">
             {headline && (
-              <h1 className="font-display text-balance text-[clamp(1.9rem,1.3rem+2.8vw,4.4rem)] leading-[1.1] text-foreground rtl:leading-[1.4]">
+              <h1 className="font-display text-balance text-[clamp(2.25rem,1.2rem+4.4vw,4.5rem)] leading-[1.1] text-foreground rtl:leading-[1.4]">
                 {headline}
               </h1>
             )}
