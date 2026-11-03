@@ -176,13 +176,27 @@ export interface Copy {
   /** The /about page: company line, story heading, contact heading. */
   aboutPage: {
     title: string;
-    company: string;
     /** The studio's line, «ابدأ — بابك لبدء مشروعك.» (moved off the home hero, MKT-1). */
     brandLine: string;
+    /** The lead: what the studio is and what it makes today (AI, software, digital marketing; two products; one account). */
+    eyebrow: string;
+    lead: string;
+    doH: string;
+    doItems: { t: string; d: string }[];
+    productsH: string;
+    /** "See Ebda Store": the product's name is appended by the page. */
+    productCta: string;
     storyH: string;
+    howH: string;
+    howItems: { t: string; d: string }[];
     contactH: string;
+    contactHelp: string;
+    /** The one small legal-entity line: label, then the link text to the legal notice. */
+    legalLabel: string;
+    legalLink: string;
     desc: string;
   };
+
   /** The /contact page (6c): every way to reach Ebda AI Studio, one line each. */
   contactPage: {
     title: string;
@@ -648,12 +662,43 @@ export const COPY: Record<Locale, Copy> = {
       modified: 'معدّل',
     },
     aboutPage: {
-      title: 'عن ابدأ ستوديو للذكاء الاصطناعي',
-      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ ستوديو للذكاء الاصطناعي، بالعربي أولًا وبواجهة بسيطة.',
-      brandLine: 'ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
-      company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
-      storyH: 'حكاية ابدأ ستوديو للذكاء الاصطناعي',
+      title: 'عن ابدأ ستوديو',
+      desc: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي، بيبني أدوات بسيطة لأصحاب الشغل في مصر: ابدأ ستور وابدأ شات.',
+      brandLine: 'ابدأ ستوديو — بابك لبدء مشروعك.',
+      eyebrow: 'ستوديو مصري',
+      lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين.',
+      doH: 'بنشتغل في إيه',
+      doItems: [
+        {
+          t: 'الذكاء الاصطناعي',
+          d: 'بيكتب ويترجم ويجهّز الردود بدالك، وإنت اللي بتراجع وتقرر.',
+        },
+        {
+          t: 'البرمجيات',
+          d: 'أدوات جاهزة من الموبايل: متجر، وطلبات، ودفع، وشحن، من غير ما تفهم في التقنية.',
+        },
+        {
+          t: 'التسويق الرقمي',
+          d: 'صفحات سريعة ورسائل بموافقة العميل، عشان عملاءك يلاقوك ويرجعوا لك.',
+        },
+      ],
+      productsH: 'منتجاتنا',
+      productCta: 'شوف',
+      storyH: 'الحكاية',
+      howH: 'إزاي بنشتغل',
+      howItems: [
+        { t: 'بالعربي الأول', d: 'كل حاجة متصممة من اليمين للشمال، بمصري بسيط، والإنجليزي جنبها.' },
+        {
+          t: 'مبني لمصر',
+          d: 'دفع أونلاين وكاش وإنستا باي، وشحن مع شركات الشحن اللي بتتعامل معاها.',
+        },
+        { t: 'حساب واحد', d: 'حساب واحد يفتح ابدأ ستور وابدأ شات.' },
+        { t: 'أسعار واضحة', d: 'الأسعار معلنة بالجنيه المصري، من غير مفاجآت.' },
+      ],
       contactH: 'تواصل معنا',
+      contactHelp: 'محتاج مساعدة؟ مركز المساعدة وحالة الخدمة أسرع من أي رد.',
+      legalLabel: 'الكيان القانوني',
+      legalLink: 'الإشعار القانوني',
     },
     contactPage: {
       title: 'تواصل مع ابدأ ستوديو للذكاء الاصطناعي',
@@ -672,11 +717,11 @@ export const COPY: Record<Locale, Copy> = {
       company: `ابدأ ستور منتج من ${CO.shortNameAr}.`,
     },
     about: {
-      title: 'حكاية ابدأ ستوديو للذكاء الاصطناعي',
+      title: 'الحكاية',
       paras: [
         'كل مشروع بيبدأ قبل ما يبقى مشروع، بيبدأ بجملة: «عندي فكرة».',
         'وبين الفكرة وأول عميل فيه أبواب كتير: موقع، وطلبات، وكلام مع العملاء، ومنتجات، ودفع، وتوصيل، وتكنولوجيا.',
-        'ابدأ ستوديو للذكاء الاصطناعي موجودة عشان تسهّل أول باب. عشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
+        'ابدأ ستوديو موجود عشان يسهّل أول باب. عشان كده اللوجو باب، واللي جوّاه صاحب الفكرة واقف على العتبة. مش محتاج يفهم في منصات التجارة ولا الـ API ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
       ],
       close: 'ابدأ.',
     },
@@ -1082,11 +1127,45 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'About Ebda AI Studio',
-      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio: Arabic first, simple, and built for the local market.',
+      desc: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing that builds simple tools for merchants in Egypt: Ebda Store and Ebda Chat.',
       brandLine: 'Ebda AI Studio — Your doorway to business.',
-      company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
-      storyH: 'The Ebda AI Studio story',
+      eyebrow: 'An Egyptian studio',
+      lead: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both.',
+      doH: 'What we do',
+      doItems: [
+        {
+          t: 'Artificial intelligence',
+          d: 'It writes, translates and drafts replies for you. You review and decide.',
+        },
+        {
+          t: 'Software',
+          d: 'Tools that work from your phone: a store, orders, payments and shipping, with no technical know-how.',
+        },
+        {
+          t: 'Digital marketing',
+          d: 'Fast pages and messages sent with the customer’s consent, so customers find you and come back.',
+        },
+      ],
+      productsH: 'Our products',
+      productCta: 'See',
+      storyH: 'The story',
+      howH: 'How we work',
+      howItems: [
+        {
+          t: 'Arabic first',
+          d: 'Everything is designed right-to-left in plain Egyptian Arabic, with English beside it.',
+        },
+        {
+          t: 'Built for Egypt',
+          d: 'Online payments, cash and InstaPay, and shipping with the carriers you already use.',
+        },
+        { t: 'One account', d: 'One account opens Ebda Store and Ebda Chat.' },
+        { t: 'Clear pricing', d: 'Prices are published in Egyptian pounds, with no surprises.' },
+      ],
       contactH: 'Contact',
+      contactHelp: 'Need help? The help centre and the service status are faster than any reply.',
+      legalLabel: 'Legal entity',
+      legalLink: 'Legal notice',
     },
     contactPage: {
       title: 'Contact Ebda AI Studio',
@@ -1106,11 +1185,11 @@ export const COPY: Record<Locale, Copy> = {
       company: `Ebda Store is a product of ${CO.shortNameEn}.`,
     },
     about: {
-      title: 'The Ebda AI Studio story',
+      title: 'The story',
       paras: [
         'Every business starts before it becomes a business. It starts with “I have an idea.”',
         'Between the idea and the first customer there are too many doors: a website, orders, talking to customers, products, payments, delivery, technology.',
-        'Ebda AI Studio exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
+        'Ebda AI Studio exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs or WhatsApp integrations. They just take the first step.',
       ],
       close: 'ابدأ.',
     },

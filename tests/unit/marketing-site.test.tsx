@@ -322,7 +322,7 @@ describe('marketing honesty', () => {
   it('footer ownership line, studio credit and Western digits everywhere', () => {
     // the studio's line moved off the home page to /about (MKT-1); the footer carries a one-line credit
     expect(renderToStaticMarkup(<AboutPage locale="ar" />)).toContain(
-      'ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.'
+      'ابدأ ستوديو — بابك لبدء مشروعك.'
     );
     expect(renderToStaticMarkup(<AboutPage locale="en" />)).toContain(
       'Ebda AI Studio — Your doorway to business.'
@@ -520,11 +520,23 @@ describe('marketing honesty', () => {
   it('the about page carries the company line, the story and both contact addresses', () => {
     for (const l of ['ar', 'en'] as const) {
       const html = renderToStaticMarkup(<AboutPage locale={l} />);
+      // a STUDIO page: AI, software and digital marketing, the two products with their names, one account (not a Store page)
       expect(html).toContain(
-        l === 'en' ? 'owned and operated by Ebda AI Studio' : 'مملوكة لابدأ ستوديو'
+        l === 'en'
+          ? 'an Egyptian studio for AI, software and digital marketing'
+          : 'ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي'
       );
+      expect(html).toMatch(l === 'en' ? /One account opens both/ : /حساب واحد يفتح الاتنين/);
+      expect(html).toContain(l === 'en' ? 'href="/en/store' : 'href="/store');
+      expect(html).toContain(l === 'en' ? 'href="/en/whatsapp' : 'href="/whatsapp');
+      // the legal entity is one small line linking to the legal notice, not in the hero
+      expect(html).toContain(
+        l === 'en' ? 'Software Development, and Digital Marketing' : 'والبرمجيات والتسويق الرقمي'
+      );
+      expect(html.indexOf('ab-legal')).toBeGreaterThan(html.indexOf('ab-hero') + 1000);
       expect(html).toContain('ahlan@ebda.app');
       expect(html).toContain('security@ebda.app');
+      expect(html).toContain('+20 151 419 1411');
       expect(html).not.toMatch(/whisky/i);
     }
   });
