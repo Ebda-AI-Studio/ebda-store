@@ -9,8 +9,11 @@
  * the bridge was deleted, Ruling WA-LEGACY-1; nothing reads it any more.) Swept 2026-10-25:
  * no other server-owned flag lives in settings (plan, limits, feature flags and verification state
  * are columns / StoreFeature rows).
+ *
+ * `goldAllowDeferredPayment` (Ruling SHARIA-GOLD-1) is a merchant choice that needs an explicit confirm and
+ * an audit row, so it is written only by `PUT /stores/:id/gold-rates/payment-policy`, never the generic route.
  */
-export const SERVER_OWNED_SETTINGS_KEYS = ['ebdaWhatsApp'] as const;
+export const SERVER_OWNED_SETTINGS_KEYS = ['ebdaWhatsApp', 'goldAllowDeferredPayment'] as const;
 
 export function reservedSettingsKeys(settings: unknown): string[] {
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return [];

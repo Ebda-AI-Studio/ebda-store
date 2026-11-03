@@ -32,6 +32,7 @@ import { config as appConfig } from '../config';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
+  GOLD_ALLOW_DEFERRED_SETTING,
   slugifyWithFallback,
   isReservedSlug,
   isProtectedSlug,
@@ -1481,6 +1482,27 @@ export class StoreService {
     const store = await this.getById(storeId);
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, mcpWriteEnabled: enabled };
+
+    const updatedStore = await updateStoreThrough(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { settings: mergedSettings as Prisma.InputJsonValue },
+      })
+    );
+
+    await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    return enabled;
+  }
+
+  /**
+   * Merchant's switch "allow COD / installments for gold" (`settings.goldAllowDeferredPayment`, absent =
+   * OFF, Ruling SHARIA-GOLD-1). Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setGoldAllowDeferredPayment(storeId: string, enabled: boolean) {
+    const store = await this.getById(storeId);
+    const existingSettings = (store.settings as Record<string, unknown>) || {};
+    const mergedSettings = { ...existingSettings, [GOLD_ALLOW_DEFERRED_SETTING]: enabled };
 
     const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({

@@ -6,3 +6,4 @@ export * from './personalisation';
 export * from './size-chart';
 export * from './instalments';
 export * from './gold-price';
+export * from './payment-policy';

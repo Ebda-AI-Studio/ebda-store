@@ -180,6 +180,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [merchant/README.md](merchant/README.md) - Ebda Store — Merchant Guide
 - [merchant/custom-domain.md](merchant/custom-domain.md) - Custom Domain Setup — ربط النطاق المخصص
 - [merchant/faq.md](merchant/faq.md) - FAQ — الأسئلة الشائعة
+- [merchant/acceptable-use.md](merchant/acceptable-use.md) - What you may and may not sell / ما يجوز بيعه وما لا يجوز
+- [merchant/gold-and-payments.md](merchant/gold-and-payments.md) - Gold orders and installments / طلبات الدهب والتقسيط
 - [merchant/inventory.md](merchant/inventory.md) - Inventory: variant stock, adjustments & scanning — المخزون: مخزون التنويعات والتعديلات والمسح
 - [merchant/orders.md](merchant/orders.md) - Orders (and the Orders app) — الطلبات (وتطبيق الطلبات)
 - [merchant/product-details.md](merchant/product-details.md) - Product details: swatches, facts, personalisation, delivery time and size guides — تفاصيل المنتج
@@ -256,6 +258,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-21-phase-b2-souq.md](plans/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/2026-10-21-phase-b3-jasmine.md](plans/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/2026-10-21-phase-b4-lamma.md](plans/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-03-sharia-gold-bnpl-aup.md](plans/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
 - [plans/2026-10-21-phase-b5-dahab-looks.md](plans/2026-10-21-phase-b5-dahab-looks.md) - Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
 - [plans/2026-10-21-search-p3-catalogue-import.md](plans/2026-10-21-search-p3-catalogue-import.md) - Search P3: Catalogue Import from Photos and PDFs Implementation Plan
 - [plans/2026-10-21-shaped-barcodes.md](plans/2026-10-21-shaped-barcodes.md) - Shaped, scannable order barcodes (2026-10-21)
