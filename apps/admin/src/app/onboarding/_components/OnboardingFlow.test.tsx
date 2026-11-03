@@ -354,6 +354,13 @@ describe('onboarding stepper', () => {
 
     // Live: summary then publish -> link, WhatsApp share, dashboard.
     await screen.findByText('onboarding.flow.live.title');
+    // F6: the summary row names the chosen look from the registry. The useT mock renders a missing key as its path, so a
+    // raw `onboarding.flow.template` (the 2026-11-02 production bug) would show up here as text starting with the namespace.
+    const templateValue = screen.getByText(
+      'onboarding.flow.live.checklistTemplate'
+    ).nextElementSibling!;
+    expect(templateValue.textContent).not.toMatch(/onboarding\./);
+    expect(templateValue.textContent).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.live.publish' }));
     expect(await screen.findByText('onboarding.flow.live.doneTitle')).toBeTruthy();
     expect(apiPost).toHaveBeenCalledWith('/api/v1/onboarding/stores/s1/go-live');

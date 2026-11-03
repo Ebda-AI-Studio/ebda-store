@@ -40,6 +40,8 @@ const listQuery = z.object({
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
+  /** Search by document number (INV-000042) or the number of the document a credit note reverses. */
+  q: z.string().trim().min(1).max(64).optional(),
 });
 const localeQuery = z.object({ locale: z.enum(['ar', 'en']).optional() });
 const UUID = z.string().uuid();
