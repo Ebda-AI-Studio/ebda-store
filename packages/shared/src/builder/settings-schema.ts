@@ -224,12 +224,17 @@ const GAPS = [
   opt('loose', 'Loose', 'واسع'),
   opt('xloose', 'Extra loose', 'واسع جداً'),
 ];
-const PADDING = [opt('none', 'None', 'بدون'), ...GAPS];
+const PADDING = [opt('none', 'None', 'بدون'), ...GAPS, opt('xxloose', 'Huge', 'ضخم')];
 
 /** Padding + width. Visibility is NOT a setting: it is `hidden` / `responsive.<viewport>.hidden`. */
 export const spacingSettings = (): SettingDefinition[] => [
-  settingFactories.select('paddingTop', 'Top spacing', 'المسافة العلوية', PADDING),
-  settingFactories.select('paddingBottom', 'Bottom spacing', 'المسافة السفلية', PADDING),
+  // Per device (Ruling SP-1): tablet / mobile values live in `responsive.<vp>.settings`.
+  settingFactories.select('paddingTop', 'Top spacing', 'المسافة العلوية', PADDING, {
+    responsive: ['tablet', 'mobile'],
+  }),
+  settingFactories.select('paddingBottom', 'Bottom spacing', 'المسافة السفلية', PADDING, {
+    responsive: ['tablet', 'mobile'],
+  }),
   settingFactories.select('maxWidth', 'Width', 'العرض', [
     opt('contained', 'Contained', 'محدود'),
     opt('full', 'Full width', 'كامل العرض'),

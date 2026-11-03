@@ -55,7 +55,13 @@ function generateLayout(seed: number): unknown {
     ...(r() < 0.3 ? { hideOnDesktop: r() < 0.5 } : {}),
     ...(r() < 0.15 ? { hideOnTablet: r() < 0.5 } : {}),
     ...(r() < 0.3
-      ? { paddingTop: pick(['none', 'tight', 'normal', 'loose', 'xloose'] as const) }
+      ? { paddingTop: pick(['none', 'tight', 'normal', 'loose', 'xloose', 'xxloose'] as const) }
+      : {}),
+    ...(r() < 0.25
+      ? {
+          paddingTopMobile: pick(['none', 'tight', 'xloose'] as const),
+          paddingBottomTablet: pick(['normal', 'loose'] as const),
+        }
       : {}),
   });
   const order = [...LEGACY_HOME_SECTION_KEYS].sort(() => r() - 0.5).slice(0, Math.floor(r() * 9));
@@ -283,6 +289,10 @@ describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
     'hideOnTablet', // -> responsive.tablet.hidden
     'layoutMobile', // -> responsive.mobile.settings.layout
     'captionPositionMobile', // -> responsive.mobile.settings.captionPosition
+    'paddingTopTablet', // -> responsive.tablet.settings.paddingTop (Ruling SP-1)
+    'paddingTopMobile',
+    'paddingBottomTablet',
+    'paddingBottomMobile',
     'slides', // -> blocks
     'items', // trust strip items -> blocks
     'id', // product carousel's internal id (kept in settings, not editable)

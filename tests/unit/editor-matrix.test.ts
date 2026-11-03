@@ -91,12 +91,12 @@ describe('editor matrix', () => {
       status: 'wired',
       evidence: 'static+probe',
     });
-    // (b) the hero comment says padding does not apply to the hero wrapper: flipping it changes nothing,
-    // which is why the control was removed (Ruling EP-5) and the matrix has no row for it any more
-    expect(row('qamar|section:hero|paddingTop')).toBeUndefined();
+    // (b) hero Top / Bottom spacing is an OUTER margin on the hero wrapper (Ruling SP-3): the control
+    // was removed while it did nothing (Ruling EP-5) and is back now that flipping it changes the HTML
+    expect(row('qamar|section:hero|paddingTop')).toMatchObject({ status: 'wired' });
     expect(
       probeSetting('qamar', 'hero', 'paddingTop', ['none', 'xloose'], { mode: 'single' }).differs
-    ).toBe(false);
+    ).toBe(true);
     // (c) a look's design key the editor has no control for would be `missing`; the mobile-only legacy
     // names (`layoutMobile`) are viewport overrides, so none is missing today
     expect(row('qamar.atelier|section:category-grid|design:layoutMobile')).toBeUndefined();

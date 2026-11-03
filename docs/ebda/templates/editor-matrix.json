@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1443,
+    "wired": 1453,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -1178,6 +1178,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -4727,6 +4753,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:hero|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:hero|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -8631,6 +8683,32 @@
       "evidence": "static+probe"
     },
     {
+      "id": "lamma|section:hero|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:hero|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "lamma|section:hero|presentation",
       "skin": "lamma",
       "looks": [
@@ -12518,6 +12596,32 @@
       "evidence": "static+probe"
     },
     {
+      "id": "qamar|section:hero|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:hero|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "qamar|section:hero|presentation",
       "skin": "qamar",
       "looks": [
@@ -16401,6 +16505,32 @@
       ],
       "surface": "section:hero",
       "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:hero|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:hero",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:hero|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:hero",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },

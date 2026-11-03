@@ -28,11 +28,21 @@ export type HeroMode = 'single' | 'slider';
  * Defaults: all undefined (= storefront baseline behavior unchanged).
  * Merchants opt in per-section.
  */
+export type SectionSpacingPreset = 'none' | 'tight' | 'normal' | 'loose' | 'xloose' | 'xxloose';
+
 export interface SectionPaddingMaxWidthVisibility {
   /** Vertical padding above the section content. Default: section's baseline. */
-  paddingTop?: 'none' | 'tight' | 'normal' | 'loose' | 'xloose';
+  paddingTop?: SectionSpacingPreset;
   /** Vertical padding below the section content. */
-  paddingBottom?: 'none' | 'tight' | 'normal' | 'loose' | 'xloose';
+  paddingBottom?: SectionSpacingPreset;
+  /**
+   * Per-device spacing (editor Ruling SP-1). Unset = the base value above applies on that device.
+   * The builder adapter maps these to `responsive.<tablet|mobile>.settings.paddingTop|Bottom`.
+   */
+  paddingTopTablet?: SectionSpacingPreset;
+  paddingTopMobile?: SectionSpacingPreset;
+  paddingBottomTablet?: SectionSpacingPreset;
+  paddingBottomMobile?: SectionSpacingPreset;
   /** Container width — 'contained' = max-w-7xl, 'full' = edge-to-edge. */
   maxWidth?: 'contained' | 'full';
   /** Hide on mobile (< 768px viewport). Default false. */
