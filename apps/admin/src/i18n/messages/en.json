@@ -5618,14 +5618,14 @@
   "auth": {
     "login": {
       "title": "Sign in",
-      "subtitle": "Sign in to access Ebda Store",
+      "subtitle": "Sign in and get back to your store.",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
       "passwordPlaceholder": "Enter your password",
       "signIn": "Sign in",
       "signingIn": "Signing in…",
-      "loginFailed": "Login failed",
+      "loginFailed": "We could not sign you in. Try again.",
       "footer": "Ebda Store",
       "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
@@ -5643,8 +5643,8 @@
       "mfaTotpLink": "Use authenticator app instead",
       "mfaInvalid": "Invalid or expired code. Please try again.",
       "rememberMe": "Remember my email",
-      "serverError": "Server returned an invalid response. Please try again.",
-      "accessDenied": "Access denied. Admin or staff privileges required.",
+      "serverError": "Something went wrong on our side. Try again in a moment.",
+      "accessDenied": "This account does not have access to the dashboard.",
       "mfaVerifyFailed": "Verification failed",
       "emailNotVerified": "Please verify your email first. We sent you a code.",
       "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
@@ -5652,7 +5652,9 @@
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
       "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
-      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue."
+      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue.",
+      "invalidCredentials": "The email or password is not right. Check them and try again.",
+      "invalidCode": "That code is wrong or has expired. Try again."
     },
     "forgot": {
       "title": "Reset your password",

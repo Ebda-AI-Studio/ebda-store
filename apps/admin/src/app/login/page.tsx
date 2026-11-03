@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
@@ -10,13 +9,13 @@ import { isPasskeyCancel, passkeyAutofillSupported, passkeysSupported } from '..
 import { useT } from '@/i18n/useT';
 import { NileNight } from './_components/NileNight';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
+import { SignInBrand } from '@/components/SignInBrand';
 import { DocumentTitle } from '@/components/DocumentTitle';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
 export default function LoginPage() {
   const t = useT('auth.login');
-  const tb = useT('components.brand');
   const tSignup = useT('onboarding.signup');
   const router = useRouter();
   const {
@@ -169,18 +168,7 @@ export default function LoginPage() {
             </div>
             <DocumentTitle title={t('title')} />
             <div className="text-center">
-              <div className="flex items-center justify-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
-                    />
-                  </svg>
-                </div>
-              </div>
+              <SignInBrand />
               <h1 className="mt-6 text-3xl font-bold text-foreground">{t('mfaRequired')}</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 {useBackupCode ? t('mfaBackupSubtitle') : t('mfaSubtitle')}
@@ -189,7 +177,7 @@ export default function LoginPage() {
 
             <form className="mt-8 space-y-6" onSubmit={handleMfaSubmit}>
               {error && (
-                <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
+                <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
                   {error}
                 </div>
               )}
@@ -294,32 +282,14 @@ export default function LoginPage() {
           </div>
           <DocumentTitle title={t('title')} />
           <div className="text-center">
-            <div className="flex items-center justify-center gap-3">
-              <Image
-                src="/logo-on-light.svg"
-                alt={tb('brandAlt')}
-                width={21}
-                height={40}
-                className="dark:hidden"
-                unoptimized
-              />
-              <Image
-                src="/logo.svg"
-                alt={tb('brandAlt')}
-                width={21}
-                height={40}
-                className="hidden dark:block"
-                unoptimized
-              />
-              <span className="text-xl font-semibold">{tb('brandAlt')}</span>
-            </div>
+            <SignInBrand />
             <h1 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h1>
             <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
+              <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
                 {error}
               </div>
             )}

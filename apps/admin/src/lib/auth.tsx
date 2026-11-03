@@ -30,6 +30,7 @@ import {
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { passkeyAssertion, type PasskeyMode } from './passkeys';
+import { signInMessageKey } from './sign-in-error';
 import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
 
 interface User {
@@ -265,12 +266,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Map an identity-service refusal to the page's existing messages. */
   function signInError(e: unknown, fallback: string): Error {
     if (e instanceof AccountsError) {
-      if (e.code === 'EMAIL_NOT_VERIFIED') return new Error(t('emailNotVerified'));
-      if (e.status === 429) return new Error(t('tooManyAttempts'));
-      if (e.status === 401 || e.status === 403) return new Error(e.message || fallback);
-      return new Error(t('serverError'));
+      // Our own sentence for every refusal; the service's raw English never reaches the page (audit A-1).
+      return new Error(t(signInMessageKey(e.status, e.code)));
     }
-    return e instanceof Error ? e : new Error(fallback);
+    // A network failure ('Failed to fetch') is not a sentence for a merchant either.
+    return new Error(fallback);
   }
 
   async function login(email: string, password: string): Promise<void | MfaChallenge> {

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LangToggle } from '@/components/LangToggle';
 import { BRAND } from '@ebda/shared';
+import { signInErrorText } from '@/lib/sign-in-error';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -18,7 +19,7 @@ const REMEMBER_EMAIL_KEY = 'force-orders-remember-email';
 export default function LoginPage() {
   const router = useRouter();
   const { login, completeMfaLogin, isAuthenticated, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -73,8 +74,7 @@ export default function LoginPage() {
       // Login succeeded — persist or clear the remembered email.
       persistRememberedEmail(parsed.data.email);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      setError(msg === 'ADMIN_ONLY' ? t.login.adminOnly : msg || t.login.failed);
+      setError(signInErrorText(err instanceof Error ? err.message : '', t.login));
     } finally {
       setSubmitting(false);
     }
@@ -93,8 +93,7 @@ export default function LoginPage() {
     try {
       await completeMfaLogin(mfaChallengeToken, code);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      setError(msg === 'ADMIN_ONLY' ? t.login.adminOnly : msg || t.login.failed);
+      setError(signInErrorText(err instanceof Error ? err.message : '', t.login));
     } finally {
       setSubmitting(false);
     }
@@ -108,24 +107,27 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex items-center justify-center gap-3">
+            {/* Studio first, then the product (the h1 below names the product). Night + Ebda gold, no orange. */}
+            <div className="mx-auto mb-4 flex items-center justify-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo-on-light.svg"
-                alt={BRAND.product.nameEn}
-                className="h-12 w-auto dark:hidden"
-                width={25}
-                height={48}
+                alt=""
+                className="h-10 w-auto dark:hidden"
+                width={21}
+                height={40}
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo.svg"
-                alt={BRAND.product.nameEn}
-                className="hidden h-12 w-auto dark:block"
-                width={25}
-                height={48}
+                alt=""
+                className="hidden h-10 w-auto dark:block"
+                width={21}
+                height={40}
               />
-              <span className="text-lg font-semibold">{t.orders.title}</span>
+              <span className="text-sm font-medium text-primary-ink">
+                {locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}
+              </span>
             </div>
             <h1 className="text-xl font-bold text-foreground">
               {mfaChallengeToken ? t.login.mfaTitle : t.login.title}
@@ -152,13 +154,13 @@ export default function LoginPage() {
                   autoFocus
                   value={mfaCode}
                   onChange={e => setMfaCode(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-input bg-card px-4 text-center text-lg tracking-[0.4em] text-foreground outline-none focus:border-primary"
+                  className="h-12 w-full rounded-xl border border-input bg-card px-4 text-center text-lg tracking-[0.4em] text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
                   required
                 />
               </div>
 
               {error && (
-                <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive-ink">
+                <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive-ink">
                   {error}
                 </p>
               )}
@@ -166,7 +168,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground active:opacity-90 disabled:opacity-60"
+                className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-90 disabled:opacity-60"
               >
                 {submitting ? t.login.submitting : t.login.mfaVerify}
               </button>
@@ -195,7 +197,7 @@ export default function LoginPage() {
                   inputMode="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground outline-none focus:border-primary"
+                  className="h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
                   required
                 />
               </div>
@@ -212,7 +214,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground outline-none focus:border-primary"
+                  className="h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
                   required
                 />
               </div>
@@ -232,7 +234,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive-ink">
+                <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive-ink">
                   {error}
                 </p>
               )}
@@ -240,7 +242,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground active:opacity-90 disabled:opacity-60"
+                className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-90 disabled:opacity-60"
               >
                 {submitting ? t.login.submitting : t.login.submit}
               </button>
