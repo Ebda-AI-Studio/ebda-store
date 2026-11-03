@@ -3,14 +3,9 @@
 import { useState } from 'react';
 import { OrderAlertsModal } from '../../../components/OrderAlertsModal';
 
+/** Reload the page to see the modal again. */
 export function OrderAlertsPreview() {
   const [open, setOpen] = useState(true);
-  if (!open) {
-    return (
-      <button type="button" onClick={() => setOpen(true)} className="m-6 underline">
-        reopen
-      </button>
-    );
-  }
+  if (!open) return null;
   return <OrderAlertsModal onEnable={() => setOpen(false)} onLater={() => setOpen(false)} />;
 }
