@@ -3426,7 +3426,7 @@ html[lang='en'] .studio-home h1 {
   text-wrap: pretty;
 }
 /* the steps sit on the tessellation watermark: darker body text keeps 4.5:1 against its gold lines */
-.sh-steps p {
+.sh-steps li p {
   color: color-mix(in srgb, var(--fg) 78%, transparent);
 }
 .sh-lead {
