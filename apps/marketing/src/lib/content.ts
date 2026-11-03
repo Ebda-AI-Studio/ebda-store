@@ -669,7 +669,7 @@ export const COPY: Record<Locale, Copy> = {
       statusLink: 'حالة الخدمة',
       securityH: 'الإبلاغ عن ثغرة أمنية',
       securityP: 'راسلنا على الإيميل ده وهنتعامل معاه بجدية. التفاصيل في ملف security.txt.',
-      company: `ابدأ ستور منتج من ${CO.legalNameAr}.`,
+      company: `ابدأ ستور منتج من ${CO.shortNameAr}.`,
     },
     about: {
       title: 'حكاية ابدأ ستوديو للذكاء الاصطناعي',
@@ -1103,7 +1103,7 @@ export const COPY: Record<Locale, Copy> = {
       securityH: 'Report a security issue',
       securityP:
         'Write to this address and we will treat it seriously. Details are in our security.txt.',
-      company: `Ebda Store is a product of ${CO.legalNameEn}.`,
+      company: `Ebda Store is a product of ${CO.shortNameEn}.`,
     },
     about: {
       title: 'The Ebda AI Studio story',

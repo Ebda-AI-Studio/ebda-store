@@ -3,9 +3,11 @@
 import {
   BRAND,
   BRAND_MARKETING_URL,
+  SITE_FOOTER_CSS,
   SITE_NAV_CSS,
   brandMarkSvg,
   brandAppIconSvg,
+  siteFooterHtml,
   siteNavHtml,
   siteWordmarkHtml,
 } from '../../../packages/shared/src/brand/index';
@@ -52,7 +54,6 @@ const T = {
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
     // a function of the YEAR: a module-level `new Date()` is evaluated while the Worker's clock is frozen at 0 (1970)
-    footer: (year: number) => `© ${year} ${BRAND.company.shortNameAr}`,
   },
   en: {
     title: `${BRAND.company.shortNameEn} Status`,
@@ -90,7 +91,6 @@ const T = {
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
-    footer: (year: number) => `© ${year} ${BRAND.company.shortNameEn}`,
   },
 } as const;
 
@@ -187,7 +187,6 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .inc-outage{border-inline-start-color:var(--bad)}
 .tag{border:1px solid var(--gold);color:var(--lift);border-radius:999px;padding:0 8px;font-size:.78rem}
 .upd{margin-top:8px}.upd li{padding:6px 0;border-top:1px solid var(--line)}
-footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
 .sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .search{position:relative;display:flex;gap:6px;margin-inline-start:auto}
 .search input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0;width:190px;font:inherit}
@@ -200,7 +199,9 @@ footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
 .ta-list mark{background:transparent;color:var(--lift);font-weight:700}
 .ta-sec{color:var(--muted);font-size:.8125rem}
 .ta-all{color:var(--muted)!important;font-size:.9rem}
-`.replace(/\n/g, '') + SITE_NAV_CSS;
+`.replace(/\n/g, '') +
+  SITE_NAV_CSS +
+  SITE_FOOTER_CSS;
 
 const SEARCH = {
   ar: { label: 'بحث', placeholder: 'دوّر في الخدمات والأحداث والمساعدة' },
@@ -341,7 +342,7 @@ ${PRODUCTS.map(prod => {
 ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>
 </main>
-<footer><div class="wrap muted small">${esc(t.footer(new Date(s.generatedAt).getUTCFullYear()))} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
+${siteFooterHtml(lang, brandMarkSvg({ size: 24, cls: 'sf-mark' }), new Date(s.generatedAt).getUTCFullYear())}
 <script src="/assets/site-nav.js" defer></script>
 <script src="/assets/typeahead.js" defer></script>
 </body>

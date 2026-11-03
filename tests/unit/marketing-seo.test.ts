@@ -16,7 +16,7 @@ import sitemap from '../../apps/marketing/src/app/sitemap';
 import robots, { AI_CRAWLERS } from '../../apps/marketing/src/app/robots';
 import { jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS } from '../../apps/marketing/src/lib/plans';
-import { SITE_PAGES, pagePath } from '../../apps/marketing/src/lib/site';
+import { SITE_PAGES, pagePath, productOfPage } from '../../apps/marketing/src/lib/site';
 
 const APP = path.resolve(__dirname, '../../apps/marketing/src/app');
 const walk = (d: string): string[] =>
@@ -134,9 +134,11 @@ describe('every page exports metadata with a canonical', () => {
       expect(meta, `${rel} must export metadata`).toBeTruthy();
       // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher. The /whatsapp page is
       // the second product (Ebda Chat): its own name, brand line and OG image, never the Store's.
-      const wa = page === 'whatsapp';
-      // the studio home (/) is the Ebda AI Studio's own page (Ruling MKT-HOME-1); /store is the Store landing
-      const studio = page === '';
+      const kind = productOfPage(page);
+      const wa = kind === 'chat';
+      // the studio's own pages (the home, About, Contact, Credits, the studio-level legal pages) say Ebda AI Studio, never
+      // Ebda Store (NAV-PRODUCT-OF-PAGE-1); /store and its family say Ebda Store; Chat and its documents say Ebda Chat
+      const studio = kind === 'studio';
       const landing = page === '' || page === 'store';
       const product = wa
         ? isEn
@@ -145,7 +147,7 @@ describe('every page exports metadata with a canonical', () => {
         : studio
           ? isEn
             ? 'Ebda AI Studio'
-            : 'ابدأ ستوديو للذكاء الاصطناعي'
+            : 'ابدأ ستوديو'
           : isEn
             ? 'Ebda Store'
             : 'ابدأ ستور';
@@ -160,7 +162,10 @@ describe('every page exports metadata with a canonical', () => {
             ? 'Ebda Chat — ابدأ شات, by Ebda AI Studio (ebda.app)'
             : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
         );
-      if (!landing) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
+      // inner titles end in the domain tail; a studio page never carries the Store tail, a Store page always does
+      if (!landing) expect(meta.title.endsWith('(ebda.app)')).toBe(true);
+      if (!landing && !studio) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
+      if (studio && page !== '') expect(meta.title).not.toMatch(/Ebda Store|ابدأ ستور/);
       expect(meta.title.length).toBeLessThanOrEqual(landing ? 60 : 90);
       expect(meta.twitter.title).toBe(meta.title);
       expect(meta.openGraph.siteName).toBe(product);

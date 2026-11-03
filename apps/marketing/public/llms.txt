@@ -1,6 +1,8 @@
-# Ebda Store (ابدأ ستور)
+# Ebda AI Studio (ابدأ ستوديو)
 
-Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). Not to be confused with any unrelated site with a similar name: this is the Egyptian store builder at https://ebda.app, made by Ebda AI Studio.
+Ebda AI Studio — ابدأ ستوديو (ebda.app) makes two products: Ebda Store (ابدأ ستور), an online store builder for sellers in Egypt, and Ebda Chat (ابدأ شات), a shared customer inbox on WhatsApp. Not to be confused with any unrelated site with a similar name: this is the Egyptian studio at https://ebda.app.
+
+## Ebda Store
 
 > Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 

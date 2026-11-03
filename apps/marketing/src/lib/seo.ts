@@ -12,6 +12,7 @@ import {
   SITE_URL,
   absoluteUrl,
   pagePath,
+  productOfPage,
   type Locale,
   type PageSlug,
 } from './site';
@@ -37,6 +38,11 @@ export const shortBrand = (locale: Locale) =>
 
 /** The Ebda Chat product page: its own name in the title tail, the OG site name, the brand line and the OG image. */
 export type PageProduct = 'store' | 'whatsapp' | 'studio';
+/** The title/OG product of a page, from its kind (NAV-PRODUCT-OF-PAGE-1): Store pages say Ebda Store, Chat pages Ebda Chat, every other page the studio. */
+const pageProduct = (page: string): PageProduct => {
+  const kind = productOfPage(page);
+  return kind === 'chat' ? 'whatsapp' : kind;
+};
 const WA_OG_IMAGE = {
   url: '/og-whatsapp.png',
   width: 1200,
@@ -74,7 +80,7 @@ export function pageMetadata(
   page: Page,
   title?: string,
   description?: string,
-  product: PageProduct = 'store'
+  product: PageProduct = pageProduct(page)
 ): Metadata {
   const c = COPY[locale];
   const wa = product === 'whatsapp';
@@ -91,8 +97,18 @@ export function pageMetadata(
   // Home: the product title as written. Other pages: page title, then the short brand tail. A title that already
   // names the product (the about page) is not repeated.
   const lead = (title ?? c.meta.title).replace(new RegExp(`^${name} — `), '');
-  const tail = wa ? `${name} (${BRAND.domains.marketing})` : shortBrand(locale);
-  const t = studio && title ? title : title ? `${lead} | ${tail}` : c.meta.title;
+  const tail = wa || studio ? `${name} (${BRAND.domains.marketing})` : shortBrand(locale);
+  // the studio home carries its own full title; a studio inner page ends in the studio name unless its title already says it
+  const t =
+    studio && page === '' && title
+      ? title
+      : studio && title
+        ? lead.includes(name)
+          ? `${lead} (${BRAND.domains.marketing})`
+          : `${lead} | ${tail}`
+        : title
+          ? `${lead} | ${tail}`
+          : c.meta.title;
   const d = description ?? c.meta.description;
   // The five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs); everything else the shared one.
   const vertical = page.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
@@ -161,7 +177,6 @@ export function jsonLd(
         '@id': org,
         name: BRAND.company.shortNameEn,
         alternateName: BRAND.company.shortNameAr,
-        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
@@ -253,7 +268,6 @@ export function studioJsonLd(locale: Locale) {
         '@id': org,
         name: BRAND.company.shortNameEn,
         alternateName: BRAND.company.shortNameAr,
-        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
@@ -307,7 +321,6 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         '@id': org,
         name: BRAND.company.shortNameEn,
         alternateName: BRAND.company.shortNameAr,
-        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,

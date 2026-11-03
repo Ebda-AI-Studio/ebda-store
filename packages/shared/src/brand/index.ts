@@ -31,7 +31,8 @@ export const BRAND = {
   /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
   company: {
     legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
-    legalNameEn: 'Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing',
+    legalNameEn:
+      'Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing',
     shortNameAr: 'ابدأ ستوديو',
     shortNameEn: 'Ebda AI Studio',
     url: 'https://ebda.app',
@@ -329,31 +330,38 @@ export function whatsappYearlyOf(id: WhatsAppBasePackageId): WhatsAppPackageDef 
   return id === 'store-included' ? whatsappPackage(id) : whatsappPackage(`${id}-yearly`);
 }
 
-// ---- shared header navigation of the support sites (docs, help, status) ----
+// ---- ONE navigation and footer for every Ebda AI Studio surface (marketing, help, docs, status) ----
 /**
- * The ONE header navigation of the three Ebda AI Studio support sites (docs, help, status): the wordmark lockup, the
- * Products menu, the five site links and the mobile menu. docs and help render it through packages/site-kit's page
- * shell, status through its own Worker renderer; both call these functions, so the three always show the same links,
- * in the same order, with the same labels in ar and en. Pure strings, no imports beyond the brand module (the status
- * Worker may import nothing else). It lives inside the brand module on purpose: the docs and help builders load it as bare TypeScript through Node, which
- * cannot resolve an extensionless sibling import, and the status Worker may import this module only.
+ * The ONE navigation and footer data of the five Ebda AI Studio sites (ruling NAV-PRODUCT-OF-PAGE-1, NAV-CTA-1,
+ * NAV-CHAT-SLUG-1; public sites audit 2026-11-03 section 4). Everything a header or footer shows (labels, hrefs, order,
+ * groups, ar and en) is returned by the functions below, and two renderers draw it: the marketing site's React
+ * `Header`/`Footer` and the string renderers here (`siteNavHtml`, `siteFooterHtml`) used by help, docs and status.
+ * `tests/unit/studio-nav-footer.test.ts` compares the two so they cannot drift.
+ *
+ * The studio bar is on every page: wordmark (always the studio home), Products, Resources, About, Contact, Log in,
+ * the studio CTA. A product bar (`productBar`) sits under it only on a product page. The footer is the same five
+ * columns everywhere. Pure strings, no imports beyond this module (the status Worker may import nothing else, and the
+ * docs and help builders load it as bare TypeScript through Node, which cannot resolve an extensionless sibling).
  */
 export type NavLang = 'ar' | 'en';
-/** The site a page belongs to: its link gets `aria-current="page"`. `null` = none (a page of another site). */
-export type NavSite = 'studio' | 'dashboard' | 'docs' | 'help' | 'status';
+/** The site a page belongs to: its Resources link gets `aria-current="page"`. `null` = none (a marketing page). */
+export type NavSite = 'docs' | 'help' | 'status';
+/** Which product a marketing page belongs to; `studio` shows no product bar. */
+export type NavKind = 'studio' | 'store' | 'chat';
 
-export interface SiteNavItem {
-  id: NavSite;
-  href: string;
+/** One link. `href` is absolute (support sites render it as is); `path` is the same-origin marketing path when the target is a marketing page (the marketing site routes it with next/link). */
+export interface NavLink {
+  id: string;
   label: string;
+  href: string;
+  path?: string;
 }
 export type SiteNavProductId = 'store' | 'whatsapp';
-export interface SiteNavProduct {
+export interface SiteNavProduct extends NavLink {
   id: SiteNavProductId;
-  href: string;
-  label: string;
   blurb: string;
 }
+
 /**
  * The Products menu icons (24x24, drawn once, stroked in the panel's gold on a night tile). `fill: true` paths are
  * solid. The marketing header renders the same paths in React, the support sites through `siteNavIconSvg`.
@@ -378,53 +386,50 @@ export const SITE_NAV_ICONS: Record<SiteNavProductId, readonly { d: string; fill
 };
 
 const L = (lang: NavLang, ar: string, en: string) => (lang === 'ar' ? ar : en);
-const marketing = (lang: NavLang) => `${BRAND_MARKETING_URL}${lang === 'ar' ? '/' : '/en/'}`;
+/** A marketing path for a locale: Arabic at the root, English under /en (`/` becomes `/en/`). */
+const mpath = (lang: NavLang, p: string) => `${lang === 'ar' ? '' : '/en'}${p}`;
+const marketing = (lang: NavLang) => `${BRAND_MARKETING_URL}${mpath(lang, '/')}`;
+const mlink = (lang: NavLang, id: string, label: string, p: string): NavLink => ({
+  id,
+  label,
+  path: mpath(lang, p),
+  href: `${BRAND_MARKETING_URL}${mpath(lang, p)}`,
+});
+const studioName = (lang: NavLang) =>
+  lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
 
-/** The five site links, in the one order every support site shows them. */
-export function siteNavItems(lang: NavLang): SiteNavItem[] {
-  const d = BRAND.domains;
-  return [
-    {
-      id: 'studio',
-      href: marketing(lang),
-      label: lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
-    },
-    { id: 'dashboard', href: BRAND_STORE_APP_URL, label: L(lang, 'لوحة التحكم', 'Dashboard') },
-    // docs: English at the root, Arabic under /ar/. help and status: Arabic at the root, English under /en.
-    {
-      id: 'docs',
-      href: `https://${d.docs}/${lang === 'ar' ? 'ar/' : ''}`,
-      label: L(lang, 'الوثائق', 'Docs'),
-    },
-    {
-      id: 'help',
-      href: `https://${d.help}/${lang === 'ar' ? '' : 'en/'}`,
-      label: L(lang, 'مركز المساعدة', 'Help centre'),
-    },
-    {
-      id: 'status',
-      href: `https://${d.status}/${lang === 'ar' ? '' : 'en'}`,
-      label: L(lang, 'حالة الخدمة', 'Status'),
-    },
-  ];
+/** The studio security mailbox (security.txt, the footer, the contact page). */
+export const BRAND_SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
+
+/** The studio home of a language (the wordmark target everywhere). */
+export function studioHomeLink(lang: NavLang): NavLink {
+  return mlink(lang, 'studio', studioName(lang), '/');
 }
 
 /**
- * The Products menu: only live products (BRAND-ARCH-1), Ebda Store then Ebda Chat (LAUNCH-SUITE-1). The same entries,
- * labels and blurbs as the marketing header's Products panel (tests/unit/site-nav-shared.test.ts keeps them equal).
+ * The Products menu: only live products (BRAND-ARCH-1), Ebda Store then Ebda Chat. Ebda Chat's page stays at
+ * /whatsapp (NAV-CHAT-SLUG-1); /chat is a redirect alias. Product names never carry "WhatsApp".
  */
 export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
   return [
     {
+      ...mlink(
+        lang,
+        'store',
+        lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
+        '/store/'
+      ),
       id: 'store',
-      href: `${marketing(lang)}store/`,
-      label: lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
       blurb: L(lang, 'متجرك أونلاين في دقايق', 'Your online store in minutes'),
     },
     {
+      ...mlink(
+        lang,
+        'whatsapp',
+        lang === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn,
+        '/whatsapp/'
+      ),
       id: 'whatsapp',
-      href: `${marketing(lang)}whatsapp/`,
-      label: lang === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn,
       blurb: L(
         lang,
         'كلّم عملاءك على واتساب من مكان واحد',
@@ -434,11 +439,251 @@ export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
   ];
 }
 
+/** The Resources menu: Help centre, Docs, Service status, each in the page's language (docs: English at the root; help and status: Arabic at the root). */
+export function siteNavResources(lang: NavLang): (NavLink & { id: NavSite })[] {
+  const d = BRAND.domains;
+  return [
+    {
+      id: 'help',
+      href: `https://${d.help}/${lang === 'ar' ? '' : 'en/'}`,
+      label: L(lang, 'مركز المساعدة', 'Help centre'),
+    },
+    {
+      id: 'docs',
+      href: `https://${d.docs}/${lang === 'ar' ? 'ar/' : ''}`,
+      label: L(lang, 'الوثائق', 'Docs'),
+    },
+    {
+      id: 'status',
+      href: `https://${d.status}/${lang === 'ar' ? '' : 'en'}`,
+      label: L(lang, 'حالة الخدمة', 'Service status'),
+    },
+  ];
+}
+
+/** The studio's own pages: About, Contact. */
+export function siteNavStudio(lang: NavLang): NavLink[] {
+  return [
+    mlink(lang, 'about', L(lang, 'عن ابدأ ستوديو', 'About the studio'), '/about/'),
+    mlink(lang, 'contact', L(lang, 'تواصل معنا', 'Contact'), '/contact/'),
+  ];
+}
+
+/** Every destination of the studio bar as one flat list (the 404 pages' site map): studio home, products, resources, About, Contact. */
+export function siteNavMap(lang: NavLang): NavLink[] {
+  return [
+    studioHomeLink(lang),
+    ...siteNavProducts(lang),
+    ...siteNavResources(lang),
+    ...siteNavStudio(lang),
+  ];
+}
+
+/** Log in: one label, and one labelled entry per product until the shared accounts sign-in has its own page (audit P1-6). */
+export function siteNavLogin(lang: NavLang): { label: string; items: NavLink[] } {
+  return {
+    label: L(lang, 'دخول', 'Log in'),
+    items: [
+      {
+        id: 'store',
+        label: L(lang, 'دخول ابدأ ستور', 'Log in to Ebda Store'),
+        href: `${BRAND_STORE_APP_URL}/login`,
+      },
+      {
+        id: 'whatsapp',
+        label: L(lang, 'دخول ابدأ شات', 'Log in to Ebda Chat'),
+        href: brandUrl(BRAND.domains.whatsappApp),
+      },
+    ],
+  };
+}
+
+/** The studio CTA (NAV-CTA-1): choose a product, anchored to the product windows of the studio home. */
+export function siteNavCta(lang: NavLang): NavLink {
+  return {
+    id: 'cta',
+    label: L(lang, 'اختار منتجك', 'Choose a product'),
+    path: `${mpath(lang, '/')}#products`,
+    href: `${marketing(lang)}#products`,
+  };
+}
+
+/** The labels of the groups, shared by both renderers. */
 export const siteNavLabels = (lang: NavLang) => ({
   nav: L(lang, 'التنقل الرئيسي', 'Main navigation'),
   products: L(lang, 'المنتجات', 'Products'),
+  resources: L(lang, 'المصادر', 'Resources'),
+  studio: L(lang, 'الستوديو', 'Studio'),
   menu: L(lang, 'القائمة', 'Menu'),
 });
+
+/**
+ * The product bar under the studio bar, only on a product page: the product chip (links to the product's page), its own
+ * sections and its own CTA. Store anchors are written `/store/#id` (one hop, audit P1-10).
+ */
+export function productBar(
+  kind: Exclude<NavKind, 'studio'>,
+  lang: NavLang
+): { chip: NavLink; links: NavLink[]; cta: NavLink } {
+  if (kind === 'store') {
+    return {
+      chip: mlink(
+        lang,
+        'store',
+        lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
+        '/store/'
+      ),
+      links: [
+        mlink(lang, 'story', L(lang, 'إزاي بيشتغل', 'How it works'), '/store/#story'),
+        mlink(lang, 'looks', L(lang, 'القوالب', 'Templates'), '/store/#looks'),
+        mlink(lang, 'features', L(lang, 'المميزات', 'Features'), '/features/'),
+        mlink(lang, 'pricing', L(lang, 'الأسعار', 'Pricing'), '/store/#pricing'),
+        mlink(lang, 'faq', L(lang, 'أسئلة', 'FAQ'), '/store/#faq'),
+      ],
+      cta: {
+        id: 'cta',
+        label: L(lang, 'افتح متجرك', 'Open your store'),
+        href: `${BRAND_STORE_APP_URL}/signup`,
+      },
+    };
+  }
+  return {
+    chip: mlink(
+      lang,
+      'whatsapp',
+      lang === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn,
+      '/whatsapp/'
+    ),
+    links: [
+      mlink(lang, 'features', L(lang, 'المميزات', 'Features'), '/whatsapp/#features'),
+      mlink(lang, 'pricing', L(lang, 'الأسعار', 'Pricing'), '/whatsapp/#pricing'),
+      mlink(lang, 'faq', L(lang, 'أسئلة', 'FAQ'), '/whatsapp/#faq'),
+    ],
+    cta: {
+      id: 'cta',
+      label: L(lang, 'ابدأ مع ابدأ شات', 'Start with Ebda Chat'),
+      href: brandUrl(BRAND.domains.whatsappApp),
+    },
+  };
+}
+
+export interface SiteFooterColumn {
+  id: 'products' | 'resources' | 'studio' | 'legal';
+  title: string;
+  links: (NavLink & { action?: 'cookies' })[];
+}
+/**
+ * The footer, identical on all five sites: the brand column (name, one-line mission, mailboxes, WhatsApp number) and
+ * four link columns (Products, Resources, Studio, Legal). No competitor compare links (Ahmad 2026-10-23). The legal
+ * entity's full name is not here: it lives on the legal pages only (AR-STUDIO-NAME-1).
+ */
+export function siteFooter(lang: NavLang): {
+  label: string;
+  brand: {
+    name: string;
+    mission: string;
+    contacts: { id: string; label: string; value: string; href: string }[];
+  };
+  columns: SiteFooterColumn[];
+  copyright: (year: number) => string;
+} {
+  const products = siteNavProducts(lang);
+  const resources = siteNavResources(lang);
+  const about = siteNavStudio(lang);
+  const m = (id: string, label: string, p: string) => mlink(lang, id, label, p);
+  return {
+    label: L(lang, 'روابط الموقع', 'Site links'),
+    brand: {
+      name: studioName(lang),
+      mission: L(lang, 'بابك لبدء مشروعك.', 'Your doorway to business.'),
+      contacts: [
+        {
+          id: 'hello',
+          label: L(lang, 'أسئلة واستفسارات', 'Questions and help'),
+          value: BRAND.supportEmail,
+          href: `mailto:${BRAND.supportEmail}`,
+        },
+        {
+          id: 'security',
+          label: L(lang, 'الإبلاغ عن ثغرة أمنية', 'Report a security issue'),
+          value: BRAND_SECURITY_EMAIL,
+          href: `mailto:${BRAND_SECURITY_EMAIL}`,
+        },
+        {
+          id: 'whatsapp',
+          label: L(lang, 'واتساب', 'WhatsApp'),
+          value: whatsappDisplay(),
+          href: whatsappUrl(),
+        },
+      ],
+    },
+    columns: [
+      {
+        id: 'products',
+        title: siteNavLabels(lang).products,
+        links: [
+          products[0],
+          m('store-features', L(lang, 'مميزات ابدأ ستور', 'Store features'), '/features/'),
+          m('store-pricing', L(lang, 'أسعار ابدأ ستور', 'Store pricing'), '/store/#pricing'),
+          m('store-templates', L(lang, 'قوالب ابدأ ستور', 'Store templates'), '/store/#looks'),
+          products[1],
+          m('chat-pricing', L(lang, 'أسعار ابدأ شات', 'Chat pricing'), '/whatsapp/#pricing'),
+        ],
+      },
+      {
+        id: 'resources',
+        title: siteNavLabels(lang).resources,
+        links: [
+          ...resources,
+          m('credits', L(lang, 'حقوق الصور والموديلات', 'Credits'), '/credits/'),
+        ],
+      },
+      {
+        id: 'studio',
+        title: siteNavLabels(lang).studio,
+        links: [
+          ...about,
+          {
+            id: 'security-txt',
+            label: 'security.txt',
+            href: `${BRAND_MARKETING_URL}/.well-known/security.txt`,
+            path: '/.well-known/security.txt',
+          },
+        ],
+      },
+      {
+        id: 'legal',
+        title: L(lang, 'قانوني', 'Legal'),
+        links: [
+          m('legal', L(lang, 'الإشعار القانوني', 'Legal notice'), '/legal/'),
+          m('privacy', L(lang, 'الخصوصية', 'Privacy'), '/privacy/'),
+          m('terms', L(lang, 'الشروط', 'Terms'), '/terms/'),
+          m('merchant', L(lang, 'اتفاقية التاجر', 'Merchant agreement'), '/merchant-agreement/'),
+          m('acceptable-use', L(lang, 'الاستخدام المقبول', 'Acceptable use'), '/acceptable-use/'),
+          m('refund', L(lang, 'الاسترداد', 'Refunds'), '/refund/'),
+          m('data-deletion', L(lang, 'حذف البيانات', 'Data deletion'), '/legal/data-deletion/'),
+          m('chat-terms', L(lang, 'شروط ابدأ شات', 'Chat terms'), '/legal/whatsapp-terms/'),
+          m('chat-privacy', L(lang, 'خصوصية ابدأ شات', 'Chat privacy'), '/legal/whatsapp-privacy/'),
+          m(
+            'chat-dpa',
+            L(lang, 'اتفاقية معالجة بيانات ابدأ شات', 'Chat DPA'),
+            '/legal/whatsapp-dpa/'
+          ),
+          {
+            ...m('cookies', L(lang, 'إعدادات الكوكيز', 'Cookie settings'), '/privacy/'),
+            action: 'cookies',
+          },
+        ],
+      },
+    ],
+    copyright: year =>
+      L(
+        lang,
+        `© ${year} ${BRAND.company.shortNameAr}. جميع الحقوق محفوظة.`,
+        `© ${year} ${BRAND.company.shortNameEn}. All rights reserved.`
+      ),
+  };
+}
 
 const esc = (s: string) =>
   s.replace(
@@ -446,15 +691,14 @@ const esc = (s: string) =>
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
   );
 
-/** The studio lockup: mark + the master brand name + the site name. `markHtml` is the caller's icon (an <img> or inline SVG). */
+/** The studio lockup: mark + the master brand name + the site name. `markHtml` is the caller's icon (an <img> or inline SVG). The href is the studio home, always. */
 export function siteWordmarkHtml(p: {
   lang: NavLang;
   href: string;
   siteLabel: string;
   markHtml: string;
 }): string {
-  const studio = p.lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
-  return `<a class="wordmark" href="${esc(p.href)}">${p.markHtml}<span>${esc(studio)}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>`;
+  return `<a class="wordmark" href="${esc(p.href)}">${p.markHtml}<span>${esc(studioName(p.lang))}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>`;
 }
 
 /** The icon as an inline <svg> string (decorative). */
@@ -470,22 +714,63 @@ export function siteNavIconSvg(id: SiteNavProductId, lang?: NavLang): string {
   return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"${mirror}>${paths}</svg>`;
 }
 
-/** The header nav: desktop link row with the Products disclosure, and the mobile menu (below 1180px it collapses into the menu button; wider, it is its own row under the wordmark, search and language switch). */
+/**
+ * The studio bar's navigation for the support sites: desktop link row with the Products, Resources and Log in
+ * disclosures, About, Contact and the CTA, and the mobile menu grouped Products / Resources / Studio (below 1180px
+ * it collapses into the menu button; wider, it is its own row under the wordmark, search and language switch).
+ */
 export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
   const t = siteNavLabels(lang);
-  const items = siteNavItems(lang);
   const products = siteNavProducts(lang);
-  const link = (i: SiteNavItem) =>
-    `<li><a href="${esc(i.href)}"${i.id === active ? ' aria-current="page"' : ''}>${esc(i.label)}</a></li>`;
+  const resources = siteNavResources(lang);
+  const studio = siteNavStudio(lang);
+  const login = siteNavLogin(lang);
+  const cta = siteNavCta(lang);
+  const a = (i: NavLink, cls = '') =>
+    `<a href="${esc(i.href)}"${cls ? ` class="${cls}"` : ''}${i.id === active ? ' aria-current="page"' : ''}>${esc(i.label)}</a>`;
+  const li = (i: NavLink) => `<li>${a(i)}</li>`;
   // one card per product: icon tile, full name, one-sentence blurb (the marketing header renders the same pieces in React)
   const prod = (p: SiteNavProduct) =>
     `<li><a href="${esc(p.href)}"><span class="np-ico">${siteNavIconSvg(p.id, lang)}</span><span class="np-txt"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></span></a></li>`;
+  const menu = (title: string, items: string) =>
+    `<li class="nav-products"><details><summary>${esc(title)}</summary><ul>${items}</ul></details></li>`;
+  const group = (title: string, links: NavLink[]) =>
+    `<li class="menu-group"><p>${esc(title)}</p><ul>${links.map(li).join('')}</ul></li>`;
   return (
     `<nav class="top-nav" aria-label="${esc(t.nav)}">` +
-    `<ul class="nav-links"><li class="nav-products"><details><summary>${esc(t.products)}</summary><ul>${products.map(prod).join('')}</ul></details></li>${items.map(link).join('')}</ul>` +
+    `<ul class="nav-links">` +
+    menu(t.products, products.map(prod).join('')) +
+    menu(t.resources, resources.map(li).join('')) +
+    studio.map(li).join('') +
+    `<li class="nav-end"></li>` +
+    menu(login.label, login.items.map(li).join('')) +
+    `<li>${a(cta, 'nav-cta')}</li>` +
+    `</ul>` +
     `<details class="nav-menu"><summary><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>${esc(t.menu)}</span></summary>` +
-    `<ul><li class="menu-group"><p>${esc(t.products)}</p><ul>${products.map(p => `<li><a href="${esc(p.href)}">${esc(p.label)}</a></li>`).join('')}</ul></li>${items.map(link).join('')}</ul></details>` +
+    `<ul>${group(t.products, products)}${group(t.resources, resources)}${group(t.studio, studio)}${group(login.label, login.items)}<li class="menu-cta">${a(cta, 'nav-cta')}</li></ul></details>` +
     `</nav>`
+  );
+}
+
+const colHtml = (c: SiteFooterColumn) =>
+  `<nav class="sf-col" aria-labelledby="sf-${c.id}"><h2 id="sf-${c.id}">${esc(c.title)}</h2><ul>${c.links
+    .map(l => `<li><a href="${esc(l.href)}">${esc(l.label)}</a></li>`)
+    .join('')}</ul></nav>`;
+
+/** The footer for the support sites: the same data as the marketing React `Footer`. `markHtml` is the caller's icon. */
+export function siteFooterHtml(lang: NavLang, markHtml: string, year: number): string {
+  const f = siteFooter(lang);
+  const contacts = f.brand.contacts
+    .map(
+      c =>
+        `<div><dt>${esc(c.label)}</dt><dd><a href="${esc(c.href)}"${c.id === 'whatsapp' ? ' dir="ltr"' : ''}>${esc(c.value)}</a></dd></div>`
+    )
+    .join('');
+  return (
+    `<footer class="site-footer band-dark sf"><div class="wrap">` +
+    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl></div>` +
+    f.columns.map(colHtml).join('') +
+    `</div><div class="sf-bottom"><p class="muted small">${esc(f.copyright(year))}</p></div></div></footer>`
   );
 }
 
@@ -583,14 +868,47 @@ export const SITE_NAV_CSS =
 .top-nav{order:3;flex:1 1 100%;min-width:0;position:relative}
 .top-nav ul{list-style:none;margin:0;padding:0}
 .top-nav .nav-links{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 16px;white-space:nowrap}
+.top-nav .nav-end{flex:1 1 0}
 .top-nav a{color:var(--fg);text-decoration:none;padding:6px 2px;display:inline-block}
 .top-nav a:hover{color:var(--lift)}
 .top-nav a[aria-current=page]{color:var(--lift);border-bottom:2px solid var(--lift)}
+.top-nav a.nav-cta{background:var(--gold);color:var(--night);border-radius:10px;padding:8px 14px;font-weight:600;border-bottom:0}
+.top-nav a.nav-cta:hover{background:var(--lift);color:var(--night)}
 .top-nav summary{cursor:pointer;list-style:none;color:var(--fg);padding:6px 2px;display:inline-flex;align-items:center;gap:6px;min-height:44px}
 .top-nav summary::-webkit-details-marker{display:none}
 .nav-products>details>summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);margin-block-start:-3px}
+.nav-end~.nav-products>details>ul{inset-inline-start:auto;inset-inline-end:-18px}
 .nav-menu>ul{position:absolute;z-index:60;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin-block-start:6px}
 .nav-menu{display:none}
 .nav-menu>ul a{display:block;padding:10px;min-height:44px}
+.nav-menu .menu-group+.menu-group{border-top:1px solid var(--line);margin-top:4px;padding-top:4px}
+.nav-menu .menu-cta{padding:8px 0 0}.nav-menu a.nav-cta{text-align:center}
 @media (max-width:1179px){.top-nav{order:0;flex:0 0 auto;margin-inline-start:auto}.top-nav .nav-links{display:none}.nav-menu{display:block}}
 `.replace(/\n/g, '') + SITE_NAV_PANEL_CSS;
+
+/**
+ * The footer's stylesheet, shared by marketing (inlined by its `Footer`) and docs, help and status (appended to their
+ * site stylesheets). A deliberately dark band whatever the page's ground: it defines its own tokens. Five columns from
+ * 900px (brand + four link columns), two columns on a phone; logical properties, so it mirrors in Arabic.
+ */
+export const SITE_FOOTER_CSS = `
+.band-dark{--canvas:${BRAND.colors.night};--panel:#121415;--raise:#181b1c;--line:#2f3435;--line-strong:#6f7775;--fg:#f3f5f4;--muted:#a9b1af;--accent-text:${BRAND.colors.lift};background:${BRAND.colors.night};color:#f3f5f4}
+.sf{margin-top:56px;padding-block:44px 24px}
+.sf a{color:#f3f5f4;text-decoration:none}
+.sf a:hover{color:${BRAND.colors.lift};text-decoration:underline;text-underline-offset:3px}
+.sf-grid{display:grid;gap:32px 24px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.sf-brand{grid-column:1/-1}
+@media (min-width:900px){.sf-grid{grid-template-columns:minmax(220px,1.4fr) repeat(4,minmax(0,1fr))}.sf-brand{grid-column:auto}}
+.sf-name{display:flex;align-items:center;gap:10px;font-weight:600;margin:0 0 6px}
+.sf-mission{color:#a9b1af;margin:0 0 16px}
+.sf-contact{margin:0;display:grid;gap:10px}
+.sf-contact dt{color:#a9b1af;font-size:.8125rem}
+.sf-contact dd{margin:0}
+.sf-col h2{font-size:.8125rem;font-weight:600;letter-spacing:.04em;color:${BRAND.colors.lift};margin:0 0 10px}
+html[lang=ar] .sf-col h2{letter-spacing:0}
+.sf-col ul{list-style:none;margin:0;padding:0;display:grid}
+.sf-col a,.sf-col button{display:inline-block;padding:9px 0;min-height:44px;color:#f3f5f4;background:none;border:0;font:inherit;text-align:start;cursor:pointer}
+.sf-col button:hover{color:${BRAND.colors.lift};text-decoration:underline;text-underline-offset:3px}
+.sf-bottom{border-top:1px solid #2f3435;margin-top:32px;padding-top:16px}
+.sf-bottom p{margin:0;color:#a9b1af}
+`.replace(/\n/g, '');

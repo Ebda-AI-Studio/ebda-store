@@ -498,25 +498,6 @@ th {
   text-transform: uppercase;
 }
 
-/* footer */
-.site-footer {
-  border-top: 1px solid var(--line);
-  padding-block: 20px;
-}
-.footer-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px 24px;
-}
-.footer-row ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 18px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;

@@ -126,30 +126,22 @@ export const SECTION_ORDER = [
 ] as const;
 export type SectionId = (typeof SECTION_ORDER)[number];
 
-/** Which product a page belongs to (MKT-WA-CHROME-1): the Ebda Chat page and its legal documents get Chat's own chrome. */
-export const productOfPage = (page: string): 'studio' | 'store' | 'whatsapp' =>
+/** The page kinds of the header: a studio page (no product bar), an Ebda Store page or an Ebda Chat page. */
+export type PageKind = 'studio' | 'store' | 'chat';
+/**
+ * Which product a page belongs to (Ruling NAV-PRODUCT-OF-PAGE-1; it replaced MKT-WA-CHROME-1's "everything that is not
+ * Chat is Store"). The Store family is an explicit list (the Store landing, /features, /compare/*, /for/*), Chat is its
+ * page and its three documents, and the default is `studio`: a new page is never silently Store.
+ */
+export const productOfPage = (page: string): PageKind =>
   page === 'whatsapp' || page.startsWith('legal/whatsapp-')
-    ? 'whatsapp'
-    : page === ''
-      ? 'studio'
-      : 'store';
-
-/** Ebda Chat nav items: sections of its own page (MKT-WA-CHROME-1), labelled with the shared nav copy. */
-export const WA_NAV_ANCHORS = [
-  { key: 'features', target: 'features' },
-  { key: 'pricing', target: 'pricing' },
-  { key: 'resources', target: 'faq' },
-] as const;
-
-/** Top-nav items other than the wordmark and the account actions, in page order. */
-export const NAV_ANCHORS = [
-  // targets are sections of the Store landing (STORE_HOME)
-  { key: 'solutions', target: 'story' },
-  { key: 'looks', target: 'looks' },
-  { key: 'features', target: 'features' },
-  { key: 'pricing', target: 'pricing' },
-  { key: 'resources', target: 'faq' },
-] as const satisfies readonly { key: string; target: SectionId }[];
+    ? 'chat'
+    : page === 'store' ||
+        page === 'features' ||
+        page.startsWith('compare/') ||
+        page.startsWith('for/')
+      ? 'store'
+      : 'studio';
 
 /**
  * Customer-stories placeholder. Null until a merchant has a live, reachable

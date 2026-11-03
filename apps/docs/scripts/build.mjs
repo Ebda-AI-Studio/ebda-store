@@ -3,7 +3,7 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
+import { BRAND, BRAND_MARKETING_URL, siteNavMap } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -16,6 +16,7 @@ import {
   writeSeoFiles,
   writeSiteCss,
 } from '@ebda/site-kit/build/shell';
+import { assertNoBrokenLinks } from '@ebda/site-kit/build/links';
 import { writeSearchAssets } from '@ebda/site-kit/build/search';
 import { loadContent, resetOut, writePage } from '@ebda/site-kit/build/site';
 import { renderOpenApi } from './openapi-render.mjs';
@@ -34,7 +35,6 @@ const EN = {
   site: `${BRAND.company.shortNameEn} Docs`,
   skip: 'Skip to content',
   search: { action: '/search/', label: 'Search', placeholder: 'Search the docs' },
-  footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. ${BRAND.product.nameEn} developer documentation.`,
   sidebarLabel: 'Documentation',
   tocLabel: 'On this page',
   openapi: {
@@ -112,15 +112,7 @@ const sidebarFor = current =>
     EN.sidebarLabel
   );
 
-const footer = renderFooter({
-  copy: EN.footer,
-  links: [
-    { href: `${BRAND_MARKETING_URL}/terms/`, label: 'Terms' },
-    { href: `${BRAND_MARKETING_URL}/privacy/`, label: 'Privacy' },
-    { href: `https://${BRAND.domains.status}`, label: 'Status' },
-    { href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail },
-  ],
-});
+const footer = renderFooter({ lang: 'en' });
 
 const searchDocs = [];
 const urls = ['/', '/ar/', '/search/'];
@@ -212,10 +204,7 @@ for (const p of waEn) {
     bodyHtml: html,
   });
 }
-const arFooter = renderFooter({
-  copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
-  links: [{ href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail }],
-});
+const arFooter = renderFooter({ lang: 'ar' });
 const arWaSidebar = current =>
   renderSidebar(
     [
@@ -321,10 +310,7 @@ for (const p of waAr) {
       index: '/search-index.en.json',
     },
     main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${cards}</article>`,
-    footer: renderFooter({
-      copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
-      links: [{ href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail }],
-    }),
+    footer: renderFooter({ lang: 'ar' }),
     skipLabel: 'تخطَّ إلى المحتوى',
   });
   writePage(out, '/ar/', page);
@@ -443,7 +429,7 @@ for (const lang of ['en', 'ar']) {
           {
             title: c.ebda,
             links: [
-              ...siteNavItems(lang).map(i => ({ href: i.href, label: i.label })),
+              ...siteNavMap(lang).map(i => ({ href: i.href, label: i.label })),
               { href: `mailto:${BRAND.supportEmail}`, label: c.contact },
             ],
           },
@@ -462,4 +448,5 @@ writeFileSync(
       '\n'
     )}\n${waEn.map(p => `- [${p.data.title}](${ORIGIN}${url(p.slug)}): ${p.data.description}`).join('\n')}\n- [OpenAPI document](${ORIGIN}/openapi.json)\n`
 );
+assertNoBrokenLinks(out, ORIGIN);
 console.log(`docs built: ${urls.length} pages -> ${out}`);

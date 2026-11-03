@@ -4,12 +4,15 @@ import { COPY } from '../lib/content';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { JsonLd } from './JsonLd';
+import { studioJsonLd } from '../lib/seo';
 
 export function AboutPage({ locale }: { locale: Locale }) {
   const c = COPY[locale];
   const p = c.aboutPage;
   return (
     <>
+      <JsonLd data={studioJsonLd(locale)} />
       <Header locale={locale} page="about" />
       <main id="main" className="wrap legal">
         <header className="legal-head">

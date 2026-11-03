@@ -4,7 +4,9 @@ import {
   BRAND,
   BRAND_MARKETING_URL,
   SITE_NAV_CSS,
+  SITE_FOOTER_CSS,
   SITE_NAV_JS,
+  siteFooterHtml,
   siteNavHtml,
   siteWordmarkHtml,
 } from '@ebda/shared/brand';
@@ -90,7 +92,7 @@ export function writeSiteCss(outDir) {
   // the shared header nav (packages/shared/src/brand/index.ts) styles itself with the same string status inlines
   writeFileSync(
     path.join(outDir, 'assets', 'site.css'),
-    readFileSync(path.join(here, '..', 'css', 'site.css'), 'utf8') + '\n' + SITE_NAV_CSS
+    readFileSync(path.join(here, '..', 'css', 'site.css'), 'utf8') + '\n' + SITE_NAV_CSS + SITE_FOOTER_CSS
   );
   // the shared header-nav behaviour: a same-origin static file, no inline code (strict CSP)
   writeFileSync(path.join(outDir, 'assets', 'site-nav.js'), SITE_NAV_JS);
@@ -226,10 +228,9 @@ export function renderToc(headings, label) {
     .join('')}</ul></nav>`;
 }
 
-export function renderFooter({ links, copy }) {
-  return `<footer class="site-footer"><div class="wrap footer-row"><p class="muted small">${esc(copy)}</p><ul>${links
-    .map(l => `<li><a href="${esc(l.href)}">${esc(l.label)}</a></li>`)
-    .join('')}</ul></div></footer>`;
+/** The one studio footer (brand module `siteFooterHtml`): the same five columns on help, docs and status. */
+export function renderFooter({ lang }) {
+  return siteFooterHtml(lang, '<img class="sf-mark" src="/icon.svg" alt="" width="24" height="24">', new Date().getUTCFullYear());
 }
 
 /** Search results page body (script reads data-* attributes). */

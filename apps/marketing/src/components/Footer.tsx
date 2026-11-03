@@ -1,102 +1,63 @@
 import Link from 'next/link';
-import { BRAND } from '@ebda/shared/brand';
-import { COPY } from '../lib/content';
+import { siteFooter, type NavLink } from '@ebda/shared/brand';
+import '@/app/chrome.css';
 import { CookieSettingsButton } from './CookieSettingsButton';
-import {
-  SECURITY_EMAIL,
-  STORE_HOME,
-  pagePath,
-  productOfPage,
-  type Locale,
-  type PageSlug,
-} from '../lib/site';
+import type { Locale, PageSlug } from '../lib/site';
 
-export function Footer({ locale, page = '' }: { locale: Locale; page?: PageSlug }) {
-  const kind = productOfPage(page);
-  const wa = kind === 'whatsapp';
-  const studio = kind === 'studio';
-  const c = COPY[locale].footer;
-  const k = COPY[locale].contact;
+/**
+ * The ONE footer, identical on every marketing page and on help, docs and status: the brand column and four link
+ * columns (Products, Resources, Studio, Legal), drawn from the brand module's `siteFooter` (which the support sites
+ * render through `siteFooterHtml`; tests/unit/studio-nav-footer.test.ts keeps them equal). `page` is accepted for the
+ * existing call sites and changes nothing: the footer no longer varies by product.
+ */
+export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
+  const f = siteFooter(locale);
+  const year = new Date().getUTCFullYear();
+  const A = ({ l }: { l: NavLink }) =>
+    l.path ? <Link href={l.path}>{l.label}</Link> : <a href={l.href}>{l.label}</a>;
   return (
-    <footer className="site-footer band-dark">
-      <div className="wrap footer-row">
-        <div>
-          <p className="footer-brand">
-            <img src="/icon.svg" alt="" className="footer-mark" width={28} height={28} />
-            <span>{locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}</span>
-          </p>
-          <p className="footer-credit">{wa ? c.waProduct : studio ? c.studioProduct : c.product}</p>
-          <p className="footer-h">{k.title}</p>
-          <dl className="footer-contact">
-            <div>
-              <dt>{k.hello}</dt>
-              <dd>
-                <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
-              </dd>
-            </div>
-            <div>
-              <dt>{k.security}</dt>
-              <dd>
-                <a href={`mailto:${SECURITY_EMAIL}`}>{SECURITY_EMAIL}</a>
-              </dd>
-            </div>
-          </dl>
+    <footer className="site-footer band-dark sf">
+      <div className="wrap">
+        <div className="sf-grid">
+          <div className="sf-brand">
+            <p className="sf-name">
+              <img src="/icon.svg" alt="" className="sf-mark" width={24} height={24} />
+              <span>{f.brand.name}</span>
+            </p>
+            <p className="sf-mission">{f.brand.mission}</p>
+            <dl className="sf-contact">
+              {f.brand.contacts.map(c => (
+                <div key={c.id}>
+                  <dt>{c.label}</dt>
+                  <dd>
+                    <a href={c.href} dir={c.id === 'whatsapp' ? 'ltr' : undefined}>
+                      {c.value}
+                    </a>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          {f.columns.map(col => (
+            <nav key={col.id} className="sf-col" aria-labelledby={`sf-${col.id}`}>
+              <h2 id={`sf-${col.id}`}>{col.title}</h2>
+              <ul>
+                {col.links.map(l => (
+                  <li key={l.id}>
+                    {l.action === 'cookies' ? (
+                      <CookieSettingsButton label={l.label} />
+                    ) : (
+                      <A l={l} />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
-        <nav aria-label={c.legalNav}>
-          <ul className="footer-links">
-            {studio && (
-              <li>
-                <Link href={STORE_HOME[locale]}>
-                  {locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
-                </Link>
-              </li>
-            )}
-            <li>
-              <Link href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'whatsapp')}>
-                {locale === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn}
-              </Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'about')}>{c.about}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'contact')}>{COPY[locale].nav.contact}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'legal')}>{c.legal}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'privacy')}>{c.privacy}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'terms')}>{c.terms}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'merchant-agreement')}>{c.merchant}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'acceptable-use')}>{c.acceptableUse}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'legal/data-deletion')}>{c.dataDeletion}</Link>
-            </li>
-            <li>
-              <Link href={pagePath(locale, 'credits')}>{c.credits}</Link>
-            </li>
-            <li>
-              <CookieSettingsButton label={c.cookies} />
-            </li>
-          </ul>
-          <p className="muted small">{c.legalVersion}</p>
-        </nav>
-      </div>
-      <div className="wrap footer-legal">
-        <p className="muted small">
-          {wa ? c.waOwnership : studio ? c.studioOwnership : c.ownership}
-        </p>
+        <div className="sf-bottom">
+          <p className="muted small">{f.copyright(year)}</p>
+        </div>
       </div>
     </footer>
   );

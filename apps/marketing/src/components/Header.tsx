@@ -1,29 +1,50 @@
-import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand';
+import {
+  SITE_NAV_ICONS,
+  productBar,
+  siteNavCta,
+  siteNavLabels,
+  siteNavLogin,
+  siteNavProducts,
+  siteNavResources,
+  siteNavStudio,
+  studioHomeLink,
+  type NavLink,
+  type SiteNavProductId,
+} from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { NavBehavior } from './NavBehavior';
-import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
-import { WHATSAPP_APP_URL } from '../lib/whatsapp-page';
 import { HeaderSearch } from './HeaderSearch';
-import {
-  HOME,
-  LOGIN_URL,
-  SIGNUP_URL,
-  NAV_ANCHORS,
-  STORE_HOME,
-  WA_NAV_ANCHORS,
-  productOfPage,
-  pagePath,
-  type Locale,
-  type PageSlug,
-} from '../lib/site';
+import { productOfPage, pagePath, type Locale, type PageSlug } from '../lib/site';
+import '@/app/chrome.css';
 
 type Page = PageSlug;
 
-/** Nav anchors that move into the "More" menu on desktop (the mobile menu lists everything). */
-const MORE_KEYS: readonly string[] = ['resources'];
+/**
+ * One link of the shared nav data (packages/shared/src/brand): a marketing page routes client-side with next/link,
+ * everything else (help, docs, status, the apps) is a plain anchor. Product-app links stay in the same tab.
+ */
+function NavA({
+  l,
+  current = false,
+  className,
+}: {
+  l: NavLink;
+  current?: boolean;
+  className?: string;
+}) {
+  const aria = current ? ({ 'aria-current': 'page' } as const) : {};
+  return l.path ? (
+    <Link href={l.path} className={className} {...aria}>
+      {l.label}
+    </Link>
+  ) : (
+    <a href={l.href} className={className} {...aria}>
+      {l.label}
+    </a>
+  );
+}
 
 /** The product icon (shared paths from the brand module, so docs/help/status draw the same one). */
 function ProductIcon({ id, mirror = false }: { id: SiteNavProductId; mirror?: boolean }) {
@@ -55,89 +76,48 @@ function ProductIcon({ id, mirror = false }: { id: SiteNavProductId; mirror?: bo
   );
 }
 
-/** `offHome`: rendered on a page that is not the home (the 404), so nav anchors link to the home. */
-export function Header({
-  locale,
-  page = '',
-  offHome = false,
-}: {
-  locale: Locale;
-  page?: Page;
-  offHome?: boolean;
-}) {
+/**
+ * The ONE header (public sites audit 2026-11-03, section 4): the studio bar on every page (wordmark to the studio home,
+ * Products, Resources, About, Contact, language, Log in, the studio CTA) and, only on a product page, the product bar
+ * under it. Its data is the brand module's (`siteNav*`, `productBar`), the same that docs, help and status render.
+ * `offHome` is kept for the 404 call site: every link is absolute now, so it changes nothing.
+ */
+export function Header({ locale, page = '' }: { locale: Locale; page?: Page; offHome?: boolean }) {
   const c = COPY[locale];
+  const lang = locale;
   const other: Locale = locale === 'ar' ? 'en' : 'ar';
-  const home = HOME[locale];
-  /** Ebda Chat's own chrome (MKT-WA-CHROME-1): its sections, its sign-in, its page behind the wordmark. */
   const kind = productOfPage(page);
-  const wa = kind === 'whatsapp';
-  const studioHome = kind === 'studio';
-  const waBase = pagePath(locale, 'whatsapp');
-  const startUrl = wa ? WHATSAPP_APP_URL : SIGNUP_URL;
-  const loginUrl = wa ? WHATSAPP_APP_URL : LOGIN_URL;
-  /** The master brand (BRAND-ARCH-1): the studio lockup, never a bare product or a bare Ebda. */
-  const studio = locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
-  /** The Products menu: Ebda Store, then Ebda Chat (the same two entries as docs, help and status; BRAND-ARCH-1). */
-  const products = [
-    {
-      id: 'store' as const,
-      href: STORE_HOME[locale],
-      name: locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
-      blurb: c.nav.storeBlurb,
-    },
-    {
-      id: 'whatsapp' as const,
-      href: pagePath(locale, 'whatsapp'),
-      name: locale === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn,
-      blurb: c.nav.whatsappBlurb,
-    },
-  ];
-  /** The Store landing's sections (Ruling MKT-HOME-1: they live at /store, not at the studio home). */
-  const storeHome = STORE_HOME[locale];
-  const anchor = (id: string) => (page === 'store' && !offHome ? `#${id}` : `${storeHome}#${id}`);
-  /** "Features" is the real /features/ page; every other item is a home section, absolute off the home. */
-  const navLink = (n: (typeof NAV_ANCHORS)[number]) =>
-    n.key === 'features' ? (
-      <Link href={pagePath(locale, 'features')}>{c.nav.features}</Link>
-    ) : (
-      <a href={anchor(n.target)}>{c.nav[n.key]}</a>
-    );
-  const waAnchor = (id: string) => `${waBase === '/' ? '' : waBase}/#${id}`;
-  const anchors: readonly { key: keyof typeof c.nav; node: ReactNode }[] = wa
-    ? WA_NAV_ANCHORS.map(n => ({
-        key: n.key,
-        node: <a href={waAnchor(n.target)}>{c.nav[n.key]}</a>,
-      }))
-    : studioHome
-      ? []
-      : NAV_ANCHORS.map(n => ({ key: n.key, node: navLink(n) }));
-  /** Secondary destinations live in one "More" menu so the top row stays on one line at every desktop width. */
-  const moreItems = [
-    ...anchors.filter(n => MORE_KEYS.includes(n.key)),
-    { key: 'about', node: <Link href={pagePath(locale, 'about')}>{c.nav.about}</Link> },
-    { key: 'contact', node: <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link> },
-  ];
+  const home = studioHomeLink(lang);
+  const t = siteNavLabels(lang);
+  const products = siteNavProducts(lang);
+  const resources = siteNavResources(lang);
+  const studio = siteNavStudio(lang);
+  const login = siteNavLogin(lang);
+  const cta = siteNavCta(lang);
+  const bar = kind === 'studio' ? null : productBar(kind, lang);
+  const here = pagePath(locale, page).replace(/\/?$/, '/');
+  const cur = (l: NavLink) => !!l.path && l.path === here;
   return (
     <header className="site-header">
       <div className="wrap header-row">
-        <Link href={wa ? waBase : home} className="wordmark" aria-label={studio}>
+        <Link href={home.path!} className="wordmark" aria-label={home.label}>
           <img src="/icon.svg" alt="" width={28} height={28} />
-          <span className="wm-name">{studio}</span>
+          <span className="wm-name">{home.label}</span>
         </Link>
-        <nav aria-label={c.nav.label} className="nav">
+        <nav aria-label={t.nav} className="nav">
           <ul className="nav-links">
             <li className="nav-products">
               <details>
-                <summary>{c.nav.products}</summary>
+                <summary>{t.products}</summary>
                 <ul>
                   {products.map(p => (
                     <li key={p.id}>
-                      <Link href={p.href}>
+                      <Link href={p.path!}>
                         <span className="np-ico">
                           <ProductIcon id={p.id} mirror={locale === 'ar' && p.id === 'whatsapp'} />
                         </span>
                         <span className="np-txt">
-                          <b>{p.name}</b>
+                          <b>{p.label}</b>
                           <span>{p.blurb}</span>
                         </span>
                       </Link>
@@ -146,21 +126,23 @@ export function Header({
                 </ul>
               </details>
             </li>
-            {anchors
-              .filter(n => !MORE_KEYS.includes(n.key))
-              .map(n => (
-                <li key={n.key}>{n.node}</li>
-              ))}
-            <li className="nav-products nav-more">
+            <li className="nav-products">
               <details>
-                <summary>{c.nav.more}</summary>
+                <summary>{t.resources}</summary>
                 <ul>
-                  {moreItems.map(m => (
-                    <li key={m.key}>{m.node}</li>
+                  {resources.map(r => (
+                    <li key={r.id}>
+                      <NavA l={r} />
+                    </li>
                   ))}
                 </ul>
               </details>
             </li>
+            {studio.map(s => (
+              <li key={s.id}>
+                <NavA l={s} current={cur(s)} />
+              </li>
+            ))}
           </ul>
           <details className="nav-menu">
             <summary>
@@ -173,27 +155,48 @@ export function Header({
                   fill="none"
                 />
               </svg>
-              <span className="menu-label">{c.nav.menu}</span>
+              <span className="menu-label">{t.menu}</span>
             </summary>
             <ul>
               <li className="menu-group">
-                <p>{c.nav.products}</p>
+                <p>{t.products}</p>
                 <ul>
                   {products.map(p => (
                     <li key={p.id}>
-                      <Link href={p.href}>{p.name}</Link>
+                      <NavA l={p} />
                     </li>
                   ))}
                 </ul>
               </li>
-              {anchors.map(n => (
-                <li key={n.key}>{n.node}</li>
-              ))}
-              <li>
-                <Link href={pagePath(locale, 'about')}>{c.nav.about}</Link>
+              <li className="menu-group">
+                <p>{t.resources}</p>
+                <ul>
+                  {resources.map(r => (
+                    <li key={r.id}>
+                      <NavA l={r} />
+                    </li>
+                  ))}
+                </ul>
               </li>
-              <li>
-                <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link>
+              <li className="menu-group">
+                <p>{t.studio}</p>
+                <ul>
+                  {studio.map(s => (
+                    <li key={s.id}>
+                      <NavA l={s} current={cur(s)} />
+                    </li>
+                  ))}
+                </ul>
+              </li>
+              <li className="menu-group menu-login">
+                <p>{login.label}</p>
+                <ul>
+                  {login.items.map(i => (
+                    <li key={i.id}>
+                      <NavA l={i} />
+                    </li>
+                  ))}
+                </ul>
               </li>
               <li className="menu-wa">
                 <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
@@ -204,14 +207,7 @@ export function Header({
                 </Link>
               </li>
               <li className="menu-start">
-                <SiteLink href={startUrl} locale={locale}>
-                  {c.nav.start}
-                </SiteLink>
-              </li>
-              <li className="menu-login">
-                <SiteLink href={loginUrl} locale={locale}>
-                  {c.nav.login}
-                </SiteLink>
+                <NavA l={bar ? bar.cta : cta} className="nav-cta" />
               </li>
             </ul>
           </details>
@@ -227,15 +223,43 @@ export function Header({
           >
             {c.nav.switchTo}
           </Link>
-          <SiteLink href={loginUrl} locale={locale} className="link-login">
-            {c.nav.login}
-          </SiteLink>
+          <div className="nav-products login-menu">
+            <details>
+              <summary>{login.label}</summary>
+              <ul>
+                {login.items.map(i => (
+                  <li key={i.id}>
+                    <NavA l={i} />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </div>
           <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} compact />
-          <SiteLink href={startUrl} locale={locale} className="btn btn-primary header-start">
-            {c.nav.start}
-          </SiteLink>
+          {!bar && <NavA l={cta} className="btn btn-primary header-start" />}
         </div>
       </div>
+      {bar && (
+        <div className="product-bar">
+          <div className="wrap product-row">
+            <Link
+              href={bar.chip.path!}
+              className="product-chip"
+              aria-current={cur(bar.chip) ? 'page' : undefined}
+            >
+              {bar.chip.label}
+            </Link>
+            <ul className="product-links">
+              {bar.links.map(l => (
+                <li key={l.id}>
+                  <NavA l={l} current={cur(l)} />
+                </li>
+              ))}
+            </ul>
+            <NavA l={bar.cta} className="btn btn-primary btn-sm product-cta" />
+          </div>
+        </div>
+      )}
       <NavBehavior />
     </header>
   );

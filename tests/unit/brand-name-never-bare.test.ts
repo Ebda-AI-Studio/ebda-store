@@ -38,12 +38,14 @@ const EN_ALLOW: RegExp[] = [
   /Ebda-Webhooks/,
   /tag: 'Ebda(?:-(?:API|Admin|Web))?'/,
   /Ebda own ads/,
+  // the registered legal entity (AR-STUDIO-NAME-1): «Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing»
+  /Ebda Studio for Artificial Intelligence/,
 ];
 
 const EN_BARE = /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP)\b)/g;
 const AR_BRAND = '(?:ابدأ|إبدأ|إبدا)';
 const AR_LETTER = '[\\u0621-\\u064A\\u0671-\\u06D3]';
-const AR_NEXT_OK = `(?!\\s*(?:ستور|ستوديو|استوديو|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;
+const AR_NEXT_OK = `(?!\\s*(?:ستور|ستوديو|استوديو|شات|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;
 const AR_END = `(?!${AR_LETTER})`;
 const AR_CTX = [
   // brand as the object of a preposition or a noun: «من ابدأ», «على إبدأ», «مدعوم من ابدأ», «تواصل مع ابدأ»
