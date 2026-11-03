@@ -1,7 +1,7 @@
 /* Ebda AI Studio home: the living girih (Ruling MKT-STUDIO-C-1). Loaded after window load + idle by an inline loader, never on
    prefers-reduced-motion or save-data; the static SVG poster (GirihPoster.tsx) is the first paint and the fallback. One canvas,
    DPR capped at 2 (full ratio, no pixel-budget downscale), 30 fps, paused off-screen and in hidden tabs. It draws NO text. Geometry and lattice origins
-   mirror GirihPoster.tsx (field: 8-fold at 64px from the hero corner; windows: 8-fold / 12-point stars at 40px from the window corner).
+   mirror GirihPoster.tsx (field: 8-fold at 64px from the hero corner; the windows (arch frames, 8-fold / 12-point lattices) are DOM + the static SVG poster, not drawn here).
    Pointer (or a slow drifting light when there is none) densifies and brightens the lines; scroll turns the inner stars. */
 (function () {
   'use strict';
@@ -16,35 +16,11 @@
   var GOLD = rgb('--sh-gold-rgb', '176,141,87');
   var BRASS = rgb('--sh-brass-rgb', '138,106,54');
   var SILVER = rgb('--sh-silver-rgb', '125,133,141');
-  var wins = [].slice.call(hero.querySelectorAll('[data-win]'));
   var W = 0,
-    H = 0,
-    rects = [];
+    H = 0;
   var ptr = { x: 0, y: 0, s: 0 }; // smoothed pointer (hero coords) and strength 0..1
   var target = null; // { cx, cy } client coords of the real pointer
   var PI = Math.PI;
-
-  /* the mihrab arch of a window: the same pointed-round profile and 96px rise as the CSS --arch-poly-96 clip */
-  function yfrac(u) {
-    return 0.5 * u + 0.5 * (1 - Math.sqrt(Math.max(0, 1 - u * u)));
-  }
-  function archPath(q) {
-    var H = Math.min(96, q.h / 2),
-      i,
-      u;
-    ctx.moveTo(q.x, q.y + H);
-    for (i = 1; i <= 14; i++) {
-      u = 1 - i / 14;
-      ctx.lineTo(q.x + q.w * (0.5 - 0.5 * u), q.y + H * yfrac(u));
-    }
-    for (i = 1; i <= 14; i++) {
-      u = i / 14;
-      ctx.lineTo(q.x + q.w * (0.5 + 0.5 * u), q.y + H * yfrac(u));
-    }
-    ctx.lineTo(q.x + q.w, q.y + q.h);
-    ctx.lineTo(q.x, q.y + q.h);
-    ctx.closePath();
-  }
 
   function measure() {
     var r = hero.getBoundingClientRect();
@@ -56,16 +32,6 @@
     cv.width = Math.max(1, Math.round(W * dpr));
     cv.height = Math.max(1, Math.round(H * dpr));
     ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
-    rects = wins.map(function (el) {
-      var b = el.getBoundingClientRect();
-      return {
-        x: b.left - r.left,
-        y: b.top - r.top,
-        w: b.width,
-        h: b.height,
-        fam: el.getAttribute('data-win'),
-      };
-    });
   }
 
   /* one closed star: n tips, tip radius from rt(k), inner radius ri, turned by rot, scaled by sc, at (cx,cy) */
@@ -213,23 +179,7 @@
     ctx.lineWidth = 1;
     ctx.lineJoin = 'round';
     var dense = prog * 0.5;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, W, H);
-    rects.forEach(function (q) {
-      archPath(q);
-    });
-    ctx.clip('evenodd');
     lattice('8', 64, 0, 0, 0, 0, W, H, t, prog, 64 * 3.2, dense);
-    ctx.restore();
-    rects.forEach(function (q) {
-      ctx.save();
-      ctx.beginPath();
-      archPath(q);
-      ctx.clip();
-      lattice(q.fam, 40, q.x, q.y, q.x, q.y, q.x + q.w, q.y + q.h, t, prog, 40 * 3.6, dense + 0.1);
-      ctx.restore();
-    });
     if (!live) {
       live = true;
       hero.setAttribute('data-live', '');

@@ -8,4 +8,8 @@ Ruling MKT-FOIL-1 - a worn gold-foil texture (`public/motifs/foil.svg`, a 256px 
 
 # MKT-ARCH-1
 
-Ruling MKT-ARCH-1 - the generic pointed arch (a rounded-pointed profile, 96px rise, no dome, minaret or crescent) frames the Store and Chat windows of the studio-home hero (CSS `clip-path` polygon `--arch-poly-96` plus the `arch-cap.svg` stroke; the hero canvas clips its window lattices to the same profile), the Chat hero art (`--arch-poly-84`), and, as a gentle elliptical top, the plan cards on `/store` and the Chat page. Decoration only on `/store` (Ahmad overrides MKT-STORE-FROZEN-1 for decoration): no copy or layout change. Cost if wrong: a card badge near a corner could clip on an unchecked viewport; removing the `border-radius` rule restores the old cards.
+Ruling MKT-ARCH-1 - the generic pointed arch (rounded-pointed profile, 56px rise, no dome, minaret or crescent) is ONE signature use: the two hero windows (Ebda Store and Ebda Chat) of the studio home, a CSS `clip-path` polygon `--arch-poly-56` plus the worn `arch-cap.svg` stroke. Ahmad (2026-11-03) found it overused after a first pass that also arched the plan cards, the Chat hero art and the hero canvas clip: those were removed and restored to their original shapes, the hero canvas fills the whole hero again (the windows carry their own static lattice and the arch), and the window top padding is back to the original plus 16px. Decoration only on `/store` and the Chat page (Ahmad overrides MKT-STORE-FROZEN-1 for decoration): no copy or layout change. Cost if wrong: a window title near a top corner could touch the arch on an unchecked viewport (checked at 1440 and 390).
+
+# MKT-FOIL-1 addendum
+
+Foil contrast (Ahmad 2026-11-03): every pixel of `foil.svg` is held at 3:1 or more against the ivory grounds (`#F5F5F2`, `#FAFAFA`), measured on a rendered tile; all foil text is large (24px or bigger, or bold 18.7px or bigger).

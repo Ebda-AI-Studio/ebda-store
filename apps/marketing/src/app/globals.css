@@ -3363,9 +3363,9 @@ body:has(.studio-home) {
   height: 100%;
   display: block;
 }
-.sh-hero[data-live] .sh-poster,
-.sh-hero[data-live] .sh-win-art {
-  visibility: hidden;
+/* the canvas takes over the field; only the field rect is hidden, the pattern defs the window svgs use must stay painted */
+.sh-hero[data-live] .sh-poster > rect {
+  display: none;
 }
 .sh-hero-in {
   display: grid;
@@ -3446,7 +3446,8 @@ html[lang='en'] .studio-home h1 {
   position: relative;
   border: 1px solid var(--sh-rule);
   border-top: 0;
-  clip-path: var(--arch-poly-96);
+  background: var(--canvas); /* the window is cut into the field: opaque paper under its own lattice */
+  clip-path: var(--arch-poly-56);
 }
 .sh-win-art {
   position: absolute;
@@ -3458,7 +3459,7 @@ html[lang='en'] .studio-home h1 {
   align-content: start;
   gap: 12px;
   height: 100%;
-  padding: calc(clamp(22px, 3vw, 40px) + 56px) clamp(22px, 3vw, 40px) clamp(22px, 3vw, 40px);
+  padding: calc(clamp(22px, 3vw, 40px) + 16px) clamp(22px, 3vw, 40px) clamp(22px, 3vw, 40px);
   background: color-mix(in srgb, var(--canvas) 60%, transparent);
   transition: background-color 0.4s var(--ease);
 }
