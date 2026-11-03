@@ -1,5 +1,6 @@
 'use client';
 
+import { storefrontText } from '@ebda/shared';
 import { pdpMaxQty } from '@/lib/b2b-moq';
 import { Fragment, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
@@ -630,7 +631,10 @@ export default function ProductDetailClient({
   const categoryNameAr = cat0?.category?.nameAr;
   const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
   // Localized product name for breadcrumb / heading / image alt.
-  const displayName = language === 'ar' && product.nameAr ? product.nameAr : product.name;
+  const displayName = storefrontText(
+    language === 'ar' && product.nameAr ? product.nameAr : product.name,
+    language === 'ar'
+  );
   // Localized description — the PDP previously hard-rendered the English
   // `description` regardless of locale, so a balanced Arabic description never
   // showed on the AR storefront. Prefer descriptionAr on the AR site.

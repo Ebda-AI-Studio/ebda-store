@@ -61,3 +61,4 @@ export * from './eta';
 export * from './templates/legacy-skin-map';
 export * from './worker-health';
 export * from './images/variants';
+export * from './region/text-digits';

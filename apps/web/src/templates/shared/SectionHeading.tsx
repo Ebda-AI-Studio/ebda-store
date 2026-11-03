@@ -1,5 +1,6 @@
 'use client';
 
+import { storefrontText } from '@ebda/shared';
 import type React from 'react';
 import Link from '../../components/StoreLink';
 import type { SectionDividers, DividerSettings } from '@ebda/shared';
@@ -206,9 +207,12 @@ export function SectionHeading({
   // Tailwind fallback class — used only when the merchant didn't pick.
   const FLANK_DEFAULT_CLS = 'h-px bg-foreground/30';
   const flankBaseCls = 'flex-1 max-w-[140px] sm:max-w-[200px]';
-  const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
+  const text = storefrontText(isRtl ? (titleAr ?? title) : (title ?? titleAr), !!isRtl);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
-  const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
+  const subtitleText = storefrontText(
+    isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr),
+    !!isRtl
+  );
   if (!text && !seeAllHref && !kickerText && !subtitleText) return null;
   const styles = getPackStyles(pack);
 
