@@ -12,6 +12,9 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Dev only: hosts (comma separated) allowed to load /_next dev assets, e.g. when a demo store host is
+  // mapped to localhost for visual checks. Empty in every real build.
+  allowedDevOrigins: (process.env.DEV_ORIGINS || '').split(',').filter(Boolean),
   // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
   poweredByHeader: false,
 
@@ -68,6 +71,12 @@ const nextConfig = {
             },
           ]
         : []),
+      {
+        protocol: 'https',
+        hostname: 'media.ebda.app',
+        port: '',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'cdn.ebda.app',
