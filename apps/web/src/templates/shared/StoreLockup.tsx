@@ -81,6 +81,9 @@ export function StoreLockup({
       {latin && (
         <span
           aria-hidden="true"
+          // PREMIUM-10: the Latin line is LTR text inside an RTL header; without dir=ltr the
+          // ellipsis landed at the START ("…MAR"). dir=ltr truncates at the end and keeps the word whole.
+          dir="ltr"
           className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap uppercase"
           style={latinStyle}
         >

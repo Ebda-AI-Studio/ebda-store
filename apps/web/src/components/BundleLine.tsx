@@ -4,23 +4,13 @@ import Image from 'next/image';
 import { useLocalePrice } from '../hooks/useLocalePrice';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNumerals } from '../hooks/useNumerals';
+import { MissingImage } from '../templates/shared/MissingImage';
 
 /** Exported for reuse by `bundles/BundleCard.tsx` (the `/bundles` index
  *  grid) — same "no image yet" glyph everywhere a bundle can render
  *  imageless, rather than a second hand-drawn icon. */
 export function BundlePlaceholderIcon() {
-  return (
-    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1}
-          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-        />
-      </svg>
-    </div>
-  );
+  return <MissingImage size="sm" />;
 }
 
 function TrashIcon() {

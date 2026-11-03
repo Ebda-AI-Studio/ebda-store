@@ -7,7 +7,7 @@ import { cn } from '@ebda/ui';
 import { IMAGE_STANDARDS, heroObjectPosition, sanitizeUrl } from '@ebda/shared';
 import type { HeroBannerProps } from '../types';
 import { HERO_TEXT_SCRIM, getPackStyles } from './pack-styles';
-import { responsiveFontSize } from './section-typography';
+import { heroHeadlineFontSize } from './section-typography';
 import { HeroBannerLink } from './HeroBannerLink';
 import { translations } from '../../contexts/LanguageContext';
 import { HeroVideo } from '../../components/commerce/HeroVideo';
@@ -215,15 +215,15 @@ export function HeroBanner({
               styles.heroHeadline,
               'text-balance',
               stacked
-                ? 'text-3xl sm:text-4xl md:text-4xl lg:text-4xl text-foreground xl:text-[color:var(--hero-ink)]'
-                : 'text-2xl sm:text-4xl md:text-4xl lg:text-4xl text-[color:var(--hero-ink)]',
+                ? 'text-foreground xl:text-[color:var(--hero-ink)]'
+                : 'text-[color:var(--hero-ink)]',
               'drop-shadow-none'
             )}
             data-zone="heroHeadline"
             data-builder-setting={builderBlockId ? (isRtl ? 'headlineAr' : 'headline') : undefined}
             style={{
               fontFamily: headingZone?.fontFamily,
-              fontSize: responsiveFontSize(headingZone?.fontSize),
+              fontSize: heroHeadlineFontSize(headingZone?.fontSize),
               fontWeight: headingZone?.fontWeight,
               letterSpacing: headingZone?.letterSpacing,
               lineHeight: headingZone?.lineHeight,
@@ -308,7 +308,7 @@ export function HeroBanner({
                   }
                   style={{
                     fontFamily: headingZone?.fontFamily,
-                    fontSize: responsiveFontSize(headingZone?.fontSize),
+                    fontSize: heroHeadlineFontSize(headingZone?.fontSize),
                     fontWeight: headingZone?.fontWeight,
                     // heroColor is always defined: merchant pick OR '#ffffff' fallback.
                     // This replaces the removed `text-white` in heroHeadline pack-styles
