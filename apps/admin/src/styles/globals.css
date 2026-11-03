@@ -747,3 +747,34 @@ main > div {
     animation: none;
   }
 }
+
+/* Order-alerts modal entrance: 220ms fade + lift; reduced motion = fade only. */
+@keyframes ebda-alerts-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ebda-alerts-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ebda-alerts-backdrop {
+  animation: ebda-alerts-fade 220ms ease-out both;
+}
+.ebda-alerts-card {
+  animation: ebda-alerts-rise 220ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ebda-alerts-card {
+    animation: ebda-alerts-fade 220ms ease-out both;
+  }
+}

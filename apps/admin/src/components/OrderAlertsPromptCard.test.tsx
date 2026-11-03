@@ -158,14 +158,14 @@ describe('OrderAlertsPromptCard', () => {
     await waitFor(() => expect(screen.queryByText(CTA)).toBeNull());
   });
 
-  it('is a labelled modal dialog with focus on the primary button', async () => {
+  it('is a labelled modal dialog that takes focus (no ring until Tab)', async () => {
     setPush('default');
     api();
     render(<OrderAlertsPromptCard storeId="s1" />);
     const dialog = await screen.findByRole('dialog');
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
-    expect(document.activeElement?.textContent).toBe(CTA);
+    expect(document.activeElement).toBe(dialog);
   });
 
   it('Esc closes it as "later" (records the dismissal)', async () => {

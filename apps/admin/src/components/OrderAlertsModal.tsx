@@ -3,8 +3,6 @@
 import { useEffect, useRef } from 'react';
 import { useT } from '@/i18n/useT';
 
-const MOTION_CSS = `@keyframes ebda-alerts-fade{from{opacity:0}to{opacity:1}}@keyframes ebda-alerts-pop{from{opacity:0;transform:scale(.96) translateY(6px)}to{opacity:1;transform:none}}`;
-
 const FOCUSABLE =
   'button:not([disabled]),[href],input,select,textarea,[tabindex]:not([tabindex="-1"])';
 
@@ -28,7 +26,7 @@ export function OrderAlertsModal({
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    dialogRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    dialogRef.current?.focus();
     return () => opener?.focus?.();
   }, []);
 
@@ -54,66 +52,67 @@ export function OrderAlertsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm motion-safe:animate-[ebda-alerts-fade_220ms_ease-out]"
+      className="ebda-alerts-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[6px]"
       onKeyDown={onKeyDown}
     >
-      <style>{MOTION_CSS}</style>
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby="order-alerts-prompt-title"
         aria-describedby="order-alerts-prompt-body"
-        className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-force-500/40 bg-force-950 p-7 text-center text-force-100 shadow-2xl motion-safe:animate-[ebda-alerts-pop_260ms_cubic-bezier(.2,.8,.2,1)]"
+        className="ebda-alerts-card relative !outline-none focus-visible:!ring-0 focus-visible:!ring-offset-0 w-[min(420px,calc(100vw-32px))] overflow-hidden rounded-[20px] border border-[#B08D57]/35 bg-[#16191b] px-7 pb-6 pt-8 text-center shadow-[0_30px_80px_rgba(0,0,0,.45)]"
       >
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-force-400 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[120px] bg-[url('/motifs/tess8.svg')] opacity-[.06] [mask-image:linear-gradient(to_bottom,#000,transparent)]"
         />
-        <span
-          aria-hidden="true"
-          className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-force-500/40 text-force-400"
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.7 21a2 2 0 01-3.4 0" />
+        <span aria-hidden="true" className="relative mx-auto block h-16 w-16">
+          <svg viewBox="0 0 44 44" width="64" height="64" fill="none" strokeLinejoin="round">
+            <circle cx="22" cy="22" r="20.5" stroke="#B08D57" strokeOpacity=".35" />
+            <path
+              d="M37 22L28.5 24.7L32.6 32.6L24.7 28.5L22 37L19.3 28.5L11.4 32.6L15.5 24.7L7 22L15.5 19.3L11.4 11.4L19.3 15.5L22 7L24.7 15.5L32.6 11.4L28.5 19.3Z"
+              stroke="#B08D57"
+              strokeOpacity=".9"
+            />
+            <circle cx="22" cy="22" r="8.6" fill="#16191b" />
+            <g
+              transform="translate(15.5 15.5) scale(.54)"
+              stroke="#CBA873"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.7 21a2 2 0 01-3.4 0" />
+            </g>
           </svg>
         </span>
         <h2
           id="order-alerts-prompt-title"
-          className="mt-5 text-balance text-lg font-semibold text-force-50"
+          className="relative mt-5 text-balance text-[22px] font-bold leading-tight text-[#f1f5f3]"
         >
           {t('title')}
         </h2>
         <p
           id="order-alerts-prompt-body"
-          className="mt-2 text-balance text-sm leading-relaxed text-force-300"
+          className="relative mx-auto mt-2 max-w-[32ch] text-balance text-[15px] leading-[1.6] text-[#a6b0ac]"
         >
           {t('body')}
         </p>
-        <div className="mt-6 flex flex-col gap-2">
+        <div className="relative mt-6 flex flex-col items-stretch gap-1">
           <button
             type="button"
-            data-autofocus
             onClick={onEnable}
             disabled={busy}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-force-400 px-4 text-sm font-semibold text-force-950 transition-colors hover:bg-force-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-force-300 focus-visible:ring-offset-2 focus-visible:ring-offset-force-950 disabled:opacity-60"
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#B08D57] px-4 text-[15px] font-semibold text-[#14110c] transition-colors hover:bg-[#bf9d68] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#CBA873] disabled:opacity-60"
           >
             {busy ? t('enabling') : t('cta')}
           </button>
           <button
             type="button"
             onClick={onLater}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm text-force-300 transition-colors hover:text-force-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-force-300"
+            className="inline-flex h-10 w-full items-center justify-center rounded-xl text-sm text-[#a6b0ac] transition-colors hover:text-[#f1f5f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#CBA873]"
           >
             {t('later')}
           </button>
@@ -121,7 +120,7 @@ export function OrderAlertsModal({
         <p
           role="status"
           aria-live="polite"
-          className={failed ? 'mt-3 text-sm text-force-300' : 'sr-only'}
+          className={failed ? 'relative mt-2 text-sm text-[#a6b0ac]' : 'sr-only'}
         >
           {failed && t('error')}
         </p>
