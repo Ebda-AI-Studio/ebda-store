@@ -15,5 +15,5 @@ it('web deploy turns language-in-the-URL on for every store host, overridable by
   expect(y).toContain(
     `--var "STOREFRONT_LOCALE_PATHS_STORES:\${{ vars.STOREFRONT_LOCALE_PATHS_STORES || 'all' }}"`
   );
-  expect(y).toContain('npx wrangler deploy "${VARS[@]}"');
+  expect(y).toContain('npx opennextjs-cloudflare deploy --cacheChunkSize 4 "${VARS[@]}"'); // Ruling DEPLOY-R2-POPULATE-1
 });

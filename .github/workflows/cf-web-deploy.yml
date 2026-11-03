@@ -114,7 +114,10 @@ jobs:
           # STOREFRONT_LOCALE_PATHS=false, or by narrowing STOREFRONT_LOCALE_PATHS_STORES to named stores.
           VARS=(--var "BUILD_COMMIT_SHA:$GITHUB_SHA" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}" --var "STOREFRONT_LOCALE_PATHS:${{ vars.STOREFRONT_LOCALE_PATHS || 'true' }}" --var "STOREFRONT_LOCALE_PATHS_STORES:${{ vars.STOREFRONT_LOCALE_PATHS_STORES || 'all' }}")
           if [ -n "$SENTRY_DSN" ]; then VARS+=(--var "SENTRY_DSN:$SENTRY_DSN"); fi
-          npx wrangler deploy "${VARS[@]}"
+          # Ruling DEPLOY-R2-POPULATE-1: OpenNext populates the R2 incremental cache with 25 parallel 60 s uploads by default; from
+          # the self-hosted runner the same 3 large entries timed out on every attempt (2026-11-03, runs 41654873558 x2). Fewer in
+          # parallel = each upload gets the bandwidth. This is the same OpenNext deploy wrangler delegated to, with one flag set.
+          npx opennextjs-cloudflare deploy --cacheChunkSize 4 "${VARS[@]}"
       - name: Verify the live Worker serves THIS build, roll back automatically if not
         # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
         # previous version for a few seconds). Identity: /_next/static/<BUILD_ID>/_buildManifest.js
