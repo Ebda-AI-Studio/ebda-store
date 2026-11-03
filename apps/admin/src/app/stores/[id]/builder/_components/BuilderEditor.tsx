@@ -800,6 +800,7 @@ export function BuilderEditor({
         doc={b.doc}
         selection={selection}
         viewport={viewport}
+        onViewportChange={setViewport}
         theme={effectiveTheme(store.theme, b.doc.theme)}
         template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
         look={store.look}

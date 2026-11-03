@@ -9733,7 +9733,28 @@
       "editProducts": "عدّل المنتجات",
       "editReviews": "افتح التقييمات",
       "editBundles": "افتح الباقات",
-      "editCategories": "عدّل التصنيفات"
+      "editCategories": "عدّل التصنيفات",
+      "spacing": {
+        "title": "المسافات",
+        "sameOnAll": "نفس المسافات على كل الأجهزة",
+        "devices": "الجهاز",
+        "differs": "مختلفة على الجهاز ده",
+        "top": "فوق",
+        "bottom": "تحت",
+        "px": "{px}px",
+        "preset": {
+          "none": "بدون",
+          "tight": "ضيق",
+          "normal": "عادي",
+          "loose": "واسع",
+          "xloose": "واسع جداً",
+          "xxloose": "ضخم"
+        },
+        "resetDefault": "رجّع للافتراضي",
+        "resetInherit": "زي الكمبيوتر",
+        "hint": "المسافة بين قسمين = أسفل القسم الأول + أعلى القسم التاني."
+      },
+      "advanced": "متقدم: شكل الخطوط والفواصل"
     },
     "theme": {
       "smartPalette": "لوحة الألوان الذكية",

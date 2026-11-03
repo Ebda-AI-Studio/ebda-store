@@ -9733,7 +9733,28 @@
       "editProducts": "Edit products",
       "editReviews": "Open reviews",
       "editBundles": "Open bundles",
-      "editCategories": "Edit categories"
+      "editCategories": "Edit categories",
+      "spacing": {
+        "title": "Spacing",
+        "sameOnAll": "Same on all devices",
+        "devices": "Device",
+        "differs": "Different on this device",
+        "top": "Above",
+        "bottom": "Below",
+        "px": "{px}px",
+        "preset": {
+          "none": "None",
+          "tight": "Tight",
+          "normal": "Normal",
+          "loose": "Wide",
+          "xloose": "Wider",
+          "xxloose": "Widest"
+        },
+        "resetDefault": "Back to default",
+        "resetInherit": "Same as desktop",
+        "hint": "The gap between two sections is the bottom of one plus the top of the next."
+      },
+      "advanced": "Advanced: text styles and dividers"
     },
     "theme": {
       "smartPalette": "Smart Palette",
