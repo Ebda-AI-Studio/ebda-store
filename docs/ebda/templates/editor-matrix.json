@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1453,
+    "wired": 1458,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3013,6 +3013,19 @@
       "control": "cardTags",
       "status": "wired",
       "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|density",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "dahab|theme|fontFamily",
@@ -6913,6 +6926,19 @@
       "control": "cardTags",
       "status": "wired",
       "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "jasmine|theme|density",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|theme|fontFamily",
@@ -10841,6 +10867,19 @@
       "evidence": "static (traits.ts)"
     },
     {
+      "id": "lamma|theme|density",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "lamma|theme|fontFamily",
       "skin": "lamma",
       "looks": [
@@ -14754,6 +14793,19 @@
       "evidence": "static (traits.ts)"
     },
     {
+      "id": "qamar|theme|density",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
       "id": "qamar|theme|fontFamily",
       "skin": "qamar",
       "looks": [
@@ -18665,6 +18717,19 @@
       "control": "cardTags",
       "status": "wired",
       "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|density",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "density",
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|theme|fontFamily",

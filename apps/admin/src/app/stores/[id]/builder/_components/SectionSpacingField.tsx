@@ -84,7 +84,12 @@ export function SectionSpacingField({
   };
 
   return (
-    <fieldset className="space-y-3" data-testid="section-spacing-field" data-field-id="paddingTop">
+    <fieldset
+      className="space-y-3"
+      data-testid="section-spacing-field"
+      data-field-id="paddingTop"
+      data-setting-id="builder.section-spacing"
+    >
       <legend className="text-xs font-semibold text-muted-foreground">{t('spacing.title')}</legend>
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>{t('spacing.sameOnAll')}</span>

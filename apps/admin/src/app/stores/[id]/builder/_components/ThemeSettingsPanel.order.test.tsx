@@ -27,7 +27,10 @@ vi.mock('@/i18n/useT', () => ({
 
 import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 
-const legends = () => [...document.querySelectorAll('legend')].map(l => l.textContent);
+const legends = () =>
+  [...document.querySelectorAll('[data-testid^="tier2-"] > summary')].map(l =>
+    l.textContent?.trim()
+  );
 afterEach(cleanup);
 
 describe('ThemeSettingsPanel order and header controls', () => {
@@ -40,8 +43,8 @@ describe('ThemeSettingsPanel order and header controls', () => {
         onSave={async () => true}
       />
     );
-    expect(legends()[0]).toBe('Header');
-    expect(legends().indexOf('Header')).toBeLessThan(legends().indexOf('Colours'));
+    expect(legends()[0]).toBe('tier.header');
+    expect(legends().indexOf('tier.header')).toBeLessThan(legends().indexOf('tier.colors'));
     expect(document.querySelector('[data-setting-id="builder.header-logo"]')).not.toBeNull();
     expect(document.querySelector('[data-setting-id="builder.header-search"]')).toBeNull();
   });
@@ -62,11 +65,11 @@ describe('ThemeSettingsPanel order and header controls', () => {
     render(
       <ThemeSettingsPanel theme={undefined} storeTemplate="dahab" onSave={async () => true} />
     );
-    expect(legends()[0]).toBe('Header');
+    expect(legends()[0]).toBe('tier.header');
     expect(document.querySelector('[data-setting-id="builder.header-logo"]')).toBeNull();
     expect(document.querySelector('[data-setting-id="builder.header-search"]')).toBeNull();
     expect(document.querySelector('[data-setting-id="builder.header-wordmark"]')).not.toBeNull();
-    expect(legends()[1]).toBe('Colours');
+    expect(legends()[1]).toBe('tier.cards');
   });
 
   it('choosing a placement saves it as a draft theme patch', async () => {

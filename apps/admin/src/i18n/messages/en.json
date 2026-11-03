@@ -9783,7 +9783,29 @@
       "cardQuickAdd": "Quick add (+) on carousel cards",
       "cardEvenImages": "Even product image sizes",
       "cardSaleCorner": "Keep the old sale badge corner",
-      "inherit": "Same as the look"
+      "inherit": "Same as the look",
+      "search": "Search settings",
+      "quick": "Quick look",
+      "presets": "Colour palettes",
+      "corner": {
+        "square": "Square",
+        "soft": "Soft",
+        "round": "Round"
+      },
+      "tier": {
+        "header": "Header and navigation",
+        "cards": "Buttons and cards",
+        "images": "Images",
+        "colors": "All colours"
+      },
+      "advanced": "Advanced: fonts, text styles and more",
+      "changedDot": "Has changes",
+      "resetAll": "Reset all changes",
+      "resetAllConfirm": "Reset every change to the look?",
+      "resetAllYes": "Reset",
+      "cancel": "Cancel",
+      "searchEmpty": "Nothing matches that search.",
+      "draftNote": "Changes stay a draft until you publish."
     },
     "revisions": {
       "error": "History could not be loaded.",
@@ -9854,7 +9876,8 @@
       "sectionTypography": "Section text style",
       "dividers": "Section dividers",
       "video": "Background video",
-      "pageSwitcher": "Switch the page you edit"
+      "pageSwitcher": "Switch the page you edit",
+      "spacing": "Section spacing, per device"
     },
     "aiPatch": {
       "tab": "Ask AI",

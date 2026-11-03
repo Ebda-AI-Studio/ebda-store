@@ -565,6 +565,21 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
         ],
       },
       {
+        // The look's section rhythm (`--space-unit`): scales every section whose spacing is unset.
+        // Offered as one of three feels in the Theme panel; only a store with a look reads it.
+        id: 'density',
+        type: 'select',
+        labelEn: 'Spacing between sections',
+        labelAr: 'المسافات بين الأقسام',
+        hintEn: 'Compact, regular or airy. It scales every section whose own spacing is not set.',
+        hintAr: 'ضيقة أو عادية أو واسعة. بتطبّق على كل قسم مسافاته مش مضبوطة بإيدك.',
+        options: [
+          opt('compact', 'Compact', 'ضيقة'),
+          opt('regular', 'Regular', 'عادية'),
+          opt('airy', 'Airy', 'واسعة'),
+        ],
+      },
+      {
         id: 'cardHeart',
         type: 'select',
         labelEn: 'Wishlist heart on home cards',
