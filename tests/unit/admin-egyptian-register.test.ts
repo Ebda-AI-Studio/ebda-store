@@ -18,7 +18,17 @@ function flatten(obj: Messages, prefix = '', out: Record<string, string> = {}) {
 const LEGAL_KEY = /legal|terms|privacy|policy|policies|consent|dpa|notice/i;
 const MSA_OPENER = /تعذّر |تعذر |الرجاء |يرجى |حدث خطأ|لم يتم |ليس لديك|لا يمكن /;
 
+// Street slang and typos the machine rewrite produced; a business admin must not carry them (second review pass, 2026-11-03).
+const SLANG_OR_TYPO = /نصل |سرڤر|رفرش|بايدك|براحتك|خلصانة|جايز|معذرتش|محفظناش|م ينفعش|تسطيك|مينفعش نرجع/;
+
 describe('admin Arabic sentences are Egyptian (G-8)', () => {
+  it('no message carries street slang or a known rewrite typo', () => {
+    const offenders = Object.entries(flatten(ar as Messages))
+      .filter(([, v]) => SLANG_OR_TYPO.test(v))
+      .map(([k]) => k);
+    expect(offenders).toEqual([]);
+  });
+
   it('no non-legal message uses a Modern Standard error opener', () => {
     const offenders = Object.entries(flatten(ar as Messages))
       .filter(([k, v]) => !LEGAL_KEY.test(k) && MSA_OPENER.test(v))
