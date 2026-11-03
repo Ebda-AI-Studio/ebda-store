@@ -623,11 +623,11 @@ export function siteFooter(lang: NavLang): {
         title: siteNavLabels(lang).products,
         links: [
           products[0],
-          m('store-features', L(lang, 'مميزات ابدأ ستور', 'Store features'), '/features/'),
-          m('store-pricing', L(lang, 'أسعار ابدأ ستور', 'Store pricing'), '/store/#pricing'),
-          m('store-templates', L(lang, 'قوالب ابدأ ستور', 'Store templates'), '/store/#looks'),
+          m('store-features', L(lang, 'مميزات ابدأ ستور', 'Ebda Store features'), '/features/'),
+          m('store-pricing', L(lang, 'أسعار ابدأ ستور', 'Ebda Store pricing'), '/store/#pricing'),
+          m('store-templates', L(lang, 'قوالب ابدأ ستور', 'Ebda Store templates'), '/store/#looks'),
           products[1],
-          m('chat-pricing', L(lang, 'أسعار ابدأ شات', 'Chat pricing'), '/whatsapp/#pricing'),
+          m('chat-pricing', L(lang, 'أسعار ابدأ شات', 'Ebda Chat pricing'), '/whatsapp/#pricing'),
         ],
       },
       {
@@ -658,15 +658,23 @@ export function siteFooter(lang: NavLang): {
           m('legal', L(lang, 'الإشعار القانوني', 'Legal notice'), '/legal/'),
           m('privacy', L(lang, 'الخصوصية', 'Privacy'), '/privacy/'),
           m('terms', L(lang, 'الشروط', 'Terms'), '/terms/'),
-          m('merchant', L(lang, 'اتفاقية التاجر', 'Merchant agreement'), '/merchant-agreement/'),
+          m(
+            'merchant',
+            L(lang, 'اتفاقية التاجر لابدأ ستور', 'Ebda Store merchant agreement'),
+            '/merchant-agreement/'
+          ),
           m('acceptable-use', L(lang, 'الاستخدام المقبول', 'Acceptable use'), '/acceptable-use/'),
-          m('refund', L(lang, 'الاسترداد', 'Refunds'), '/refund/'),
+          m('refund', L(lang, 'استرداد ابدأ ستور', 'Ebda Store refunds'), '/refund/'),
           m('data-deletion', L(lang, 'حذف البيانات', 'Data deletion'), '/legal/data-deletion/'),
-          m('chat-terms', L(lang, 'شروط ابدأ شات', 'Chat terms'), '/legal/whatsapp-terms/'),
-          m('chat-privacy', L(lang, 'خصوصية ابدأ شات', 'Chat privacy'), '/legal/whatsapp-privacy/'),
+          m('chat-terms', L(lang, 'شروط ابدأ شات', 'Ebda Chat terms'), '/legal/whatsapp-terms/'),
+          m(
+            'chat-privacy',
+            L(lang, 'خصوصية ابدأ شات', 'Ebda Chat privacy'),
+            '/legal/whatsapp-privacy/'
+          ),
           m(
             'chat-dpa',
-            L(lang, 'اتفاقية معالجة بيانات ابدأ شات', 'Chat DPA'),
+            L(lang, 'اتفاقية معالجة بيانات ابدأ شات', 'Ebda Chat DPA'),
             '/legal/whatsapp-dpa/'
           ),
           {
@@ -870,8 +878,8 @@ export const SITE_NAV_CSS =
 .top-nav .nav-links{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 16px;white-space:nowrap}
 .top-nav .nav-end{flex:1 1 0}
 .top-nav a{color:var(--fg);text-decoration:none;padding:6px 2px;display:inline-block}
-.top-nav a:hover{color:var(--lift)}
-.top-nav a[aria-current=page]{color:var(--lift);border-bottom:2px solid var(--lift)}
+.top-nav a:hover{color:var(--accent-text,var(--lift))}
+.top-nav a[aria-current=page]{color:var(--accent-text,var(--lift));border-bottom:2px solid var(--accent-text,var(--lift))}
 .top-nav a.nav-cta{background:var(--gold);color:var(--night);border-radius:10px;padding:8px 14px;font-weight:600;border-bottom:0}
 .top-nav a.nav-cta:hover{background:var(--lift);color:var(--night)}
 .top-nav summary{cursor:pointer;list-style:none;color:var(--fg);padding:6px 2px;display:inline-flex;align-items:center;gap:6px;min-height:44px}
@@ -885,6 +893,147 @@ export const SITE_NAV_CSS =
 .nav-menu .menu-cta{padding:8px 0 0}.nav-menu a.nav-cta{text-align:center}
 @media (max-width:1179px){.top-nav{order:0;flex:0 0 auto;margin-inline-start:auto}.top-nav .nav-links{display:none}.nav-menu{display:block}}
 `.replace(/\n/g, '') + SITE_NAV_PANEL_CSS;
+
+// ---- Islamic geometry for help, docs and status (static SVG, no script) ----
+/**
+ * The same motif family as the marketing site (`apps/marketing/public/motifs/*`: Ebda gold, brass and silver, the 8-fold star
+ * and the 12-point star, never a {6/2} hexagram, ruling MKT-NO-HEXAGRAM-1), generated here as pure strings so that the
+ * status Worker (which may import only this module) and the docs/help builds draw it without a file copy or a request.
+ * Every star is a single closed polygon of 16 or 24 vertices; the guard in tests/unit/marketing-no-hexagram.test.ts reads
+ * `SITE_ART_SVGS`. Light ground by default (`dark` raises the strokes for the night footer band).
+ */
+const ART_GOLD = BRAND.colors.gold;
+const ART_BRASS = '#8A6A36';
+const ART_SILVER = '#7D858D';
+const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
+/** A closed star polygon: `n` tips, outer radius `ro`, inner radius `ri`, first tip pointing up. */
+function artStar(cx: number, cy: number, n: number, ro: number, ri: number): string {
+  const pts: string[] = [];
+  for (let k = 0; k < n * 2; k++) {
+    const a = (k * Math.PI) / n - Math.PI / 2;
+    const r = k % 2 ? ri : ro;
+    pts.push(`${f1(cx + Math.cos(a) * r)} ${f1(cy + Math.sin(a) * r)}`);
+  }
+  return `M${pts.join('L')}Z`;
+}
+/** A closed regular polygon (the octagon ring). */
+function artPoly(cx: number, cy: number, n: number, r: number, rot = 0): string {
+  const pts: string[] = [];
+  for (let k = 0; k < n; k++) {
+    const a = (k * 2 * Math.PI) / n - Math.PI / 2 + rot;
+    pts.push(`${f1(cx + Math.cos(a) * r)} ${f1(cy + Math.sin(a) * r)}`);
+  }
+  return `M${pts.join('L')}Z`;
+}
+const stroke = (d: string, c: string, o: number, w = 1) =>
+  `<path d='${d}' fill='none' stroke='${c}' stroke-opacity='${o}' stroke-width='${w}' stroke-linejoin='round'/>`;
+const svg = (w: number, h: number, body: string) =>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>${body}</svg>`;
+const ring = (c: number, r: number, color: string, o: number) =>
+  `<circle cx='${c}' cy='${c}' r='${r}' fill='none' stroke='${color}' stroke-opacity='${o}'/>`;
+
+/** The medallions (44x44): 8-fold star, 12-point star, quatrefoil, octagon ring. */
+const medallion = {
+  m8: svg(
+    44,
+    44,
+    ring(22, 20, ART_GOLD, 0.5) +
+      stroke(artStar(22, 22, 8, 15, 9.6), ART_GOLD, 0.9) +
+      stroke(artStar(22, 22, 8, 8.4, 5.4), ART_SILVER, 0.9) +
+      `<circle cx='22' cy='22' r='1.4' fill='${ART_BRASS}'/>`
+  ),
+  m12: svg(
+    44,
+    44,
+    ring(22, 20, ART_GOLD, 0.5) +
+      stroke(artStar(22, 22, 12, 16, 11.4), ART_GOLD, 0.9) +
+      stroke(artStar(22, 22, 12, 8, 5.6), ART_SILVER, 0.9) +
+      `<circle cx='22' cy='22' r='1.4' fill='${ART_BRASS}'/>`
+  ),
+  // quatrefoil: four lobes, each a circle arc, meeting at the centre
+  mq: svg(
+    44,
+    44,
+    ring(22, 20, ART_GOLD, 0.5) +
+      stroke(
+        'M22 8A7 7 0 0 1 36 22A7 7 0 0 1 22 36A7 7 0 0 1 8 22A7 7 0 0 1 22 8Z',
+        ART_GOLD,
+        0.9
+      ) +
+      stroke(artPoly(22, 22, 4, 7, Math.PI / 4), ART_SILVER, 0.9) +
+      `<circle cx='22' cy='22' r='1.4' fill='${ART_BRASS}'/>`
+  ),
+  mo: svg(
+    44,
+    44,
+    stroke(artPoly(22, 22, 8, 20, Math.PI / 8), ART_GOLD, 0.7) +
+      stroke(artPoly(22, 22, 8, 14, 0), ART_SILVER, 0.9) +
+      `<circle cx='22' cy='22' r='4.2' fill='none' stroke='${ART_BRASS}' stroke-opacity='.9'/>`
+  ),
+};
+const strip = (c: string, o: number) =>
+  svg(
+    40,
+    16,
+    stroke(artStar(10, 8, 8, 7, 4.4), c, o) +
+      stroke('M35 8L30 13L25 8L30 3Z', c, o) +
+      `<path d='M17 8H25M35 8H40M0 8H3' stroke='${c}' stroke-opacity='${o}'/>`
+  );
+const tess = svg(
+  96,
+  96,
+  [
+    [48, 48],
+    [0, 0],
+    [96, 0],
+    [0, 96],
+    [96, 96],
+  ]
+    .map(([x, y]) => stroke(artStar(x, y, 8, 30, 19), ART_GOLD, 0.2))
+    .join('') +
+    [
+      [48, 0],
+      [0, 48],
+      [96, 48],
+      [48, 96],
+    ]
+      .map(([x, y]) => stroke(artPoly(x, y, 4, 12, 0), ART_SILVER, 0.2))
+      .join('')
+);
+/** Every SVG the support sites draw, raw (the no-hexagram guard reads these). */
+export const SITE_ART_SVGS = {
+  ...medallion,
+  strip: strip(ART_GOLD, 0.8),
+  stripDark: strip(BRAND.colors.lift, 0.75),
+  tess,
+} as const;
+const uri = (x: string) =>
+  `url("data:image/svg+xml,${x.replace(/%/g, '%25').replace(/#/g, '%23').replace(/</g, '%3C').replace(/>/g, '%3E')}")`;
+
+/**
+ * The art as CSS: a gold strip under the header, a strip on the footer band, medallion dividers (`<div class="medal m8">`
+ * etc., decorative), and a faint tessellation watermark on landing and index pages (`.tess`). Static data-URI SVG, no
+ * request and no JS. Purely decorative (aria-hidden, no text), so it carries no contrast duty.
+ */
+export const SITE_ART_CSS = `
+.site-header::after{content:"";display:block;height:10px;background:${uri(SITE_ART_SVGS.strip)} center/25px 10px repeat-x}
+.sf{position:relative}
+.sf::before{content:"";position:absolute;inset-inline:0;top:0;height:16px;background:${uri(SITE_ART_SVGS.stripDark)} center/40px 16px repeat-x}
+.medal{position:relative;height:44px;margin:40px auto;max-width:520px;background:var(--medal) center/44px 44px no-repeat}
+.medal::before,.medal::after{content:"";position:absolute;top:50%;height:1px;width:calc(50% - 34px);background:linear-gradient(90deg,transparent,${ART_GOLD})}
+.medal::before{inset-inline-start:0}
+.medal::after{inset-inline-end:0;transform:scaleX(-1)}
+.medal.m8{--medal:${uri(SITE_ART_SVGS.m8)}}
+.medal.m12{--medal:${uri(SITE_ART_SVGS.m12)}}
+.medal.mq{--medal:${uri(SITE_ART_SVGS.mq)}}
+.medal.mo{--medal:${uri(SITE_ART_SVGS.mo)}}
+.tess{background-image:${uri(SITE_ART_SVGS.tess)};background-size:96px 96px}
+`.replace(/\n/g, '');
+
+/** A decorative medallion divider for a page body: one of the four motifs. */
+export function siteMedalHtml(kind: 'm8' | 'm12' | 'mq' | 'mo' = 'm8'): string {
+  return `<div class="medal ${kind}" role="presentation" aria-hidden="true"></div>`;
+}
 
 /**
  * The footer's stylesheet, shared by marketing (inlined by its `Footer`) and docs, help and status (appended to their

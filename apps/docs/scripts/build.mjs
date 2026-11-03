@@ -3,7 +3,7 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_MARKETING_URL, siteNavMap } from '@ebda/shared/brand';
+import { BRAND, BRAND_MARKETING_URL, siteMedalHtml, siteNavMap } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -146,6 +146,7 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
     search: EN.search,
     sidebar: sidebarFor(slug),
     main: `<article class="prose">${renderToc(headings, EN.tocLabel)}${main}</article>`,
+    tess: slug === 'index',
     footer,
     skipLabel: EN.skip,
   });
@@ -309,7 +310,8 @@ for (const p of waAr) {
       placeholder: 'ابحث في الوثائق (بالإنجليزية)',
       index: '/search-index.en.json',
     },
-    main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${cards}</article>`,
+    main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${siteMedalHtml('m12')}${cards}</article>`,
+    tess: true,
     footer: renderFooter({ lang: 'ar' }),
     skipLabel: 'تخطَّ إلى المحتوى',
   });

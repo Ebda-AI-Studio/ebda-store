@@ -4,7 +4,13 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL, siteNavMap } from '@ebda/shared/brand';
+import {
+  BRAND,
+  BRAND_STORE_APP_URL,
+  BRAND_MARKETING_URL,
+  siteMedalHtml,
+  siteNavMap,
+} from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -187,7 +193,7 @@ for (const lang of ['ar', 'en']) {
     .filter(id => content[lang].some(a => a.product === id))
     .map(
       id =>
-        `<section aria-labelledby="p-${id}"><h2 id="p-${id}">${esc(PRODUCT_NAME[id][lang])}</h2><ul class="cards">${cardsFor(id)}</ul></section>`
+        `${siteMedalHtml(id === 'whatsapp' ? 'm12' : 'm8')}<section aria-labelledby="p-${id}"><h2 id="p-${id}">${esc(PRODUCT_NAME[id][lang])}</h2><ul class="cards">${cardsFor(id)}</ul></section>`
     )
     .join('')}</div>`;
   writePage(
@@ -201,6 +207,7 @@ for (const lang of ['ar', 'en']) {
       alternates: alternates('/', '/en/'),
       langSwitch: { ...base(lang).langSwitch, href: homeUrl(other) },
       main: homeMain,
+      tess: true,
     })
   );
   urls.push(homeUrl(lang));

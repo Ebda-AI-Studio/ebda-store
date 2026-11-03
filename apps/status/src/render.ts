@@ -3,11 +3,13 @@
 import {
   BRAND,
   BRAND_MARKETING_URL,
+  SITE_ART_CSS,
   SITE_FOOTER_CSS,
   SITE_NAV_CSS,
   brandMarkSvg,
   brandAppIconSvg,
   siteFooterHtml,
+  siteMedalHtml,
   siteNavHtml,
   siteWordmarkHtml,
 } from '../../../packages/shared/src/brand/index';
@@ -153,12 +155,12 @@ function incident(i: Incident, lang: Lang): string {
 
 const CSS =
   `
-:root{--night:${BRAND.colors.night};--gold:${BRAND.colors.gold};--lift:${BRAND.colors.lift};--panel:#121415;--raise:#181b1c;--line:#2f3435;--fg:#f3f5f4;--muted:#a9b1af;--ok:#5fd08a;--warn:#e6b450;--bad:#ff8a80}
+:root{--night:${BRAND.colors.night};--gold:${BRAND.colors.gold};--lift:${BRAND.colors.lift};--canvas:#fafafa;--panel:#ffffff;--raise:#f2f2f2;--line:#e2e3e3;--fg:#121314;--muted:#575c5d;--accent-text:color-mix(in srgb,var(--gold) 70%,#000);--ok:#0d7a43;--warn:#8a5a00;--bad:#b42318}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--night);color:var(--fg);font-family:${BRAND.fonts.stacks.sans};line-height:1.65}
+body{margin:0;background:var(--canvas);color:var(--fg);font-family:${BRAND.fonts.stacks.sans};line-height:1.65}
 html[lang=ar] body{font-family:${BRAND.fonts.stacks.arabic};line-height:1.85}
-a{color:var(--lift);text-underline-offset:3px}a:hover{color:var(--fg)}
-:focus-visible{outline:3px solid var(--lift);outline-offset:3px;border-radius:4px}
+a{color:var(--accent-text);text-underline-offset:3px}a:hover{color:var(--fg)}
+:focus-visible{outline:3px solid var(--fg);outline-offset:3px;border-radius:4px}
 .wrap{max-width:860px;margin-inline:auto;padding-inline:16px}
 .skip{position:absolute;inset-inline-start:8px;top:-80px;background:var(--lift);color:var(--night);padding:10px 14px;border-radius:8px;font-weight:600}
 .skip:focus{top:8px;color:var(--night)}
@@ -185,23 +187,24 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .b.up{background:var(--ok)}.b.part{background:var(--warn)}.b.down{background:var(--bad)}
 .inc{border:1px solid var(--line);border-inline-start:4px solid var(--warn);border-radius:10px;padding:12px 16px;margin-bottom:12px;background:var(--panel)}
 .inc-outage{border-inline-start-color:var(--bad)}
-.tag{border:1px solid var(--gold);color:var(--lift);border-radius:999px;padding:0 8px;font-size:.78rem}
+.tag{border:1px solid var(--gold);color:var(--accent-text);border-radius:999px;padding:0 8px;font-size:.78rem}
 .upd{margin-top:8px}.upd li{padding:6px 0;border-top:1px solid var(--line)}
 .sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .search{position:relative;display:flex;gap:6px;margin-inline-start:auto}
 .search input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0;width:190px;font:inherit}
 .search button{background:var(--gold);color:var(--night);border:0;border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
-.ta-list,.ta-note{position:absolute;inset-inline-end:0;top:calc(100% + 6px);z-index:30;inline-size:min(420px,calc(100vw - 32px));margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.45);text-align:start}
+.ta-list,.ta-note{position:absolute;inset-inline-end:0;top:calc(100% + 6px);z-index:30;inline-size:min(420px,calc(100vw - 32px));margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.14);text-align:start}
 .ta-note{padding:12px 14px;color:var(--muted)}
 .ta-list[hidden],.ta-note[hidden]{display:none}
 .ta-list a{display:flex;flex-direction:column;gap:2px;min-block-size:44px;justify-content:center;padding:8px 12px;border-radius:8px;color:var(--fg);text-decoration:none}
 .ta-list a[aria-selected=true],.ta-list a:hover{background:var(--raise);outline:1px solid var(--gold)}
-.ta-list mark{background:transparent;color:var(--lift);font-weight:700}
+.ta-list mark{background:transparent;color:var(--accent-text);font-weight:700}
 .ta-sec{color:var(--muted);font-size:.8125rem}
 .ta-all{color:var(--muted)!important;font-size:.9rem}
 `.replace(/\n/g, '') +
   SITE_NAV_CSS +
-  SITE_FOOTER_CSS;
+  SITE_FOOTER_CSS +
+  SITE_ART_CSS;
 
 const SEARCH = {
   ar: { label: 'بحث', placeholder: 'دوّر في الخدمات والأحداث والمساعدة' },
@@ -326,11 +329,12 @@ ${siteNavHtml(lang, 'status')}
 ${searchForm(lang)}
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>
-<main id="main" class="wrap">
+<main id="main" class="wrap tess">
 <div class="banner ${s.overall}" role="status"><span class="dot" aria-hidden="true"></span><h1>${esc(t.overall[s.overall])}</h1></div>
 <p class="muted small">${esc(t.explain)} ${esc(t.bars)}</p>
 <h2>${esc(t.activeIncidents)}</h2>
 ${active}
+${siteMedalHtml('m8')}
 <h2>${esc(t.components)}</h2>
 ${PRODUCTS.map(prod => {
   const list = s.components.filter(c => COMPONENTS.find(x => x.id === c.id)?.product === prod.id);
@@ -338,6 +342,7 @@ ${PRODUCTS.map(prod => {
     ? `<section class="prod" aria-labelledby="prod-${prod.id}"><h3 id="prod-${prod.id}">${esc(prod.name[lang])}</h3><ul class="comps">${list.map(c => component(c, lang)).join('')}</ul></section>`
     : '';
 }).join('')}
+${siteMedalHtml('m12')}
 <h2>${esc(t.recentIncidents)}</h2>
 ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>
