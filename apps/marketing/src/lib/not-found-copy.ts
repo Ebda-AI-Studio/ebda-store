@@ -55,7 +55,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         title: BRAND.company.shortNameAr,
         links: [
           { href: HOME.ar, label: 'الرئيسية' },
-          { href: pagePath('ar', 'about'), label: 'عن الاستوديو' },
+          { href: pagePath('ar', 'about'), label: 'عن ابدأ ستوديو' },
           { href: pagePath('ar', 'contact'), label: 'تواصل معانا' },
         ],
       },

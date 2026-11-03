@@ -50,7 +50,7 @@ describe('site-kit company identity', () => {
     const { renderPage } = await import('../../packages/site-kit/src/build/shell.mjs');
     for (const [lang, company] of [
       ['en', 'Ebda AI Studio'],
-      ['ar', 'ابدأ استوديو للذكاء الاصطناعي'],
+      ['ar', 'ابدأ ستوديو للذكاء الاصطناعي'],
     ]) {
       const html = renderPage({
         lang,

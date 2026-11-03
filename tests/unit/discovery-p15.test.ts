@@ -71,7 +71,7 @@ describe('help and docs pages (site-kit shell)', () => {
   it('Arabic pages use ar_EG and the Arabic studio name', () => {
     const html = page({ lang: 'ar' });
     expect(meta(html, 'og:locale')).toBe('ar_EG');
-    expect(JSON.stringify(jsonLd(html)['@graph'][0])).toContain('ابدأ استوديو للذكاء الاصطناعي');
+    expect(JSON.stringify(jsonLd(html)['@graph'][0])).toContain('ابدأ ستوديو للذكاء الاصطناعي');
   });
   it('JSON-LD cannot close its own script element', () => {
     const html = page({ title: 'a </script><b> | Help' });

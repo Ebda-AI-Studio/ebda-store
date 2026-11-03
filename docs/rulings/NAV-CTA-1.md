@@ -1,0 +1,3 @@
+# NAV-CTA-1
+
+Ruling NAV-CTA-1 - the studio-level primary call to action, on every studio page and on help, docs and status, is "اختار منتجك / Choose a product", linking to the product windows on the studio home (`/#products`, `/en/#products`). It never reads "Start now" and never points at one product's signup. Product pages (Ebda Store, Ebda Chat) keep their own CTA in the product bar ("Open your store" to store.ebda.app/signup, "Start with Ebda Chat" to wa.ebda.app). Evidence: audit 2026-11-03 P1-6. Cost if wrong: studio visitors need one extra click to a product instead of a direct signup; the label is one string in the brand module.

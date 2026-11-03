@@ -50,7 +50,7 @@ describe('marketing nav', () => {
     for (const l of ['ar', 'en'] as const) {
       const t = String(pageMetadata(l, 'store').title);
       expect(t.length).toBeLessThanOrEqual(60);
-      expect(t).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
+      expect(t).not.toMatch(/Ebda AI Studio|ابدأ ستوديو/);
     }
   });
   it('has the five links in page order with correct targets (en)', () => {
@@ -73,7 +73,7 @@ describe('marketing nav', () => {
   });
   it('header: the master brand lockup plus a Products menu naming only the live products, Ebda Store and Ebda Chat (BRAND-ARCH-1)', () => {
     for (const [html, studio, store, wa, soon] of [
-      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ شات', /قريب/],
+      [ar, 'ابدأ ستوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ شات', /قريب/],
       [en, 'Ebda AI Studio', 'Ebda Store', 'Ebda Chat', /coming soon/i],
     ] as const) {
       const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
@@ -138,7 +138,7 @@ describe('marketing hero and structure', () => {
       expect(hero).not.toMatch(/look-phone|class="scr"|id="hp-/);
       // the retired hero furniture is gone: particles, poster, studio kicker, slug pill
       expect(hero).not.toMatch(/nile|hero-poster|hero-brand|slug-pill|<canvas/);
-      expect(hero).not.toMatch(/ابدأ استوديو للذكاء|Ebda AI Studio/);
+      expect(hero).not.toMatch(/ابدأ ستوديو للذكاء|Ebda AI Studio/);
     }
   });
   it('the retired sections and their assets are gone; the story stays with the new Dahab frames (MKT-1)', () => {
@@ -305,18 +305,18 @@ describe('marketing honesty', () => {
   it('footer ownership line, studio credit and Western digits everywhere', () => {
     // the studio's line moved off the home page to /about (MKT-1); the footer carries a one-line credit
     expect(renderToStaticMarkup(<AboutPage locale="ar" />)).toContain(
-      'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.'
+      'ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.'
     );
     expect(renderToStaticMarkup(<AboutPage locale="en" />)).toContain(
       'Ebda AI Studio — Your doorway to business.'
     );
     expect(en).toContain('<p class="footer-credit">Ebda Store — a product of Ebda AI Studio</p>');
-    expect(ar).toContain('منتج من ابدأ استوديو للذكاء الاصطناعي</p>');
+    expect(ar).toContain('منتج من ابدأ ستوديو للذكاء الاصطناعي</p>');
     expect(en).toContain(
       'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );
     expect(ar).toContain(
-      'ابدأ ستور منتج من ابدأ استوديو للذكاء الاصطناعي. © 2026 ابدأ استوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.'
+      'ابدأ ستور منتج من ابدأ ستوديو للذكاء الاصطناعي. © 2026 ابدأ ستوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.'
     );
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
@@ -334,7 +334,7 @@ describe('marketing honesty', () => {
       'The Service is a technology platform owned and operated by Ebda AI Studio'
     );
     const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
-    expect(lar).toContain('اتفاق بينك وبين ابدأ استوديو للذكاء الاصطناعي');
+    expect(lar).toContain('اتفاق بينك وبين ابدأ ستوديو للذكاء الاصطناعي');
     for (const l of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
@@ -498,7 +498,7 @@ describe('marketing honesty', () => {
     for (const html of [ar, en, ...pages]) expect(html).not.toMatch(/whisky/i);
     const org = jsonLd('en')['@graph'][0] as Record<string, unknown>;
     expect(org.name).toBe('Ebda AI Studio');
-    expect(org.alternateName).toBe('ابدأ استوديو للذكاء الاصطناعي');
+    expect(org.alternateName).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(org.url).toBe('https://ebda.app');
     expect(org).not.toHaveProperty('parentOrganization');
     expect(JSON.stringify(org)).not.toMatch(/whisky/i);
@@ -509,7 +509,7 @@ describe('marketing honesty', () => {
       expect(html).toContain(
         l === 'en'
           ? 'owned and operated by Ebda AI Studio'
-          : 'مملوكة لابدأ استوديو للذكاء الاصطناعي'
+          : 'مملوكة لابدأ ستوديو للذكاء الاصطناعي'
       );
       expect(html).toContain('ahlan@ebda.app');
       expect(html).toContain('security@ebda.app');

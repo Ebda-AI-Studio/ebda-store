@@ -43,7 +43,7 @@ const EN_ALLOW: RegExp[] = [
 const EN_BARE = /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP)\b)/g;
 const AR_BRAND = '(?:ابدأ|إبدأ|إبدا)';
 const AR_LETTER = '[\\u0621-\\u064A\\u0671-\\u06D3]';
-const AR_NEXT_OK = `(?!\\s*(?:ستور|استوديو|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;
+const AR_NEXT_OK = `(?!\\s*(?:ستور|ستوديو|استوديو|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;
 const AR_END = `(?!${AR_LETTER})`;
 const AR_CTX = [
   // brand as the object of a preposition or a noun: «من ابدأ», «على إبدأ», «مدعوم من ابدأ», «تواصل مع ابدأ»
@@ -119,7 +119,7 @@ describe('BRAND-NAME-1: the brand is never written alone', () => {
     expect(probe('ابدأ بيعمل طلب')).toBe(true);
     expect(probe('ابدأ متجرك أونلاين')).toBe(false);
     expect(probe('ابدأ دلوقتي')).toBe(false);
-    expect(probe('تواصل مع ابدأ استوديو للذكاء الاصطناعي')).toBe(false);
+    expect(probe('تواصل مع ابدأ ستوديو للذكاء الاصطناعي')).toBe(false);
     // an allowlisted token must not hide a bare brand elsewhere on the same line
     expect(probe('X-Ebda-Id header, Powered by Ebda')).toBe(true);
     expect(probe('X-Ebda-Signature: t=1')).toBe(false);

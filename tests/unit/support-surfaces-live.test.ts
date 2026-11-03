@@ -20,8 +20,8 @@ beforeAll(async () => {
 afterAll(() => releaseBuildLock());
 
 describe.each([
-  ['help', 'Ebda AI Studio Help', 'مركز مساعدة ابدأ استوديو للذكاء الاصطناعي'],
-  ['docs', 'Ebda AI Studio Docs', 'وثائق ابدأ استوديو للذكاء الاصطناعي'],
+  ['help', 'Ebda AI Studio Help', 'مركز مساعدة ابدأ ستوديو للذكاء الاصطناعي'],
+  ['docs', 'Ebda AI Studio Docs', 'وثائق ابدأ ستوديو للذكاء الاصطناعي'],
 ] as const)('%s.ebda.app', (app, titleEn, titleAr) => {
   const out = (...p: string[]) => path.join(ROOT, 'apps', app, 'out', ...p);
   beforeAll(() => {

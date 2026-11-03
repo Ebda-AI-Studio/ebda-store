@@ -1,0 +1,3 @@
+# NAV-PRODUCT-OF-PAGE-1
+
+Ruling NAV-PRODUCT-OF-PAGE-1 - `productOfPage()` (apps/marketing/src/lib/site.ts) returns `studio | store | chat`. `store` is an explicit list (`store`, `features`, `compare/*`, `for/*`), `chat` is `whatsapp` and `legal/whatsapp-*`, and the default is `studio`. Before this the default was `store`, which put the Store sub-nav on About, Contact, Credits and every legal page (audit 2026-11-03 P1-1). Cost if wrong: a new Store page forgotten from the list shows the studio bar without the Store product bar, a navigation gap caught by tests/unit/studio-nav-footer.test.ts, not a broken page.

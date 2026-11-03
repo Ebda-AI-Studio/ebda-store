@@ -2,7 +2,7 @@
 
 Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). Not to be confused with any unrelated site with a similar name: this is the Egyptian store builder at https://ebda.app, made by Ebda AI Studio.
 
-> Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
+> Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 
 Five templates (Qamar for fashion, Souq for electronics and retail, Jasmine for beauty and care, Lamma for groceries and food, Dahab for jewellery), three looks each, and a visual editor that edits the real storefront on a phone-sized canvas. Every template has a live demo store you can open and shop without signing up.
 

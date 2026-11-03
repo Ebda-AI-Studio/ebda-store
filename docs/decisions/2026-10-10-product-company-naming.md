@@ -2,7 +2,7 @@
 
 Ahmad approved folders, repository and app branding on 2026-10-10.
 
-Ruling NAMING-1 — Product = Ebda Store (ابدأ ستور); company = Ebda AI Studio (ابدأ استوديو). Existing expanded legal operator names and domains/resource IDs remain. Evidence: approved scope, central BRAND.product/company contracts and unchanged deployment bindings. Cost if wrong: technical diagnostics may retain legacy service identifiers.
+Ruling NAMING-1 — Product = Ebda Store (ابدأ ستور); company = Ebda AI Studio (ابدأ ستوديو). Existing expanded legal operator names and domains/resource IDs remain. Evidence: approved scope, central BRAND.product/company contracts and unchanged deployment bindings. Cost if wrong: technical diagnostics may retain legacy service identifiers.
 
 Ruling NAMING-MFA-2 — New MFA enrollments use Ebda Store as issuer; existing enrollments remain untouched. Evidence: verifyCode validates the stored secret and token, independently of issuer metadata. Cost if wrong: old authenticator entries keep the shorter Ebda label.
 
@@ -12,7 +12,7 @@ Ruling NAMING-GRAPH-1 — Commit the AST graph/report update; retain existing HT
 
 Verification: affected brand/render/MFA/manifest tests (81), monorepo typecheck, lint and all affected app builds pass. Foundation resolver tests: 18 pass. All 23 worktree registrations, branches and dirty statuses survived the folder move. Repo remains private under Whisky-11 with main as default branch. Live rollout is recorded in handoff.md after deployment.
 
-Ruling NAMING-AR-2 — Company Arabic name is ابدأ استوديو للذكاء الاصطناعي everywhere; marketing uses Ebda AI Studio, including page titles and site metadata. Evidence: Ahmad explicitly corrected marketing naming and requested AI in Arabic everywhere on 2026-10-10. Product remains Ebda Store / ابدأ ستور. Cost if wrong: the longer Arabic name requires more header space, so verify mobile layout.
+Ruling NAMING-AR-2 — Company Arabic name is ابدأ ستوديو للذكاء الاصطناعي everywhere; marketing uses Ebda AI Studio, including page titles and site metadata. Evidence: Ahmad explicitly corrected marketing naming and requested AI in Arabic everywhere on 2026-10-10. Product remains Ebda Store / ابدأ ستور. Cost if wrong: the longer Arabic name requires more header space, so verify mobile layout.
 
 Ruling NAMING-SEO-1 — Every marketing page title, Open Graph/Twitter title and WebSite identity carries the localized company name. Evidence: Ahmad explicitly requested Google search titles and browser tabs. Google chooses and refreshes its displayed result independently after crawling. Cost if wrong: search may retain or rewrite its displayed title despite correct source metadata.
 
