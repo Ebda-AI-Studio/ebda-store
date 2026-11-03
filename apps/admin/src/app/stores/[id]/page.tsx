@@ -15,6 +15,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StatsGrid } from './_components/StatsGrid';
+import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
@@ -138,6 +139,8 @@ export default function StoreDetailPage() {
           (store.settings as { defaultLanguage?: string } | undefined)?.defaultLanguage
         )}
       />
+
+      <OrderAlertsPromptCard storeId={store.id} />
 
       <StatsGrid storeId={store.id} />
 

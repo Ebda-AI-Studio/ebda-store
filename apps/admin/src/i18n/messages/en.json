@@ -6199,6 +6199,14 @@
       "denied": "The browser is blocking notifications. Allow them in the site settings and try again.",
       "unavailable": "Alerts are not available right now. Try again in a moment.",
       "error": "We could not turn on alerts. Try again."
+    },
+    "orderAlertsPrompt": {
+      "title": "Know about every new order the moment it lands",
+      "body": "Turn on order alerts on this device",
+      "cta": "Turn on alerts",
+      "enabling": "Turning on alerts…",
+      "later": "Not now",
+      "error": "We couldn't turn on alerts. Try again."
     }
   },
   "finance": {

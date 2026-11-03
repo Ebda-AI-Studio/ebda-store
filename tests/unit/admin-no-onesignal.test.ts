@@ -48,10 +48,20 @@ describe('OneSignal loads only after the explicit opt-in click', () => {
     const callers = walk(src).filter(
       f => rel(f) !== OPT_IN_MODULE && /enableOrderAlerts\(/.test(readFileSync(f, 'utf8'))
     );
-    expect(callers.map(rel)).toEqual(['components/EnableOrderAlertsButton.tsx']);
-    const btn = readFileSync(callers[0], 'utf8');
-    expect(btn).not.toMatch(/useEffect/);
-    expect(btn).toMatch(/onClick=\{enable\}/);
+    expect(callers.map(rel).sort()).toEqual([
+      'components/EnableOrderAlertsButton.tsx',
+      'components/OrderAlertsPromptCard.tsx',
+    ]);
+    for (const f of callers) {
+      const body = readFileSync(f, 'utf8');
+      expect(body, rel(f)).toMatch(/onClick=\{enable\}/);
+      // the only call sits inside the click handler, never inside an effect
+      expect(body.match(/enableOrderAlerts\(/g)?.length, rel(f)).toBe(1);
+      expect(body, rel(f)).toMatch(/async function enable\(\) \{[\s\S]*?await enableOrderAlerts\(/);
+      expect(body.replace(/async function enable\(\) \{[\s\S]*$/, ''), rel(f)).not.toMatch(
+        /enableOrderAlerts\(/
+      );
+    }
   });
 
   it('keeps the dependency and the service worker so existing subscriptions keep working', () => {

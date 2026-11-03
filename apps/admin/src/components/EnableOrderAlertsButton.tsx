@@ -19,6 +19,8 @@ export function EnableOrderAlertsButton({ onDone }: { onDone?: (r: EnableAlertsR
   const [result, setResult] = useState<EnableAlertsResult | 'error' | null>(null);
 
   if (!user || user.role === 'customer') return null;
+  // Already blocked in the browser: say how to re-enable instead of offering a button that cannot work.
+  const blocked = typeof Notification !== 'undefined' && Notification.permission === 'denied';
 
   async function enable() {
     if (!user || busy) return;
@@ -49,12 +51,12 @@ export function EnableOrderAlertsButton({ onDone }: { onDone?: (r: EnableAlertsR
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t('body')}</p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={enable} disabled={busy || result === 'enabled'}>
+        <Button type="button" onClick={enable} disabled={busy || result === 'enabled' || blocked}>
           {busy ? t('enabling') : result === 'enabled' ? t('enabled') : t('cta')}
         </Button>
         <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
           {result === 'enabled' && t('doneHint')}
-          {result === 'denied' && t('denied')}
+          {(result === 'denied' || blocked) && t('denied')}
           {result === 'unavailable' && t('unavailable')}
           {result === 'error' && t('error')}
         </p>
