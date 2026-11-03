@@ -127,7 +127,8 @@ describe('brand module nav data', () => {
           flat.some(l => l.href.includes(`${r}.ebda.app`)),
           r
         ).toBe(true);
-      expect(JSON.stringify(f)).not.toMatch(/Software Development|والبرمجيات/);
+      expect(JSON.stringify(f)).not.toMatch(/تكنولوجيا المعلومات|legal entity/);
+      expect(JSON.stringify(f)).not.toContain(BRAND.company.legalNameEn);
     });
   }
 });
@@ -413,10 +414,8 @@ describe('names and facts (AR-STUDIO-NAME-1)', () => {
     for (const lang of ['ar', 'en'] as const) {
       const contact = renderToStaticMarkup(<ContactPage locale={lang} />);
       const legal = renderToStaticMarkup(<LegalPage locale={lang} page="legal" />);
-      expect(contact).not.toMatch(/Software Development|والبرمجيات والتسويق/);
-      expect(legal).toMatch(
-        lang === 'en' ? /Software Development, and Digital Marketing/ : /والبرمجيات والتسويق الرقمي/
-      );
+      expect(contact).not.toContain(BRAND.company[lang === 'en' ? 'legalNameEn' : 'legalNameAr']);
+      expect(legal).toMatch(lang === 'en' ? /Ebda Studio\b/ : /ابدأ ستوديو لتكنولوجيا المعلومات/);
     }
   });
 });
@@ -503,6 +502,11 @@ describe('the office (BRAND.office): About, Contact and the legal notice show it
           addressCountry: 'EG',
         });
         expect(org.foundingDate).toBe('2026-09-11');
+        // name is the marketing name, legalName the registered entity (LEGAL-NAME-2)
+        expect(org.name).toBe('Ebda AI Studio');
+        expect(org.legalName).toBe(
+          lang === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn
+        );
       }
     }
   });

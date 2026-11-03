@@ -18,8 +18,8 @@ describe('BRAND', () => {
     expect(BRAND.name).toBe('Ebda AI Studio');
     expect(BRAND.nameAr).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(BRAND.company).toEqual({
-      legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
-      legalNameEn: 'Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing',
+      legalNameAr: 'ابدأ ستوديو لتكنولوجيا المعلومات',
+      legalNameEn: 'Ebda Studio',
       shortNameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
       shortNameEn: 'Ebda AI Studio',
       foundedOn: '2026-09-11',

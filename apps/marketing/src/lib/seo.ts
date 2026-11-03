@@ -185,6 +185,7 @@ export function jsonLd(
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         // No verified public profiles yet; add real ones only (never a guessed handle).
@@ -278,6 +279,7 @@ export function studioJsonLd(locale: Locale) {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
@@ -333,6 +335,7 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         sameAs: [] as string[],

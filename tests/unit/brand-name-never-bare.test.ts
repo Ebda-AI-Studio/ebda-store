@@ -38,8 +38,8 @@ const EN_ALLOW: RegExp[] = [
   /Ebda-Webhooks/,
   /tag: 'Ebda(?:-(?:API|Admin|Web))?'/,
   /Ebda own ads/,
-  // the registered legal entity (AR-STUDIO-NAME-1): «Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing»
-  /Ebda Studio for Artificial Intelligence/,
+  // the registered legal entity (LEGAL-NAME-2): legalNameEn 'Ebda Studio' (the marketing name stays Ebda AI Studio)
+  /legalNameEn:\s*'Ebda Studio'/,
 ];
 
 const EN_BARE = /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP)\b)/g;

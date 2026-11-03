@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { productBar } from '../../packages/shared/src/brand';
+import { BRAND, productBar } from '../../packages/shared/src/brand';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
 import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
@@ -531,9 +531,7 @@ describe('marketing honesty', () => {
       expect(html).toContain(l === 'en' ? 'href="/en/store' : 'href="/store');
       expect(html).toContain(l === 'en' ? 'href="/en/whatsapp' : 'href="/whatsapp');
       // the legal entity is one small line linking to the legal notice, not in the hero
-      expect(html).toContain(
-        l === 'en' ? 'Software Development, and Digital Marketing' : 'والبرمجيات والتسويق الرقمي'
-      );
+      expect(html).toContain(l === 'en' ? BRAND.company.legalNameEn : BRAND.company.legalNameAr);
       expect(html.indexOf('ab-legal')).toBeGreaterThan(html.indexOf('ab-hero') + 1000);
       expect(html).toContain('ahlan@ebda.app');
       expect(html).toContain('security@ebda.app');
