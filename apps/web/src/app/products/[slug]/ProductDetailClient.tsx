@@ -581,6 +581,9 @@ export default function ProductDetailClient({
     product?.goldPricing ??
     null;
   const goldStale = useGoldRateStale(goldForSelection);
+  // Every hook runs before the loading / not-found early returns (rules-of-hooks): the WhatsApp
+  // ask button reads only slug + name, so a placeholder is safe while the product loads.
+  const hasWaAsk = useHasWaMeProductButton(product ?? { slug: '', name: '' });
 
   if (isLoading) {
     return (
@@ -732,7 +735,6 @@ export default function ProductDetailClient({
       : priceText;
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
-  const hasWaAsk = useHasWaMeProductButton(product);
   const personalisationCfg = activePersonalisation(product.personalisation);
   const typedNote = cleanNote(note);
   const waPersonalisation =

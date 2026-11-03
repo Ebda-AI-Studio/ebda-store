@@ -54,7 +54,7 @@ export function TrustLine({
     // on every ground), a check mark, and room to wrap: it is a reason to buy, not a footnote.
     <p
       data-testid="pdp-trust-line"
-      className={`${className} flex flex-wrap items-center gap-x-1 text-[15px] leading-6 text-foreground`}
+      className={`${className} flex flex-wrap items-center gap-x-1 text-base leading-6 text-foreground`}
     >
       <svg
         aria-hidden="true"
