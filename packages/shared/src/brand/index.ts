@@ -499,7 +499,10 @@ export function siteNavLogin(
   // a product page logs in to its own product only (MKT-WA-CHROME-1: a Chat page never sends a visitor to the Store app)
   return {
     label: L(lang, 'دخول', 'Log in'),
-    items: kind === 'store' ? [items[0]] : kind === 'chat' ? [items[1]] : items,
+    items:
+      kind === 'studio'
+        ? items
+        : items.filter(i => i.id === (kind === 'store' ? 'store' : 'whatsapp')),
   };
 }
 
@@ -593,6 +596,7 @@ export function siteFooter(lang: NavLang): {
   copyright: (year: number) => string;
 } {
   const products = siteNavProducts(lang);
+  const [storeProduct, chatProduct] = products as [SiteNavProduct, SiteNavProduct];
   const resources = siteNavResources(lang);
   const about = siteNavStudio(lang);
   const m = (id: string, label: string, p: string) => mlink(lang, id, label, p);
@@ -627,11 +631,11 @@ export function siteFooter(lang: NavLang): {
         id: 'products',
         title: siteNavLabels(lang).products,
         links: [
-          products[0],
+          storeProduct,
           m('store-features', L(lang, 'مميزات ابدأ ستور', 'Ebda Store features'), '/features/'),
           m('store-pricing', L(lang, 'أسعار ابدأ ستور', 'Ebda Store pricing'), '/store/#pricing'),
           m('store-templates', L(lang, 'قوالب ابدأ ستور', 'Ebda Store templates'), '/store/#looks'),
-          products[1],
+          chatProduct,
           m('chat-pricing', L(lang, 'أسعار ابدأ شات', 'Ebda Chat pricing'), '/whatsapp/#pricing'),
         ],
       },
@@ -984,26 +988,24 @@ const strip = (c: string, o: number) =>
       stroke('M35 8L30 13L25 8L30 3Z', c, o) +
       `<path d='M17 8H25M35 8H40M0 8H3' stroke='${c}' stroke-opacity='${o}'/>`
   );
+const TESS_STARS: [number, number][] = [
+  [48, 48],
+  [0, 0],
+  [96, 0],
+  [0, 96],
+  [96, 96],
+];
+const TESS_DIAMONDS: [number, number][] = [
+  [48, 0],
+  [0, 48],
+  [96, 48],
+  [48, 96],
+];
 const tess = svg(
   96,
   96,
-  [
-    [48, 48],
-    [0, 0],
-    [96, 0],
-    [0, 96],
-    [96, 96],
-  ]
-    .map(([x, y]) => stroke(artStar(x, y, 8, 30, 19), ART_GOLD, 0.2))
-    .join('') +
-    [
-      [48, 0],
-      [0, 48],
-      [96, 48],
-      [48, 96],
-    ]
-      .map(([x, y]) => stroke(artPoly(x, y, 4, 12, 0), ART_SILVER, 0.2))
-      .join('')
+  TESS_STARS.map(([x, y]) => stroke(artStar(x, y, 8, 30, 19), ART_GOLD, 0.2)).join('') +
+    TESS_DIAMONDS.map(([x, y]) => stroke(artPoly(x, y, 4, 12, 0), ART_SILVER, 0.2)).join('')
 );
 /** Every SVG the support sites draw, raw (the no-hexagram guard reads these). */
 export const SITE_ART_SVGS = {
