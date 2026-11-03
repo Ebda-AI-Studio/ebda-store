@@ -6,6 +6,7 @@ import {
   quoteKey,
   freshQuote,
   expectedTotalFor,
+  expectedTotalToSend,
   priceChangedCopy,
   type OrderQuote,
 } from './checkout-quote';
@@ -59,6 +60,16 @@ describe('the held quote is only valid for the exact inputs and cart it was pric
     expect(freshQuote(held, key)).toBe(held.quote);
     expect(expectedTotalFor(held, key)).toBe(88000);
   });
+  it('QA-COUPON-1: expectedTotal is ALWAYS sent: the fresh quote total, else the total on screen (coupon applied: 42000)', () => {
+    const held = { key, quote: quote(42000) };
+    expect(expectedTotalToSend(held, key, 51000)).toBe(42000);
+    // quote failed / in flight / stale: the shown total (with the coupon) is still sent, never undefined
+    expect(expectedTotalToSend(null, key, 42000)).toBe(42000);
+    expect(expectedTotalToSend(held, quoteKey({ ...inputs, couponCode: null }, lines), 42000)).toBe(
+      42000
+    );
+    expect(Number.isInteger(expectedTotalToSend(null, key, 41999.6))).toBe(true);
+  });
   it.each([
     ['area', { ...inputs, area: 'Maadi' }, lines],
     ['provider (COD fee)', { ...inputs, selectedProvider: 'paymob:card' }, lines],
@@ -104,8 +115,10 @@ describe('PRICE_CHANGED copy', () => {
  */
 describe('CheckoutClient wiring (I-1)', () => {
   const src = readFileSync(join(__dirname, '../app/checkout/CheckoutClient.tsx'), 'utf8');
-  it('the createOrder request body carries expectedTotal from the held server quote', () => {
-    expect(src).toMatch(/expectedTotal:\s*expectedTotalFor\(heldQuote,\s*currentQuoteKey\)/);
+  it('the createOrder request body carries expectedTotal (held server quote, else the shown total; QA-COUPON-1)', () => {
+    expect(src).toMatch(
+      /expectedTotal:\s*expectedTotalToSend\(heldQuote,\s*currentQuoteKey,\s*total\)/
+    );
   });
   it('fetches the quote from the server on the payment step and never prices the confirmed total in the browser', () => {
     expect(src).toMatch(/api\s*\.quoteOrder\(buildQuoteRequest\(quoteInputs\)\)/);

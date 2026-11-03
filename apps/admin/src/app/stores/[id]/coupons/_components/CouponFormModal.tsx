@@ -20,6 +20,9 @@ interface CouponFormModalProps {
   onClose: () => void;
   storeId: string;
   customerGroups: CustomerGroupOption[];
+  /** Why the server refused the save (already in the admin language). */
+  saveError?: string | null;
+  onDismissError?: () => void;
 }
 
 /**
@@ -36,6 +39,8 @@ export function CouponFormModal({
   onClose,
   storeId,
   customerGroups,
+  saveError,
+  onDismissError,
 }: CouponFormModalProps) {
   const tModal = useT('coupons.modal');
   const tForm = useT('coupons.form');
@@ -73,6 +78,19 @@ export function CouponFormModal({
       }
     >
       <form id={FORM_ID} onSubmit={onSubmit} className="space-y-6">
+        {saveError ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {saveError}
+            {onDismissError ? (
+              <button type="button" onClick={onDismissError} className="ms-3 underline">
+                ×
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {/* Basic Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

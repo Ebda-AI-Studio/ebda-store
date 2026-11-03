@@ -1,3 +1,4 @@
+import { isFreeActiveProduct, PRICE_REQUIRED_MESSAGE } from '../lib/sellable-price';
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
 import { storeDb, storeMoney, storeWriter } from '../lib/repo-factory';
 import logger from '../lib/logger';
@@ -961,6 +962,19 @@ export class BulkService {
             });
             continue;
           }
+          // QA-PRICE-ZERO-1: an explicit variant price of 0 is a free variant (blank inherits the product's price).
+          if (
+            row.price !== undefined &&
+            String(row.price).trim() !== '' &&
+            Number(String(row.price).trim()) === 0
+          ) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `${PRICE_REQUIRED_MESSAGE.messageEn} (variant price)`,
+            });
+            continue;
+          }
           const variantBarcode = checkBarcode(
             row.barcode,
             `variant:${parentSku}:${rowIndex}`,
@@ -1066,6 +1080,23 @@ export class BulkService {
         const rowPricingMode = String(row.pricing_mode ?? '')
           .trim()
           .toLowerCase();
+
+        // QA-PRICE-ZERO-1: a row that would leave an ACTIVE product at price 0 fails alone (a draft row may be 0; a gold
+        // row is priced by the repricer).
+        if (
+          isFreeActiveProduct({
+            status: String(row.status ?? '').trim() || 'draft',
+            price: parseInt(String(row.price), 10),
+            pricingMode:
+              rowPricingMode === 'gold_rate' || (existing && goldPrice.has(existing.id))
+                ? 'gold_rate'
+                : 'fixed',
+          })
+        ) {
+          result.failed++;
+          result.errors.push({ row: rowIndex, error: PRICE_REQUIRED_MESSAGE.messageEn });
+          continue;
+        }
         if (rowPricingMode !== '' && rowPricingMode !== 'gold_rate' && rowPricingMode !== 'fixed') {
           result.failed++;
           result.errors.push({
@@ -1759,17 +1790,54 @@ export class BulkService {
       return { updated: 0, failed: 0, errors: [] };
     }
 
+    // QA-PRICE-ZERO-1: activating a product that would be orderable for free is refused for THAT product (it stays as it
+    // was); the rest of the batch goes through. Variant products are judged on their variants, gold on the repricer.
+    const refused: string[] = [];
+    let allowedIds = productIds;
+    if (status === 'active') {
+      const rows = await (
+        await storeWriter(storeId)
+      ).product.findMany({
+        where: { id: { in: productIds }, storeId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          pricingMode: true,
+          _count: { select: { variants: true } },
+        },
+      });
+      const free = rows.filter(r =>
+        isFreeActiveProduct({
+          status: 'active',
+          price: r.price,
+          pricingMode: r.pricingMode,
+          hasVariants: r._count.variants > 0,
+        })
+      );
+      for (const r of free) refused.push(`${r.name}: ${PRICE_REQUIRED_MESSAGE.messageEn}`);
+      const freeIds = new Set(free.map(r => r.id));
+      allowedIds = productIds.filter(id => !freeIds.has(id));
+      if (allowedIds.length === 0) {
+        return { updated: 0, failed: productIds.length, errors: refused };
+      }
+    }
+
     // Update all matching rows for this store in one query
     const result = await (
       await storeWriter(storeId)
     ).product.updateMany({
-      where: { id: { in: productIds }, storeId, deletedAt: null },
+      where: { id: { in: allowedIds }, storeId, deletedAt: null },
       data: { status },
     });
     // Only active products are indexed: publish adds vectors, unpublish removes them (review M5).
     if (result.count > 0) await requestStoreReindex(storeId, 'bulk-status');
 
-    return { updated: result.count, failed: productIds.length - result.count, errors: [] };
+    return {
+      updated: result.count,
+      failed: productIds.length - result.count,
+      errors: refused,
+    };
   }
 
   // Helper methods

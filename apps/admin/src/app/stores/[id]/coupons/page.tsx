@@ -50,6 +50,8 @@ export default function CouponsPage() {
     setFilterActive,
     fetchCoupons,
     saveCoupon,
+    saveError,
+    clearSaveError,
     deleteCoupon,
     toggleActive,
   } = useCoupons(storeId);
@@ -164,6 +166,8 @@ export default function CouponsPage() {
               formData={formData}
               onChange={setFormData}
               onSubmit={handleSubmit}
+              saveError={saveError}
+              onDismissError={clearSaveError}
               onClose={closeModal}
               storeId={storeId}
               customerGroups={customerGroups}

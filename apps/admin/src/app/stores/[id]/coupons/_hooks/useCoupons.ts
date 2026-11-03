@@ -17,6 +17,9 @@ interface UseCouponsResult {
   setFilterActive: (value: CouponStatusFilter) => void;
   fetchCoupons: () => Promise<void>;
   saveCoupon: (data: CouponFormData, editingId: string | null) => Promise<boolean>;
+  /** The server's (already localized) reason the last save was refused; null once a save succeeds. */
+  saveError: string | null;
+  clearSaveError: () => void;
   deleteCoupon: (couponId: string) => Promise<void>;
   toggleActive: (couponId: string) => Promise<void>;
 }
@@ -79,6 +82,7 @@ export function useCoupons(storeId: string): UseCouponsResult {
   // Bumped after a save/delete/toggle: the fetch effect owns EVERY request, so the refetch reads
   // the CURRENT filter, not the one captured when the mutation started (issue 2443).
   const [refreshKey, setRefreshKey] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const beginRequest = useLatestRequest();
   const fetchCoupons = useCallback(async () => {
     const isLatest = beginRequest();
@@ -126,9 +130,12 @@ export function useCoupons(storeId: string): UseCouponsResult {
 
         if (error) {
           console.error('Failed to save coupon:', error.message);
+          // QA-PRICE-ZERO-1: a refusal (e.g. a 0% coupon) used to leave the modal open with no word. Show the reason.
+          setSaveError(error.message || null);
           return false;
         }
 
+        setSaveError(null);
         setRefreshKey(k => k + 1);
         return true;
       } catch (error) {
@@ -176,6 +183,8 @@ export function useCoupons(storeId: string): UseCouponsResult {
     setFilterActive,
     fetchCoupons,
     saveCoupon,
+    saveError,
+    clearSaveError: () => setSaveError(null),
     deleteCoupon,
     toggleActive,
   };
