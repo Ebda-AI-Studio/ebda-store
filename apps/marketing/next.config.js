@@ -18,6 +18,8 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   images: { unoptimized: true },
+  // Build-time copyright year (static export): identical in the server HTML and the hydrating client. See src/lib/copyright-year.ts.
+  env: { NEXT_PUBLIC_COPYRIGHT_YEAR: String(new Date().getUTCFullYear()) },
   outputFileTracingRoot: ROOT,
   turbopack: { root: ROOT },
 };

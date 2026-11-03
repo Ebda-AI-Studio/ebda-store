@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { siteFooter, type NavLink } from '@ebda/shared/brand';
 import { SiteLink } from './SiteLink';
 import { CookieSettingsButton } from './CookieSettingsButton';
+import { COPYRIGHT_YEAR } from '../lib/copyright-year';
 import type { Locale, PageSlug } from '../lib/site';
 
 /**
@@ -12,7 +13,6 @@ import type { Locale, PageSlug } from '../lib/site';
  */
 export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
   const f = siteFooter(locale);
-  const year = new Date().getUTCFullYear();
   const A = ({ l }: { l: NavLink }) =>
     l.path ? (
       <Link href={l.path}>{l.label}</Link>
@@ -66,7 +66,7 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
           ))}
         </div>
         <div className="sf-bottom">
-          <p className="muted small">{f.copyright(year)}</p>
+          <p className="muted small">{f.copyright(COPYRIGHT_YEAR)}</p>
         </div>
       </div>
     </footer>

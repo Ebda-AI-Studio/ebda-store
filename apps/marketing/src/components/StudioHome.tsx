@@ -54,7 +54,8 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
   const rtl = locale === 'ar';
   const store = rtl ? BRAND.product.nameAr : BRAND.product.nameEn;
   const chat = rtl ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn;
-  const num = (n: number) => (rtl ? ['٠١', '٠٢', '٠٣'][n] : ['01', '02', '03'][n]);
+  // Western digits in every locale (Ruling DIGITS-1).
+  const num = (n: number) => ['01', '02', '03'][n];
   return (
     <>
       <a href="#main" className="skip">
