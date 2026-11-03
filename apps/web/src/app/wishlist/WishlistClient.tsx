@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyStateKit } from '../../components/EmptyStateKit';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from '../../components/StoreLink';
 import { useRouter } from 'next/navigation';
@@ -208,33 +209,33 @@ export default function WishlistClient() {
       <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">{t('My Wishlist', 'قائمة المفضلة')}</h1>
-          <div className="text-center py-12 bg-muted rounded-xl">
-            <svg
-              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-            <h2 className="text-xl font-semibold mb-2">
-              {t('Sign in to view your wishlist', 'سجّل دخول عشان تشوف المفضلة')}
-            </h2>
-            <p className="text-muted-foreground mb-4">
-              {t('Save your favorite items for later', 'احفظ المنتجات اللي عاجباك لبعدين')}
-            </p>
+          <EmptyStateKit
+            icon={
+              <svg
+                className="h-16 w-16 text-primary/40"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            }
+            title={t('Sign in to view your wishlist', 'سجّل دخول عشان تشوف المفضلة')}
+            body={t('Save your favorite items for later', 'احفظ المنتجات اللي عاجباك لبعدين')}
+          >
             <Link
               href={storeUrl('/auth/login?redirect=/wishlist')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+              className="inline-flex h-12 items-center rounded-[var(--radius)] border border-primary px-6 text-base font-semibold text-primary"
             >
               {t('Sign In', translations['Sign In'])}
             </Link>
-          </div>
+          </EmptyStateKit>
         </div>
       </ShopChrome>
     );
@@ -436,33 +437,29 @@ export default function WishlistClient() {
         )}
 
         {!error && items.length === 0 ? (
-          <div className="text-center py-12 bg-background rounded-lg">
-            <svg
-              className="w-16 h-16 text-muted-foreground mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-            <h2 className="text-xl font-semibold mb-2">
-              {t('Your wishlist is empty', 'المفضلة فاضية')}
-            </h2>
-            <p className="text-muted-foreground mb-4">
-              {t('Start adding products you love!', 'ابدأ ضيف المنتجات اللي بتحبها!')}
-            </p>
-            <Link
-              href={storeUrl('/products')}
-              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-            >
-              {t('Browse Products', 'تصفح المنتجات')}
-            </Link>
-          </div>
+          <EmptyStateKit
+            icon={
+              <svg
+                className="h-16 w-16 text-primary/40"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            }
+            title={t('Your wishlist is empty', 'المفضلة فاضية')}
+            body={t(
+              'Tap the heart on anything you like and it will wait here.',
+              'دوس على القلب عند أي حاجة عاجباك وهتلاقيها هنا.'
+            )}
+          />
         ) : T && !templateLoading ? (
           <T.ProductGrid
             products={wishlistTemplateProducts}
