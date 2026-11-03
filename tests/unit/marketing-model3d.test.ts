@@ -52,6 +52,41 @@ describe('3D assets', () => {
   });
 });
 
+describe('serum liquid stays opaque (Ruling MKT-3D-FIX-1)', () => {
+  it('the generated jasmine glb has no transmission or volume on any serum material', () => {
+    const b = readFileSync(pub('3d/jasmine-serum.glb'));
+    const json = JSON.parse(
+      b
+        .subarray(20, 20 + b.readUInt32LE(12))
+        .toString('utf8')
+        .trimEnd()
+    ) as {
+      materials: { name: string; extensions?: Record<string, unknown> }[];
+    };
+    const serums = json.materials.filter(m => /^serum/.test(m.name));
+    expect(serums.length).toBe(4); // default + rose, amber, sage
+    for (const m of serums) {
+      expect(m.extensions?.KHR_materials_transmission, m.name).toBeUndefined();
+      expect(m.extensions?.KHR_materials_volume, m.name).toBeUndefined();
+    }
+    // the glass keeps its transmission: only the liquid under it is opaque
+    expect(
+      json.materials.find(m => m.name === 'glass')?.extensions?.KHR_materials_transmission
+    ).toBeTruthy();
+  });
+  it('the generator source keeps the serum material without transmission', () => {
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/marketing/scripts/3d/make-models.mjs'),
+      'utf8'
+    );
+    const block = src.slice(
+      src.indexOf("const serum = P('serum'"),
+      src.indexOf('g.add(mk(lathe(liquid)')
+    );
+    expect(block).not.toMatch(/transmission|thickness/);
+  });
+});
+
 describe('licence credits (Ruling MKT-12)', () => {
   it('CREDITS.md credits Shopify (CC BY 4.0) and Poly Haven (CC0) for all five models', () => {
     const c = readFileSync(pub('demo/CREDITS.md'), 'utf8');
