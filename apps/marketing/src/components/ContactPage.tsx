@@ -4,6 +4,7 @@ import { COPY } from '../lib/content';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { OfficeBlock } from './OfficeBlock';
 import { SiteLink } from './SiteLink';
 
 export function ContactPage({ locale }: { locale: Locale }) {
@@ -56,6 +57,9 @@ export function ContactPage({ locale }: { locale: Locale }) {
               {' · '}
               <a href="/.well-known/security.txt">security.txt</a>
             </p>
+          </section>
+          <section aria-labelledby="contact-office-h">
+            <OfficeBlock locale={locale} headingId="contact-office-h" />
           </section>
           <p className="muted small">{p.company}</p>
           <p className="legal-back">

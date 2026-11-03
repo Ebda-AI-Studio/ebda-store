@@ -1,0 +1,203 @@
+/* The studio bar's additions to the header (Log in menu, the studio CTA) and the product bar that sits under it on a
+   product page only (Ebda Store, Ebda Chat). Data: packages/shared/src/brand (siteNav*, productBar). Logical
+   properties throughout, so everything mirrors in Arabic RTL. */
+.login-menu > details > ul {
+  inset-inline-start: auto;
+  inset-inline-end: -18px;
+  width: min(260px, calc(100vw - 32px));
+}
+@media (max-width: 520px) {
+  /* a phone has no room for it in the bar: the Menu carries the same Log in group */
+  .login-menu {
+    display: none;
+  }
+}
+.nav-menu a.nav-cta {
+  justify-content: center;
+  background: var(--gold);
+  color: var(--night);
+  border-radius: 10px;
+  font-weight: 600;
+}
+.nav-menu a.nav-cta:hover {
+  background: var(--lift);
+  color: var(--night);
+}
+
+.product-bar {
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+.product-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 48px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.product-row::-webkit-scrollbar {
+  display: none;
+}
+.product-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline-end: 18px;
+  border-inline-end: 1px solid var(--line);
+  font-weight: 700;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.product-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+.product-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.product-links a:hover,
+.product-links a[aria-current='page'],
+.product-chip:hover {
+  color: var(--accent-text);
+}
+.product-links a[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 8px;
+}
+.btn-sm {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.9375rem;
+}
+.product-cta {
+  flex: none;
+  margin-inline-start: auto;
+}
+@media (max-width: 440px) {
+  /* the same CTA is in the Menu on a phone */
+  .product-cta {
+    display: none;
+  }
+}
+
+/* site-footer:start (generated from SITE_FOOTER_CSS in packages/shared/src/brand; tests/unit/studio-nav-footer.test.ts keeps it equal) */
+.band-dark {
+  --canvas: #0a0b0c;
+  --panel: #121415;
+  --raise: #181b1c;
+  --line: #2f3435;
+  --line-strong: #6f7775;
+  --fg: #f3f5f4;
+  --muted: #a9b1af;
+  --accent-text: #cba873;
+  background: #0a0b0c;
+  color: #f3f5f4;
+}
+.sf {
+  margin-top: 56px;
+  padding-block: 44px 24px;
+}
+.sf a {
+  color: #f3f5f4;
+  text-decoration: none;
+}
+.sf a:hover {
+  color: #cba873;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sf-grid {
+  display: grid;
+  gap: 32px 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sf-brand {
+  grid-column: 1/-1;
+}
+@media (min-width: 900px) {
+  .sf-grid {
+    grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(0, 1fr));
+  }
+  .sf-brand {
+    grid-column: auto;
+  }
+}
+.sf-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.sf-mission {
+  color: #a9b1af;
+  margin: 0 0 16px;
+}
+.sf-contact {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.sf-contact dt {
+  color: #a9b1af;
+  font-size: 0.8125rem;
+}
+.sf-contact dd {
+  margin: 0;
+}
+.sf-col h2 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #cba873;
+  margin: 0 0 10px;
+}
+html[lang='ar'] .sf-col h2 {
+  letter-spacing: 0;
+}
+.sf-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.sf-col a,
+.sf-col button {
+  display: inline-block;
+  padding: 9px 0;
+  min-height: 44px;
+  color: #f3f5f4;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.sf-col button:hover {
+  color: #cba873;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sf-bottom {
+  border-top: 1px solid #2f3435;
+  margin-top: 32px;
+  padding-top: 16px;
+}
+.sf-bottom p {
+  margin: 0;
+  color: #a9b1af;
+}
+
+/* site-footer:end */

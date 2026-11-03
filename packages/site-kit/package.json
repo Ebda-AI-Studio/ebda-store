@@ -12,6 +12,7 @@
     "./build/mdx": "./src/build/mdx.mjs",
     "./build/shell": "./src/build/shell.mjs",
     "./build/search": "./src/build/search.mjs",
+    "./build/links": "./src/build/links.mjs",
     "./build/site": "./src/build/site.mjs",
     "./search-core": "./src/search-core.mjs",
     "./css/site.css": "./src/css/site.css",

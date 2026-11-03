@@ -13,6 +13,8 @@ export interface WhatsAppPage {
   h1: string;
   lead: string;
   ctaStart: string;
+  /** Alt text and caption of the Ebda Chat art (Ruling MKT-CHAT-ART-1): /chat/chat-{hero,inbox,campaign}-{ar,en}.svg. */
+  art: { hero: string; inbox: string; campaign: string; caption: string };
   featuresH: string;
   features: { t: string; p: string }[];
   storeH: string;
@@ -85,6 +87,13 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
     },
     h1: `${AR} — بيع ورد على عملائك على واتساب`,
     lead: `أكّد الطلبات وابعت الحملات لعملائك على واتساب من مكان واحد، ومربوط بمتجرك على ${STORE_AR}. بيشتغل على منصة واتساب للأعمال الرسمية من Meta.`,
+    art: {
+      hero: 'محادثة على واتساب بين متجر وعميل: رسالة تأكيد طلب دفع عند الاستلام، ورد العميل، وتأكيد الطلب',
+      inbox: 'الصندوق المشترك: قايمة محادثات العملاء مع تاجز ورسايل جديدة وتوزيع على فريقك',
+      campaign:
+        'إرسال حملة: قالب معتمد، وشريحة عملاء وافقوا على العروض، والتكلفة المتوقعة قبل التأكيد',
+      caption: 'مثال توضيحي',
+    },
     ctaStart: 'ابدأ دلوقتي',
     featuresH: 'اللي هتلاقيه جوّه',
     features: [
@@ -214,6 +223,14 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
     },
     h1: `${EN} — sell and support your customers on WhatsApp`,
     lead: `Confirm orders and send campaigns to your customers on WhatsApp, all in one place, linked to ${STORE_EN}. Works with the WhatsApp Business Platform.`,
+    art: {
+      hero: 'A WhatsApp conversation between a store and a customer: a cash-on-delivery order confirmation message, the customer reply, and the confirmed order',
+      inbox:
+        'Shared inbox: a list of customer conversations with tags, new messages and assignment to your team',
+      campaign:
+        'Sending a campaign: an approved template, a segment of customers who agreed to offers, and the estimated cost before confirming',
+      caption: 'Illustrative example',
+    },
     ctaStart: 'Start now',
     featuresH: "What's inside",
     features: [

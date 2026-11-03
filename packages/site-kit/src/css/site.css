@@ -1,14 +1,17 @@
-/* Ebda docs + help — night canvas, Antique Gold accents. Brand tokens (--night, --gold,
+/* Ebda docs + help — the studio's light canvas (as ebda.app), Ebda gold / brass / silver accents, a dark footer band. Brand tokens (--night, --gold,
    --lift, --font-*) are injected from BRAND on :root by the page shell. */
 :root {
-  --panel: #121415;
-  --raise: #181b1c;
-  --line: #2f3435;
-  --fg: #f3f5f4;
-  --muted: #a9b1af;
-  --ok: #5fd08a;
-  --warn: #e6b450;
-  --bad: #ff8a80;
+  --canvas: #fafafa;
+  --panel: #ffffff;
+  --raise: #f2f2f2;
+  --line: #e2e3e3;
+  --fg: #121314;
+  --muted: #575c5d;
+  /* gold as TEXT would fail AA at body size, so the text form is the brand gold mixed toward black (as ebda.app) */
+  --accent-text: color-mix(in srgb, var(--gold) 70%, #000);
+  --ok: #0d7a43;
+  --warn: #8a5a00;
+  --bad: #b42318;
   --radius: 12px;
   --maxw: 1180px;
 }
@@ -20,7 +23,7 @@ html {
 }
 body {
   margin: 0;
-  background: var(--night);
+  background: var(--canvas);
   color: var(--fg);
   font-family: var(--font-sans);
   line-height: 1.7;
@@ -33,14 +36,14 @@ html[lang='ar'] body {
   line-height: 1.9;
 }
 a {
-  color: var(--lift);
+  color: var(--accent-text);
   text-underline-offset: 3px;
 }
 a:hover {
   color: var(--fg);
 }
 :focus-visible {
-  outline: 3px solid var(--lift);
+  outline: 3px solid var(--fg);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -110,7 +113,8 @@ ol {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(10, 11, 12, 0.94);
+  background: color-mix(in srgb, var(--canvas) 92%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
 .header-row {
@@ -138,7 +142,7 @@ ol {
   display: block;
 }
 .wm-ar {
-  color: var(--lift);
+  color: var(--accent-text);
 }
 .wm-site {
   color: var(--muted);
@@ -164,7 +168,7 @@ ol {
   display: inline-block;
 }
 .top-nav a:hover {
-  color: var(--lift);
+  color: var(--accent-text);
 }
 .search {
   display: flex;
@@ -184,7 +188,7 @@ ol {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
   text-align: start;
 }
 .ta-note {
@@ -258,7 +262,7 @@ ol {
 }
 .btn-ghost {
   background: transparent;
-  color: var(--lift);
+  color: var(--accent-text);
   border: 1px solid var(--gold);
 }
 .lang-switch {
@@ -296,7 +300,7 @@ ol {
 .side a[aria-current='page'] {
   background: var(--raise);
   border-color: var(--gold);
-  color: var(--lift);
+  color: var(--accent-text);
 }
 .side-title {
   font-size: 0.8rem;
@@ -412,7 +416,7 @@ th {
 }
 .callout strong {
   display: block;
-  color: var(--lift);
+  color: var(--accent-text);
 }
 .callout > :last-child {
   margin-bottom: 0;
@@ -488,7 +492,7 @@ th {
   border-radius: 6px;
   background: var(--raise);
   border: 1px solid var(--gold);
-  color: var(--lift);
+  color: var(--accent-text);
 }
 .op h4 {
   margin: 14px 0 4px;
@@ -498,25 +502,6 @@ th {
   text-transform: uppercase;
 }
 
-/* footer */
-.site-footer {
-  border-top: 1px solid var(--line);
-  padding-block: 20px;
-}
-.footer-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px 24px;
-}
-.footer-row ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 18px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;

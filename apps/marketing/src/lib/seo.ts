@@ -1,15 +1,24 @@
 import type { Metadata } from 'next';
-import { BRAND, WHATSAPP_PACKAGES, type WhatsAppBasePackageId } from '@ebda/shared/brand';
+import {
+  BRAND,
+  WHATSAPP_PACKAGES,
+  officePostalAddress,
+  servicesJsonLd,
+  type WhatsAppBasePackageId,
+} from '@ebda/shared/brand';
 import { CAPABILITIES } from './capabilities';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import { WHATSAPP_APP_URL, WHATSAPP_PAGE } from './whatsapp-page';
+import { STUDIO_HOME } from './studio-home';
 import {
   HOME,
+  STORE_HOME,
   SIGNUP_URL,
   SITE_URL,
   absoluteUrl,
   pagePath,
+  productOfPage,
   type Locale,
   type PageSlug,
 } from './site';
@@ -34,7 +43,12 @@ export const shortBrand = (locale: Locale) =>
   `${productLabel(locale)} (${BRAND.domains.marketing})`;
 
 /** The Ebda Chat product page: its own name in the title tail, the OG site name, the brand line and the OG image. */
-export type PageProduct = 'store' | 'whatsapp';
+export type PageProduct = 'store' | 'whatsapp' | 'studio';
+/** The title/OG product of a page, from its kind (NAV-PRODUCT-OF-PAGE-1): Store pages say Ebda Store, Chat pages Ebda Chat, every other page the studio. */
+const pageProduct = (page: string): PageProduct => {
+  const kind = productOfPage(page);
+  return kind === 'chat' ? 'whatsapp' : kind;
+};
 const WA_OG_IMAGE = {
   url: '/og-whatsapp.png',
   width: 1200,
@@ -72,18 +86,35 @@ export function pageMetadata(
   page: Page,
   title?: string,
   description?: string,
-  product: PageProduct = 'store'
+  product: PageProduct = pageProduct(page)
 ): Metadata {
   const c = COPY[locale];
   const wa = product === 'whatsapp';
+  const studio = product === 'studio';
   // Titles, OG and Twitter name the PRODUCT (ruling PRODUCT-NAME-1); the studio is only the
   // publisher / organization (see jsonLd).
-  const name = wa ? waLabel(locale) : productLabel(locale);
+  const name = wa
+    ? waLabel(locale)
+    : studio
+      ? locale === 'ar'
+        ? BRAND.company.shortNameAr
+        : BRAND.company.shortNameEn
+      : productLabel(locale);
   // Home: the product title as written. Other pages: page title, then the short brand tail. A title that already
   // names the product (the about page) is not repeated.
   const lead = (title ?? c.meta.title).replace(new RegExp(`^${name} — `), '');
-  const tail = wa ? `${name} (${BRAND.domains.marketing})` : shortBrand(locale);
-  const t = title ? `${lead} | ${tail}` : c.meta.title;
+  const tail = wa || studio ? `${name} (${BRAND.domains.marketing})` : shortBrand(locale);
+  // the studio home carries its own full title; a studio inner page ends in the studio name unless its title already says it
+  const t =
+    studio && page === '' && title
+      ? title
+      : studio && title
+        ? lead.includes(name)
+          ? `${lead} (${BRAND.domains.marketing})`
+          : `${lead} | ${tail}`
+        : title
+          ? `${lead} | ${tail}`
+          : c.meta.title;
   const d = description ?? c.meta.description;
   // The five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs); everything else the shared one.
   const vertical = page.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
@@ -106,7 +137,7 @@ export function pageMetadata(
       siteName: name,
       title: t,
       // the full disambiguating line rides in the OG description (and the JSON-LD), not in every title
-      description: `${d} ${wa ? whatsappBrandLine() : brandLine()}.`,
+      description: studio ? d : `${d} ${wa ? whatsappBrandLine() : brandLine()}.`,
       url: pagePath(locale, page),
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       alternateLocale: locale === 'ar' ? ['en_US'] : ['ar_EG'],
@@ -152,9 +183,12 @@ export function jsonLd(
         '@id': org,
         name: BRAND.company.shortNameEn,
         alternateName: BRAND.company.shortNameAr,
-        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        ...servicesJsonLd(locale),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
+        foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         // No verified public profiles yet; add real ones only (never a guessed handle).
         sameAs: [] as string[],
@@ -165,7 +199,7 @@ export function jsonLd(
         '@id': brand,
         name: BRAND.product.nameEn,
         alternateName: [BRAND.product.nameAr, brandLine()],
-        url: `${SITE_URL}/#store`,
+        url: absoluteUrl(STORE_HOME[locale]),
         logo: `${SITE_URL}/logo-store.png`,
         email: BRAND.supportEmail,
         parentOrganization: { '@id': org },
@@ -174,7 +208,7 @@ export function jsonLd(
       {
         '@type': 'WebSite',
         '@id': site,
-        url: absoluteUrl(HOME[locale]),
+        url: absoluteUrl(STORE_HOME[locale]),
         name: productLabel(locale),
         alternateName: productAlt(locale),
         inLanguage: locale,
@@ -230,6 +264,62 @@ export function jsonLd(
 }
 
 /**
+ * JSON-LD of the Ebda AI Studio home (Ruling MKT-HOME-1): the studio is the Organization and the WebSite; each product is
+ * its own entity under it (the same ids as on the product pages).
+ */
+export function studioJsonLd(locale: Locale) {
+  const org = `${SITE_URL}/#organization`;
+  const c = STUDIO_HOME[locale];
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': org,
+        name: BRAND.company.shortNameEn,
+        alternateName: BRAND.company.shortNameAr,
+        url: SITE_URL,
+        logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        ...servicesJsonLd(locale),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
+        foundingDate: BRAND.company.foundedOn,
+        email: BRAND.supportEmail,
+        sameAs: [] as string[],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE_URL}/#website`,
+        url: absoluteUrl(HOME[locale]),
+        name: BRAND.company.shortNameEn,
+        alternateName: BRAND.company.shortNameAr,
+        description: c.meta.desc,
+        inLanguage: locale,
+        publisher: { '@id': org },
+      },
+      {
+        '@type': 'Organization',
+        '@id': `${SITE_URL}/#store`,
+        name: BRAND.product.nameEn,
+        alternateName: [BRAND.product.nameAr, brandLine()],
+        url: absoluteUrl(STORE_HOME[locale]),
+        parentOrganization: { '@id': org },
+        sameAs: [] as string[],
+      },
+      {
+        '@type': 'Organization',
+        '@id': `${SITE_URL}/#whatsapp`,
+        name: BRAND.productWhatsapp.nameEn,
+        alternateName: [BRAND.productWhatsapp.nameAr, whatsappBrandLine()],
+        url: absoluteUrl(pagePath(locale, 'whatsapp')),
+        parentOrganization: { '@id': org },
+        sameAs: [] as string[],
+      },
+    ],
+  };
+}
+
+/**
  * JSON-LD of the Ebda Chat page: the studio (publisher), the product as a brand under it, a SoftwareApplication
  * and the page FAQ. Offers come from WHATSAPP_PACKAGES (WA-PRICE-1), the same constant the pricing section renders.
  */
@@ -245,9 +335,12 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         '@id': org,
         name: BRAND.company.shortNameEn,
         alternateName: BRAND.company.shortNameAr,
-        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        ...servicesJsonLd(locale),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
+        foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
       },

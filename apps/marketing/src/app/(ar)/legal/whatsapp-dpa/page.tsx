@@ -8,7 +8,8 @@ const doc = COPY['ar'].legalPages.waDpa;
 export const metadata: Metadata = pageMetadata(
   'ar',
   'legal/whatsapp-dpa',
-  doc.title,
+  // P2-1: the page title names the product in Arabic; the vendored document keeps its source heading
+  doc.title.replace('Ebda Chat', 'ابدأ شات'),
   doc.sections[0].p[0].slice(0, 160)
 );
 

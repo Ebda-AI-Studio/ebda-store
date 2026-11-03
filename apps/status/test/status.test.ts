@@ -430,7 +430,7 @@ describe('master brand, products and discovery files (BRAND-ARCH-1, 6c)', () => 
     expect(en).toMatch(/<h3 id="prod-store">Ebda Store<\/h3>/);
     expect(en).toMatch(/<h3 id="prod-studio">Ebda AI Studio<\/h3>/);
     const ar = await (await get('/')).text();
-    expect(ar).toContain('حالة خدمات ابدأ استوديو للذكاء الاصطناعي');
+    expect(ar).toContain('حالة خدمات ابدأ ستوديو');
     expect(ar).toContain('ابدأ ستور</h3>');
     expect(ar).not.toMatch(/قريب|coming soon/i);
   });

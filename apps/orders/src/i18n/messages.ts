@@ -794,7 +794,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       searchOrders: 'دوّر في الطلبات',
       orders: 'الطلبات',
       home: 'الرئيسية',
-      backToSite: 'ارجع لموقع ابدأ استوديو للذكاء الاصطناعي',
+      backToSite: 'ارجع لموقع ابدأ ستوديو للذكاء الاصطناعي',
     },
   },
 };

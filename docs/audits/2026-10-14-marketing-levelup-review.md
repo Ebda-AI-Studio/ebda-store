@@ -13,21 +13,21 @@ Screenshots are in `scratchpad/live/`: `{ar,en}-{390,1440}-full.png`, plus slice
 
 The page runs in this order. Heights are at 1440 px; the 390 px heights are in brackets.
 
-| #   | Section    | Height          | What it shows                                                                                                                                                                     |
-| --- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | hero       | 820 (776)       | Particle "dust stream" (NileNight), gold kicker "ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.", h1 "ابدأ متجرك أونلاين في دقايق.", two CTAs, and a `yourstore.ebda.app` pill |
-| 2   | story      | **3060 (2870)** | A sticky Dahab phone with 4 numbered lines: "اختار اسم ولوجو / نزّل منتجاتك / ظبّط ألوانك / وأول طلب يوصلك"                                                                       |
-| 3   | how        | 600 (966)       | **4 more numbered steps** in gold-ringed cards (01–04): sign up / add products / pick a look / receive orders                                                                     |
-| 4   | templates  | 1014 (606)      | Dahab laptop, tablet and phone frames (night + gold)                                                                                                                              |
-| 5   | breakout   | **2700 (2532)** | Outline-stroke "ابدأ دلوقتي" words behind a Dahab phone                                                                                                                           |
-| 6   | dahab (3D) | 1170 (880)      | Procedural three.js ring on a full gold field, metal and stone chips                                                                                                              |
-| 7   | features   | 891             | 8 items in a 2-column ruled list                                                                                                                                                  |
-| 8   | payments   | 713             | Logo rails: payment (COD, InstaPay, Paymob, Kashier, Fawry) and shipping (Bosta, ShipBlu, Mylerz, Aramex, self-delivery)                                                          |
-| 9   | about      | 857             | "حكاية ابدأ استوديو للذكاء الاصطناعي": 3 paragraphs plus the arch mark                                                                                                            |
-| 10  | pricing    | 2042 (**2840**) | 3 plan cards (1,490 / 3,490 / 9,990 EGP) and a 14-row comparison table                                                                                                            |
-| 11  | faq        | 780             | 7 questions                                                                                                                                                                       |
-| 12  | start      | 524             | "الدور عليك." and 2 CTAs                                                                                                                                                          |
-| –   | footer     | 300             |                                                                                                                                                                                   |
+| #   | Section    | Height          | What it shows                                                                                                                                                                    |
+| --- | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | hero       | 820 (776)       | Particle "dust stream" (NileNight), gold kicker "ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.", h1 "ابدأ متجرك أونلاين في دقايق.", two CTAs, and a `yourstore.ebda.app` pill |
+| 2   | story      | **3060 (2870)** | A sticky Dahab phone with 4 numbered lines: "اختار اسم ولوجو / نزّل منتجاتك / ظبّط ألوانك / وأول طلب يوصلك"                                                                      |
+| 3   | how        | 600 (966)       | **4 more numbered steps** in gold-ringed cards (01–04): sign up / add products / pick a look / receive orders                                                                    |
+| 4   | templates  | 1014 (606)      | Dahab laptop, tablet and phone frames (night + gold)                                                                                                                             |
+| 5   | breakout   | **2700 (2532)** | Outline-stroke "ابدأ دلوقتي" words behind a Dahab phone                                                                                                                          |
+| 6   | dahab (3D) | 1170 (880)      | Procedural three.js ring on a full gold field, metal and stone chips                                                                                                             |
+| 7   | features   | 891             | 8 items in a 2-column ruled list                                                                                                                                                 |
+| 8   | payments   | 713             | Logo rails: payment (COD, InstaPay, Paymob, Kashier, Fawry) and shipping (Bosta, ShipBlu, Mylerz, Aramex, self-delivery)                                                         |
+| 9   | about      | 857             | "حكاية ابدأ ستوديو للذكاء الاصطناعي": 3 paragraphs plus the arch mark                                                                                                            |
+| 10  | pricing    | 2042 (**2840**) | 3 plan cards (1,490 / 3,490 / 9,990 EGP) and a 14-row comparison table                                                                                                           |
+| 11  | faq        | 780             | 7 questions                                                                                                                                                                      |
+| 12  | start      | 524             | "الدور عليك." and 2 CTAs                                                                                                                                                         |
+| –   | footer     | 300             |                                                                                                                                                                                  |
 
 Other measurements:
 
@@ -52,7 +52,7 @@ The product already ships a real 3D viewer [M]. `packages/ui/src/model3d/Product
 | #         | Heuristic                       | Score     | Key issue                                                                                                                                                                                                                         |
 | --------- | ------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1         | Visibility of system status     | 3         | The sticky nav and story-step highlighting work. A scroll runway gives no sense of "how much more" (3,060 px story)                                                                                                               |
-| 2         | Match system / real world       | 3         | Egyptian colloquial is excellent ("ابدأ دلوقتي", "باقة على قد متجرك"). But the wordmark, kicker and About section all say "ابدأ استوديو للذكاء الاصطناعي", a company name, where a merchant expects "Ebda Store"                  |
+| 2         | Match system / real world       | 3         | Egyptian colloquial is excellent ("ابدأ دلوقتي", "باقة على قد متجرك"). But the wordmark, kicker and About section all say "ابدأ ستوديو للذكاء الاصطناعي", a company name, where a merchant expects "Ebda Store"                   |
 | 3         | User control and freedom        | 3         | Plain scrolling and an FAQ. About 5,700 px of sticky runway (story + breakout) feels like scroll-jacking on mobile                                                                                                                |
 | 4         | Consistency and standards       | **2**     | Two 4-step sequences back to back (story, then how). The site wears the **retired** night + gold Dahab look while the product's 5×3 looks are light, varied and colourful. The brand name changes between header, hero and footer |
 | 5         | Error prevention                | 3         | Pricing is clear: annual price, 0% commission, gateway fees called out                                                                                                                                                            |
@@ -106,8 +106,8 @@ The copy is the best asset: short, colloquial and confident. The visual layer se
   - _Fix:_ before ads, ship one real or demo store at a real URL ("شوف متجر حقيقي") plus a merchant quote with face and city. Until a merchant exists, link the 5 looks as browsable demo stores.
   - _Command:_ `$impeccable clarify`.
 - **[P1] Brand-name confusion.**
-  - _Why:_ the header wordmark, hero kicker and About all say "ابدأ استوديو للذكاء الاصطناعي" (the studio). Merchants are buying **Ebda Store**. The About section (857 px) is company philosophy on a conversion page.
-  - _Fix:_ use "ابدأ ستور" in the header and hero. Move the studio to the footer line ("ابدأ ستور منتج من ابدأ استوديو") and the full story to `/about`, which already exists.
+  - _Why:_ the header wordmark, hero kicker and About all say "ابدأ ستوديو للذكاء الاصطناعي" (the studio). Merchants are buying **Ebda Store**. The About section (857 px) is company philosophy on a conversion page.
+  - _Fix:_ use "ابدأ ستور" in the header and hero. Move the studio to the footer line ("ابدأ ستور منتج من ابدأ ستوديو") and the full story to `/about`, which already exists.
   - _Command:_ `$impeccable clarify`.
 
 ### Persona red flags
