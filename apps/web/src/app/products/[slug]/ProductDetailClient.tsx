@@ -44,7 +44,7 @@ import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
 import { B2bPdpPanel } from '../../../components/pricing/B2bPdpPanel';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
-import { WaMeProductButton } from '../../../templates/shared/WaMeButtons';
+import { WaMeProductButton, useHasWaMeProductButton } from '../../../templates/shared/WaMeButtons';
 import { SpecTable } from '../../../templates/shared/SpecTable';
 import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
 import {
@@ -732,6 +732,7 @@ export default function ProductDetailClient({
       : priceText;
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
+  const hasWaAsk = useHasWaMeProductButton(product);
   const personalisationCfg = activePersonalisation(product.personalisation);
   const typedNote = cleanNote(note);
   const waPersonalisation =
@@ -978,7 +979,11 @@ export default function ProductDetailClient({
                     disabled={noteMissing}
                     onBlocked={() => setNoteNudge(n => n + 1)}
                   />
-                  <ShareProductRow productName={displayName} url={shareUrl} />
+                  <ShareProductRow
+                    productName={displayName}
+                    url={shareUrl}
+                    hasWhatsAppAsk={hasWaAsk}
+                  />
                 </>
               }
               // Ruling B5-1 (finding): the Dahab branch never passed `mediaSlot`, so a Dahab product
@@ -1385,6 +1390,23 @@ export default function ProductDetailClient({
                   {/* B2-9: merchant-configured estimate, PDP only; renders nothing when off. */}
                   <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
                 </div>
+                {/* Audit #13: the saving in words next to the struck price, for the picked variant
+                  too (its own compare-at, see getProductPricing). Rendered with the price, so
+                  there is no shift when a variant is picked. */}
+                {pricing.mode === 'single' &&
+                  displayCompare &&
+                  displayCompare > displayPrice &&
+                  discountBadgeText && (
+                    <p
+                      data-testid="pdp-saving"
+                      className="mt-1 text-sm font-medium text-destructive-ink"
+                    >
+                      {t(
+                        `You save ${formatPrice(displayCompare - displayPrice)} (${discountBadgeText})`,
+                        `وفّرت ${formatPrice(displayCompare - displayPrice)} (${discountBadgeText})`
+                      )}
+                    </p>
+                  )}
                 <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
                 <GoldRateLine
                   gold={goldForSelection}
@@ -1470,15 +1492,13 @@ export default function ProductDetailClient({
                     </div>
                     {effectiveInventory !== undefined &&
                       effectiveInventory !== null &&
-                      outOfStock && (
+                      canBackorder && (
                         <span className="text-sm text-muted-foreground">
                           {/* From the same stock answer as the button (X-02): a variant
                           product's own inventory is 0, and a pre-order is not "out".
                           Taste re-audit P2-1: "in stock" is true for almost every item, so
                           only pre-order and out of stock are said (quality bar § 8). */}
-                          {canBackorder
-                            ? t('Available to pre-order', 'متاح للطلب المسبق')
-                            : t('Out of stock', 'غير متوفر')}
+                          {t('Available to pre-order', 'متاح للطلب المسبق')}
                         </span>
                       )}
                   </div>
@@ -1554,9 +1574,19 @@ export default function ProductDetailClient({
                   // read as "only the first line saved". Matches how FAQ answers
                   // and how-to guides already render merchant prose. Still plain
                   // text (React escapes it), so no HTML injection surface.
-                  <p className="mt-4 max-w-prose whitespace-pre-line text-muted-foreground leading-relaxed">
-                    {displayDescription}
-                  </p>
+                  // Audit #13: its own section (rule, heading, 17 px / 1.9 leading) so a one-line
+                  // description does not sit as a stray grey line in a white column.
+                  <section
+                    data-testid="pdp-description"
+                    className="mt-10 border-t border-border pt-8"
+                  >
+                    <h2 className="mb-3 text-lg font-semibold text-foreground">
+                      {t('About this piece', 'عن المنتج')}
+                    </h2>
+                    <p className="max-w-prose whitespace-pre-line text-[17px] leading-[1.9] text-foreground/85">
+                      {displayDescription}
+                    </p>
+                  </section>
                 )}
 
                 {/* SKU */}
@@ -1569,19 +1599,25 @@ export default function ProductDetailClient({
                 {/* Spec rows: below the buy box on purpose (PDP above-the-fold budget). */}
                 <FactsTable facts={product.facts} />
 
-                <WaMeProductButton
-                  product={product}
-                  priceMinor={displayPrice}
-                  className="mt-6 w-full sm:w-auto"
-                  personalisation={waPersonalisation}
-                  disabled={noteMissing}
-                  onBlocked={() => setNoteNudge(n => n + 1)}
-                />
-                <ShareProductRow
-                  productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
-                  url={shareUrl}
-                  className="mt-6 border-t border-border pt-6"
-                />
+                {/* Audit #13: ONE row for "ask on WhatsApp" + share. The share row used to carry
+                  its own WhatsApp pill under the ask button: two WhatsApp rows, one job. */}
+                <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-6">
+                  <WaMeProductButton
+                    product={product}
+                    priceMinor={displayPrice}
+                    className="w-full sm:w-auto"
+                    personalisation={waPersonalisation}
+                    disabled={noteMissing}
+                    onBlocked={() => setNoteNudge(n => n + 1)}
+                  />
+                  <ShareProductRow
+                    productName={
+                      language === 'ar' && product.nameAr ? product.nameAr : product.name
+                    }
+                    url={shareUrl}
+                    hasWhatsAppAsk={hasWaAsk}
+                  />
+                </div>
                 <SpecTable
                   specifications={
                     (product as { specifications?: unknown }).specifications as
@@ -1597,18 +1633,22 @@ export default function ProductDetailClient({
         </div>
       </div>
       {/* Phone sticky bar: SAME handler + SAME addDisabled/label as the main button. */}
-      <StickyAddToCart
-        anchorRef={buyRef}
-        title={displayName}
-        price={stickyPriceText}
-        label={addLabel}
-        disabled={addDisabled || isAdding}
-        onAdd={handleAddToCart}
-        cartHref={storeUrl('/cart')}
-        cartCount={cartCount}
-        cartCountText={localize(cartCount)}
-        cartLabel={cartLinkLabel}
-      />
+      {/* A sold-out product has ONE sold-out state: the inline button. A second disabled bar at the
+        bottom said the same thing again and covered the wishlist button (audit #6). */}
+      {(buyableNow || goldStale) && (
+        <StickyAddToCart
+          anchorRef={buyRef}
+          title={displayName}
+          price={stickyPriceText}
+          label={addLabel}
+          disabled={addDisabled || isAdding}
+          onAdd={handleAddToCart}
+          cartHref={storeUrl('/cart')}
+          cartCount={cartCount}
+          cartCountText={localize(cartCount)}
+          cartLabel={cartLinkLabel}
+        />
+      )}
     </ShopChrome>
   );
 }

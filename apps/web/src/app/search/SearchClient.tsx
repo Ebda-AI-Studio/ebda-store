@@ -197,7 +197,12 @@ function SearchContent() {
   return (
     <ShopChrome>
       {/* A dark look lists product photos on the inverse band, as /products does (I-3). */}
-      <div className="flex-1" style={darkLookListingBand(store?.theme, store?.look, false)}>
+      {/* min-h: the page is a client fetch, so before its results (or its empty state) arrive the footer
+          would sit under an empty box and then jump (CLS 0.42 on the empty search, audit 2026-11-03 #8). */}
+      <div
+        className="min-h-[70svh] flex-1"
+        style={darkLookListingBand(store?.theme, store?.look, false)}
+      >
         {/* Search results are still product listings — same typography
           zone as /products. */}
         <div

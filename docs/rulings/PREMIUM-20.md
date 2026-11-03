@@ -1,0 +1,5 @@
+# PREMIUM-20
+
+> Section: 2026-11-03 - Storefront premium defaults (PREMIUM-\*)
+
+Ruling PREMIUM-20 - price filter is one accessible two-thumb slider, filter values are chips, the panel frame is a hairline. the products filter panel uses `PriceRangeSlider` (WAI-ARIA slider x2: arrows, PageUp/Down, Home/End, RTL-aware, formatted `aria-valuetext`, 44px hit area, pointer capture) in place of two native range inputs; facet values and categories are 44px pill chips over real checkboxes/buttons; the panel FRAME is a 12% hairline of the panel's own ink. This supersedes B1-43/VT-05 for the frame only: a container is not a control, so WCAG 1.4.11 does not require the `--input` boundary there; the controls inside keep real boundaries. The card heart plate is opaque white with a hairline ring (it was 85-95% white, grey over a photo) and keeps the look's radius (Ruling LB-c). Evidence: `tests/unit/price-range.test.tsx`, `products-filter-sidebar-state.test.ts`, `form-field-input-boundary.test.ts`. Cost if wrong: a merchant filter colour that makes the 12% hairline vanish loses the panel outline, never a control boundary.

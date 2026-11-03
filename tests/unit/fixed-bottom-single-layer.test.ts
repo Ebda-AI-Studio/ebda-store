@@ -88,6 +88,28 @@ describe('C-04: one fixed-bottom layer, every bar feeds scroll-padding-bottom', 
     expect(offenders).toEqual([]);
   });
 
+  it('a short page ends its footer above the bar: the shop wrapper subtracts the body reserve (audit #6)', () => {
+    // The wrapper was min-h-screen with the body's pb-32 BELOW it, so on a short page the footer
+    // sat at the viewport floor under the tab bar. Its min-height now subtracts --chrome-reserve,
+    // and every body rule that changes the padding changes the variable with it.
+    const chrome = readFileSync(join(WEB, 'components/ShopChrome.tsx'), 'utf8');
+    expect(chrome.match(/min-h-\[calc\(100dvh-var\(--chrome-reserve,0px\)\)\]/g)?.length).toBe(2);
+    expect(chrome).not.toMatch(/className="flex min-h-screen flex-col/);
+    expect(decl(block, 'html')).toContain('--chrome-reserve: 8rem');
+    expect(
+      decl(
+        block,
+        "html[data-tab-bar='off'] body:not([data-sticky-atc='1']):not([data-sticky-cart])"
+      )
+    ).toContain('--chrome-reserve: 0px');
+    expect(decl(block, "body[data-sticky-cart='1']")).toContain(
+      '--chrome-reserve: calc(8rem + 4.25rem)'
+    );
+    expect(decl(block, "body[data-sticky-cart='blocked']")).toContain(
+      '--chrome-reserve: calc(8rem + 4.25rem + 1.5rem)'
+    );
+  });
+
   it('the hook that marks the task bar is what every task bar uses', () => {
     const hook = readFileSync(join(WEB, 'components/commerce/useStickyBarHeight.ts'), 'utf8');
     expect(hook).toContain('root.dataset.taskBar');

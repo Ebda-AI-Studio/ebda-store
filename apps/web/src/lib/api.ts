@@ -585,6 +585,19 @@ function hasSessionEvidence(): boolean {
 }
 
 /**
+ * Public read of the session hint for code that must not call `/auth/me` blind (AuthContext's mount
+ * check on non-account routes, the PDP review form): true when this browser has ever held a session.
+ */
+export function hasSessionHint(): boolean {
+  try {
+    return hasSessionEvidence();
+  } catch {
+    // Blocked storage (private mode, a throwing accessor): no hint, the conservative answer.
+    return false;
+  }
+}
+
+/**
  * One evidence-free refresh probe per TAB, for the session check only (#2164).
  *
  * `hasSessionEvidence()` reads localStorage alone, and Safari ITP evicts

@@ -21,8 +21,12 @@ export function StoreNotFound({ store }: { store: ResolvedStore }) {
   const logo = store.logo || store.logoAr;
   const storeName = store.nameAr || store.name;
 
+  // Audit 2026-11-03 #8 (CLS 0.13): the column was vertically CENTRED in 70vh, so the categories arriving
+  // late (client fetch) pushed the logo and heading up by half their height AND grew the box, which moved
+  // the cookie-preferences row below it. Top-aligned with a full-screen floor: late content only fills space
+  // that is already reserved.
   return (
-    <main className="flex min-h-[70vh] flex-col items-center justify-center gap-8 bg-background px-6 py-20 text-center text-foreground">
+    <main className="flex min-h-[100svh] flex-col items-center justify-start gap-8 bg-background px-6 pb-20 pt-20 text-center text-foreground sm:pt-28">
       <Link href={homeHref} className="inline-flex items-center" aria-label={storeName}>
         {logo ? (
           <>
