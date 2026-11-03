@@ -6201,11 +6201,11 @@
       "error": "We could not turn on alerts. Try again."
     },
     "orderAlertsPrompt": {
-      "title": "Know about every new order the moment it lands",
-      "body": "Turn on order alerts on this device",
+      "title": "Never miss an order",
+      "body": "Turn on alerts on this device and we'll tell you the moment a new order arrives.",
       "cta": "Turn on alerts",
       "enabling": "Turning on alerts…",
-      "later": "Not now",
+      "later": "Later",
       "error": "We couldn't turn on alerts. Try again."
     }
   },

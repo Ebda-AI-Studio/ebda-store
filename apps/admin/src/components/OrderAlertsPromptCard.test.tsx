@@ -19,7 +19,12 @@ vi.mock('@/i18n/useT', () => ({
   useT: (ns?: string) => (key: string) => `${ns}.${key}`,
 }));
 
-import { OrderAlertsPromptCard, orderAlertsDismissKey } from './OrderAlertsPromptCard';
+import {
+  OrderAlertsPromptCard,
+  orderAlertsDismissKey,
+  SESSION_VIEWS_KEY,
+  SESSION_GRACE_MS,
+} from './OrderAlertsPromptCard';
 
 function setPush(permission: NotificationPermission | null) {
   if (permission === null) {
@@ -40,8 +45,19 @@ function api({ orders = 3, guideDone = false } = {}) {
 const CTA = 'components.orderAlertsPrompt.cta';
 
 const memory = new Map<string, string>();
+const session = new Map<string, string>();
+const store = (m: Map<string, string>) => ({
+  getItem: (k: string) => m.get(k) ?? null,
+  setItem: (k: string, v: string) => void m.set(k, v),
+  removeItem: (k: string) => void m.delete(k),
+});
+/** A later page view in the session: the 10 s grace no longer applies. */
+const secondView = () => session.set(SESSION_VIEWS_KEY, '1');
 beforeEach(() => {
   memory.clear();
+  session.clear();
+  secondView();
+  Object.defineProperty(window, 'sessionStorage', { configurable: true, value: store(session) });
   Object.defineProperty(window, 'localStorage', {
     configurable: true,
     value: {
@@ -53,7 +69,11 @@ beforeEach(() => {
   apiGet.mockReset();
   enableOrderAlerts.mockReset();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  document.body.innerHTML = '';
+});
 
 describe('OrderAlertsPromptCard', () => {
   it('shows when eligible (has orders)', async () => {
@@ -136,5 +156,76 @@ describe('OrderAlertsPromptCard', () => {
       })
     );
     await waitFor(() => expect(screen.queryByText(CTA)).toBeNull());
+  });
+
+  it('is a labelled modal dialog with focus on the primary button', async () => {
+    setPush('default');
+    api();
+    render(<OrderAlertsPromptCard storeId="s1" />);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(document.activeElement?.textContent).toBe(CTA);
+  });
+
+  it('Esc closes it as "later" (records the dismissal)', async () => {
+    setPush('default');
+    api();
+    render(<OrderAlertsPromptCard storeId="s1" />);
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(memory.get(orderAlertsDismissKey('u1'))).toBeTruthy();
+  });
+
+  it('traps Tab inside the dialog in both directions', async () => {
+    setPush('default');
+    api();
+    render(<OrderAlertsPromptCard storeId="s1" />);
+    const dialog = await screen.findByRole('dialog');
+    const primary = screen.getByText(CTA);
+    const later = screen.getByText('components.orderAlertsPrompt.later');
+    later.focus();
+    fireEvent.keyDown(later, { key: 'Tab' });
+    expect(document.activeElement).toBe(primary);
+    primary.focus();
+    fireEvent.keyDown(primary, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(later);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it('returns focus to the opener when closed', async () => {
+    setPush('default');
+    api();
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    render(<OrderAlertsPromptCard storeId="s1" />);
+    fireEvent.click(await screen.findByText('components.orderAlertsPrompt.later'));
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('never shows on top of another open dialog', async () => {
+    setPush('default');
+    api();
+    const other = document.createElement('div');
+    other.setAttribute('role', 'dialog');
+    document.body.appendChild(other);
+    render(<OrderAlertsPromptCard storeId="s1" />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    await new Promise(r => setTimeout(r, 20));
+    expect(screen.queryByText(CTA)).toBeNull();
+  });
+
+  it('waits out the grace period on the first page view of a session', async () => {
+    setPush('default');
+    api();
+    session.clear();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<OrderAlertsPromptCard storeId="s1" />);
+    await vi.advanceTimersByTimeAsync(SESSION_GRACE_MS - 500);
+    expect(screen.queryByText(CTA)).toBeNull();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await screen.findByText(CTA)).toBeTruthy();
   });
 });
