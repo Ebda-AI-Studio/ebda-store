@@ -5,6 +5,7 @@ import { BRAND } from '@ebda/shared/brand';
 import { type Locale } from '../lib/site';
 import { EbdaTracking } from './EbdaTracking';
 import '@/app/globals.css';
+import '@/app/motifs.css';
 
 /**
  * SEO-5: fonts are self-hosted at build by next/font (no fonts.googleapis.com / gstatic request, no

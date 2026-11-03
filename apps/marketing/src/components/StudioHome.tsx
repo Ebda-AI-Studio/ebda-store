@@ -77,7 +77,6 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
               <li className="sh-win" data-win="8">
                 <WindowGirih id="g8w" />
                 <div className="sh-win-in">
-                  <p className="sh-family">{c.windows.storeFamily}</p>
                   <h2>
                     <Icon id="store" />
                     {store}
@@ -96,7 +95,6 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
               <li className="sh-win" data-win="6">
                 <WindowGirih id="g6w" />
                 <div className="sh-win-in">
-                  <p className="sh-family">{c.windows.chatFamily}</p>
                   <h2>
                     <Icon id="whatsapp" mirror={rtl} />
                     {chat}

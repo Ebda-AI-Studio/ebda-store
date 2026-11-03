@@ -1,6 +1,6 @@
 /* Ebda AI Studio home: the living girih (Ruling MKT-STUDIO-C-1). Loaded after window load + idle by an inline loader, never on
    prefers-reduced-motion or save-data; the static SVG poster (GirihPoster.tsx) is the first paint and the fallback. One canvas,
-   DPR capped at 2 and at ~3M pixels, 30 fps, paused off-screen and in hidden tabs. It draws NO text. Geometry and lattice origins
+   DPR capped at 2 (full ratio, no pixel-budget downscale), 30 fps, paused off-screen and in hidden tabs. It draws NO text. Geometry and lattice origins
    mirror GirihPoster.tsx (field: 8-fold at 64px from the hero corner; windows: 8-fold / 6-fold at 40px from the window corner).
    Pointer (or a slow drifting light when there is none) densifies and brightens the lines; scroll turns the inner stars. */
 (function () {
@@ -28,12 +28,12 @@
     var r = hero.getBoundingClientRect();
     W = r.width;
     H = r.height;
+    // Full device pixel ratio (cap 2), NO pixel-budget downscale: the old ~3M-pixel cap made the hero canvas 1.45x instead of 2x
+    // on a 1440 screen, which the browser then stretched (blurry lines). Backing store = CSS size x dpr, scale from the real ratio.
     var dpr = Math.min(2, window.devicePixelRatio || 1);
-    var cap = Math.sqrt(3e6 / Math.max(1, W * H));
-    if (cap < dpr) dpr = Math.max(1, cap);
-    cv.width = Math.round(W * dpr);
-    cv.height = Math.round(H * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cv.width = Math.max(1, Math.round(W * dpr));
+    cv.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
     rects = wins.map(function (el) {
       var b = el.getBoundingClientRect();
       return {

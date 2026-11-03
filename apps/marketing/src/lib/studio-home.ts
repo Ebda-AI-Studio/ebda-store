@@ -14,8 +14,6 @@ export interface StudioHome {
   store: { blurb: string; cta: string; more: string };
   chat: { blurb: string; cta: string; more: string };
   account: string;
-  /** Living-geometry hero (Ruling MKT-STUDIO-C-1): the windows cut into the pattern. */
-  windows: { storeFamily: string; chatFamily: string };
   /** What the studio does: one statement and three lines (the three fields of the legal name). */
   does: {
     label: string;
@@ -63,7 +61,6 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
       more: `اعرف أكتر عن ${CHAT_AR}`,
     },
     account: 'حساب واحد للاتنين، من غير باسورد تاني.',
-    windows: { storeFamily: 'نجمة ثمانية', chatFamily: 'نجمة سداسية' },
     does: {
       label: 'اللي بنعمله',
       statement: 'بنبني برامج بتشتغل بالذكاء الاصطناعي، علشان التاجر المصري يبيع أكتر ويتعب أقل.',
@@ -130,7 +127,6 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
       more: `Learn more about ${CHAT_EN}`,
     },
     account: 'One account for both, no second password.',
-    windows: { storeFamily: 'Eight-point star', chatFamily: 'Six-point star' },
     does: {
       label: 'What we do',
       statement: 'We build AI-powered software so merchants in Egypt can sell more and work less.',

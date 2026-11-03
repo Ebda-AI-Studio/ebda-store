@@ -3322,6 +3322,7 @@ body:has(.studio-home) {
   stroke-opacity: 0.42;
   stroke-width: 1;
   stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 .g-brass {
   fill: none;
@@ -3329,6 +3330,7 @@ body:has(.studio-home) {
   stroke-opacity: 0.4;
   stroke-width: 1;
   stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 .g-silver {
   fill: none;
@@ -3336,6 +3338,7 @@ body:has(.studio-home) {
   stroke-opacity: 0.46;
   stroke-width: 1;
   stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 .sh-hero {
   position: relative;
@@ -3462,16 +3465,6 @@ html[lang='en'] .studio-home h1 {
 .sh-win:hover .sh-win-in,
 .sh-win:focus-within .sh-win-in {
   background: color-mix(in srgb, var(--canvas) 44%, transparent);
-}
-.sh-family {
-  margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--accent-text);
-}
-html[lang='en'] .sh-family {
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 .sh-win h2 {
   display: flex;

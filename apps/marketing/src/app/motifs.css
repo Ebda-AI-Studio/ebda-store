@@ -1,0 +1,179 @@
+/* Islamic-geometry motifs (Ruling MKT-STUDIO-C-1): small, quiet SVG ornaments from the same girih family as the studio home
+   hero (8-fold star = Ebda Store, 6-fold star = Ebda Chat). Static files in public/motifs/, no JS. Every motif is symmetric or
+   positioned with logical properties so Arabic RTL and English LTR read the same. Pure decoration: aria-hidden by nature
+   (background images and pseudo-elements), absolutely positioned so no copy or layout moves on the pages that only get motifs. */
+
+/* ---------- studio home: one motif per section ---------- */
+.sh-sec {
+  position: relative;
+  isolation: isolate;
+}
+.sh-sec::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -22px;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translateX(-50%);
+  background: var(--sh-medal) center / contain no-repeat;
+}
+#studio {
+  --sh-medal: url(/motifs/m8.svg);
+}
+#products {
+  --sh-medal: url(/motifs/m6.svg);
+}
+#start {
+  --sh-medal: url(/motifs/mq.svg);
+}
+#trust {
+  --sh-medal: url(/motifs/mr.svg);
+}
+.sh-label::after {
+  content: '';
+  display: block;
+  width: 120px;
+  height: 12px;
+  margin-top: 14px;
+  background: url(/motifs/orn.svg) center / contain no-repeat;
+}
+#start::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess8.svg) 0 0 / 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 15%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 15%, transparent 78%);
+}
+.sh-facts li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.sh-facts li::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  align-self: center;
+  background: url(/motifs/bullet.svg) center / contain no-repeat;
+}
+.sh-win-in::before,
+.sh-win-in::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: url(/motifs/corner.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+.sh-win-in::before {
+  inset-block-start: 9px;
+  inset-inline-start: 9px;
+}
+.sh-win-in::after {
+  inset-block-end: 9px;
+  inset-inline-end: 9px;
+}
+
+/* ---------- the footer edge on the studio home, the Store landing and the Chat page: a narrow pattern band ---------- */
+body:has(.studio-home, main > .hero, .wa-head) .site-footer {
+  position: relative;
+}
+body:has(.studio-home, main > .hero, .wa-head) .site-footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 16px;
+  background: url(/motifs/strip8-dark.svg) center top / 40px 16px repeat-x;
+}
+body:has(.wa-head) .site-footer::before {
+  background-image: url(/motifs/strip6-dark.svg);
+}
+
+/* ---------- Ebda Store landing (/store): decoration only, all absolutely positioned ---------- */
+body:has(main > .hero) main > .section {
+  position: relative;
+}
+body:has(main > .hero) main > .section::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 4px;
+  left: 50%;
+  width: 292px;
+  height: 36px;
+  transform: translateX(-50%);
+  background: url(/motifs/d8.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+body:has(main > .hero) main > .section:nth-of-type(even)::before {
+  background-image: url(/motifs/d6.svg);
+}
+body:has(main > .hero) #features {
+  isolation: isolate;
+}
+body:has(main > .hero) #features::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess8.svg) 0 0 / 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 10%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 10%, transparent 75%);
+}
+body:has(main > .hero) .plan::after,
+body:has(.wa-head) .plan::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: 10px;
+  width: 16px;
+  height: 16px;
+  background: url(/motifs/corner.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+
+/* ---------- Ebda Chat page: the same art level, in Chat's 6-fold family ---------- */
+body:has(.wa-head) .page-sec {
+  position: relative;
+  isolation: isolate;
+}
+body:has(.wa-head) .page-sec::before {
+  content: '';
+  position: absolute;
+  inset-block-start: calc(-0.5 * clamp(40px, 6vw, 72px) - 16px);
+  left: 50%;
+  width: 262px;
+  height: 32px;
+  transform: translateX(-50%);
+  background: url(/motifs/d6.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+body:has(.wa-head) .page-sec > h2::after {
+  content: '';
+  display: block;
+  width: 120px;
+  height: 12px;
+  margin-top: 12px;
+  background: url(/motifs/orn.svg) center / contain no-repeat;
+}
+body:has(.wa-head) #features::after {
+  content: '';
+  position: absolute;
+  inset: -24px -16px;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess6.svg) 0 0 / 40px 69.3px;
+  -webkit-mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, #000 10%, transparent 80%);
+  mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, #000 10%, transparent 80%);
+}
+.wa-head::after {
+  content: '';
+  height: 16px;
+  background: url(/motifs/strip6.svg) center / 40px 16px repeat-x;
+  opacity: 0.9;
+}
