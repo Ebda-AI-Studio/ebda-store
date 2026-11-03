@@ -3,6 +3,75 @@
    positioned with logical properties so Arabic RTL and English LTR read the same. Pure decoration: aria-hidden by nature
    (background images and pseudo-elements), absolutely positioned so no copy or layout moves on the pages that only get motifs. */
 
+:root {
+  --arch-poly-96: polygon(
+    0% 96px,
+    3.6% 74.8px,
+    7.1% 64.4px,
+    10.7% 56px,
+    14.3% 48.7px,
+    17.9% 42.1px,
+    21.4% 36px,
+    25% 30.4px,
+    28.6% 25.2px,
+    32.1% 20.3px,
+    35.7% 15.7px,
+    39.3% 11.4px,
+    42.9% 7.3px,
+    46.4% 3.6px,
+    50% 0px,
+    53.6% 3.6px,
+    57.1% 7.3px,
+    60.7% 11.4px,
+    64.3% 15.7px,
+    67.9% 20.3px,
+    71.4% 25.2px,
+    75% 30.4px,
+    78.6% 36px,
+    82.1% 42.1px,
+    85.7% 48.7px,
+    89.3% 56px,
+    92.9% 64.4px,
+    96.4% 74.8px,
+    100% 96px,
+    100% 100%,
+    0 100%
+  );
+  --arch-poly-84: polygon(
+    0% 84px,
+    3.6% 65.4px,
+    7.1% 56.4px,
+    10.7% 49px,
+    14.3% 42.6px,
+    17.9% 36.8px,
+    21.4% 31.5px,
+    25% 26.6px,
+    28.6% 22.1px,
+    32.1% 17.8px,
+    35.7% 13.8px,
+    39.3% 10px,
+    42.9% 6.4px,
+    46.4% 3.1px,
+    50% 0px,
+    53.6% 3.1px,
+    57.1% 6.4px,
+    60.7% 10px,
+    64.3% 13.8px,
+    67.9% 17.8px,
+    71.4% 22.1px,
+    75% 26.6px,
+    78.6% 31.5px,
+    82.1% 36.8px,
+    85.7% 42.6px,
+    89.3% 49px,
+    92.9% 56.4px,
+    96.4% 65.4px,
+    100% 84px,
+    100% 100%,
+    0 100%
+  );
+}
+
 /* ---------- studio home: one motif per section ---------- */
 .sh-sec {
   position: relative;
@@ -38,7 +107,7 @@
   margin-top: 14px;
   background: url(/motifs/orn.svg) center / contain no-repeat;
 }
-#start::after {
+.studio-home #start::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -71,8 +140,9 @@
   pointer-events: none;
 }
 .sh-win-in::before {
-  inset-block-start: 9px;
-  inset-inline-start: 9px;
+  inset-block-start: 22px;
+  left: 50%;
+  margin-left: -9px;
 }
 .sh-win-in::after {
   inset-block-end: 9px;
@@ -97,6 +167,7 @@ body:has(.wa-head) .site-footer::before {
 /* ---------- Ebda Store landing (/store): decoration only, all absolutely positioned ---------- */
 body:has(main > .hero) main > .section {
   position: relative;
+  isolation: isolate;
 }
 body:has(main > .hero) main > .section::before {
   content: '';
@@ -176,4 +247,79 @@ body:has(.wa-head) #features::after {
   height: 16px;
   background: url(/motifs/strip12.svg) center / 40px 16px repeat-x;
   opacity: 0.9;
+}
+
+/* ---------- mihrab arch frames (generic pointed arch; no dome, minaret or crescent) ---------- */
+.sh-win::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 96px;
+  z-index: 2;
+  pointer-events: none;
+  background: url(/motifs/arch-cap.svg) 0 0 / 100% 100% no-repeat;
+}
+body:has(main > .hero) .plan,
+body:has(.wa-head) .plan {
+  border-radius: 50% 50% 16px 16px / 22px 22px 16px 16px;
+}
+.wa-art-hero img {
+  clip-path: var(--arch-poly-84);
+}
+
+/* ---------- calligraphy texture of our own name (Ruling MKT-SCRIPT-1): static SVG outlines, silver, very low contrast ---------- */
+.sh-hero::before,
+#studio::after,
+#trust::after,
+body:has(main > .hero) #ainative::after,
+body:has(main > .hero) #start::after,
+body:has(.wa-head) .wa-head::before,
+body:has(.wa-head) .wa-close::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: url(/motifs/script.svg) center / cover no-repeat;
+  opacity: 0.8;
+}
+.sh-hero::before {
+  -webkit-mask-image: linear-gradient(to right, #000, transparent 24%, transparent 76%, #000);
+  mask-image: linear-gradient(to right, #000, transparent 24%, transparent 76%, #000);
+}
+#studio::after,
+body:has(main > .hero) #ainative::after,
+body:has(.wa-head) .wa-head::before {
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 70% 40%, #000, transparent 85%);
+  mask-image: radial-gradient(ellipse 80% 80% at 70% 40%, #000, transparent 85%);
+}
+#trust::after,
+body:has(main > .hero) #start::after,
+body:has(.wa-head) .wa-close::after {
+  background-position: 30% 60%;
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 30% 60%, #000, transparent 85%);
+  mask-image: radial-gradient(ellipse 80% 80% at 30% 60%, #000, transparent 85%);
+}
+.wa-head {
+  position: relative;
+  isolation: isolate;
+}
+
+/* ---------- worn gold-foil (Ruling MKT-FOIL-1): used sparingly on a few headings and the hero hairlines; flat gold stays elsewhere ---------- */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .sh-win h2,
+  body:has(main > .hero) #features h2,
+  body:has(main > .hero) #pricing h2,
+  body:has(.wa-head) #features h2,
+  body:has(.wa-head) .wa-close h2 {
+    background: url(/motifs/foil.svg) 0 0 / 256px 256px;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}
+.sh-eyebrow::before {
+  height: 2px;
+  background: url(/motifs/foil.svg) 0 0 / 256px 256px;
 }

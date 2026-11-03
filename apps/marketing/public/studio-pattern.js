@@ -24,6 +24,28 @@
   var target = null; // { cx, cy } client coords of the real pointer
   var PI = Math.PI;
 
+  /* the mihrab arch of a window: the same pointed-round profile and 96px rise as the CSS --arch-poly-96 clip */
+  function yfrac(u) {
+    return 0.5 * u + 0.5 * (1 - Math.sqrt(Math.max(0, 1 - u * u)));
+  }
+  function archPath(q) {
+    var H = Math.min(96, q.h / 2),
+      i,
+      u;
+    ctx.moveTo(q.x, q.y + H);
+    for (i = 1; i <= 14; i++) {
+      u = 1 - i / 14;
+      ctx.lineTo(q.x + q.w * (0.5 - 0.5 * u), q.y + H * yfrac(u));
+    }
+    for (i = 1; i <= 14; i++) {
+      u = i / 14;
+      ctx.lineTo(q.x + q.w * (0.5 + 0.5 * u), q.y + H * yfrac(u));
+    }
+    ctx.lineTo(q.x + q.w, q.y + q.h);
+    ctx.lineTo(q.x, q.y + q.h);
+    ctx.closePath();
+  }
+
   function measure() {
     var r = hero.getBoundingClientRect();
     W = r.width;
@@ -195,7 +217,7 @@
     ctx.beginPath();
     ctx.rect(0, 0, W, H);
     rects.forEach(function (q) {
-      ctx.rect(q.x, q.y, q.w, q.h);
+      archPath(q);
     });
     ctx.clip('evenodd');
     lattice('8', 64, 0, 0, 0, 0, W, H, t, prog, 64 * 3.2, dense);
@@ -203,7 +225,7 @@
     rects.forEach(function (q) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(q.x, q.y, q.w, q.h);
+      archPath(q);
       ctx.clip();
       lattice(q.fam, 40, q.x, q.y, q.x, q.y, q.x + q.w, q.y + q.h, t, prog, 40 * 3.6, dense + 0.1);
       ctx.restore();

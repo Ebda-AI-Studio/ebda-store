@@ -3445,8 +3445,8 @@ html[lang='en'] .studio-home h1 {
 .sh-win {
   position: relative;
   border: 1px solid var(--sh-rule);
-  outline: 1px solid color-mix(in srgb, var(--gold) 28%, transparent);
-  outline-offset: 5px;
+  border-top: 0;
+  clip-path: var(--arch-poly-96);
 }
 .sh-win-art {
   position: absolute;
@@ -3458,7 +3458,7 @@ html[lang='en'] .studio-home h1 {
   align-content: start;
   gap: 12px;
   height: 100%;
-  padding: clamp(22px, 3vw, 40px);
+  padding: calc(clamp(22px, 3vw, 40px) + 56px) clamp(22px, 3vw, 40px) clamp(22px, 3vw, 40px);
   background: color-mix(in srgb, var(--canvas) 60%, transparent);
   transition: background-color 0.4s var(--ease);
 }
