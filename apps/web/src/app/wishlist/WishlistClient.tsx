@@ -18,6 +18,15 @@ interface WishlistItem {
   product: WishlistCardProduct;
 }
 
+const GUEST_CODES = new Set([
+  'UNAUTHORIZED',
+  'UNAUTHENTICATED',
+  'AUTH_REQUIRED',
+  'TOKEN_EXPIRED',
+  'INVALID_TOKEN',
+  'NO_REFRESH_TOKEN',
+]);
+
 export default function WishlistClient() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
@@ -52,7 +61,8 @@ export default function WishlistClient() {
       if (response.success && response.data) {
         setItems(response.data.items || []);
         setIsPublic(response.data.isPublic ?? false);
-      } else if (response.error?.code === 'UNAUTHORIZED') {
+      } else if (response.error?.code && GUEST_CODES.has(response.error.code)) {
+        // PREMIUM-8: every "you are not signed in" answer is the signed-out empty state, not an error.
         setIsLoggedIn(false);
       } else {
         setError(response.error?.message || t('Failed to load wishlist', 'معرفناش نحمّل المفضلة'));

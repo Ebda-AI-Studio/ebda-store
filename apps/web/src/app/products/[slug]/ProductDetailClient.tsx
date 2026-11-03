@@ -81,6 +81,7 @@ import {
 import { activePersonalisation, cleanNote } from '@ebda/shared';
 import { countText, ITEMS } from '../../../lib/plural';
 import { MinusIcon, PlusIcon } from '../../../templates/shared/icons';
+import { MissingImage } from '../../../templates/shared/MissingImage';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -1185,23 +1186,10 @@ export default function ProductDetailClient({
                       ))}
                     </div>
                   ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
-                        <svg
-                          className="h-20 w-20 text-primary"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <MissingImage
+                      label={language === 'ar' && product.nameAr ? product.nameAr : product.name}
+                      size="lg"
+                    />
                   )}
                   {/* Out-of-stock label + image dim — same platform OOS system as
                     the product cards (productCardDefaults oosLabel + oosDimColor),
