@@ -7,6 +7,7 @@ import { apiGet, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { ConfirmActionModal } from '../../../components/ConfirmActionModal';
+import { EnableOrderAlertsButton } from '../../../components/EnableOrderAlertsButton';
 
 interface OneSignalDevice {
   id: string;
@@ -65,6 +66,9 @@ export default function DevicesPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        <div className="mb-4">
+          <EnableOrderAlertsButton onDone={() => void fetchDevices()} />
+        </div>
         {isLoading && (
           <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             {t('loading')}

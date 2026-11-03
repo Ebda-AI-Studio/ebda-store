@@ -6182,7 +6182,18 @@
     "noEvents": "No timeline events yet",
     "by": "by",
     "reasonLabel": "Reason:",
-    "refundViaLabel": "Refund via:"
+    "refundViaLabel": "Refund via:",
+    "orderAlerts": {
+      "title": "Order alerts on this device",
+      "body": "When a new order arrives you get an alert on this device, even when the dashboard is closed. We only ask for permission when you press the button.",
+      "cta": "Turn on order alerts on this device",
+      "enabling": "Turning on alerts…",
+      "enabled": "Alerts are on",
+      "doneHint": "Done. New order alerts will reach this device.",
+      "denied": "The browser is blocking notifications. Allow them in the site settings and try again.",
+      "unavailable": "Alerts are not available right now. Try again in a moment.",
+      "error": "We could not turn on alerts. Try again."
+    }
   },
   "finance": {
     "accounts": {

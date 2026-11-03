@@ -40,6 +40,6 @@ export const config = {
     // Everything except Next internals and a few named static prefixes/files. NOT "anything with a
     // file extension": a dynamic route such as /foo.svg or /stores/a.b/settings must still get the
     // CSP. Static assets in public/ get a fallback from public/_headers.
-    '/((?!_next/static|_next/image|icons/|favicon\\.(?:ico|png|svg)$|health$|sw\\.js$|manifest\\.webmanifest$).*)',
+    '/((?!_next/static|_next/image|icons/|favicon\\.(?:ico|png|svg)$|health$|sw\\.js$|manifest\\.webmanifest$|OneSignalSDK[\\w.]*\\.js$).*)',
   ],
 };

@@ -100,8 +100,8 @@ describe('middleware matcher (Opus review SEC-4)', () => {
       expect(re.test(p), p).toBe(false);
   });
 
-  it('admin no longer carves out the OneSignal worker path (the SDK is gone from the admin)', () => {
-    expect(toRe(adminMatcher.matcher[0]).test('/OneSignalSDKWorker.js')).toBe(true);
+  it('both apps serve the OneSignal worker un-nonced (existing subscriptions keep receiving pushes)', () => {
+    expect(toRe(adminMatcher.matcher[0]).test('/OneSignalSDKWorker.js')).toBe(false);
     expect(toRe(ordersMatcher.matcher[0]).test('/OneSignalSDKWorker.js')).toBe(false);
   });
 
