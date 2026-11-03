@@ -188,12 +188,12 @@ export function CouponFormModal({
                 : tForm('valueAmountLabel')}
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              dir="ltr"
               required
-              min="0"
-              max={formData.type === 'percentage' ? 100 : undefined}
               value={formData.value}
-              onChange={e => onChange({ ...formData, value: parseFloat(e.target.value) || 0 })}
+              onChange={e => onChange({ ...formData, value: e.target.value })}
               disabled={formData.type === 'free_shipping'}
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted"
             />

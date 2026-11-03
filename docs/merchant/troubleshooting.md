@@ -101,7 +101,7 @@ Ebda Store sessions last 30 days. If you're logged out earlier:
 Ebda Store enforces strict validation. The error message tells you which field — common ones:
 
 - **Name (Arabic) is required**: even if you only sell to English-speakers, Arabic name is required for SEO + Search
-- **Price must be > 0** for an active product or variant (a draft may stay at 0; gold-priced pieces are priced by the gold rate). A coupon needs a value above zero and a percentage below 100%; a free order is not something a coupon can do. Keep a free item as a draft.
+- **Price must be > 0**: free products → use a coupon for 100% discount instead
 - **At least one image**: drag-drop one before saving
 - **SKU must be unique**: if you copy-pasted from another product, the SKU got duplicated
 

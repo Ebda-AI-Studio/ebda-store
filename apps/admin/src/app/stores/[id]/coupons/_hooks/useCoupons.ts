@@ -8,6 +8,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 import { roundToMinor } from '@ebda/shared';
+import { parseCouponValue } from './coupon-value';
 interface UseCouponsResult {
   coupons: Coupon[];
   isLoading: boolean;
@@ -34,6 +35,13 @@ function majorStringToMinor(v: string): number {
  * send null to actually clear it, the way customerGroupId / minQuantity
  * already do. Exported so the money conversions are testable without a DOM.
  */
+function couponValueForPayload(formData: CouponFormData): number {
+  if (formData.type === 'free_shipping') return 0;
+  const n = parseCouponValue(formData.value);
+  if (Number.isNaN(n)) return 0;
+  return formData.type === 'fixed' ? roundToMinor(n) : n;
+}
+
 export function buildCouponPayload(formData: CouponFormData, intent: 'create' | 'update') {
   return {
     code: formData.code,
@@ -44,7 +52,8 @@ export function buildCouponPayload(formData: CouponFormData, intent: 'create' | 
     type: formData.type,
     // `fixed` coupons: the input is in EGP → store as piastres (×100, via roundToMinor).
     // `percentage` coupons: the value is a percent (e.g. 5 = 5%), stored as-is.
-    value: formData.type === 'fixed' ? roundToMinor(formData.value) : formData.value,
+    // free_shipping carries no value; an unreadable entry is sent as 0 so the API refuses it by name (never a silent save).
+    value: couponValueForPayload(formData),
     // Clearing a limit/date must remove the restriction (null), not
     // silently no-op (undefined) — same convention as the text fields
     // above. A cleared minOrderAmount/expiresAt/usageLimit makes the

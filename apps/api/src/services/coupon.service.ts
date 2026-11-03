@@ -293,22 +293,14 @@ export class CouponService {
     },
     orderTotal: number
   ): number {
-    let discount = 0;
-
-    if (coupon.type === 'percentage') {
-      discount = Math.round((orderTotal * coupon.value) / 100);
-      if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-        discount = coupon.maxDiscount;
-      }
-    } else if (coupon.type === 'fixed') {
-      discount = coupon.value;
-      if (discount > orderTotal) {
-        discount = orderTotal;
-      }
-    }
-    // free_shipping is handled separately
-
-    return discount;
+    // ONE formula for validate, quote and order: promotion-targeting's computeDiscount (the order and the DO twin use it
+    // too). This used to be a second copy with a different max-discount rule (QA-COUPON-1).
+    return computeDiscount(
+      coupon.type as 'percentage' | 'fixed' | 'free_shipping',
+      coupon.value,
+      coupon.maxDiscount,
+      orderTotal
+    );
   }
 
   /**

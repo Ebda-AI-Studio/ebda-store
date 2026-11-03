@@ -4,9 +4,9 @@
  * - An ACTIVE product (or active variant) with a fixed price must have price > 0. A draft or archived row may be 0
  *   (a placeholder). A gold-rate row is exempt: its price is written only by the repricer (Ruling B5-13) and a gold
  *   row with no rate stays draft, so the repricer's own writes must never trip this guard.
- * - A percentage or fixed coupon must have value > 0; a percentage coupon must stay below 100 (a free order is not a
- *   discount a merchant should get by typing 100). `free_shipping` has no value. There is no explicit "free order"
- *   coupon type, so 100% is refused until one exists.
+ * - A percentage or fixed coupon must have value > 0. A 100% coupon is a legitimate giveaway tool and stays allowed (a
+ *   percentage above 100 is meaningless and refused; a fixed coupon is capped at the order subtotal at checkout).
+ *   `free_shipping` has no value.
  *
  * Pure functions, one place: product create/update/bulk/import, variant create/update and coupon create/update all call
  * these, so the rule cannot drift between paths.
@@ -20,8 +20,8 @@ export const PRICE_REQUIRED_MESSAGE = {
 } as const;
 
 export const COUPON_VALUE_MESSAGE = {
-  messageEn: 'A discount coupon needs a value above zero (a percentage coupon must be below 100%).',
-  messageAr: 'كوبون الخصم لازم قيمته أكبر من صفر (والنسبة المئوية لازم تكون أقل من 100%).',
+  messageEn: 'A discount coupon needs a value above zero (a percentage coupon is 1% to 100%).',
+  messageAr: 'كوبون الخصم لازم قيمته أكبر من صفر (والنسبة المئوية من 1% لـ 100%).',
 } as const;
 
 export function priceRequiredError(): AppError {
@@ -76,7 +76,7 @@ export function assertActiveVariantPrice(v: {
 export function isValidCouponValue(type: string | null | undefined, value: number): boolean {
   if (type === 'free_shipping') return true;
   if (!Number.isFinite(value) || value <= 0) return false;
-  return type === 'percentage' ? value < 100 : true;
+  return type === 'percentage' ? value <= 100 : true;
 }
 
 export function assertCouponValue(type: string | null | undefined, value: number): void {

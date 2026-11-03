@@ -69,9 +69,12 @@ describe('active variant price', () => {
 });
 
 describe('coupon value', () => {
-  it('percentage and fixed need a value above zero; percentage stays below 100; free_shipping has none', () => {
+  it('percentage and fixed need a value above zero; 100% (a giveaway) is allowed, above 100 is not; free_shipping has none', () => {
     expect(isValidCouponValue('percentage', 0)).toBe(false);
-    expect(isValidCouponValue('percentage', 100)).toBe(false);
+    expect(isValidCouponValue('percentage', 100)).toBe(true);
+    expect(isValidCouponValue('percentage', 101)).toBe(false);
+    expect(isValidCouponValue('percentage', -5)).toBe(false);
+    expect(isValidCouponValue('fixed', -1)).toBe(false);
     expect(isValidCouponValue('percentage', 20)).toBe(true);
     expect(isValidCouponValue('fixed', 0)).toBe(false);
     expect(isValidCouponValue('fixed', 5000)).toBe(true);
@@ -133,5 +136,31 @@ describe('CouponService wiring', () => {
     await expect(CouponService.getByCode('s1', 'QA20')).rejects.toMatchObject({
       code: 'COUPON_VALUE_REQUIRED',
     });
+  });
+});
+
+describe('QA-COUPON-1: validate, quote, order and the DO compute the SAME discount', () => {
+  it('one formula across CouponService.calculateDiscount, computeDiscount (Postgres) and the DO twin, incl. cap 0 = no cap, 100% and fixed over the subtotal', async () => {
+    const { computeDiscount } = await import('../../apps/api/src/services/promotion-targeting');
+    const { computeDiscount: doCompute } = await import('../../packages/repo/src/do/promotions');
+    const types = ['percentage', 'fixed', 'free_shipping'] as const;
+    for (const type of types)
+      for (const value of [1, 20, 100, 5000])
+        for (const max of [null, 0, 300, 100_000])
+          for (const base of [0, 450, 45_000]) {
+            const a = CouponService.calculateDiscount({ type, value, maxDiscount: max }, base);
+            expect(a).toBe(computeDiscount(type, value, max, base));
+            expect(a).toBe(doCompute(type, value, max, base));
+            expect(a).toBeLessThanOrEqual(base);
+          }
+    expect(
+      CouponService.calculateDiscount({ type: 'percentage', value: 20, maxDiscount: 0 }, 45_000)
+    ).toBe(9_000);
+    expect(
+      CouponService.calculateDiscount({ type: 'percentage', value: 100, maxDiscount: null }, 45_000)
+    ).toBe(45_000);
+    expect(
+      CouponService.calculateDiscount({ type: 'fixed', value: 99_999, maxDiscount: null }, 45_000)
+    ).toBe(45_000);
   });
 });
