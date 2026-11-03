@@ -3,6 +3,7 @@ import {
   BRAND,
   WHATSAPP_PACKAGES,
   officePostalAddress,
+  servicesJsonLd,
   type WhatsAppBasePackageId,
 } from '@ebda/shared/brand';
 import { CAPABILITIES } from './capabilities';
@@ -185,6 +186,7 @@ export function jsonLd(
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
+        ...servicesJsonLd(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
@@ -279,6 +281,7 @@ export function studioJsonLd(locale: Locale) {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
+        ...servicesJsonLd(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
@@ -335,6 +338,7 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
+        ...servicesJsonLd(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,

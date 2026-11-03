@@ -7,6 +7,7 @@ import { WHATSAPP_APP_URL } from '../lib/whatsapp-page';
 import { studioJsonLd } from '../lib/seo';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { ServicesGrid } from './ServicesGrid';
 import { GirihPoster, WindowGirih } from './GirihPoster';
 import { JsonLd } from './JsonLd';
 import { SiteLink } from './SiteLink';
@@ -125,14 +126,7 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
             </h2>
             <div className="sh-body">
               <p className="sh-statement">{c.does.statement}</p>
-              <ul className="sh-trio">
-                {c.does.items.map(i => (
-                  <li key={i.h}>
-                    <h3>{i.h}</h3>
-                    <p>{i.p}</p>
-                  </li>
-                ))}
-              </ul>
+              <ServicesGrid locale={locale} />
             </div>
           </div>
         </section>

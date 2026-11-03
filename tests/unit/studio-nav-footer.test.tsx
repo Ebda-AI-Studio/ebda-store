@@ -15,6 +15,7 @@ import {
   BRAND,
   SITE_FOOTER_CSS,
   officeInfo,
+  serviceInfo,
   siteFooter,
   siteFooterHtml,
   siteNavCta,
@@ -37,6 +38,7 @@ import {
   studioJsonLd,
   whatsappJsonLd,
 } from '../../apps/marketing/src/lib/seo';
+import { StudioHomePage } from '../../apps/marketing/src/components/StudioHome';
 import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
 import { productOfPage, SITE_PAGES } from '../../apps/marketing/src/lib/site';
 import type { Snapshot } from '../../apps/status/src/types';
@@ -525,4 +527,48 @@ describe('the founding date (BRAND.company.foundedOn)', () => {
     expect(formatLegalDate('2026-09-11', 'en')).toBe('11 September 2026');
     expect(ar + en).toContain('dateTime="2026-09-11"');
   });
+});
+
+describe('services (BRAND.services): studio home and About render all seven, separate from the products', () => {
+  const ids = ['ai', 'software', 'marketing', 'photography', 'training', '3d', 'events'];
+  it('BRAND holds the seven, benefit lines only (no prices)', () => {
+    expect(BRAND.services.map(s => s.id)).toEqual(ids);
+    for (const s of BRAND.services) {
+      expect(`${s.ar} ${s.en} ${s.benefitAr} ${s.benefitEn}`).not.toMatch(/EGP|جنيه|ج\.م|\d{2,}/);
+      expect(s.benefitAr.length).toBeGreaterThan(8);
+    }
+  });
+  for (const lang of ['ar', 'en'] as const) {
+    it(`${lang}: the studio home and About show every service from BRAND, and the home keeps Products as its own section`, () => {
+      const home = renderToStaticMarkup(<StudioHomePage locale={lang} />);
+      const about = renderToStaticMarkup(<AboutPage locale={lang} />);
+      for (const [name, html] of [
+        ['home', home],
+        ['about', about],
+      ] as const) {
+        expect((html.match(/data-service="/g) ?? []).length, name).toBe(7);
+        for (const s of serviceInfo(lang)) {
+          expect(html, `${name} ${s.id}`).toContain(s.name);
+          expect(html, `${name} ${s.id}`).toContain(s.benefit);
+        }
+      }
+      expect(home).toContain('id="products"');
+      expect(home.indexOf('id="studio"')).toBeLessThan(home.indexOf('id="products"'));
+      // the CTA to /contact on About
+      expect(about).toContain(lang === 'ar' ? 'كلّمنا عن مشروعك' : 'Tell us about your project');
+      expect(about).toMatch(lang === 'ar' ? /href="\/contact"/ : /href="\/en\/contact"/);
+    });
+    it(`${lang}: Organization JSON-LD lists the services as knowsAbout and makesOffer (Service, no price)`, () => {
+      const orgs = [studioJsonLd(lang), jsonLd(lang), whatsappJsonLd(lang, [])]
+        .flatMap(g => g['@graph'] as Record<string, unknown>[])
+        .filter(n => n['@id'] === 'https://ebda.app/#organization');
+      expect(orgs.length).toBe(3);
+      for (const org of orgs) {
+        expect(org.knowsAbout).toEqual(serviceInfo(lang).map(s => s.name));
+        const offers = org.makesOffer as { itemOffered: { '@type': string; name: string } }[];
+        expect(offers.map(o => o.itemOffered['@type'])).toEqual(Array(7).fill('Service'));
+        expect(JSON.stringify(offers)).not.toMatch(/price/i);
+      }
+    });
+  }
 });

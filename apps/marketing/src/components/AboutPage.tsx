@@ -11,6 +11,7 @@ import { COPY } from '../lib/content';
 import { pagePath, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { ServicesGrid } from './ServicesGrid';
 import { OfficeBlock } from './OfficeBlock';
 import { SiteLink } from './SiteLink';
 import { JsonLd } from './JsonLd';
@@ -51,14 +52,7 @@ export function AboutPage({ locale }: { locale: Locale }) {
             <h2 className="ab-h2" id="ab-do-h">
               {p.doH}
             </h2>
-            <ul className="ab-grid ab-grid-3">
-              {p.doItems.map(i => (
-                <li key={i.t}>
-                  <h3>{i.t}</h3>
-                  <p>{i.d}</p>
-                </li>
-              ))}
-            </ul>
+            <ServicesGrid locale={locale} />
           </div>
         </section>
 
@@ -126,6 +120,11 @@ export function AboutPage({ locale }: { locale: Locale }) {
               </SiteLink>
             </p>
             <OfficeBlock locale={locale} />
+            <p>
+              <Link href={pagePath(locale, 'contact')} className="btn btn-primary">
+                {p.talkCta}
+              </Link>
+            </p>
             <p className="muted">{p.contactHelp}</p>
             <p>
               <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link>

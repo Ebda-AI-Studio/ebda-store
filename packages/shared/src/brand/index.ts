@@ -55,6 +55,63 @@ export const BRAND = {
     region: 'Cairo',
     country: 'EG',
   },
+  /**
+   * What the studio does (Ahmad, 2026-11-03): the seven services, one source for the studio home, About and the
+   * Organization JSON-LD. Benefit lines only: no prices, no claims we cannot back, no client names. Products (Ebda Store,
+   * Ebda Chat) are separate from services.
+   */
+  services: [
+    {
+      id: 'ai',
+      ar: 'الذكاء الاصطناعي',
+      en: 'Artificial intelligence',
+      benefitAr: 'مساعد بيكتب ويرد ويرتّب معاك، من غير ما تحتاج تفهم تقنية.',
+      benefitEn:
+        'An assistant that writes, replies and organises with you, no technical know-how needed.',
+    },
+    {
+      id: 'software',
+      ar: 'البرمجيات',
+      en: 'Software',
+      benefitAr: 'متجر وشات جاهزين بالعربي، بيشتغلوا على الموبايل قبل الكمبيوتر.',
+      benefitEn: 'A store and a chat tool, ready in Arabic, built for the phone first.',
+    },
+    {
+      id: 'marketing',
+      ar: 'التسويق الرقمي',
+      en: 'Digital marketing',
+      benefitAr: 'أدوات تجيبلك العميل وترجّعه، وأرقام واضحة تعرف منها إيه اللي نفع.',
+      benefitEn: 'Tools that bring customers in and back again, with clear numbers on what worked.',
+    },
+    {
+      id: 'photography',
+      ar: 'التصوير',
+      en: 'Photography',
+      benefitAr: 'تصوير منتجاتك بشكل يبيع.',
+      benefitEn: 'Product photography that helps your products sell.',
+    },
+    {
+      id: 'training',
+      ar: 'استشارات وتدريب',
+      en: 'Consulting and training',
+      benefitAr: 'تدريب فريقك على أدوات الذكاء الاصطناعي.',
+      benefitEn: 'Training your team on AI tools, and advice on where to start.',
+    },
+    {
+      id: '3d',
+      ar: 'تصميم ثري دي',
+      en: '3D design',
+      benefitAr: 'تصميم ثري دي لمنتجاتك ومساحاتك.',
+      benefitEn: '3D design for your products and spaces.',
+    },
+    {
+      id: 'events',
+      ar: 'الفعاليات',
+      en: 'Events',
+      benefitAr: 'تنظيم فعاليات وإطلاقات.',
+      benefitEn: 'Organising events and launches.',
+    },
+  ],
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',
   colors: {
@@ -135,6 +192,28 @@ export function officeInfo(locale?: string | null) {
     address: ar ? o.addressAr : o.addressEn,
     mapUrl: o.mapUrl,
     meeting: ar ? o.meetingAr : o.meetingEn,
+  };
+}
+
+/** A service for a locale (name and one-line benefit). */
+export function serviceInfo(locale?: string | null) {
+  const ar = !!locale && locale.toLowerCase().startsWith('ar');
+  return BRAND.services.map(s => ({
+    id: s.id,
+    name: ar ? s.ar : s.en,
+    benefit: ar ? s.benefitAr : s.benefitEn,
+  }));
+}
+
+/** schema.org `knowsAbout` and `makesOffer` (Service, no price) for the Organization node, from BRAND.services. */
+export function servicesJsonLd(locale?: string | null) {
+  const list = serviceInfo(locale);
+  return {
+    knowsAbout: list.map(s => s.name),
+    makesOffer: list.map(s => ({
+      '@type': 'Offer',
+      itemOffered: { '@type': 'Service', name: s.name, description: s.benefit },
+    })),
   };
 }
 

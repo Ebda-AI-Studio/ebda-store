@@ -184,7 +184,8 @@ export interface Copy {
     /** «اتأسست في» / "Founded": followed by the date (BRAND.company.foundedOn through formatLegalDate). */
     foundedLabel: string;
     doH: string;
-    doItems: { t: string; d: string }[];
+    /** The call to action to /contact. */
+    talkCta: string;
     productsH: string;
     /** "See Ebda Store": the product's name is appended by the page. */
     productCta: string;
@@ -647,22 +648,9 @@ export const COPY: Record<Locale, Copy> = {
       brandLine: 'ابدأ ستوديو — بابك لبدء مشروعك.',
       eyebrow: 'ستوديو مصري',
       foundedLabel: 'اتأسست في',
-      lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين.',
+      lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين. وبنقدّم كمان خدمات: تصوير، واستشارات وتدريب، وتصميم ثري دي، وفعاليات.',
       doH: 'بنشتغل في إيه',
-      doItems: [
-        {
-          t: 'الذكاء الاصطناعي',
-          d: 'بيكتب ويترجم ويجهّز الردود بدالك، وإنت اللي بتراجع وتقرر.',
-        },
-        {
-          t: 'البرمجيات',
-          d: 'أدوات جاهزة من الموبايل: متجر، وطلبات، ودفع، وشحن، من غير ما تفهم في التقنية.',
-        },
-        {
-          t: 'التسويق الرقمي',
-          d: 'صفحات سريعة ورسائل بموافقة العميل، عشان عملاءك يلاقوك ويرجعوا لك.',
-        },
-      ],
+      talkCta: 'كلّمنا عن مشروعك',
       productsH: 'منتجاتنا',
       productCta: 'شوف',
       storyH: 'الحكاية',
@@ -1096,22 +1084,9 @@ export const COPY: Record<Locale, Copy> = {
       brandLine: 'Ebda AI Studio — Your doorway to business.',
       eyebrow: 'An Egyptian studio',
       foundedLabel: 'Founded',
-      lead: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both.',
+      lead: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both. We also offer services: photography, consulting and training, 3D design and events.',
       doH: 'What we do',
-      doItems: [
-        {
-          t: 'Artificial intelligence',
-          d: 'It writes, translates and drafts replies for you. You review and decide.',
-        },
-        {
-          t: 'Software',
-          d: 'Tools that work from your phone: a store, orders, payments and shipping, with no technical know-how.',
-        },
-        {
-          t: 'Digital marketing',
-          d: 'Fast pages and messages sent with the customer’s consent, so customers find you and come back.',
-        },
-      ],
+      talkCta: 'Tell us about your project',
       productsH: 'Our products',
       productCta: 'See',
       storyH: 'The story',

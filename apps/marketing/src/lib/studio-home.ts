@@ -14,11 +14,10 @@ export interface StudioHome {
   store: { blurb: string; cta: string; more: string };
   chat: { blurb: string; cta: string; more: string };
   account: string;
-  /** What the studio does: one statement and three lines (the three fields of the legal name). */
+  /** What the studio does: one statement; the seven services are BRAND.services. */
   does: {
     label: string;
     statement: string;
-    items: { h: string; p: string }[];
   };
   /** The products, one row each with three short facts. */
   products: { label: string; storeFacts: string[]; chatFacts: string[] };
@@ -63,12 +62,7 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
     account: 'حساب واحد للاتنين، من غير باسورد تاني.',
     does: {
       label: 'اللي بنعمله',
-      statement: 'بنبني برامج بتشتغل بالذكاء الاصطناعي، علشان التاجر المصري يبيع أكتر ويتعب أقل.',
-      items: [
-        { h: 'ذكاء اصطناعي', p: 'مساعد بيكتب وبيرد وبيرتّب معاك، من غير ما تحتاج تفهم تقنية.' },
-        { h: 'برمجيات', p: 'متجر وشات جاهزين بالعربي، بيشتغلوا على الموبايل قبل الكمبيوتر.' },
-        { h: 'تسويق رقمي', p: 'أدوات تجيبلك العميل وترجّعه، وأرقام واضحة تعرف منها إيه اللي نفع.' },
-      ],
+      statement: 'ستوديو مصري بيبني أدوات وخدمات لأصحاب الشغل، علشان يبيعوا أكتر ويتعبوا أقل.',
     },
     products: {
       label: 'منتجاتنا',
@@ -129,21 +123,8 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
     account: 'One account for both, no second password.',
     does: {
       label: 'What we do',
-      statement: 'We build AI-powered software so merchants in Egypt can sell more and work less.',
-      items: [
-        {
-          h: 'Artificial intelligence',
-          p: 'An assistant that writes, replies and organises with you, no technical know-how needed.',
-        },
-        {
-          h: 'Software',
-          p: 'A store and a chat tool, ready in Arabic, built for the phone first.',
-        },
-        {
-          h: 'Digital marketing',
-          p: 'Tools that bring customers in and back again, with clear numbers on what worked.',
-        },
-      ],
+      statement:
+        'An Egyptian studio that builds tools and services for business owners, so they sell more and work less.',
     },
     products: {
       label: 'Our products',

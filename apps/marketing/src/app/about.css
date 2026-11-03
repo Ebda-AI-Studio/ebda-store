@@ -144,3 +144,46 @@ html[dir='rtl'] .ab-h2::after {
   margin: 0 0 8px;
   font-size: 1.0625rem;
 }
+
+/* services grid (BRAND.services): the studio home and About. One small motif per card; benefit lines only. */
+.svc-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+.svc {
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.svc::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 14px;
+  background: var(--svc-motif) center / contain no-repeat;
+}
+.svc-m8 {
+  --svc-motif: url(/motifs/m8.svg);
+}
+.svc-mr {
+  --svc-motif: url(/motifs/mr.svg);
+}
+.svc-mq {
+  --svc-motif: url(/motifs/mq.svg);
+}
+.svc h3 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+.svc p {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  color: var(--muted);
+}
