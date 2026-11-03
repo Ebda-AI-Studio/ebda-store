@@ -39,7 +39,7 @@ function Icon({ id, mirror = false }: { id: SiteNavProductId; mirror?: boolean }
 /**
  * The Ebda AI Studio home (`/`, `/en`), Rulings MKT-HOME-1 and MKT-STUDIO-C-1: "living geometry". The hero is a full-bleed girih
  * lattice in Ebda gold on ivory (static SVG first, then one canvas from `/studio-pattern.js` loaded after `load`, which breathes,
- * answers the pointer and turns with scroll); Ebda Store (8-fold star) and Ebda Chat (6-fold star) are windows cut into it. All text
+ * answers the pointer and turns with scroll); Ebda Store (8-fold star) and Ebda Chat (12-point star) are windows cut into it. All text
  * is DOM, never canvas. Below the hero sits a typographic grid: big Arabic display type, gold hairlines, numbers only for the steps.
  * The Store landing itself moved, unchanged, to /store (Ruling MKT-STORE-FROZEN-1); `hash-forward.js` forwards old `/#pricing` links.
  */
@@ -92,8 +92,8 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                   </p>
                 </div>
               </li>
-              <li className="sh-win" data-win="6">
-                <WindowGirih id="g6w" />
+              <li className="sh-win" data-win="12">
+                <WindowGirih id="g12w" />
                 <div className="sh-win-in">
                   <h2>
                     <Icon id="whatsapp" mirror={rtl} />

@@ -4,7 +4,8 @@
  * whole artwork under `prefers-reduced-motion`, `save-data` and no-JS. Keep the constants in step with that file.
  *   8-fold family (Ebda Store): 8-point stars on every even lattice point, turned squares on the odd ones; the star
  *   tips (long on the diagonals) meet the squares and each other, so the lines close.
- *   6-fold family (Ebda Chat): a 6-point star on every point of a triangular lattice, tips touching.
+ *   12-point-star family (Ebda Chat, still 6-fold symmetric): a 12-point star on every point of a triangular lattice, tips touching.
+ *   No {6/2} star (two overlapping triangles) anywhere: Ruling MKT-NO-HEXAGRAM-1, guarded by tests/unit/marketing-no-hexagram.test.ts.
  * Colours come from CSS classes (.g-gold / .g-brass / .g-silver) so the page owns the palette.
  */
 const f = (n: number) => String(Math.round(n * 10) / 10);
@@ -31,20 +32,21 @@ const diamond = (s: number) => {
   const d = 0.38 * s;
   return `M${f(d)} 0L0 ${f(d)}L${f(-d)} 0L0 ${f(-d)}Z`;
 };
-const star6 = (s: number) => {
+/** A 12-point star (24 vertices, tips 0.5 s, inner 0.3 s): the Chat family. Never two overlapping triangles (Ruling MKT-NO-HEXAGRAM-1). */
+const star12 = (s: number) => {
   const pts: string[] = [];
-  for (let k = 0; k < 12; k++) {
-    const a = (k * Math.PI) / 6;
-    const r = k % 2 ? 0.2887 * s : 0.5 * s;
+  for (let k = 0; k < 24; k++) {
+    const a = (k * Math.PI) / 12;
+    const r = (k % 2 ? 0.3 : 0.5) * s;
     pts.push(`${f(Math.cos(a) * r)} ${f(Math.sin(a) * r)}`);
   }
   return `M${pts.join('L')}Z`;
 };
-const inner6 = (s: number) => {
+const inner12 = (s: number) => {
   const pts: string[] = [];
-  for (let k = 0; k < 12; k++) {
-    const a = (k * Math.PI) / 6;
-    const r = (k % 2 ? 0.1 : 0.2) * s;
+  for (let k = 0; k < 24; k++) {
+    const a = (k * Math.PI) / 12;
+    const r = (k % 2 ? 0.12 : 0.22) * s;
     pts.push(`${f(Math.cos(a) * r)} ${f(Math.sin(a) * r)}`);
   }
   return `M${pts.join('L')}Z`;
@@ -80,7 +82,7 @@ function P8({ id, s }: { id: string; s: number }) {
   );
 }
 
-function P6({ id, s }: { id: string; s: number }) {
+function P12({ id, s }: { id: string; s: number }) {
   const H = Math.sqrt(3) * s;
   const pts: [number, number][] = [
     [0, 0],
@@ -93,8 +95,8 @@ function P6({ id, s }: { id: string; s: number }) {
   ];
   return (
     <pattern id={id} width={s} height={H} patternUnits="userSpaceOnUse">
-      <path id={`${id}-st`} d={star6(s)} className="g-gold" />
-      <path id={`${id}-in`} d={inner6(s)} className="g-silver" />
+      <path id={`${id}-st`} d={star12(s)} className="g-gold" />
+      <path id={`${id}-in`} d={inner12(s)} className="g-silver" />
       {pts.map(([x, y]) => (
         <g key={`${x}-${y}`} transform={`translate(${f(x)} ${f(y)})`}>
           <use href={`#${id}-st`} />
@@ -105,7 +107,7 @@ function P6({ id, s }: { id: string; s: number }) {
   );
 }
 
-/** Field (8-fold at 64px) plus the two window lattices (8-fold and 6-fold at 40px). Pattern ids: g8, g8w, g6w. */
+/** Field (8-fold at 64px) plus the two window lattices (8-fold and 12-point stars at 40px). Pattern ids: g8, g8w, g12w. */
 export function GirihPoster() {
   return (
     <svg
@@ -119,7 +121,7 @@ export function GirihPoster() {
       <defs>
         <P8 id="g8" s={64} />
         <P8 id="g8w" s={40} />
-        <P6 id="g6w" s={40} />
+        <P12 id="g12w" s={40} />
       </defs>
       <rect width="100%" height="100%" fill="url(#g8)" />
     </svg>
@@ -127,7 +129,7 @@ export function GirihPoster() {
 }
 
 /** A window's own lattice, shown until the canvas takes over. */
-export function WindowGirih({ id }: { id: 'g8w' | 'g6w' }) {
+export function WindowGirih({ id }: { id: 'g8w' | 'g12w' }) {
   return (
     <svg className="sh-win-art" width="100%" height="100%" aria-hidden="true" focusable="false">
       <rect width="100%" height="100%" fill={`url(#${id})`} />

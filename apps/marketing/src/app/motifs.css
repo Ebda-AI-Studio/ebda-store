@@ -1,5 +1,5 @@
 /* Islamic-geometry motifs (Ruling MKT-STUDIO-C-1): small, quiet SVG ornaments from the same girih family as the studio home
-   hero (8-fold star = Ebda Store, 6-fold star = Ebda Chat). Static files in public/motifs/, no JS. Every motif is symmetric or
+   hero (8-fold star = Ebda Store, 12-point star = Ebda Chat; never a two-triangle star, Ruling MKT-NO-HEXAGRAM-1). Static files in public/motifs/, no JS. Every motif is symmetric or
    positioned with logical properties so Arabic RTL and English LTR read the same. Pure decoration: aria-hidden by nature
    (background images and pseudo-elements), absolutely positioned so no copy or layout moves on the pages that only get motifs. */
 
@@ -22,7 +22,7 @@
   --sh-medal: url(/motifs/m8.svg);
 }
 #products {
-  --sh-medal: url(/motifs/m6.svg);
+  --sh-medal: url(/motifs/mr.svg);
 }
 #start {
   --sh-medal: url(/motifs/mq.svg);
@@ -91,7 +91,7 @@ body:has(.studio-home, main > .hero, .wa-head) .site-footer::before {
   background: url(/motifs/strip8-dark.svg) center top / 40px 16px repeat-x;
 }
 body:has(.wa-head) .site-footer::before {
-  background-image: url(/motifs/strip6-dark.svg);
+  background-image: url(/motifs/strip12-dark.svg);
 }
 
 /* ---------- Ebda Store landing (/store): decoration only, all absolutely positioned ---------- */
@@ -110,7 +110,7 @@ body:has(main > .hero) main > .section::before {
   pointer-events: none;
 }
 body:has(main > .hero) main > .section:nth-of-type(even)::before {
-  background-image: url(/motifs/d6.svg);
+  background-image: url(/motifs/d12.svg);
 }
 body:has(main > .hero) #features {
   isolation: isolate;
@@ -137,7 +137,7 @@ body:has(.wa-head) .plan::after {
   pointer-events: none;
 }
 
-/* ---------- Ebda Chat page: the same art level, in Chat's 6-fold family ---------- */
+/* ---------- Ebda Chat page: the same art level, in Chat's 12-point-star family ---------- */
 body:has(.wa-head) .page-sec {
   position: relative;
   isolation: isolate;
@@ -150,7 +150,7 @@ body:has(.wa-head) .page-sec::before {
   width: 262px;
   height: 32px;
   transform: translateX(-50%);
-  background: url(/motifs/d6.svg) center / contain no-repeat;
+  background: url(/motifs/d12.svg) center / contain no-repeat;
   pointer-events: none;
 }
 body:has(.wa-head) .page-sec > h2::after {
@@ -167,13 +167,13 @@ body:has(.wa-head) #features::after {
   inset: -24px -16px;
   z-index: -1;
   pointer-events: none;
-  background: url(/motifs/tess6.svg) 0 0 / 40px 69.3px;
+  background: url(/motifs/tess12.svg) 0 0 / 40px 69.3px;
   -webkit-mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, #000 10%, transparent 80%);
   mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, #000 10%, transparent 80%);
 }
 .wa-head::after {
   content: '';
   height: 16px;
-  background: url(/motifs/strip6.svg) center / 40px 16px repeat-x;
+  background: url(/motifs/strip12.svg) center / 40px 16px repeat-x;
   opacity: 0.9;
 }

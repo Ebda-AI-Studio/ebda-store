@@ -1,7 +1,7 @@
 /* Ebda AI Studio home: the living girih (Ruling MKT-STUDIO-C-1). Loaded after window load + idle by an inline loader, never on
    prefers-reduced-motion or save-data; the static SVG poster (GirihPoster.tsx) is the first paint and the fallback. One canvas,
    DPR capped at 2 (full ratio, no pixel-budget downscale), 30 fps, paused off-screen and in hidden tabs. It draws NO text. Geometry and lattice origins
-   mirror GirihPoster.tsx (field: 8-fold at 64px from the hero corner; windows: 8-fold / 6-fold at 40px from the window corner).
+   mirror GirihPoster.tsx (field: 8-fold at 64px from the hero corner; windows: 8-fold / 12-point stars at 40px from the window corner).
    Pointer (or a slow drifting light when there is none) densifies and brightens the lines; scroll turns the inner stars. */
 (function () {
   'use strict';
@@ -63,7 +63,7 @@
     ctx.stroke();
   }
 
-  /* a lattice region. fam '8' | '6'; S cell; ox,oy origin (lattice origin in hero coords); bounds in hero coords */
+  /* a lattice region. fam '8' | '12'; S cell; ox,oy origin (lattice origin in hero coords); bounds in hero coords */
   function lattice(fam, S, ox, oy, x0, y0, x1, y1, t, prog, reach, dense) {
     var i, j, X, Y, d, k, a, b, ph;
     var rot = prog * (PI / 4);
@@ -145,12 +145,20 @@
           ph = Math.sin(t / 2600 + i * 0.6 + j * 0.9);
           a = 0.42 + 0.07 * ph + k * 0.5 + prog * 0.08;
           b = 1 + 0.025 * ph + k * 0.1;
-          star(X, Y, 6, 0.5 * S, 0.2887 * S, 0, b);
+          star(X, Y, 12, 0.5 * S, 0.3 * S, 0, b);
           line(GOLD, a);
-          star(X, Y, 6, 0.2 * S, 0.1 * S, (((i + j) % 2 ? 1 : -1) * t) / 8000 + rot, 1 + k * 0.6);
+          star(
+            X,
+            Y,
+            12,
+            0.22 * S,
+            0.12 * S,
+            (((i + j) % 2 ? 1 : -1) * t) / 8000 + rot,
+            1 + k * 0.6
+          );
           line(SILVER, a * 1.1);
           if (k > 0.12 || dense > 0.05) {
-            star(X, Y, 6, 0.2 * S, 0.1 * S, -t / 6500 - rot, 0.5 + 0.3 * Math.max(k, dense));
+            star(X, Y, 12, 0.22 * S, 0.12 * S, -t / 6500 - rot, 0.5 + 0.3 * Math.max(k, dense));
             line(GOLD, a * Math.max(k, dense) * 1.4);
           }
         }
