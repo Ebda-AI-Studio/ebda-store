@@ -180,6 +180,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [merchant/README.md](merchant/README.md) - Ebda Store — Merchant Guide
 - [merchant/custom-domain.md](merchant/custom-domain.md) - Custom Domain Setup — ربط النطاق المخصص
 - [merchant/faq.md](merchant/faq.md) - FAQ — الأسئلة الشائعة
+- [merchant/acceptable-use.md](merchant/acceptable-use.md) - What you may and may not sell / ما يجوز بيعه وما لا يجوز
 - [merchant/gold-and-payments.md](merchant/gold-and-payments.md) - Gold orders and installments / طلبات الدهب والتقسيط
 - [merchant/inventory.md](merchant/inventory.md) - Inventory: variant stock, adjustments & scanning — المخزون: مخزون التنويعات والتعديلات والمسح
 - [merchant/orders.md](merchant/orders.md) - Orders (and the Orders app) — الطلبات (وتطبيق الطلبات)

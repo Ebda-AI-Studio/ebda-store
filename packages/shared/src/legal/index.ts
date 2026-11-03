@@ -62,6 +62,18 @@ function v11(material: boolean, summary: { ar: string; en: string }): LegalVersi
   });
 }
 
+/** v1.2 (SHARIA-AUP-1), published 2026-11-03. No fee change. */
+function v12(summary: { ar: string; en: string }): LegalVersion {
+  return Object.freeze({
+    version: '1.2',
+    publishedAt: '2026-11-03',
+    effectiveAt: '2026-11-03',
+    material: true,
+    feeChange: false,
+    summary: Object.freeze(summary),
+  });
+}
+
 const doc = (...history: LegalVersion[]) =>
   Object.freeze({ history: Object.freeze(history) as readonly LegalVersion[] });
 
@@ -93,6 +105,10 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
     v11(true, {
       ar: 'منتجات ممنوعة عبر ابدأ شات وفق سياسة التجارة في واتساب من Meta.',
       en: "Products that may not be sold through Ebda Chat, following Meta's WhatsApp Commerce Policy.",
+    }),
+    v12({
+      ar: 'حظر الكحوليات ولحم الخنزير، وحظر السحوبات ذات الدخول المدفوع والصناديق الغامضة التي تُباع بالصدفة والتقييمات المزيفة والندرة المزيفة.',
+      en: 'Alcohol and pork are banned, as are paid-entry prize draws, mystery boxes sold for chance, fake reviews, and fake scarcity or countdown timers.',
     })
   ),
   merchant: doc(
@@ -100,6 +116,10 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
     v11(true, {
       ar: 'الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإخطار التاجر بالاختراق خلال 72 ساعة، وضمانات النقل خارج مصر.',
       en: 'Prices are final amounts with no VAT, notice of a data breach to the merchant within 72 hours, and safeguards for transfers outside Egypt.',
+    }),
+    v12({
+      ar: 'الأحكام الجديدة في سياسة الاستخدام المقبول (الكحوليات ولحم الخنزير والسحوبات المدفوعة والتقييمات المزيفة)، والتقسيط معطّل افتراضيًا، وطلبات الذهب تُدفع كاملة عبر الإنترنت ما لم يغيّر التاجر الإعداد.',
+      en: 'The new Acceptable Use Policy bans (alcohol, pork, paid-entry draws, fake reviews), installments off by default, and gold orders paid in full online unless the merchant changes the setting.',
     })
   ),
 });
