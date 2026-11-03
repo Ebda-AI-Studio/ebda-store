@@ -147,7 +147,7 @@ describe('every page exports metadata with a canonical', () => {
         : studio
           ? isEn
             ? 'Ebda AI Studio'
-            : 'ابدأ ستوديو'
+            : 'ابدأ ستوديو للذكاء الاصطناعي'
           : isEn
             ? 'Ebda Store'
             : 'ابدأ ستور';

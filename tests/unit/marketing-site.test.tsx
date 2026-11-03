@@ -89,7 +89,7 @@ describe('marketing nav', () => {
   });
   it('header: the master brand lockup plus a Products menu naming only the live products, Ebda Store and Ebda Chat (BRAND-ARCH-1)', () => {
     for (const [html, studio, store, wa, soon] of [
-      [ar, 'ابدأ ستوديو', 'ابدأ ستور', 'ابدأ شات', /قريب/],
+      [ar, 'ابدأ ستوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ شات', /قريب/],
       [en, 'Ebda AI Studio', 'Ebda Store', 'Ebda Chat', /coming soon/i],
     ] as const) {
       const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
@@ -331,7 +331,7 @@ describe('marketing honesty', () => {
     // one footer on every page: the studio's brand column and a (c) line, never a per-product ownership sentence
     const year = new Date().getUTCFullYear();
     expect(en).toContain(`© ${year} Ebda AI Studio. All rights reserved.`);
-    expect(ar).toContain(`© ${year} ابدأ ستوديو. جميع الحقوق محفوظة.`);
+    expect(ar).toContain(`© ${year} ابدأ ستوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.`);
     expect(en).toContain('<p class="sf-mission">Your doorway to business.</p>');
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
@@ -513,7 +513,7 @@ describe('marketing honesty', () => {
     for (const html of [ar, en, ...pages]) expect(html).not.toMatch(/whisky/i);
     const org = jsonLd('en')['@graph'][0] as Record<string, unknown>;
     expect(org.name).toBe('Ebda AI Studio');
-    expect(org.alternateName).toBe('ابدأ ستوديو');
+    expect(org.alternateName).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(org.url).toBe('https://ebda.app');
     expect(org).not.toHaveProperty('parentOrganization');
     expect(JSON.stringify(org)).not.toMatch(/whisky/i);

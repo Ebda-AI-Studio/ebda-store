@@ -20,7 +20,7 @@ describe('BRAND', () => {
     expect(BRAND.company).toEqual({
       legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
       legalNameEn: 'Ebda Studio for Artificial Intelligence, Software Development, and Digital Marketing',
-      shortNameAr: 'ابدأ ستوديو',
+      shortNameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
       shortNameEn: 'Ebda AI Studio',
       url: 'https://ebda.app',
     });

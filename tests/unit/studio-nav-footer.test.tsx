@@ -364,7 +364,7 @@ describe('page kinds (NAV-PRODUCT-OF-PAGE-1)', () => {
       'شروط خدمة ابدأ شات | ابدأ شات (ebda.app)'
     );
     expect(pageMetadata('ar', 'contact', 'تواصل').openGraph).toMatchObject({
-      siteName: 'ابدأ ستوديو',
+      siteName: 'ابدأ ستوديو للذكاء الاصطناعي',
     });
   });
 });
@@ -392,8 +392,8 @@ describe('names and facts (AR-STUDIO-NAME-1)', () => {
     return out;
   };
   it('«ابدأ استوديو» (with the alef) appears nowhere in apps, packages or docs', () => {
-    // the ruling itself quotes the old spelling, and the vendored foundation (a managed file) still has it until the foundation repo ships the same change
-    const allowed = ['docs/rulings/AR-STUDIO-NAME-1.md', 'packages/shared/src/foundation/brand.ts'];
+    // the ruling itself quotes the old spelling; the vendored foundation brand.ts now carries the corrected values too
+    const allowed = ['docs/rulings/AR-STUDIO-NAME-1.md'];
     const hits = ['apps', 'packages', 'docs']
       .flatMap(d => walk(path.join(ROOT, d)))
       .filter(f => !allowed.includes(path.relative(ROOT, f)))
