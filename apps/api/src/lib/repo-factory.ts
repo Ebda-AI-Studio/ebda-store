@@ -1572,8 +1572,8 @@ export async function storeUpdateAfterCommit(
 ): Promise<any> {
   // The hook is bound to THIS transaction object (Ruling NZ-D19), not to the ambient tenant scope: a separate money transaction can
   // roll back while the outer tenant transaction commits. A transaction with no hook registry cannot take it: refused (fail closed).
-  let write: (() => Promise<void>) | undefined;
-  if (!afterTxCommit(tx, () => write?.()))
+  const pending: { write?: () => Promise<void> } = {};
+  if (!afterTxCommit(tx, () => pending.write?.()))
     throw new AppError(
       501,
       'STORE_TX_WRITE_UNSUPPORTED',
@@ -1598,7 +1598,7 @@ export async function storeUpdateAfterCommit(
     data,
     select: { id: true },
   });
-  write = () => applyPostCommit(storeId, data);
+  pending.write = () => applyPostCommit(storeId, data);
   const projected: Record<string, unknown> = { ...current };
   for (const [k, v] of Object.entries(data))
     if (!selected || selected.includes(k)) projected[k] = v;

@@ -18,8 +18,8 @@ const PREFIX: Record<SaleDocType | RefundDocType, string> = {
   credit_note: 'CRN',
   refund_receipt: 'RFR',
 };
-/** 6 years: UTPL Art. 38 (5 years after the tax period) + Art. 44 (6 for evasion). */
-const RETENTION_YEARS = 6;
+/** 7 years: must equal apps/api/src/config/retention.ts RETENTION_YEARS (Ruling RETENTION-1; legal minimum 5 + 2 buffer). */
+const RETENTION_YEARS = 7;
 const SALE_TYPES = "('tax_invoice', 'receipt')";
 const REFUND_TYPES = "('credit_note', 'refund_receipt')";
 

@@ -3,7 +3,7 @@
 /**
  * Super-admin tax archive — /tax-archive (ruling MONEYB-4).
  *
- * Fiscal documents are kept for six years, including those of stores that were later deleted.
+ * Fiscal documents are kept for seven years, including those of stores that were later deleted.
  * This page lists every store that has archived documents; opening one shows its documents.
  *
  * Route guard: super_admin only (RequireSuperAdmin + the API's authorize('super_admin')).

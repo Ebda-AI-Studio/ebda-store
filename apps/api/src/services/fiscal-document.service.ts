@@ -23,7 +23,7 @@ import { storeDb } from '../lib/repo-factory';
  * and the document commit or roll back together. Never the random order number.
  *
  * Documents are immutable (DB trigger) and have no FK to stores/orders, so a
- * store deletion leaves them in place for 6 years (`retain_until`).
+ * store deletion leaves them in place for 7 years (`retain_until`).
  */
 
 export type FiscalDocTypeValue =
@@ -44,7 +44,7 @@ export const FISCAL_NUMBER_PREFIX: Record<
   refund_receipt: 'RFR',
 };
 
-/** 6 years: UTPL Art. 38 (5 years after the tax period) + Art. 44 (6 for evasion). */
+/** 7 years from the order date (Ruling RETENTION-1; the legal minimum is 5, see config/retention.ts). */
 export const FISCAL_RETENTION_YEARS = RETENTION_YEARS; // Ruling RETENTION-1: one constant (config/retention.ts)
 
 export function fiscalNumber(docType: keyof typeof FISCAL_NUMBER_PREFIX, serial: number): string {
