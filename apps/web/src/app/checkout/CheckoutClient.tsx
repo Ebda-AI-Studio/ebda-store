@@ -82,7 +82,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
-import { priceChangedLines } from '@/lib/gold-display';
+import { priceChangedLines, isDeferredGoldOption } from '@/lib/gold-display';
 import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
@@ -517,6 +517,24 @@ export default function CheckoutClient() {
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
+  // SHARIA-GOLD-1: with a gold line in the cart (and the merchant not allowing it) COD and installments are
+  // hidden. Display only: the API refuses them whatever this shows.
+  const [goldPrepaidOnly, setGoldPrepaidOnly] = useState(true);
+  const cartHasGold = cartContextItems.some(i => !i.unavailable && Boolean(i.gold));
+  const shownPaymentProviders = useMemo(
+    () =>
+      cartHasGold && goldPrepaidOnly
+        ? paymentProviders.filter(o => !isDeferredGoldOption(o.id))
+        : paymentProviders,
+    [cartHasGold, goldPrepaidOnly, paymentProviders]
+  );
+  useEffect(() => {
+    if (
+      shownPaymentProviders.length > 0 &&
+      !shownPaymentProviders.some(o => o.id === selectedProvider)
+    )
+      setSelectedProvider(shownPaymentProviders[0].id);
+  }, [shownPaymentProviders, selectedProvider]);
   // COD fee settings from /payments/config — the checkout quotes the fee with
   // the SAME function the order freezes it with (codFeeForOrder, MONEYB-3).
   const [codFeeConfig, setCodFeeConfig] = useState<CodFeeConfig | null>(null);
@@ -677,6 +695,8 @@ export default function CheckoutClient() {
             /** Per online provider, the methods the merchant turned on. */
             methods?: Record<string, Array<{ code: string; name: string; nameAr: string }>>;
             defaultProvider?: string;
+            /** SHARIA-GOLD-1: true unless the merchant allowed COD / installments for gold. */
+            goldPrepaidOnly?: boolean;
             cod?: {
               fixedFee: number;
               percentBps?: number;
@@ -777,6 +797,7 @@ export default function CheckoutClient() {
           }
 
           setPaymentProviders(allProviders);
+          setGoldPrepaidOnly(paymentResult.data.goldPrepaidOnly !== false);
           if (paymentResult.data.defaultProvider) {
             // The default is a provider id; a provider shown as several methods starts on its first.
             const def = paymentResult.data.defaultProvider;
@@ -2780,7 +2801,7 @@ export default function CheckoutClient() {
                     formData={formData}
                     shippingNames={reviewPlaceNames}
                     onEditShipping={() => setStep(1)}
-                    paymentProviders={paymentProviders}
+                    paymentProviders={shownPaymentProviders}
                     paymentConfigError={paymentConfigError}
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}

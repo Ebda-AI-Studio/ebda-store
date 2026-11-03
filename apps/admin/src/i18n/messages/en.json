@@ -4952,6 +4952,7 @@
         "expiryInvalid": "Enter a whole number of hours between 1 and 720.",
         "save": "Save options"
       },
+      "bnplDisclosure": "Installments are financed by the provider (valU, Kashier, Aman, Masary), not by Ebda. The provider own terms, fees and any late charges apply to your customer. Check them before you turn this on.",
       "methods": {
         "card": "Card",
         "wallet": "Mobile wallet",
@@ -10105,6 +10106,17 @@
       "reject": "Reject",
       "confirm": "Confirm",
       "failed": "The decision did not save. Try again."
+    },
+    "paymentPolicy": {
+      "title": "Payment for gold",
+      "intro": "Orders with gold are paid in full online. Cash on delivery and installments are hidden at checkout for gold.",
+      "allow": "Allow cash on delivery and installments for gold",
+      "explain": "Gold bought for money is normally paid in full at the time of sale. If you allow cash on delivery or installments for gold, you take responsibility for that choice.",
+      "confirmCheck": "I understand and I confirm.",
+      "save": "Save",
+      "saved": "Saved.",
+      "failed": "It did not save. Try again.",
+      "needConfirm": "Tick the confirmation first."
     },
     "settings": {
       "title": "Settings",
