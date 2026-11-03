@@ -14,7 +14,7 @@ import { GENERATED_STORE_DO_REGISTRY } from './registry.generated';
 
 export type TableClass =
   | { kind: 'no-pii' }
-  /** Merchant-owned content with no customer identifiers; goes with `deleteAll()` on merchant erase. */
+  /** Merchant-owned content with no customer identifiers; KEPT on merchant erase (Rulings NZ-D16, RETENTION-1: only its PII columns are anonymised). */
   | { kind: 'store-owned' }
   | {
       kind: 'customer-pii';

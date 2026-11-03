@@ -197,6 +197,24 @@ declare module '@ebda-src/repo' {
     m: DoMutation
   ): Promise<DoQueryResult>;
   export function ensureIdempotencySchema(sql: SqlRunner): void;
+  export interface DoMoneyInFlight {
+    paidUndelivered: number;
+    awaitingTransferConfirmation: number;
+    openReturns: number;
+    codOutstanding: number;
+    paymentsInDispute: number;
+    unsettledPayouts: number;
+    walletBalances: number;
+  }
+  export function moneyInFlightOnDo(db: SyncSql): DoMoneyInFlight;
+  export function totalInFlight(f: DoMoneyInFlight): number;
+  export function isStoreClosed(db: SyncSql): boolean;
+  export function closeStore(db: SyncSql): void;
+  export type CloseResult =
+    | { closed: true; token: string | null }
+    | { refused: true; counts: DoMoneyInFlight };
+  export function closeIfNoMoneyInFlight(db: SyncSql): CloseResult;
+  export function reopenAfterFailedDelete(db: SyncSql, token: string): { reopened: boolean };
   export function readStoreRecord(
     sql: SqlRunner,
     meta: Meta,

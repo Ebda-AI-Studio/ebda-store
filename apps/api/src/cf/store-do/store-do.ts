@@ -41,6 +41,13 @@ import {
   ensureIdempotencySchema,
   ensurePaymentSchema,
   scrubReceiptsForOrders,
+  moneyInFlightOnDo,
+  isStoreClosed,
+  closeStore,
+  closeIfNoMoneyInFlight,
+  reopenAfterFailedDelete,
+  type CloseResult,
+  type DoMoneyInFlight,
   ensureSearchIndex,
   purgeErasureLedger,
   MoneyError,
@@ -64,6 +71,7 @@ import {
 } from '../erasure/store-do-sql';
 import { unclassifiedTables } from '../erasure/registry';
 import type { Subject } from '../erasure/types';
+import { eraseMerchantAtomically } from '../erasure/merchant-anonymise';
 import {
   buildBackup,
   dumpTables,
@@ -122,6 +130,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    * cf/cutover.ts, which checks the CUTOVER_IMPORT_SECRET bearer before this DO sees the request.
    */
   async fetch(request: Request): Promise<Response> {
+    // A closed store's data is a retained legal record: the cutover surface may not import into it or WIPE it (__unseal).
+    if (isStoreClosed(this.sync) && /\/__(import|unseal)\b/.test(new URL(request.url).pathname))
+      return new Response(JSON.stringify({ ok: false, code: 'STORE_CLOSED' }), {
+        status: 423,
+        headers: { 'content-type': 'application/json' },
+      });
     return handleStoreAdmin(request, {
       sql: this.ctx.storage.sql as never,
       transactionSync: fn => this.ctx.storage.transactionSync(fn),
@@ -188,6 +202,32 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     }
   }
 
+  /** A closed store (Ruling NZ-D15) refuses every write; reads, exports and backups keep working. Nothing is ever deleted. */
+  private closedOr<T>(answer: T): T | null {
+    return isStoreClosed(this.sync) ? answer : null;
+  }
+
+  /** Writes call this first; a closed store is a 410 answer (inside `run`, a StoreError). */
+  private assertOpen(): void {
+    if (isStoreClosed(this.sync)) throw new StoreError('STORE_CLOSED', 410);
+  }
+
+  /** ATOMIC money gate + close in one DO call (Ruling NZ-D17): {closed, token} or {refused, counts}. Deletes nothing. */
+  closeIfNoMoneyInFlight(storeId: string): Result<CloseResult> {
+    return run(() => {
+      this.bind(storeId);
+      return closeIfNoMoneyInFlight(this.sync);
+    });
+  }
+
+  /** Compensating rollback of a close that this delete made, when the delete then failed (Ruling NZ-D17). */
+  reopenAfterFailedDelete(storeId: string, token: string): Result<{ reopened: boolean }> {
+    return run(() => {
+      this.bind(storeId);
+      return reopenAfterFailedDelete(this.sync, token);
+    });
+  }
+
   /**
    * Catalogue/content writes for the API Worker (lib/repo-factory.ts `storeWriter`). ONE atomic transaction per call;
    * `m.key` makes a retry return the first run's result. Refuses (as an answer, never a throw) a model that is not on the
@@ -195,6 +235,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    */
   async mutate(storeId: string, m: DoMutation): Promise<DoQueryResult> {
     try {
+      this.bind(storeId);
+      const closed = this.closedOr({
+        ok: false as const,
+        code: 'STORE_CLOSED',
+        message: 'store is closed',
+      });
+      if (closed) return closed;
       return await runWrites(await this.lite(storeId), doSqlRunner(this.ctx.storage), m);
     } catch (e) {
       if (e instanceof StoreMismatch)
@@ -216,6 +263,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
       return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
     }
+    const closed = this.closedOr({
+      ok: false as const,
+      code: 'STORE_CLOSED',
+      status: 410,
+      message: 'store is closed',
+    });
+    if (closed) return closed;
     return answerStockOp(this.sync, storeId, op, argsJson, key);
   }
 
@@ -231,6 +285,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
       return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
     }
+    const closed = this.closedOr({
+      ok: false as const,
+      code: 'STORE_CLOSED',
+      status: 410,
+      message: 'store is closed',
+    });
+    if (closed) return closed;
     return answerMoneyOp(this.sync, storeId, op, argsJson, key);
   }
 
@@ -244,6 +305,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
     try {
       this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
       const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
       const fields = decodeRpc<Record<string, unknown>>(fieldsJson);
       return {
@@ -282,6 +344,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       const id = rows.store?.id ?? rows.products[0]?.storeId;
       if (!id) throw new StoreError('PRODUCT_NOT_FOUND', 404);
       this.bind(id);
+      this.assertOpen();
       for (const p of rows.products) if (p.storeId !== id) throw new StoreMismatch();
       return repo.seed(this.sync, rows);
     });
@@ -303,6 +366,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   ) {
     return run(() => {
       this.bind(storeId);
+      this.assertOpen();
       return repo.addCartItem(this.sync, storeId, sessionId, productId, qty, variantId);
     });
   }
@@ -310,6 +374,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   createOrder(storeId: string, sessionId: string) {
     return run(() => {
       this.bind(storeId);
+      this.assertOpen();
       return repo.createOrder(this.sync, storeId, sessionId);
     });
   }
@@ -383,6 +448,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   ): Promise<Result<Record<string, { rows: number; sha256: string; ok: boolean }>>> {
     try {
       this.bind(sourceStoreId); // the restored rows carry the source store's id: this instance now serves that store
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
       return { ok: true, data: await this.restoreFromUnsafe(sourceStoreId, day) };
     } catch (e) {
       // Returned, not thrown: a refused restore is an answer, not a Durable Object fault.
@@ -455,7 +521,11 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /** Merchant: wipe the whole DO (rows, alarm). Customer: delete/scrub the registry rows that match. */
-  async eraseSubject(s: Subject): Promise<{ erased: Record<string, number>; remaining: number }> {
+  async eraseSubject(s: Subject): Promise<{
+    erased: Record<string, number>;
+    remaining: number;
+    refused?: Record<string, number>;
+  }> {
     const sqlx = this.ctx.storage.sql;
     if (s.kind === 'customer') {
       this.assertRegistryCoversSchema();
@@ -467,15 +537,21 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       });
       return { erased, remaining: countCustomerRows(sqlx, s) };
     }
-    const erased = this.rowCounts();
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
-    const left = sqlx
-      .exec(
-        "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
-      )
-      .one().n as number;
-    return { erased, remaining: left };
+    // MERCHANT erasure = ANONYMISATION in ONE transaction with the money gate (Rulings NZ-D16, NZ-D17, RETENTION-1): refused while
+    // money is in flight; otherwise buyer data is anonymised, account / cart / consent / marketing data deleted, the merchant's own
+    // contact and actor ids anonymised, fiscal / payment / VAT / ETA rows KEPT, and the store closed. No deleteAll.
+    this.assertRegistryCoversSchema();
+    return eraseMerchantAtomically(
+      {
+        sql: sqlx,
+        sync: this.sync,
+        transactionSync: fn => this.ctx.storage.transactionSync(fn),
+        scrubReceipts: orderIds => scrubReceiptsForOrders(this.sync, { orderIds }),
+        moneyInFlight: db => moneyInFlightOnDo(db) as unknown as Record<string, number>,
+        closeStore: db => closeStore(db),
+      },
+      s.requestId
+    );
   }
 
   /** PITR bookmark for "now" (SQLite-backed DOs, 30 days). Returned so the drill can record availability. */

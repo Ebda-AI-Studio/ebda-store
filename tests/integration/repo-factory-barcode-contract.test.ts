@@ -117,15 +117,32 @@ async function world(mirror: boolean) {
         ...o,
       },
     });
-  const a = await mk('A');
-  const b = await mk('B', { barcode: '2000000000411' }); // already in the in-store range: allocation continues after it
-  const c = await mk('C', { deletedAt: new Date() });
-  const parent = await mk('P', { hasVariants: true });
+  // Explicit, distinct created_at: the fill order is (created_at, id), and rows made back to back can share a millisecond. Then the
+  // random uuid decides, and the Postgres world and the DO world (different rows, different uuids) would fill in different orders.
+  const at = (i: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, i));
+  const a = await mk('A', { createdAt: at(1) });
+  const b = await mk('B', { barcode: '2000000000411', createdAt: at(2) }); // already in the in-store range: allocation continues after it
+  const c = await mk('C', { deletedAt: new Date(), createdAt: at(3) });
+  const parent = await mk('P', { hasVariants: true, createdAt: at(4) });
   const v1 = await prisma.productVariant.create({
-    data: { productId: parent.id, title: 'S', sku: `PS-${k}`, price: 1_000, inventory: 0 },
+    data: {
+      productId: parent.id,
+      title: 'S',
+      sku: `PS-${k}`,
+      price: 1_000,
+      inventory: 0,
+      createdAt: at(5),
+    },
   });
   const v2 = await prisma.productVariant.create({
-    data: { productId: parent.id, title: 'M', sku: `PM-${k}`, price: 1_000, inventory: 0 },
+    data: {
+      productId: parent.id,
+      title: 'M',
+      sku: `PM-${k}`,
+      price: 1_000,
+      inventory: 0,
+      createdAt: at(6),
+    },
   });
   if (mirror) {
     insertSqlite(sqlite, 'Product', [a, b, c, parent] as never);

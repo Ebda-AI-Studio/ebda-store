@@ -1,4 +1,5 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
+import { registerTxHooks, runCommitHooks } from './tx-hooks';
 
 /**
  * Wraps `prisma.$transaction` with the money-safe defaults required by
@@ -14,8 +15,20 @@ export function withMoneyTx<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
   opts?: { maxWait?: number; timeout?: number }
 ): Promise<T> {
-  return (prisma.$transaction as (...args: unknown[]) => Promise<T>)(fn, {
-    maxWait: opts?.maxWait ?? 10000,
-    timeout: opts?.timeout ?? 30000,
-  });
+  // Ruling NZ-D19: this transaction's own after-COMMIT hooks (`afterTxCommit(tx, ...)`): fired only if THIS transaction commits.
+  const hooks: Array<() => unknown> = [];
+  return (async () => {
+    const result = await (prisma.$transaction as (...args: unknown[]) => Promise<T>)(
+      (tx: Prisma.TransactionClient) => {
+        registerTxHooks(tx as object, hooks);
+        return fn(tx);
+      },
+      {
+        maxWait: opts?.maxWait ?? 10000,
+        timeout: opts?.timeout ?? 30000,
+      }
+    );
+    await runCommitHooks(hooks); // a rollback threw above: the hooks are dropped with it
+    return result;
+  })();
 }
