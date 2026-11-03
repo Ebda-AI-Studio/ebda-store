@@ -229,7 +229,8 @@
           "slugTooShort": "Slug must be at least 3 characters",
           "slugTooLong": "Slug must be less than 50 characters",
           "slugTaken": "This slug is already in use"
-        }
+        },
+        "activateCta": "Activate store"
       },
       "owner": {
         "title": "Store Owner",
@@ -460,7 +461,8 @@
         "bulkImport": "Bulk Import",
         "backToStore": "Back to Store",
         "orderNewArrivals": "Order New Arrivals",
-        "orderBestSellers": "Order Best Sellers"
+        "orderBestSellers": "Order Best Sellers",
+        "more": "More"
       },
       "filters": {
         "ariaLabel": "Filter products by status",
@@ -497,10 +499,11 @@
         "delete": "Delete"
       },
       "empty": {
-        "title": "No products found",
-        "description": "Add your first product to get started.",
-        "descriptionFiltered": "Try adjusting your search or filters.",
-        "addProduct": "Add Product"
+        "title": "No products yet",
+        "description": "Add your first product to start selling.",
+        "descriptionFiltered": "No results. Try changing the search or filters.",
+        "addProduct": "Add Product",
+        "titleFiltered": "No matching products"
       },
       "pagination": {
         "showing": "Showing {from} to {to} of {total} products",
@@ -5615,14 +5618,14 @@
   "auth": {
     "login": {
       "title": "Sign in",
-      "subtitle": "Sign in to access Ebda Store",
+      "subtitle": "Sign in and get back to your store.",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
       "passwordPlaceholder": "Enter your password",
       "signIn": "Sign in",
       "signingIn": "Signing in…",
-      "loginFailed": "Login failed",
+      "loginFailed": "We could not sign you in. Try again.",
       "footer": "Ebda Store",
       "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
@@ -5640,8 +5643,8 @@
       "mfaTotpLink": "Use authenticator app instead",
       "mfaInvalid": "Invalid or expired code. Please try again.",
       "rememberMe": "Remember my email",
-      "serverError": "Server returned an invalid response. Please try again.",
-      "accessDenied": "Access denied. Admin or staff privileges required.",
+      "serverError": "Something went wrong on our side. Try again in a moment.",
+      "accessDenied": "This account does not have access to the dashboard.",
       "mfaVerifyFailed": "Verification failed",
       "emailNotVerified": "Please verify your email first. We sent you a code.",
       "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
@@ -5649,7 +5652,14 @@
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
       "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
-      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue."
+      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue.",
+      "invalidCredentials": "The email or password is not right. Check them and try again.",
+      "invalidCode": "That code is wrong or has expired. Try again.",
+      "titleChat": "Sign in to Ebda Chat",
+      "subtitleChat": "Sign in and carry on in Ebda Chat.",
+      "footerChat": "Ebda Chat",
+      "brandTitleChat": "Ebda Chat",
+      "brandSubtitleChat": "Reply to your customers on WhatsApp from one place, with your whole team."
     },
     "forgot": {
       "title": "Reset your password",
@@ -6177,7 +6187,18 @@
     "noEvents": "No timeline events yet",
     "by": "by",
     "reasonLabel": "Reason:",
-    "refundViaLabel": "Refund via:"
+    "refundViaLabel": "Refund via:",
+    "orderAlerts": {
+      "title": "Order alerts on this device",
+      "body": "When a new order arrives you get an alert on this device, even when the dashboard is closed. We only ask for permission when you press the button.",
+      "cta": "Turn on order alerts on this device",
+      "enabling": "Turning on alerts…",
+      "enabled": "Alerts are on",
+      "doneHint": "Done. New order alerts will reach this device.",
+      "denied": "The browser is blocking notifications. Allow them in the site settings and try again.",
+      "unavailable": "Alerts are not available right now. Try again in a moment.",
+      "error": "We could not turn on alerts. Try again."
+    }
   },
   "finance": {
     "accounts": {
@@ -7341,6 +7362,7 @@
     "upgradeCta": "Upgrade to {plan}",
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
+    "requiresFeature": "Requires the “{feature}” feature.",
     "alsoIncluded": "Also included in this plan"
   },
   "aiTools": {

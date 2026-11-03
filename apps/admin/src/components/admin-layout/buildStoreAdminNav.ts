@@ -219,7 +219,8 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
     },
     {
       name: labels.marketing,
-      href: `/stores/${storeId}/ai-tools`,
+      // Lands on a tab every plan can open; /ai-tools is bulk-operations gated (audit M-1).
+      href: `/stores/${storeId}/newsletter`,
       hubKey: 'marketing',
       // Sparkle icon
       icon: 'M5 3v4 M3 5h4 M6 17v4 M4 19h4 M13 3l3.5 7L24 13.5 16.5 17 13 24l-3.5-7L2 13.5 9.5 10z',

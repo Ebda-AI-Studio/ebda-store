@@ -275,6 +275,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/2026-10-28-customer-intelligence.md](plans/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
 - [plans/2026-10-28-store-on-cloudflare.md](plans/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
+- [plans/2026-11-03-admin-audit-polish.md](plans/2026-11-03-admin-audit-polish.md) - Admin impeccable-audit polish: plan gate, OneSignal opt-in, formatting, Egyptian copy, sign-in
 - [plans/2026-11-02-neon-zero.md](plans/2026-11-02-neon-zero.md) - NEON-ZERO-1: the Ebda API with zero Postgres, Neon or Hyperdrive (inventory, scale rules, design note)
 - [plans/2026-11-03-editor-theme-spacing.md](plans/2026-11-03-editor-theme-spacing.md) - SP-1..3: simplified Theme panel (tiers, presets, density) and per-section, per-device spacing in the visual editor
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something

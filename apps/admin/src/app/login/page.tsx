@@ -1,22 +1,32 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
-import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
+import { useAuth, postLoginDestination, goAfterSignIn, type MfaChallenge } from '../../lib/auth';
 import { isPasskeyCancel, passkeyAutofillSupported, passkeysSupported } from '../../lib/passkeys';
 import { useT } from '@/i18n/useT';
 import { NileNight } from './_components/NileNight';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
+import { SignInBrand } from '@/components/SignInBrand';
+import { signInProduct, type SignInProduct } from '../../lib/sign-in-return';
 import { DocumentTitle } from '@/components/DocumentTitle';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
 export default function LoginPage() {
   const t = useT('auth.login');
-  const tb = useT('components.brand');
+  // Which product sent the person here (?product=chat from Ebda Chat); anything else is the Store (Ruling SIGNIN-RETURN-1).
+  // `null` until the query is read: the first render is neutral, so a Chat visitor never sees the Store's name first.
+  const [product, setProduct] = useState<SignInProduct | null>(null);
+  useEffect(() => {
+    setProduct(signInProduct(new URLSearchParams(window.location.search).get('product')));
+  }, []);
+  const tp = (key: 'title' | 'subtitle' | 'footer' | 'brandTitle' | 'brandSubtitle') => {
+    if (product === null) return key === 'title' ? t('title') : '';
+    return t(product === 'chat' ? (`${key}Chat` as const) : key);
+  };
   const tSignup = useT('onboarding.signup');
   const router = useRouter();
   const {
@@ -50,7 +60,7 @@ export default function LoginPage() {
   // a login form they don't need.
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace(postLoginDestination());
+      goAfterSignIn(router, postLoginDestination(), 'replace');
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -167,20 +177,9 @@ export default function LoginPage() {
             <div className="mb-6 flex justify-end">
               <AdminLanguageSwitcher />
             </div>
-            <DocumentTitle title={t('title')} />
+            <DocumentTitle title={tp('title')} />
             <div className="text-center">
-              <div className="flex items-center justify-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
-                    />
-                  </svg>
-                </div>
-              </div>
+              <SignInBrand product={product} />
               <h1 className="mt-6 text-3xl font-bold text-foreground">{t('mfaRequired')}</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 {useBackupCode ? t('mfaBackupSubtitle') : t('mfaSubtitle')}
@@ -189,7 +188,10 @@ export default function LoginPage() {
 
             <form className="mt-8 space-y-6" onSubmit={handleMfaSubmit}>
               {error && (
-                <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
+                <div
+                  role="alert"
+                  className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink"
+                >
                   {error}
                 </div>
               )}
@@ -254,7 +256,7 @@ export default function LoginPage() {
               </div>
             </form>
 
-            <p className="mt-8 text-center text-xs text-muted-foreground">{t('footer')}</p>
+            <p className="mt-8 text-center text-xs text-muted-foreground">{tp('footer')}</p>
           </div>
         </div>
 
@@ -264,9 +266,9 @@ export default function LoginPage() {
             <NileNight />
             <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
             <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-              <p className="text-4xl font-bold">{t('brandTitle')}</p>
+              <p className="text-4xl font-bold">{tp('brandTitle')}</p>
               <p className="mt-4 text-lg text-white/85 text-center max-w-md">
-                {t('brandSubtitle')}
+                {tp('brandSubtitle')}
               </p>
             </div>
           </div>
@@ -292,34 +294,19 @@ export default function LoginPage() {
           <div className="mb-6 flex justify-end">
             <AdminLanguageSwitcher />
           </div>
-          <DocumentTitle title={t('title')} />
+          <DocumentTitle title={tp('title')} />
           <div className="text-center">
-            <div className="flex items-center justify-center gap-3">
-              <Image
-                src="/logo-on-light.svg"
-                alt={tb('brandAlt')}
-                width={21}
-                height={40}
-                className="dark:hidden"
-                unoptimized
-              />
-              <Image
-                src="/logo.svg"
-                alt={tb('brandAlt')}
-                width={21}
-                height={40}
-                className="hidden dark:block"
-                unoptimized
-              />
-              <span className="text-xl font-semibold">{tb('brandAlt')}</span>
-            </div>
-            <h1 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>
+            <SignInBrand product={product} />
+            <h1 className="mt-6 text-3xl font-bold text-foreground">{tp('title')}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{tp('subtitle')}</p>
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
+              <div
+                role="alert"
+                className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink"
+              >
                 {error}
               </div>
             )}
@@ -426,14 +413,17 @@ export default function LoginPage() {
             </div>
           )}
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {tSignup('noAccount')}{' '}
-            <Link href="/signup" className="text-primary-ink underline underline-offset-4">
-              {tSignup('createStore')}
-            </Link>
-          </p>
+          {/* Store sign-up copy names the Store: shown only once the product is known to be the Store. */}
+          {product === 'store' && (
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              {tSignup('noAccount')}{' '}
+              <Link href="/signup" className="text-primary-ink underline underline-offset-4">
+                {tSignup('createStore')}
+              </Link>
+            </p>
+          )}
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">{t('footer')}</p>
+          <p className="mt-8 text-center text-xs text-muted-foreground">{tp('footer')}</p>
         </div>
       </div>
 
@@ -443,8 +433,8 @@ export default function LoginPage() {
           <NileNight />
           <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
           <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-            <p className="text-4xl font-bold">{t('brandTitle')}</p>
-            <p className="mt-4 text-lg text-white/85 text-center max-w-md">{t('brandSubtitle')}</p>
+            <p className="text-4xl font-bold">{tp('brandTitle')}</p>
+            <p className="mt-4 text-lg text-white/85 text-center max-w-md">{tp('brandSubtitle')}</p>
           </div>
         </div>
       </div>

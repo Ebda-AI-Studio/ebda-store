@@ -186,10 +186,16 @@ export const HUBS: HubDefinition[] = [
       { label: labels.warehouses, href: `/stores/${storeId}/stock/warehouses` },
       { label: labels.scan, href: `/stores/${storeId}/stock/scan` },
       { label: labels.adjustments, href: `/stores/${storeId}/stock/adjustments` },
-      { label: labels.suppliers, href: `/stores/${storeId}/stock/suppliers` },
+      // Purchasing group (suppliers, purchase orders, backorders), then the planning group: dividers keep the
+      // 10-tab strip readable (audit 2.4).
+      {
+        label: labels.suppliers,
+        href: `/stores/${storeId}/stock/suppliers`,
+        groupStart: true,
+      },
       { label: labels.purchaseOrders, href: `/stores/${storeId}/stock/purchase-orders` },
       { label: labels.backorders, href: `/stores/${storeId}/stock/backorders` },
-      { label: labels.reorder, href: `/stores/${storeId}/stock/reorder` },
+      { label: labels.reorder, href: `/stores/${storeId}/stock/reorder`, groupStart: true },
       { label: labels.deadstock, href: `/stores/${storeId}/stock/deadstock` },
     ],
   },
@@ -235,20 +241,20 @@ export const HUBS: HubDefinition[] = [
       '/answer-engine',
     ],
     buildTabs: (storeId, labels) => [
-      { label: labels.aiTools, href: `/stores/${storeId}/ai-tools` },
-      { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
-      { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
-      { label: labels.notifications, href: `/stores/${storeId}/notifications` },
+      // Campaigns first: the hub lands on a page every plan can open (audit M-1); the AI tools page is gated by
+      // bulk operations and sits in its own group at the end. Dividers split the 11 tabs (audit M-2).
       { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
-      // Feature-gated (`email_campaigns` is Growth + Business, not Basic) via
-      // useRequireFeature('email_campaigns') — same "tab always renders,
-      // the page itself gates" pattern as bundles/coupons/loyalty above.
+      // Feature-gated (`email_campaigns` is Growth + Business, not Basic): the layout shows the locked card.
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
       { label: labels.paymentAbandonments, href: `/stores/${storeId}/payment-abandonments` },
       { label: labels.lifecycleEmails, href: `/stores/${storeId}/lifecycle-emails` },
+      { label: labels.notifications, href: `/stores/${storeId}/notifications` },
+      { label: labels.affiliates, href: `/stores/${storeId}/affiliates`, groupStart: true },
       { label: labels.marketingPixels, href: `/stores/${storeId}/marketing-pixels` },
-      { label: labels.affiliates, href: `/stores/${storeId}/affiliates` },
+      { label: labels.aiTools, href: `/stores/${storeId}/ai-tools`, groupStart: true },
+      { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
+      { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
     ],
   },
   {

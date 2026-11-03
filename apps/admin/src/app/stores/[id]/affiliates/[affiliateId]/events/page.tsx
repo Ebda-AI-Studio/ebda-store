@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, uiIntlTag } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 
 interface AffiliateEvent {
@@ -323,7 +323,7 @@ export default function AffiliateEventsPage() {
                     </div>
 
                     <time dateTime={event.at} className="mt-1 block text-xs text-muted-foreground">
-                      {new Date(event.at).toLocaleString('en-US', {
+                      {new Date(event.at).toLocaleString(uiIntlTag(), {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       })}

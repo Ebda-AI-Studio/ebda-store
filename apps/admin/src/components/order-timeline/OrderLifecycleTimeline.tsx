@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { uiIntlTag } from '@/lib/format';
 
 interface TimelineRow {
   at: string;
@@ -247,7 +248,7 @@ export function OrderLifecycleTimeline({ storeId, orderId }: OrderLifecycleTimel
                       <p className="mt-0.5 text-xs text-muted-foreground">{row.details}</p>
                     )}
                     <time dateTime={row.at} className="mt-1 block text-xs text-muted-foreground">
-                      {new Date(row.at).toLocaleString('en-US', {
+                      {new Date(row.at).toLocaleString(uiIntlTag(), {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       })}

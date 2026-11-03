@@ -21,6 +21,12 @@
  */
 
 import { hasSessionHintCookie, sessionHintCookieClears } from '@ebda/shared';
+import {
+  PLAN_GATE_FALLBACK,
+  RAW_PLAN_GATE_MESSAGES,
+  RAW_STATUS_MESSAGE,
+  isPlanGateError,
+} from './route-feature-gates';
 import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
 
 export interface ApiResponse<T = unknown> {
@@ -555,7 +561,10 @@ export async function checkSessionWithMountRetries(
  */
 export async function apiRequest<T = unknown>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit & {
+    /** An optional widget call: a plan 402/403 must not open the upgrade dialog (the widget just hides). */
+    quietUpsell?: boolean;
+  } = {}
 ): Promise<{ data: T | null; error: ApiError | null }> {
   const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
 
@@ -670,18 +679,28 @@ export async function apiRequest<T = unknown>(
       ) {
         window.location.assign('/account/security');
       }
-      const message = localizedApiMessage(
+      let message = localizedApiMessage(
         errCode,
         errMessage || `Request failed with status ${response.status}`,
         errObj?.details
       );
-      if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
+      // A plan-gated call must not hand a page the raw API text (audit G-2): pages render error.message as-is.
+      if (
+        isPlanGateError({ status: response.status, code: errCode }) &&
+        (RAW_STATUS_MESSAGE.test(message) || RAW_PLAN_GATE_MESSAGES.includes(message))
+      ) {
+        message = PLAN_GATE_FALLBACK[adminUiLocale()];
+      }
+      if (options.quietUpsell) {
+        // optional widget: no dialog
+      } else if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
       else if (response.status === 403 && errCode === 'FEATURE_DISABLED') {
         // Only when the API says the PLAN withholds it (it names the unlocking sold plan).
         const flat = data as unknown as Record<string, unknown>;
         if (flat.upgradeTo) {
           const text = adminUiLocale() === 'ar' ? flat.messageAr : flat.messageEn;
-          dispatchUpsell(errCode, typeof text === 'string' && text ? text : message, {
+          if (typeof text === 'string' && text) message = text;
+          dispatchUpsell(errCode, message, {
             upgradeTo: flat.upgradeTo,
           });
         }
@@ -790,6 +809,11 @@ export async function apiGet<T = unknown>(
   if (headers) init.headers = headers;
   if (signal) init.signal = signal;
   return apiRequest<T>(endpoint, init);
+}
+
+/** GET for an optional widget: a plan refusal (402/403) never opens the upgrade dialog. */
+export async function apiGetQuiet<T = unknown>(endpoint: string) {
+  return apiRequest<T>(endpoint, { method: 'GET', quietUpsell: true });
 }
 
 /** The `meta` block list routes return beside `data` (see expenses.routes.ts). */

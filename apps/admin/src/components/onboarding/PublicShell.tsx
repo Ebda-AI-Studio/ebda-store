@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Image from 'next/image';
+import { useLocale } from 'next-intl';
 import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
@@ -21,6 +22,7 @@ export function PublicShell({
 }) {
   const tb = useT('components.brand');
   const t = useT('onboarding.shell');
+  const isAr = useLocale() === 'ar';
   return (
     <main id="admin-main-content" className="min-h-dvh bg-background px-4 py-5 sm:px-6">
       <DocumentTitle title={title} />
@@ -43,6 +45,11 @@ export function PublicShell({
               className="hidden dark:block"
               unoptimized
             />
+            {/* Studio first, then the product: the same lockup order as the sign-in page. */}
+            <span className="text-sm font-medium text-primary-ink">
+              {isAr ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}
+            </span>
+            <span aria-hidden="true" className="h-4 w-px bg-border" />
             <span className="text-sm font-semibold">{tb('brandAlt')}</span>
           </a>
           <AdminLanguageSwitcher />
