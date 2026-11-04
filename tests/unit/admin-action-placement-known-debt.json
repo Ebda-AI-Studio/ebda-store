@@ -1,7 +1,6 @@
 {
   "backTo": [
     "app/stores/[id]/agent-key/page.tsx",
-    "app/stores/[id]/ai-tools/page.tsx",
     "app/stores/[id]/announcement/page.tsx",
     "app/stores/[id]/blog/page.tsx",
     "app/stores/[id]/delivery/page.tsx",
@@ -13,28 +12,11 @@
     "app/stores/[id]/webhooks/page.tsx"
   ],
   "nativeDialog": [
-    "app/billing-events/_components/ClaimsPanel.tsx",
-    "app/billing-events/page.tsx",
-    "app/email-queue/page.tsx",
-    "app/platform-settings/page.tsx",
-    "app/sms-queue/page.tsx",
-    "app/stores/[id]/ai-tools/page.tsx",
-    "app/stores/[id]/billing/page.tsx",
     "app/stores/[id]/blog/page.tsx",
-    "app/stores/[id]/finance/bank-reconciliation/[statementId]/page.tsx",
-    "app/stores/[id]/finance/bank-reconciliation/page.tsx",
-    "app/stores/[id]/finance/expenses/page.tsx",
     "app/stores/[id]/seo/redirects/page.tsx",
     "app/stores/[id]/size-charts/_components/SizeChartEditor.tsx",
     "app/stores/[id]/size-charts/page.tsx",
-    "app/stores/[id]/stock/inventory/page.tsx",
-    "app/stores/[id]/stock/purchase-orders/[poId]/page.tsx",
-    "app/stores/[id]/stock/scan/page.tsx",
-    "app/stores/[id]/stock/suppliers/page.tsx",
-    "app/stores/[id]/stock/warehouses/page.tsx",
     "app/stores/[id]/tax/_components/TaxVerificationCard.tsx",
-    "app/tax-verification/page.tsx",
-    "app/webhook-events/page.tsx",
     "components/ProviderVerificationSection.tsx",
     "components/SmartPaletteModal.tsx",
     "components/ZoneEditor.tsx"

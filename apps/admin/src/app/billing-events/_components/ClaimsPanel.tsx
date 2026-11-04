@@ -85,7 +85,7 @@ export function ClaimsPanel({
     void fetchRows();
   }, [fetchRows, refreshKey]);
 
-  function confirm(r: ClaimRow) {
+  function confirmClaim(r: ClaimRow) {
     onConfirm({
       storeId: r.storeId,
       storeName: r.storeName,
@@ -213,7 +213,11 @@ export function ClaimsPanel({
           </Button>
         ) : r.status === 'pending' ? (
           <span className="flex flex-wrap gap-2">
-            <Button size="sm" className="max-md:min-h-11 max-md:px-4" onClick={() => confirm(r)}>
+            <Button
+              size="sm"
+              className="max-md:min-h-11 max-md:px-4"
+              onClick={() => confirmClaim(r)}
+            >
               {t('confirm')}
             </Button>
             <Button
@@ -311,7 +315,7 @@ export function ClaimsPanel({
               onApprove={() => {
                 const claim = reviewing;
                 setReviewing(null);
-                confirm(claim);
+                confirmClaim(claim);
               }}
               onReject={async reason => {
                 const err = await postReject(reviewing, reason);

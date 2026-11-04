@@ -9,6 +9,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const { apiGet, apiPost } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
+const confirmMock = vi.hoisted(() => vi.fn());
+vi.mock('../../hooks/useConfirm', () => ({ useConfirm: () => confirmMock }));
 vi.mock('../../lib/api', () => ({ apiGet, apiPost }));
 vi.mock('../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -104,7 +106,7 @@ describe('super-admin billing ledger page', () => {
       error: null,
     });
     apiPost.mockResolvedValue({ data: {}, error: null });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     render(<BillingEventsPage />);
     const buttons = await screen.findAllByRole('button', { name: 'refund' });
     expect(buttons.length).toBeGreaterThan(0);

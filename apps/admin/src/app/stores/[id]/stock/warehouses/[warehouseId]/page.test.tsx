@@ -113,7 +113,7 @@ describe('warehouse stock — refetch reads CURRENT page/search, latest wins (is
     fireEvent.click(screen.getByText('7')); // enter edit mode
     fireEvent.click(screen.getByText('save')); // PUT in flight, started on page 1
     await waitFor(() => expect(puts).toHaveLength(1));
-    fireEvent.click(screen.getByText('→'));
+    fireEvent.click(screen.getByLabelText('pageNext'));
     await waitFor(() => expect(stockCalls()).toHaveLength(2));
 
     await act(async () => puts[0].resolve({ data: {} }));
@@ -127,7 +127,7 @@ describe('warehouse stock — refetch reads CURRENT page/search, latest wins (is
 
   it('a search from page 2 issues ONE request for page 1; an older response landing last never repaints', async () => {
     await loadFirstPage();
-    fireEvent.click(screen.getByText('→'));
+    fireEvent.click(screen.getByLabelText('pageNext'));
     await waitFor(() => expect(stockCalls()).toHaveLength(2));
     await act(async () => respond(stockCalls()[1]));
     await screen.findByText('ROW-all-2');

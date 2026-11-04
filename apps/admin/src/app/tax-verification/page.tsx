@@ -20,6 +20,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { apiGet, apiPost } from '../../lib/api';
 import { openProtectedDocument } from '../../lib/open-document';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { withNumerals } from '@ebda/shared';
 
 type Tab = 'pending' | 'verified' | 'rejected' | 'revoked' | 'all';
@@ -70,6 +71,7 @@ function duplicateCount(v: ReviewRow['duplicateTrnStores']): number {
 
 function TaxVerificationInner() {
   const t = useT('taxReview');
+  const askConfirm = useConfirm();
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
   const [tab, setTab] = useState<Tab>('pending');
@@ -138,7 +140,14 @@ function TaxVerificationInner() {
     const needsReason = decision !== 'approve';
     const trimmed = reason.trim();
     if (needsReason && trimmed.length < 3) return setReasonError(true);
-    if (decision === 'revoke' && !window.confirm(t('actions.revokeConfirm'))) return;
+    if (decision === 'revoke') {
+      const ok = await askConfirm({
+        object: t('actions.revokeObject'),
+        consequence: t('actions.revokeConfirm'),
+        confirmLabel: t('actions.revoke'),
+      });
+      if (!ok) return;
+    }
     setReasonError(false);
     setWorking(true);
     const { error } = await apiPost(

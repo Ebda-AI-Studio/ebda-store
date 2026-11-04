@@ -39,7 +39,6 @@ export default function ImportStatementPage() {
   const router = useRouter();
   const t = useT('finance.bankRec');
   const ti = useT('finance.bankRec.import');
-  const tc = useT('common');
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -107,19 +106,11 @@ export default function ImportStatementPage() {
   const canImport = !!file && !!selectedAccountId && !importing;
 
   return (
-    <AdminLayout title={ti('title')}>
+    <AdminLayout
+      title={ti('title')}
+      parent={{ label: t('title'), href: `/stores/${storeId}/finance/bank-reconciliation` }}
+    >
       <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
-        {/* Header */}
-        <div>
-          <button
-            onClick={() => router.back()}
-            className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            ← {tc('back')}
-          </button>
-          <h1 className="text-xl font-semibold text-foreground">{ti('title')}</h1>
-        </div>
-
         {/* Form card */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
           {/* GL Account select */}
@@ -212,15 +203,15 @@ export default function ImportStatementPage() {
             </div>
             {result.parseErrors.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-amber-700 mb-1">{ti('parseErrors')}:</p>
+                <p className="text-xs font-semibold text-warning-ink mb-1">{ti('parseErrors')}:</p>
                 <ul className="list-inside list-disc space-y-0.5">
                   {result.parseErrors.slice(0, 10).map((e, i) => (
-                    <li key={i} className="text-xs text-amber-700">
+                    <li key={i} className="text-xs text-warning-ink">
                       {e}
                     </li>
                   ))}
                   {result.parseErrors.length > 10 && (
-                    <li className="text-xs text-amber-500">
+                    <li className="text-xs text-warning-ink">
                       {ti('andMore', { count: result.parseErrors.length - 10 })}
                     </li>
                   )}
