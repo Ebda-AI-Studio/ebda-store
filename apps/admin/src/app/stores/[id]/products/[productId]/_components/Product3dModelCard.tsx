@@ -9,6 +9,7 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, useToast } from '@ebda/ui';
+import { useConfirm } from '@/hooks/useConfirm';
 import type { ProductModelViewerHandle } from '@ebda/ui/model3d';
 import {
   DEFAULT_THEME,
@@ -189,6 +190,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
   const { isEnabled, isLoading: featuresLoading } = useFeatures();
   const enabled = isEnabled('product_3d');
   const { success: toastSuccess, error: toastError } = useToast();
+  const askConfirm = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<AdminModel | null>(null);
@@ -347,7 +349,12 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
   }
 
   async function removeModel() {
-    if (!window.confirm(t('removeConfirm'))) return;
+    const ok = await askConfirm({
+      object: t('removeDialog.object'),
+      consequence: t('removeDialog.consequence'),
+      confirmLabel: t('removeDialog.confirmLabel'),
+    });
+    if (!ok) return;
     setBusy(true);
     const { error } = await apiDelete(base);
     setBusy(false);

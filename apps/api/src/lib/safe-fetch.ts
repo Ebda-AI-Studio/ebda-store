@@ -21,6 +21,7 @@
  * proportionate, standard mitigation for the merchant-URL threat model.
  */
 import { isWorkers } from './runtime';
+import { fetchWithTimeout } from './fetch-timeout';
 
 const MAX_REDIRECTS = 3;
 
@@ -254,7 +255,7 @@ export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Res
   let currentInit = init;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const validated = await assertPublicHttpUrl(current);
-    const res = await fetch(current, { ...currentInit, redirect: 'manual' });
+    const res = await fetchWithTimeout(current, { ...currentInit, redirect: 'manual' });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get('location');
       if (!loc) return res;

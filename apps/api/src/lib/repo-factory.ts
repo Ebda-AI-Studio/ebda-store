@@ -357,6 +357,19 @@ export interface StockClient {
   }>;
 }
 
+/** A `loyalty_points` row as the DO returns it (Prisma field names, epoch-ms timestamps). */
+export interface DoLoyaltyPointsRow {
+  id: string;
+  storeId: string;
+  customerId: string;
+  points: number;
+  totalEarned: number;
+  totalRedeemed: number;
+  tier: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** An InstaPay order receipt as the DO returns it (`ReceiptRow` of `do/instapay-receipts.ts`). */
 export type DoReceipt = import('@ebda-src/repo').InstapayReceiptRow;
 
@@ -374,6 +387,92 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+  /** L-1 (Ruling FP-2): the admin / storefront reads and manual awards, on the DO ledger. Row timestamps are epoch ms. */
+  loyaltyAward(
+    a: {
+      customerId: string;
+      points: number;
+      type: string;
+      description?: string | null;
+      featureEnabled: boolean;
+    },
+    key?: string
+  ): Promise<{ newBalance: number }>;
+  loyaltyInit(
+    a: { customerId: string; giveSignupBonus: boolean; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ row: DoLoyaltyPointsRow; settings: Record<string, any> }>;
+  loyaltyReviewBonus(
+    a: { customerId: string; productId: string; reviewId: string; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ awarded: boolean; points: number }>;
+  loyaltyCustomerPoints(a: {
+    customerId: string;
+    featureEnabled: boolean;
+  }): Promise<{ row: DoLoyaltyPointsRow; settings: Record<string, any> } | null>;
+  loyaltyHistory(a: { customerId: string; page?: number; limit?: number }): Promise<{
+    transactions: Array<{
+      id: string;
+      storeId: string;
+      customerId: string;
+      orderId: string | null;
+      type: string;
+      points: number;
+      description: string | null;
+      expiresAt: number | null;
+      createdAt: number;
+      order: { id: string; orderNumber: string } | null;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
+  loyaltyMembers(a: { page?: number; limit?: number; tier?: string }): Promise<{
+    members: DoLoyaltyPointsRow[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
+  loyaltyStats(a?: Record<string, never>): Promise<{
+    totalMembers: number;
+    tierBreakdown: { bronze: number; silver: number; gold: number; platinum: number };
+    totalPointsIssued: number;
+    totalPointsRedeemed: number;
+    outstandingPoints: number;
+  }>;
+  loyaltyStoreTransactions(a: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    customerId?: string;
+    from?: number | null;
+    to?: number | null;
+  }): Promise<{
+    transactions: Array<{
+      id: string;
+      storeId: string;
+      customerId: string;
+      orderId: string | null;
+      type: string;
+      points: number;
+      description: string | null;
+      expiresAt: number | null;
+      createdAt: number;
+      order: { id: string; orderNumber: string } | null;
+    }>;
+    total: number;
+  }>;
+  loyaltyImportState(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyMarkImported(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyImport(a: {
+    customerId: string;
+    markDone?: boolean;
+    rows: Array<{
+      id: string;
+      orderId?: string | null;
+      type: string;
+      points: number;
+      description?: string | null;
+      expiresAt?: number | null;
+      createdAt: number;
+    }>;
+  }): Promise<{ inserted: number; skipped: number; newBalance: number; disabled?: true }>;
   /** WalletService.applyEntry on the DO (Ruling WALLET-GL-1): ledger row + balance + GL in one section. */
   walletEntry(
     a: {
@@ -1084,6 +1183,17 @@ export function makeMoneyClient(
     loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+    loyaltyAward: (a, key) => call('loyaltyAward', a, key),
+    loyaltyInit: (a, key) => call('loyaltyInit', a, key),
+    loyaltyReviewBonus: (a, key) => call('loyaltyReviewBonus', a, key),
+    loyaltyCustomerPoints: a => call('loyaltyCustomerPoints', a),
+    loyaltyHistory: a => call('loyaltyHistory', a),
+    loyaltyMembers: a => call('loyaltyMembers', a),
+    loyaltyStats: a => call('loyaltyStats', a ?? {}),
+    loyaltyStoreTransactions: a => call('loyaltyStoreTransactions', a),
+    loyaltyImport: a => call('loyaltyImport', a),
+    loyaltyImportState: a => call('loyaltyImportState', a),
+    loyaltyMarkImported: a => call('loyaltyMarkImported', a),
     walletEntry: (a, key) => call('walletEntry', a, key),
     receiptCreate: a => call('receiptCreate', a),
     receiptExtraction: a => call('receiptExtraction', a),

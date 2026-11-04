@@ -32,7 +32,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma, runInTenantContext } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -145,6 +145,8 @@ router.get(
 router.post(
   '/:id/integrations/merchant-keys',
   ...chain,
+  // BE:S-2 (Ruling FP-3): an impersonated session must not mint a durable key that outlives it.
+  rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;

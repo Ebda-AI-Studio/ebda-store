@@ -16,7 +16,6 @@
     "branding": 4,
     "builder": 6,
     "bulk": 5,
-    "bundles": 1,
     "campaigns": 4,
     "categories": 8,
     "checkoutDelivery": 1,
@@ -42,13 +41,13 @@
     "newsletter": 4,
     "notifications": 7,
     "onboarding": 0,
-    "orders": 30,
+    "orders": 28,
     "pages": 2,
     "paymentSettings": 2,
     "planLimit": 12,
     "plans": 0,
     "platformSettings": 1,
-    "products": 31,
+    "products": 29,
     "pwa": 2,
     "returns": 27,
     "reviews": 11,
@@ -67,7 +66,6 @@
   },
   "englishFeedback": {
     "app/stores/[id]/affiliates/[affiliateId]/events/page.tsx": 1,
-    "app/stores/[id]/orders/page.tsx": 2,
     "app/stores/[id]/settings/page.tsx": 3
   },
   "smallText": {

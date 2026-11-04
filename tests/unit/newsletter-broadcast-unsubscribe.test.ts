@@ -52,6 +52,9 @@ vi.mock('@api/middleware/auth', () => ({
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),
 }));
+vi.mock('@api/middleware/feature-gate', () => ({
+  requireFeature: () => (_req: any, _res: any, next: any) => next(),
+}));
 vi.mock('@api/middleware/security', () => ({
   auditLog: vi.fn(),
   writeLimiter: (_req: any, _res: any, next: any) => next(),

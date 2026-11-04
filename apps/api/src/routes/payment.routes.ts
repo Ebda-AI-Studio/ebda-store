@@ -12,6 +12,7 @@ import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import {
@@ -46,6 +47,7 @@ import {
 } from '@ebda/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/error-handler';
+import { checkStoreAccess } from '../middleware/store-access';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
 import {
   codCollectMinor,
@@ -110,12 +112,16 @@ const createPaymentSchema = z.object({
 });
 
 const refundSchema = z.object({
-  transactionId: z.string(),
+  // BE:S-12: bounded, both land in the audit log and the provider call.
+  transactionId: z.string().min(1).max(128),
   /** Narrows the lookup when two providers hold the same reference string (Ruling ITEST-14). */
   provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
   amount: z.number().int().positive().optional(),
-  reason: z.string().optional(),
+  reason: z.string().max(500).optional(),
 });
+
+// BE:S-13: the retry body names at most a provider.
+const retryBodySchema = z.object({ provider: z.enum(['paymob', 'kashier', 'fawry']).optional() });
 
 // ==========================================
 // Helper Functions
@@ -137,10 +143,10 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
     // resolved first (validated X-Store-ID / host, the same resolver the public
     // routes use) and every read below runs inside its scope.
     const storeId = await resolvePublicStoreId(req);
+    // BE:S-22: no resolvable store is a 404, never the platform default (and never "first store").
+    if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-    const data = await (storeId
-      ? withStore(storeId, () => loadCheckoutPaymentConfig(storeId))
-      : loadCheckoutPaymentConfig(undefined));
+    const data = await withStore(storeId, () => loadCheckoutPaymentConfig(storeId));
 
     res.json({ success: true, data });
   } catch (error) {
@@ -267,6 +273,7 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
     const currency = (req.query.currency as Currency) || REGION.currency;
     const provider = req.query.provider as PaymentProvider | undefined;
     const storeId = await resolvePublicStoreId(req);
+    if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // BE:S-22
 
     const methods = await PaymentService.getPaymentMethods(amount, currency, provider, storeId);
 
@@ -1172,6 +1179,9 @@ router.get(
 router.post(
   '/refund',
   authenticate,
+  // BE:S-2 / S-11 (Ruling FP-3): money out is never done from an impersonated session; super_admin needs MFA.
+  requireMfaEnrolled,
+  rejectImpersonated,
   requirePermission('orders:refund'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1200,12 +1210,17 @@ router.post(
         });
         return;
       }
-      if (user.role === 'store_admin' && paymentRow.order.store.ownerId !== user.userId) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment not found' },
-        });
-        return;
+      // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
+      // `orders:refund` (on any store) passed with no membership check at all.
+      if (user.role !== 'super_admin') {
+        const access = await checkStoreAccess(paymentRow.order.store.id, user);
+        if (!access.ok) {
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Payment not found' },
+          });
+          return;
+        }
       }
 
       const refundStoreId = paymentRow.order.store.id;
@@ -1295,12 +1310,15 @@ router.post(
 router.post(
   '/retry/:paymentId',
   authenticate,
+  rejectImpersonated,
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { paymentId } = req.params;
       const user = getAuthUser(req);
-      const provider = req.body.provider as PaymentProvider | undefined;
+      const provider = retryBodySchema.parse(req.body ?? {}).provider as
+        | PaymentProvider
+        | undefined;
 
       // The store is not known yet (strict RLS shows a contextless read nothing): a definer
       // maps the payment id to its store, then the ownership check reads inside that scope.

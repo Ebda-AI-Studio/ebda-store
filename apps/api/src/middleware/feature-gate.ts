@@ -24,6 +24,36 @@ const PLAN_GATED_FEATURES: Record<
 };
 
 /**
+ * The 403 body of a feature that is off. Two shapes in one: the standard envelope (`error.code`, `error.message`,
+ * `error.details`, which every client reads first) and the flat legacy fields (`code`, `feature`, `upgradeTo`, `messageEn/Ar`)
+ * the admin client still reads for the upsell. `error.code` was missing, so a caller of any gated route got `undefined`.
+ */
+function featureDisabledBody(
+  featureKey: FeatureKey,
+  extra: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const { messageEn, messageAr, upgradeTo } = extra as {
+    messageEn?: string;
+    messageAr?: string;
+    upgradeTo?: unknown;
+  };
+  return {
+    success: false,
+    error: {
+      code: 'FEATURE_DISABLED',
+      message: 'Feature not available',
+      details: {
+        feature: featureKey,
+        ...(upgradeTo ? { upgradeTo, messageEn, messageAr } : {}),
+      },
+    },
+    code: 'FEATURE_DISABLED',
+    feature: featureKey,
+    ...extra,
+  };
+}
+
+/**
  * Feature Gate Middleware — Fail Closed
  *
  * Returns 403 if the feature is disabled, unavailable, or if the storeId
@@ -70,12 +100,7 @@ export function requireFeature(featureKey: FeatureKey) {
         { featureKey, path: req.path },
         '[requireFeature] No storeId found, denying access'
       );
-      res.status(403).json({
-        success: false,
-        error: 'Feature not available',
-        code: 'FEATURE_DISABLED',
-        feature: featureKey,
-      });
+      res.status(403).json(featureDisabledBody(featureKey));
       return;
     }
 
@@ -122,19 +147,18 @@ export function requireFeature(featureKey: FeatureKey) {
         // admin can show an upgrade prompt. Absent when the plan is not the cause.
         const e = await getEntitlements(storeId);
         const upgradeTo = e ? upgradeTargetForDisabledFeature(e.planCode, featureKey) : null;
-        res.status(403).json({
-          success: false,
-          error: 'Feature not available',
-          code: 'FEATURE_DISABLED',
-          feature: featureKey,
-          ...(upgradeTo
-            ? {
-                upgradeTo,
-                messageEn: `This feature is available on the ${upgradeTo.nameEn} plan.`,
-                messageAr: `الميزة دي متاحة في باقة ${upgradeTo.nameAr}.`,
-              }
-            : {}),
-        });
+        res.status(403).json(
+          featureDisabledBody(
+            featureKey,
+            upgradeTo
+              ? {
+                  upgradeTo,
+                  messageEn: `This feature is available on the ${upgradeTo.nameEn} plan.`,
+                  messageAr: `الميزة دي متاحة في باقة ${upgradeTo.nameAr}.`,
+                }
+              : {}
+          )
+        );
         return;
       }
 
@@ -142,12 +166,7 @@ export function requireFeature(featureKey: FeatureKey) {
     } catch (err) {
       // Fail closed on any service error
       logger.error({ err, storeId, featureKey }, '[requireFeature] Service error, denying access');
-      res.status(403).json({
-        success: false,
-        error: 'Feature not available',
-        code: 'FEATURE_DISABLED',
-        feature: featureKey,
-      });
+      res.status(403).json(featureDisabledBody(featureKey));
     }
   };
 }

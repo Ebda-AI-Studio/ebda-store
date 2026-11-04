@@ -4,11 +4,36 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  ECHOED_SERVER_OWNED_KEYS,
   SERVER_OWNED_SETTINGS_KEYS,
   mergeClientSettings,
   reservedSettingsKeys,
   stripServerOwnedSettings,
 } from '@ebda/shared';
+
+describe('server-owned settings keys: the MCP switch and the gold flag (BE:S-8, Ruling FP-1)', () => {
+  it('reserves mcpWriteEnabled and goldAllowDeferredPayment', () => {
+    expect(SERVER_OWNED_SETTINGS_KEYS).toEqual(
+      expect.arrayContaining(['mcpWriteEnabled', 'goldAllowDeferredPayment'])
+    );
+  });
+  it('a generic merge can neither flip, plant nor erase either flag', () => {
+    const existing = { mcpWriteEnabled: false, goldAllowDeferredPayment: false, a: 1 };
+    expect(
+      mergeClientSettings(existing, { mcpWriteEnabled: true, goldAllowDeferredPayment: true, a: 2 })
+    ).toEqual({ mcpWriteEnabled: false, goldAllowDeferredPayment: false, a: 2 });
+    expect(mergeClientSettings({ a: 1 }, { mcpWriteEnabled: false })).toEqual({ a: 1 });
+    expect(mergeClientSettings(existing, { mcpWriteEnabled: null })).toEqual(existing);
+  });
+  it('the flags a stale whole copy echoes back are listed as silently dropped', () => {
+    expect([...ECHOED_SERVER_OWNED_KEYS].sort()).toEqual([
+      'goldAllowDeferredPayment',
+      'mcpWriteEnabled',
+    ]);
+    for (const k of ECHOED_SERVER_OWNED_KEYS) expect(SERVER_OWNED_SETTINGS_KEYS).toContain(k);
+    expect(ECHOED_SERVER_OWNED_KEYS).not.toContain('ebdaWhatsApp'); // a planted platform link still answers 400
+  });
+});
 
 describe('server-owned settings keys', () => {
   it('reserves the WhatsApp link key and strips it from client settings', () => {

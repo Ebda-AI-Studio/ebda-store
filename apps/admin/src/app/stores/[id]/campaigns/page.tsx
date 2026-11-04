@@ -20,6 +20,7 @@ import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { formatDateTime } from '@/lib/format';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { DataTable } from '../../../../components/mobile/DataTable';
 import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
@@ -214,53 +215,65 @@ export default function CampaignsListPage() {
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">{t('colName')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('colStatus')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('colRecipients')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('colSent')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('colFailed')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('colDate')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map(c => (
-                  <tr key={c.id} className="border-t align-top">
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/stores/${storeId}/campaigns/${c.id}`)}
-                        className="font-medium text-primary hover:underline text-start"
-                      >
-                        {c.name}
-                      </button>
-                      {lastErrorText(c.lastError) && (
-                        <p className="mt-0.5 text-xs text-destructive-ink">
-                          {lastErrorText(c.lastError)}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <OrderStatusBadge
-                        status={c.status}
-                        namespace="campaigns.status"
-                        colorMap={CAMPAIGN_STATUS_COLORS}
-                      />
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">{c.recipientCount}</td>
-                    <td className="px-3 py-2 tabular-nums">{c.sentCount}</td>
-                    <td className="px-3 py-2 tabular-nums">{c.failedCount}</td>
-                    <td className="px-3 py-2 text-muted-foreground" dir={isRtl ? 'rtl' : 'ltr'}>
-                      {dateCell(c)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          // Card mode below md (shared DataTable), the real table from md up (UX:M-2).
+          <DataTable<CampaignListItem>
+            ariaLabel={t('title')}
+            rows={campaigns}
+            rowKey={c => c.id}
+            columns={[
+              {
+                header: t('colName'),
+                primaryOnMobile: true,
+                cell: c => (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/stores/${storeId}/campaigns/${c.id}`)}
+                      className="min-h-11 font-medium text-primary hover:underline text-start"
+                    >
+                      {c.name}
+                    </button>
+                    {lastErrorText(c.lastError) && (
+                      <p className="mt-0.5 text-xs text-destructive-ink">
+                        {lastErrorText(c.lastError)}
+                      </p>
+                    )}
+                  </>
+                ),
+              },
+              {
+                header: t('colStatus'),
+                mobileBadge: true,
+                cell: c => (
+                  <OrderStatusBadge
+                    status={c.status}
+                    namespace="campaigns.status"
+                    colorMap={CAMPAIGN_STATUS_COLORS}
+                  />
+                ),
+              },
+              {
+                header: t('colRecipients'),
+                cell: c => <span className="tabular-nums">{c.recipientCount}</span>,
+              },
+              {
+                header: t('colSent'),
+                cell: c => <span className="tabular-nums">{c.sentCount}</span>,
+              },
+              {
+                header: t('colFailed'),
+                cell: c => <span className="tabular-nums">{c.failedCount}</span>,
+              },
+              {
+                header: t('colDate'),
+                cell: c => (
+                  <span className="text-muted-foreground" dir={isRtl ? 'rtl' : 'ltr'}>
+                    {dateCell(c)}
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
 
         {nextCursor && (
