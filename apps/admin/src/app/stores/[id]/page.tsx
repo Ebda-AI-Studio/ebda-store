@@ -3,7 +3,8 @@
 import { GoldRateBanner } from './_components/GoldRateBanner';
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, useToast } from '@ebda/ui';
+import { buttonVariants, cn, useToast } from '@ebda/ui';
+import Link from 'next/link';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
@@ -15,6 +16,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StatsGrid } from './_components/StatsGrid';
+import { NeedsAction } from './_components/NeedsAction';
 import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
@@ -120,15 +122,14 @@ export default function StoreDetailPage() {
       title={store.name}
       subtitle={getStoreDisplayUrl(store)}
       actions={
-        <div className="flex gap-2">
-          {!isEditing && (
-            <Button size="sm" onClick={() => setIsEditing(true)}>
-              {t('editStore')}
-            </Button>
-          )}
-        </div>
+        // One primary: the editor, the job a merchant opens this page for. "View store" is the TopBar's own button.
+        <Link href={`/stores/${store.id}/builder`} className={cn(buttonVariants({ size: 'sm' }))}>
+          {t('openEditor')}
+        </Link>
       }
     >
+      <NeedsAction storeId={store.id} />
+
       <GoldRateBanner storeId={store.id} />
 
       <SetupGuideCard
@@ -163,6 +164,7 @@ export default function StoreDetailPage() {
             resetEditForm();
           }}
           onActivate={() => setIsEditing(true)}
+          onEdit={() => setIsEditing(true)}
         />
         <div className="space-y-6">
           <StoreOwnerCard owner={store.owner} />
@@ -174,13 +176,7 @@ export default function StoreDetailPage() {
           dashboard 2026-05-14 to avoid duplicating the surface and to keep
           the dashboard focused on quick-glance store overview + actions. */}
 
-      <QuickActions
-        store={store}
-        isSuperAdmin={isSuperAdmin}
-        isChangingStatus={isChangingStatus}
-        onRequestSuspend={() => setShowSuspendModal(true)}
-        onActivate={() => handleStatusChange('active')}
-      />
+      <QuickActions store={store} isSuperAdmin={isSuperAdmin} />
 
       <SettingsLink storeId={store.id} />
 
@@ -188,7 +184,14 @@ export default function StoreDetailPage() {
           store admins must NOT see this. Rendered last so it's clearly
           separated from the rest of the dashboard. */}
       {isSuperAdmin && (
-        <DangerZone isDeleting={isDeleting} onRequestDelete={() => setShowDeleteModal(true)} />
+        <DangerZone
+          isDeleting={isDeleting}
+          onRequestDelete={() => setShowDeleteModal(true)}
+          status={store.status}
+          isChangingStatus={isChangingStatus}
+          onRequestSuspend={() => setShowSuspendModal(true)}
+          onActivate={() => handleStatusChange('active')}
+        />
       )}
 
       <SuspendStoreModal

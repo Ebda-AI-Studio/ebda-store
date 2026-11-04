@@ -1,5 +1,6 @@
 'use client';
 
+import { SparkleIcon } from './SparkleIcon';
 import { useState } from 'react';
 import { apiPost } from '../lib/api';
 import { useT } from '@/i18n/useT';
@@ -174,7 +175,7 @@ export function AITranslateMissingButton({
             />
           </svg>
         ) : (
-          <span aria-hidden>✨</span>
+          <SparkleIcon />
         )}
         <span>{buttonLabel}</span>
       </button>

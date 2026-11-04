@@ -12,6 +12,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [CHANGELOG-2026-10-16-ahmad-decisions.md](CHANGELOG-2026-10-16-ahmad-decisions.md) - Changelog — Ahmad's 2026-10-16 decisions (branch `fix/ahmad-decisions-1016`)
 - [CHANGELOG-2026-10-16-followups-b0-46.md](CHANGELOG-2026-10-16-followups-b0-46.md) - Changelog — B0-46 follow-up fixes (branch `fix/followups-b0-46`)
+- [CHANGELOG-2026-11-04-admin-fix-pass-t3.md](CHANGELOG-2026-11-04-admin-fix-pass-t3.md) - Admin fix pass, T3 UI foundation (2026-11-04)
 - [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) - Database backup, restore & disaster recovery
 - [DB-INDEX-MIGRATIONS.md](DB-INDEX-MIGRATIONS.md) - DB index migrations — lock procedure
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Ebda Store - Production Deployment Guide
@@ -22,6 +23,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [ROLLBACK.md](ROLLBACK.md) - Production rollback — Ebda
 - [RULINGS.md](RULINGS.md) - Rulings ledger (moved)
 - [SCALING.md](SCALING.md) - Horizontal Scaling Guide — Ebda Store API
+
+## admin - Admin app standards
+
+- [admin/ACTION-PLACEMENT-STANDARD.md](admin/ACTION-PLACEMENT-STANDARD.md) - Admin action-placement standard
 
 ## adr - Architecture decision records
 
