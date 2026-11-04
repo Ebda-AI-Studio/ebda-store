@@ -1,4 +1,6 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import { requirePlatformDb } from '../lib/platform-db';
+import { d1StoreBriefs, platformDb as platformDirectoryDb } from '../lib/platform-directory';
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { customerAuthRoute } from '../lib/customer-auth';
@@ -1307,6 +1309,8 @@ router.put(
         role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
         status: z.enum(['active', 'inactive', 'suspended']).optional(),
         password: z.string().min(8).max(255).optional(),
+        // N-9: names the store of a customer that exists only in its StoreDO (no Postgres row to find)
+        storeId: z.string().uuid().optional(),
       });
       const data = schema.parse(req.body);
 
@@ -1325,6 +1329,48 @@ router.put(
         : await asPlatformOperator(req.user!.userId, () =>
             prisma.user.findUnique({ where: { id } })
           );
+      if (!existing && data.storeId) {
+        const doRoute = await customerAuthRoute(data.storeId, { write: true });
+        const profile =
+          doRoute.kind === 'do'
+            ? await doRoute.client.call<Record<string, unknown> | null>('getProfile', {
+                userId: id,
+              })
+            : null;
+        if (doRoute.kind === 'do' && profile) {
+          const other = Object.keys(data).filter(
+            k => k !== 'status' && k !== 'storeId' && (data as never)[k] !== undefined
+          );
+          if (other.length > 0) {
+            res.status(409).json({
+              success: false,
+              error: {
+                code: 'CUSTOMER_ON_STORE_DO',
+                message:
+                  'This customer is served by its store: only the status can be changed here.',
+              },
+            });
+            return;
+          }
+          if (data.status !== undefined) {
+            await AuthService.setCustomerStatusOnDo(id, data.storeId, data.status);
+            await auditLog({
+              action: 'user.updated',
+              userId: req.user!.userId,
+              resourceType: 'user',
+              resourceId: id,
+              details: { changedFields: 'status', backend: 'store-do', status: data.status },
+              ip: req.ip,
+              userAgent: req.headers['user-agent'],
+            });
+          }
+          res.json({
+            success: true,
+            data: { user: { ...profile, status: data.status ?? profile.status } },
+          });
+          return;
+        }
+      }
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -1339,7 +1385,7 @@ router.put(
         const doRoute = await customerAuthRoute(existing.storeId, { write: true });
         if (doRoute.kind === 'do') {
           const other = Object.keys(data).filter(
-            k => k !== 'status' && (data as never)[k] !== undefined
+            k => k !== 'status' && k !== 'storeId' && (data as never)[k] !== undefined
           );
           if (other.length > 0) {
             res.status(409).json({
@@ -1676,6 +1722,25 @@ router.delete(
           },
         })
       );
+      // N-9: a customer that exists only in its StoreDO (?storeId=<store>) is erased there.
+      const doStore = typeof req.query.storeId === 'string' ? req.query.storeId : null;
+      if (!target && doStore && /^[0-9a-f-]{36}$/i.test(doStore)) {
+        const doRoute = await customerAuthRoute(doStore, { write: true });
+        if (doRoute.kind === 'do') {
+          await AuthService.eraseAccount(id, { actorId: req.user!.userId, storeHint: doStore });
+          await auditLog({
+            action: 'user.deleted',
+            userId: req.user!.userId,
+            resourceType: 'user',
+            resourceId: id,
+            details: { role: 'customer', backend: 'store-do', storeId: doStore },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+          res.json({ success: true, data: { message: 'User deleted' } });
+          return;
+        }
+      }
       if (!target) {
         res.status(404).json({
           success: false,
@@ -2503,6 +2568,42 @@ export async function loadUsageHistoryRows(
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
+  // `store_usage_snapshots` is on D1 once the `ai-usage` family moved (Ruling NZ-INTEG-1): one global read, no per-store Postgres
+  // transaction. The routed delegate has no `include`, so the store's slug / name / plan come from the D1 directory.
+  if (await platformFamilyOnD1('ai-usage')) {
+    const d1db = await requirePlatformDb(); // D1 has no RLS: the platform client directly, no store scope to open
+    const periods: Array<{ periodStart: Date }> = await d1db.storeUsageSnapshot.groupBy({
+      by: ['periodStart'],
+      orderBy: { periodStart: 'desc' },
+      take: months,
+    });
+    if (periods.length === 0) return [];
+    const snaps: Awaited<ReturnType<typeof loadUsageHistoryRows>> =
+      await d1db.storeUsageSnapshot.findMany({
+        where: { periodStart: { in: periods.map(p => p.periodStart) } },
+        orderBy: [{ periodStart: 'desc' }],
+      });
+    const d1 = platformDirectoryDb();
+    const briefs = new Map(
+      (d1
+        ? await d1StoreBriefs(
+            d1,
+            snaps.map(r => r.storeId)
+          )
+        : []
+      ).map(b => [b.id, b])
+    );
+    return snaps.map(r => ({
+      ...r,
+      store: briefs.has(r.storeId)
+        ? {
+            slug: briefs.get(r.storeId)!.slug,
+            name: briefs.get(r.storeId)!.name,
+            plan: briefs.get(r.storeId)!.plan,
+          }
+        : null,
+    }));
+  }
   const perStore = await acrossStores(
     storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
     { storeIds: await boundedFanoutStoreIds() }

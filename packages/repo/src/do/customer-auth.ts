@@ -47,7 +47,7 @@ const DDL = [
      language TEXT NOT NULL DEFAULT 'en', last_login_at INTEGER,
      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER,
      mfa_enabled INTEGER NOT NULL DEFAULT 0, mfa_secret TEXT, mfa_backup_codes TEXT NOT NULL DEFAULT '[]',
-     mfa_enrolled_at INTEGER, token_version INTEGER NOT NULL DEFAULT 0)`,
+     mfa_enrolled_at INTEGER, token_version INTEGER NOT NULL DEFAULT 0, erased_at INTEGER)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS _cauth_users_email ON _cauth_users (email)`,
   `CREATE TABLE IF NOT EXISTS _cauth_refresh (
      id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, user_id TEXT NOT NULL,
@@ -324,7 +324,28 @@ export function loginRow(
 }
 
 /**
- * Called after the (async) compare said yes. Re-reads the row: if the password or the token version moved while the compare
+ * Credential for the Worker's password compare (Ruling NZ-N9-2, revised after the Opus review): bcrypt cost 12 costs ~250 ms of
+ * CPU, which inside the single-threaded store DO would let a distributed login flood starve that store's checkout / stock /
+ * orders. The compare therefore runs in the API Worker (which scales out), and the DO only hands the hash to that Worker over the
+ * internal DO stub. NOT on the cutover channel's allow-list, never returned to a browser.
+ */
+export function credential(
+  db: SyncSql,
+  a: { email: string }
+): Res<{ id: string; hash: string; tokenVersion: number } | null> {
+  return ok(loginRow(db, String(a.email)));
+}
+
+export function credentialById(
+  db: SyncSql,
+  a: { userId: string }
+): Res<{ id: string; hash: string } | null> {
+  const hash = hashOf(db, String(a.userId));
+  return ok(hash ? { id: a.userId, hash } : null);
+}
+
+/**
+ * Called after the compare said yes. Re-reads the row: if the password or the token version moved while the compare
  * ran (a reset or a revoke landed), the success is void. Stamps last_login_at and returns the account.
  */
 export function loginSucceeded(
@@ -604,7 +625,7 @@ export function expiredDeleted(db: SyncSql, a: { before: number; limit: number }
   return ok(
     db
       .all(
-        `SELECT id FROM _cauth_users WHERE deleted_at IS NOT NULL AND deleted_at < ? AND email NOT LIKE 'erased-%' LIMIT ?`,
+        `SELECT id FROM _cauth_users WHERE deleted_at IS NOT NULL AND deleted_at < ? AND erased_at IS NULL LIMIT ?`,
         [a.before, Math.min(Math.max(1, a.limit | 0), 1000)]
       )
       .map(r => r.id as string)
@@ -876,7 +897,13 @@ export function passkeyAdd(
   now = Date.now()
 ): Res<PasskeyRow> {
   return db.transactionSync(() => {
-    if (!userById(db, a.userId)) return no('NOT_FOUND', 404, 'User not found');
+    const owner = one(db, `SELECT mfa_enabled, mfa_secret FROM _cauth_users WHERE id = ?`, [
+      a.userId,
+    ]);
+    if (!owner) return no('NOT_FOUND', 404, 'User not found');
+    // Ruling NZ-N9-1: TOTP is not ported; an MFA account must not gain a passkey (a second-factor-free way in)
+    if (bool(owner.mfa_enabled) && owner.mfa_secret)
+      return no('MFA_UNAVAILABLE', 409, 'MFA account');
     if (one(db, `SELECT 1 AS x FROM _cauth_passkeys WHERE credential_id = ?`, [a.credentialId]))
       return no('PASSKEY_EXISTS', 409, 'credential already registered');
     db.run(
@@ -988,9 +1015,10 @@ export function eraseCustomer(
     db.run(
       `UPDATE _cauth_users SET email = ?, password_hash = ?, first_name = 'Deleted', last_name = 'User', phone = NULL, avatar = NULL,
          date_of_birth = NULL, status = 'inactive', email_verified = 0, deleted_at = COALESCE(deleted_at, ?), mfa_enabled = 0,
-         mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL, token_version = token_version + 1, updated_at = ?
+         mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL, token_version = token_version + 1, updated_at = ?,
+         erased_at = ?
        WHERE id = ?`,
-      [`erased-${a.userId}@anonymized.local`, '!', now, now, a.userId]
+      [`erased-${a.userId}@anonymized.local`, '!', now, now, now, a.userId]
     );
     db.run(`DELETE FROM _cauth_refresh WHERE user_id = ?`, [a.userId]);
     db.run(`DELETE FROM _cauth_tokens WHERE user_id = ?`, [a.userId]);

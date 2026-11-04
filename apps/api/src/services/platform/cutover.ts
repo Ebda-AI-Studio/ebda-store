@@ -272,3 +272,17 @@ export function familyOfModel(model: string): PlatformFamily | undefined {
     if (models.includes(model)) return family as PlatformFamily;
   return undefined;
 }
+
+/**
+ * The ONE answer to "does a user-scoped request/call (no store) open a Postgres transaction?" (Ruling NZ-INTEG-1): no, once the
+ * platform D1 is bound and the billing, access and platform families are all on it. Used by `userContext` and by the database
+ * scope resolver. An unreadable marker throws the 503 of `platformFamilyOnD1` (never a Postgres guess).
+ */
+export async function platformUserScopeIsLazy(): Promise<boolean> {
+  const [billing, access, platform] = await Promise.all([
+    platformFamilyOnD1('billing'),
+    platformFamilyOnD1('access'),
+    platformFamilyOnD1('platform'),
+  ]);
+  return billing && access && platform;
+}

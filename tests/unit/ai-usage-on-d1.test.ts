@@ -47,6 +47,7 @@ vi.mock('@ebda/database', async () => {
     notifyModelWrite: vi.fn(),
     setModelRouter: vi.fn(),
     setRoutedModelGuard: vi.fn(),
+    setPlatformOperatorVerifier: vi.fn(),
   };
 });
 

@@ -23,6 +23,7 @@ vi.mock('@ebda/database', () => {
   };
   return {
     prisma: {
+      store: tx.store,
       fiscalDocument: { findMany: async () => [] },
       order: { findFirst: async () => state.order, count },
       product: { count },

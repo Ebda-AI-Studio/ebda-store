@@ -7,8 +7,9 @@
  * creates the Postgres row first and syncs the directory after, and `withStore` there must keep working. An unreadable
  * flag (503) propagates: never a guess. Import once at boot (app.ts).
  */
-import { setHubStoreLister, setStoreScopeResolver, setUserScopeNoPg } from '@ebda/database';
+import { setScopeResolver } from '@ebda/database';
 import { hubFanoutStoreIds, hubOnD1 } from './platform-hub';
+import { platformUserScopeIsLazy } from '../services/platform/cutover';
 import { backendFor } from './store-backend';
 import { AppError } from '../middleware/error-handler';
 
@@ -22,8 +23,14 @@ export async function resolveStoreScope(storeId: string): Promise<'pg' | 'no-pg'
   }
 }
 
-setStoreScopeResolver(resolveStoreScope);
-
-// The hub (user scope, no store) lists its stores from D1 once the platform families moved; otherwise undefined = the definer.
-setHubStoreLister(async () => ((await hubOnD1()) ? (await hubFanoutStoreIds()).ids : undefined));
-setUserScopeNoPg(() => hubOnD1());
+/**
+ * The ONE scope resolver (Ruling NZ-INTEG-1, reconciling NZ-TX-2 and NZ-C-3). Store scope: a DO store never opens a Postgres
+ * transaction; an unknown id is a 404 once the directory is authoritative, never a guess. User scope (no store): lazy only when
+ * the platform D1 is bound AND the billing, access and platform families are all on it (an unreadable marker is a 503). The
+ * per-query scope still sets the GUCs, so a Postgres store or the users table keeps its RLS identity.
+ */
+setScopeResolver({
+  lazyForStore: async storeId => (await resolveStoreScope(storeId)) === 'no-pg',
+  lazyForUser: platformUserScopeIsLazy,
+  hubStoreIds: async () => ((await hubOnD1()) ? (await hubFanoutStoreIds()).ids : undefined),
+});

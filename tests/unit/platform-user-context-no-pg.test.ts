@@ -30,6 +30,9 @@ vi.mock('@api/middleware/auth', () => ({
 }));
 vi.mock('@api/services/platform/cutover', () => ({
   platformFamilyOnD1: (f: string) => m.on(f),
+  // the real helper is "billing && access && platform"; same rule over the mocked marker reads
+  platformUserScopeIsLazy: async () =>
+    (await Promise.all(['billing', 'access', 'platform'].map(f => m.on(f)))).every(Boolean),
 }));
 
 import { platformUserContext } from '@api/middleware/tenant-context';

@@ -747,24 +747,23 @@ export async function listStoreClaims(storeId: string) {
 /** Super-admin queue: claims across stores (each read in its own store scope). */
 export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'rejected' = 'pending') {
   const now = new Date();
-  const parts = await acrossStores(async storeId => {
-    const claims = await prisma.manualPaymentClaim.findMany({
-      where: { storeId, status },
-      include: {
-        store: { select: { name: true, slug: true, status: true, billingSuspendedReason: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 200,
-    });
+  type ClaimRow = Prisma.ManualPaymentClaimGetPayload<{
+    include: {
+      store: { select: { name: true; slug: true; status: true; billingSuspendedReason: true } };
+    };
+  }>;
+  const shape = async (storeId: string | undefined, claims: ClaimRow[]) => {
     if (claims.length === 0) return [];
-    const [receipts, sub] = await Promise.all([
+    const ids = [...new Set(claims.map(c => c.storeId))];
+    const [receipts, subs] = await Promise.all([
       prisma.instapayReceipt.findMany({
-        where: { storeId, claimId: { in: claims.map(c => c.id) } },
+        where: { ...(storeId ? { storeId } : {}), claimId: { in: claims.map(c => c.id) } },
       }),
-      prisma.storeSubscription.findUnique({ where: { storeId } }),
+      prisma.storeSubscription.findMany({ where: { storeId: { in: ids } } }),
     ]);
     return claims.map(c => {
       const r = receipts.find(x => x.claimId === c.id);
+      const sub = subs.find(x => x.storeId === c.storeId) ?? null;
       const interval: BillingInterval = isInterval(c.billingInterval)
         ? c.billingInterval
         : 'monthly';
@@ -776,7 +775,36 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
         subStatus: sub?.status ?? null,
       };
     });
-  });
+  };
+  const include = {
+    store: { select: { name: true, slug: true, status: true, billingSuspendedReason: true } },
+  } as const;
+  // D1: ONE query over every store's claims (the oldest 200 of the queue), no Postgres scope per store.
+  const parts = (await platformFamilyOnD1('payments'))
+    ? [
+        {
+          value: await shape(
+            undefined,
+            await prisma.manualPaymentClaim.findMany({
+              where: { status },
+              include,
+              orderBy: { createdAt: 'asc' },
+              take: 200,
+            })
+          ),
+        },
+      ]
+    : await acrossStores(async storeId =>
+        shape(
+          storeId,
+          await prisma.manualPaymentClaim.findMany({
+            where: { storeId, status },
+            include,
+            orderBy: { createdAt: 'asc' },
+            take: 200,
+          })
+        )
+      );
   return parts
     .flatMap(p => p.value)
     .sort((a, b) => a.claim.createdAt.getTime() - b.claim.createdAt.getTime())

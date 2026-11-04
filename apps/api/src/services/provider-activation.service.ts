@@ -9,6 +9,8 @@
  *
  * The credentials never leave the server: every result here is a status, a code and a time.
  */
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { onD1 } from './platform/billing-d1';
 import {
   acrossStoresFlat,
   prisma,
@@ -17,7 +19,7 @@ import {
   storeDirectory,
   withStore,
 } from '@ebda/database';
-import { storeDb, storeWriter } from '../lib/repo-factory';
+import { storeRepo } from '../lib/repo-factory';
 import { asOperator, platformHubOnD1 } from '../lib/platform-scope';
 import { listDirectoryStores } from './platform/directory-d1';
 import { gateRead } from './platform/access-d1';
@@ -117,7 +119,9 @@ async function loadConnection(storeId: string, provider: string, kind: 'payments
   // the store's own backend (NEON-ZERO, Ruling NZ-C-8): its Durable Object for a DO store, `prisma` otherwise
   const db = await storeDb(storeId);
   if (kind === 'payments') {
-    const row = await db.paymentConfig.findFirst({ where: { provider, storeId } });
+    const row = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({ where: { provider, storeId } });
     if (!row) return null;
     return { kind, row, test: row.connectionTest };
   }
@@ -322,7 +326,6 @@ export async function runTestForStore(
   if (!entry || entry.manual)
     throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
   if (entry.kind === 'payments') {
-    // the store's own backend (its Durable Object or Postgres): the result is recorded where the config row lives
     const row = await (
       await storeDb(storeId)
     ).paymentConfig.findFirst({ where: { provider, storeId } });
@@ -330,17 +333,17 @@ export async function runTestForStore(
       throw new AppError(404, 'NOT_FOUND', 'The store has not saved credentials for this provider');
     // The gateway call holds no transaction: read, call, then a short write.
     const { result, stored } = await runConnectionTest(row);
-    await (
-      await storeWriter(storeId)
-    ).paymentConfig.update({
-      where: { id: row.id, storeId },
-      data: {
-        connectionTest: stored as unknown as Prisma.InputJsonValue,
-        healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',
-        lastHealthCheck: new Date(stored.at),
-        updatedBy: actor.userId,
-      },
-    });
+    await withStore(storeId, async () =>
+      (await storeWriter(storeId)).paymentConfig.update({
+        where: { id: row.id, storeId },
+        data: {
+          connectionTest: stored as unknown as Prisma.InputJsonValue,
+          healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',
+          lastHealthCheck: new Date(stored.at),
+          updatedBy: actor.userId,
+        },
+      })
+    );
     clearProviderCaches(storeId);
   } else {
     await runInStoreScope(storeId, () =>

@@ -23,33 +23,12 @@
         "auditLog": 2
       }
     },
-    "apps/api/src/mcp/tools/order.tools.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 1
-      }
-    },
     "apps/api/src/routes/notification.routes.ts": {
       "kind": "pg-branch",
       "guardFile": "apps/api/src/lib/analytics-backend.ts",
       "reason": "NZ-AN-1: notification log list/count/stats. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
       "models": {
         "notificationLog": 4
-      }
-    },
-    "apps/api/src/routes/payment-settings.routes.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 7
-      }
-    },
-    "apps/api/src/routes/payment.routes.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 2
       }
     },
     "apps/api/src/services/abandoned-cart.service.ts": {
@@ -82,7 +61,8 @@
       "models": {
         "product": 1,
         "productVariant": 1,
-        "category": 1
+        "category": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/purchase-order.service.ts": {
@@ -91,6 +71,14 @@
       "models": {
         "productVariant": 4,
         "product": 1
+      }
+    },
+    "apps/api/src/services/accounting/reorder-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "the reorder scan: a store on its Durable Object takes the storeMoney() reorderUpsert section (Ruling NZ-A-1); the remaining tx read is the Postgres upsert branch inside its tenant transaction.",
+      "models": {
+        "reorderSuggestion": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/stock-adjustment.service.ts": {
@@ -111,10 +99,11 @@
     },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
-      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route.",
       "models": {
         "campaignRecipient": 1,
-        "address": 1
+        "address": 1,
+        "wholesaleApplication": 1
       }
     },
     "apps/api/src/services/barcode-scan.service.ts": {
@@ -190,20 +179,6 @@
         "notificationEventConfig": 1
       }
     },
-    "apps/api/src/services/onboarding-instapay.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 1
-      }
-    },
-    "apps/api/src/services/onboarding.service.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 4
-      }
-    },
     "apps/api/src/services/order.service.ts": {
       "kind": "pg-branch",
       "reason": "create / rollbackForPaymentFailure / createAdminOrder: after `storeMoney()` early return (CF-ORDERS-1, CF-R4-2); the interactive-transaction body is the Postgres branch.",
@@ -218,27 +193,6 @@
         "bundleItem": 1
       }
     },
-    "apps/api/src/services/payment-providers/cod.provider.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 1
-      }
-    },
-    "apps/api/src/services/payment-providers/instapay.service.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 1
-      }
-    },
-    "apps/api/src/services/payment-providers/payment.factory.ts": {
-      "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
-      "models": {
-        "paymentConfig": 1
-      }
-    },
     "apps/api/src/services/product.service.ts": {
       "kind": "pg-branch",
       "reason": "update(): the `tx` body is the Postgres transaction path; a DO store takes updateOnDo (CF-WRITES-2).",
@@ -248,15 +202,14 @@
     },
     "apps/api/src/services/provider-verification.service.ts": {
       "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
       "models": {
-        "paymentConfig": 1,
         "shippingCarrierConfig": 1
       }
     },
     "apps/api/src/services/shipping-carrier.service.ts": {
       "kind": "platform",
-      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
       "models": {
         "shippingCarrierConfig": 3
       }
@@ -267,13 +220,6 @@
       "reason": "NZ-AN-1: SMS idempotency lookup. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
       "models": {
         "notificationLog": 1
-      }
-    },
-    "apps/api/src/services/tax-profile.service.ts": {
-      "kind": "platform",
-      "reason": "merchant tax-profile paths (get-or-create, submit, update) still read the profile through the store-scope prisma; the super-admin queue and decision already use storeDb / storeWriter (group C). The merchant paths belong to N-11 and are Postgres-store only until then.",
-      "models": {
-        "storeTaxProfile": 3
       }
     },
     "apps/api/src/services/variant.service.ts": {

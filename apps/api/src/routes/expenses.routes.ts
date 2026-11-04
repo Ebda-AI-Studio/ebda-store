@@ -9,7 +9,7 @@ import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
 import { enforceMaxDimensions } from '../services/image-resize.service';
 import { sniffImage, IMAGE_EXT, renameByKind, uploadContentError } from '../lib/upload-sniff';
-import { runInTenantContext } from '@ebda/database';
+
 import { inngest } from '../lib/inngest/client';
 import { ALLOWED_CURRENCIES, REGION } from '@ebda/shared';
 import logger from '../lib/logger';
@@ -21,6 +21,7 @@ import {
   listExpenses,
   getExpense,
 } from '../services/accounting/expense.service';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router();
 
@@ -120,7 +121,7 @@ router.get(
       // dashboard's "Pending OCR drafts" card). It was sent but never read, so
       // that card counted every draft.
       const hasOcr = req.query.hasOcr === 'true' ? true : undefined;
-      const result = await runInTenantContext(req.params.storeId, () =>
+      const result = await runInStoreCtx(req.params.storeId, () =>
         listExpenses(req.params.storeId, { status, page, perPage, from, to, hasOcr })
       );
       res.json({
@@ -147,7 +148,7 @@ router.get(
   requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         getExpense(req.params.storeId, req.params.id)
       );
       if (!data) {
@@ -184,7 +185,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         createExpense({
           storeId: req.params.storeId,
           createdBy: req.user?.userId,
@@ -207,7 +208,7 @@ router.post(
   requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         approveExpense(req.params.storeId, req.params.id, req.user?.userId)
       );
       res.json({ data });
@@ -226,7 +227,7 @@ router.post(
   requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         postExpense(req.params.storeId, req.params.id)
       );
       res.json({ data });
@@ -258,7 +259,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         rejectExpense(req.params.storeId, req.params.id)
       );
       res.json({ data });
@@ -321,7 +322,7 @@ router.post(
       const storedKind = sniffImage(receiptBuffer) ?? receiptKind;
 
       // Upload to R2 under stores/<storeId>/receipts/
-      const uploaded = await runInTenantContext(req.params.storeId, () =>
+      const uploaded = await runInStoreCtx(req.params.storeId, () =>
         StorageService.upload(
           receiptBuffer,
           renameByKind(req.file!.originalname, IMAGE_EXT[storedKind], 'receipt'),

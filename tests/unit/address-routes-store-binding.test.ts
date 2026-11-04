@@ -84,12 +84,21 @@ describe('/addresses store binding', () => {
     expect(res.body.error.code).toBe('STORE_REQUIRED');
   });
 
-  it('a merchant token ignores X-Store-ID: Postgres address book, no DO, no store scope', async () => {
-    h.user = { userId: 'm1', role: 'store_admin' };
-    const res = await request(app).get('/addresses').set('x-store-id', B);
-    expect(res.status).toBe(200);
+  it('Ruling NZ-INTEG-ADDR-1: a merchant / staff / super_admin token has no address book: 400, nothing touched', async () => {
+    for (const role of ['store_admin', 'staff', 'super_admin']) {
+      h.user = { userId: 'm1', role };
+      for (const call of [
+        request(app).get('/addresses').set('x-store-id', B),
+        request(app).post('/addresses').send({}),
+        request(app).put(`/addresses/${A}`).send({}),
+        request(app).delete(`/addresses/${A}`),
+      ]) {
+        const res = await call;
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('ADDRESS_BOOK_CUSTOMER_ONLY');
+      }
+    }
     expect(h.storeWriter).not.toHaveBeenCalled();
-    expect(h.pg).toHaveBeenCalledTimes(1);
-    expect(h.userStores).toEqual([undefined]);
+    expect(h.pg).not.toHaveBeenCalled();
   });
 });

@@ -47,7 +47,7 @@ describe('route table manifest (N-15)', () => {
     collect((apiRoutes as unknown as { stack: Layer[] }).stack, '', found);
     const uniq = [...new Set(found.map(([m, p]) => `${m} ${p}`))].sort();
     expect(uniq.length).toBeGreaterThan(200);
-    const text = JSON.stringify(uniq, null, 1) + '\n';
+    const text = JSON.stringify(uniq, null, 2) + '\n';
     if (process.env.WRITE_ROUTE_TABLE === '1') writeFileSync(FILE, text);
     expect(readFileSync(FILE, 'utf8')).toBe(text);
   }, 60_000);

@@ -34,6 +34,16 @@ import { storeDb, storeRepo, storeUpdate, storeWriter } from '../lib/repo-factor
 
 type Actor = { userId: string; ip?: string; userAgent?: string };
 
+const DOC_SELECT = {
+  id: true,
+  kind: true,
+  fileName: true,
+  mimeType: true,
+  sizeBytes: true,
+  createdAt: true,
+} satisfies Prisma.StoreTaxDocumentSelect;
+
+// storageKey is NEVER selected for a response (ruling TAX-4).
 const PROFILE_SELECT = {
   id: true,
   status: true,
@@ -45,19 +55,11 @@ const PROFILE_SELECT = {
   verifiedAt: true,
   revokedAt: true,
   rejectionReason: true,
-  documents: {
-    orderBy: { createdAt: 'asc' as const },
-    // storageKey is NEVER selected for a response (ruling TAX-4).
-    select: {
-      id: true,
-      kind: true,
-      fileName: true,
-      mimeType: true,
-      sizeBytes: true,
-      createdAt: true,
-    },
-  },
 } satisfies Prisma.StoreTaxProfileSelect;
+
+type ProfileWithDocs = Prisma.StoreTaxProfileGetPayload<{ select: typeof PROFILE_SELECT }> & {
+  documents: Array<Prisma.StoreTaxDocumentGetPayload<{ select: typeof DOC_SELECT }>>;
+};
 
 export type TaxProfileView = {
   status: TaxProfileStatusValue;
@@ -92,9 +94,7 @@ const EMPTY_PROFILE: TaxProfileView = {
   documents: [],
 };
 
-function toView(
-  p: Prisma.StoreTaxProfileGetPayload<{ select: typeof PROFILE_SELECT }> | null
-): TaxProfileView {
+function toView(p: ProfileWithDocs | null): TaxProfileView {
   if (!p) return EMPTY_PROFILE;
   const { id: _id, ...rest } = p;
   return rest;
@@ -118,6 +118,35 @@ function assertEditable(status: TaxProfileStatusValue): void {
   }
 }
 
+/** The DO's review guard (and the Postgres trigger) refuse a non-super-admin write with this message prefix. */
+async function guarded<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (/tax profile: /.test(msg))
+      throw new AppError(
+        403,
+        'TAX_PROFILE_FORBIDDEN',
+        'This change is reserved to a platform super admin'
+      );
+    throw err;
+  }
+}
+
+/** Profile + its documents as two flat reads (no nested relation select: the DO's prisma-lite has no include). */
+async function readProfile(storeId: string): Promise<ProfileWithDocs | null> {
+  const db = await storeDb(storeId);
+  const p = await db.storeTaxProfile.findUnique({ where: { storeId }, select: PROFILE_SELECT });
+  if (!p) return null;
+  const documents = await db.storeTaxDocument.findMany({
+    where: { storeId, profileId: p.id },
+    orderBy: { createdAt: 'asc' },
+    select: DOC_SELECT,
+  });
+  return { ...p, documents };
+}
+
 /** Sniff the real type from the first bytes; the client's mimetype is not trusted. */
 export function sniffTaxDocumentMime(buf: Buffer): (typeof TAX_DOCUMENT_MIME_TYPES)[number] | null {
   if (buf.length >= 5 && buf.subarray(0, 5).toString('latin1') === '%PDF-')
@@ -139,15 +168,31 @@ const EXT: Record<(typeof TAX_DOCUMENT_MIME_TYPES)[number], string> = {
 };
 
 async function loadOrCreate(storeId: string) {
-  const existing = await prisma.storeTaxProfile.findUnique({
+  const existing = await (
+    await storeDb(storeId)
+  ).storeTaxProfile.findUnique({
     where: { storeId },
     select: { id: true, status: true },
   });
   if (existing) return existing;
-  return prisma.storeTaxProfile.create({
-    data: { storeId },
-    select: { id: true, status: true },
-  });
+  try {
+    return await (
+      await storeWriter(storeId)
+    ).storeTaxProfile.create({
+      data: { storeId },
+      select: { id: true, status: true },
+    });
+  } catch (err) {
+    // two first requests raced: the unique (store_id) refused the second; the row exists now
+    const again = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
+      where: { storeId },
+      select: { id: true, status: true },
+    });
+    if (again) return again;
+    throw err;
+  }
 }
 
 /**
@@ -254,14 +299,7 @@ export async function listProfilesForReview(status: string | null): Promise<TaxR
 
 export class TaxProfileService {
   static async get(storeId: string): Promise<TaxProfileView> {
-    // NEON-ZERO (Ruling NZ-C-7): a Durable Object store's tax profile is in its DO; `storeDb` is `prisma` for every other store.
-    const p = await (
-      await storeDb(storeId)
-    ).storeTaxProfile.findUnique({
-      where: { storeId },
-      select: PROFILE_SELECT,
-    });
-    return toView(p);
+    return toView(await readProfile(storeId));
   }
 
   static async updateDetails(
@@ -271,11 +309,15 @@ export class TaxProfileService {
   ): Promise<TaxProfileView> {
     const current = await loadOrCreate(storeId);
     assertEditable(current.status);
-    const p = await prisma.storeTaxProfile.update({
-      where: { storeId },
-      data: { taxRegistrationNumber: data.taxRegistrationNumber, legalName: data.legalName },
-      select: PROFILE_SELECT,
-    });
+    // ONE conditional write: a super-admin approving between the read above and this write is not overwritten.
+    const written = await guarded(async () =>
+      (await storeWriter(storeId)).storeTaxProfile.updateMany({
+        where: { storeId, status: { in: [...TAX_PROFILE_EDITABLE_STATUSES] } },
+        data: { taxRegistrationNumber: data.taxRegistrationNumber, legalName: data.legalName },
+      })
+    );
+    const p = await readProfile(storeId);
+    if (written.count === 0) assertEditable((p?.status ?? 'pending') as TaxProfileStatusValue);
     await auditLog({
       action: 'tax_profile.details_updated',
       userId: actor.userId,
@@ -308,7 +350,9 @@ export class TaxProfileService {
         'Upload a PDF, JPG or PNG. / ارفع ملف PDF أو JPG أو PNG.'
       );
     }
-    const count = await prisma.storeTaxDocument.count({
+    const count = await (
+      await storeDb(storeId)
+    ).storeTaxDocument.count({
       where: { storeId, profileId: current.id },
     });
     if (count >= TAX_DOCUMENT_MAX_COUNT) {
@@ -330,20 +374,22 @@ export class TaxProfileService {
     });
     let doc;
     try {
-      doc = await prisma.storeTaxDocument.create({
-        data: {
-          storeId,
-          profileId: current.id,
-          kind,
-          storageKey: key,
-          fileName,
-          mimeType: mime,
-          sizeBytes: file.buffer.length,
-          sha256,
-          uploadedBy: actor.userId,
-        },
-        select: PROFILE_SELECT.documents.select,
-      });
+      doc = await guarded(async () =>
+        (await storeWriter(storeId)).storeTaxDocument.create({
+          data: {
+            storeId,
+            profileId: current.id,
+            kind,
+            storageKey: key,
+            fileName,
+            mimeType: mime,
+            sizeBytes: file.buffer.length,
+            sha256,
+            uploadedBy: actor.userId,
+          },
+          select: DOC_SELECT,
+        })
+      );
     } catch (err) {
       // Compensate: the object would otherwise sit unreferenced in the private
       // bucket (no orphan sweep runs there).
@@ -368,12 +414,16 @@ export class TaxProfileService {
   static async deleteDocument(storeId: string, documentId: string, actor: Actor): Promise<void> {
     const current = await loadOrCreate(storeId);
     assertEditable(current.status);
-    const doc = await prisma.storeTaxDocument.findFirst({
+    const doc = await (
+      await storeDb(storeId)
+    ).storeTaxDocument.findFirst({
       where: { id: documentId, storeId },
       select: { id: true, storageKey: true, kind: true },
     });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-    await prisma.storeTaxDocument.delete({ where: { id: doc.id, storeId } });
+    await guarded(async () =>
+      (await storeWriter(storeId)).storeTaxDocument.delete({ where: { id: doc.id, storeId } })
+    );
     const storageKey = doc.storageKey;
     void deferAfterTenantCommit('taxProfile.deletePrivateObject', () =>
       StorageService.deletePrivate(storageKey)
@@ -409,7 +459,9 @@ export class TaxProfileService {
   }
 
   static async submit(storeId: string, actor: Actor): Promise<TaxProfileView> {
-    const current = await prisma.storeTaxProfile.findUnique({
+    const current = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
       where: { storeId },
       select: {
         id: true,
@@ -435,17 +487,34 @@ export class TaxProfileService {
       );
     }
     const now = new Date();
-    const p = await prisma.storeTaxProfile.update({
-      where: { storeId },
-      data: {
-        status: 'pending',
-        attestedAt: now,
-        submittedAt: now,
-        submittedBy: actor.userId,
-        rejectionReason: null,
-      },
-      select: PROFILE_SELECT,
-    });
+    // conditional at the storage layer: only an editable, complete profile with evidence moves to pending
+    const moved = await guarded(async () =>
+      (await storeWriter(storeId)).storeTaxProfile.updateMany({
+        where: {
+          storeId,
+          status: { in: [...TAX_PROFILE_EDITABLE_STATUSES] },
+          taxRegistrationNumber: { not: null },
+          legalName: { not: null },
+          documents: { some: {} },
+        },
+        data: {
+          status: 'pending',
+          attestedAt: now,
+          submittedAt: now,
+          submittedBy: actor.userId,
+          rejectionReason: null,
+        },
+      })
+    );
+    const p = await readProfile(storeId);
+    if (moved.count === 0) {
+      assertEditable((p?.status ?? 'pending') as TaxProfileStatusValue);
+      throw new AppError(
+        400,
+        'TAX_PROFILE_INCOMPLETE',
+        'Enter your tax registration number and legal name and upload your tax card first. / أدخل رقم التسجيل الضريبي والاسم القانوني وارفع البطاقة الضريبية أولًا.'
+      );
+    }
     bustPublicTaxCaches(storeId);
     await auditLog({
       action: 'tax_profile.submitted',
@@ -471,97 +540,110 @@ export class TaxProfileService {
     decision: TaxReviewDecision,
     actor: Actor
   ): Promise<TaxProfileView> {
-    // A Durable Object store has no Postgres row to scope to: its profile is read and written in the DO and the decision runs in
-    // the request's user scope. Every other store keeps the user + store transaction (the trigger checks the acting user).
-    return inReviewScope(actor.userId, storeId, async () => {
-      const current = await (
-        await storeDb(storeId)
-      ).storeTaxProfile.findUnique({
-        where: { storeId },
-        select: { id: true, status: true },
-      });
-      if (!current) throw new AppError(404, 'NOT_FOUND', 'No tax profile for this store');
-      const now = new Date();
-      let data: Prisma.StoreTaxProfileUpdateInput;
-      if (decision.decision === 'approve') {
-        if (current.status !== 'pending') {
+    return withUser(
+      actor.userId,
+      async () => {
+        const current = await (
+          await storeDb(storeId)
+        ).storeTaxProfile.findUnique({
+          where: { storeId },
+          select: { id: true, status: true },
+        });
+        if (!current) throw new AppError(404, 'NOT_FOUND', 'No tax profile for this store');
+        const now = new Date();
+        let data: Prisma.StoreTaxProfileUpdateInput;
+        if (decision.decision === 'approve') {
+          if (current.status !== 'pending') {
+            throw new AppError(
+              409,
+              'INVALID_TRANSITION',
+              `Cannot approve a ${current.status} profile`
+            );
+          }
+          data = {
+            status: 'verified',
+            verifiedAt: now,
+            reviewedAt: now,
+            reviewedBy: actor.userId,
+            rejectionReason: null,
+            revokedAt: null,
+          };
+        } else if (decision.decision === 'reject') {
+          if (current.status !== 'pending') {
+            throw new AppError(
+              409,
+              'INVALID_TRANSITION',
+              `Cannot reject a ${current.status} profile`
+            );
+          }
+          data = {
+            status: 'rejected',
+            reviewedAt: now,
+            reviewedBy: actor.userId,
+            rejectionReason: decision.reason,
+          };
+        } else {
+          if (current.status !== 'verified') {
+            throw new AppError(
+              409,
+              'INVALID_TRANSITION',
+              `Cannot revoke a ${current.status} profile`
+            );
+          }
+          data = {
+            status: 'revoked',
+            revokedAt: now,
+            reviewedAt: now,
+            reviewedBy: actor.userId,
+            rejectionReason: decision.reason,
+          };
+        }
+        // conditional on the status the decision was read against: two reviewers cannot both move one profile
+        const from = decision.decision === 'revoke' ? 'verified' : 'pending';
+        const moved = await guarded(async () =>
+          (await storeWriter(storeId)).storeTaxProfile.updateMany({
+            where: { storeId, status: from },
+            data: data as never,
+          })
+        );
+        if (moved.count === 0)
           throw new AppError(
             409,
             'INVALID_TRANSITION',
-            `Cannot approve a ${current.status} profile`
+            `Cannot ${decision.decision} this profile any more`
           );
+        const p = await readProfile(storeId);
+        if (decision.decision === 'revoke') {
+          // Turn the merchant's switch off too: a later re-verification must not
+          // silently restart VAT without the merchant choosing it (ruling TAX-3).
+          await storeUpdate(prisma, { where: { id: storeId }, data: { taxEnabled: false } });
         }
-        data = {
-          status: 'verified',
-          verifiedAt: now,
-          reviewedAt: now,
-          reviewedBy: actor.userId,
-          rejectionReason: null,
-          revokedAt: null,
-        };
-      } else if (decision.decision === 'reject') {
-        if (current.status !== 'pending') {
-          throw new AppError(
-            409,
-            'INVALID_TRANSITION',
-            `Cannot reject a ${current.status} profile`
-          );
-        }
-        data = {
-          status: 'rejected',
-          reviewedAt: now,
-          reviewedBy: actor.userId,
-          rejectionReason: decision.reason,
-        };
-      } else {
-        if (current.status !== 'verified') {
-          throw new AppError(
-            409,
-            'INVALID_TRANSITION',
-            `Cannot revoke a ${current.status} profile`
-          );
-        }
-        data = {
-          status: 'revoked',
-          revokedAt: now,
-          reviewedAt: now,
-          reviewedBy: actor.userId,
-          rejectionReason: decision.reason,
-        };
-      }
-      await (
-        await storeWriter(storeId)
-      ).storeTaxProfile.update({ where: { storeId }, data, select: { id: true } });
-      const p = await (
-        await storeDb(storeId)
-      ).storeTaxProfile.findUnique({ where: { storeId }, select: PROFILE_SELECT });
-      if (decision.decision === 'revoke') {
-        // Turn the merchant's switch off too: a later re-verification must not
-        // silently restart VAT without the merchant choosing it (ruling TAX-3).
-        await storeUpdate(prisma, { where: { id: storeId }, data: { taxEnabled: false } });
-      }
-      bustPublicTaxCaches(storeId);
-      await auditLog({
-        action: `tax_profile.${decision.decision === 'approve' ? 'approved' : decision.decision === 'reject' ? 'rejected' : 'revoked'}`,
-        userId: actor.userId,
-        storeId,
-        resourceType: 'store_tax_profile',
-        resourceId: current.id,
-        details: {
-          from: current.status,
-          to: data.status,
-          ...(decision.decision !== 'approve' ? { reason: decision.reason } : {}),
-        },
-        ip: actor.ip,
-        userAgent: actor.userAgent,
-      });
-      return toView(p);
-    });
+        bustPublicTaxCaches(storeId);
+        await auditLog({
+          action: `tax_profile.${decision.decision === 'approve' ? 'approved' : decision.decision === 'reject' ? 'rejected' : 'revoked'}`,
+          userId: actor.userId,
+          storeId,
+          resourceType: 'store_tax_profile',
+          resourceId: current.id,
+          details: {
+            from: current.status,
+            to: data.status,
+            ...(decision.decision !== 'approve' ? { reason: decision.reason } : {}),
+          },
+          ip: actor.ip,
+          userAgent: actor.userAgent,
+        });
+        return toView(p);
+      },
+      storeId
+    );
   }
 
   /** Is this store's VAT registration verified? (the settings write gate) */
   static async isVerified(storeId: string): Promise<boolean> {
-    const p = await prisma.storeTaxProfile.findUnique({
+    const p = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
       where: { storeId },
       select: { status: true },
     });

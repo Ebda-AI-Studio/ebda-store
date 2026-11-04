@@ -211,12 +211,30 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
         [storeId, JSON.stringify(buyerKeys)]
       );
       flag(0);
-      // 3c. notification log rows (NZ-AN-1): `recipient_phone_hash` is the suite buyer key, so the shopper's own keys delete them.
-      db.run(
-        'DELETE FROM notification_logs WHERE store_id = ? AND recipient_phone_hash IN (SELECT value FROM json_each(?))',
-        [storeId, JSON.stringify(buyerKeys)]
-      );
     }
+
+    // 3c. delivery log rows (NZ-AN-1, security review): `recipient_phone_hash` is the hash of a phone the shopper merely TYPED on
+    //     an order, so deleting by every order buyer key would erase ANOTHER person's history (A enters B's number). Only rows
+    //     provably tied to this shopper go: (a) rows whose idempotency key ends `_<order number>` of one of THEIR orders (the
+    //     dispatcher keys a message `sms_<store>_<event>_<order number>`), and (b) rows keyed by the buyer key PROVEN to be theirs
+    //     (`provenBuyerKey`: a verified phone). Never by an unverified order phone alone.
+    const orderNumbers = orderIds.length
+      ? db
+          .all(
+            'SELECT order_number FROM orders WHERE store_id = ? AND id IN (SELECT value FROM json_each(?)) AND order_number IS NOT NULL',
+            [storeId, JSON.stringify(orderIds)]
+          )
+          .map(r => r.order_number as string)
+      : [];
+    if (orderNumbers.length > 0 || provenKey)
+      db.run(
+        `DELETE FROM notification_logs WHERE store_id = ? AND (
+           (? IS NOT NULL AND recipient_phone_hash = ?)
+           OR EXISTS (SELECT 1 FROM json_each(?) j
+                      WHERE idempotency_key IS NOT NULL
+                        AND substr(idempotency_key, -(length(j.value) + 1)) = '_' || j.value))`,
+        [storeId, provenKey ?? null, provenKey ?? null, JSON.stringify(orderNumbers)]
+      );
 
     // 4. orders keep money history, lose identity
     db.run(

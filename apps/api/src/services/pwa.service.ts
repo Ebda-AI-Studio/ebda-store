@@ -10,7 +10,7 @@ import { BRAND } from '@ebda/shared';
 import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
 import { redis } from './redis.service';
 import { sendAlert } from './alerts.service';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeUpdate, storeWritesToDo } from '../lib/repo-factory';
 import { withStoreRead } from '../lib/store-read';
 
 // PWA Settings structure
@@ -359,7 +359,7 @@ export class PWAService {
     data: { pwaEnabled?: boolean; settings?: Partial<PWASettings> }
   ): Promise<PWASettingsResponse> {
     // Verify store exists
-    const existing = await withStore(storeId, tx =>
+    const existing = await withStoreRead(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
         select: { name: true, pwaSettings: true },
@@ -382,19 +382,21 @@ export class PWAService {
       ? { ...currentSettings, ...data.settings }
       : currentSettings;
 
-    const store = await withStore(storeId, tx =>
-      storeUpdate(tx, {
-        where: { id: storeId },
-        data: {
-          pwaEnabled: data.pwaEnabled,
-          pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
-        },
-        select: {
-          pwaEnabled: true,
-          pwaSettings: true,
-        },
-      })
-    );
+    const updateArgs = {
+      where: { id: storeId },
+      data: {
+        pwaEnabled: data.pwaEnabled,
+        pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
+      },
+      select: {
+        pwaEnabled: true,
+        pwaSettings: true,
+      },
+    };
+    // A DO store's settings live in D1/DO: no Postgres transaction is opened for it.
+    const store = (await storeWritesToDo(storeId))
+      ? await storeUpdate(prisma, updateArgs)
+      : await withStore(storeId, tx => storeUpdate(tx, updateArgs));
 
     // Every write here can change what /public/:storeId/manifest.json and
     // the storefront's home-screen icon look like. The manifest route itself

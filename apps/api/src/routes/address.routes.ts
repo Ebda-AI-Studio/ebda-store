@@ -18,12 +18,21 @@ const VALIDATED_STORE = Symbol('ebda.addressStore');
  *  - a customer always uses `req.user.storeId` (the store the token was issued for). An `X-Store-ID` header is never trusted:
  *    absent is fine, present must be ONE well-formed id equal to the token's store, otherwise 403 (an array, a duplicate that
  *    Node joins with a comma, or any other shape is a 400). A customer token with no store is a 400 `STORE_REQUIRED`.
- *  - every other role ignores `X-Store-ID` entirely and keeps the Postgres address book it always had.
+ *  - every other role is refused 400 `ADDRESS_BOOK_CUSTOMER_ONLY` (Ruling NZ-INTEG-ADDR-1).
  * The one validated id is what `userContext` and `storeWriter` both receive.
  */
 function resolveAddressStore(req: Request, _res: Response, next: NextFunction): void {
   try {
     let store: string | undefined;
+    // Ruling NZ-INTEG-ADDR-1: the shopper's address book is the customer's alone. A merchant, staff or super_admin token has no
+    // storefront address book after NEON-ZERO (the Postgres `addresses` table is retired with the database); none of the admin,
+    // orders or accounts apps calls this router.
+    if (req.user && req.user.role !== 'customer')
+      throw new AppError(
+        400,
+        'ADDRESS_BOOK_CUSTOMER_ONLY',
+        'The address book belongs to storefront customers'
+      );
     if (req.user?.role === 'customer') {
       const claim = (req.user as { storeId?: string }).storeId;
       if (typeof claim !== 'string' || !UUID_RE.test(claim))

@@ -1,15 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import { withUser } from '@ebda/database';
-import { AppError } from './error-handler';
+import { cfBindings } from '../cf/bindings';
 import { getAccountState } from '../lib/identity-client';
-import { platformFamilyOnD1 } from '../services/platform/cutover';
+import { AppError } from './error-handler';
+import { liveIdentityMemo } from './auth';
 
 /**
  * Enforce MFA enrollment for super_admin users.
  *
  * - Non-super_admin roles (store_admin, customer, …) pass through immediately —
  *   MFA is opt-in for them, not enforced.
- * - For super_admin, reads mfaEnabled from DB. If not enrolled, returns
+ * - For super_admin, reads mfaEnabled from the IDENTITY SERVICE (the authority for accounts, Rulings ID-1/ID-2: the live
+ *   answer `authenticate` already fetched this request, else one RPC); only a deployment with no identity binding (Node,
+ *   local dev) reads the Postgres `users` row. A Worker with Postgres gone never opens a transaction here.
+ *   If not enrolled, returns
  *   403 MFA_SETUP_REQUIRED so the client can redirect to the enrollment page.
  *
  * Placement: mount AFTER `authenticate` (so req.user is populated) on
@@ -27,28 +31,20 @@ export async function requireMfaEnrolled(
   }
 
   try {
-    // NEON-ZERO (Ruling NZ-C-2): once the `access` family is on D1 the MFA state is the identity service's (the account is
-    // credential-managed there: Rulings ID-1/ID-2); the Postgres `users.mfa_enabled` is a stale mirror. An unknown account or
-    // an unreachable identity service blocks (never "enrolled"). Cost if wrong: a super_admin whose identity record lacks
-    // `mfaEnabled` is sent to enrollment instead of being let in.
-    if (await platformFamilyOnD1('access')) {
-      const st = await getAccountState(req.user.userId);
-      if (!st?.mfaEnabled) {
-        return next(
-          new AppError(403, 'MFA_SETUP_REQUIRED', 'Super-admin must enable two-factor auth')
-        );
-      }
-      return next();
+    const userId = req.user.userId;
+    let mfaEnabled: boolean | undefined;
+    const known = liveIdentityMemo(req).value?.account;
+    if (known) mfaEnabled = known.mfaEnabled;
+    else if (cfBindings()?.ACCOUNTS) mfaEnabled = (await getAccountState(userId))?.mfaEnabled;
+    else {
+      // `users` is RLS-scoped to the user itself: read as them.
+      const u = await withUser(userId, tx =>
+        tx.user.findUnique({ where: { id: userId }, select: { mfaEnabled: true } })
+      );
+      mfaEnabled = u?.mfaEnabled;
     }
-    // `users` is RLS-scoped to the user itself: read as them.
-    const u = await withUser(req.user.userId, tx =>
-      tx.user.findUnique({
-        where: { id: req.user!.userId },
-        select: { mfaEnabled: true },
-      })
-    );
 
-    if (!u?.mfaEnabled) {
+    if (!mfaEnabled) {
       return next(
         new AppError(403, 'MFA_SETUP_REQUIRED', 'Super-admin must enable two-factor auth')
       );

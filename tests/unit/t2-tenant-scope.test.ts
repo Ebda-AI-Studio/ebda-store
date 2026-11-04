@@ -29,6 +29,8 @@ const STORE = '11111111-1111-1111-1111-111111111111';
 
 describe('assertCustomerGroupInStore (BE:S-25)', () => {
   it('passes without a group and for an own group; 404 for a foreign one', async () => {
+    const repo = await import('@api/lib/repo-factory');
+    vi.mocked(repo.storeDb).mockResolvedValue(prismaMock as never);
     const { assertCustomerGroupInStore } = await import('@api/lib/customer-group-scope');
     await expect(assertCustomerGroupInStore(STORE, null)).resolves.toBeUndefined();
     await expect(assertCustomerGroupInStore(STORE, undefined)).resolves.toBeUndefined();

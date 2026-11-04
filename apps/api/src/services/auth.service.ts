@@ -70,10 +70,10 @@ import { signSessionTokens } from './session-tokens';
 import {
   clientForScopedToken,
   customerAuthRoute,
-  assertNoCustomerAuthFreeze,
   type CustomerAuthClient,
 } from '../lib/customer-auth';
-import { storeDo } from '../lib/store-backend';
+import { doStoreIdList, hasStoresOnBackend, storeDo } from '../lib/store-backend';
+import { scrubOrEnqueue } from '../lib/customer-pg-scrub';
 import { CustomerAuthFlows, type DoCustomer } from './customer-auth-flows';
 import { verifyRefreshJwt } from '../middleware/security';
 
@@ -701,8 +701,10 @@ export class AuthService {
       return { success: true, message: 'Email already verified' };
     }
 
-    // N-9: this redemption writes Postgres rows of a customer; refused (503) while the store's rows are frozen for the copy.
-    await customerAuthRoute(tokenUser.storeId, { write: true });
+    // N-9: refused (503) while the store's rows are frozen for the copy; and a pre-flip link of a store now served by its StoreDO
+    // is invalid, never "verified" in the stale Postgres copy while the live account is unchanged.
+    if ((await customerAuthRoute(tokenUser.storeId, { write: true })).kind === 'do')
+      throw new AppError(400, 'TOKEN_INVALID', 'Invalid verification token');
 
     // Update user as verified and mark token as used
     await withUser(
@@ -831,6 +833,14 @@ export class AuthService {
     // re-casing the address (Ebda SP5 review).
     const route = await customerAuthRoute(storeId, { write: true });
     if (route.kind === 'do') return CustomerAuthFlows.login(route.client, email, password, ip);
+    // No store: the admin namespace (merchants, staff, super admins), whose credentials live in the identity service. The answer
+    // does not depend on the email or the password, so it needs no Postgres lookup and reveals nothing about any account.
+    if (storeId === null && (await hasStoresOnBackend('do')) && !(await hasStoresOnBackend('pg')))
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
 
     const lockoutKey = loginGate.lockoutKey(email, storeId);
     await loginGate.assertNotLocked(lockoutKey);
@@ -1472,10 +1482,30 @@ export class AuthService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    // N-9: a DO store's refresh rows are its DO's (expired and long-revoked ones; the DO alarm does the same nightly). The
+    // Postgres definer is asked ONLY while a `pg` store exists: with every store on D1 / a DO there is nothing in Postgres to
+    // purge, and the cron must not need it.
+    let total = 0;
+    for (const storeId of await doStoreIdList()) {
+      const route = await customerAuthRoute(storeId, { write: true });
+      if (route.kind !== 'do') continue;
+      try {
+        total += (await route.client.call<{ deleted: number }>('purge', {})).deleted;
+      } catch (err) {
+        // a closed store keeps its rows as a retained record (Ruling NZ-D15); anything else fails the job
+        if (!(err instanceof AppError && err.code === 'STORE_CLOSED')) throw err;
+      }
+    }
+    if (!(await hasStoresOnBackend('pg'))) {
+      if (total > 0)
+        logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows (DO stores)');
+      return total;
+    }
+
     // `refresh_tokens` is user-keyed under RLS; the cross-user purge is the
     // `ebda_refresh_tokens_purge` definer, which only the named platform job
     // 'token-retention' may call (`withSystemJob`).
-    const total = await purgeRefreshTokens(now, thirtyDaysAgo);
+    total += await purgeRefreshTokens(now, thirtyDaysAgo);
     if (total > 0) {
       logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows');
     }
@@ -1706,7 +1736,25 @@ export class AuthService {
     // customer is revoked in its DO and never only in a stale Postgres row (security review of 5bd6aac92).
     let scopeStoreId = scope?.storeId ?? null;
     if (!scopeStoreId) {
-      const st = await getUserState(userId).catch(() => null);
+      // Fail CLOSED: if the store cannot be resolved the revocation might belong to a DO-served customer, and reporting success
+      // after revoking only a stale Postgres row is the exact bug this guards. 503, retryable.
+      let st: Awaited<ReturnType<typeof getUserState>> = null;
+      try {
+        st = await getUserState(userId);
+      } catch (err) {
+        logger.error(
+          { err, userId },
+          '[auth.revokeAllSessions] user lookup failed; refusing to revoke blind'
+        );
+        throw new AppError(
+          503,
+          'REVOCATION_UNAVAILABLE',
+          'Could not resolve the account to revoke; retry',
+          {
+            retryable: true,
+          }
+        );
+      }
       if (st?.role === 'customer') scopeStoreId = st.storeId;
     }
     const route = await customerAuthRoute(scopeStoreId, { write: true });
@@ -1809,6 +1857,61 @@ export class AuthService {
     const r = await route.client.call<{ tokenVersion: number }>('setStatus', { userId, status });
     await pushTokenVersion(userId, r.tokenVersion, 'auth.setCustomerStatus.setTokenVersion');
     return true;
+  }
+
+  /**
+   * Store-scoped status change of a customer (suspend / deactivate / reactivate): the DO when the store is DO-served (status +
+   * session revocation in one section), else the Postgres row followed by `revokeAllSessions`. Used by the store-scoped customer
+   * route; a customer unknown to the store is a 404.
+   */
+  static async setCustomerStatus(
+    userId: string,
+    storeId: string,
+    status: 'active' | 'inactive' | 'suspended'
+  ): Promise<void> {
+    if (await AuthService.setCustomerStatusOnDo(userId, storeId, status)) return;
+    const before = await withStore(storeId, tx =>
+      tx.user.findFirst({
+        where: { id: userId, storeId, role: 'customer' },
+        select: { status: true },
+      })
+    );
+    if (!before) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+    await withStore(storeId, tx =>
+      tx.user.update({ where: { id: userId, storeId }, data: { status } })
+    );
+    await AuthService.revokeAllSessions(userId, 'revoke_all', { storeId });
+  }
+
+  /**
+   * Store-scoped deactivation (soft delete) of a customer: sessions end NOW. DO: one section (`softDelete`) then the cache push;
+   * Postgres: deletedAt then `revokeAllSessions`. Returns the phone for the caller's WhatsApp-consent withdrawal.
+   */
+  static async softDeleteCustomer(
+    userId: string,
+    storeId: string
+  ): Promise<{ phone: string | null }> {
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') {
+      const r = await route.client.call<{ tokenVersion: number; phone: string | null }>(
+        'softDelete',
+        { userId }
+      );
+      await pushTokenVersion(userId, r.tokenVersion, 'auth.softDelete.setTokenVersion');
+      return { phone: r.phone };
+    }
+    const before = await withStore(storeId, tx =>
+      tx.user.findFirst({
+        where: { id: userId, storeId, role: 'customer' },
+        select: { phone: true },
+      })
+    );
+    if (!before) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+    await withStore(storeId, tx =>
+      tx.user.update({ where: { id: userId, storeId }, data: { deletedAt: new Date() } })
+    );
+    await AuthService.revokeAllSessions(userId, 'revoke_all', { storeId });
+    return { phone: before.phone ?? null };
   }
 
   /**
@@ -1980,8 +2083,15 @@ export class AuthService {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
     }
 
-    // N-9: a Postgres redemption writes a customer's rows; refused (503) while that store is frozen for the copy.
-    await assertNoCustomerAuthFreeze();
+    // N-9: a pre-flip (Postgres) link of a customer whose store is now served by its StoreDO must NOT write the stale Postgres
+    // copy and report "reset" while the live account is unchanged: it is simply invalid (the customer asks for a new link).
+    // For a store still on Postgres this is the freeze guard (retryable 503 while its rows are copied).
+    const resetUser = await getUserState(storedToken.userId);
+    if (resetUser?.storeId) {
+      const r = await customerAuthRoute(resetUser.storeId, { write: true });
+      if (r.kind === 'do')
+        throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
+    }
 
     // Hash new password (slow) BEFORE claiming the token, so the claim and the
     // password write sit as close together as possible.
@@ -2763,6 +2873,8 @@ export class AuthService {
     );
     if (auth.tokenVersion !== null)
       await pushTokenVersion(userId, auth.tokenVersion, 'auth.eraseAccount.revoke-sessions');
+    // The stale Postgres copy of the same person goes too (queued + P1 if Postgres is unreachable).
+    await scrubOrEnqueue(userId, storeId);
     if (doErase.receiptIds.length > 0)
       void InstapayReceiptService.deleteImages(storeId, doErase.receiptIds).catch(err =>
         logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')

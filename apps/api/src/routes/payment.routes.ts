@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
@@ -14,7 +15,7 @@ import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
@@ -59,6 +60,7 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
 // ==========================================
@@ -147,7 +149,7 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
     // BE:S-22: no resolvable store is a 404, never the platform default (and never "first store").
     if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-    const data = await withStore(storeId, () => loadCheckoutPaymentConfig(storeId));
+    const data = await runInStoreCtx(storeId, () => loadCheckoutPaymentConfig(storeId));
 
     res.json({ success: true, data });
   } catch (error) {
@@ -197,7 +199,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     displayNameAr: string | null;
   } | null = null;
   const codRecord = storeId
-    ? await prisma.paymentConfig.findFirst({
+    ? await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: { storeId, provider: 'cod' as const, isEnabled: true },
       })
     : null;
@@ -243,7 +247,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
   // Ruling SHARIA-GOLD-1: a cart with gold hides COD + installments unless the merchant allowed them. The
   // storefront only hides the options; the API refuses them (assertGoldPaymentAllowed) whatever it shows.
   const goldStore = storeId
-    ? await prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    ? await (
+        await storeDb(storeId)
+      ).store.findUnique({ where: { id: storeId }, select: { settings: true } })
     : null;
   const goldPrepaidOnly = !goldAllowsDeferredPayment(goldStore?.settings);
 
@@ -529,7 +535,7 @@ router.post(
 
       if (data.provider === 'cod' || data.provider === 'instapay') {
         // No network: one short tenant transaction.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -588,7 +594,9 @@ router.post(
           // ==========================================
           // Look up COD config for fee
           // The store's own COD row only (no platform-level row exists for the app role, R-EBDA-007).
-          const codConfig = await prisma.paymentConfig.findFirst({
+          const codConfig = await (
+            await storeDb(order.storeId)
+          ).paymentConfig.findFirst({
             where: { storeId: order.storeId, provider: 'cod', isEnabled: true },
           });
 
@@ -862,7 +870,7 @@ router.post(
         };
 
         // Short transaction to record: the Payment row + its audit event + the audit log.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -928,7 +936,7 @@ router.post(
         // under ebda_app the rollback would read no rows and do nothing
         // (PR 2301 audit, same class as the MCP place_order rollbacks).
         const rb = rollbackContext;
-        await runInTenantContext(rb.storeId, () =>
+        await runInStoreCtx(rb.storeId, () =>
           OrderService.rollbackForPaymentFailure(rb.storeId, rb.orderId, rb.sessionId)
         ).catch(rbErr =>
           logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
@@ -1228,7 +1236,7 @@ router.post(
 
       // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
       // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
-      const refund = await runInTenantContext(refundStoreId, () =>
+      const refund = await runInStoreCtx(refundStoreId, () =>
         PaymentService.refund({
           transactionId: data.transactionId,
           amount: data.amount,
@@ -1240,7 +1248,7 @@ router.post(
       // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
       // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
       // a pre-refund snapshot.
-      await runInTenantContext(refundStoreId, async () => {
+      await runInStoreCtx(refundStoreId, async () => {
         await auditLog({
           action: 'payment.refunded',
           userId: user.userId,

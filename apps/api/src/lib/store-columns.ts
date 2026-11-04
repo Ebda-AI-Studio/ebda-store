@@ -39,7 +39,7 @@ export const STORE_MIRROR_FIELDS = [
   'isDemo',
 ] as const;
 
-const D1_FIELDS = new Set<string>([...STORE_D1_ONLY_FIELDS, ...STORE_MIRROR_FIELDS]);
+export const D1_FIELDS = new Set<string>([...STORE_D1_ONLY_FIELDS, ...STORE_MIRROR_FIELDS]);
 
 /** The part of a Store patch D1 `stores` owns (authoritative there). */
 export function d1StorePatch(data: Record<string, unknown>): Record<string, unknown> {

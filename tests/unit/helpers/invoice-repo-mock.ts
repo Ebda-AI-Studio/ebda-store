@@ -12,6 +12,8 @@ export async function repoFactoryMock() {
     storeRepo: async () => ({ backend: 'pg' }),
     storeDb: async () => ({
       ...prisma,
+      // the platform `Store` of the last order read (a Durable Object order cannot join it)
+      store: { findUnique: async () => last?.store ?? null },
       order: {
         ...prisma.order,
         findFirst: async (...a: unknown[]) => {

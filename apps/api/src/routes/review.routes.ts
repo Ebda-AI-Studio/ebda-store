@@ -8,7 +8,7 @@ import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
-import { prisma } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
 import { requireAiEnabled } from '../lib/store-ai-switch';
@@ -451,7 +451,9 @@ router.put(
       const data = ownerResponseSchema.parse(req.body);
       // Direct prisma update — ReviewService.update doesn't expose owner
       // response fields (those are merchant-managed, not moderation fields).
-      const review = await prisma.review.update({
+      const review = await (
+        await storeWriter(req.storeId!)
+      ).review.update({
         where: { id, storeId: req.storeId! },
         data: {
           ownerResponse: data.ownerResponse,

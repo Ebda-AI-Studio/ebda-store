@@ -12,6 +12,7 @@
  * shared schema, and the route calls it before `setPaymentMethods` so the
  * "at least one method stays on" rule sees the new state.
  */
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { prisma, type Prisma } from '@ebda/database';
 import { instapaySettingsSchema } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -28,14 +29,18 @@ export async function applyOnboardingInstapay(
   storeId: string,
   input: OnboardingInstapayInput
 ): Promise<{ instapay: boolean; configId: string | null }> {
-  const existing = await prisma.paymentConfig.findFirst({
+  const existing = await (
+    await storeDb(storeId)
+  ).paymentConfig.findFirst({
     where: { storeId, provider: 'instapay' },
     select: { id: true, settings: true },
   });
 
   if (!input.enabled) {
     if (existing) {
-      await prisma.paymentConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: { isEnabled: false },
       });
@@ -66,12 +71,16 @@ export async function applyOnboardingInstapay(
   const settings = parsed.data as Prisma.InputJsonValue;
 
   const config = existing
-    ? await prisma.paymentConfig.update({
+    ? await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: { isEnabled: true, settings },
         select: { id: true },
       })
-    : await prisma.paymentConfig.create({
+    : await (
+        await storeWriter(storeId)
+      ).paymentConfig.create({
         data: {
           storeId,
           provider: 'instapay',

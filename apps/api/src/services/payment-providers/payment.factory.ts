@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { runInStoreCtx } from '../../lib/jobs/store-db';
 import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@ebda/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
@@ -189,11 +190,8 @@ class PaymentFactory {
                 orderBy: { provider: 'asc' },
               })
             : await withStore(storeId, () =>
-                prisma.paymentConfig.findMany({
-                  where: {
-                    storeId: storeId,
-                    isEnabled: true,
-                  },
+                repo!.db.paymentConfig.findMany({
+                  where: { storeId: storeId, isEnabled: true },
                   orderBy: { provider: 'asc' },
                 })
               );
@@ -794,7 +792,7 @@ export class PaymentService {
     );
     // Short record transaction. Without a store there is nothing to scope (platform tests).
     if (storeId) {
-      await runInTenantContext(storeId, () =>
+      await runInStoreCtx(storeId, () =>
         PaymentService.recordProviderPayment(providerName, request, response, storeId)
       );
     } else {
@@ -825,9 +823,9 @@ export class PaymentService {
     let keyed = request;
     if (!request.metadata?.idempotencyKey) {
       const prior = storeId
-        ? await withStore(storeId, () =>
-            prisma.payment.count({ where: { orderId: request.orderId, provider: p.name } })
-          )
+        ? await (
+            await storeDb(storeId)
+          ).payment.count({ where: { orderId: request.orderId, provider: p.name } })
         : 0;
       keyed = {
         ...request,
@@ -2683,22 +2681,41 @@ export class PaymentService {
     payment: { provider: string; transactionId: string; amount: number; currency?: string },
     providerStatus: { paidAmount?: number; paidCurrency?: string; currency?: string }
   ): Promise<{ outcome: string; orderId: string }> {
+    return PaymentService.applyPolledStatusOnDo(storeId, payment, 'completed', providerStatus);
+  }
+
+  /**
+   * A gateway status found by a poll (the auto-cancel sweep, the merchant's "refresh payment status", the guest's verify on
+   * return) applied to a store on its Durable Object through the same `paymentWebhook` section a delivered webhook uses
+   * (Ruling CF-JOBS-4, NZ-A-4). `completed` is the captured record; `failed` / `expired` / `cancelled` is the failure record
+   * (the engine moves only an UNPAID order to failed). The status came from a server-to-server call, so it is the confirmed
+   * gateway record; a replay of the same status applies once.
+   */
+  static async applyPolledStatusOnDo(
+    storeId: string,
+    payment: { provider: string; transactionId: string; amount: number; currency?: string },
+    status: 'completed' | 'failed' | 'expired' | 'cancelled',
+    providerStatus: { paidAmount?: number; paidCurrency?: string; currency?: string },
+    source = 'auto_cancel_sweep'
+  ): Promise<{ outcome: string; orderId: string; paymentStatus: string }> {
     const money = await storeMoney(storeId);
     if (!money)
       throw new AppError(500, 'NOT_A_DO_STORE', 'store is not served by its Durable Object');
+    const captured = status === 'completed';
     const result = await money.paymentWebhook({
       input: {
         provider: payment.provider,
-        eventId: `status-poll:${payment.transactionId}:completed`,
+        eventId: `status-poll:${payment.transactionId}:${status}`,
         providerRef: payment.transactionId,
         kind: 'payment',
-        status: 'completed',
-        amount: providerStatus.paidAmount ?? payment.amount,
-        currency:
-          providerStatus.paidCurrency ?? providerStatus.currency ?? payment.currency ?? null,
-        rawPayload: { source: 'auto_cancel_sweep' },
+        status,
+        amount: captured ? (providerStatus.paidAmount ?? payment.amount) : null,
+        currency: captured
+          ? (providerStatus.paidCurrency ?? providerStatus.currency ?? payment.currency ?? null)
+          : null,
+        rawPayload: { source },
       },
-      confirmed: { kind: 'payment', status: 'SUCCESS' },
+      confirmed: { kind: 'payment', status: captured ? 'SUCCESS' : 'FAILURE' },
     });
     for (const a of result.alerts)
       void sendAlert({
@@ -2712,7 +2729,76 @@ export class PaymentService {
       }).catch(() => undefined);
     if (result.outcome === 'applied')
       await PaymentService.afterWebhookOnDo(storeId, payment.provider as PaymentProvider, result);
-    return { outcome: result.outcome, orderId: result.orderId };
+    return {
+      outcome: result.outcome,
+      orderId: result.orderId,
+      paymentStatus: result.paymentStatus,
+    };
+  }
+
+  /**
+   * A refund status found by a poll (the merchant's "refresh refund status") applied to a store on its Durable Object through
+   * the same `paymentWebhook` section a delivered refund webhook uses (Ruling NZ-A-4): the settlement arithmetic, the payment
+   * row, the full-refund order flip and its stock/coupon/wallet reversal are ONE section there, and a replay of the same status
+   * applies once. The status came from a server-to-server call, so it is the confirmed gateway record.
+   */
+  static async applyPolledRefundOnDo(
+    storeId: string,
+    payment: { provider: string; transactionId: string },
+    refund: {
+      refundId: string;
+      status: 'pending' | 'completed' | 'failed';
+      amount?: number | null;
+      refundReference?: string | null;
+    }
+  ): Promise<{ outcome: string; orderId: string; paymentStatus: string; orderStatus: string }> {
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(500, 'NOT_A_DO_STORE', 'store is not served by its Durable Object');
+    const result = await money.paymentWebhook({
+      input: {
+        provider: payment.provider,
+        eventId: `refund-poll:${refund.refundId}:${refund.status}:${refund.amount ?? ''}`,
+        providerRef: payment.transactionId,
+        kind: 'refund',
+        status: refund.status,
+        amount: refund.amount ?? null,
+        refund: {
+          refundId: refund.refundId,
+          status: refund.status,
+          amount: refund.amount ?? null,
+          refundReference: refund.refundReference ?? null,
+        },
+        rawPayload: { source: 'admin_refresh' },
+      },
+      confirmed: {
+        kind: 'refund',
+        status:
+          refund.status === 'completed'
+            ? 'SUCCESS'
+            : refund.status === 'failed'
+              ? 'FAILURE'
+              : 'PENDING',
+      },
+    });
+    for (const a of result.alerts)
+      void sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: storeId, name: storeId },
+        source: `payment.webhook.${a.kind}`,
+        title: `${payment.provider} refund poll: ${a.kind}`,
+        body: a.body,
+        context: { storeId, paymentId: a.paymentId, orderId: a.orderId, ...(a.context ?? {}) },
+      }).catch(() => undefined);
+    if (result.outcome === 'applied')
+      await PaymentService.afterWebhookOnDo(storeId, payment.provider as PaymentProvider, result);
+    return {
+      outcome: result.outcome,
+      orderId: result.orderId,
+      paymentStatus: result.paymentStatus,
+      orderStatus: result.orderStatus,
+    };
   }
 
   /** The post-commit work of an applied webhook: the same fan-out as the Postgres branch. */

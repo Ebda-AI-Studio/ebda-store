@@ -13,7 +13,10 @@
  * is exactly why the index exists underneath.
  */
 import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
+import { randomUUID } from 'node:crypto';
 import { prisma, Prisma } from '@ebda/database';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
+import { atomicWrites } from '../lib/atomic-writes';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
 import { invalidateB2bPricing } from '../lib/b2b-invalidate';
@@ -55,7 +58,8 @@ export interface AssignIdentity {
 
 export const CustomerGroupService = {
   async list(storeId: string) {
-    const groups = await prisma.customerGroup.findMany({
+    const db = await storeDb(storeId);
+    const groups = await db.customerGroup.findMany({
       where: { storeId },
       select: { ...groupSelect, _count: { select: { customers: true, priceTiers: true } } },
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
@@ -71,7 +75,8 @@ export const CustomerGroupService = {
   },
 
   async get(storeId: string, id: string) {
-    const group = await prisma.customerGroup.findFirst({
+    const db = await storeDb(storeId);
+    const group = await db.customerGroup.findFirst({
       where: { id, storeId },
       select: { ...groupSelect, _count: { select: { customers: true, priceTiers: true } } },
     });
@@ -82,82 +87,90 @@ export const CustomerGroupService = {
   },
 
   async create(storeId: string, input: CustomerGroupInput) {
-    return prisma.$transaction(async tx => {
-      if (input.isDefault) {
-        await tx.customerGroup.updateMany({
-          where: { storeId, isDefault: true },
-          data: { isDefault: false },
-        });
-      }
-
-      try {
-        return await tx.customerGroup.create({
-          data: {
-            storeId,
-            name: input.name,
-            nameAr: input.nameAr ?? null,
-            isActive: input.isActive ?? true,
-            isDefault: input.isDefault ?? false,
-            pricingMode: input.pricingMode ?? 'none',
-            discountBps: input.discountBps ?? 0,
-            requiresApproval: input.requiresApproval ?? false,
-            isWholesale: input.isWholesale ?? false,
-          },
-          select: groupSelect,
-        });
-      } catch (err) {
-        throw translateUniqueViolation(err);
-      }
+    const w = await storeWriter(storeId);
+    const create = w.customerGroup.create({
+      data: {
+        storeId,
+        name: input.name,
+        nameAr: input.nameAr ?? null,
+        isActive: input.isActive ?? true,
+        isDefault: input.isDefault ?? false,
+        pricingMode: input.pricingMode ?? 'none',
+        discountBps: input.discountBps ?? 0,
+        requiresApproval: input.requiresApproval ?? false,
+        isWholesale: input.isWholesale ?? false,
+      },
+      select: groupSelect,
     });
+    try {
+      // one atomic batch: the default swap and the insert land together or not at all
+      if (input.isDefault) {
+        const [, created] = await atomicWrites(storeId, w, [
+          w.customerGroup.updateMany({
+            where: { storeId, isDefault: true },
+            data: { isDefault: false },
+          }),
+          create,
+        ]);
+        return created;
+      }
+      return await create;
+    } catch (err) {
+      throw translateUniqueViolation(err);
+    }
   },
 
   async update(storeId: string, id: string, input: Partial<CustomerGroupInput>) {
-    return prisma.$transaction(async tx => {
-      const existing = await tx.customerGroup.findFirst({
-        where: { id, storeId },
-        select: { id: true, isDefault: true },
-      });
-      if (!existing) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
-
-      if (input.isDefault === true && !existing.isDefault) {
-        await tx.customerGroup.updateMany({
-          where: { storeId, isDefault: true },
-          data: { isDefault: false },
-        });
-      }
-
-      // Refuse to unset the only default — a store with no default group has
-      // nowhere to put new customers, and the UI offers no way back.
-      if (input.isDefault === false && existing.isDefault) {
-        throw new AppError(
-          400,
-          'DEFAULT_GROUP_REQUIRED',
-          'Set another group as default instead of unsetting this one.'
-        );
-      }
-
-      try {
-        invalidateB2bPricing(storeId); // pricing mode / %, isActive and isWholesale change what members pay (deferred to commit)
-        return await tx.customerGroup.update({
-          where: { id, storeId },
-          data: {
-            ...(input.name !== undefined ? { name: input.name } : {}),
-            ...(input.nameAr !== undefined ? { nameAr: input.nameAr } : {}),
-            ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-            ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
-            ...(input.pricingMode !== undefined ? { pricingMode: input.pricingMode } : {}),
-            ...(input.discountBps !== undefined ? { discountBps: input.discountBps } : {}),
-            ...(input.requiresApproval !== undefined
-              ? { requiresApproval: input.requiresApproval }
-              : {}),
-            ...(input.isWholesale !== undefined ? { isWholesale: input.isWholesale } : {}),
-          },
-          select: groupSelect,
-        });
-      } catch (err) {
-        throw translateUniqueViolation(err);
-      }
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
+    const existing = await db.customerGroup.findFirst({
+      where: { id, storeId },
+      select: { id: true, isDefault: true },
     });
+    if (!existing) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
+
+    // Refuse to unset the only default — a store with no default group has
+    // nowhere to put new customers, and the UI offers no way back.
+    if (input.isDefault === false && existing.isDefault) {
+      throw new AppError(
+        400,
+        'DEFAULT_GROUP_REQUIRED',
+        'Set another group as default instead of unsetting this one.'
+      );
+    }
+
+    invalidateB2bPricing(storeId); // pricing mode / %, isActive and isWholesale change what members pay (deferred to commit)
+    const update = w.customerGroup.update({
+      where: { id, storeId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.nameAr !== undefined ? { nameAr: input.nameAr } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+        ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
+        ...(input.pricingMode !== undefined ? { pricingMode: input.pricingMode } : {}),
+        ...(input.discountBps !== undefined ? { discountBps: input.discountBps } : {}),
+        ...(input.requiresApproval !== undefined
+          ? { requiresApproval: input.requiresApproval }
+          : {}),
+        ...(input.isWholesale !== undefined ? { isWholesale: input.isWholesale } : {}),
+      },
+      select: groupSelect,
+    });
+    try {
+      if (input.isDefault === true && !existing.isDefault) {
+        const [, updated] = await atomicWrites(storeId, w, [
+          w.customerGroup.updateMany({
+            where: { storeId, isDefault: true },
+            data: { isDefault: false },
+          }),
+          update,
+        ]);
+        return updated;
+      }
+      return await update;
+    } catch (err) {
+      throw translateUniqueViolation(err);
+    }
   },
 
   /**
@@ -165,26 +178,32 @@ export const CustomerGroupService = {
    * they simply become ungrouped.
    */
   async remove(storeId: string, id: string) {
-    const existing = await prisma.customerGroup.findFirst({
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
+    const existing = await db.customerGroup.findFirst({
       where: { id, storeId },
       select: { id: true },
     });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
 
-    await prisma.customerGroup.delete({ where: { id, storeId } });
+    await w.customerGroup.delete({ where: { id, storeId } });
     invalidateB2bPricing(storeId); // members return to retail; the group's tiers cascade away
   },
 
   /** Assign a customer to a group, or clear it when `groupId` is null. */
   async assignCustomer(storeId: string, customerId: string, groupId: string | null) {
-    const customer = await prisma.customer.findFirst({
+    const customer = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: { id: customerId, storeId },
       select: { id: true },
     });
     if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
 
     if (groupId) {
-      const group = await prisma.customerGroup.findFirst({
+      const group = await (
+        await storeDb(storeId)
+      ).customerGroup.findFirst({
         where: { id: groupId, storeId },
         select: { id: true },
       });
@@ -192,7 +211,9 @@ export const CustomerGroupService = {
       if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
     }
 
-    const updated = await prisma.customer.update({
+    const updated = await (
+      await customerWrites(storeId)
+    ).update({
       where: { id: customerId, storeId },
       data: { groupId },
       select: { id: true, groupId: true },
@@ -209,7 +230,9 @@ export const CustomerGroupService = {
    * unverified and a linked row that held a wholesaler's phone would be matched by it later).
    */
   async linkApprovedBuyer(storeId: string, userId: string, groupId: string) {
-    const group = await prisma.customerGroup.findFirst({
+    const group = await (
+      await storeDb(storeId)
+    ).customerGroup.findFirst({
       where: { id: groupId, storeId },
       select: { id: true },
     });
@@ -231,24 +254,30 @@ export const CustomerGroupService = {
         'The applicant account is suspended or deleted.'
       );
 
-    const linked = await prisma.customer.findFirst({
+    const linked = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: { storeId, userId },
       select: { id: true },
     });
     let row;
     if (linked) {
-      row = await prisma.customer.update({
+      row = await (
+        await customerWrites(storeId)
+      ).update({
         where: { id: linked.id, storeId },
         data: { groupId },
         select: assignReturnSelect,
       });
     } else {
-      const emailTaken = await prisma.customer.findFirst({
+      const emailTaken = await (
+        await storeDb(storeId)
+      ).customer.findFirst({
         where: { storeId, email: { equals: shopper.email, mode: 'insensitive' } },
         select: { id: true },
       });
-      row = await withSavepoint(() =>
-        prisma.customer.create({
+      row = await withSavepoint(async () =>
+        (await customerWrites(storeId)).create({
           data: {
             storeId,
             userId,
@@ -278,18 +307,24 @@ export const CustomerGroupService = {
     storeId: string,
     userId: string
   ): Promise<{ removed: boolean; fromGroupId: string | null }> {
-    const linked = await prisma.customer.findFirst({
+    const linked = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: { storeId, userId },
       select: { id: true, groupId: true, group: { select: { isWholesale: true } } },
     });
     if (!linked || !linked.groupId || !linked.group?.isWholesale) {
       return { removed: false, fromGroupId: linked?.groupId ?? null };
     }
-    const dflt = await prisma.customerGroup.findFirst({
+    const dflt = await (
+      await storeDb(storeId)
+    ).customerGroup.findFirst({
       where: { storeId, isDefault: true, isWholesale: false },
       select: { id: true },
     });
-    await prisma.customer.update({
+    await (
+      await customerWrites(storeId)
+    ).update({
       where: { id: linked.id, storeId },
       data: { groupId: dflt?.id ?? null },
       select: { id: true },
@@ -324,7 +359,9 @@ export const CustomerGroupService = {
     }
 
     if (groupId) {
-      const group = await prisma.customerGroup.findFirst({
+      const group = await (
+        await storeDb(storeId)
+      ).customerGroup.findFirst({
         where: { id: groupId, storeId },
         select: { id: true },
       });
@@ -352,12 +389,14 @@ export const CustomerGroupService = {
             });
       if (!shopper) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
 
-      const linked = await prisma.customer.findFirst({
+      const linked = await (
+        await storeDb(storeId)
+      ).customer.findFirst({
         where: { storeId, userId: shopper.id },
         select: { id: true },
       });
       if (linked) {
-        return prisma.customer.update({
+        return (await customerWrites(storeId)).update({
           where: { id: linked.id, storeId },
           data: { groupId },
           select: assignReturnSelect,
@@ -365,7 +404,9 @@ export const CustomerGroupService = {
       }
       const free = async (field: 'phone' | 'email', value: string | null) => {
         if (!value) return null;
-        const taken = await prisma.customer.findFirst({
+        const taken = await (
+          await storeDb(storeId)
+        ).customer.findFirst({
           where:
             field === 'phone'
               ? { storeId, phone: value }
@@ -376,7 +417,7 @@ export const CustomerGroupService = {
       };
       try {
         return await withSavepoint(async () =>
-          prisma.customer.create({
+          (await customerWrites(storeId)).create({
             data: {
               storeId,
               userId: shopper.id,
@@ -393,12 +434,14 @@ export const CustomerGroupService = {
         );
       } catch (err) {
         if ((err as { code?: string })?.code === 'P2002') {
-          const raced = await prisma.customer.findFirst({
+          const raced = await (
+            await storeDb(storeId)
+          ).customer.findFirst({
             where: { storeId, userId: shopper.id },
             select: { id: true },
           });
           if (raced) {
-            return prisma.customer.update({
+            return (await customerWrites(storeId)).update({
               where: { id: raced.id, storeId },
               data: { groupId },
               select: assignReturnSelect,
@@ -415,16 +458,18 @@ export const CustomerGroupService = {
       ? { storeId, userId: null, phone }
       : { storeId, userId: null, email: { equals: email as string, mode: 'insensitive' } };
     const existing =
-      (await prisma.customer.findFirst({ where: match, select: { id: true } })) ??
+      (await (await storeDb(storeId)).customer.findFirst({ where: match, select: { id: true } })) ??
       (email && phone
-        ? await prisma.customer.findFirst({
+        ? await (
+            await storeDb(storeId)
+          ).customer.findFirst({
             where: { storeId, userId: null, email: { equals: email, mode: 'insensitive' } },
             select: { id: true },
           })
         : null);
 
     if (existing) {
-      return prisma.customer.update({
+      return (await customerWrites(storeId)).update({
         where: { id: existing.id, storeId },
         data: { groupId },
         select: assignReturnSelect,
@@ -433,7 +478,9 @@ export const CustomerGroupService = {
 
     // Only a LINKED row matches this phone / email: refuse, loudly, rather than attach the group to someone else's account
     // or trip the unique index with a 500. The merchant assigns the group from that shopper's profile instead.
-    const linkedOnly = await prisma.customer.findFirst({
+    const linkedOnly = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: {
         storeId,
         userId: { not: null },
@@ -455,8 +502,8 @@ export const CustomerGroupService = {
     try {
       // #1582: this runs inside the request's ambient tenant transaction; a failed INSERT aborts it (25P02), so the
       // P2002 recovery below needs a savepoint to be reachable.
-      return await withSavepoint(() =>
-        prisma.customer.create({
+      return await withSavepoint(async () =>
+        (await customerWrites(storeId)).create({
           data: {
             storeId,
             phone,
@@ -471,9 +518,11 @@ export const CustomerGroupService = {
     } catch (err) {
       // Lost a concurrent upsert race against the (store, phone)/(store, email) unique index: re-find, attach only.
       if ((err as { code?: string })?.code === 'P2002') {
-        const raced = await prisma.customer.findFirst({ where: match, select: { id: true } });
+        const raced = await (
+          await storeDb(storeId)
+        ).customer.findFirst({ where: match, select: { id: true } });
         if (raced) {
-          return prisma.customer.update({
+          return (await customerWrites(storeId)).update({
             where: { id: raced.id, storeId },
             data: { groupId },
             select: assignReturnSelect,
@@ -491,6 +540,91 @@ export const CustomerGroupService = {
     return row;
   },
 };
+
+/**
+ * The write client of the CRM `customers` row. Postgres stores keep the unchanged prisma client. A store served by its
+ * Durable Object has NO generic writer for `Customer`; the only columns the admin path writes there are the group
+ * membership, through the named procedures `customerSetGroup` / `customerCreateInGroup` (packages/repo/src/rpc/writes.ts),
+ * each batched atomically with its audit row.
+ */
+async function customerWrites(storeId: string): Promise<typeof prisma.customer> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return prisma.customer;
+  const w = repo.writer;
+  const unwrap = async (run: () => Promise<unknown[]>) => {
+    try {
+      return (await run())[0] as Record<string, unknown>;
+    } catch (e) {
+      const m = (e as Error)?.message ?? '';
+      if (m === 'group not found') throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
+      if (m === 'customer not found') throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+      throw e;
+    }
+  };
+  return {
+    update: (args: { where: { id: string }; data: { groupId?: string | null } }) => {
+      const keys = Object.keys(args.data ?? {});
+      if (keys.length !== 1 || keys[0] !== 'groupId')
+        throw new AppError(
+          501,
+          'CUSTOMER_WRITE_UNSUPPORTED',
+          'Only the group can be changed here.'
+        );
+      const groupId = args.data.groupId ?? null;
+      return unwrap(() =>
+        atomicWrites(storeId, w, [
+          w.$proc('customerSetGroup', { storeId, customerId: args.where.id, groupId }),
+          w.auditLog.create({
+            data: {
+              action: 'customer.group_assigned',
+              resourceType: 'customer',
+              resourceId: args.where.id,
+              storeId,
+              details: { groupId },
+            },
+          }),
+        ])
+      );
+    },
+    create: (args: {
+      data: {
+        storeId: string;
+        userId?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        firstName: string;
+        lastName: string;
+        groupId: string;
+      };
+    }) => {
+      const d = args.data;
+      const id = randomUUID();
+      return unwrap(() =>
+        atomicWrites(storeId, w, [
+          w.$proc('customerCreateInGroup', {
+            id,
+            storeId,
+            userId: d.userId ?? null,
+            email: d.email ?? null,
+            phone: d.phone ?? null,
+            firstName: d.firstName,
+            lastName: d.lastName,
+            groupId: d.groupId,
+          }),
+          w.auditLog.create({
+            data: {
+              action: 'customer.group_assigned',
+              resourceType: 'customer',
+              resourceId: id,
+              storeId,
+              details: { groupId: d.groupId, created: true },
+            },
+          }),
+        ])
+      );
+    },
+  } as unknown as typeof prisma.customer;
+}
 
 const assignReturnSelect = {
   id: true,

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { runInStoreScope, runInTenantContext, runInUserScope } from '@ebda/database';
-import { platformFamilyOnD1 } from '../services/platform/cutover';
+import { platformUserScopeIsLazy } from '../services/platform/cutover';
 import { withDeferredWork } from '../lib/after-tenant-commit';
 import { backendFor } from '../lib/store-backend';
 import { resolvePublicStoreId } from '../utils/store-helpers';
@@ -494,51 +494,43 @@ export function userContext(
       }, next);
       return;
     }
-    openUserTransaction(res, next, storeId, userId);
+    // NEON-ZERO-1 (NZ-TX-2): on a Worker whose platform data is in D1 the user-keyed request (the whole /admin namespace, the
+    // account's own addresses) opens NO Postgres transaction up front: the scope carries the user, and a Postgres query a
+    // handler still makes on a user-keyed table runs in its own short transaction. A deployment with no D1 (Node, local
+    // dev) keeps the request transaction.
+    platformUserScopeIsLazy().then(lazy => {
+      if (res.destroyed || res.writableEnded) return;
+      if (lazy) openUserScope(res, next, userId);
+      else openUserTransaction(res, next, storeId, userId);
+    }, next);
   };
 }
 
+function openUserScope(res: Response, next: NextFunction, userId: string): void {
+  runRequestInTransaction(
+    res,
+    next,
+    (body, releaseResponse) =>
+      withDeferredWork(
+        { storeId: undefined, userId, noPgTx: true },
+        () => runInUserScope(userId, body),
+        releaseResponse
+      ),
+    { userId, middleware: 'userContext', backend: 'do' }
+  );
+}
+
 /**
- * NEON-ZERO (Ruling NZ-C-1): the user scope of the PLATFORM namespace (`/admin`, the super-admin hub). Once the `billing`,
- * `access` and `platform` families are on D1 the hub's data is D1 + the Durable Objects, so the request opens NO Postgres
- * transaction (BEGIN + set_config was a 500 on every `/admin` route with Postgres dead). Before the markers exist it is exactly
- * `userContext` (one request transaction). With the markers set the scope is the lazy per-query user scope (`runInUserScope`):
- * a handler that still reads Postgres runs each query in its own short transaction carrying `app.current_user_id`, so nothing
- * loses its RLS identity, and a handler that does not touch Postgres never leases a connection. An unreadable marker is a 503
- * (`platformFamilyOnD1` throws), never a silent Postgres fallback. Cost if wrong: a handler that relied on one atomic request
- * transaction across several statements loses that atomicity once the markers are set (each such handler must use D1 `$batch`).
+ * NEON-ZERO (Rulings NZ-C-1 + NZ-TX-2, one implementation): the user scope of the PLATFORM namespace (`/admin`, the super-admin
+ * hub). It is exactly `userContext`: with the `billing`, `access` and `platform` families all on D1 the request opens NO Postgres
+ * transaction (BEGIN + set_config was a 500 on every `/admin` route with Postgres dead) and the lazy per-query user scope
+ * (`runInUserScope`) carries `app.current_user_id`, so a handler that still reads Postgres keeps its RLS identity in its own
+ * short transaction. Before the markers exist, or without a D1 binding, it is one request transaction. An unreadable marker is
+ * a 503, never a silent Postgres fallback. Cost if wrong: a handler that relied on one atomic request transaction across several
+ * statements loses that atomicity once the markers are set (each such handler must use D1 `$batch`).
  */
 export function platformUserContext(getUserId: (req: Request) => string | undefined) {
-  const plain = userContext(getUserId);
-  return function (req: Request, res: Response, next: NextFunction): void {
-    const userId = getUserId(req);
-    if (!userId) {
-      next();
-      return;
-    }
-    Promise.all([
-      platformFamilyOnD1('billing'),
-      platformFamilyOnD1('access'),
-      platformFamilyOnD1('platform'),
-    ]).then(([billing, access, platform]) => {
-      if (res.destroyed || res.writableEnded) return;
-      if (!(billing && access && platform)) {
-        plain(req, res, next);
-        return;
-      }
-      runRequestInTransaction(
-        res,
-        next,
-        (body, releaseResponse) =>
-          withDeferredWork(
-            { userId, noPgTx: true },
-            () => runInUserScope(userId, body),
-            releaseResponse
-          ),
-        { userId, middleware: 'userContext', backend: 'do' }
-      );
-    }, next);
-  };
+  return userContext(getUserId);
 }
 
 function openUserTransaction(

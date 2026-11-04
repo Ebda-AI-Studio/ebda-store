@@ -409,6 +409,8 @@ describe('cutover switch', () => {
         'answerEngineProviderConfig',
         'storeUsageSnapshot',
         'ciInsight',
+        'oneSignalSubscription', // admin push devices (NZ-C-11, family ops)
+        'store', // directory-column READS only (NZ-TX-2, services/platform/router.ts)
       ].sort()
     );
     setModelRouter(undefined);

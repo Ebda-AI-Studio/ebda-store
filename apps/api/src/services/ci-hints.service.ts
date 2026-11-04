@@ -25,7 +25,7 @@ import { AppError } from '../middleware/error-handler';
 /** Never call a hint without the merchant's switch, the platform gate AND this store's own auto-gate (CI-13). */
 async function enabled(storeId: string, feature: CiHintFeature): Promise<boolean> {
   if (!(await featureService.isFeatureEnabled(storeId, 'customer_intelligence'))) return false;
-  if (!(await gateState(feature)).enabled) return false;
+  if (!(await gateState(feature, storeId)).enabled) return false;
   return !(await storeGateClosed(storeId, feature));
 }
 
@@ -115,8 +115,10 @@ export interface CiOverview {
 export async function ciOverview(storeId: string): Promise<CiOverview> {
   const [hintsEnabled, store, gates, paused] = await Promise.all([
     featureService.isFeatureEnabled(storeId, 'customer_intelligence'),
-    prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } }),
-    allGates(),
+    storeDb(storeId).then(db =>
+      db.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } })
+    ),
+    allGates(storeId),
     storeGates(storeId),
   ]);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');

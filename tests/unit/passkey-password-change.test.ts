@@ -37,6 +37,14 @@ vi.mock('@api/lib/definer', async importOriginal => {
   return {
     ...actual,
     lookupStore: async () => null,
+    getUserState: async () => ({
+      id: 'owner',
+      role: 'store_admin',
+      status: 'active',
+      tokenVersion: 0,
+      storeId: null,
+      deletedAt: null,
+    }),
     passkeyLookup: async (id: string) => h.creds.find(c => c.credentialId === id) ?? null,
     insertAuditLog: async (e: Row) => void h.audits.push(e),
     refreshTokenUser: async (stored: string) =>

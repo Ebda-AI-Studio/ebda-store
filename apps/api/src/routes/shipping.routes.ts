@@ -7,11 +7,10 @@ import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { EGYPT_GOVERNORATES, minorToDecimalString, REGION, BRAND } from '@ebda/shared';
 import { parsePriceCell } from '../services/price-cell';
 import { tenantContext } from '../middleware/tenant-context';
-import { storeDb } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -85,8 +84,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const db = await storeDb(storeId);
 
-      const rates = await prisma.shippingAreaRate.findMany({
+      const rates = await db.shippingAreaRate.findMany({
         where: { storeId },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
         take: AREA_RATES_MAX, // BE:E-5
@@ -116,8 +116,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const db = await storeDb(storeId);
 
-      const rates = await prisma.shippingAreaRate.findMany({
+      const rates = await db.shippingAreaRate.findMany({
         where: { storeId },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
         take: AREA_RATES_MAX, // BE:E-5
@@ -665,11 +666,13 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const db = await storeDb(storeId);
+      const w = await storeWriter(storeId);
       const { rates } = bulkAreaRateSchema.parse(req.body);
 
-      await prisma.$transaction(
+      await w.$transaction(
         rates.map(rate =>
-          prisma.shippingAreaRate.upsert({
+          w.shippingAreaRate.upsert({
             where: {
               storeId_country_governorate_area: {
                 storeId,
@@ -704,7 +707,7 @@ router.put(
         )
       );
 
-      const rates_result = await prisma.shippingAreaRate.findMany({
+      const rates_result = await db.shippingAreaRate.findMany({
         where: { storeId },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
         take: AREA_RATES_MAX, // BE:E-5
@@ -737,6 +740,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const w = await storeWriter(storeId);
 
       let rows: ImportRow[];
       let dryRun: boolean;
@@ -833,9 +837,9 @@ router.post(
       }
 
       if (toUpsert.length > 0) {
-        await prisma.$transaction(
+        await w.$transaction(
           toUpsert.map((rate, position) =>
-            prisma.shippingAreaRate.upsert({
+            w.shippingAreaRate.upsert({
               where: {
                 storeId_country_governorate_area: {
                   storeId,
@@ -889,9 +893,11 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
+      const db = await storeDb(storeId);
+      const w = await storeWriter(storeId);
       const data = updateAreaRateSchema.parse(req.body);
 
-      const rate = await prisma.shippingAreaRate.updateMany({
+      const rate = await w.shippingAreaRate.updateMany({
         where: { id, storeId },
         data,
       });
@@ -904,7 +910,7 @@ router.patch(
         return;
       }
 
-      const updated = await prisma.shippingAreaRate.findFirst({
+      const updated = await db.shippingAreaRate.findFirst({
         where: { id, storeId },
       });
 
@@ -927,8 +933,9 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
+      const w = await storeWriter(storeId);
 
-      const deleted = await prisma.shippingAreaRate.deleteMany({
+      const deleted = await w.shippingAreaRate.deleteMany({
         where: { id, storeId },
       });
 
@@ -1013,10 +1020,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const db = await storeDb(storeId);
 
-      const rates = await (
-        await storeDb(storeId)
-      ).shippingAreaRate.findMany({
+      const rates = await db.shippingAreaRate.findMany({
         where: { storeId, isActive: true },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
         take: AREA_RATES_MAX, // BE:E-5

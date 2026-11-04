@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { storeDb } from './repo-factory';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -10,7 +10,9 @@ export async function assertCustomerGroupInStore(
   customerGroupId: string | null | undefined
 ): Promise<void> {
   if (!customerGroupId) return;
-  const group = await prisma.customerGroup.findFirst({
+  const group = await (
+    await storeDb(storeId)
+  ).customerGroup.findFirst({
     where: { id: customerGroupId, storeId },
     select: { id: true },
   });

@@ -41,7 +41,7 @@ import {
 } from '../services/r2-cleanup.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import {
   ADMIN_MODEL3D_SELECT,
   assertProductInStore,
@@ -183,7 +183,9 @@ router.post(
             ip: req.ip,
             userAgent: req.headers['user-agent'],
           });
-          const m = await prisma.productModel.findFirst({
+          const m = await (
+            await storeDb(storeId)
+          ).productModel.findFirst({
             where: { storeId, productId },
             select: ADMIN_MODEL3D_SELECT,
           });
@@ -305,7 +307,9 @@ router.put(
         }
       }
       const current = await getModelRow(storeId, productId);
-      const model = await prisma.productModel.update({
+      const model = await (
+        await storeWriter(storeId)
+      ).productModel.update({
         where: { id: current.id, storeId },
         data: {
           ...(body.altText !== undefined ? { altText: body.altText || null } : {}),
@@ -343,7 +347,9 @@ router.put(
       const { storeId, productId } = req.params;
       const { bindings } = model3dBindingsBodySchema.parse(req.body);
       const count = await replaceBindings(storeId, productId, bindings);
-      const model = await prisma.productModel.findFirst({
+      const model = await (
+        await storeDb(storeId)
+      ).productModel.findFirst({
         where: { storeId, productId },
         select: ADMIN_MODEL3D_SELECT,
       });
@@ -368,7 +374,9 @@ router.delete(
     try {
       const { storeId, productId } = req.params;
       const current = await getModelRow(storeId, productId);
-      await prisma.productModel.delete({ where: { id: current.id, storeId } });
+      await (
+        await storeWriter(storeId)
+      ).productModel.delete({ where: { id: current.id, storeId } });
       await auditLog({
         action: 'product.model3d.deleted',
         userId: req.user!.userId,

@@ -20,7 +20,7 @@ import {
   storeStockValueFils,
 } from '../lib/effective-inventory-sql';
 import { z } from 'zod/v3';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -58,6 +58,7 @@ import {
   getReconciliationSummary,
   getReconciliationDifference,
 } from '../services/accounting/bank-reconcile.service';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router({ mergeParams: true });
 
@@ -114,7 +115,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tree = await runInTenantContext(req.params.storeId, () =>
+      const tree = await runInStoreCtx(req.params.storeId, () =>
         listAccountsTree(req.params.storeId)
       );
       res.json({ data: tree });
@@ -156,7 +157,7 @@ router.get(
         if (q.to) where.postedAt.lte = new Date(q.to);
       }
 
-      const [items, total] = await runInTenantContext(req.params.storeId, () =>
+      const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
           prisma.journalEntry.findMany({
             where,
@@ -205,7 +206,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const entry = await runInTenantContext(req.params.storeId, () =>
+      const entry = await runInStoreCtx(req.params.storeId, () =>
         prisma.journalEntry.findFirst({
           where: { id: req.params.entryId, storeId: req.params.storeId },
           include: {
@@ -321,7 +322,7 @@ router.post(
         };
       });
 
-      const entry = await runInTenantContext(req.params.storeId, () =>
+      const entry = await runInStoreCtx(req.params.storeId, () =>
         postEntry({
           storeId: req.params.storeId,
           source: 'manual',
@@ -359,7 +360,7 @@ router.post(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const created = await runInTenantContext(req.params.storeId, () =>
+      const created = await runInStoreCtx(req.params.storeId, () =>
         seedCoaForStore(req.params.storeId)
       );
       res.status(201).json({ data: { created } });
@@ -407,7 +408,7 @@ router.post(
         });
         return;
       }
-      const acct = await runInTenantContext(req.params.storeId, () =>
+      const acct = await runInStoreCtx(req.params.storeId, () =>
         createChildAccount({ storeId: req.params.storeId, ...body.data })
       );
       res.status(201).json({ data: acct });
@@ -445,7 +446,7 @@ router.patch(
         });
         return;
       }
-      const acct = await runInTenantContext(req.params.storeId, () =>
+      const acct = await runInStoreCtx(req.params.storeId, () =>
         setAccountActive(req.params.storeId, req.params.accountId, body.data.isActive)
       );
       res.json({ data: acct });
@@ -474,7 +475,7 @@ router.get(
       const asOf = req.query.asOf
         ? parseFinanceDate(req.query.asOf, new Date(), 'end', tz)
         : undefined;
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
       res.json({ data });
@@ -507,7 +508,7 @@ router.get(
         tz
       );
       const to = parseFinanceDate(req.query.to, new Date(), 'end', tz);
-      const raw = await runInTenantContext(req.params.storeId, () =>
+      const raw = await runInStoreCtx(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
       // Reshape service output ({ revenue: row[], expenses: row[], totalRevenue, ... })
@@ -560,7 +561,7 @@ router.get(
     try {
       const tz = await storeTimeZone(req.params.storeId);
       const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end', tz);
-      const raw = await runInTenantContext(req.params.storeId, () =>
+      const raw = await runInStoreCtx(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
       // Reshape service output ({ assets: row[], liabilities: row[], equity: row[], total* })
@@ -631,7 +632,7 @@ router.get(
       const from = parseFinanceDate(req.query.from, monthStart, 'start', tz);
       const to = parseFinanceDate(req.query.to, now, 'end', tz);
 
-      const data = await runInTenantContext(req.params.storeId, async () => {
+      const data = await runInStoreCtx(req.params.storeId, async () => {
         const [pnl, bs, stockValue, disabledValueRows] = await Promise.all([
           profitAndLoss(req.params.storeId, from, to),
           balanceSheet(req.params.storeId, to),
@@ -693,7 +694,7 @@ router.get(
       const asOf = req.query.asOf
         ? parseFinanceDate(req.query.asOf, new Date(), 'end', tz)
         : undefined;
-      const rows = await runInTenantContext(req.params.storeId, () =>
+      const rows = await runInStoreCtx(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
       const date = zonedIsoDay(asOf ?? new Date(), tz);
@@ -757,7 +758,7 @@ router.get(
         tz
       );
       const to = parseFinanceDate(req.query.to, new Date(), 'end', tz);
-      const raw = await runInTenantContext(req.params.storeId, () =>
+      const raw = await runInStoreCtx(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
 
@@ -825,7 +826,7 @@ router.get(
     try {
       const tz = await storeTimeZone(req.params.storeId);
       const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end', tz);
-      const raw = await runInTenantContext(req.params.storeId, () =>
+      const raw = await runInStoreCtx(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
 
@@ -932,7 +933,7 @@ router.get(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         generateTaxReport(req.params.storeId, { from, to, timeZone: tz })
       );
       res.json({ data });
@@ -982,7 +983,7 @@ router.get(
         });
         return;
       }
-      const report = await runInTenantContext(req.params.storeId, () =>
+      const report = await runInStoreCtx(req.params.storeId, () =>
         generateTaxReport(req.params.storeId, { from, to, timeZone: tz })
       );
 
@@ -1134,7 +1135,7 @@ router.get(
       };
       if (currency) where.currency = currency.toUpperCase();
 
-      const rates = await runInTenantContext(req.params.storeId, () =>
+      const rates = await runInStoreCtx(req.params.storeId, () =>
         prisma.fxRateEntry.findMany({
           where,
           orderBy: { rateDate: 'desc' },
@@ -1173,7 +1174,7 @@ router.post(
       const { currency, rate, rateDate } = parsed.data;
       const rateDateValue = rateDate ? new Date(rateDate) : new Date();
 
-      const entry = await runInTenantContext(req.params.storeId, () =>
+      const entry = await runInStoreCtx(req.params.storeId, () =>
         prisma.fxRateEntry.create({
           data: {
             storeId: req.params.storeId,
@@ -1332,7 +1333,7 @@ router.get(
       const where: any = { storeId: req.params.storeId };
       if (q.status) where.status = q.status;
 
-      const [items, total] = await runInTenantContext(req.params.storeId, () =>
+      const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
           prisma.bankStatement.findMany({
             where,
@@ -1372,7 +1373,7 @@ router.get(
   ...bankRecMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const stmt = await runInTenantContext(req.params.storeId, () =>
+      const stmt = await runInStoreCtx(req.params.storeId, () =>
         prisma.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: {
@@ -1418,7 +1419,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Verify statement ownership before running the difference query
-      const stmt = await runInTenantContext(req.params.storeId, () =>
+      const stmt = await runInStoreCtx(req.params.storeId, () =>
         prisma.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
@@ -1455,7 +1456,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Verify statement belongs to this store
-      const stmt = await runInTenantContext(req.params.storeId, () =>
+      const stmt = await runInStoreCtx(req.params.storeId, () =>
         prisma.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
@@ -1473,7 +1474,7 @@ router.get(
       const where: any = { statementId: req.params.sid, storeId: req.params.storeId };
       if (q.matchStatus) where.matchStatus = q.matchStatus;
 
-      const [items, total] = await runInTenantContext(req.params.storeId, () =>
+      const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
           prisma.bankTransaction.findMany({
             where,
@@ -1524,7 +1525,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Verify statement ownership
-      const stmt = await runInTenantContext(req.params.storeId, () =>
+      const stmt = await runInStoreCtx(req.params.storeId, () =>
         prisma.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
@@ -1622,7 +1623,7 @@ router.delete(
   ...bankRecMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const stmt = await runInTenantContext(req.params.storeId, () =>
+      const stmt = await runInStoreCtx(req.params.storeId, () =>
         prisma.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
@@ -1636,7 +1637,7 @@ router.delete(
         return;
       }
 
-      await runInTenantContext(req.params.storeId, () =>
+      await runInStoreCtx(req.params.storeId, () =>
         prisma.bankStatement.delete({ where: { id: req.params.sid, storeId: req.params.storeId } })
       );
 

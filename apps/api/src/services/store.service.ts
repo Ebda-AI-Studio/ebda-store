@@ -67,9 +67,12 @@ import {
   deleteStoreClients,
   eraseIdentityUser,
   getAccountState,
+  getAccountsBrief,
   isIdentityManagedUser,
   setAccountStatus,
 } from '../lib/identity-client';
+import { platformFamilyOnD1 } from './platform/cutover';
+import { pageDirectoryStoreIds } from './platform/directory-d1';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { sendAlert } from './alerts.service';
 import { StorageService } from './storage.service';
@@ -371,6 +374,42 @@ export class StoreService {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
+
+    // NEON-ZERO (integration gap): with the access family on D1 the directory is D1 `stores`, each store's record is read from
+    // its own backend, the owner from the identity service and the counts from the store's backend. No Postgres.
+    if (await platformFamilyOnD1('access')) {
+      const { ids, total } = await pageDirectoryStoreIds({
+        ownerId: options.ownerId,
+        skip,
+        take: limit,
+      });
+      const rows = await Promise.all(
+        ids.map(async id => {
+          const db = await storeDb(id);
+          const [st, products, orders] = await Promise.all([
+            db.store.findUnique({ where: { id } }),
+            db.product.count({ where: { storeId: id } }),
+            db.order.count({ where: { storeId: id } }),
+          ]);
+          return st ? { st, products, orders } : null;
+        })
+      );
+      const found = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+      const owners = new Map(
+        (await getAccountsBrief(found.map(r => (r.st as { ownerId: string }).ownerId))).map(a => [
+          a.id,
+          { id: a.id, email: a.email, firstName: a.firstName, lastName: a.lastName },
+        ])
+      );
+      return {
+        stores: found.map(r => ({
+          ...r.st,
+          owner: owners.get((r.st as { ownerId: string }).ownerId) ?? null,
+          _count: { products: r.products, orders: r.orders },
+        })),
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    }
 
     const where = options.ownerId ? { ownerId: options.ownerId } : {};
 

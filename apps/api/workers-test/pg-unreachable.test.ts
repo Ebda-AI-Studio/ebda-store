@@ -584,4 +584,31 @@ describe.skipIf(e.E2E_DB === '1')('customer auth on a StoreDO with Postgres unre
       { id: 'user-s', status: 'suspended' },
     ]);
   });
+
+  it('login names its store by header only (the storefront sends x-store-id); with no store it is the identity service, never a Postgres lookup', async () => {
+    const vt = `${A}~${hex('d')}`;
+    await doOp(A, 'register', {
+      id: 'user-h',
+      email: 'hdr@exit-test.invalid',
+      passwordHash: HASH,
+      firstName: 'H',
+      lastName: 'D',
+      verification: { tokenHash: await sha(vt), expiresAt: Date.now() + 3_600_000, rowId: 'v-h' },
+    });
+    const viaHeader = await post(
+      '/auth/login',
+      { email: 'hdr@exit-test.invalid', password: PW },
+      { 'x-store-id': A }
+    );
+    expect(viaHeader.status).toBe(200);
+    const noStore = await post('/auth/login', { email: 'hdr@exit-test.invalid', password: PW });
+    expect(noStore.status).toBe(409);
+    expect((await data(noStore)).error?.code).toBe('USE_IDENTITY_SERVICE');
+    // a customer's passkey list answers from the DO side without Postgres (no origin -> the passkey surface says "not available", 4xx)
+    const l = (await data(viaHeader)).data;
+    const list = await e.API.fetch('https://api.ebda.app/api/v1/auth/passkeys/', {
+      headers: { authorization: `Bearer ${l.accessToken}`, 'x-store-id': A },
+    });
+    expect(list.status).toBeLessThan(500);
+  });
 });
