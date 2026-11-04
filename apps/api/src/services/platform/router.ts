@@ -8,7 +8,6 @@
  * docs/plans/2026-11-02-neon-zero.md section N-10 (Ruling NZ-10-2) with the replacement (one atomic statement, `$batch`,
  * a compare-and-set, or a compensating write).
  */
-import { AppError } from '../../middleware/error-handler';
 import {
   prisma,
   notifyModelWrite,
