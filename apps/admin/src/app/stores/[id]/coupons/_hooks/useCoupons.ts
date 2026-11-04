@@ -23,6 +23,13 @@ interface UseCouponsResult {
   clearSaveError: () => void;
   deleteCoupon: (couponId: string) => Promise<void>;
   toggleActive: (couponId: string) => Promise<void>;
+  /** The list could not be read. The page shows an error with a retry, never "no coupons" (UX:S-1). */
+  loadFailed: boolean;
+  /** The save threw or the server refused it with no readable reason; the modal shows a generic Arabic line. */
+  saveFailed: boolean;
+  /** Which row action failed last; the page turns it into a toast and clears it. */
+  actionError: 'delete' | 'toggle' | null;
+  clearActionError: () => void;
 }
 
 /** A merchant-typed EGP amount → integer piastres, rounded once. */
@@ -92,6 +99,9 @@ export function useCoupons(storeId: string): UseCouponsResult {
   // the CURRENT filter, not the one captured when the mutation started (issue 2443).
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [actionError, setActionError] = useState<'delete' | 'toggle' | null>(null);
   const beginRequest = useLatestRequest();
   const fetchCoupons = useCallback(async () => {
     const isLatest = beginRequest();
@@ -102,15 +112,19 @@ export function useCoupons(storeId: string): UseCouponsResult {
         query.append('isActive', filterActive === 'active' ? 'true' : 'false');
       }
 
-      const { data } = await apiGet<{ coupons: Coupon[] }>(
+      const { data, error } = await apiGet<{ coupons: Coupon[] }>(
         `/api/v1/stores/${storeId}/coupons?${query}`
       );
       if (!isLatest()) return;
-      if (data) {
+      if (error) {
+        setLoadFailed(true);
+      } else if (data) {
+        setLoadFailed(false);
         setCoupons(data.coupons);
       }
     } catch (error) {
       console.error('Failed to fetch coupons:', error);
+      if (isLatest()) setLoadFailed(true);
     } finally {
       if (isLatest()) setIsLoading(false);
     }
@@ -141,14 +155,17 @@ export function useCoupons(storeId: string): UseCouponsResult {
           console.error('Failed to save coupon:', error.message);
           // QA-PRICE-ZERO-1: a refusal (e.g. a 0% coupon) used to leave the modal open with no word. Show the reason.
           setSaveError(error.message || null);
+          setSaveFailed(!error.message);
           return false;
         }
 
         setSaveError(null);
+        setSaveFailed(false);
         setRefreshKey(k => k + 1);
         return true;
       } catch (error) {
         console.error('Failed to save coupon:', error);
+        setSaveFailed(true);
         return false;
       }
     },
@@ -159,11 +176,11 @@ export function useCoupons(storeId: string): UseCouponsResult {
     async (couponId: string) => {
       try {
         const { error } = await apiDelete(`/api/v1/stores/${storeId}/coupons/${couponId}`);
-        if (!error) {
-          setRefreshKey(k => k + 1);
-        }
+        if (error) setActionError('delete');
+        else setRefreshKey(k => k + 1);
       } catch (error) {
         console.error('Failed to delete coupon:', error);
+        setActionError('delete');
       }
     },
     [storeId]
@@ -173,11 +190,11 @@ export function useCoupons(storeId: string): UseCouponsResult {
     async (couponId: string) => {
       try {
         const { error } = await apiPatch(`/api/v1/stores/${storeId}/coupons/${couponId}/toggle`);
-        if (!error) {
-          setRefreshKey(k => k + 1);
-        }
+        if (error) setActionError('toggle');
+        else setRefreshKey(k => k + 1);
       } catch (error) {
         console.error('Failed to toggle coupon:', error);
+        setActionError('toggle');
       }
     },
     [storeId]
@@ -193,8 +210,15 @@ export function useCoupons(storeId: string): UseCouponsResult {
     fetchCoupons,
     saveCoupon,
     saveError,
-    clearSaveError: () => setSaveError(null),
+    clearSaveError: () => {
+      setSaveError(null);
+      setSaveFailed(false);
+    },
     deleteCoupon,
     toggleActive,
+    loadFailed,
+    saveFailed,
+    actionError,
+    clearActionError: () => setActionError(null),
   };
 }

@@ -2523,6 +2523,9 @@ export class OrderService {
           missingPersonalisation.map(i => i.productId).join(', '),
         { productIds: missingPersonalisation.map(i => i.productId) }
       );
+    // Ruling FP-2: the customer's Postgres loyalty history is in the DO ledger before the DO order operation redeems from it.
+    if (customerId && (data.pointsToRedeem ?? 0) > 0)
+      await LoyaltyService.ensureDoHistory(storeId, customerId);
     const [loyaltyOn, backorderOn, wholesale, walletOk] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'loyalty'),
       featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
@@ -4024,6 +4027,18 @@ export class OrderService {
     /** Who the order is priced for (Ruling B2B-2d): the Customer the merchant selected; absent = retail. */
     pricingOpts: { buyer?: BuyerIdentity } = {}
   ) {
+    // BE:S-23: a negotiated shipping fee replaces the computed one, so it is the owner's call (same roles as the coupon and MOQ
+    // overrides); staff place the order at the computed fee. The route writes the audit row.
+    if (
+      typeof data.shippingOverride === 'number' &&
+      (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+    )
+      throw new AppError(
+        403,
+        'SHIPPING_OVERRIDE_FORBIDDEN',
+        'Only a store admin can set a custom shipping fee on an order'
+      );
+
     await assertOrderAllowed(storeId);
     if (data.items.length === 0) {
       throw new AppError(400, 'NO_ITEMS', 'Order must have at least one item');

@@ -83,6 +83,7 @@ import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 import { referralSignupCounts } from '../services/lifecycle-emails.service';
 import { storeUpdate } from '../lib/repo-factory';
+import { toSafeStoreResponse } from '../lib/store-response';
 
 const router = Router();
 
@@ -360,7 +361,7 @@ router.get(
 
       res.json({
         success: true,
-        data: { store, stats },
+        data: { store: toSafeStoreResponse(store), stats },
       });
     } catch (error) {
       next(error);
@@ -405,7 +406,7 @@ router.patch(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -874,7 +875,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);

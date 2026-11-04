@@ -137,7 +137,18 @@ const createProductSchema = z.object({
       })
     )
     .optional(),
+  // BE:F-6: a single photo URL is accepted too (the category API's shape); the route folds it into `images`.
+  image: z.string().url().optional(),
 });
+
+/** Fold the single-photo `image` into `images` (an explicit `images` wins); the service only knows `images`. */
+function foldImage<T extends { image?: string; images?: Array<{ url: string; alt?: string }> }>(
+  d: T
+): Omit<T, 'image'> {
+  const { image, ...rest } = d;
+  if (image && !rest.images?.length) return { ...rest, images: [{ url: image }] };
+  return rest;
+}
 
 /**
  * Reject a fixed discount that exceeds the price — it would produce a
@@ -167,8 +178,13 @@ function refineFixedDiscount(
   }
 }
 
-export const createProductSchemaChecked = createProductSchema.superRefine(refineFixedDiscount);
-export const updateProductSchema = createProductSchema.partial().superRefine(refineFixedDiscount);
+export const createProductSchemaChecked = createProductSchema
+  .superRefine(refineFixedDiscount)
+  .transform(foldImage);
+export const updateProductSchema = createProductSchema
+  .partial()
+  .superRefine(refineFixedDiscount)
+  .transform(foldImage);
 
 /**
  * @swagger
@@ -663,6 +679,11 @@ router.post(
 // the merchant controls exactly which rows change.
 //
 // Body: { productIds: string[]; lowStockThreshold: number }
+// BE:S-28: Zod at the edge (uuid ids, at most 500, bounded threshold) instead of a hand check.
+const bulkLowStockSchema = z.object({
+  productIds: z.array(z.string().uuid()).min(1).max(500),
+  lowStockThreshold: z.number().int().min(0).max(1_000_000),
+});
 router.post(
   '/bulk-set-low-stock-threshold',
   authenticate,
@@ -673,28 +694,11 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { productIds, lowStockThreshold } = req.body as {
-        productIds?: unknown;
-        lowStockThreshold?: unknown;
-      };
-      if (
-        !Array.isArray(productIds) ||
-        productIds.length === 0 ||
-        !productIds.every(id => typeof id === 'string' && id.length > 0)
-      ) {
-        throw new AppError(400, 'INVALID_BODY', 'productIds must be a non-empty string array');
-      }
-      if (
-        typeof lowStockThreshold !== 'number' ||
-        !Number.isInteger(lowStockThreshold) ||
-        lowStockThreshold < 0
-      ) {
-        throw new AppError(400, 'INVALID_BODY', 'lowStockThreshold must be a non-negative integer');
-      }
+      const { productIds, lowStockThreshold } = bulkLowStockSchema.parse(req.body);
 
       const result = await ProductService.bulkSetLowStockThreshold(
         storeId,
-        productIds as string[],
+        productIds,
         lowStockThreshold
       );
 
@@ -823,7 +827,8 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { product },
+        // BE:F-6: the category the product was filed under, so a caller need not re-read it (first of `categories`).
+        data: { product: { ...product, categoryId: data.categories?.[0] ?? null } },
       });
     } catch (error) {
       next(error);
