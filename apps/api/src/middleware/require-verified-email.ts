@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { withUser } from '@ebda/database';
-import { AppError } from './error-handler';
+import { cfBindings } from '../cf/bindings';
 import { getAccountState } from '../lib/identity-client';
+import { AppError } from './error-handler';
 import { onAccessD1 } from '../services/platform/access-d1';
 
 /**
@@ -20,23 +21,25 @@ export async function requireVerifiedEmail(
     const user = req.user;
     if (!user) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
     if (user.role === 'super_admin') return next();
-    // After the `access` cutover the account (and its verified flag) lives in the identity service; before it, the
-    // RLS-scoped Postgres read.
-    const row = (await onAccessD1())
-      ? await getAccountState(user.userId).then(a =>
-          a
-            ? {
-                emailVerified: a.emailVerified,
-                deletedAt: a.status === 'active' ? null : new Date(),
-              }
-            : null
-        )
-      : await withUser(user.userId, tx =>
-          tx.user.findUnique({
-            where: { id: user.userId },
-            select: { emailVerified: true, deletedAt: true },
-          })
-        );
+    // The account (and its verified flag) lives in the identity service wherever it is bound (NEON-ZERO identity) or once the
+    // `access` family is on D1; otherwise the RLS-scoped Postgres read as that user. A deleted account has no state record and
+    // an inactive / suspended one is treated as gone: both refuse exactly as the Postgres read does.
+    const row =
+      cfBindings()?.ACCOUNTS || (await onAccessD1())
+        ? await getAccountState(user.userId).then(a =>
+            a
+              ? {
+                  emailVerified: a.emailVerified,
+                  deletedAt: a.status === 'active' ? null : new Date(),
+                }
+              : null
+          )
+        : await withUser(user.userId, tx =>
+            tx.user.findUnique({
+              where: { id: user.userId },
+              select: { emailVerified: true, deletedAt: true },
+            })
+          );
     if (!row || row.deletedAt || !row.emailVerified) {
       throw new AppError(
         403,

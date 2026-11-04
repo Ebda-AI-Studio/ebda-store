@@ -190,11 +190,8 @@ class PaymentFactory {
                 orderBy: { provider: 'asc' },
               })
             : await withStore(storeId, () =>
-                prisma.paymentConfig.findMany({
-                  where: {
-                    storeId: storeId,
-                    isEnabled: true,
-                  },
+                repo!.db.paymentConfig.findMany({
+                  where: { storeId: storeId, isEnabled: true },
                   orderBy: { provider: 'asc' },
                 })
               );

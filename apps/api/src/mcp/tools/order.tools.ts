@@ -1,4 +1,5 @@
 import { z } from 'zod/v3';
+import { storeDb } from '../../lib/repo-factory';
 import { storefrontOrigin } from '@ebda/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { prisma, runInTenantContext, withTenantContext } from '@ebda/database';
@@ -121,7 +122,9 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // store that never enabled COD. Checked BEFORE creating the
           // order so a store with no COD config never gets an orphan
           // agent order.
-          const codConfig = await prisma.paymentConfig.findFirst({
+          const codConfig = await (
+            await storeDb(store.id)
+          ).paymentConfig.findFirst({
             // The platform-wide (storeId null) row is invisible under the store's
             // RLS and cannot be named under the tenant guard, so only the store's
             // own row is looked up.

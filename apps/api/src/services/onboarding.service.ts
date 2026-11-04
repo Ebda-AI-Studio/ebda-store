@@ -9,10 +9,11 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
-import { recordReferral } from './billing/grants.service';
-import { storeDb, storeRepo, storeUpdate, storeWritesToDo } from '../lib/repo-factory';
-import { requirePlatformDb } from '../lib/platform-db';
+import { cfBindings } from '../cf/bindings';
 import { getAccountState } from '../lib/identity-client';
+import { recordReferral } from './billing/grants.service';
+import { storeDb, storeRepo, storeUpdate, storeWriter, storeWritesToDo } from '../lib/repo-factory';
+import { requirePlatformDb } from '../lib/platform-db';
 import { onAccessD1, ownedStoreIdsD1 } from './platform/access-d1';
 import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
@@ -409,12 +410,16 @@ export class OnboardingService {
       );
     }
     if (existing) {
-      await prisma.paymentConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: { isEnabled: methods.cod },
       });
     } else {
-      await prisma.paymentConfig.create({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.create({
         data: {
           storeId,
           provider: 'cod',

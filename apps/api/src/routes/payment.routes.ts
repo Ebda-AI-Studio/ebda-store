@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
@@ -59,7 +60,6 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
-import { storeDb } from '../lib/repo-factory';
 import { runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
@@ -594,7 +594,9 @@ router.post(
           // ==========================================
           // Look up COD config for fee
           // The store's own COD row only (no platform-level row exists for the app role, R-EBDA-007).
-          const codConfig = await prisma.paymentConfig.findFirst({
+          const codConfig = await (
+            await storeDb(order.storeId)
+          ).paymentConfig.findFirst({
             where: { storeId: order.storeId, provider: 'cod', isEnabled: true },
           });
 

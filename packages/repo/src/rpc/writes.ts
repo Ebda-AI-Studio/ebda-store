@@ -28,6 +28,13 @@ export type WriteOp = (typeof WRITE_OPS)[number];
 
 /** Non-money catalogue, content and cart models whose writes the StoreDO accepts in D1 (and R2). Everything else is a money op. */
 export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
+  // a store's payment gateway configuration; `credentials` is ciphertext written by the route (Ruling NEON-ZERO-2)
+  'PaymentConfig',
+  // the store's VAT registration profile and its evidence rows (Ruling NEON-ZERO-2; status transitions stay in TaxProfileService)
+  'StoreTaxProfile',
+  // the VAT rates the order tax sums (ruling TAX-1); the admin CRUD writes the table checkout reads (Ruling NEON-ZERO-2)
+  'TaxRate',
+  'StoreTaxDocument',
   'Product',
   'ProductVariant',
   'ProductOption',
@@ -364,6 +371,68 @@ export interface DoMutation {
   /** Optional replay key (8-128 chars of [A-Za-z0-9._:-]). */
   key?: string;
   ops: DoQuery[];
+  /**
+   * The role of the authenticated caller, set by the API Worker from the verified access token (never from a request body).
+   * Only the tax-profile review guard reads it: the DO is reachable only through the API's service binding.
+   */
+  actorRole?: string;
+}
+
+/** The Postgres trigger `tax_profile_review_guard`, reproduced on the DO (Ruling NEON-ZERO-2). */
+const TAX_REVIEW_STATUSES = new Set(['verified', 'rejected', 'revoked']);
+const TAX_EDITABLE_STATUSES = new Set(['none', 'rejected', 'revoked']);
+type TaxRow = {
+  store_id: string;
+  status: string;
+  tax_registration_number: unknown;
+  legal_name: unknown;
+};
+const taxState = (sql: SqlRunner) => ({
+  profiles: new Map(
+    (
+      sql.all(
+        'SELECT store_id, status, tax_registration_number, legal_name FROM store_tax_profiles',
+        []
+      ) as TaxRow[]
+    ).map(r => [r.store_id, r])
+  ),
+  docs: (sql.all('SELECT id FROM store_tax_documents ORDER BY id', []) as Array<{ id: string }>)
+    .map(r => r.id)
+    .join(','),
+});
+/**
+ * Compares the state before and after a batch that touched the VAT profile. Runs inside the batch's transaction, so a refusal
+ * rolls everything back. By STATE DIFF, not by parsing the ops, so no nested write shape can step around it:
+ *  - a move INTO verified / rejected / revoked, or an edit of a verified identity (TRN, legal name): super_admin only;
+ *  - evidence documents added or removed while the profile is not editable (pending / verified): super_admin only.
+ */
+function assertTaxProfileGuard(
+  sql: SqlRunner,
+  before: ReturnType<typeof taxState>,
+  actorRole: string | undefined
+): void {
+  if (actorRole === 'super_admin') return;
+  const after = taxState(sql);
+  for (const [storeId, now] of after.profiles) {
+    const old = before.profiles.get(storeId);
+    const oldStatus = old?.status ?? 'none';
+    if (now.status !== oldStatus && TAX_REVIEW_STATUSES.has(now.status))
+      throw new Error(`tax profile: only a super_admin may set status ${now.status}`);
+    if (
+      old &&
+      old.status === 'verified' &&
+      now.status === 'verified' &&
+      (now.tax_registration_number !== old.tax_registration_number ||
+        now.legal_name !== old.legal_name)
+    )
+      throw new Error('tax profile: a verified identity is changed only by a super_admin');
+  }
+  if (after.docs !== before.docs)
+    for (const now of after.profiles.values())
+      if (!TAX_EDITABLE_STATUSES.has(now.status))
+        throw new Error(
+          'tax profile: evidence of a pending or verified profile is changed only by a super_admin'
+        );
 }
 
 const KEY_RE = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -404,6 +473,8 @@ export function checkMutation(m: DoMutation): DoQueryResult | undefined {
     return refuse('BAD_BATCH', 'ops must be 1..200');
   if (m.key !== undefined && (typeof m.key !== 'string' || !KEY_RE.test(m.key)))
     return refuse('BAD_IDEMPOTENCY_KEY', 'key');
+  if (m.actorRole !== undefined && (typeof m.actorRole !== 'string' || m.actorRole.length > 32))
+    return refuse('BAD_ACTOR', 'actorRole');
   for (const q of m.ops) {
     if (q?.model === PROC_MODEL) {
       if (!Object.prototype.hasOwnProperty.call(DO_PROCS, q.op as string))
@@ -471,6 +542,11 @@ export async function runWrites(
         if (prior) sql.run('DELETE FROM _idempotency WHERE k = ?', [m.key]);
       }
       const out: unknown[] = [];
+      const taxBefore = m.ops.some(
+        q => q.model === 'StoreTaxProfile' || q.model === 'StoreTaxDocument'
+      )
+        ? taxState(sql)
+        : null;
       for (const q of m.ops) {
         if (q.model === PROC_MODEL) {
           out.push(DO_PROCS[q.op as string](sql, (q.args ?? {}) as Record<string, unknown>));
@@ -482,6 +558,7 @@ export async function runWrites(
         >;
         out.push(await d[q.op](q.args));
       }
+      if (taxBefore) assertTaxProfileGuard(sql, taxBefore, m.actorRole);
       const json = encodeRpc(out);
       if (m.key) {
         sql.run('DELETE FROM _idempotency WHERE at < ?', [now() - KEY_TTL_MS]);

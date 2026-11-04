@@ -120,4 +120,18 @@ Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
   `ebda_is_super_admin()`. Cost if wrong: an identity outage denies admin routes (fail closed).
 - NZ-PR-4 - the tax review queue fans out over DO stores (500 max, 8 concurrent) as an interim until tax profiles move.
   Cost if wrong: queue is bounded and may omit stores beyond 500.
-- Residual (DO model gap, owners: tax-on-DO and payments-on-DO work): `GET /admin/tax-verification/:storeId` (+ document file) read `StoreTaxProfile`/`StoreTaxDocument`, and `/payment-settings/store/:storeId` GET/PUT/DELETE/toggle use `prisma.paymentConfig`, from Postgres. `PaymentConfig` is NOT made DO-writable here: 9 other direct readers (checkout, onboarding, COD, instapay) would split-brain.
+- NZ-PR-5 (Ruling NEON-ZERO-2) - `PaymentConfig`, `StoreTaxProfile` and `StoreTaxDocument` are per-store config and live in the
+  StoreDO (tables `payment_configs`, `store_tax_profiles`, `store_tax_documents` already exist in the DO schema and are copied
+  and verified by `migrate-store-to-do` / `verify-store`, which are manifest-driven: per-store freeze -> copy -> verify -> flip,
+  no new copy step). Every reader and writer goes through `storeDb` / `storeWriter` (checkout payment.routes + COD fee, MCP order
+  tool, InstaPay config, provider health/verification/activation, onboarding, payment-settings, tax-verification, order tax).
+  Credentials stay ciphertext written by the route (AES-GCM via `encryption.service`); the DO RPC never logs row data. Default
+  unset + create/update is one atomic `$transaction` batch. There is no Postgres fallback for a DO store. Store creation on the
+  Postgres path (provisioning.service, a store not yet flipped) still seeds its COD row in Postgres by design; a DO-created store
+  seeds it in the DO (`rpc/settings.ts`). BEFORE deploying this change, re-run `migrate-store-to-do` for any store ALREADY flipped
+  (it is idempotent per page): edits made to these three tables while the code still wrote Postgres are not in its DO.
+  Cost if wrong: a store flipped before the re-copy would show its checkout the older gateway settings until re-copied.
+- The review state machine for the tax profile (approve only from pending, revoke only from verified) stays in
+  `TaxProfileService.review`; the Postgres trigger `tax_profile_review_guard` has no DO twin, the route (`authorize('super_admin')`
+  - MFA) is the only caller. Cost if wrong: a future second caller of `review` would not be refused at the data layer.
+- Residual: none for these routes.

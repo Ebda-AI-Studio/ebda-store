@@ -17,6 +17,7 @@
  * a request transaction, and never delays the money path.
  * `isProviderVerified` is BOUNDED-stale (60 s in-process cache): bookkeeping and display only.
  */
+import { storeDb } from '../lib/repo-factory';
 import { prisma, withStore } from '@ebda/database';
 import {
   AUTO_VERIFY_AFTER_DEFAULT,
@@ -97,7 +98,9 @@ async function modeOf(
   try {
     const testMode = await withStore(storeId, async tx => {
       if (kind === 'payments') {
-        const r = await tx.paymentConfig.findFirst({
+        const r = await (
+          await storeDb(storeId)
+        ).paymentConfig.findFirst({
           where: { storeId, provider },
           select: { testMode: true },
         });
