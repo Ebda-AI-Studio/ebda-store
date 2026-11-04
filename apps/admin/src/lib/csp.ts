@@ -6,7 +6,7 @@ import { nonceScriptSrc } from '@ebda/shared';
  * It lives here, not in next.config.js, because a nonce differs on every request and
  * `headers()` is evaluated once at build time. `script-src` is nonce + 'strict-dynamic': Next
  * stamps the nonce on its own scripts when the request carries it, and anything those scripts
- * load (PostHog; the OneSignal SDK only on the opt-in routes below) is trusted through them. No 'unsafe-inline' for scripts.
+ * load (PostHog; the OneSignal SDK after the opt-in click) is trusted through them. No 'unsafe-inline' for scripts.
  *
  * The ad / pixel hosts (connect.facebook.net, www.facebook.com) are NOT here: the admin never
  * loads a marketing pixel (those run on storefronts).
@@ -17,17 +17,16 @@ export const BUILDER_PREVIEW_PATH = /^\/stores\/[^/]+\/builder$/;
 const PREVIEW_FRAME_SRC = 'https:';
 
 /**
- * The only routes that may load the OneSignal SDK: the explicit "enable order alerts on this device" buttons
- * (Settings -> Notifications, My devices). The SDK is lazy-loaded by that click and nowhere else; every other
- * admin route keeps a CSP with no onesignal host (audit G-1, 2026-11-03).
+ * OneSignal opt-in (audit G-1, 2026-11-03; widened after the pre-push review): the SDK is lazy-loaded ONLY by an explicit
+ * "enable order alerts" click, but that click lives on the dashboard card, Settings -> Notifications and My devices, and the
+ * admin is a single-page app: the CSP of the FIRST page loaded applies to every client-side navigation after it. A per-route
+ * allowance therefore blocks the SDK for anyone who landed elsewhere. `script-src` uses 'strict-dynamic', which makes script
+ * host lists moot, so only connect-src, frame-src and style-src gate the SDK and they carry the OneSignal hosts on every route.
+ * The script nonce model is unchanged: the SDK is still never loaded without the click (tests/unit/admin-no-onesignal.test.ts).
  */
-export const PUSH_OPT_IN_PATH = /^(\/account\/devices|\/stores\/[^/]+\/notifications)$/;
-const PUSH_SCRIPT_HOSTS = [
-  'https://cdn.onesignal.com',
-  'https://*.onesignal.com',
-  'https://onesignal.com',
-] as const;
 const PUSH_HTTP_HOSTS = 'https://onesignal.com https://*.onesignal.com';
+const PUSH_STYLE_HOSTS = 'https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com';
+const PUSH_CONNECT_HOSTS = `${PUSH_HTTP_HOSTS} wss://*.onesignal.com`;
 
 const SCRIPT_HOSTS = [
   'https://us-assets.i.posthog.com',
@@ -37,7 +36,7 @@ const SCRIPT_HOSTS = [
   'https://static.cloudflareinsights.com',
 ] as const;
 
-/** Not needed even by the opt-in push SDK on its two routes; see docs/architecture/admin-csp.md. */
+/** Not needed even by the opt-in push SDK; see docs/architecture/admin-csp.md. */
 export const ADMIN_NEEDS_UNSAFE_EVAL = false;
 
 export interface AdminCspInput {
@@ -60,27 +59,20 @@ export function buildAdminCsp({
 }: AdminCspInput): string {
   const api = `${apiOrigin} ${apiOrigin.replace(/^http/, 'ws')}`;
   const framesForRoute = BUILDER_PREVIEW_PATH.test(pathname) ? PREVIEW_FRAME_SRC : defaultFrameSrc;
-  const push = PUSH_OPT_IN_PATH.test(pathname);
-  const scriptHosts = push ? [...SCRIPT_HOSTS, ...PUSH_SCRIPT_HOSTS] : SCRIPT_HOSTS;
-  const pushStyle = push
-    ? ' https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com'
-    : '';
-  const pushConnect = push ? ` ${PUSH_HTTP_HOSTS} wss://*.onesignal.com` : '';
-  const pushFrame = push ? `${PUSH_HTTP_HOSTS} ` : '';
   return [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
     "form-action 'self'",
-    nonceScriptSrc(nonce, { hosts: scriptHosts, unsafeEval: ADMIN_NEEDS_UNSAFE_EVAL }),
+    nonceScriptSrc(nonce, { hosts: SCRIPT_HOSTS, unsafeEval: ADMIN_NEEDS_UNSAFE_EVAL }),
     // Inline event-handler attributes never run (React binds handlers in JS).
     "script-src-attr 'none'",
-    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com${pushStyle}`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com ${PUSH_STYLE_HOSTS}`,
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
-    `connect-src 'self' ${api} ${accounts} https://media.ebda.app${pushConnect} https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
-    `frame-src ${pushFrame}${framesForRoute}`,
+    `connect-src 'self' ${api} ${accounts} https://media.ebda.app ${PUSH_CONNECT_HOSTS} https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
+    `frame-src ${PUSH_HTTP_HOSTS} ${framesForRoute}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "frame-ancestors 'none'",

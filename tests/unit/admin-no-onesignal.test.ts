@@ -1,12 +1,12 @@
 /**
  * Audit G-1 (2026-11-03) + follow-up: the OneSignal push SDK must NOT load on admin page load (it injected an English
  * opt-in card over the editor and intercepted clicks on its tabs). Merchant order alerts stay available as an explicit
- * opt-in: only a click on the "enable order alerts" button lazy-loads the SDK, only on the two routes that carry it.
+ * opt-in: only a click on the "enable order alerts" button lazy-loads the SDK, (its network hosts are in the CSP on every admin route because the admin is a SPA).
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildAdminCsp, PUSH_OPT_IN_PATH } from '../../apps/admin/src/lib/csp';
+import { buildAdminCsp } from '../../apps/admin/src/lib/csp';
 
 const ADMIN = join(__dirname, '../../apps/admin');
 const OPT_IN_MODULE = 'lib/push-opt-in.ts';
@@ -30,6 +30,20 @@ describe('OneSignal loads only after the explicit opt-in click', () => {
     const body = readFileSync(join(src, OPT_IN_MODULE), 'utf8');
     expect(body).toMatch(/await import\('react-onesignal'\)/);
     expect(body).not.toMatch(/^import .* from 'react-onesignal'/m);
+  });
+
+  it('page load only resumes an ALREADY-granted subscription: silent, no prompt, no subscribe', () => {
+    const body = readFileSync(join(src, OPT_IN_MODULE), 'utf8');
+    const resume = body.slice(
+      body.indexOf('export async function resumeGrantedAlerts'),
+      body.indexOf('export async function enableOrderAlerts')
+    );
+    expect(resume).toMatch(/Notification\.permission !== 'granted'\) return/);
+    expect(resume).not.toMatch(/requestPermission|optIn|addTag/);
+    const listener = readFileSync(join(src, 'components/PushClickListener.tsx'), 'utf8');
+    expect(listener).toMatch(/resumeGrantedAlerts\(\)/);
+    expect(listener).not.toMatch(/enableOrderAlerts/);
+    expect(readFileSync(join(src, OPT_IN_MODULE), 'utf8')).toMatch(/addEventListener\('click'/);
   });
 
   it('no provider, layout or page-load module touches the opt-in or the SDK', () => {
@@ -71,7 +85,7 @@ describe('OneSignal loads only after the explicit opt-in click', () => {
   });
 });
 
-describe('CSP: onesignal hosts only on the opt-in routes', () => {
+describe('CSP: OneSignal connect/frame hosts on every admin route (SPA: the first page CSP applies)', () => {
   const csp = (pathname: string) =>
     buildAdminCsp({
       nonce: 'AAAAAAAAAAAAAAAAAAAAAA==',
@@ -79,19 +93,22 @@ describe('CSP: onesignal hosts only on the opt-in routes', () => {
       apiOrigin: 'https://api.ebda.app',
     });
 
-  it.each(['/', '/login', '/stores/a/products', '/stores/a/builder', '/stores/a/notifications/x'])(
-    '%s has no onesignal host',
-    p => {
-      expect(csp(p)).not.toMatch(/onesignal/i);
-    }
-  );
-
-  it.each(['/account/devices', '/stores/abc/notifications'])('%s allows the SDK hosts', p => {
-    expect(PUSH_OPT_IN_PATH.test(p)).toBe(true);
+  it.each([
+    '/',
+    '/login',
+    '/stores/abc',
+    '/stores/a/products',
+    '/stores/a/builder',
+    '/stores/abc/notifications',
+    '/account/devices',
+  ])('%s allows the SDK network hosts but keeps the nonce script model', p => {
     const c = csp(p);
-    expect(c).toMatch(/script-src[^;]*https:\/\/cdn\.onesignal\.com/);
     expect(c).toMatch(/connect-src[^;]*https:\/\/onesignal\.com/);
+    expect(c).toMatch(/connect-src[^;]*wss:\/\/\*\.onesignal\.com/);
     expect(c).toMatch(/frame-src https:\/\/onesignal\.com/);
+    expect(c).toMatch(/script-src[^;]*'nonce-/);
+    expect(c).toMatch(/script-src[^;]*'strict-dynamic'/);
+    expect(c).not.toMatch(/script-src[^;]*unsafe-inline/);
   });
 });
 

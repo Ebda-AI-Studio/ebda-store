@@ -107,6 +107,8 @@ Admin and Orders sign in from the browser against the shared identity service (`
 ## Admin push opt-in (2026-11-03, audit G-1 follow-up)
 
 The OneSignal SDK no longer loads on admin page load. It is lazy-loaded by one click ("enable order alerts on this device",
-`components/EnableOrderAlertsButton.tsx` -> `lib/push-opt-in.ts`), and the OneSignal hosts are in the admin CSP ONLY for
-`PUSH_OPT_IN_PATH` (`/account/devices`, `/stores/:id/notifications`). Every other route has no onesignal host. The service
+`components/EnableOrderAlertsButton.tsx` -> `lib/push-opt-in.ts`), and the OneSignal hosts are in the admin CSP on EVERY route
+(connect-src, frame-src, style-src; script hosts are moot under `'strict-dynamic'`). The admin is a SPA, so the CSP of the first page
+loaded governs every later client-side navigation: a per-route allowance (the earlier `PUSH_OPT_IN_PATH`) blocked opt-in from the
+dashboard card and from anyone who landed elsewhere. The script nonce model is unchanged. The service
 worker (`public/OneSignalSDKWorker.js`) stays, so existing subscriptions keep receiving pushes. Guard: `tests/unit/admin-no-onesignal.test.ts`.
