@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
-import { runInTenantContext } from '@ebda/database';
+
 import {
   createSupplier,
   updateSupplier,
@@ -12,6 +12,7 @@ import {
   getSupplier,
   softDeleteSupplier,
 } from '../services/accounting/supplier.service';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router();
 
@@ -57,7 +58,7 @@ router.get(
   async (req, res, next) => {
     try {
       const includeInactive = req.query.includeInactive === 'true';
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         listSuppliers(req.params.storeId, { includeInactive })
       );
       res.json({ data });
@@ -75,7 +76,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         getSupplier(req.params.storeId, req.params.id)
       );
       if (!data) {
@@ -112,7 +113,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         createSupplier({ storeId: req.params.storeId, ...body.data })
       );
       res.status(201).json({ data });
@@ -143,7 +144,7 @@ router.patch(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         updateSupplier(req.params.storeId, req.params.id, body.data)
       );
       res.json({ data });
@@ -162,7 +163,7 @@ router.delete(
   writeLimiter,
   async (req, res, next) => {
     try {
-      await runInTenantContext(req.params.storeId, () =>
+      await runInStoreCtx(req.params.storeId, () =>
         softDeleteSupplier(req.params.storeId, req.params.id)
       );
       res.status(204).end();

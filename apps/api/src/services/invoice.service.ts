@@ -222,8 +222,8 @@ async function loadInvoiceOrder(storeId: string, orderId: string) {
   });
   if (!order) return null;
   const [store, customers] = await Promise.all([
-    withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: INVOICE_STORE_SELECT })
+    storeDb(storeId).then(d =>
+      d.store.findUnique({ where: { id: storeId }, select: INVOICE_STORE_SELECT })
     ),
     customersById(storeId, [order.customerId]),
   ]);

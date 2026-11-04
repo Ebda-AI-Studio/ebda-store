@@ -5,8 +5,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findMany = vi.fn();
-vi.mock('@ebda/database', () => ({
-  prisma: { order: { findMany: (...a: unknown[]) => findMany(...a) } },
+let lastRows: Array<{ store?: unknown }> = [];
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => ({
+    order: {
+      findMany: async (...a: unknown[]) => {
+        lastRows = await findMany(...a);
+        return lastRows;
+      },
+    },
+    // `Store` is a platform row: read beside the order, here from the first row the mock returned
+    store: { findUnique: async () => lastRows[0]?.store ?? null },
+  }),
 }));
 
 const { PackingSlipService, PACKING_SLIP_MAX_ORDERS } =

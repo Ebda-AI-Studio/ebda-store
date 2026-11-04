@@ -8,7 +8,7 @@ import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../servic
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { prisma } from '@ebda/database';
+import { listAuditWithActors } from '../lib/audit-actors';
 import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
@@ -617,7 +617,11 @@ router.get(
       // Audit rows keyed by resourceId=returnId, scoped to the store (the tenant
       // guard refuses an OR over storeId; store-less legacy rows are not visible
       // to a store scope under strict RLS anyway).
-      const auditRows = await readAuditByResource(storeId, 'return', returnId);
+      const auditRows = await listAuditWithActors(
+        storeId,
+        { resourceType: 'return', resourceId: returnId },
+        200
+      );
 
       const timeline = auditRows.map(row => {
         const details = row.details as Record<string, unknown>;
