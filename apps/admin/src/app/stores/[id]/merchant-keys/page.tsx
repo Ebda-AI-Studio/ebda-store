@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Button, Modal, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
@@ -302,16 +301,9 @@ export default function MerchantKeysPage() {
       title={t('page.title')}
       subtitle={t('page.subtitle')}
       actions={
-        <div className="flex gap-2">
-          <Link href={`/stores/${storeId}/settings`}>
-            <Button type="button" variant="outline" size="sm">
-              {t('page.backToSettings')}
-            </Button>
-          </Link>
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            {t('actions.mint')}
-          </Button>
-        </div>
+        <Button type="button" className="min-h-11" onClick={() => setCreateOpen(true)}>
+          {t('actions.mint')}
+        </Button>
       }
     >
       <div className="space-y-4">

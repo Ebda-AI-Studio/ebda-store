@@ -80,7 +80,7 @@ export function TaxTimeZoneCard({ storeId }: { storeId: string }) {
           disabled={saving}
           onChange={e => void save(e.target.value)}
           dir="ltr"
-          className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+          className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm"
         >
           {options.map(z => (
             <option key={z} value={z}>

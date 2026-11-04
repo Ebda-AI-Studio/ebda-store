@@ -128,7 +128,10 @@
       "successMessage": "Search settings saved",
       "failedMessage": "Could not save the search settings",
       "connectionError": "Cannot reach the server right now. Try again.",
-      "socialSaveError": "The Wikipedia or Wikidata link is not valid"
+      "socialSaveError": "The Wikipedia or Wikidata link is not valid",
+      "redirectsDeleteObject": "This redirect",
+      "redirectsDeleteConsequence": "The old link stops sending visitors to the new one, and they will land on a page that does not exist.",
+      "redirectsDeleteLabel": "Delete the redirect"
     }
   },
   "content": {
@@ -192,6 +195,122 @@
       "offToast": "Browser notifications are off",
       "failedTitle": "Could not change browser notifications",
       "failedBody": "Try again in a moment."
+    }
+  },
+  "tax": {
+    "steps": {
+      "label": "Tax setup steps",
+      "register": "Register the tax number",
+      "eta": "Connect e-invoicing",
+      "rates": "Set the rates",
+      "done": "done"
+    },
+    "page": {
+      "timeZoneMoved": "The time zone now sits with the language settings.",
+      "timeZoneLink": "Open language and time zone",
+      "rateSaveFailed": "Could not save the rate",
+      "rateToggleFailed": "Could not change the rate status",
+      "rateDeleteFailed": "Could not delete the rate",
+      "rateDeleteObject": "The tax rate \"{name}\"",
+      "rateDeleteConsequence": "The rate is removed from the store and will not apply to any new order.",
+      "rateDeleteLabel": "Delete the rate"
+    }
+  },
+  "taxVerification": {
+    "documents": {
+      "deleteObject": "The document \"{name}\"",
+      "deleteConsequence": "The document is deleted for good from your tax file.",
+      "deleteLabel": "Delete the document"
+    }
+  },
+  "language": {
+    "page": {
+      "title": "Language and time zone",
+      "subtitle": "The language customers see first, and the store time zone",
+      "save": "Save language",
+      "successMessage": "Store language saved",
+      "failedMessage": "Could not save the language",
+      "connectionError": "Cannot reach the server right now. Try again."
+    }
+  },
+  "domain": {
+    "page": {
+      "dnsPointingTitle": "The domain does not point to your store yet",
+      "dnsPointingMessage": "We confirmed the domain is yours, but its DNS records still point somewhere else. Anyone opening your domain now will not reach your store. Change the records below at your domain provider.",
+      "dnsWaitingTitle": "Waiting for DNS to update",
+      "dnsWaitingMessage": "Add the records below at your domain provider. The update can take up to 48 hours and we check automatically.",
+      "dnsEmailTitle": "Email records are still missing",
+      "dnsInstructions": "Add these DNS records at your domain provider:",
+      "copyAll": "Copy all records",
+      "copiedAll": "Records copied",
+      "emailInstructions": "Email these instructions to whoever manages the domain",
+      "emailSubject": "DNS records to connect the store domain",
+      "emailBody": "Please add these DNS records at the domain provider (type, name, value):",
+      "dnsPropagation": "DNS changes can take up to 48 hours.",
+      "removeObject": "The domain {domain}",
+      "removeConsequence": "The store goes back to its default link and this link will no longer open your store.",
+      "removeLabel": "Remove the domain"
+    }
+  },
+  "codes": {
+    "crossLink": {
+      "labels": {
+        "text": "Product labels are used while you count stock.",
+        "link": "Open stock"
+      },
+      "receipt": {
+        "text": "The receipt barcode shows on the orders you print.",
+        "link": "Open orders"
+      }
+    }
+  },
+  "pwa": {
+    "page": {
+      "title": "App on the customer's phone",
+      "subtitle": "Customers install your store on their phone screen like any app",
+      "advanced": "Advanced: the app file (manifest)",
+      "advancedHint": "This is what the browser reads to install the app. You rarely need to change anything here."
+    },
+    "actions": {
+      "switchTitle": "Turn the app on for your customers",
+      "enabled": "On",
+      "disabled": "Off",
+      "save": "Save the app"
+    }
+  },
+  "announcement": {
+    "page": {
+      "title": "Announcement bar",
+      "subtitle": "A short line above the whole store, like an offer or free shipping",
+      "saveChanges": "Save the announcement",
+      "successMessage": "Announcement saved",
+      "failedMessage": "Could not save the announcement",
+      "connectionError": "Cannot reach the server right now. Try again.",
+      "textEnglishPlaceholder": "Free shipping on orders over 500 EGP!",
+      "textArabicPlaceholder": "شحن ببلاش للطلبات فوق 500 جنيه!",
+      "linkTextEnglishPlaceholder": "Shop now",
+      "linkTextArabicPlaceholder": "اشتري دلوقتي"
+    }
+  },
+  "floatingWidget": {
+    "pageTitle": "Floating WhatsApp button",
+    "premiumSubtitle": "Extra feature",
+    "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
+    "saveChanges": "Save the buttons",
+    "savedToast": "Buttons saved",
+    "tooltipEnPlaceholder": "Text in English",
+    "tooltipArPlaceholder": "Text in Arabic"
+  },
+  "sizeCharts": {
+    "page": {
+      "deleteObject": "The size chart \"{name}\"",
+      "deleteConsequence": "Products and categories linked to it will show without a size chart.",
+      "deleteLabel": "Delete the chart"
+    },
+    "editor": {
+      "templateReplaceObject": "The ready-made template",
+      "templateReplace": "The template replaces the chart you are writing now.",
+      "templateReplaceLabel": "Replace with the template"
     }
   }
 }

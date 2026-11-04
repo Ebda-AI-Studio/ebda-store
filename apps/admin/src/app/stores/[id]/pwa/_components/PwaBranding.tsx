@@ -31,7 +31,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             value={settings.appName}
             onChange={e => onChange({ ...settings, appName: e.target.value })}
             placeholder={t('appNamePlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             disabled={!pwaEnabled}
           />
         </div>
@@ -44,7 +44,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             value={settings.appNameAr || ''}
             onChange={e => onChange({ ...settings, appNameAr: e.target.value })}
             placeholder={t('appNameArPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             lang="ar"
             dir="rtl"
             disabled={!pwaEnabled}
@@ -63,7 +63,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             value={settings.shortName}
             onChange={e => onChange({ ...settings, shortName: e.target.value })}
             placeholder={t('shortNamePlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             disabled={!pwaEnabled}
           />
           <p className="text-xs text-muted-foreground mt-1">{t('shortNameHelp')}</p>
@@ -78,7 +78,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             value={settings.shortNameAr || ''}
             onChange={e => onChange({ ...settings, shortNameAr: e.target.value })}
             placeholder={t('shortNameArPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             lang="ar"
             dir="rtl"
             disabled={!pwaEnabled}
@@ -92,7 +92,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             value={settings.description}
             onChange={e => onChange({ ...settings, description: e.target.value })}
             placeholder={t('descriptionPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             rows={2}
             disabled={!pwaEnabled}
           />
@@ -105,7 +105,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             value={settings.descriptionAr || ''}
             onChange={e => onChange({ ...settings, descriptionAr: e.target.value })}
             placeholder={t('descriptionArPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             rows={2}
             lang="ar"
             dir="rtl"

@@ -161,7 +161,7 @@ function FeeInputs({
           value={feeMajor}
           onChange={e => onFeeChange(e.target.value)}
           aria-label={feeLabel}
-          className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+          className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
         />
         <span className="text-xs text-muted-foreground">{currencyLabel}</span>
       </div>
@@ -177,7 +177,7 @@ function FeeInputs({
           value={thresholdMajor}
           onChange={e => onThresholdChange(e.target.value)}
           aria-label={freeOverLabel}
-          className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+          className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
         />
         <span className="text-xs text-muted-foreground">{currencyLabel}</span>
       </div>
@@ -963,7 +963,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   value={globalBulkFeeMajor}
                   onChange={e => setGlobalBulkFeeMajor(e.target.value)}
                   aria-label={t('applyAllGlobalFee')}
-                  className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                  className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
                 />
                 <span className="text-xs text-muted-foreground">{t('currency')}</span>
               </div>
@@ -984,7 +984,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   value={globalBulkThresholdMajor}
                   onChange={e => setGlobalBulkThresholdMajor(e.target.value)}
                   aria-label={t('applyAllGlobalThreshold')}
-                  className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                  className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
                 />
                 <span className="text-xs text-muted-foreground">{t('currency')}</span>
               </div>
@@ -1065,7 +1065,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                         setBulkFeeMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('applyAll')}
-                      className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
                     <button
@@ -1089,7 +1089,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                         setBulkThresholdMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('freeOver')}
-                      className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
                     <button
@@ -1242,7 +1242,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 [addKey]: { ...addForm, area: e.target.value },
                               }))
                             }
-                            className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -1258,7 +1258,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 [addKey]: { ...addForm, areaAr: e.target.value },
                               }))
                             }
-                            className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                            className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -1457,7 +1457,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                     [govAddKey]: { ...govAddForm, area: e.target.value },
                                   }))
                                 }
-                                className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1473,7 +1473,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                     [govAddKey]: { ...govAddForm, areaAr: e.target.value },
                                   }))
                                 }
-                                className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                                className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1568,7 +1568,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   placeholder={t('countryEnSample')}
                   value={addLocForm.country}
                   onChange={e => setAddLocForm(prev => ({ ...prev, country: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Country AR */}
@@ -1580,7 +1580,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   dir="rtl"
                   value={addLocForm.countryAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, countryAr: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                 />
               </div>
               {/* Governorate EN */}
@@ -1593,7 +1593,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   placeholder={t('cityEnSample')}
                   value={addLocForm.governorate}
                   onChange={e => setAddLocForm(prev => ({ ...prev, governorate: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Governorate AR */}
@@ -1607,7 +1607,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   onChange={e =>
                     setAddLocForm(prev => ({ ...prev, governorateAr: e.target.value }))
                   }
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                 />
               </div>
               {/* Area EN */}
@@ -1618,7 +1618,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   placeholder={t('districtEnSample')}
                   value={addLocForm.area}
                   onChange={e => setAddLocForm(prev => ({ ...prev, area: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Area AR */}
@@ -1630,7 +1630,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   dir="rtl"
                   value={addLocForm.areaAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, areaAr: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                 />
               </div>
               {/* Fee */}
@@ -1644,7 +1644,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                     placeholder="0.00"
                     value={addLocForm.feeMajor}
                     onChange={e => setAddLocForm(prev => ({ ...prev, feeMajor: e.target.value }))}
-                    className="w-28 px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                    className="w-28 px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
                   />
                   <span className="text-xs text-muted-foreground">{t('currency')}</span>
                 </div>

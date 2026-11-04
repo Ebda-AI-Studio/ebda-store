@@ -214,7 +214,7 @@ export default function CodReconciliationPage() {
                 <select
                   value={importCarrier}
                   onChange={e => setImportCarrier(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+                  className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm"
                 >
                   {CARRIERS.map(c => (
                     <option key={c} value={c}>
@@ -239,7 +239,7 @@ export default function CodReconciliationPage() {
               rows={4}
               placeholder={t('pastePlaceholder')}
               aria-label={t('paste')}
-              className="mt-3 w-full px-3 py-2 border border-border rounded-lg text-xs font-mono"
+              className="mt-3 w-full px-3 py-2 border border-input rounded-lg text-xs font-mono"
             />
             <button
               type="button"
@@ -280,7 +280,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterStatus')}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg"
+                className="px-3 py-1.5 text-sm border border-input rounded-lg"
               >
                 <option value="">{t('allStatuses')}</option>
                 <option value="flagged">{t('statuses.flagged')}</option>
@@ -299,7 +299,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterCarrier')}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg"
+                className="px-3 py-1.5 text-sm border border-input rounded-lg"
               >
                 <option value="">{t('allCarriers')}</option>
                 {CARRIERS.map(c => (

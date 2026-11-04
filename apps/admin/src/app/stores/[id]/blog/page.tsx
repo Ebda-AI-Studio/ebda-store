@@ -50,7 +50,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   // Debounced search term — client-side filter over post title (EN or AR).
   const [search, setSearch] = useState('');
   const t = useT('blog.page');
-  const confirm = useConfirm();
+  const askConfirm = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const [togglingBlog, setTogglingBlog] = useState(false);
 
@@ -95,7 +95,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   }, [posts]);
 
   async function handleDelete(post: BlogPost) {
-    const ok = await confirm({
+    const ok = await askConfirm({
       object: t('postDeleteObject', { title: post.title }),
       consequence: t('postDeleteConsequence'),
       confirmLabel: t('postDeleteLabel'),
@@ -142,7 +142,10 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
     >
       <div className="space-y-6">
         {store && store.blogEnabled === false && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
+          <div
+            data-setting-id="branding.blog"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm"
+          >
             <div className="min-w-0">
               <p className="font-semibold text-warning-ink">{t('disabledTitle')}</p>
               <p className="mt-1 text-muted-foreground">{t('disabledBody')}</p>

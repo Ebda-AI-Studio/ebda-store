@@ -9,11 +9,7 @@ import { apiGet, apiPost, apiPut, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { StickySaveBar } from '../../../../components/StickySaveBar';
-import {
-  arabicInEnglishFields,
-  normalizeLanguagePair,
-  type EnglishSeoField,
-} from './language-guard';
+import { arabicInEnglishFields, normalizeLanguagePair } from './language-guard';
 
 interface SeoSettings {
   metaTitle: string;
@@ -347,7 +343,7 @@ export default function StoreSeoPage() {
             placeholder={t('metaTitlePlaceholder')}
             maxLength={TITLE_MAX + 20}
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-              settings.metaTitle.length > TITLE_MAX ? 'border-destructive/40' : 'border-border'
+              settings.metaTitle.length > TITLE_MAX ? 'border-destructive/40' : 'border-input'
             }`}
           />
           <p className="mt-1 text-xs text-muted-foreground">
@@ -367,7 +363,7 @@ export default function StoreSeoPage() {
             rows={3}
             maxLength={DESC_MAX + 50}
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
-              settings.metaDescription.length > DESC_MAX ? 'border-destructive/40' : 'border-border'
+              settings.metaDescription.length > DESC_MAX ? 'border-destructive/40' : 'border-input'
             }`}
           />
           <p className="mt-1 text-xs text-muted-foreground">
@@ -402,7 +398,7 @@ export default function StoreSeoPage() {
             placeholder={t('metaTitleArPlaceholder')}
             maxLength={TITLE_MAX + 20}
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-              settings.metaTitleAr.length > TITLE_MAX ? 'border-destructive/40' : 'border-border'
+              settings.metaTitleAr.length > TITLE_MAX ? 'border-destructive/40' : 'border-input'
             }`}
           />
         </div>
@@ -423,7 +419,7 @@ export default function StoreSeoPage() {
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
               settings.metaDescriptionAr.length > DESC_MAX
                 ? 'border-destructive/40'
-                : 'border-border'
+                : 'border-input'
             }`}
           />
         </div>
@@ -536,7 +532,7 @@ export default function StoreSeoPage() {
                   className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
                     settings.metaDescriptionAeo.length > DESC_MAX
                       ? 'border-destructive/40'
-                      : 'border-border'
+                      : 'border-input'
                   }`}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">{t('aeoHintText')}</p>
@@ -602,7 +598,7 @@ export default function StoreSeoPage() {
                         }))
                       }
                       placeholder={t('twitterPlaceholder')}
-                      className="flex-1 rounded-e-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="flex-1 rounded-e-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -621,7 +617,7 @@ export default function StoreSeoPage() {
                       }))
                     }
                     placeholder={t('googleSiteVerificationPlaceholder')}
-                    className="w-full rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-input px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">
                     {t('googleSiteVerificationHint')}
@@ -707,7 +703,7 @@ export default function StoreSeoPage() {
                       className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
                         socialLinks[key] && !isValidUrl(socialLinks[key])
                           ? 'border-destructive/40'
-                          : 'border-border'
+                          : 'border-input'
                       }`}
                     />
                     <p className="mt-1 text-xs text-muted-foreground">{t(hintKey)}</p>

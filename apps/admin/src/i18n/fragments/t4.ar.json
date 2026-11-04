@@ -128,7 +128,10 @@
       "successMessage": "اتحفظت إعدادات البحث",
       "failedMessage": "مقدرناش نحفظ إعدادات البحث",
       "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
-      "socialSaveError": "رابط ويكيبيديا أو ويكي داتا مش صحيح"
+      "socialSaveError": "رابط ويكيبيديا أو ويكي داتا مش صحيح",
+      "redirectsDeleteObject": "التحويل ده",
+      "redirectsDeleteConsequence": "الرابط القديم هيبطل يوديك للرابط الجديد، واللي بيفتحه هيلاقي صفحة مش موجودة.",
+      "redirectsDeleteLabel": "امسح التحويل"
     }
   },
   "content": {
@@ -192,6 +195,122 @@
       "offToast": "إشعارات المتصفح اتقفلت",
       "failedTitle": "مقدرناش نغيّر إشعارات المتصفح",
       "failedBody": "جرّب تاني بعد شوية."
+    }
+  },
+  "tax": {
+    "steps": {
+      "label": "خطوات إعداد الضريبة",
+      "register": "سجّل الرقم الضريبي",
+      "eta": "اربط الفاتورة الإلكترونية",
+      "rates": "حدد النسب",
+      "done": "خلصت"
+    },
+    "page": {
+      "timeZoneMoved": "المنطقة الزمنية بقت مع إعدادات اللغة.",
+      "timeZoneLink": "افتح اللغة والمنطقة الزمنية",
+      "rateSaveFailed": "مقدرناش نحفظ النسبة",
+      "rateToggleFailed": "مقدرناش نغيّر حالة النسبة",
+      "rateDeleteFailed": "مقدرناش نمسح النسبة",
+      "rateDeleteObject": "نسبة الضريبة «{name}»",
+      "rateDeleteConsequence": "النسبة هتتشال من المتجر ومش هتتطبق على أي طلب جديد.",
+      "rateDeleteLabel": "امسح النسبة"
+    }
+  },
+  "taxVerification": {
+    "documents": {
+      "deleteObject": "المستند «{name}»",
+      "deleteConsequence": "المستند هيتمسح نهائيًا من ملف الضريبة بتاعك.",
+      "deleteLabel": "امسح المستند"
+    }
+  },
+  "language": {
+    "page": {
+      "title": "اللغة والمنطقة الزمنية",
+      "subtitle": "لغة المتجر اللي بتظهر للعميل أول ما يفتحه، والمنطقة الزمنية بتاعته",
+      "save": "احفظ اللغة",
+      "successMessage": "اتحفظت لغة المتجر",
+      "failedMessage": "مقدرناش نحفظ اللغة",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني."
+    }
+  },
+  "domain": {
+    "page": {
+      "dnsPointingTitle": "الدومين لسه مش موجّه لمتجرك",
+      "dnsPointingMessage": "اتأكدنا إن الدومين بتاعك، بس سجلات الـ DNS لسه بتوديه لمكان تاني. اللي يفتح دومينك دلوقتي مش هيوصل لمتجرك. غيّر السجلات اللي تحت عند مزوّد الدومين.",
+      "dnsWaitingTitle": "مستنيين الـ DNS يتحدّث",
+      "dnsWaitingMessage": "ضيف السجلات اللي تحت عند مزوّد الدومين. التحديث ممكن ياخد لحد 48 ساعة، وإحنا هنتأكد تلقائيًا.",
+      "dnsEmailTitle": "فاضل سجلات الإيميل",
+      "dnsInstructions": "ضيف سجلات الـ DNS دي عند مزوّد الدومين:",
+      "copyAll": "انسخ كل السجلات",
+      "copiedAll": "اتنسخت السجلات",
+      "emailInstructions": "ابعت التعليمات بالإيميل لمين بيدير الدومين",
+      "emailSubject": "سجلات DNS لربط دومين المتجر",
+      "emailBody": "محتاج تضيف سجلات الـ DNS دي عند مزوّد الدومين (النوع، الاسم، القيمة):",
+      "dnsPropagation": "تغييرات الـ DNS ممكن تاخد لحد 48 ساعة.",
+      "removeObject": "الدومين {domain}",
+      "removeConsequence": "المتجر هيرجع للرابط الأساسي بتاعه، والرابط ده مش هيفتح متجرك تاني.",
+      "removeLabel": "شيل الدومين"
+    }
+  },
+  "codes": {
+    "crossLink": {
+      "labels": {
+        "text": "استيكرات المنتجات بتستخدمها وانت بتجرد المخزون.",
+        "link": "افتح المخزون"
+      },
+      "receipt": {
+        "text": "باركود الإيصال بيظهر على الأوردرات اللي بتطبعها.",
+        "link": "افتح الطلبات"
+      }
+    }
+  },
+  "pwa": {
+    "page": {
+      "title": "تطبيق على موبايل العميل",
+      "subtitle": "العميل يثبّت متجرك على شاشة موبايله زي أي تطبيق",
+      "advanced": "متقدم: ملف التطبيق (manifest)",
+      "advancedHint": "ده اللي المتصفح بيقراه علشان يثبّت التطبيق. غالبًا مش هتحتاج تغيّر فيه حاجة."
+    },
+    "actions": {
+      "switchTitle": "شغّل التطبيق لعملاءك",
+      "enabled": "شغّال",
+      "disabled": "مقفول",
+      "save": "احفظ التطبيق"
+    }
+  },
+  "announcement": {
+    "page": {
+      "title": "شريط الإعلان",
+      "subtitle": "جملة قصيرة فوق المتجر كله، زي عرض أو شحن ببلاش",
+      "saveChanges": "احفظ الإعلان",
+      "successMessage": "اتحفظ الإعلان",
+      "failedMessage": "مقدرناش نحفظ الإعلان",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
+      "textEnglishPlaceholder": "Free shipping on orders over 500 EGP!",
+      "textArabicPlaceholder": "شحن ببلاش للطلبات فوق 500 جنيه!",
+      "linkTextEnglishPlaceholder": "Shop now",
+      "linkTextArabicPlaceholder": "اشتري دلوقتي"
+    }
+  },
+  "floatingWidget": {
+    "pageTitle": "زرار الواتساب العايم",
+    "premiumSubtitle": "ميزة إضافية",
+    "mainSubtitle": "أزرار ثابتة بيشوفها عميلك في كل صفحة، زي الواتساب والاتصال",
+    "saveChanges": "احفظ الأزرار",
+    "savedToast": "اتحفظت الأزرار",
+    "tooltipEnPlaceholder": "النص بالإنجليزي",
+    "tooltipArPlaceholder": "النص بالعربي"
+  },
+  "sizeCharts": {
+    "page": {
+      "deleteObject": "جدول المقاسات «{name}»",
+      "deleteConsequence": "المنتجات والأقسام المربوطة بيه هتظهر من غير جدول مقاسات.",
+      "deleteLabel": "امسح الجدول"
+    },
+    "editor": {
+      "templateReplaceObject": "القالب الجاهز",
+      "templateReplace": "القالب هيستبدل الجدول اللي بتكتبه دلوقتي.",
+      "templateReplaceLabel": "استبدل بالقالب"
     }
   }
 }

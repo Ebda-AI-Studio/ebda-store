@@ -199,7 +199,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             placeholder={t('placeholders.titleEn')}
             maxLength={200}
             disabled={sending}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>
         <div>
@@ -214,7 +214,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             maxLength={200}
             disabled={sending}
             dir="rtl"
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>
         <div>
@@ -228,7 +228,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             maxLength={2000}
             rows={3}
             disabled={sending}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>
         <div>
@@ -243,7 +243,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             rows={3}
             disabled={sending}
             dir="rtl"
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>
         <div className="md:col-span-2">
@@ -257,7 +257,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             placeholder={t('placeholders.url')}
             maxLength={2000}
             disabled={sending}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('urlHelp')}</p>
         </div>

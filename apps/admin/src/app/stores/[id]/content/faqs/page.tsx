@@ -310,7 +310,7 @@ export default function StoreFaqsPage() {
                         type="text"
                         value={faqDraft.question}
                         onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
-                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                     <div>
@@ -325,7 +325,7 @@ export default function StoreFaqsPage() {
                         onChange={e =>
                           setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))
                         }
-                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                   </div>
@@ -338,7 +338,7 @@ export default function StoreFaqsPage() {
                         rows={3}
                         value={faqDraft.answer}
                         onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
-                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                       />
                     </div>
                     <div>
@@ -353,7 +353,7 @@ export default function StoreFaqsPage() {
                         onChange={e =>
                           setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))
                         }
-                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                       />
                     </div>
                   </div>
@@ -460,7 +460,7 @@ export default function StoreFaqsPage() {
                     type="text"
                     value={faqDraft.question}
                     onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     autoFocus
                   />
                 </div>
@@ -474,7 +474,7 @@ export default function StoreFaqsPage() {
                     dir="rtl"
                     value={faqDraft.questionAr ?? ''}
                     onChange={e => setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))}
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -487,7 +487,7 @@ export default function StoreFaqsPage() {
                     rows={3}
                     value={faqDraft.answer}
                     onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                   />
                 </div>
                 <div>
@@ -500,7 +500,7 @@ export default function StoreFaqsPage() {
                     dir="rtl"
                     value={faqDraft.answerAr ?? ''}
                     onChange={e => setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))}
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                   />
                 </div>
               </div>
@@ -679,7 +679,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             value={draft.title}
             autoFocus={autoFocus}
             onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
@@ -692,7 +692,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             dir="rtl"
             value={draft.titleAr ?? ''}
             onChange={e => setDraft(d => ({ ...d, titleAr: e.target.value || null }))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       </div>
@@ -705,7 +705,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             rows={2}
             value={draft.description}
             onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
           />
         </div>
         <div>
@@ -718,7 +718,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             dir="rtl"
             value={draft.descriptionAr ?? ''}
             onChange={e => setDraft(d => ({ ...d, descriptionAr: e.target.value || null }))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
           />
         </div>
       </div>
@@ -748,7 +748,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           return (
             <div key={i} className="mb-2 rounded-lg border border-border p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary-ink">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary-ink">
                   {i + 1}
                 </span>
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -763,7 +763,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         return { ...d, steps };
                       })
                     }
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="rounded-lg border border-input px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <input
                     type="text"
@@ -810,7 +810,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                       return { ...d, steps };
                     })
                   }
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  className="rounded-lg border border-input px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                 />
                 <textarea
                   rows={2}
