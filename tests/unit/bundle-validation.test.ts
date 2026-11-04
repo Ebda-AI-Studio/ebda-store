@@ -62,6 +62,8 @@ const { mockPrisma, mockIsFeatureEnabled } = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  // an anonymous admin-namespace GET takes the per-query store scope (LAZY-TX-3)
+  runInStoreScope: (_storeId: string, fn: () => unknown) => fn(),
 }));
 
 vi.mock('@api/middleware/auth', () => ({

@@ -5,6 +5,10 @@ import { backendFor } from '../lib/store-backend';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';
 import { skipsRequestTransaction } from './public-read-limit';
+import { authenticateAccounts, liveIdentityMemo } from './auth';
+import { isAccountsToken } from '../lib/accounts-token';
+import { needsLiveIdentity } from '../lib/auth-sensitivity';
+import { recordTiming } from '../lib/request-timing';
 
 /**
  * Tenant Context Middleware
@@ -115,19 +119,103 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
     next();
     return;
   }
+
+  // BE:E-1 (Ruling LAZY-TX-3): an admin-namespace request with NO credential never leases a pooled client. Express runs this param callback BEFORE the
+  // route's own `authenticate`, so an anonymous GET/HEAD used to BEGIN a 30 s interactive transaction just to be answered 401.
+  // It now takes the per-query store scope (no connection held); the handler's own queries each open a short tenant
+  // transaction exactly like `runInStoreScope` callers. Writes keep the transaction (atomicity), and so does every request that
+  // carries any credential.
+  if (isAnonymousSafeRead(req)) {
+    storeScopeContext(req, res, next);
+    return;
+  }
+
   (res as unknown as Record<symbol, TenantScope>)[REQUEST_TENANT_SCOPE] = { storeId, userId };
 
-  // NEON-ZERO-1 (Ruling NZ-TX-1): a store whose backend is `do` has its data in its Durable Object and its platform reads in D1,
-  // so the request opens NO Postgres transaction (BEGIN + set_config was a 500 on every admin route with Postgres dead). The
-  // flag is the D1 directory column (`backendFor`, the one source); an unreadable flag is a 503, never a Postgres fallback.
+  // BE:E-1: the identity round trips of `authenticate` must NOT happen while a pooled client is leased. Do the live check
+  // FIRST (it fills the 30 s single-flight cache, lib/identity-live-cache.ts), so `authenticate` inside the transaction is a
+  // cache hit. A failure is ignored here on purpose: `authenticate` owns the 401/403/503 and public routes keep their guest path.
+  const credential = bearerToken(req);
+  if (credential && isAccountsToken(credential)) {
+    preAuthenticate(req, credential)
+      .then(() => {
+        // The client may have gone while the identity check ran: a transaction opened now would never see `close`.
+        if (res.destroyed || res.writableEnded) return;
+        openForBackend(req, res, next, storeId, userId);
+      })
+      .catch(next);
+    return;
+  }
+  openForBackend(req, res, next, storeId, userId);
+}
+
+function bearerToken(req: Request): string | undefined {
+  const h = req.headers.authorization;
+  return h && h.startsWith('Bearer ') ? h.split(' ')[1] : undefined;
+}
+
+/**
+ * The ADMIN namespace: `/stores/<uuid>/...` (every router that registers `router.param('storeId', tenantContext)`). The public
+ * storefront reaches this middleware through `publicStoreContext` under `/public/...`, which is the hot anonymous path and keeps
+ * its one-transaction read (Ruling LAZY-TX-1/2), so it is NOT matched here.
+ */
+const ADMIN_STORE_PATH_RE = /^(?:\/api\/v1)?\/stores\/[0-9a-f-]{36}(?:[/?]|$)/i;
+
+/** An admin-namespace GET/HEAD with no Authorization header and no cookie: nothing downstream can authenticate it. */
+function isAnonymousSafeRead(req: Request): boolean {
+  const m = req.method.toUpperCase();
+  return (
+    (m === 'GET' || m === 'HEAD') &&
+    !req.user && // an upstream authenticate already ran: not anonymous
+    !req.headers.authorization &&
+    !req.headers.cookie &&
+    ADMIN_STORE_PATH_RE.test(req.originalUrl ?? req.url ?? '')
+  );
+}
+
+async function preAuthenticate(req: Request, token: string): Promise<void> {
+  const timing: { identityMs?: number } = {};
+  const start = performance.now();
+  try {
+    await authenticateAccounts(token, {
+      live: needsLiveIdentity(req),
+      timing,
+      memo: liveIdentityMemo(req),
+    });
+    recordTiming(req, 'auth', performance.now() - start);
+    if (timing.identityMs !== undefined) recordTiming(req, 'identity', timing.identityMs);
+  } catch {
+    /* authenticate (the route's own) reports it */
+  }
+}
+
+/**
+ * NEON-ZERO-1 (Ruling NZ-TX-1): a store whose backend is `do` has its data in its Durable Object and its platform reads in D1, so
+ * the request opens NO Postgres transaction (BEGIN + set_config was a 500 on every admin route with Postgres dead). The flag is
+ * the D1 directory column (`backendFor`, the one source); an unreadable flag is a 503, never a Postgres fallback. A `pg` store
+ * keeps the request transaction of before.
+ */
+function openForBackend(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  storeId: string,
+  userId: string | undefined
+): void {
   backendFor(storeId).then(backend => {
+    // The client may have gone while the flag was read: a transaction opened now would never see `close`.
     if (res.destroyed || res.writableEnded) return;
     if (backend === 'do') openDoRequest(res, next, storeId, userId);
-    else openTransaction(res, next, storeId, userId);
+    else openTransaction(req, res, next, storeId, userId);
   }, next);
 }
 
-/** The same lifecycle as `openTransaction` (response gate, then the deferred drain) with NO Postgres transaction. */
+/**
+ * The same lifecycle as `openTransaction` (response gate, then the deferred drain) with NO Postgres transaction. The scope
+ * carries the user, so a `withStore`/`prisma` call a handler still makes on the user-keyed tables (`users`, `addresses`) sees
+ * `app.current_user_id` exactly as under the request transaction. Residual (Ruling NZ-TX-1): a leftover Postgres WRITE on a DO
+ * request autocommits per query instead of rolling back with the request.
+ */
 function openDoRequest(
   res: Response,
   next: NextFunction,
@@ -140,7 +228,7 @@ function openDoRequest(
     (body, releaseResponse) =>
       withDeferredWork(
         { storeId, userId, noPgTx: true },
-        () => runInStoreScope(storeId, body),
+        () => runInStoreScope(storeId, body, userId),
         releaseResponse
       ),
     { storeId, middleware: 'tenantContext', backend: 'do' }
@@ -148,11 +236,13 @@ function openDoRequest(
 }
 
 function openTransaction(
+  req: Request,
   res: Response,
   next: NextFunction,
   storeId: string,
   userId: string | undefined
 ): void {
+  const queuedAt = performance.now();
   runRequestInTransaction(
     res,
     next,
@@ -173,7 +263,16 @@ function openTransaction(
     (body, releaseResponse) =>
       withDeferredWork(
         { storeId, userId },
-        () => runInTenantContext(storeId, body, userId),
+        () =>
+          runInTenantContext(
+            storeId,
+            () => {
+              // BEGIN done: the time since the request reached this middleware is client lease + BEGIN + SET LOCAL.
+              recordTiming(req, 'db-wait', performance.now() - queuedAt);
+              return body();
+            },
+            userId
+          ),
         releaseResponse
       ),
     { storeId, middleware: 'tenantContext' }

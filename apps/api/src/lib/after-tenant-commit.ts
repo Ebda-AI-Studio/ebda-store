@@ -406,21 +406,15 @@ async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<v
  * rejects.
  */
 async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext): Promise<void> {
-  if (ctx.noPgTx && ctx.storeId) {
-    try {
-      await runInStoreScope(ctx.storeId, () => task.run().then(() => undefined));
-    } catch (err) {
-      try {
-        reportDeferredFailure(task.name, err, ctx);
-      } catch {
-        // A broken logger/alerter must not strand the rest of the queue.
-      }
-    }
-    return;
-  }
   const held = await acquireDeferredTxSlot(task.connections);
   try {
-    await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    // A DO-store request (NZ-TX-1) has no Postgres transaction to join: the task runs under the lazy per-query scope, carrying
+    // the same user. It still takes one slot, so a burst of DO-store requests cannot start unbounded deferred work at once.
+    if (ctx.noPgTx && ctx.storeId) {
+      await runInStoreScope(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    } else {
+      await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    }
   } catch (err) {
     try {
       reportDeferredFailure(task.name, err, ctx);

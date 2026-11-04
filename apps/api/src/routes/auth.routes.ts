@@ -1213,9 +1213,10 @@ router.post(
   verifyEmailLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { token } = req.body;
+      // BE:S-16: a non-string token (object / number / array) reached `verifyEmail` and answered 500. It is a 400 now.
+      const token: unknown = req.body?.token;
 
-      if (!token) {
+      if (typeof token !== 'string' || token.length === 0 || token.length > 512) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Verification token is required' },

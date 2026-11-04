@@ -36,6 +36,10 @@ const events: string[] = [];
 
 function app() {
   const r = express.Router();
+  r.use((q, _s, n) => {
+    (q as never as { user: { userId: string } }).user = { userId: 'u-1' };
+    n();
+  });
   r.param('storeId', tenantContext);
   r.get('/:storeId/things', (_q, res) => {
     void deferAfterTenantCommit('t', async () => {
@@ -67,7 +71,8 @@ describe('tenantContext by backend', () => {
       .set('authorization', 'Bearer x');
     expect(res.status).toBe(200);
     expect(m.runInTenantContext).not.toHaveBeenCalled();
-    expect(m.runInStoreScope).toHaveBeenCalledWith(STORE, expect.any(Function));
+    // the user rides along: user-keyed RLS tables (users, addresses) still see app.current_user_id
+    expect(m.runInStoreScope).toHaveBeenCalledWith(STORE, expect.any(Function), 'u-1');
     await vi.waitFor(() => expect(events).toEqual(['handler', 'deferred']));
   });
 
