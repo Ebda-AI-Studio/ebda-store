@@ -293,6 +293,39 @@ describe.skipIf(e.E2E_DB === '1')(
       } catch {
         /* creation failed: the following steps still run against a missing product and are recorded */
       }
+      if (productId === ZERO) {
+        // Product create is its own fix (group B). The cart / quote / order steps below must not be skipped meanwhile:
+        // seed one product through the operator seed route so they run against a real, priced, in-stock row.
+        const seeded = crypto.randomUUID();
+        const now = Date.now();
+        const r = await e.API.fetch(
+          `https://api.ebda.app/api/v1/internal/store-do/${storeId}/seed`,
+          {
+            method: 'POST',
+            headers: {
+              authorization: 'Bearer workers-test-seed-token',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              products: [
+                {
+                  id: seeded,
+                  storeId,
+                  name: 'Seeded Sweep Product',
+                  slug: 'seeded-sweep',
+                  price: 5000,
+                  inventory: 10,
+                  status: 'active',
+                  hasVariants: false,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ],
+            }),
+          }
+        );
+        if (r.status === 200) productId = seeded;
+      }
       void cat;
       await hit('FLOW', 'GET', '/public/categories', `${BASE}/public/categories`, h);
       await hit('FLOW', 'GET', '/public/products', `${BASE}/public/products`, h);

@@ -29,7 +29,9 @@ export class CustomerReorderService {
     limit: number = REORDER_MAX
   ): Promise<string[]> {
     const cap = Math.min(REORDER_MAX, Math.max(1, Math.floor(limit) || REORDER_MAX));
-    const orders = await prisma.order.findMany({
+    const orders = await (
+      await storeDb(storeId)
+    ).order.findMany({
       where: {
         storeId,
         customerId,

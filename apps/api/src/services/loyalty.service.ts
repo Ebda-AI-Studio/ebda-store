@@ -11,6 +11,7 @@ import {
   type MoneyClient,
 } from '../lib/repo-factory';
 import { assertStoreCustomer } from '../lib/store-customer';
+import { withStoreRead } from '../lib/store-read';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -301,7 +302,7 @@ export class LoyaltyService {
    * Get store loyalty settings
    */
   static async getSettings(storeId: string): Promise<LoyaltySettingsResponse> {
-    const store = await withStore(storeId, tx =>
+    const store = await withStoreRead(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
         select: {
