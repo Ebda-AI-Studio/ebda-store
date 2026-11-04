@@ -48,6 +48,7 @@ describe('workflow wiring', () => {
           [
             "${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}",
             "${{ ((vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '' || (vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '\"ubuntu-24.04\"') && 'npm' || '' }}",
+            "${{ ((vars.EBDA_RUNS_ON_DEPLOY || vars.EBDA_RUNS_ON) == '' || (vars.EBDA_RUNS_ON_DEPLOY || vars.EBDA_RUNS_ON) == '\"ubuntu-24.04\"') && 'npm' || '' }}",
           ],
           `${f}: setup-node cache`
         ).toContain(m[1].trim());

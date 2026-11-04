@@ -16,17 +16,22 @@ self-hosted label, `vars.USE_SELF_HOSTED` or `SCHEDULED_ON_CLOUD` reappears.
 
 ## Where jobs run (Ruling CI-SPLIT-1, 2026-11-04)
 
-Two repo variables pick the runner, both JSON (`gh variable set ... --body '"ubuntu-24.04"'`):
+Three repo variables pick the runner, all JSON (`gh variable set ... --body '"ubuntu-24.04"'`). Each of the two split
+variables falls back to `EBDA_RUNS_ON`, then to `"ubuntu-24.04"`:
 
-- `EBDA_RUNS_ON` (today `["self-hosted","umbra-ebda"]`): the minute-heavy jobs - unit, integration, workerd, app builds,
-  E2E, RLS, mutation. Unset = GitHub-hosted `ubuntu-24.04`.
-- `EBDA_RUNS_ON_LIGHT` (new, optional): the light jobs - ci.yml `changes`, `guards`, `lint`, `typecheck`, `notify-failure`;
-  gitleaks, blast-radius, deploy-change-label, semgrep, cf-schema-current; every `cf-*-deploy.yml` job (plan, deploy,
-  notify). Set to `"ubuntu-24.04"` they run GitHub-hosted; unset they follow `EBDA_RUNS_ON`. Light jobs have
-  `timeout-minutes` <= 10 (deploy <= 20), pinned by `tests/unit/workflow-hosted-runners-only.test.ts`.
-- `setup-node` caches npm only when the job actually runs hosted: `EBDA_RUNS_ON_LIGHT || EBDA_RUNS_ON` empty or
-  `"ubuntu-24.04"`.
-- Fall back to Umbra for everything: `gh variable delete EBDA_RUNS_ON_LIGHT -R Whisky-11/ebda-store`.
+- `EBDA_RUNS_ON` (today `["self-hosted","umbra-ebda"]`): the minute-heavy jobs (unit, integration, workerd, app builds,
+  E2E, RLS, mutation) and the default for the other two.
+- `EBDA_RUNS_ON_DEPLOY`: every job (plan, deploy, notify) in the 9 `cf-*-deploy.yml`. **Decision: set to
+  `"ubuntu-24.04"` now.** Deploys fail on Umbra's R2 tunnel. Cost: about 16 hosted min per merge, about $19/month at
+  the current ~5 merges/day.
+- `EBDA_RUNS_ON_LIGHT`: ci.yml `changes`, `guards`, `lint`, `typecheck`, `notify-failure`; gitleaks, blast-radius,
+  deploy-change-label, semgrep, cf-schema-current. **Decision: stays unset (Umbra)** until the Ebda org with its own
+  2,000 free minutes exists. Cost if set hosted: about 11-13 min per PR push, about $95/month at ~37 PR runs/day.
+- Light jobs have `timeout-minutes` <= 10, deploy jobs <= 20 (plan/notify <= 10), pinned by
+  `tests/unit/workflow-hosted-runners-only.test.ts`.
+- `setup-node` caches npm only when the job actually runs hosted: its own selector (`DEPLOY` or `LIGHT`, then
+  `EBDA_RUNS_ON`) empty or `"ubuntu-24.04"`.
+- Fall back to Umbra: `gh variable delete EBDA_RUNS_ON_DEPLOY -R Whisky-11/ebda-store` (or `_LIGHT`).
 
 ## Lanes
 

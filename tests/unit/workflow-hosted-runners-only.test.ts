@@ -61,6 +61,7 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
   // identical to the heavy switch, so the same one-variable fallback holds.
   const ALLOWED = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
   const ALLOWED_LIGHT = `\${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  const ALLOWED_DEPLOY = `\${{ fromJSON(vars.EBDA_RUNS_ON_DEPLOY || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
   it('every runs-on is the EBDA_RUNS_ON switch (or the LIGHT switch) with an ubuntu-24.04 fallback', () => {
     // Ruling OFFMACHINE-1: the off-machine database backup must NOT depend on the Umbra fleet (the Mac and the CI guest are
     // exactly what it protects against), so db-backup.yml alone pins the literal GitHub-hosted runner.
@@ -68,6 +69,7 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
       r =>
         r.value !== ALLOWED &&
         r.value !== ALLOWED_LIGHT &&
+        r.value !== ALLOWED_DEPLOY &&
         !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
     );
     expect(
@@ -98,10 +100,11 @@ describe('the LIGHT runner switch is confined to light jobs', () => {
   });
 
   it.each(workflowFiles.filter(f => /^cf-.*-deploy\.yml$/.test(f)))(
-    '%s: every job uses it, light <= 10 min and deploy <= 20 min',
+    '%s: every job uses the DEPLOY switch (not LIGHT), plan/notify <= 10 min and deploy <= 20 min',
     f => {
       for (const j of jobBlocks(f)) {
-        expect(j.body, `${f}:${j.name}`).toContain('vars.EBDA_RUNS_ON_LIGHT');
+        expect(j.body, `${f}:${j.name}`).toContain('vars.EBDA_RUNS_ON_DEPLOY');
+        expect(j.body, `${f}:${j.name}`).not.toContain('EBDA_RUNS_ON_LIGHT');
         const t = Number(/^ {4}timeout-minutes: (\d+)/m.exec(j.body)?.[1]);
         expect(t, `${f}:${j.name} timeout`).toBeLessThanOrEqual(j.name === 'deploy' ? 20 : 10);
       }

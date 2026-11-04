@@ -26,6 +26,7 @@ name: CI
 # Ruling CI-SPLIT-1: the cheap jobs (changes, guards, lint, typecheck, notify-failure) read
 # EBDA_RUNS_ON_LIGHT first, then EBDA_RUNS_ON. Set EBDA_RUNS_ON_LIGHT to '"ubuntu-24.04"' and they run on GitHub-hosted
 # runners while the minute-heavy jobs stay on EBDA_RUNS_ON; unset, they follow EBDA_RUNS_ON exactly as before.
+# The cf-*-deploy.yml jobs have their own twin switch, EBDA_RUNS_ON_DEPLOY.
 #
 # setup-node's `cache: npm` restores/saves the GitHub Actions cache over the network.
 # On the Umbra runners (one VM, one user) ~/.npm already persists locally, so that
