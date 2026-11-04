@@ -446,6 +446,10 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
     exempt:
       'brandingSchema uses `.strip()` with a narrow named allowlist (no prohibited field names)',
   },
+  "store.routes.ts PUT '/:id/branding-bundle'": {
+    exempt:
+      '`brandingBundleSchema` is `.strict()` and each part is parsed by the same schema as its own route (brandingSchema, themeSchema, contactSchema, socialSchema); `settings` goes through updateStoreSchema (reserved keys refused or stripped) and the service merge',
+  },
   "store.routes.ts PUT '/:id/social'": {
     exempt:
       '`.strip()` schema AND the handler iterates `Object.keys(socialSchema.shape)` explicitly (own anti-prototype-pollution allowlist) before touching the socialLinks JSON',

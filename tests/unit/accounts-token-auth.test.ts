@@ -44,6 +44,8 @@ const { authenticate, optionalAuthenticate, accountsUser } =
 const { configureAccountsVerifier, configureRevocationCheck, isAccountsToken } =
   await import('../../apps/api/src/lib/accounts-token');
 const { config } = await import('../../apps/api/src/config');
+const { invalidateAccountState, LIVE_IDENTITY_TTL_MS } =
+  await import('../../apps/api/src/lib/identity-live-cache');
 
 const ISS = 'https://accounts.ebda.app';
 const keys = await generateKeyPair('ES256');
@@ -244,6 +246,7 @@ describe('the Store profile row is checked on every request (defence in depth fo
     const token = await mint();
     expect((await run(authenticate, token)).err).toBeUndefined();
     rows.delete('user-1'); // hard-deleted in the Store
+    invalidateAccountState('user-1'); // the Store path that deletes/changes an account drops the 30 s cache (FP-4)
     const { err, req } = await run(authenticate, token);
     expect(err).toMatchObject({ statusCode: 401, code: 'TOKEN_REVOKED' });
     expect(req.user).toBeUndefined();
@@ -259,6 +262,7 @@ describe('the Store profile row is checked on every request (defence in depth fo
     const token = await mint();
     expect((await run(authenticate, token)).err).toBeUndefined();
     rows.get('user-1')!.status = status;
+    invalidateAccountState('user-1'); // setAccountStatus does this on the isolate that suspends (FP-4)
     expect((await run(authenticate, token)).err).toMatchObject({
       statusCode: 403,
       code: 'ACCOUNT_SUSPENDED',
@@ -302,10 +306,12 @@ describe('live vs claims-only identity (Ruling NZ-D2)', () => {
     ).toBe(401);
     revoked.clear();
     rows.get('user-1')!.status = 'suspended';
+    invalidateAccountState('user-1'); // setAccountStatus drops the 30 s account-state cache (FP-4)
     expect(
       (await runWith('PUT', '/api/v1/stores/store-1/settings', await mint())).err?.statusCode
     ).toBe(403);
     rows.delete('user-1');
+    invalidateAccountState('user-1');
     expect(
       (await runWith('DELETE', '/api/v1/stores/store-1/products/p1', await mint())).err?.statusCode
     ).toBe(401);
@@ -452,5 +458,43 @@ describe('integrator client tokens are never accepted by the Store (identity v1.
     const t = await mint({ sub: 'cli_abc', claims: clientClaims });
     const { req } = await run(optionalAuthenticate, t);
     expect(req.user).toBeUndefined();
+  });
+});
+
+describe('account-state cache (BE:E-1, Ruling FP-4)', () => {
+  it('a positive answer is reused inside the window: one identity lookup for two requests', async () => {
+    const token = await mint();
+    expect((await run(authenticate, token)).err).toBeUndefined();
+    rows.get('user-1')!.status = 'suspended'; // changed elsewhere; no Store path invalidated it
+    // documented residual: still served for up to LIVE_IDENTITY_TTL_MS
+    expect((await run(authenticate, token)).err).toBeUndefined();
+  });
+
+  it('the residual closes at the TTL', async () => {
+    vi.useFakeTimers();
+    try {
+      const token = await mint();
+      expect((await run(authenticate, token)).err).toBeUndefined();
+      rows.get('user-1')!.status = 'suspended';
+      vi.advanceTimersByTime(LIVE_IDENTITY_TTL_MS + 1);
+      expect((await run(authenticate, token)).err).toMatchObject({ code: 'ACCOUNT_SUSPENDED' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a NEGATIVE answer is never cached: a suspended account is re-asked, so reactivation bites at once', async () => {
+    const token = await mint();
+    rows.get('user-1')!.status = 'suspended';
+    expect((await run(authenticate, token)).err).toMatchObject({ code: 'ACCOUNT_SUSPENDED' });
+    rows.get('user-1')!.status = 'active';
+    expect((await run(authenticate, token)).err).toBeUndefined();
+  });
+
+  it('revocation is NOT cached: a revoked session is refused on the very next request', async () => {
+    const token = await mint();
+    expect((await run(authenticate, token)).err).toBeUndefined();
+    revoked.add('sid-1');
+    expect((await run(authenticate, token)).err).toMatchObject({ code: 'TOKEN_REVOKED' });
   });
 });

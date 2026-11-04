@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma, Prisma } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
@@ -58,22 +59,29 @@ const paymentConfigSchema = z.object({
     .refine(code => PAYMENT_PROVIDER_CODES.includes(code), { message: 'Unknown payment provider' }),
   isEnabled: z.boolean().default(false),
   isDefault: z.boolean().default(false),
-  displayName: z.string().optional(),
-  displayNameAr: z.string().optional(),
+  // BE:S-10: bounded display strings and method/currency lists (they used to spread unconstrained into the row).
+  displayName: z.string().max(120).optional(),
+  displayNameAr: z.string().max(120).optional(),
   apiKey: z.string().optional(),
   secretKey: z.string().optional(),
   merchantId: z.string().optional(),
   webhookSecret: z.string().optional(),
   testMode: z.boolean().default(true),
-  supportedMethods: z.array(z.string()).default([]),
-  supportedCurrencies: z.array(z.string()).default([REGION.currency]),
+  supportedMethods: z.array(z.string().min(1).max(40)).max(20).default([]),
+  supportedCurrencies: z
+    .array(z.string().regex(/^[A-Za-z]{3}$/))
+    .max(10)
+    .default([REGION.currency]),
   fixedFee: z.number().int().min(0).default(0),
   percentageFee: z.number().min(0).max(100).default(0),
   /** Non-secret per-provider settings (InstaPay handle/phone/expiry, COD percentage). */
   settings: z.record(z.string(), z.unknown()).optional(),
 });
 
-const updateConfigSchema = paymentConfigSchema.partial();
+// BE:S-3: the provider is the URL segment and NEVER updatable. With `provider` in the body a cod/instapay row could be renamed
+// into an enabled paymob row, skipping the credentials/test/activation gate keyed on the URL provider. Zod strips the unknown
+// key, so a UI that echoes the whole row still works and the rename is simply ignored.
+const updateConfigSchema = paymentConfigSchema.omit({ provider: true }).partial();
 
 // ==========================================
 // Helper Functions
@@ -242,6 +250,8 @@ router.use(
 router.get(
   '/store/:storeId',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -312,6 +322,8 @@ router.get(
 router.post(
   '/store/:storeId',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -447,6 +459,8 @@ router.post(
 router.put(
   '/store/:storeId/:provider',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -599,6 +613,8 @@ router.put(
 router.delete(
   '/store/:storeId/:provider',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -679,6 +695,8 @@ router.delete(
 router.post(
   '/store/:storeId/:provider/toggle',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -801,6 +819,8 @@ async function loadOwnedStore(req: Request, storeId: string) {
 router.put(
   '/store/:storeId/:provider/credentials',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -931,6 +951,8 @@ router.put(
 router.post(
   '/store/:storeId/:provider/test',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),

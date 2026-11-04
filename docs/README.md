@@ -35,6 +35,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## api - API references
 
+- [api/auth-impersonation-and-error-contract.md](api/auth-impersonation-and-error-contract.md) - Auth, impersonation, error bodies and Server-Timing (API contract)
 - [api/b2b-wholesale.md](api/b2b-wholesale.md) - B2B wholesale pricing API
 - [api/lifecycle-emails.md](api/lifecycle-emails.md) - Lifecycle emails (self-serve onboarding)
 - [api/openapi.yaml](api/openapi.yaml) - openapi
@@ -51,6 +52,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [architecture/inventory-model.md](architecture/inventory-model.md) - Inventory model — where a product's stock actually lives
 - [architecture/merchant-mcp.md](architecture/merchant-mcp.md) - Merchant-admin MCP surface
 - [architecture/page-definition.md](architecture/page-definition.md) - PageDefinition — the visual builder's page document
+- [architecture/request-transaction-lifecycle.md](architecture/request-transaction-lifecycle.md) - Request transaction lifecycle (tenantContext, identity pre-check, Server-Timing)
 - [architecture/security-contracts.md](architecture/security-contracts.md) - Security Contracts
 - [architecture/slug-redirects.md](architecture/slug-redirects.md) - Slug redirects
 - [architecture/sticky-overflow-follow-up.md](architecture/sticky-overflow-follow-up.md) - Follow-up: `position: sticky` is inert storefront-wide
