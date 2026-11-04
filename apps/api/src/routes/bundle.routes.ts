@@ -414,7 +414,16 @@ router.get(
       if (isActive !== undefined) where.isActive = isActive;
       if (search) {
         // Arabic-normalised name + nameAr word-AND (product-search.service searchNameIds).
-        where.id = { in: await searchNameIds('bundles', storeId, search) };
+        if (await bundlesOnDo(storeId)) {
+          // The Postgres search is a raw SQL fold over `bundles`; a DO store filters its own rows by every word in the name
+          // or the Arabic name (no Arabic digit / hamza folding there), never by ids from a table it does not have.
+          const words = search.trim().split(/\s+/).filter(Boolean).slice(0, 8);
+          where.AND = words.map(w => ({
+            OR: [{ name: { contains: w } }, { nameAr: { contains: w } }],
+          }));
+        } else {
+          where.id = { in: await searchNameIds('bundles', storeId, search) };
+        }
       }
 
       const [rows, total] = await Promise.all([

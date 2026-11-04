@@ -1682,6 +1682,21 @@ router.post(
         return;
       }
 
+      // A Durable Object store's order and payment rows live in its DO; the confirmation below claims and writes them in
+      // Postgres, where they do not exist (a failed claim there used to read as "paid", a completed one threw). Until N-11 /
+      // N-12 port that money path, report the DO order's own state and let the webhook settle it. Never derive "paid" here.
+      if ((await storeRepo(storeId)).backend === 'do') {
+        res.json({
+          success: true,
+          data: {
+            paymentStatus: order.paymentStatus === 'failed' ? 'failed' : 'unpaid',
+            providerStatus: 'pending',
+            statusChanged: false,
+          },
+        });
+        return;
+      }
+
       // Ask the provider directly. PaymentService resolves the provider +
       // per-store credentials from the stored payment row. We key on OUR
       // stored transactionId (the invoice id), which is the authoritative
