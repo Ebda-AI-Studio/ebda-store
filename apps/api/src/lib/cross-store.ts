@@ -1,5 +1,6 @@
 import { acrossStores, acrossStoresFlat, withUser } from '@ebda/database';
 import { ownedStoreIds as definerOwnedStoreIds } from './definer';
+import { hubFanoutStoreIds, hubOnD1 } from './platform-hub';
 
 /**
  * Merge helpers for reads that span stores (super-admin dashboards, platform
@@ -48,7 +49,10 @@ export async function pageAcrossStores<T>(args: {
   fetch: (window: number) => Promise<{ rows: T[]; total: number }>;
 }): Promise<{ rows: T[]; total: number }> {
   const window = args.skip + args.take;
-  const parts = await acrossStores(() => args.fetch(window), { storeIds: args.storeIds });
+  // NEON-ZERO (Ruling NZ-C-4): no Postgres directory once the platform families are on D1 - the store list is D1's (capped).
+  const storeIds =
+    args.storeIds ?? ((await hubOnD1()) ? (await hubFanoutStoreIds()).ids : undefined);
+  const parts = await acrossStores(() => args.fetch(window), { storeIds });
   const rows = dedupeById(parts.flatMap(p => p.value.rows));
   const key = (r: T): number => {
     const k = args.orderKey(r);

@@ -34,6 +34,9 @@ export default class FakeAccounts extends WorkerEntrypoint {
       createdAt: new Date(0).toISOString(),
     }));
   }
+  async eraseUser() {
+    return { erased: true, remaining: 0 };
+  }
   async revokeUser() {}
   async revokeSession() {}
   async isRevoked() {

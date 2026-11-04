@@ -102,6 +102,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'WishlistItem',
   'Bundle',
   'BundleItem',
+  // the super-admin VAT-registration decision (approve / reject / revoke) on the store's tax profile (NEON-ZERO, Ruling NZ-C-7)
+  'StoreTaxProfile',
   // the per-store audit trail (NEON-ZERO N-10d): appended by services/audit-sink.ts, which only ever `create`s
   'AuditLog',
 ]);

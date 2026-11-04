@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { hubFanout, hubOnD1, hubOwners, hubStorePage } from '../lib/platform-hub';
 import bcrypt from 'bcryptjs';
 import {
   prisma,
@@ -492,6 +493,36 @@ export class ProvisioningService {
     const { page = 1, limit = 20, status, search, ownerId } = options;
     const skip = (page - 1) * limit;
 
+    // NEON-ZERO (Ruling NZ-C-4): one D1 page of the directory, the owners from the identity service and the per-store counts
+    // from each store's own backend (bounded pool, at most one page = `limit` <= 100 stores).
+    if (await hubOnD1()) {
+      const { rows, total } = await hubStorePage({ search, status, ownerId, skip, take: limit });
+      const [owners, counts] = await Promise.all([
+        hubOwners(rows.map(s => s.ownerId)),
+        hubFanout(
+          rows.map(s => s.id),
+          async storeId => {
+            const db = await storeDb(storeId);
+            const [products, orders] = await Promise.all([
+              db.product.count({ where: { storeId } }),
+              db.order.count({ where: { storeId } }),
+            ]);
+            return { products, orders };
+          },
+          () => undefined
+        ),
+      ]);
+      const byId = new Map(counts.map(c => [c.storeId, c.value]));
+      return {
+        stores: rows.map(s => ({
+          ...s,
+          owner: owners.get(s.ownerId) ?? null,
+          _count: byId.get(s.id) ?? { products: 0, orders: 0 },
+        })),
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      } as never;
+    }
+
     const where: Prisma.StoreWhereInput = {};
     if (ownerId) where.ownerId = ownerId;
     if (status) where.status = status as StoreStatus;
@@ -560,16 +591,17 @@ export class ProvisioningService {
   }
 
   private static async readStoreStats(storeId: string) {
+    const db = await storeDb(storeId);
     const [productCount, orderCount, customerCount, revenueResult] = await Promise.all([
-      (await storeDb(storeId)).product.count({ where: { storeId } }),
-      prisma.order.count({ where: { storeId } }),
-      prisma.order
+      db.product.count({ where: { storeId } }),
+      db.order.count({ where: { storeId } }),
+      db.order
         .groupBy({
           by: ['customerId'],
           where: { storeId },
         })
         .then(r => r.length),
-      prisma.order.aggregate({
+      db.order.aggregate({
         where: { storeId, paymentStatus: 'paid' },
         _sum: { total: true },
       }),

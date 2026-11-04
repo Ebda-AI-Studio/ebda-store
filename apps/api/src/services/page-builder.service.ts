@@ -158,8 +158,10 @@ const META_SELECT = {
 const docBytes = (d: unknown) => Buffer.byteLength(JSON.stringify(d), 'utf8');
 
 async function loadStore(storeId: string) {
-  return withStore(storeId, tx =>
-    tx.store.findUnique({
+  // NEON-ZERO (Ruling NZ-C-4): a Durable Object store's record is its DO, not Postgres; `storeDb` is the Postgres `prisma`
+  // proxy for every other store, so that path is unchanged (same ambient tenant transaction).
+  return withStore(storeId, async () =>
+    (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
       select: {
         layoutSettings: true,
@@ -638,8 +640,10 @@ async function applyPublishedLayout(
   // writes exactly the layout keys that page owns (Ruling VE-13) and nothing else, then purges the caches.
   if (isSectionPageKind(definition.pageKey)) {
     const owned = PAGE_OWNED_SETTING_KEYS[definition.pageKey];
-    const next = await withStore(storeId, async tx => {
-      const row = await tx.store.findUnique({
+    const next = await withStore(storeId, async () => {
+      const row = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { layoutSettings: true },
       });
@@ -652,7 +656,7 @@ async function applyPublishedLayout(
       }
       // a reorder or a hidden section changes no layout key: leave the store row alone
       if (!isDeepStrictEqual(merged, current))
-        await storeUpdate(tx, {
+        await storeUpdate(prisma, {
           where: { id: storeId },
           data: { layoutSettings: merged as object },
         });
@@ -669,12 +673,14 @@ async function applyPublishedLayout(
     : undefined;
   const chromePatch = hasChromePatch(definition.chrome) ? definition.chrome : undefined;
   let removedFontUrls: string[] = [];
-  await withStore(storeId, async tx => {
+  await withStore(storeId, async () => {
     // Merge the pending theme / typography / header+footer content over the CURRENT live
     // values read in this same transaction (the Branding tab and the classic
     // builder also write other theme / settings keys), and write them with
     // layout_settings in one statement.
-    const live = await tx.store.findUnique({
+    const live = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { theme: true, typography: true, settings: true, layoutSettings: true },
     });
@@ -698,7 +704,7 @@ async function applyPublishedLayout(
         .filter(f => f.type === 'custom' && f.url && !kept.has(f.url))
         .map(f => f.url as string);
     }
-    return storeUpdate(tx, {
+    return storeUpdate(prisma, {
       where: { id: storeId },
       data: {
         layoutSettings: layout as unknown as object,
