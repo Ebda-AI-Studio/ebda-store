@@ -38,20 +38,6 @@
         "notificationLog": 4
       }
     },
-    "apps/api/src/routes/order.routes.ts": {
-      "kind": "platform",
-      "reason": "N-10d (#419) audit family: order timeline audit trail reads `auditLog` for a store through Postgres; DO-store audit rows live in the StoreDO, so this read must go through the audit reader before Postgres is removed (listed in neon-zero-remaining.md, unowned).",
-      "models": {
-        "auditLog": 1
-      }
-    },
-    "apps/api/src/routes/return.routes.ts": {
-      "kind": "platform",
-      "reason": "N-10d (#419) audit family: return timeline audit trail reads `auditLog` for a store through Postgres; DO-store audit rows live in the StoreDO, so this read must go through the audit reader before Postgres is removed (listed in neon-zero-remaining.md, unowned).",
-      "models": {
-        "auditLog": 1
-      }
-    },
     "apps/api/src/services/abandoned-cart.service.ts": {
       "kind": "pg-branch",
       "reason": "processReminders / getStats / candidate load: each Postgres read sits in the `backend !== 'do'` / `onDo` else-branch next to the DO read (CF-R4-5).",
