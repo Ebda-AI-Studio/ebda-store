@@ -206,8 +206,6 @@
       "done": "done"
     },
     "page": {
-      "timeZoneMoved": "The time zone now sits with the language settings.",
-      "timeZoneLink": "Open language and time zone",
       "rateSaveFailed": "Could not save the rate",
       "rateToggleFailed": "Could not change the rate status",
       "rateDeleteFailed": "Could not delete the rate",
@@ -225,8 +223,8 @@
   },
   "language": {
     "page": {
-      "title": "Language and time zone",
-      "subtitle": "The language customers see first, and the store time zone",
+      "title": "Language",
+      "subtitle": "The language customers see first",
       "save": "Save language",
       "successMessage": "Store language saved",
       "failedMessage": "Could not save the language",

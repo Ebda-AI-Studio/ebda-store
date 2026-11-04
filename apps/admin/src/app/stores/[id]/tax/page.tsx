@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -12,6 +11,7 @@ import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 import { useConfirm } from '../../../../hooks/useConfirm';
 import { TaxGeneralSettings } from './_components/TaxGeneralSettings';
 import { TaxSteps } from './_components/TaxSteps';
+import { TaxTimeZoneCard } from './_components/TaxTimeZoneCard';
 import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
 import { TaxInfoBox } from './_components/TaxInfoBox';
@@ -296,15 +296,7 @@ export default function TaxSettingsPage() {
               onSettingsChange={setSettings}
               onSaveSettings={handleSaveSettings}
             />
-            <p className="text-sm text-muted-foreground">
-              {tPage('timeZoneMoved')}{' '}
-              <Link
-                href={`/stores/${storeId}/language`}
-                className="font-medium text-primary-ink underline underline-offset-2"
-              >
-                {tPage('timeZoneLink')}
-              </Link>
-            </p>
+            <TaxTimeZoneCard storeId={storeId} />
             <div id="tax-rates" className="scroll-mt-24">
               <TaxRatesTable
                 rates={rates}

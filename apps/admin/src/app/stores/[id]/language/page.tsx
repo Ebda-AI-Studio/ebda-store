@@ -7,7 +7,6 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
-import { TaxTimeZoneCard } from '../tax/_components/TaxTimeZoneCard';
 
 type Language = 'en' | 'ar';
 
@@ -17,7 +16,7 @@ const OPTIONS: Array<{ id: Language; badge: string }> = [
 ];
 
 /**
- * "اللغة والمنطقة الزمنية": the storefront's default language and the store time zone (moved here from the tax
+ * x: the storefront's default language and the store time zone (moved here from the tax
  * page, UX:TX-2). One sticky Save for the language; the time zone card saves its own single field.
  */
 export default function LanguagePage() {
@@ -143,8 +142,6 @@ export default function LanguagePage() {
             })}
           </div>
         </div>
-
-        <TaxTimeZoneCard storeId={storeId} />
       </div>
       <StickySaveBar
         dirty={defaultLanguage !== savedLanguage || isSaving}
