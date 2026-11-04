@@ -1,7 +1,7 @@
 import { storeDb } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { authenticate, customerUserId } from '../middleware/auth';
+import { authenticate, customerUserId, rejectImpersonated } from '../middleware/auth';
 import { requirePermission, hasPermission, type Role } from '../middleware/rbac';
 import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -429,6 +429,7 @@ router.get(
 router.post(
   '/admin/:id/complete',
   authenticate,
+  rejectImpersonated, // Ruling FP-3: completing a return sends money back; an impersonated session is read-only here
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
