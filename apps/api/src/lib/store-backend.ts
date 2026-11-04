@@ -116,6 +116,30 @@ export async function doStoreIdList(): Promise<string[]> {
   }
 }
 
+/**
+ * Is there at least one live store on `backend`? One indexed EXISTS ... LIMIT 1 (never the full scan of `doStoreIdList`), for the
+ * per-webhook / per-callback "does the fleet contain X" question. D1 unbound: the env list for `do`, always true for `pg`.
+ */
+export async function hasStoresOnBackend(backend: StoreBackend): Promise<boolean> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: FlagD1 } | undefined)?.PLATFORM_DB;
+  if (!d1) {
+    if (backend === 'pg') return true;
+    if (enabledStoreIds().size > 0 && process.env.NODE_ENV === 'production') throw unavailable();
+    return enabledStoreIds().size > 0;
+  }
+  try {
+    const row = await d1
+      .prepare(
+        'SELECT 1 AS one FROM stores WHERE storage_backend = ?1 AND deleted_at IS NULL LIMIT 1'
+      )
+      .bind(backend)
+      .first<{ one?: unknown }>();
+    return !!row;
+  } catch {
+    throw unavailable();
+  }
+}
+
 export async function doStoreIdSet(): Promise<Set<string>> {
   return new Set(await doStoreIdList());
 }
