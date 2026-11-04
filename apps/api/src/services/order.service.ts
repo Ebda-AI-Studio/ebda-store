@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
 import { matchingCustomers, type CustomerMatches } from './admin-search.service';
 export {
@@ -492,12 +493,15 @@ async function attachCustomers<T extends { customerId: string | null }>(
   select: Prisma.UserSelect
 ): Promise<T[]> {
   const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
-  const users = ids.length
-    ? await prisma.user.findMany({
-        where: { id: { in: ids }, storeId },
-        select: { id: true, ...select },
-      })
-    : [];
+  const doRows = await customerRows(storeId, ids);
+  const users: Array<{ id: string }> = doRows
+    ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
+    : ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids }, storeId },
+          select: { id: true, ...select },
+        })
+      : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => ({
     ...r,
@@ -4035,10 +4039,14 @@ export class OrderService {
     // fabricated order and their name + email read back through the order
     // detail include. Validate it the same way.
     if (data.customerId) {
-      const customer = await prisma.user.findFirst({
-        where: { id: data.customerId, storeId, role: 'customer' },
-        select: { id: true, status: true, deletedAt: true },
-      });
+      const doCustomer = await customerRow(storeId, data.customerId);
+      const customer =
+        doCustomer !== undefined
+          ? doCustomer
+          : await prisma.user.findFirst({
+              where: { id: data.customerId, storeId, role: 'customer' },
+              select: { id: true, status: true, deletedAt: true },
+            });
       if (!customer) {
         throw new AppError(404, 'NOT_FOUND', 'Customer not found for this store');
       }

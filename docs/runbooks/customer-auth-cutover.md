@@ -13,7 +13,7 @@ For a DO store the API serves customer auth from its StoreDO exactly when D1 `sy
 2. `CUTOVER_IMPORT_SECRET` set on the API Worker (>= 24 chars); `wrangler d1` access to `ebda-platform`.
 3. Every store you pass is `storage_backend = 'do'` in D1 (the script refuses otherwise).
 4. MFA check (Ruling NZ-N9-1): `SELECT id, email FROM users WHERE store_id = '<id>' AND role = 'customer' AND mfa_enabled AND mfa_secret IS NOT NULL;` should be empty. Any row cannot sign in on the DO until its MFA is cleared by hand.
-5. Low traffic: customer registers / logins / refreshes of the store get a retryable 503 for roughly `2 x freeze-wait` (default 40 s).
+5. Low traffic: customer registers / logins / refreshes of the store get a retryable 503 for roughly `drain + settle` (default 65 s).
 
 ## Steps
 
@@ -21,13 +21,13 @@ For a DO store the API serves customer auth from its StoreDO exactly when D1 `sy
 export CUTOVER_PG_URL=... CUTOVER_IMPORT_SECRET=...
 F="--d1 ebda-platform --d1-target remote --d1-config apps/api/wrangler.jsonc --do-url https://api.ebda.app --allow-prod-read --store <uuid>"
 node scripts/cf/cutover-customer-auth.mjs $F             # 1. DRY RUN: PG vs DO counts, marker state
-node scripts/cf/cutover-customer-auth.mjs $F --commit    # 2. freeze -> wait -> copy -> read back + digest -> marker -> wait -> re-verify on a NEW connection -> DO live -> unfreeze
+node scripts/cf/cutover-customer-auth.mjs $F --commit    # 2. freeze -> drain -> snapshot -> copy -> read back + digest -> marker -> settle -> drift check on a NEW connection -> DO live -> unfreeze
 node scripts/cf/cutover-customer-auth.mjs $F --status
 # after EVERY DO store is done (and for stores created later):
 node scripts/cf/cutover-customer-auth.mjs $F --commit --global   # also writes customer_auth_cutover.__all
 ```
 
-`--commit` refuses a store whose marker exists or whose DO says live. It flips only if EVERY table of the store is equal on both sides. Exit 2 = Postgres changed after the copy (drift): the DO is NOT marked live (imports stay open), the freeze stays; re-run is refused by the marker, so investigate, re-apply the rows by hand through `importRows`, then `--unfreeze`. Verification and reset links mailed before the flip stop working (Ruling NZ-N9-4).
+`--commit` refuses a store whose marker exists or whose DO says live. It flips only if EVERY table of the store is equal on both sides. Exit 2 = Postgres changed after the copy (drift): the freeze is lifted, the DO is NOT marked live (imports stay open); re-run is refused by the marker, so investigate and re-apply the rows by hand through `importRows`. The freeze is the same mechanism as #407 (expiry + P1 if left behind, SIGINT/SIGTERM lift). Verification and reset links mailed before the flip stop working (Ruling NZ-N9-4).
 
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 

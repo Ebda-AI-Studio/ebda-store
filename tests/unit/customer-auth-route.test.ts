@@ -3,26 +3,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  keys: new Set<string>(),
+  keys: new Map<string, string>(),
   fail: { v: false },
   backend: new Map<string, 'do' | 'pg'>(),
   reads: { n: 0 },
+  alerts: [] as string[],
 }));
 vi.mock('../../apps/api/src/cf/bindings', () => ({
   cfBindings: () => ({
     PLATFORM_DB: {
-      prepare: (sql: string) => ({
+      prepare: () => ({
         bind: (...v: string[]) => ({
-          first: async () => {
+          all: async () => {
             h.reads.n++;
             if (h.fail.v) throw new Error('d1 down');
-            const hit = /key IN/.test(sql) ? v.some(k => h.keys.has(k)) : h.keys.has(v[0]);
-            return hit ? { ok: 1 } : null;
+            return {
+              results: v.filter(k => h.keys.has(k)).map(k => ({ key: k, value: h.keys.get(k) })),
+            };
           },
         }),
       }),
     },
   }),
+}));
+vi.mock('../../apps/api/src/services/alerts.service', () => ({
+  sendAlert: async (a: { title: string }) => {
+    h.alerts.push(a.title);
+  },
 }));
 vi.mock('../../apps/api/src/lib/store-backend', () => ({
   backendFor: async (id: string) => h.backend.get(id) ?? 'pg',
@@ -32,7 +39,6 @@ vi.mock('../../apps/api/src/lib/store-backend', () => ({
 }));
 
 import {
-  assertCustomerAuthNotFrozen,
   assertNoCustomerAuthFreeze,
   clientForScopedToken,
   customerAuthRoute,
@@ -52,6 +58,7 @@ beforeEach(() => {
   h.fail.v = false;
   h.backend.clear();
   h.reads.n = 0;
+  h.alerts.length = 0;
   resetCustomerAuthCaches();
 });
 
@@ -64,7 +71,7 @@ describe('customerAuthRoute', () => {
   it('a DO store without a marker is pg; with its marker or the global one it is do; "on" is cached', async () => {
     h.backend.set(S, 'do');
     expect(await customerAuthRoute(S, { write: false })).toEqual({ kind: 'pg' });
-    h.keys.add(markerKey(S));
+    h.keys.set(markerKey(S), '{}');
     resetCustomerAuthCaches();
     expect((await customerAuthRoute(S, { write: false })).kind).toBe('do');
     const reads = h.reads.n;
@@ -72,7 +79,7 @@ describe('customerAuthRoute', () => {
     expect(h.reads.n).toBe(reads); // cached
     h.keys.clear();
     resetCustomerAuthCaches();
-    h.keys.add(GLOBAL_MARKER_KEY);
+    h.keys.set(GLOBAL_MARKER_KEY, '{}');
     expect((await customerAuthRoute(S, { write: false })).kind).toBe('do');
   });
   it('"off" is re-read after the TTL, not every call', async () => {
@@ -88,32 +95,52 @@ describe('customerAuthRoute', () => {
   });
 });
 
-describe('freeze', () => {
-  it('a Postgres write for a frozen DO store is a retryable 503; reads and unfrozen stores pass', async () => {
+describe('freeze (#407 semantics)', () => {
+  const live = () => JSON.stringify({ expiresAt: Date.now() + 60_000 });
+  it('a write for a frozen DO store is a retryable 503; a read still answers (pg before the flip)', async () => {
     h.backend.set(S, 'do');
-    h.keys.add(freezeKey(S));
+    h.keys.set(freezeKey(S), live());
     await expect(customerAuthRoute(S, { write: true })).rejects.toMatchObject({
       statusCode: 503,
       code: 'CUSTOMER_AUTH_FROZEN',
     });
     expect(await customerAuthRoute(S, { write: false })).toEqual({ kind: 'pg' });
-    resetCustomerAuthCaches();
-    h.keys.clear();
+  });
+  it('"off" is never cached while frozen, so the very read after the flip sees the marker', async () => {
+    h.backend.set(S, 'do');
+    h.keys.set(freezeKey(S), live());
+    await customerAuthRoute(S, { write: false });
+    await customerAuthRoute(S, { write: false });
+    expect(h.reads.n).toBe(2);
+    h.keys.set(markerKey(S), '{}');
+    expect((await customerAuthRoute(S, { write: false })).kind).toBe('do');
+  });
+  it('marker + freeze coexisting: a write is refused until the freeze lifts (no mixed backends)', async () => {
+    h.backend.set(S, 'do');
+    h.keys.set(markerKey(S), '{}');
+    h.keys.set(freezeKey(S), live());
+    await expect(customerAuthRoute(S, { write: true })).rejects.toMatchObject({ statusCode: 503 });
+    h.keys.delete(freezeKey(S));
+    expect((await customerAuthRoute(S, { write: true })).kind).toBe('do');
+  });
+  it('an expired freeze is ignored and pages once (P1)', async () => {
+    h.backend.set(S, 'do');
+    h.keys.set(freezeKey(S), JSON.stringify({ expiresAt: Date.now() - 1 }));
     expect(await customerAuthRoute(S, { write: true })).toEqual({ kind: 'pg' });
+    await customerAuthRoute(S, { write: true });
+    expect(h.alerts).toHaveLength(1);
   });
   it('the any-freeze guards unscoped Postgres-era tokens', async () => {
     await expect(assertNoCustomerAuthFreeze()).resolves.toBeUndefined();
-    resetCustomerAuthCaches();
-    h.keys.add(ANY_FREEZE_KEY);
+    h.keys.set(ANY_FREEZE_KEY, live());
     await expect(assertNoCustomerAuthFreeze()).rejects.toMatchObject({
       code: 'CUSTOMER_AUTH_FROZEN',
     });
-    await expect(assertCustomerAuthNotFrozen(S)).resolves.toBeUndefined();
   });
-  it('once the marker is on, the freeze is not consulted (the DO is the source)', async () => {
+  it('a write never trusts a cached "off"', async () => {
     h.backend.set(S, 'do');
-    h.keys.add(markerKey(S));
-    h.keys.add(freezeKey(S));
+    await customerAuthRoute(S, { write: false }); // caches off
+    h.keys.set(markerKey(S), '{}');
     expect((await customerAuthRoute(S, { write: true })).kind).toBe('do');
   });
 });
@@ -142,8 +169,30 @@ describe('scoped one-time tokens', () => {
     expect(await clientForScopedToken('a'.repeat(64))).toBeNull();
     expect(await clientForScopedToken(mintScopedToken(S).token)).toBeNull();
     h.backend.set(S, 'do');
-    h.keys.add(markerKey(S));
+    h.keys.set(markerKey(S), '{}');
     const c = await clientForScopedToken(mintScopedToken(S).token);
     expect(c?.storeId).toBe(S);
+  });
+});
+
+describe('markCustomerAuthOnDo (store-create)', () => {
+  it('writes the per-store marker idempotently, and the router then serves the store from its DO', async () => {
+    const { markCustomerAuthOnDo } = await import('../../apps/api/src/lib/customer-auth');
+    const writes: unknown[][] = [];
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...v: unknown[]) => ({
+          run: async () => {
+            expect(sql).toMatch(/ON CONFLICT \(key\) DO NOTHING/);
+            writes.push(v);
+            h.keys.set(v[1] as string, v[2] as string);
+          },
+        }),
+      }),
+    };
+    await markCustomerAuthOnDo(db, S);
+    expect(writes[0][1]).toBe(markerKey(S));
+    h.backend.set(S, 'do');
+    expect((await customerAuthRoute(S, { write: true })).kind).toBe('do');
   });
 });

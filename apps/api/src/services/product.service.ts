@@ -1,4 +1,5 @@
 import { assertActiveProductPrice } from '../lib/sellable-price';
+import { customerRows } from '../lib/customer-directory';
 import {
   prisma,
   Prisma,
@@ -2371,12 +2372,14 @@ export class ProductService {
       Record<string, unknown> & { customerId?: string | null }
     >;
     const ids = [...new Set(rows.map(r => r.customerId).filter((v): v is string => !!v))];
-    const users = ids.length
-      ? await prisma.user.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, firstName: true, lastName: true },
-        })
-      : [];
+    const users =
+      (await customerRows(storeId, ids)) ??
+      (ids.length
+        ? await prisma.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, firstName: true, lastName: true },
+          })
+        : []);
     const byId = new Map(users.map(u => [u.id, { firstName: u.firstName, lastName: u.lastName }]));
     const withCustomer = rows.map(({ customerId, ...r }) => ({
       ...r,

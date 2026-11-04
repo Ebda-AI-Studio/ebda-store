@@ -1702,7 +1702,14 @@ export class AuthService {
     reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all',
     scope?: { storeId?: string | null }
   ): Promise<void> {
-    const route = await customerAuthRoute(scope?.storeId, { write: true });
+    // No scope given (admin suspend, MFA change, any sibling path): resolve the customer's store from the user row, so a DO-served
+    // customer is revoked in its DO and never only in a stale Postgres row (security review of 5bd6aac92).
+    let scopeStoreId = scope?.storeId ?? null;
+    if (!scopeStoreId) {
+      const st = await getUserState(userId).catch(() => null);
+      if (st?.role === 'customer') scopeStoreId = st.storeId;
+    }
+    const route = await customerAuthRoute(scopeStoreId, { write: true });
     if (route.kind === 'do') {
       // The DO is the revocation authority: the bump and the refresh revocation are one section; the cache push follows.
       const r = await route.client.call<{ tokenVersion: number }>('revokeAll', { userId, reason });
@@ -1785,6 +1792,23 @@ export class AuthService {
         where: { userId, token: { startsWith: 'reset:' } },
       })
     );
+  }
+
+  /**
+   * Operator / merchant status change of a CUSTOMER served by a StoreDO: status + version bump + revocation of every session in
+   * ONE DO section, then the cache push. Returns false when the customer is not DO-served (the caller keeps its Postgres write).
+   * Throws if the store is DO-served and the DO does not know the customer: a Postgres-only write there would leave it active.
+   */
+  static async setCustomerStatusOnDo(
+    userId: string,
+    storeId: string | null,
+    status: 'active' | 'inactive' | 'suspended'
+  ): Promise<boolean> {
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind !== 'do') return false;
+    const r = await route.client.call<{ tokenVersion: number }>('setStatus', { userId, status });
+    await pushTokenVersion(userId, r.tokenVersion, 'auth.setCustomerStatus.setTokenVersion');
+    return true;
   }
 
   /**

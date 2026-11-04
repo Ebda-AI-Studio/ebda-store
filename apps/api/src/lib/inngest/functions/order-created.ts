@@ -1,4 +1,12 @@
 import type { JobDef } from '../../jobs/types';
+import { customerRow, isLiveCustomer } from '../../customer-directory';
+
+/** The customer to mail: a DO-served store's customer comes from its DO and only when still active (N-9); else Postgres. */
+async function customerOf(storeId: string, id: string) {
+  const doRow = await customerRow(storeId, id);
+  if (doRow !== undefined) return doRow && isLiveCustomer(doRow) ? doRow : null;
+  return withStore(storeId, tx => tx.user.findFirst({ where: { id } }));
+}
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { storeDb, storeMoney } from '../../repo-factory';
 import { groupOrderLinesForDisplay, deliveryLineFromNotes } from '@ebda/shared';
@@ -91,9 +99,7 @@ export const orderCreated: JobDef = inngest.createFunction(
           },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
-        const customer = row.customerId
-          ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
-          : null;
+        const customer = row.customerId ? await customerOf(storeId, row.customerId!) : null;
         return { ...row, customer };
       }
       return runInTenantContext(storeId, async () => {

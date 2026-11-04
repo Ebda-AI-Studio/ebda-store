@@ -11,7 +11,7 @@
 //
 // Per store, --commit: (1) refuses when the store (or global) marker exists, or the DO already says live; (2) writes the freeze
 // (D1 system_settings customer_auth_freeze.<id> and .__any): a Postgres write of these rows is a retryable 503 in the API; waits
-// --freeze-wait-ms (longer than the 5 s freeze cache and the 10 s marker cache); (3) ONLY THEN opens a new REPEATABLE READ snapshot
+// --drain-ms (longer than any Postgres transaction may live); (3) ONLY THEN opens a new REPEATABLE READ snapshot
 // (a snapshot taken before the freeze would hide writes made during the copy), copies in pages (idempotent upserts), reads the DO
 // back page by page and compares count + digest of every column; (4) on equality inserts the marker; (5) waits again, re-digests
 // Postgres on a NEW connection (a write that landed in the flip window shows as drift: exit 2), tells the DO it is live (imports
@@ -58,7 +58,12 @@ async function main() {
       'd1-config': { type: 'string' },
       'persist-to': { type: 'string' },
       store: { type: 'string', multiple: true },
-      'freeze-wait-ms': { type: 'string', default: '20000' },
+      // freeze -> drain -> snapshot: longer than any Postgres transaction may live (#407's sequence)
+      'drain-ms': { type: 'string', default: '45000' },
+      // after the flip: longer than the isolates' marker cache, before the drift check
+      'settle-ms': { type: 'string', default: '20000' },
+      // a freeze carries its own expiry: if this script dies the API ignores it after this long and pages (P1)
+      'freeze-ttl-ms': { type: 'string', default: '900000' },
       commit: { type: 'boolean', default: false },
       global: { type: 'boolean', default: false },
       status: { type: 'boolean', default: false },
@@ -79,14 +84,15 @@ async function main() {
     config: args['d1-config'],
     persistTo: args['persist-to'],
   };
-  const wait = Number(args['freeze-wait-ms']);
+  const drain = Number(args['drain-ms']);
+  const settle = Number(args['settle-ms']);
   const setFreeze = async (on, ids) => {
     const keys = [...ids.map(freezeKey), ANY];
     await d1Statements(
       d,
       keys.map(k =>
         on
-          ? `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(k)}, ${lit(JSON.stringify({ at: new Date().toISOString() }))}, 'cutover', 0) ON CONFLICT (key) DO NOTHING;`
+          ? `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(k)}, ${lit(JSON.stringify({ expiresAt: Date.now() + Number(args['freeze-ttl-ms']), by: 'cutover-customer-auth' }))}, 'cutover', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`
           : `DELETE FROM system_settings WHERE key = ${lit(k)};`
       )
     );
@@ -165,13 +171,25 @@ async function main() {
     return;
   }
 
-  await setFreeze(true, stores);
-  console.log(
-    `FROZEN ${stores.length} store(s): customer-auth writes get 503 CUSTOMER_AUTH_FROZEN; waiting ${wait} ms for isolates`
-  );
   const flipped = new Set();
+  let frozenNow = false;
+  const lift = async () => {
+    await setFreeze(false, stores);
+    frozenNow = false;
+  };
+  // a killed run must not leave the freeze up (it also expires on its own, with a P1)
+  for (const sig of ['SIGINT', 'SIGTERM'])
+    process.once(sig, () => {
+      console.error(`${sig}: lifting the freeze before exit`);
+      lift().finally(() => process.exit(130));
+    });
+  await setFreeze(true, stores);
+  frozenNow = true;
+  console.log(
+    `FROZEN ${stores.length} store(s): every customer-auth write gets 503 CUSTOMER_AUTH_FROZEN; draining ${drain} ms`
+  );
   try {
-    await sleep(wait);
+    await sleep(drain);
     client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
     const before = {};
     for (const s of stores) {
@@ -223,7 +241,7 @@ async function main() {
     );
 
     // re-verify on a NEW connection after the marker TTL: a Postgres write that landed in the window shows as drift
-    await sleep(wait);
+    await sleep(settle);
     client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
     const drift = [];
     for (const s of stores)
@@ -235,8 +253,9 @@ async function main() {
     await client.query('ROLLBACK');
     await client.end();
     if (drift.length) {
+      await lift();
       console.log(
-        `DRIFT: Postgres changed after the copy in ${drift.join(', ')}. Imports stay OPEN (DO not marked live) so those rows can be re-applied; the freeze is kept. Investigate, then --unfreeze.`
+        `DRIFT: Postgres changed after the copy in ${drift.join(', ')}. The freeze is lifted; the DO is NOT marked live (imports stay open) so those rows can be re-applied by hand through importRows. Investigate.`
       );
       process.exit(2);
     }
@@ -249,19 +268,18 @@ async function main() {
         'GLOBAL marker written: every DO store now serves customer auth from its StoreDO'
       );
     }
-    await setFreeze(false, stores);
+    await lift();
     console.log(
       `UNFROZEN; done in ${fmtMs(performance.now() - t0)}. Postgres digests unchanged since the copy (verified on a new connection).`
     );
   } catch (e) {
     const open = stores.filter(s => !flipped.has(s));
-    if (!flipped.size) {
-      await setFreeze(false, stores).catch(() => {});
-      console.log('UNFROZEN (aborted before any flip)');
-    } else
-      console.log(
-        `PARTIAL: flipped ${[...flipped].join(',')}; not flipped ${open.join(',') || '-'}. The freeze is kept on the flipped stores' Postgres side only until you --unfreeze.`
-      );
+    await lift().catch(() => {});
+    console.log(
+      flipped.size
+        ? `PARTIAL: flipped ${[...flipped].join(',')}; not flipped ${open.join(',') || '-'}.${frozenNow ? ' !!! the freeze is STILL UP: run --unfreeze' : ''}`
+        : 'UNFROZEN (aborted before any flip)'
+    );
     throw e;
   }
 }

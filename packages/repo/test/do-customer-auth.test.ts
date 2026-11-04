@@ -352,3 +352,51 @@ describe('cutover import', () => {
     expect(A.importRows(dst, { table: 'users', rows: [] })).toMatchObject({ ok: false });
   });
 });
+
+describe('operator status change (setStatus) and directory reads', () => {
+  it('suspend revokes everything in the same section: version bump, refresh rows, reset links', () => {
+    const db = fx();
+    reg(db);
+    session(db, 'u1', 'h1');
+    A.requestReset(
+      db,
+      { email: 'a@x.com', tokenHash: 'r1', rowId: 'rr1', expiresAt: T0 + 1e6 },
+      T0
+    );
+    expect(A.setStatus(db, { userId: 'u1', status: 'suspended' }, T0 + 5)).toMatchObject({
+      ok: true,
+      data: { tokenVersion: 1, previous: 'active' },
+    });
+    expect(A.userState(db, { userId: 'u1' })).toMatchObject({
+      data: { status: 'suspended', tokenVersion: 1 },
+    });
+    expect(rot(db, 'h1', 'n', T0 + 6)).toMatchObject({ ok: false, code: 'TOKEN_REUSED' });
+    expect(A.resetPassword(db, { tokenHash: 'r1', newHash: 'H2' }, T0 + 7)).toMatchObject({
+      ok: false,
+    });
+    expect(session(db, 'u1', 'h2', 1)).toMatchObject({ ok: false, code: 'ACCOUNT_SUSPENDED' });
+    expect(A.setStatus(db, { userId: 'ghost', status: 'suspended' })).toMatchObject({
+      ok: false,
+      status: 404,
+    });
+    expect(A.setStatus(db, { userId: 'u1', status: 'banned' as never })).toMatchObject({
+      ok: false,
+      status: 400,
+    });
+  });
+  it('profiles / newest / expiredDeleted read only what they say', () => {
+    const db = fx();
+    reg(db);
+    reg(db, 'b@x.com', 'u2', 'v2');
+    expect(A.profiles(db, { ids: ['u1', 'u2', 'nope'] })).toMatchObject({ ok: true });
+    const p = A.profiles(db, { ids: ['u1', 'u2', 'nope'] });
+    expect(p.ok && p.data.map(x => x.id).sort()).toEqual(['u1', 'u2']);
+    expect(JSON.stringify(p)).not.toMatch(/H1|password/i);
+    A.softDelete(db, { userId: 'u1' }, T0);
+    const n = A.newest(db, { limit: 10 });
+    expect(n.ok && n.data.map(x => x.id)).toEqual(['u2']);
+    expect(A.expiredDeleted(db, { before: T0 + 10, limit: 10 })).toMatchObject({ data: ['u1'] });
+    A.eraseCustomer(db, { userId: 'u1' }, T0);
+    expect(A.expiredDeleted(db, { before: T0 + 10, limit: 10 })).toMatchObject({ data: [] });
+  });
+});

@@ -25,6 +25,7 @@
  * tiers use the VARIANT total. The caller passes only orderable, loose (non-bundle) lines (review I4).
  * Memoisation: per instance (= per request) only. Never cache a resolved price across requests.
  */
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { prisma } from '@ebda/database';
 import { resolveUnitPrice, type BuyerGroup, type PriceTierRow, type Resolved } from '@ebda/shared';
 import { featureService } from './feature.service';
@@ -206,16 +207,22 @@ export async function loadBuyerGroup(
 ): Promise<(BuyerGroup & { name: string; isWholesale: boolean }) | null> {
   let customer: { group: GroupRow | null } | null = null;
   if (buyer.kind === 'session') {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: buyer.userId,
-        storeId,
-        role: 'customer',
-        status: 'active',
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
+    const doUser = await customerRow(storeId, buyer.userId);
+    const user =
+      doUser !== undefined
+        ? doUser && isLiveCustomer(doUser)
+          ? doUser
+          : null
+        : await prisma.user.findFirst({
+            where: {
+              id: buyer.userId,
+              storeId,
+              role: 'customer',
+              status: 'active',
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
     if (!user) return null;
     customer = await (
       await storeDb(storeId)
@@ -228,16 +235,22 @@ export async function loadBuyerGroup(
     if (buyer.shopperUserId) {
       // Same account tests as the session branch (design review M-5): a suspended / deleted account is never priced as a
       // group member, even when a merchant picked it.
-      const shopper = await prisma.user.findFirst({
-        where: {
-          id: buyer.shopperUserId,
-          storeId,
-          role: 'customer',
-          status: 'active',
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
+      const doShopper = await customerRow(storeId, buyer.shopperUserId);
+      const shopper =
+        doShopper !== undefined
+          ? doShopper && isLiveCustomer(doShopper)
+            ? doShopper
+            : null
+          : await prisma.user.findFirst({
+              where: {
+                id: buyer.shopperUserId,
+                storeId,
+                role: 'customer',
+                status: 'active',
+                deletedAt: null,
+              },
+              select: { id: true },
+            });
       if (!shopper) return null;
     }
     customer = await (

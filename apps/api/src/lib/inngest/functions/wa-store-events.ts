@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../../customer-directory';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { acrossStoresDb, readStoreDb } from '../../jobs/store-db';
 import { alarmStoreId } from '../../jobs/store-scope';
@@ -233,12 +234,16 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   if (row.status === 'recovered' || row.recoveredAt) return [];
   // A deactivated / erased account is never chased (belt and braces next to the revoke on delete).
   if (row.customerId) {
-    const owner = await runInTenantContext(storeId, () =>
-      prisma.user.findFirst({
-        where: { id: row.customerId!, storeId },
-        select: { deletedAt: true },
-      })
-    );
+    const doOwner = await customerRow(storeId, row.customerId);
+    const owner =
+      doOwner !== undefined
+        ? doOwner
+        : await runInTenantContext(storeId, () =>
+            prisma.user.findFirst({
+              where: { id: row.customerId!, storeId },
+              select: { deletedAt: true },
+            })
+          );
     if (!owner || owner.deletedAt) return [];
   }
   const phone = toE164(row.customerPhone);

@@ -5,6 +5,7 @@
  * the application only and is never an identity. Applicant PII (business name, phone, commercial reg. no.) is covered by the
  * customer export and erasure (auth.service) and cascades with the store.
  */
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
@@ -67,10 +68,16 @@ async function notify(
 export const WholesaleApplicationService = {
   async apply(storeId: string, userId: string, input: ApplyInput) {
     await assertWholesaleEntitled(storeId);
-    const user = await prisma.user.findFirst({
-      where: { id: userId, storeId, role: 'customer', status: 'active', deletedAt: null },
-      select: { id: true, email: true, firstName: true, lastName: true, emailVerified: true },
-    });
+    const doUser = await customerRow(storeId, userId);
+    const user =
+      doUser !== undefined
+        ? doUser && isLiveCustomer(doUser)
+          ? doUser
+          : null
+        : await prisma.user.findFirst({
+            where: { id: userId, storeId, role: 'customer', status: 'active', deletedAt: null },
+            select: { id: true, email: true, firstName: true, lastName: true, emailVerified: true },
+          });
     if (!user) throw new AppError(404, 'NOT_FOUND', 'Customer account not found');
     // Verified email is a precondition for APPLYING (not for binding, which is the user_id link).
     if (!user.emailVerified) {
@@ -186,18 +193,33 @@ export const WholesaleApplicationService = {
 
   async list(storeId: string, opts: { status?: string; limit?: number; cursor?: string } = {}) {
     const limit = Math.min(Math.max(opts.limit ?? 25, 1), 100);
+    // N-9: for a DO-served store the applicant is read from the store's DO (the Postgres relation is a stale copy).
+    const onDo = (await customerRow(storeId, null)) === null;
     const rows = await prisma.wholesaleApplication.findMany({
       where: { storeId, ...(opts.status ? { status: opts.status } : {}) },
       select: {
         ...appSelect,
-        user: { select: { email: true, firstName: true, lastName: true } },
+        ...(onDo ? {} : { user: { select: { email: true, firstName: true, lastName: true } } }),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     });
     const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const directory = onDo
+      ? new Map(
+          (
+            (await customerRows(
+              storeId,
+              page.map(r => (r as { userId: string }).userId)
+            )) ?? []
+          ).map(u => [u.id, { email: u.email, firstName: u.firstName, lastName: u.lastName }])
+        )
+      : null;
+    const items = directory
+      ? page.map(r => ({ ...r, user: directory.get((r as { userId: string }).userId) ?? null }))
+      : page;
     return { items, nextCursor: hasMore ? items[items.length - 1]!.id : null };
   },
 
@@ -266,10 +288,16 @@ export const WholesaleApplicationService = {
       select: appSelect,
     });
     invalidateB2bPricing(storeId);
-    const user = await prisma.user.findFirst({
-      where: { id: app.userId, storeId },
-      select: { email: true, firstName: true, lastName: true },
-    });
+    const doUser = await customerRow(storeId, app.userId);
+    const user =
+      doUser !== undefined
+        ? doUser && isLiveCustomer(doUser)
+          ? doUser
+          : null
+        : await prisma.user.findFirst({
+            where: { id: app.userId, storeId },
+            select: { email: true, firstName: true, lastName: true },
+          });
     if (user) void notify(storeId, 'approved', user, app.businessName);
     return updated;
   },
@@ -295,10 +323,16 @@ export const WholesaleApplicationService = {
       where: { id, storeId },
       select: appSelect,
     });
-    const user = await prisma.user.findFirst({
-      where: { id: app.userId, storeId },
-      select: { email: true, firstName: true, lastName: true },
-    });
+    const doUser = await customerRow(storeId, app.userId);
+    const user =
+      doUser !== undefined
+        ? doUser && isLiveCustomer(doUser)
+          ? doUser
+          : null
+        : await prisma.user.findFirst({
+            where: { id: app.userId, storeId },
+            select: { email: true, firstName: true, lastName: true },
+          });
     if (user) void notify(storeId, 'rejected', user, app.businessName, note);
     return updated;
   },

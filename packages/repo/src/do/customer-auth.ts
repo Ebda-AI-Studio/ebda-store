@@ -537,6 +537,57 @@ export function getProfile(db: SyncSql, a: { userId: string }): Res<CustomerPubl
   return ok(r ? toPublic(r) : null);
 }
 
+/** Public rows for many ids (<= 500): the directory read the merchant admin, orders, emails and eligibility checks use. */
+export function profiles(db: SyncSql, a: { ids: string[] }): Res<CustomerPublic[]> {
+  const ids = [...new Set((a.ids ?? []).filter(x => typeof x === 'string'))].slice(0, 500);
+  if (ids.length === 0) return ok([]);
+  return ok(
+    db
+      .all(
+        `SELECT ${PUBLIC_COLS} FROM _cauth_users WHERE id IN (${ids.map(() => '?').join(',')})`,
+        ids
+      )
+      .map(toPublic)
+  );
+}
+
+/** Newest registered, not-deleted customers (the admin "registered but never ordered" union), optionally within `ids`. */
+export function newest(db: SyncSql, a: { limit: number; ids?: string[] }): Res<CustomerPublic[]> {
+  const limit = Math.min(Math.max(1, a.limit | 0), 5000);
+  if (a.ids) {
+    const ids = a.ids.slice(0, 500);
+    if (ids.length === 0) return ok([]);
+    return ok(
+      db
+        .all(
+          `SELECT ${PUBLIC_COLS} FROM _cauth_users WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
+          [...ids, limit]
+        )
+        .map(toPublic)
+    );
+  }
+  return ok(
+    db
+      .all(
+        `SELECT ${PUBLIC_COLS} FROM _cauth_users WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT ?`,
+        [limit]
+      )
+      .map(toPublic)
+  );
+}
+
+/** Soft-deleted accounts past the retention cutoff that are not yet anonymised (the retention cron's candidates). */
+export function expiredDeleted(db: SyncSql, a: { before: number; limit: number }): Res<string[]> {
+  return ok(
+    db
+      .all(
+        `SELECT id FROM _cauth_users WHERE deleted_at IS NOT NULL AND deleted_at < ? AND email NOT LIKE 'erased-%' LIMIT ?`,
+        [a.before, Math.min(Math.max(1, a.limit | 0), 1000)]
+      )
+      .map(r => r.id as string)
+  );
+}
+
 export function updateProfile(
   db: SyncSql,
   a: { userId: string; firstName?: string; lastName?: string; phone?: string },
@@ -587,6 +638,37 @@ export function revokeAll(
   return db.transactionSync(() => {
     if (!userById(db, a.userId)) return no('NOT_FOUND', 404, 'User not found');
     return ok({ tokenVersion: revokeAllIn(db, a.userId, a.reason ?? 'revoke_all', now) });
+  });
+}
+
+/**
+ * Operator / merchant status change (suspend, deactivate, reactivate) in ONE section: the status, the token-version bump and
+ * the revocation of every live refresh row and reset link. A status that leaves `active` therefore kills the sessions NOW
+ * (access tokens on the next request via the version, refresh tokens at once), never "status recorded, sessions alive".
+ */
+export function setStatus(
+  db: SyncSql,
+  a: { userId: string; status: 'active' | 'inactive' | 'suspended' },
+  now = Date.now()
+): Res<{ tokenVersion: number; previous: string }> {
+  if (!['active', 'inactive', 'suspended'].includes(a.status))
+    return no('VALIDATION_ERROR', 400, 'bad status');
+  return db.transactionSync(() => {
+    const u = one(db, `SELECT status FROM _cauth_users WHERE id = ?`, [a.userId]);
+    if (!u) return no('NOT_FOUND', 404, 'User not found');
+    db.run(`UPDATE _cauth_users SET status = ?, updated_at = ? WHERE id = ?`, [
+      a.status,
+      now,
+      a.userId,
+    ]);
+    // leaving active (or any change) bumps and revokes; reactivation also bumps so a token minted before the suspension stays dead
+    const tokenVersion = revokeAllIn(
+      db,
+      a.userId,
+      a.status === 'active' ? 'revoke_all' : 'account_suspended',
+      now
+    );
+    return ok({ tokenVersion, previous: u.status as string });
   });
 }
 

@@ -263,4 +263,41 @@ describe.skipIf(e.E2E_DB === '1')('customer auth on a StoreDO with Postgres unre
       data: null,
     });
   });
+
+  it('an operator suspend (setStatus) kills the refresh token at once and blocks the next login; profiles reads the DO', async () => {
+    const vt = `${A}~${hex('c')}`;
+    await doOp(A, 'register', {
+      id: 'user-s',
+      email: 'susp@exit-test.invalid',
+      passwordHash: HASH,
+      firstName: 'Su',
+      lastName: 'Sp',
+      verification: { tokenHash: await sha(vt), expiresAt: Date.now() + 3_600_000, rowId: 'v-s' },
+    });
+    const l = (
+      await data(
+        await post('/auth/login', { email: 'susp@exit-test.invalid', password: PW, storeId: A })
+      )
+    ).data;
+    expect(l.refreshToken).toBeTruthy();
+    expect(await doOp(A, 'setStatus', { userId: 'user-s', status: 'suspended' })).toMatchObject({
+      ok: true,
+      data: { tokenVersion: 1 },
+    });
+    const r = await post('/auth/refresh', { refreshToken: l.refreshToken });
+    expect(r.status).toBe(401);
+    const again = await post('/auth/login', {
+      email: 'susp@exit-test.invalid',
+      password: PW,
+      storeId: A,
+    });
+    expect(again.status).toBe(403);
+    // the directory read the merchant admin / emails / eligibility checks use: from the DO, suspended is visible
+    const p = await doOp(A, 'profiles', { ids: ['user-s', 'nope'] });
+    expect(p).toMatchObject({ ok: true });
+    expect(JSON.stringify(p)).not.toMatch(/passwordHash|password_hash|\$2b\$/);
+    expect((p as { data: Array<{ id: string; status: string }> }).data).toMatchObject([
+      { id: 'user-s', status: 'suspended' },
+    ]);
+  });
 });

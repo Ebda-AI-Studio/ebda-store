@@ -7,18 +7,18 @@
  * writes them, after copying and verifying the store's rows. Before the marker every call is served by Postgres exactly as
  * before (Ruling NEON-ZERO-2: one marker, one source of truth, no dual read).
  *
- * Marker staleness class: BOUNDED, one-way. "On" is cached for the life of the isolate (never removed; a rollback is a new
- * deploy). "Off" is re-read at most every OFF_TTL_MS per isolate and store. The marker unreadable -> 503 (fail closed).
- * Freeze: while `customer_auth_freeze.<storeId>` exists, a Postgres WRITE of that store's customer-auth rows is a retryable 503,
- * so none can land between the copy and the flip (cached FREEZE_TTL_MS per isolate; the script waits longer before copying).
+ * ONE freeze mechanism: #407's (platform/cutover.ts, feat/nz-platform-d1 7ed916be5), ported here per store. The freeze row
+ * carries an expiry, "off" is never cached while frozen, a write is refused while marker + freeze coexist, and the script
+ * follows freeze -> drain -> snapshot -> copy -> verify -> flip -> settle -> drift check on a NEW connection -> lift.
+ * Marker unreadable -> 503 (fail closed).
  */
 import crypto from 'crypto';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo } from './store-backend';
+import { sendAlert } from '../services/alerts.service';
 
 export const OFF_TTL_MS = 10_000;
-export const FREEZE_TTL_MS = 5_000;
 export const markerKey = (storeId: string) => `customer_auth_cutover.${storeId}`;
 export const GLOBAL_MARKER_KEY = 'customer_auth_cutover.__all';
 export const freezeKey = (storeId: string) => `customer_auth_freeze.${storeId}`;
@@ -27,77 +27,137 @@ export const ANY_FREEZE_KEY = 'customer_auth_freeze.__any';
 
 interface MarkerD1 {
   prepare(sql: string): {
-    bind(...v: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> };
+    bind(...v: unknown[]): { all<T = Record<string, unknown>>(): Promise<{ results?: T[] }> };
   };
 }
 const d1 = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATFORM_DB;
 
+// Freeze + marker semantics are #407's (cutover.ts, head 7ed916be5), ported verbatim in behaviour: a freeze row carries
+// `{"expiresAt": <epoch ms>}` and past it is IGNORED with a P1 (once per isolate); "off" is never cached while a freeze
+// exists; a WRITE never trusts a cached "off" and is refused (retryable 503) while a freeze exists, marker or not.
 const on = new Set<string>();
 const offUntil = new Map<string, number>();
-const freezeCache = new Map<string, { frozen: boolean; until: number }>();
+const expiredAlerted = new Set<string>();
 /** Test seam. */
 export function resetCustomerAuthCaches(): void {
   on.clear();
   offUntil.clear();
-  freezeCache.clear();
+  expiredAlerted.clear();
 }
 
 const unreadable = () =>
   new AppError(503, 'CUSTOMER_AUTH_CUTOVER_UNREADABLE', 'Platform database is unavailable');
+const frozenError = () =>
+  new AppError(503, 'CUSTOMER_AUTH_FROZEN', 'This data is being moved; retry in a minute', {
+    retryable: true,
+    retryAfterSeconds: 30,
+  });
 
-/** True when this store's customers are served by its StoreDO. Binding absent (Node, unit tests) -> false. */
-export async function customerAuthOnDo(storeId: string): Promise<boolean> {
-  if (on.has(storeId)) return true;
-  const db = d1();
-  if (!db) return false;
-  if ((offUntil.get(storeId) ?? 0) > Date.now()) return false;
+/** Marker (store or global) and freeze (store or any) in ONE read. */
+async function readKeys(
+  db: MarkerD1,
+  storeId: string | null
+): Promise<{ moved: boolean; frozen: boolean }> {
+  const keys = storeId
+    ? [markerKey(storeId), GLOBAL_MARKER_KEY, freezeKey(storeId), ANY_FREEZE_KEY]
+    : [ANY_FREEZE_KEY];
   try {
-    // ONE read for both markers; "on" is cached, so a hot store reads D1 once per isolate.
-    const row = await db
-      .prepare('SELECT 1 AS ok FROM system_settings WHERE key IN (?1, ?2) LIMIT 1')
-      .bind(markerKey(storeId), GLOBAL_MARKER_KEY)
-      .first<{ ok: number }>();
-    if (row) {
-      on.add(storeId);
-      return true;
+    const rows =
+      (
+        await db
+          .prepare(
+            `SELECT key, value FROM system_settings WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(',')})`
+          )
+          .bind(...keys)
+          .all<{ key: string; value: string }>()
+      ).results ?? [];
+    let frozen = false;
+    for (const r of rows) {
+      if (r.key !== ANY_FREEZE_KEY && r.key !== (storeId ? freezeKey(storeId) : '')) continue;
+      let expiresAt = Number.POSITIVE_INFINITY;
+      try {
+        const parsed = JSON.parse(r.value) as { expiresAt?: unknown };
+        if (typeof parsed.expiresAt === 'number') expiresAt = parsed.expiresAt;
+      } catch {
+        /* a freeze without a readable expiry is honoured */
+      }
+      if (expiresAt <= Date.now()) {
+        if (!expiredAlerted.has(r.key)) {
+          expiredAlerted.add(r.key);
+          void sendAlert({
+            level: 'p1',
+            title: 'Customer auth cutover: an expired freeze was left behind',
+            body: `${r.key} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: node scripts/cf/cutover-customer-auth.mjs --unfreeze --store <id> (same --d1 flags)`,
+          }).catch(() => undefined);
+        }
+        continue;
+      }
+      frozen = true;
     }
-    offUntil.set(storeId, Date.now() + OFF_TTL_MS);
-    return false;
+    return {
+      moved:
+        !!storeId && rows.some(r => r.key === markerKey(storeId) || r.key === GLOBAL_MARKER_KEY),
+      frozen,
+    };
   } catch {
     throw unreadable();
   }
 }
 
-/** Throws a retryable 503 when the store's customer-auth rows are frozen for a copy. Call only for writes that go to Postgres. */
-export async function assertCustomerAuthNotFrozen(storeId: string): Promise<void> {
-  return assertFrozenKey(storeId, freezeKey(storeId));
+/** READ path: true when this store's customers are served by its StoreDO. "On" is cached for good; "off" for OFF_TTL_MS, never while frozen. */
+export async function customerAuthOnDo(storeId: string): Promise<boolean> {
+  if (on.has(storeId)) return true;
+  const db = d1();
+  if (!db) return false;
+  if ((offUntil.get(storeId) ?? 0) > Date.now()) return false;
+  const { moved, frozen } = await readKeys(db, storeId);
+  if (moved) {
+    on.add(storeId);
+    return true;
+  }
+  if (!frozen) offUntil.set(storeId, Date.now() + OFF_TTL_MS);
+  return false;
+}
+
+/** WRITE path: never from a stale "off"; refused (503) while a freeze exists, marker or not (no mixed backends). */
+async function customerAuthOnDoForWrite(storeId: string): Promise<boolean> {
+  if (on.has(storeId)) return true;
+  const db = d1();
+  if (!db) return false;
+  const { moved, frozen } = await readKeys(db, storeId);
+  if (frozen) throw frozenError();
+  if (moved) {
+    on.add(storeId);
+    return true;
+  }
+  return false;
 }
 
 /** For a Postgres-era token that names no store (reset link): refused while ANY store is being copied. */
 export async function assertNoCustomerAuthFreeze(): Promise<void> {
-  return assertFrozenKey('__any', ANY_FREEZE_KEY);
-}
-
-async function assertFrozenKey(cacheKey: string, key: string): Promise<void> {
   const db = d1();
   if (!db) return;
-  let c = freezeCache.get(cacheKey);
-  if (!c || c.until <= Date.now()) {
-    try {
-      const row = await db
-        .prepare('SELECT 1 AS ok FROM system_settings WHERE key = ?1')
-        .bind(key)
-        .first<{ ok: number }>();
-      c = { frozen: !!row, until: Date.now() + FREEZE_TTL_MS };
-      freezeCache.set(cacheKey, c);
-    } catch {
-      throw unreadable();
-    }
-  }
-  if (c.frozen)
-    throw new AppError(503, 'CUSTOMER_AUTH_FROZEN', 'This data is being moved; retry in a minute', {
-      retryAfterSeconds: 30,
-    });
+  if ((await readKeys(db, null)).frozen) throw frozenError();
+}
+
+/**
+ * For store-create (#408): a store created ON a Durable Object has no Postgres customers to copy, so it starts with the marker
+ * on. Call it in the SAME step that writes the D1 `stores` row with `storage_backend = 'do'`:
+ *   `await markCustomerAuthOnDo(env.PLATFORM_DB, store.id)`
+ * Idempotent (`ON CONFLICT DO NOTHING`). Without it the new store's first customers register in Postgres.
+ */
+export async function markCustomerAuthOnDo(
+  db: {
+    prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } };
+  },
+  storeId: string
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO system_settings (id, key, value, category, is_public) VALUES (?1, ?2, ?3, 'cutover', 0) ON CONFLICT (key) DO NOTHING"
+    )
+    .bind(crypto.randomUUID(), markerKey(storeId), JSON.stringify({ on: true, by: 'store-create' }))
+    .run();
 }
 
 export type CustomerAuthRoute = { kind: 'do'; client: CustomerAuthClient } | { kind: 'pg' };
@@ -112,10 +172,10 @@ export async function customerAuthRoute(
 ): Promise<CustomerAuthRoute> {
   if (!storeId || typeof storeId !== 'string') return { kind: 'pg' };
   if ((await backendFor(storeId)) !== 'do') return { kind: 'pg' };
-  if (await customerAuthOnDo(storeId))
-    return { kind: 'do', client: new CustomerAuthClient(storeId) };
-  if (opts.write) await assertCustomerAuthNotFrozen(storeId);
-  return { kind: 'pg' };
+  const onDo = opts.write
+    ? await customerAuthOnDoForWrite(storeId)
+    : await customerAuthOnDo(storeId);
+  return onDo ? { kind: 'do', client: new CustomerAuthClient(storeId) } : { kind: 'pg' };
 }
 
 interface AuthStub {

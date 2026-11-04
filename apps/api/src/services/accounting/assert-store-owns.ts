@@ -1,4 +1,10 @@
 import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
+import {
+  customerRow,
+  customerRows,
+  isLiveCustomer,
+  pickSelected,
+} from '../../lib/customer-directory';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../middleware/error-handler';
 import { storeRepo } from '../../lib/repo-factory';
@@ -95,7 +101,8 @@ export async function assertStoreOwns(
         })
       : [],
     customerIds.length
-      ? client.user.findMany({ where: { id: { in: customerIds }, storeId }, select: { id: true } })
+      ? ((await customerRows(storeId, customerIds)) ??
+        client.user.findMany({ where: { id: { in: customerIds }, storeId }, select: { id: true } }))
       : [],
     categoryIds.length
       ? client.category.findMany({

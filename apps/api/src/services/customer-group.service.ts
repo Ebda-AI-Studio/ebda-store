@@ -12,6 +12,7 @@
  * 23505. Never rely on the service alone — concurrent writers would race, which
  * is exactly why the index exists underneath.
  */
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
@@ -213,10 +214,16 @@ export const CustomerGroupService = {
       select: { id: true },
     });
     if (!group) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
-    const shopper = await prisma.user.findFirst({
-      where: { id: userId, storeId, role: 'customer', status: 'active', deletedAt: null },
-      select: { id: true, email: true, firstName: true, lastName: true },
-    });
+    const doShopper = await customerRow(storeId, userId);
+    const shopper =
+      doShopper !== undefined
+        ? doShopper && isLiveCustomer(doShopper)
+          ? doShopper
+          : null
+        : await prisma.user.findFirst({
+            where: { id: userId, storeId, role: 'customer', status: 'active', deletedAt: null },
+            select: { id: true, email: true, firstName: true, lastName: true },
+          });
     if (!shopper)
       throw new AppError(
         409,
@@ -333,10 +340,16 @@ export const CustomerGroupService = {
     //    change nothing else on it. Such a row has no user_id, so it grants no group PRICE or promotion benefit to anyone
     //    who types its phone; it is only ever used when the merchant explicitly picks it.
     if (userId) {
-      const shopper = await prisma.user.findFirst({
-        where: { id: userId, storeId, role: 'customer', deletedAt: null },
-        select: { id: true, email: true, phone: true, firstName: true, lastName: true },
-      });
+      const doShopper = await customerRow(storeId, userId);
+      const shopper =
+        doShopper !== undefined
+          ? doShopper && doShopper.deletedAt === null
+            ? doShopper
+            : null
+          : await prisma.user.findFirst({
+              where: { id: userId, storeId, role: 'customer', deletedAt: null },
+              select: { id: true, email: true, phone: true, firstName: true, lastName: true },
+            });
       if (!shopper) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
 
       const linked = await prisma.customer.findFirst({

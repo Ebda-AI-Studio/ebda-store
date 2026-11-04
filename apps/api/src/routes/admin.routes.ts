@@ -1,4 +1,5 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import { customerAuthRoute } from '../lib/customer-auth';
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -1126,6 +1127,49 @@ router.put(
         return;
       }
 
+      // N-9: a customer of a store served by its StoreDO lives THERE (its Postgres row is a stale copy). Status goes to the DO,
+      // where it revokes every session in the same section; every other field would only edit the stale copy, so it is refused.
+      if (existing.role === 'customer' && existing.storeId) {
+        const doRoute = await customerAuthRoute(existing.storeId, { write: true });
+        if (doRoute.kind === 'do') {
+          const other = Object.keys(data).filter(
+            k => k !== 'status' && (data as never)[k] !== undefined
+          );
+          if (other.length > 0) {
+            res.status(409).json({
+              success: false,
+              error: {
+                code: 'CUSTOMER_ON_STORE_DO',
+                message:
+                  'This customer is served by its store: only the status can be changed here (it signs them out at once).',
+              },
+            });
+            return;
+          }
+          if (data.status !== undefined) {
+            await AuthService.setCustomerStatusOnDo(id, existing.storeId, data.status);
+            await auditLog({
+              action: 'user.updated',
+              userId: req.user!.userId,
+              resourceType: 'user',
+              resourceId: id,
+              details: {
+                changedFields: 'status',
+                transitions: { status: { from: existing.status, to: data.status } },
+                backend: 'store-do',
+              },
+              ip: req.ip,
+              userAgent: req.headers['user-agent'],
+            });
+          }
+          const profile = await doRoute.client.call<Record<string, unknown> | null>('getProfile', {
+            userId: id,
+          });
+          res.json({ success: true, data: { user: profile } });
+          return;
+        }
+      }
+
       // Merchant, staff and super-admin accounts (users.store_id NULL) keep their credentials, email, role and status in the
       // shared identity service (Rulings ID-1/ID-2). The Store refuses to edit a credential or an email here (it would only
       // change a profile row the identity service ignores); status and role go to the identity service first.
@@ -1356,6 +1400,29 @@ router.delete(
           },
         });
         return;
+      }
+
+      // N-9: a customer served by its StoreDO is erased there (store rows + auth rows + sessions), not hard-deleted from the stale
+      // Postgres copy, which would leave the live account signing in.
+      if (target.role === 'customer' && target.storeId) {
+        const doRoute = await customerAuthRoute(target.storeId, { write: true });
+        if (doRoute.kind === 'do') {
+          await AuthService.eraseAccount(id, {
+            actorId: req.user!.userId,
+            storeHint: target.storeId,
+          });
+          await auditLog({
+            action: 'user.deleted',
+            userId: req.user!.userId,
+            resourceType: 'user',
+            resourceId: id,
+            details: { email: target.email, role: target.role, backend: 'store-do' },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+          res.json({ success: true, data: { message: 'User deleted' } });
+          return;
+        }
       }
 
       // The identity is erased FIRST: its sessions, refresh tokens and passkeys go with it, so no token of this user can be
