@@ -78,7 +78,7 @@ describe('store_usage_snapshots RLS follow-up (#1059)', () => {
     // takes the client it must read on. The ONLY caller runs it once per store through
     // `acrossStores`, and the helper reads the table through that client, never the bare `prisma`.
     expect(admin, 'the usage-history route no longer reads store by store').toContain(
-      'acrossStores(storeId =>\n    loadUsageHistoryRows('
+      'acrossStores(\n    storeId => loadUsageHistoryRows('
     );
     expect(admin.split('loadUsageHistoryRows(').length - 1, 'a second caller appeared').toBe(2);
     const helper = admin.slice(

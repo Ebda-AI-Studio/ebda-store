@@ -44,6 +44,7 @@ import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { prisma, withStore } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { getUsageSummary } from '../services/plan-limit.service';
 import { planService } from '../services/plan.service';
@@ -116,7 +117,12 @@ router.get(
   }
 );
 
-const guard = [authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess];
+const guard = [
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+];
 
 const checkoutSchema = z.object({
   planCode: z.string().min(1).max(64),

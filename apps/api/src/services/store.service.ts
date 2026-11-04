@@ -172,7 +172,11 @@ export async function updateStoreThrough<T>(
     const watched = new Proxy(tx as object, {
       get(target, prop) {
         const v = (target as any)[prop];
-        if (prop !== 'store') return v;
+        // `$queryRaw` / `$executeRaw` are called as `tx.$queryRaw`..., i.e. with this Proxy as `this`: bind them to the real client.
+        if (prop !== 'store')
+          return typeof v === 'function' && typeof prop === 'string' && prop[0] === '$'
+            ? v.bind(target)
+            : v;
         return new Proxy(v, {
           get(st, m) {
             if (m !== 'update') return st[m];
@@ -270,6 +274,33 @@ async function countStoreRows(
       ? { products, categories, orders: orders as number }
       : { products, categories };
   });
+}
+
+/**
+ * The CURRENT `settings` JSON, read at write time inside the writer's own call (BE:F-2).
+ *
+ * The lost update came from merging against a copy read minutes earlier (a page mounted, another surface wrote, the page saved
+ * its stale whole copy). Reading the live row here narrows the server-side window to one statement pair: on Postgres the row is
+ * locked (`FOR UPDATE`, held to the end of the request transaction) so two concurrent writers serialise and BOTH keys survive;
+ * on a Durable Object store (`updateStoreThrough` hands a stand-in that serves only `store.*`) it is a plain fresh read.
+ * RESIDUAL (Ruling FP-5): on the DO path two writers inside the same few milliseconds can still interleave, because the D1 +
+ * DO pair has no row lock to take. Cost if wrong: one key written in that window is lost, instead of every key written during
+ * the page's lifetime.
+ */
+async function readLiveSettings(
+  tx: Parameters<Parameters<typeof updateStoreThrough>[1]>[0],
+  storeId: string,
+  onDo: boolean
+): Promise<Record<string, unknown>> {
+  const raw = tx as unknown as {
+    $queryRaw?: (q: TemplateStringsArray, ...v: unknown[]) => Promise<Array<{ settings: unknown }>>;
+  };
+  if (!onDo && typeof raw.$queryRaw === 'function') {
+    const rows = await raw.$queryRaw`SELECT settings FROM stores WHERE id = ${storeId} FOR UPDATE`;
+    return (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
+  }
+  const row = await tx.store.findUnique({ where: { id: storeId }, select: { settings: true } });
+  return (row?.settings as Record<string, unknown> | null) ?? {};
 }
 
 export class StoreService {
@@ -631,18 +662,23 @@ export class StoreService {
       }
     }
 
-    // Merge settings instead of replacing entirely
-    let mergedSettings = data.settings;
-    if (data.settings && typeof data.settings === 'object') {
-      // Server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
-      mergedSettings = mergeClientSettings(
-        (store.settings as Record<string, unknown>) || {},
-        data.settings as Record<string, unknown>
-      ) as Prisma.InputJsonValue;
-    }
+    // Merge settings instead of replacing entirely. BE:F-2: the merge happens against the row as it is NOW, inside the writer's
+    // own call (see readLiveSettings), and `incoming` holds only the keys the client sent.
+    const incoming =
+      data.settings && typeof data.settings === 'object'
+        ? (data.settings as Record<string, unknown>)
+        : undefined;
+    const onDo = incoming ? await storeWritesToDo(storeId) : false;
 
-    const updatedStore = await updateStoreThrough(storeId, tx =>
-      tx.store.update({
+    const updatedStore = await updateStoreThrough(storeId, async tx => {
+      // Server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
+      const mergedSettings = incoming
+        ? (mergeClientSettings(
+            await readLiveSettings(tx, storeId, onDo),
+            incoming
+          ) as Prisma.InputJsonValue)
+        : data.settings;
+      return tx.store.update({
         where: { id: storeId },
         data: {
           name: data.name,
@@ -685,8 +721,8 @@ export class StoreService {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
         },
-      })
-    );
+      });
+    });
 
     // Invalidate store cache (best-effort)
     try {
@@ -1479,21 +1515,27 @@ export class StoreService {
     await StoreService.invalidateCache(store);
   }
 
-  static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
+  /**
+   * Replace ONE top-level `settings` key (BE:F-2): read the live row inside the writer's own call (readLiveSettings), splice the
+   * key, write, bust the caches. Used by the single-purpose setters so none of them writes back a copy read earlier.
+   */
+  private static async setSettingsKey(storeId: string, key: string, value: unknown) {
     const store = await this.getById(storeId);
-    const existingSettings = (store.settings as Record<string, unknown>) || {};
-    const mergedSettings = { ...existingSettings, floatingWidget };
-
-    const updatedStore = await updateStoreThrough(storeId, tx =>
-      tx.store.update({
+    const onDo = await storeWritesToDo(storeId);
+    const updatedStore = await updateStoreThrough(storeId, async tx => {
+      const live = await readLiveSettings(tx, storeId, onDo);
+      return tx.store.update({
         where: { id: storeId },
-        data: { settings: mergedSettings as Prisma.InputJsonValue },
-      })
-    );
-
+        data: { settings: { ...live, [key]: value } as Prisma.InputJsonValue },
+      });
+    });
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
+  }
+
+  static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
+    return this.setSettingsKey(storeId, 'floatingWidget', floatingWidget);
   }
 
   /**
@@ -1504,19 +1546,7 @@ export class StoreService {
    * is the `merchant_mcp_write` feature (mcp/merchant-write.ts checks both).
    */
   static async setMcpWriteEnabled(storeId: string, enabled: boolean) {
-    const store = await this.getById(storeId);
-    const existingSettings = (store.settings as Record<string, unknown>) || {};
-    const mergedSettings = { ...existingSettings, mcpWriteEnabled: enabled };
-
-    const updatedStore = await updateStoreThrough(storeId, tx =>
-      tx.store.update({
-        where: { id: storeId },
-        data: { settings: mergedSettings as Prisma.InputJsonValue },
-      })
-    );
-
-    await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    await this.setSettingsKey(storeId, 'mcpWriteEnabled', enabled);
     return enabled;
   }
 
@@ -1525,19 +1555,7 @@ export class StoreService {
    * OFF, Ruling SHARIA-GOLD-1). Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
    */
   static async setGoldAllowDeferredPayment(storeId: string, enabled: boolean) {
-    const store = await this.getById(storeId);
-    const existingSettings = (store.settings as Record<string, unknown>) || {};
-    const mergedSettings = { ...existingSettings, [GOLD_ALLOW_DEFERRED_SETTING]: enabled };
-
-    const updatedStore = await updateStoreThrough(storeId, tx =>
-      tx.store.update({
-        where: { id: storeId },
-        data: { settings: mergedSettings as Prisma.InputJsonValue },
-      })
-    );
-
-    await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    await this.setSettingsKey(storeId, GOLD_ALLOW_DEFERRED_SETTING, enabled);
     return enabled;
   }
 

@@ -12,7 +12,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { withStore, withUser, UserRole } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
@@ -101,6 +102,9 @@ router.get(
 router.post(
   '/',
   authenticate,
+  requireMfaEnrolled,
+  // BE:S-2 (Ruling FP-3): adding a staff member grants durable access; not from an impersonated session.
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),
@@ -337,11 +341,13 @@ router.post(
         success: true,
         data: {
           membershipId: membership.id,
+          // BE:S-20: echo what the OWNER typed, never fields read from a pre-existing account (its stored name is that
+          // person's data, and showing it confirmed whose account the address belongs to).
           user: {
             id: staffUser.id,
-            email: staffUser.email,
-            firstName: staffUser.firstName,
-            lastName: staffUser.lastName,
+            email: input.email,
+            firstName: input.firstName,
+            lastName: input.lastName,
             role: staffUser.role,
           },
         },

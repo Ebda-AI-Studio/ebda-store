@@ -5,8 +5,12 @@ import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
 import { getAccountState } from '../lib/identity-client';
+import { withIdentityTimeout } from '../lib/identity-timeout';
+import { accountStateCached } from '../lib/identity-live-cache';
 import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
+import { enterImpersonation } from '../lib/impersonation-context';
+import { recordTiming } from '../lib/request-timing';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { isIdentityManagedUser } from '../lib/identity-client';
@@ -148,6 +152,17 @@ export function accountsUser(c: AccountsClaims, profileRole?: string): AuthPaylo
   return { userId: c.sub, email: c.email ?? '', role, storeId: null };
 }
 
+export interface LiveIdentityMemo {
+  key?: string;
+  value?: { revoked: boolean; account: Awaited<ReturnType<typeof getAccountState>> };
+}
+const LIVE_MEMO = Symbol('ebda.liveIdentityMemo');
+/** The request's live-identity memo (created on first use). Shared by tenantContext's pre-check and `authenticate`. */
+export function liveIdentityMemo(req: Request): LiveIdentityMemo {
+  const holder = req as unknown as Record<symbol, LiveIdentityMemo | undefined>;
+  return (holder[LIVE_MEMO] ??= {});
+}
+
 /** Verify an identity-service token and its session. Throws AppError on any failure. */
 export async function authenticateAccounts(
   token: string,
@@ -159,6 +174,13 @@ export async function authenticateAccounts(
      * refresh). `false`: trust the signed claims (plain reads; tokens live <= 5 minutes). Ruling NZ-D2.
      */
     live?: boolean;
+    /** Out-parameter: how long the identity round trip took (0 on a cache hit / non-live), for Server-Timing. */
+    timing?: { identityMs?: number };
+    /**
+     * Per-request memo of the live answers. `tenantContext` pre-checks before it opens the request transaction and hands the
+     * same memo to `authenticate`, so the RPCs are not repeated inside the transaction.
+     */
+    memo?: LiveIdentityMemo;
   } = {}
 ): Promise<{ user: AuthPayload; claims: AccountsClaims }> {
   let claims: AccountsClaims;
@@ -184,11 +206,32 @@ export async function authenticateAccounts(
   // LIVE: ONE source for revocation + existence + status (the identity service). Postgres is not consulted.
   let revoked: boolean;
   let account: Awaited<ReturnType<typeof getAccountState>>;
+  const memoKey = `${claims.sid}|${claims.sub}`;
+  const identityStart = performance.now();
   try {
-    [revoked, account] = await Promise.all([
-      sessionRevoked(claims.sid),
-      getAccountState(claims.sub),
-    ]);
+    if (opts.memo?.key === memoKey && opts.memo.value) {
+      // The pre-check made moments ago in THIS request (tenantContext, before its transaction opened): same answers, no
+      // second round trip while a pooled client is leased.
+      ({ revoked, account } = opts.memo.value);
+    } else {
+      // 3 s budget per RPC. Revocation is asked every time; the account state is shared by concurrent requests and kept 30 s
+      // when positive (lib/identity-live-cache.ts documents the NEVER-stale class and the cross-isolate residual).
+      const [r, a] = await Promise.all([
+        withIdentityTimeout(sessionRevoked(claims.sid), 'isRevoked'),
+        accountStateCached(
+          claims.sub,
+          () => withIdentityTimeout(getAccountState(claims.sub), 'getAccountState'),
+          v => v?.status === 'active'
+        ),
+      ]);
+      revoked = r;
+      account = a;
+      if (opts.memo) {
+        opts.memo.key = memoKey;
+        opts.memo.value = { revoked, account };
+      }
+    }
+    if (opts.timing) opts.timing.identityMs = performance.now() - identityStart;
   } catch (err) {
     // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
     logger.error({ err: (err as Error).message }, '[auth] identity live check failed');
@@ -216,7 +259,15 @@ export async function authenticate(
   // Identity-service (ES256) token: merchants, staff and super admins. Customer and impersonation tokens stay HS256.
   if (isAccountsToken(token)) {
     try {
-      const { user, claims } = await authenticateAccounts(token, { live: needsLiveIdentity(req) });
+      const timing: { identityMs?: number } = {};
+      const authStart = performance.now();
+      const { user, claims } = await authenticateAccounts(token, {
+        live: needsLiveIdentity(req),
+        timing,
+        memo: liveIdentityMemo(req),
+      });
+      recordTiming(req, 'auth', performance.now() - authStart);
+      if (timing.identityMs !== undefined) recordTiming(req, 'identity', timing.identityMs);
       req.user = user;
       (req as any).tokenJti = claims.jti;
       (req as any).accountsSid = claims.sid;
@@ -285,6 +336,8 @@ export async function authenticate(
     }
 
     req.user = payload;
+    // BE:S-2: every audit row written for the rest of this request names the impersonating super_admin.
+    if (payload.impersonatedBy) enterImpersonation(payload.impersonatedBy);
     // Expose the jti on the request so downstream middleware (e.g. logout)
     // can denylist this specific token without re-decoding.
     (req as any).tokenJti = decoded?.jti;
