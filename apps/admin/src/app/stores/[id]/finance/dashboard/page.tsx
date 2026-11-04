@@ -498,7 +498,7 @@ export default function FinanceDashboardPage() {
                               className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
                                 a.severity === 'p0'
                                   ? 'bg-red-100 text-red-700'
-                                  : 'bg-amber-100 text-amber-700'
+                                  : 'bg-warning/10 text-warning-ink'
                               }`}
                             >
                               {a.severity.toUpperCase()}

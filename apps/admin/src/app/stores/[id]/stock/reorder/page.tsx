@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
 import { VariantText, useToast } from '@ebda/ui';
@@ -74,7 +75,7 @@ function UrgencyBadge({
   }
   if (days < 7) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning-ink">
         {t('card.urgencyDays', { days })}
       </span>
     );
@@ -324,8 +325,9 @@ export default function ReorderPage() {
               disabled={meta.page === 1}
               onClick={() => load(meta.page - 1)}
               className="px-3 py-1 rounded border border-border disabled:opacity-40"
+              aria-label={t('pagePrev')}
             >
-              ←
+              <ArrowStart />
             </button>
             <span className="text-muted-foreground">
               {meta.page} / {meta.totalPages}
@@ -335,8 +337,9 @@ export default function ReorderPage() {
               disabled={meta.page >= meta.totalPages}
               onClick={() => load(meta.page + 1)}
               className="px-3 py-1 rounded border border-border disabled:opacity-40"
+              aria-label={t('pageNext')}
             >
-              →
+              <ArrowEnd />
             </button>
           </div>
         )}

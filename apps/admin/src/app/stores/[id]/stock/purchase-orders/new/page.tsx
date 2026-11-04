@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { FormFooter } from '@/components/FormFooter';
 import { apiGet, apiPost } from '@/lib/api';
 import { isVariantProduct } from '@/lib/variant-product';
 import { formatPrice } from '@/lib/format';
@@ -72,7 +73,6 @@ export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const t = useT('stock.purchaseOrders');
   const tNew = useT('stock.purchaseOrders.new');
-  const tc = useT('common');
 
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -249,12 +249,12 @@ export default function NewPurchaseOrderPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supplierId) {
-      setError('Please select a supplier.');
+      setError(tNew('supplierRequired'));
       return;
     }
     const validLines = lines.filter(l => l.productId && l.qty && l.unitCost);
     if (validLines.length === 0) {
-      setError('Add at least one line item with product, quantity, and unit cost.');
+      setError(tNew('linesRequired'));
       return;
     }
     if (validLines.some(l => productHasVariants(l.productId) && !l.variantId)) {
@@ -308,7 +308,10 @@ export default function NewPurchaseOrderPage() {
   }
 
   return (
-    <AdminLayout title={tNew('title')}>
+    <AdminLayout
+      title={tNew('title')}
+      parent={{ label: t('title'), href: `/stores/${storeId}/stock/purchase-orders` }}
+    >
       <form onSubmit={handleSubmit} className="max-w-4xl space-y-5">
         {/* Supplier + Expected date */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -393,24 +396,17 @@ export default function NewPurchaseOrderPage() {
           </button>
         </div>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
+        {error && (
+          <div role="alert" className="text-destructive-ink text-sm">
+            {error}
+          </div>
+        )}
 
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-          >
-            {submitting ? tc('saving') : tNew('submit')}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders`)}
-            className="px-4 py-2 border border-border rounded text-sm"
-          >
-            {tc('cancel')}
-          </button>
-        </div>
+        <FormFooter
+          primaryLabel={tNew('submit')}
+          cancelHref={`/stores/${storeId}/stock/purchase-orders`}
+          saving={submitting}
+        />
       </form>
     </AdminLayout>
   );

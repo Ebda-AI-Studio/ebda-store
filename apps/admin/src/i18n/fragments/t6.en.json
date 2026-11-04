@@ -1,0 +1,188 @@
+{
+  "stock": {
+    "suppliers": {
+      "loadFailed": "Could not load suppliers. Try again.",
+      "deactivateObject": "Supplier \"{name}\"",
+      "deactivateConsequence": "It leaves new lists; existing purchase orders stay as they are.",
+      "deactivateAction": "Deactivate supplier",
+      "rowMenu": "Options for supplier {name}"
+    },
+    "warehouses": {
+      "saveFailed": "Could not save the warehouse. Try again.",
+      "deactivateFailed": "Could not deactivate the warehouse. Try again.",
+      "defaultFailed": "Could not make it the default warehouse. Try again.",
+      "deactivateObject": "Warehouse \"{name}\"",
+      "deactivateConsequence": "It stops being used; its stock data is kept.",
+      "deactivateAction": "Deactivate warehouse",
+      "rowMenu": "Options for warehouse {name}"
+    },
+    "warehouseStock": {
+      "saveFailed": "Could not save the quantity. Try again.",
+      "adjustFailed": "Could not adjust the stock. Try again.",
+      "reconcileFailed": "Could not start the stock reconcile. Try again.",
+      "breadcrumb": "Warehouses",
+      "pagePrev": "Previous page",
+      "pageNext": "Next page"
+    },
+    "purchaseOrders": {
+      "detail": {
+        "loadFailed": "Could not load the purchase order. Try again.",
+        "qtyRequired": "Enter at least one quantity to receive.",
+        "cancelObject": "Purchase order {number}",
+        "cancelConsequence": "It is cancelled and cannot be restored. Quantities already received stay.",
+        "cancelAction": "Cancel purchase order",
+        "menuLabel": "Purchase order options"
+      },
+      "loadFailed": "Could not load purchase orders. Try again.",
+      "newButton": "New purchase order",
+      "new": {
+        "supplierRequired": "Select a supplier first.",
+        "linesRequired": "Add at least one line with a product, quantity and unit cost."
+      }
+    },
+    "adjustments": {
+      "loadFailed": "Could not load stock adjustments. Try again.",
+      "newButton": "New stock adjustment",
+      "new": {
+        "itemsRequired": "Add at least one product with a quantity.",
+        "unexpectedResponse": "The server sent an unexpected reply. Try again.",
+        "postFailedAfterDraft": "Saved as a draft but could not be approved: {error}",
+        "postObject": "Stock adjustment on {count} products",
+        "postConsequence": "Stock changes for real and cannot be undone once approved. Save as a draft first if you want to review.",
+        "cancel": "Cancel",
+        "submitPost": "Approve adjustment",
+        "submitDraft": "Save as draft",
+        "evidencePlaceholder": "https://… (link to a photo or file that proves the reason)"
+      }
+    },
+    "inventory": {
+      "backorderObject": "Backorder on {count} products",
+      "backorderEnableConsequence": "Customers can order these products even when they are out of stock.",
+      "backorderDisableConsequence": "Out-of-stock products can no longer be ordered.",
+      "backorderEnableFailed": "Could not enable backorder. Try again.",
+      "backorderDisableFailed": "Could not disable backorder. Try again.",
+      "backorderEnabledDone": "Backorder enabled on {count} products",
+      "backorderDisabledDone": "Backorder disabled on {count} products",
+      "moreActions": "Inventory options"
+    },
+    "scan": {
+      "counting": {
+        "closeObject": "Close the count ({count} items counted)",
+        "closeConsequence": "You cannot add more items to this count once it is closed.",
+        "reconcileObject": "Approve count differences: {count} items differ, net {units} units",
+        "reconcileConsequence": "Stock is adjusted for every item that differs and is recorded in the accounts. This cannot be undone.",
+        "reconcileAction": "Approve differences"
+      }
+    },
+    "reorder": {
+      "pagePrev": "Previous page",
+      "pageNext": "Next page"
+    },
+    "deadstock": {
+      "pagePrev": "Previous page",
+      "pageNext": "Next page"
+    }
+  },
+  "finance": {
+    "expenses": {
+      "loadFailed": "Could not load expenses. Try again.",
+      "actions": {
+        "rejectObject": "This expense",
+        "rejectConsequence": "It is marked rejected and does not enter the accounts.",
+        "failed": "The action did not go through. Try again.",
+        "menu": "Options for expense {number}",
+        "reject": "Reject expense"
+      },
+      "newButton": "Add expense",
+      "new": {
+        "submit": "Save expense"
+      }
+    },
+    "bankRec": {
+      "loadFailed": "Could not load bank statements. Try again.",
+      "deleteObject": "Bank statement \"{name}\"",
+      "deleteConsequence": "The statement and every matched transaction are removed.",
+      "deleteAction": "Delete statement",
+      "deleteFailed": "Could not delete the statement. Try again.",
+      "rowMenu": "Options for statement {name}"
+    },
+    "accounts": {
+      "loadFailed": "Could not load the chart of accounts. Try again."
+    },
+    "journal": {
+      "loadFailed": "Could not load journal entries. Try again.",
+      "entryNotFound": "This entry was not found.",
+      "loadEntryFailed": "Could not load the entry. Try again."
+    },
+    "reports": {
+      "loadTrialFailed": "Could not load the trial balance. Try again.",
+      "loadPnlFailed": "Could not load the profit and loss report. Try again.",
+      "loadBalanceFailed": "Could not load the balance sheet. Try again.",
+      "loadTaxFailed": "Could not load the tax report. Try again."
+    },
+    "newEntry": {
+      "submit": "Post entry"
+    }
+  },
+  "insights": {
+    "dashboard": {
+      "loadFailed": "Could not load the insights. Try again."
+    },
+    "cohorts": {
+      "loadFailed": "Could not load the returning-customers data. Try again."
+    },
+    "funnel": {
+      "loadFailed": "Could not load the buying-journey data. Try again."
+    }
+  },
+  "aiTools": {
+    "replaceObject": "Forced AI sweep",
+    "replaceConsequence": "The content this sweep covers is replaced with new results.",
+    "replaceAction": "Replace content",
+    "cancelObject": "The running sweep",
+    "cancelConsequence": "It stops. Items already processed keep their changes.",
+    "cancelAction": "Stop sweep"
+  },
+  "billing": {
+    "cancelObject": "Cancelling your plan subscription",
+    "cancelAction": "Cancel subscription"
+  },
+  "analytics": {
+    "errors": {
+      "cashflowLockedTitle": "Cash flow is locked on your plan",
+      "cashflowLockedBody": "Cash flow and stock value are for the store owner on plans that include accounting.",
+      "cashflowLockedCta": "See plans"
+    }
+  },
+  "emailQueue": {
+    "confirmRetryObject": "Retry every failed message",
+    "corrupt": {
+      "discardObject": "The unreadable messages"
+    }
+  },
+  "smsQueue": {
+    "confirmRetryObject": "Retry every failed message",
+    "corrupt": {
+      "discardObject": "The unreadable messages"
+    }
+  },
+  "webhookEvents": {
+    "replayObject": "A payment event that was already processed",
+    "replayAction": "Process it again"
+  },
+  "billingEvents": {
+    "refundObject": "Refund {amount}",
+    "refundAction": "Refund the payment"
+  },
+  "platformSettings": {
+    "vat": {
+      "enableObject": "Turning on VAT on invoices",
+      "enableAction": "Turn on VAT"
+    }
+  },
+  "taxReview": {
+    "actions": {
+      "revokeObject": "Tax verification for this store"
+    }
+  }
+}

@@ -27,6 +27,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
 import { SupportLink } from '../../../../components/billing/SupportLink';
 import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
@@ -127,7 +128,7 @@ function UsageBar({
   const pct =
     limit === null ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
   const tone =
-    limit !== null && used > limit ? 'bg-destructive' : pct >= 80 ? 'bg-amber-500' : 'bg-primary';
+    limit !== null && used > limit ? 'bg-destructive' : pct >= 80 ? 'bg-warning' : 'bg-primary';
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
@@ -158,6 +159,7 @@ export default function StoreBillingPage() {
   const storeId = params?.id as string;
   const t = useT('billing');
   const tCommon = useT('common');
+  const askConfirm = useConfirm();
   const tLimits = useT('plans.limits');
   const tNotice = useT('billing.notice');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
@@ -338,7 +340,12 @@ export default function StoreBillingPage() {
   }
 
   async function cancelPlan() {
-    if (!window.confirm(t('confirmCancel'))) return;
+    const ok = await askConfirm({
+      object: t('cancelObject'),
+      consequence: t('confirmCancel'),
+      confirmLabel: t('cancelAction'),
+    });
+    if (!ok) return;
     setBusy('cancel');
     try {
       const { data: d, error: e } = await apiPost<{ mode: 'at_period_end' | 'immediate' }>(
@@ -539,7 +546,7 @@ export default function StoreBillingPage() {
           {payOnOtherStore && (
             <div
               role="alert"
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+              className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
             >
               <p className="font-semibold">
                 {t(data.payOnStoreIncluded ? 'payOnStoreIncludedTitle' : 'payOnStoreTitle')}
@@ -562,7 +569,7 @@ export default function StoreBillingPage() {
               className={`rounded-xl border p-4 text-sm ${
                 noticeUrgent
                   ? 'border-destructive/40 bg-destructive/10 text-destructive-ink'
-                  : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200'
+                  : 'border-warning/30 bg-warning/10 text-warning-ink'
               }`}
             >
               <p className="font-semibold">{noticeCopy.title}</p>
@@ -624,7 +631,7 @@ export default function StoreBillingPage() {
           {overOrders && (
             <div
               role="alert"
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+              className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
             >
               <p className="font-semibold">{t('overLimit.title')}</p>
               <p className="mt-1">

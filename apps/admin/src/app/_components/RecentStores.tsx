@@ -63,7 +63,7 @@ export function RecentStores({ stores, isLoading }: RecentStoresProps) {
               <div className="flex shrink-0 items-center gap-2">
                 <Badge
                   variant={store.status === 'active' ? 'default' : 'secondary'}
-                  className="text-[10px] px-2 py-0.5 capitalize"
+                  className="text-xs px-2 py-0.5 capitalize"
                 >
                   {store.status}
                 </Badge>

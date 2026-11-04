@@ -19,6 +19,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { VariantText } from '@ebda/ui';
@@ -397,7 +398,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
 
       {lookup && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          {lookup.ambiguous && <p className="text-xs text-amber-600">{t('ambiguousWarning')}</p>}
+          {lookup.ambiguous && <p className="text-xs text-warning-ink">{t('ambiguousWarning')}</p>}
           <div>
             <p className="font-semibold text-sm">{lookup.productName}</p>
             {lookup.variantTitle && (
@@ -708,6 +709,7 @@ function PickMode({ storeId }: { storeId: string }) {
 function CountMode({ storeId }: { storeId: string }) {
   const t = useT('stock.scan');
   const tc = useT('common');
+  const askConfirm = useConfirm();
   const cameraSupported = useBarcodeDetectorSupported();
   const [sessions, setSessions] = useState<
     | { id: string; status: string; note: string | null; lineCount: number; createdAt: string }[]
@@ -811,7 +813,13 @@ function CountMode({ storeId }: { storeId: string }) {
 
   const closeSession = async () => {
     if (!activeSession) return;
-    if (!confirm(t('counting.closeConfirm'))) return;
+    const ok = await askConfirm({
+      object: t('counting.closeObject', { count: activeSession.lines.length }),
+      consequence: t('counting.closeConsequence'),
+      confirmLabel: t('counting.closeSession'),
+      tone: 'default',
+    });
+    if (!ok) return;
     const { data } = await apiPost<{ id: string; status: string }>(
       `/api/v1/stores/${storeId}/inventory/count-sessions/${activeSession.id}/close`,
       {}
@@ -821,7 +829,17 @@ function CountMode({ storeId }: { storeId: string }) {
 
   const reconcile = async () => {
     if (!activeSession) return;
-    if (!confirm(t('counting.reconcileConfirm'))) return;
+    const changed = activeSession.lines.filter(l => l.variance !== 0);
+    const netUnits = changed.reduce((sum, l) => sum + l.variance, 0);
+    const ok = await askConfirm({
+      object: t('counting.reconcileObject', {
+        count: changed.length,
+        units: `${netUnits > 0 ? '+' : ''}${netUnits}`,
+      }),
+      consequence: t('counting.reconcileConsequence'),
+      confirmLabel: t('counting.reconcileAction'),
+    });
+    if (!ok) return;
     setReconciling(true);
     setReconcileErr(null);
     const { data, error } = await apiPost<{

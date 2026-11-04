@@ -160,7 +160,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       .catch(() => {
         if (!isLatest()) return;
         setRows(null);
-        setError('Failed to load trial balance');
+        setError(t('loadTrialFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -342,7 +342,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
       .catch(() => {
         if (!isLatest()) return;
         setData(null);
-        setError('Failed to load P&L');
+        setError(t('loadPnlFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -535,7 +535,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
       .catch(() => {
         if (!isLatest()) return;
         setData(null);
-        setError('Failed to load balance sheet');
+        setError(t('loadBalanceFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -711,7 +711,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
       .catch(() => {
         if (!isLatest()) return;
         setData(null);
-        setError('Failed to load tax report');
+        setError(t('loadTaxFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -823,9 +823,9 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                 {major(data.summary.totalTaxableSales)} {tc('egp')}
               </p>
             </div>
-            <div className="rounded-xl border border-border p-4 bg-amber-50 border-amber-200">
+            <div className="rounded-xl border border-border p-4 bg-warning/10 border-warning/30">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
-              <p className="text-2xl font-semibold font-mono text-amber-800">
+              <p className="text-2xl font-semibold font-mono text-warning-ink">
                 {major(data.summary.totalTaxCollected)} {tc('egp')}
               </p>
             </div>
@@ -859,7 +859,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                         <td className="px-3 py-2 font-mono">{r.taxRate}%</td>
                         <td className="px-3 py-2 text-end font-mono">{r.transactionCount}</td>
                         <td className="px-3 py-2 text-end font-mono">{major(r.totalSubtotal)}</td>
-                        <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                        <td className="px-3 py-2 text-end font-mono font-semibold text-warning-ink">
                           {major(r.totalTaxCollected)}
                         </td>
                       </tr>
@@ -927,7 +927,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           </td>
                           <td className="px-3 py-2 text-end font-mono">{major(row.subtotal)}</td>
                           <td className="px-3 py-2 text-end font-mono">{row.taxRate}%</td>
-                          <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                          <td className="px-3 py-2 text-end font-mono font-semibold text-warning-ink">
                             {major(row.taxCollected)}
                           </td>
                           <td className="px-3 py-2 text-end font-mono">
@@ -945,7 +945,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           {major(data.summary.totalTaxableSales)}
                         </td>
                         <td />
-                        <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                        <td className="px-3 py-2 text-end font-mono font-semibold text-warning-ink">
                           {major(data.summary.totalTaxCollected)}
                         </td>
                         <td />
