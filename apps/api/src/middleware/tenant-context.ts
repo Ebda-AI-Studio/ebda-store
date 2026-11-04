@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { runInStoreScope, runInTenantContext } from '@ebda/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
+import { backendFor } from '../lib/store-backend';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';
 import { skipsRequestTransaction } from './public-read-limit';
@@ -116,6 +117,42 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
   }
   (res as unknown as Record<symbol, TenantScope>)[REQUEST_TENANT_SCOPE] = { storeId, userId };
 
+  // NEON-ZERO-1 (Ruling NZ-TX-1): a store whose backend is `do` has its data in its Durable Object and its platform reads in D1,
+  // so the request opens NO Postgres transaction (BEGIN + set_config was a 500 on every admin route with Postgres dead). The
+  // flag is the D1 directory column (`backendFor`, the one source); an unreadable flag is a 503, never a Postgres fallback.
+  backendFor(storeId).then(backend => {
+    if (res.destroyed || res.writableEnded) return;
+    if (backend === 'do') openDoRequest(res, next, storeId, userId);
+    else openTransaction(res, next, storeId, userId);
+  }, next);
+}
+
+/** The same lifecycle as `openTransaction` (response gate, then the deferred drain) with NO Postgres transaction. */
+function openDoRequest(
+  res: Response,
+  next: NextFunction,
+  storeId: string,
+  userId: string | undefined
+): void {
+  runRequestInTransaction(
+    res,
+    next,
+    (body, releaseResponse) =>
+      withDeferredWork(
+        { storeId, userId, noPgTx: true },
+        () => runInStoreScope(storeId, body),
+        releaseResponse
+      ),
+    { storeId, middleware: 'tenantContext', backend: 'do' }
+  );
+}
+
+function openTransaction(
+  res: Response,
+  next: NextFunction,
+  storeId: string,
+  userId: string | undefined
+): void {
   runRequestInTransaction(
     res,
     next,

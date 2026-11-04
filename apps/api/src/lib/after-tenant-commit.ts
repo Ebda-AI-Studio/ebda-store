@@ -69,7 +69,7 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { onClosedTenantTxAccess, runInTenantContext } from '@ebda/database';
+import { onClosedTenantTxAccess, runInStoreScope, runInTenantContext } from '@ebda/database';
 import logger from './logger';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 import { sendAlert } from '../services/alerts.service';
@@ -120,6 +120,11 @@ interface DeferralScope {
 export interface TenantCommitContext {
   storeId?: string;
   userId?: string;
+  /**
+   * The request is for a store on its Durable Object (NEON-ZERO-1, Ruling NZ-TX-1): its deferred tasks run under the lazy
+   * per-query store scope with NO Postgres transaction and no pooled-connection slot.
+   */
+  noPgTx?: boolean;
 }
 
 const deferralStorage = new AsyncLocalStorage<DeferralScope>();
@@ -401,6 +406,18 @@ async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<v
  * rejects.
  */
 async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext): Promise<void> {
+  if (ctx.noPgTx && ctx.storeId) {
+    try {
+      await runInStoreScope(ctx.storeId, () => task.run().then(() => undefined));
+    } catch (err) {
+      try {
+        reportDeferredFailure(task.name, err, ctx);
+      } catch {
+        // A broken logger/alerter must not strand the rest of the queue.
+      }
+    }
+    return;
+  }
   const held = await acquireDeferredTxSlot(task.connections);
   try {
     await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
