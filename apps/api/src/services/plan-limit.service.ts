@@ -45,6 +45,7 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { storeRepo } from '../lib/repo-factory';
+import { onAccessD1 } from './platform/access-d1';
 import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlements';
 import { socketService } from './socket.service';
 import { EmailService } from './email.service';
@@ -73,6 +74,9 @@ export async function countUsage(
       });
     }
   }
+  // NEON-ZERO-1 (N-7): seats are D1 rows after the `access` cutover; count them without opening a Postgres transaction.
+  if (limitKey === 'maxStaff' && (await onAccessD1()))
+    return (prisma as unknown as Tx).storeStaff.count({ where: { storeId } });
   const run = async (db: Tx): Promise<number | null> => {
     switch (limitKey) {
       case 'maxProducts':

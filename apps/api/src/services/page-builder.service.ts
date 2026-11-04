@@ -45,6 +45,8 @@
 import { storeDb, storeRepo, storeUpdate, storeWriter } from '../lib/repo-factory';
 import { isDeepStrictEqual } from 'node:util';
 import { prisma, withStore } from '@ebda/database';
+import { getAccountsBrief } from '../lib/identity-client';
+import { gateRead, onAccessD1 } from './platform/access-d1';
 import { AppError } from '../middleware/error-handler';
 import {
   BUILDER_LIMITS,
@@ -556,6 +558,20 @@ async function publisherNames(storeId: string, ids: string[]): Promise<Map<strin
     u.deletedAt ? '' : `${u.firstName} ${u.lastName}`.trim();
   const select = { firstName: true, lastName: true, deletedAt: true } as const;
   try {
+    if (await onAccessD1()) {
+      // After the `access` cutover: memberships + owner from D1, names from the identity service (one call).
+      const staffRows = (await prisma.storeStaff.findMany({
+        where: { storeId, userId: { in: ids } },
+        select: { userId: true },
+      })) as Array<{ userId: string }>;
+      const g = await gateRead(storeId, null);
+      const want = [...new Set([...staffRows.map(r => r.userId), ...(g ? [g.store.ownerId] : [])])];
+      for (const b of await getAccountsBrief(want)) {
+        const n = `${b.firstName} ${b.lastName}`.trim();
+        if (n && ids.includes(b.id)) out.set(b.id, n);
+      }
+      return out;
+    }
     const [staff, store] = await Promise.all([
       prisma.storeStaff.findMany({
         where: { storeId, userId: { in: ids } },

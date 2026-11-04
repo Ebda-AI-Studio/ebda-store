@@ -7,6 +7,7 @@ import {
   storeIdsOnPlanD1,
 } from '../services/platform/billing-d1';
 import { prisma, withStore, withSystemJob, type Prisma } from '@ebda/database';
+import { onAccessD1, ownedStoreIdsD1 } from '../services/platform/access-d1';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import {
@@ -1031,6 +1032,8 @@ export async function storeIdsClaimingDomain(domain: string): Promise<string[]> 
  * must BE `ownerId`, or an active super_admin; wrap the call in `withUser(ownerId, ...)`.
  */
 export async function ownedStoreIds(ownerId: string): Promise<string[]> {
+  // NEON-ZERO-1 (N-6): D1 `stores` answers once the `access` family is on D1 (same predicate as the SQL function below).
+  if (await onAccessD1()) return ownedStoreIdsD1(ownerId);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT ebda_owned_store_ids AS id FROM public.ebda_owned_store_ids(${ownerId})`;
   return rows.map(r => r.id);

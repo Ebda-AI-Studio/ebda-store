@@ -23,7 +23,7 @@ import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
 
-export type PlatformFamily = 'billing';
+export type PlatformFamily = 'billing' | 'access';
 
 /** Prisma model names (delegate form) that each family owns. */
 export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
@@ -37,6 +37,8 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
     'billingWebhookEvent',
     'storeLifecycleEmail',
   ],
+  // NEON-ZERO-1 (N-6/N-7): store membership. The access gate, staff, staff invites and owner/staff listings.
+  access: ['storeStaff', 'staffInvite'],
 };
 
 export const OFF_TTL_MS = 10_000;

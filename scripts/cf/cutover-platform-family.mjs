@@ -24,6 +24,7 @@
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { cli, fmtMs } from './lib/cli.mjs';
+import pg from 'pg';
 import { connectReadOnly } from './lib/pg.mjs';
 import { loadPlan } from './lib/plan.mjs';
 import { bindPlan, droppedColumnLoss, sourceDigest, sourcePages } from './lib/source.mjs';
@@ -42,7 +43,40 @@ export const FAMILIES = {
     'billing_webhook_events',
     'store_lifecycle_emails',
   ],
+  // N-6/N-7: store membership (the access gate, staff, staff invites). Keep in step with FAMILY_MODELS.access.
+  access: ['store_staff', 'staff_invites'],
 };
+
+/** Families whose Postgres rows are EMPTIED after the flip (fail closed: Postgres policies/definers that still read them deny). */
+const EMPTY_PG_AFTER_FLIP = new Set(['access']);
+
+const STORE_FACTS_SQL_PG =
+  'SELECT id, owner_id, status, billing_suspended_reason, deleted_at IS NOT NULL AS deleted FROM stores';
+/**
+ * `access` pre-flip check: the gate decides on D1 `stores` (owner, status, suspension, deleted) once the marker exists, so
+ * every PG-backed store must carry the same facts there. The `storage_backend` column exists ONLY in D1: a store D1 owns
+ * (`do`) is skipped (its Postgres row is sealed and stale by design); a Postgres store missing from D1 is drift (404 at the gate).
+ */
+async function storeFactMismatches(client, d) {
+  const fact = r =>
+    `${r.owner_id}|${r.status}|${r.billing_suspended_reason ?? ''}|${r.deleted ? 1 : 0}`;
+  const pg = new Map((await client.query(STORE_FACTS_SQL_PG)).rows.map(r => [r.id, fact(r)]));
+  const d1 = new Map(
+    (
+      await d1Query(
+        d,
+        'SELECT id, owner_id, status, billing_suspended_reason, deleted_at IS NOT NULL AS deleted, storage_backend FROM stores'
+      )
+    ).map(r => [r.id, { v: fact(r), backend: r.storage_backend }])
+  );
+  const bad = [];
+  for (const [id, v] of pg) {
+    const row = d1.get(id);
+    if (!row) bad.push(id);
+    else if (row.backend !== 'do' && row.v !== v) bad.push(id);
+  }
+  return bad;
+}
 
 const markerKey = family => `platform_cutover.${family}`;
 const freezeKey = family => `platform_freeze.${family}`;
@@ -71,6 +105,9 @@ async function main() {
     unfreeze: { type: 'boolean', default: false },
     'drain-ms': { type: 'string', default: '45000' },
     'settle-ms': { type: 'string', default: '12000' },
+    // `access` only: a WRITE connection used once, after the flip, to empty the migrated Postgres rows.
+    'pg-write-url': { type: 'string' },
+    'allow-prod-write': { type: 'boolean', default: false },
     // a freeze carries its own expiry: if this script dies without lifting it the API ignores it after this long and pages
     'freeze-ttl-ms': { type: 'string', default: '900000' },
   });
@@ -128,6 +165,7 @@ async function main() {
     );
 
   const t0 = performance.now();
+  const writeUrl = args['pg-write-url'] ?? process.env.CUTOVER_PG_WRITE_URL;
   const plan = loadPlan();
   const open = async () => {
     const client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
@@ -190,8 +228,19 @@ async function main() {
           count: gone.length,
         });
     }
+    let drift0 = [];
+    if (args.family === 'access') {
+      drift0 = await storeFactMismatches(client, d);
+      if (drift0.length)
+        console.log(
+          `STORE DIRECTORY DRIFT (owner/status/suspension/deleted/missing): ${drift0.slice(0, 10).join(', ')} (${drift0.length})`
+        );
+      else console.log('  store directory facts equal on both sides');
+    }
     await client.query('ROLLBACK');
     await client.end();
+    if (drift0.length)
+      throw new Error('D1 stores differ from Postgres: run the directory reconcile, then re-run');
     if (orphans.length) {
       console.log(
         `FK PRE-CHECK FAILED: family rows name stores that are not in D1 stores:\n${JSON.stringify(orphans, null, 1)}`
@@ -200,6 +249,19 @@ async function main() {
         'stores must be in D1 first (run the directory reconcile / migrate-platform-to-d1 for stores)'
       );
     }
+    if (args.commit && EMPTY_PG_AFTER_FLIP.has(args.family) && !writeUrl)
+      throw new Error(
+        `family ${args.family} empties its Postgres rows after the flip (fail closed): pass --pg-write-url (or CUTOVER_PG_WRITE_URL) and, for a prod host, --allow-prod-write. Nothing was frozen.`
+      );
+    if (
+      args.commit &&
+      EMPTY_PG_AFTER_FLIP.has(args.family) &&
+      /neon\.tech$/.test(new URL(writeUrl).hostname) &&
+      !args['allow-prod-write']
+    )
+      throw new Error(
+        'the write URL is a production Neon host: pass --allow-prod-write to confirm. Nothing was frozen.'
+      );
     if (!args.commit) {
       console.log(
         `dry run: nothing written (${fmtMs(performance.now() - t0)}). Add --commit to freeze, copy, verify and flip.`
@@ -232,11 +294,13 @@ async function main() {
       lift().finally(() => process.exit(130));
     });
   await setFreeze();
+  const frozenAt = Date.now();
   frozenNow = true;
   console.log(
     `FROZEN ${args.family}: writes are refused (503, retryable). Draining ${args['drain-ms']} ms ...`
   );
   let flipped = false;
+  let copied = {};
   const before = {};
   let famNames = [];
   try {
@@ -264,11 +328,18 @@ async function main() {
       stmts = [];
       bytes = 0;
     };
+    const copiedPks = {};
     for (const bt of fam) {
       before[bt.name] = await sourceDigest(client, bt, plan.platform, 'all');
       const names = bt.columns.map(c => c.col);
+      const pkIdx = bt.pk.map(c => names.indexOf(c));
+      copiedPks[bt.name] = new Map();
       for await (const page of sourcePages(client, bt, plan.platform, 'all', null, args.pageSize))
         for (const r of page) {
+          copiedPks[bt.name].set(
+            JSON.stringify(pkIdx.map(i => String(r[i]))),
+            pkIdx.map(i => r[i])
+          );
           const st = upsert(bt.name, names, bt.pk, r);
           stmts.push(st);
           bytes += st.length;
@@ -276,6 +347,29 @@ async function main() {
         }
       await flush();
       console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
+    }
+    copied = copiedPks;
+
+    // 3b. STRAYS: upserts never delete, so a D1 row Postgres does not have (left by an earlier partial migration, or a row
+    // Postgres since deleted) would be a permanent MISMATCH and, for membership, a phantom grant. Inside the freeze, remove it.
+    for (const bt of fam) {
+      const have = await d1Query(
+        d,
+        `SELECT ${bt.pk.map(q).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name)}`
+      );
+      const stray = have.filter(
+        row => !copiedPks[bt.name].has(JSON.stringify(bt.pk.map(c => String(row[c]))))
+      );
+      if (stray.length) {
+        await d1Statements(
+          d,
+          stray.map(
+            row =>
+              `DELETE FROM ${q(bt.name)} WHERE ${bt.pk.map(c => `${q(c)} = ${lit(row[c])}`).join(' AND ')};`
+          )
+        );
+        console.log(`  removed ${stray.length} stray D1 row(s) from ${bt.name} (not in Postgres)`);
+      }
     }
 
     if (deferred.length) {
@@ -323,6 +417,12 @@ async function main() {
         `verification failed (${bad.join(', ')}); the switch was NOT flipped and the freeze is lifted. Re-run.`
       );
 
+    // The API ignores the freeze after --freeze-ttl-ms: never flip when more than 80% of it is gone (the drift check and the
+    // emptying still have to run inside it).
+    if (Date.now() - frozenAt > 0.8 * Number(args['freeze-ttl-ms']))
+      throw new Error(
+        `the freeze has used 80% of --freeze-ttl-ms (${args['freeze-ttl-ms']}): not flipping; re-run.`
+      );
     // 5. flip
     const value = JSON.stringify({
       family: args.family,
@@ -344,9 +444,6 @@ async function main() {
     }
   }
   await sleep(Number(args['settle-ms']));
-  await lift();
-  if (frozenNow) throw new Error('the freeze is still up (see above); run --unfreeze');
-  console.log('freeze lifted.');
 
   // 6. drift: a NEW connection = a snapshot taken after the flip. Any difference is a write that reached Postgres.
   const after = await open();
@@ -358,6 +455,46 @@ async function main() {
   }
   await after.client.query('ROLLBACK');
   await after.client.end();
+
+  // 7. FAIL CLOSED (still frozen): empty the migrated Postgres rows, so every Postgres policy/definer that still reads them
+  // (users/stores RLS, ebda_may_act_on_user, customer search) denies instead of granting a stale membership. Only the rows
+  // copied are deleted, by primary key, in one transaction. The Neon dump is the backup. Skipped on drift: those rows are the
+  // only copy of a write D1 does not have.
+  if (EMPTY_PG_AFTER_FLIP.has(args.family) && !drift.length) {
+    const w = new pg.Client({
+      connectionString: writeUrl,
+      application_name: 'ebda-cf-migrate-empty',
+    });
+    await w.connect();
+    try {
+      await w.query('BEGIN');
+      await w.query('SET LOCAL row_security = off');
+      for (const bt of [...after.fam].reverse()) {
+        const ids = [...copied[bt.name].values()].map(v => v[0]);
+        if (bt.pk.length !== 1) throw new Error(`${bt.name}: expected a single-column primary key`);
+        const res = await w.query(`DELETE FROM "${bt.origin}" WHERE "${bt.pk[0]}" = ANY($1)`, [
+          ids,
+        ]);
+        console.log(`  emptied Postgres ${bt.origin}: ${res.rowCount} row(s)`);
+        if (res.rowCount !== ids.length)
+          throw new Error(
+            `${bt.origin}: deleted ${res.rowCount}, expected ${ids.length}; rolled back`
+          );
+      }
+      await w.query('COMMIT');
+    } catch (e) {
+      await w.query('ROLLBACK').catch(() => {});
+      console.log(
+        `EMPTYING POSTGRES FAILED (${e.message}); Postgres rows remain, the freeze is lifted. Re-run only the empty by hand.`
+      );
+      process.exitCode = 3;
+    } finally {
+      await w.end();
+    }
+  }
+  await lift();
+  if (frozenNow) throw new Error('the freeze is still up (see above); run --unfreeze');
+  console.log('freeze lifted.');
   if (drift.length) {
     console.log(
       `DRIFT: Postgres changed after the copy in ${drift.join(', ')}. Re-apply those rows in D1 by hand (query Postgres on updated_at).`

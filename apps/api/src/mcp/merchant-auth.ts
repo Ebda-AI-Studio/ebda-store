@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { withStore } from '@ebda/database';
 import { getUserState } from '../lib/definer';
+import { getAccountState } from '../lib/identity-client';
+import { gateRead, onAccessD1 } from '../services/platform/access-d1';
 import type { McpStore } from './resolve-store';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
@@ -173,6 +175,12 @@ export async function isStoreMember(
   userId: string,
   role: string
 ): Promise<boolean> {
+  if (await onAccessD1()) {
+    const g = await gateRead(storeId, userId);
+    if (!g) return false;
+    if (role === 'store_admin') return g.store.ownerId === userId;
+    return role === 'staff' && g.isStaff;
+  }
   if (role === 'store_admin') {
     const s = await withStore(storeId, tx =>
       tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
@@ -231,7 +239,15 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
   // strict RLS, and an owner/staff row that has since left the store is not
   // visible from its scope — a join would throw on the required relation
   // instead of refusing the key.
-  const keyUser = key ? await getUserState(key.userId) : null;
+  // After the `access` cutover the identity service is the one source for the owning account (merchant and staff accounts
+  // live there); an account it does not know is no principal. Before it: the Postgres definer, unchanged.
+  const keyUser = key
+    ? (await onAccessD1())
+      ? await getAccountState(key.userId).then(a =>
+          a ? { role: a.role as string, status: a.status as string, deletedAt: null } : null
+        )
+      : await getUserState(key.userId)
+    : null;
 
   // MEMBERSHIP, re-read per call with the same rule requireStoreAccess applies: a
   // store_admin must still OWN this store, staff must still hold a store_staff row.
