@@ -323,6 +323,7 @@ describe('cutover switch', () => {
     expect([...platformRouter.models].sort()).toEqual(
       [
         'aiUsage', // Ruling NZ-AN-1: the platform-wide AI usage family
+        'storeUsageSnapshot', // Ruling NZ-AN-3: the monthly usage snapshots move with it
         'billingEvent',
         'billingGrant',
         'billingReferral',

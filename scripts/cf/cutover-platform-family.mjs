@@ -62,7 +62,7 @@ export const FAMILIES = {
   inbox: ['webhook_events'],
   // Ruling NZ-AN-1: platform-wide AI usage (the quota counts across stores). The per-store analytics tables use
   // scripts/cf/copy-analytics-to-do.mjs instead (same marker/freeze keys, family `analytics`).
-  'ai-usage': ['ai_usage'],
+  'ai-usage': ['ai_usage', 'store_usage_snapshots'],
 };
 
 /** Families whose Postgres rows are EMPTIED after the flip (fail closed: Postgres policies/definers that still read them deny). */

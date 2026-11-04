@@ -81,6 +81,9 @@ export default defineConfig(async () => {
           compatibilityFlags: ['nodejs_compat'],
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
+            // the route sweep's switches (workers-test/route-sweep.test.ts): a workerd test cannot read the host's process.env
+            SWEEP_ONLY: process.env.SWEEP_ONLY ?? '',
+            SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
             ...apiVars,
           },

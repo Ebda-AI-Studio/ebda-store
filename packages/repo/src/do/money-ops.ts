@@ -91,6 +91,16 @@ import {
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import {
+  analyticsCashflowOp,
+  analyticsCustomersOp,
+  analyticsItemsOp,
+  analyticsLowStockOp,
+  analyticsOrdersByOp,
+  analyticsPeriodOp,
+  analyticsSalesOp,
+  analyticsStockOp,
+} from './analytics-reads';
+import {
   analyticsImportFinishOp,
   analyticsImportOp,
   analyticsImportStatusOp,
@@ -259,7 +269,15 @@ export type MoneyOpName =
   | 'viewRecord'
   | 'analyticsImportStatus'
   | 'analyticsImport'
-  | 'analyticsImportFinish';
+  | 'analyticsImportFinish'
+  | 'analyticsPeriod'
+  | 'analyticsSales'
+  | 'analyticsItems'
+  | 'analyticsOrdersBy'
+  | 'analyticsCustomers'
+  | 'analyticsLowStock'
+  | 'analyticsStock'
+  | 'analyticsCashflow';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -370,6 +388,14 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsImportStatus',
   'analyticsImport',
   'analyticsImportFinish',
+  'analyticsPeriod',
+  'analyticsSales',
+  'analyticsItems',
+  'analyticsOrdersBy',
+  'analyticsCustomers',
+  'analyticsLowStock',
+  'analyticsStock',
+  'analyticsCashflow',
 ];
 
 const TABLE = '_money_ops';
@@ -772,6 +798,15 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsImportStatus: (db, storeId) => analyticsImportStatusOp(db, storeId),
   analyticsImport: (db, storeId, a) => analyticsImportOp(db, storeId, a),
   analyticsImportFinish: (db, storeId, a) => analyticsImportFinishOp(db, storeId, a),
+  /** Merchant analytics reads (analytics-reads.ts): reads, a retry is a fresh read. */
+  analyticsPeriod: (db, storeId, a) => analyticsPeriodOp(db, storeId, a),
+  analyticsSales: (db, storeId, a) => analyticsSalesOp(db, storeId, a),
+  analyticsItems: (db, storeId, a) => analyticsItemsOp(db, storeId, a),
+  analyticsOrdersBy: (db, storeId, a) => analyticsOrdersByOp(db, storeId, a),
+  analyticsCustomers: (db, storeId, a) => analyticsCustomersOp(db, storeId, a),
+  analyticsLowStock: (db, storeId, a) => analyticsLowStockOp(db, storeId, a),
+  analyticsStock: (db, storeId) => analyticsStockOp(db, storeId),
+  analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),

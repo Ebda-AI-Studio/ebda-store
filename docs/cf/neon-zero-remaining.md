@@ -8,6 +8,8 @@ Reproduce: `cd apps/api && npm run cf:dry-run && EBDA_WORKERS_TEST_DB_URL=postgr
 
 Stack top: the Postgres connect error is raised in `packages/database/src/client-pool.ts:73` (pg-pool) and re-thrown through `apps/api/src/cf/database-role-guard.ts:33`, the lazy role check that runs on the first Postgres use of a request. The calling handler frame is not in the async chain (workerd keeps ~17 async frames), so the route path IS the locator; a handler that throws its own error shows that frame instead.
 
+Fixed after the sweep (fix/nz-analytics-routes, Ruling NZ-INTEG-1): the nine `GET /stores/:storeId/analytics/*` routes (customers, low-stock, orders-by-status, payment-status, price-source, recent-orders, sales, top-categories, top-products) and `GET /stores/:storeId/ai/usage/{log,summary}` (the AI switch read the Store row from Postgres) now answer 200 with Postgres dead (SWEEP_ONLY='analytics|insights|ai-usage|/ai/usage|usage-history' SWEEP_STRICT=1). `GET /admin/super-admin/ai-usage/summary` and `/usage-history` are ported (D1 store list, D1 usage snapshots) but still answer 500 because EVERY `/admin/*` route opens the Postgres user-scoped request transaction (`adminUserContext`, `asPlatformOperator`) before its handler: that namespace-wide dependency is the open item for those two. `/admin/ci/insights` is the Customer Intelligence D1 family, not analytics.
+
 Coordination: `origin/feat/nz-platform-d1-d` (N-10d) does not exist yet, so nothing was merged from it. Whoever writes N-10d should remove its rows from the tables below and keep this file's header.
 
 Owner column: the PR whose plan item (docs/plans/2026-11-02-neon-zero.md) covers the area, or `unowned`. N-11 (per-store admin: ~118 service files without DO routing) has NO open PR and is the bulk of the list.
@@ -74,8 +76,6 @@ Owner column: the PR whose plan item (docs/plans/2026-11-02-neon-zero.md) covers
 | `POST /stores/:storeId/ai/suggest-categories`                         | WRITE-empty  | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
 | `POST /stores/:storeId/ai/suggest-store-categories`                   | WRITE-empty  | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
 | `POST /stores/:storeId/ai/translate`                                  | WRITE-empty  | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
-| `GET /stores/:storeId/ai/usage/log`                                   | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
-| `GET /stores/:storeId/ai/usage/summary`                               | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
 | `GET /stores/:storeId/ci/overview`                                    | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
 | `GET /stores/:storeId/coupons`                                        | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
 | `GET /stores/:storeId/coupons/:id`                                    | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use)           |
@@ -282,17 +282,8 @@ Owner column: the PR whose plan item (docs/plans/2026-11-02-neon-zero.md) covers
 
 ## #416 (9 routes)
 
-| Route                                             | Group        | Status | Cause                                                                  |
-| ------------------------------------------------- | ------------ | ------ | ---------------------------------------------------------------------- |
-| `GET /stores/:storeId/analytics/customers`        | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/low-stock`        | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/orders-by-status` | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/payment-status`   | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/price-source`     | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/recent-orders`    | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/sales`            | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/top-categories`   | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
-| `GET /stores/:storeId/analytics/top-products`     | GET-merchant | 500    | Postgres connect (client-pool.ts:73 via database-role-guard first use) |
+| Route | Group | Status | Cause |
+| ----- | ----- | ------ | ----- |
 
 ## #413 (N-4) plus unowned 400-as-500 (Session ID required) (7 routes)
 

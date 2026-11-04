@@ -1,4 +1,9 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import {
+  d1ListStoreIds,
+  d1StoreBriefs,
+  platformDb as platformDirectoryDb,
+} from '../lib/platform-directory';
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { customerAuthRoute } from '../lib/customer-auth';
@@ -153,7 +158,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export const SUPER_ADMIN_FANOUT_CAP = 500;
 export async function boundedFanoutStoreIds(ids?: string[]): Promise<string[]> {
-  const all = ids ?? (await storeDirectory()).map(s => s.id);
+  // With the platform D1 bound the store list is the D1 directory (Ruling NZ-INTEG-1): no Postgres definer, no connection
+  const d1 = platformDirectoryDb();
+  const all = ids ?? (d1 ? await d1ListStoreIds(d1) : (await storeDirectory()).map(s => s.id));
   if (all.length <= SUPER_ADMIN_FANOUT_CAP) return all;
   logger.warn(
     { stores: all.length, cap: SUPER_ADMIN_FANOUT_CAP },
@@ -2020,10 +2027,13 @@ router.get(
         // Fetch store metadata for all referenced storeIds
         const storeIds = [...new Set(storeStats.map(r => r.store_id))];
 
-        const stores = await prisma.store.findMany({
-          where: { id: { in: storeIds } },
-          select: { id: true, slug: true, name: true, plan: true },
-        });
+        const d1 = platformDirectoryDb();
+        const stores = d1
+          ? await d1StoreBriefs(d1, storeIds)
+          : await prisma.store.findMany({
+              where: { id: { in: storeIds } },
+              select: { id: true, slug: true, name: true, plan: true },
+            });
         const storeMap = new Map(stores.map(s => [s.id, s]));
 
         // Aggregate per-store
@@ -2172,6 +2182,40 @@ export async function loadUsageHistoryRows(
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
+  // `store_usage_snapshots` is on D1 once the `ai-usage` family moved (Ruling NZ-INTEG-1): one global read, no per-store Postgres
+  // transaction. The routed delegate has no `include`, so the store's slug / name / plan come from the D1 directory.
+  if (await platformFamilyOnD1('ai-usage')) {
+    const periods = await prisma.storeUsageSnapshot.groupBy({
+      by: ['periodStart'],
+      orderBy: { periodStart: 'desc' },
+      take: months,
+    });
+    if (periods.length === 0) return [];
+    const snaps = await prisma.storeUsageSnapshot.findMany({
+      where: { periodStart: { in: periods.map(p => p.periodStart) } },
+      orderBy: [{ periodStart: 'desc' }],
+    });
+    const d1 = platformDirectoryDb();
+    const briefs = new Map(
+      (d1
+        ? await d1StoreBriefs(
+            d1,
+            snaps.map(r => r.storeId)
+          )
+        : []
+      ).map(b => [b.id, b])
+    );
+    return snaps.map(r => ({
+      ...r,
+      store: briefs.has(r.storeId)
+        ? {
+            slug: briefs.get(r.storeId)!.slug,
+            name: briefs.get(r.storeId)!.name,
+            plan: briefs.get(r.storeId)!.plan,
+          }
+        : null,
+    }));
+  }
   const perStore = await acrossStores(
     storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
     { storeIds: await boundedFanoutStoreIds() }

@@ -26,6 +26,8 @@ const e = env as unknown as {
     prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } };
   };
   TEST_PLATFORM_MIGRATIONS: unknown[];
+  SWEEP_ONLY?: string;
+  SWEEP_STRICT?: string;
 };
 
 const BASE = 'https://api.ebda.app/api/v1';
@@ -109,6 +111,10 @@ async function hit(
 
 const failing = (r: Result) => r.status < 0 || r.status >= 500;
 
+/** SWEEP_ONLY=<regex>: walk only the routes whose path matches (a fast loop for one area; the full sweep is the default). */
+const ONLY = e.SWEEP_ONLY ? new RegExp(e.SWEEP_ONLY) : null;
+const wanted = (route: string): boolean => !ONLY || ONLY.test(route);
+
 /** Run `fns` with a bounded number in flight. */
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<unknown>): Promise<void> {
   let i = 0;
@@ -177,7 +183,10 @@ describe.skipIf(e.E2E_DB === '1')(
         .replace(/\/$/, '/');
 
     it('every GET route (public anonymous, merchant as store_admin, /admin as super_admin)', async () => {
-      const gets = (ROUTES as string[]).filter(r => r.startsWith('GET ')).map(r => r.slice(4));
+      const gets = (ROUTES as string[])
+        .filter(r => r.startsWith('GET '))
+        .map(r => r.slice(4))
+        .filter(wanted);
       await pool(gets, 8, async route => {
         const isPublic = route.startsWith('/public') || route.startsWith('/stores/public');
         const isAdminNs = route.startsWith('/admin') || route.startsWith('/internal');
@@ -192,7 +201,7 @@ describe.skipIf(e.E2E_DB === '1')(
           headers
         );
       });
-      expect(results.length).toBeGreaterThan(300);
+      if (!ONLY) expect(results.length).toBeGreaterThan(300);
     }, 600_000);
 
     it('GET as a logged-in storefront customer (customer-scoped reads)', async () => {
@@ -214,7 +223,10 @@ describe.skipIf(e.E2E_DB === '1')(
     }, 300_000);
 
     it('every mutating route with an empty JSON body (validation must answer before any Postgres read)', async () => {
-      const writes = (ROUTES as string[]).filter(r => !r.startsWith('GET ')).map(r => r.split(' '));
+      const writes = (ROUTES as string[])
+        .filter(r => !r.startsWith('GET '))
+        .map(r => r.split(' '))
+        .filter(([, route]) => wanted(route!));
       await pool(writes, 8, async ([method, route]) => {
         const isPublic =
           route!.startsWith('/public') ||
@@ -396,7 +408,7 @@ describe.skipIf(e.E2E_DB === '1')(
       console.log(
         `SWEEP_SUMMARY total=${results.length} ok2xx=${results.filter(r => r.status >= 200 && r.status < 300).length} expected4xx=${results.filter(r => EXPECTED_4XX.has(r.status)).length} failing=${bad.length} odd=${odd.length}`
       );
-      if (process.env.SWEEP_STRICT === '1')
+      if (e.SWEEP_STRICT === '1')
         expect(bad.map(r => `${r.method} ${r.route} ${r.status}`)).toEqual([]);
     });
   }

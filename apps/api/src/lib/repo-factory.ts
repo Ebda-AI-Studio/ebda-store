@@ -776,6 +776,65 @@ export interface MoneyClient {
     pruneBeforeMs?: number;
   }): Promise<{ counted: true }>;
   viewRecord(a: { dayMs: number; productId: string }): Promise<{ counted: true }>;
+  /** Merchant analytics reads on the DO (analytics-reads.ts); the Postgres twins are raw SQL in analytics.service.ts. */
+  analyticsPeriod(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    revenue: number;
+    orders: number;
+    customers: number;
+    profit: number | null;
+    costedLines: number;
+    missingLines: number;
+    missingRevenue: number;
+  }>;
+  analyticsSales(a: {
+    startMs: number;
+    endMs: number;
+    offsetMinutes: number;
+    granularity: 'day' | 'week' | 'month';
+  }): Promise<Array<{ key: string; revenue: number; orders: number }>>;
+  analyticsItems(
+    a:
+      | { by: 'product'; startMs: number; endMs: number; nonRevenue: string[]; limit?: number }
+      | { by: 'priceSource'; startMs: number; endMs: number; nonRevenue: string[] }
+  ): Promise<
+    Array<{
+      productId?: string;
+      priceSource?: string | null;
+      priceGroupApplied?: boolean | null;
+      quantity: number;
+      total: number;
+    }>
+  >;
+  analyticsOrdersBy(a: {
+    by: 'status' | 'paymentStatus';
+    startMs: number;
+    endMs: number;
+    nonRevenue?: string[];
+  }): Promise<Array<{ key: string; count: number; total: number }>>;
+  analyticsCustomers(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    newCustomers: number;
+    returningCustomers: number;
+    top: Array<{ customerId: string | null; total: number; count: number }>;
+  }>;
+  analyticsStock(a: Record<string, never>): Promise<{
+    stockValue: number;
+    backorderCount: number;
+    backorderValue: number;
+  }>;
+  analyticsCashflow(a: {
+    fromMs: number;
+    toMs: number;
+  }): Promise<Array<{ dayMs: number; net: number }>>;
+  analyticsLowStock(a: { threshold: number }): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      sku: string | null;
+      inventory: number;
+      imageUrl: string | null;
+    }>
+  >;
   analyticsImportStatus(a: Record<string, never>): Promise<{
     done: boolean;
     batches: number;
@@ -1295,6 +1354,14 @@ export function makeMoneyClient(
     analyticsImportStatus: a => call('analyticsImportStatus', a),
     analyticsImport: a => call('analyticsImport', a),
     analyticsImportFinish: a => call('analyticsImportFinish', a),
+    analyticsPeriod: a => call('analyticsPeriod', a),
+    analyticsSales: a => call('analyticsSales', a),
+    analyticsItems: a => call('analyticsItems', a),
+    analyticsOrdersBy: a => call('analyticsOrdersBy', a),
+    analyticsCustomers: a => call('analyticsCustomers', a),
+    analyticsLowStock: a => call('analyticsLowStock', a),
+    analyticsStock: a => call('analyticsStock', a),
+    analyticsCashflow: a => call('analyticsCashflow', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),

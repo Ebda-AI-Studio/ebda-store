@@ -56,7 +56,9 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   // its writers (provider callbacks) run on a different cadence from the admin surface.
   inbox: ['webhookEvent'],
   // Ruling NZ-AN-1: the AI quota counts usage across stores, so `ai_usage` is one platform table on D1 (append-only)
-  'ai-usage': ['aiUsage'],
+  // The monthly per-store usage snapshot (`store_usage_snapshots`) is the same usage family: written by the snapshot job, read by
+  // the super-admin usage history, and its AI columns are copied from `ai_usage` (Ruling NZ-INTEG-1).
+  'ai-usage': ['aiUsage', 'storeUsageSnapshot'],
   // Ruling NZ-AN-1: no routed model. The marker + freeze only gate WHEN a Durable Object store's per-store analytics tables
   // (search/product-view/qr/notification/gsc) start being served by its DO (lib/analytics-backend.ts)
   analytics: [],
