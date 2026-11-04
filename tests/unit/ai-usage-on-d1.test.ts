@@ -42,14 +42,21 @@ vi.mock('@ebda/database', async () => {
       }
     ),
   });
-  return { ...actual, notifyModelWrite: vi.fn(), setModelRouter: vi.fn() };
+  return {
+    ...actual,
+    notifyModelWrite: vi.fn(),
+    setModelRouter: vi.fn(),
+    setRoutedModelGuard: vi.fn(),
+  };
 });
 
-import { countAiUsage } from '@api/lib/definer';
+import { AI_COUNT_TTL_MS, countAiUsage, resetAiCountCache } from '@api/lib/definer';
 import { platformRouter } from '@api/services/platform/router';
 import { FAMILY_MODELS } from '@api/services/platform/cutover';
 
 beforeEach(() => {
+  resetAiCountCache();
+  vi.useRealTimers();
   h.onD1 = true;
   h.rows.length = 0;
   h.pgCalls = 0;
@@ -110,5 +117,24 @@ describe('ai-usage family', () => {
     );
     expect((per as number[]).reduce((a, b) => a + b, 0)).toBe(3);
     expect(h.pgCalls).toBe(0);
+  });
+
+  it('the platform-wide count is BOUNDED-stale: one D1 read per window, a fresh read after the TTL', async () => {
+    vi.useFakeTimers();
+    const since = new Date(Date.now() - 1000);
+    const spy = vi.spyOn(d1.aiUsage, 'count');
+    await d1.aiUsage.create({
+      data: { id: 'x1', storeId: 's1', feature: 'seo', cachedHit: false },
+    });
+    expect(await countAiUsage({ since, cachedHit: false })).toBe(1);
+    await d1.aiUsage.create({
+      data: { id: 'x2', storeId: 's1', feature: 'seo', cachedHit: false },
+    });
+    expect(await countAiUsage({ since, cachedHit: false })).toBe(1); // inside the window: served from memory
+    expect(spy).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(AI_COUNT_TTL_MS + 1);
+    expect(await countAiUsage({ since, cachedHit: false })).toBe(2);
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
   });
 });

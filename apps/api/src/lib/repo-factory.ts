@@ -787,6 +787,9 @@ export interface MoneyClient {
     table: string;
     rows: Array<Record<string, unknown>>;
   }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportReset(a: {
+    confirm: string;
+  }): Promise<{ reset: true; deleted: Record<string, number> }>;
   analyticsImportFinish(a: {
     expect: Record<string, { rows: number; sums: Record<string, number> }>;
   }): Promise<{ done: true; tables: Record<string, number> }>;
@@ -1296,6 +1299,7 @@ export function makeMoneyClient(
     analyticsImportStatus: a => call('analyticsImportStatus', a),
     analyticsImport: a => call('analyticsImport', a),
     analyticsImportFinish: a => call('analyticsImportFinish', a),
+    analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),

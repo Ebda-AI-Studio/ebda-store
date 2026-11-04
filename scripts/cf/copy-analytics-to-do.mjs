@@ -40,9 +40,25 @@ export const SUMS = {
   search_query_daily: ['searches', 'zero_results', 'last_result_count'],
   product_daily_views: ['count'],
   qr_scan_daily: ['count'],
-  notification_logs: ['created_at'],
+  // no SUM of epoch-ms (past 2^53 after ~5k rows, JS and SQLite then round differently): count + MIN/MAX instead
+  notification_logs: [],
   gsc_daily_metrics: ['impressions', 'clicks'],
 };
+export const EXTREMES = { notification_logs: ['created_at', 'updated_at'] };
+/** historic recipient hashes were an UNSALTED SHA-256 of the phone (reversible, personal data): not copied (Ruling NZ-AN-1) */
+const DROP_ON_COPY = { notification_logs: ['recipient_phone_hash', 'recipient_email_hash'] };
+const newTotals = table => ({
+  rows: 0,
+  sums: {
+    ...Object.fromEntries(SUMS[table].map(c => [c, 0])),
+    ...Object.fromEntries(
+      (EXTREMES[table] ?? []).flatMap(c => [
+        [`min:${c}`, null],
+        [`max:${c}`, null],
+      ])
+    ),
+  },
+});
 const BATCH = 400;
 const MARKER = 'platform_cutover.analytics';
 const FREEZE = 'platform_freeze.analytics';
@@ -82,6 +98,7 @@ async function main() {
     'delete-marker': { type: 'boolean', default: false },
     'drain-ms': { type: 'string', default: '45000' },
     'settle-ms': { type: 'string', default: '12000' },
+    'freeze-ttl-ms': { type: 'string', default: '900000' },
   }));
   if (!args.d1) throw new Error('pass --d1 <database name>');
   const d = {
@@ -92,9 +109,10 @@ async function main() {
   };
   const marker = async () =>
     (await d1Query(d, `SELECT created_at FROM system_settings WHERE key = ${lit(MARKER)}`))[0];
+  // The freeze is the platform freeze of #407 (cutover.ts readKeys): it carries an expiry, past which the API ignores it and pages.
   const setFreeze = () =>
     d1Statements(d, [
-      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(FREEZE)}, '{}', 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
+      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(FREEZE)}, ${lit(JSON.stringify({ expiresAt: Date.now() + Number(args['freeze-ttl-ms']), by: 'copy-analytics-to-do' }))}, 'cutover', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`,
     ]);
   const liftFreeze = () =>
     d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(FREEZE)};`]);
@@ -149,20 +167,17 @@ async function main() {
     return { client, bts };
   };
 
-  // Postgres expectations for one store, read through the SAME transform the rows are sent with
+  // Postgres expectations for one store, read through the SAME transform the rows are sent with. Batches are keyed by the FIRST
+  // row id of the batch (rows arrive id-ordered), so a row added between two runs shifts nothing that was already applied.
   const readStore = async (client, bts, storeId, send) => {
     const exp = {};
     for (const bt of bts) {
       const names = bt.columns.map(c => c.col);
-      const e = (exp[bt.name] = {
-        rows: 0,
-        sums: Object.fromEntries(SUMS[bt.name].map(c => [c, 0])),
-      });
-      let n = 0;
+      const e = (exp[bt.name] = newTotals(bt.name));
       let pending = [];
       const flush = async () => {
         if (!pending.length) return;
-        if (send) await send(bt.name, n++, pending);
+        if (send) await send(bt.name, pending[0].id, pending);
         pending = [];
       };
       for await (const page of sourcePages(client, bt, plan.store, 'store', storeId, 2000))
@@ -172,13 +187,29 @@ async function main() {
             throw new Error(`${bt.name} ${obj.id}: date ${obj.date} is not a UTC midnight (TZ?)`);
           e.rows += 1;
           for (const c of SUMS[bt.name]) e.sums[c] += Number(obj[c] ?? 0);
+          for (const c of EXTREMES[bt.name] ?? []) {
+            const v = Number(obj[c] ?? 0);
+            if (e.sums[`min:${c}`] === null || v < e.sums[`min:${c}`]) e.sums[`min:${c}`] = v;
+            if (e.sums[`max:${c}`] === null || v > e.sums[`max:${c}`]) e.sums[`max:${c}`] = v;
+          }
+          for (const c of DROP_ON_COPY[bt.name] ?? []) obj[c] = null;
           pending.push(obj);
           if (pending.length >= BATCH) await flush();
         }
       await flush();
     }
+    for (const t of Object.keys(exp))
+      for (const k of Object.keys(exp[t].sums)) if (exp[t].sums[k] === null) exp[t].sums[k] = 0;
     return exp;
   };
+  const sameSums = (x, y) => {
+    const kx = Object.keys(x).sort();
+    return (
+      JSON.stringify(kx) === JSON.stringify(Object.keys(y).sort()) && kx.every(k => x[k] === y[k])
+    );
+  };
+  const sameTotals = (a, b) =>
+    TABLES.every(t => a[t].rows === b[t].rows && sameSums(a[t].sums, b[t].sums));
 
   // 1. dry run (also the first half of --commit; closed before the freeze)
   console.log(`${stores.length} Durable Object store(s); marker ${have ? 'PRESENT' : 'absent'}`);
@@ -188,9 +219,9 @@ async function main() {
       for (const s of stores) {
         const exp = await readStore(client, bts, s.id, null);
         const st = await call(s.id, 'analyticsImportStatus', {});
-        const native = TABLES.filter(t => st.tables[t].rows > 0 && st.batches === 0);
+        const stale = !st.done || !sameTotals(exp, st.tables);
         console.log(
-          `  ${s.slug.padEnd(28)} PG ${TABLES.map(t => `${t}=${exp[t].rows}`).join(' ')} | DO done=${st.done}${native.length ? ` NATIVE ROWS in ${native.join(',')} (would refuse)` : ''}`
+          `  ${s.slug.padEnd(28)} PG ${TABLES.map(t => `${t}=${exp[t].rows}`).join(' ')} | DO done=${st.done}${stale ? ' (will be reset and re-copied)' : ' (matches Postgres, kept)'}`
         );
       }
     } finally {
@@ -201,45 +232,82 @@ async function main() {
   if (!args.commit)
     return console.log(`dry run only (${fmtMs(performance.now() - t0)}); pass --commit to copy`);
 
-  // 2. freeze, drain, copy, finish
-  await setFreeze();
-  console.log(`froze ${FREEZE}; draining ${args['drain-ms']} ms`);
-  await sleep(Number(args['drain-ms']));
+  // 2. freeze, drain, copy, finish. EVERY exit lifts the freeze (a killed run must not block DO-store analytics writes: the freeze
+  //    also expires by itself after --freeze-ttl-ms and the API pages about it).
+  let frozenNow = false;
+  const lift = async () => {
+    if (!frozenNow) return;
+    try {
+      await liftFreeze();
+      frozenNow = false;
+    } catch (e) {
+      console.error(`!!! COULD NOT LIFT THE FREEZE ${FREEZE}: ${e.message}`);
+      console.error('!!! run the same command with --unfreeze (same --d1 flags)');
+      process.exitCode = 1;
+    }
+  };
+  for (const sig of ['SIGINT', 'SIGTERM'])
+    process.once(sig, () => {
+      console.error(`${sig}: lifting the freeze before exit`);
+      lift().finally(() => process.exit(130));
+    });
   const expectations = new Map();
+  let flipped = false;
   try {
+    await setFreeze();
+    frozenNow = true;
+    console.log(`froze ${FREEZE}; draining ${args['drain-ms']} ms`);
+    await sleep(Number(args['drain-ms']));
     const { client, bts } = await open();
     try {
       for (const s of stores) {
-        const st = await call(s.id, 'analyticsImportStatus', {});
-        const exp = await readStore(client, bts, s.id, async (table, n, rows) => {
-          if (!st.done)
-            await call(s.id, 'analyticsImport', { batchId: `${s.id}:${table}:${n}`, table, rows });
-        });
-        expectations.set(s.id, exp);
-        if (!st.done) await call(s.id, 'analyticsImportFinish', { expect: exp });
-        console.log(
-          `  ${s.slug}: finished ${TABLES.map(t => `${t}=${exp[t].rows}`).join(' ')}${st.done ? ' (was already done)' : ''}`
+        let st = await call(s.id, 'analyticsImportStatus', {});
+        // A done store is trusted only if it still equals FRESH Postgres totals; anything else (a failed earlier run, rows
+        // written to Postgres since, rows a store flip copied) starts from a clean slate. Reset is refused by the API once the
+        // marker exists, and before it the DO holds nothing but copied rows.
+        if (st.done) {
+          const fresh = await readStore(client, bts, s.id, null);
+          if (sameTotals(fresh, st.tables)) {
+            expectations.set(s.id, fresh);
+            console.log(`  ${s.slug}: already copied and equal to Postgres, kept`);
+            continue;
+          }
+        }
+        const anyRows = TABLES.some(t => st.tables[t].rows > 0);
+        if (st.done || st.batches > 0 || anyRows) {
+          await call(s.id, 'analyticsImportReset', { confirm: s.id });
+          console.log(`  ${s.slug}: reset (stale or partial copy)`);
+        }
+        const exp = await readStore(client, bts, s.id, (table, firstId, rows) =>
+          call(s.id, 'analyticsImport', { batchId: `${s.id}:${table}:${firstId}`, table, rows })
         );
+        await call(s.id, 'analyticsImportFinish', { expect: exp });
+        expectations.set(s.id, exp);
+        console.log(`  ${s.slug}: finished ${TABLES.map(t => `${t}=${exp[t].rows}`).join(' ')}`);
       }
     } finally {
       await client.query('ROLLBACK').catch(() => {});
       await client.end();
     }
+
+    // 3. flip, settle
+    await d1Statements(d, [
+      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(MARKER)}, '{}', 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
+    ]);
+    flipped = true;
+    console.log(`marker ${MARKER} set; settling ${args['settle-ms']} ms`);
+    await sleep(Number(args['settle-ms']));
   } catch (e) {
     console.error(
-      `copy failed: ${e.message}\nThe marker is NOT set; the freeze is lifted. Re-run to resume (applied batches are skipped).`
+      flipped
+        ? `failed AFTER the marker was set: ${e.message}`
+        : `copy failed: ${e.message}\nThe marker is NOT set. Re-run: stores already equal to Postgres are kept, any other is reset and re-copied.`
     );
-    await liftFreeze();
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await lift();
   }
-
-  // 3. flip, settle, thaw
-  await d1Statements(d, [
-    `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(MARKER)}, '{}', 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
-  ]);
-  console.log(`marker ${MARKER} set; settling ${args['settle-ms']} ms`);
-  await sleep(Number(args['settle-ms']));
-  await liftFreeze();
+  if (process.exitCode) process.exit(process.exitCode);
 
   // 4. NEW connection: Postgres must not have changed for any copied store
   const { client, bts } = await open();

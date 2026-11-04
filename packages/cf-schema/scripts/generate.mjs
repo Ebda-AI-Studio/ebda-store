@@ -799,7 +799,7 @@ function main() {
       analyticsStoreSql
     ),
     'migrations/store/0003_analytics.sql': analyticsStoreSql,
-    'migrations/platform/0003_ai_usage.sql': emitSql(
+    'migrations/platform/0005_ai_usage.sql': emitSql(
       onlyTables(out.d1, ANALYTICS_PLATFORM_TABLES),
       'D1 ai_usage (Ruling NZ-AN-1), for a D1 that already ran 0001'
     ),

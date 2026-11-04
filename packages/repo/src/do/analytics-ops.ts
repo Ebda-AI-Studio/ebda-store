@@ -157,7 +157,10 @@ export function viewRecordOp(
 
 /** table -> its columns (the copy writes exactly these; anything else is refused) and the columns whose SUM is verified. */
 export const ANALYTICS_TABLES: Readonly<
-  Record<string, { columns: readonly string[]; sums: readonly string[] }>
+  Record<
+    string,
+    { columns: readonly string[]; sums: readonly string[]; extremes?: readonly string[] }
+  >
 > = {
   search_query_daily: {
     columns: [
@@ -193,7 +196,9 @@ export const ANALYTICS_TABLES: Readonly<
       'created_at',
       'updated_at',
     ],
-    sums: ['created_at'],
+    // no SUM of epoch-ms (it passes 2^53 after ~5k rows and JS and SQLite then round differently): count + MIN/MAX instead
+    sums: [],
+    extremes: ['created_at', 'updated_at'],
   },
   gsc_daily_metrics: {
     columns: [
@@ -229,13 +234,29 @@ function totalsFor(
   tbl: string
 ): { rows: number; sums: Record<string, number> } {
   const spec = ANALYTICS_TABLES[tbl];
-  const cols = ['COUNT(*) AS n', ...spec.sums.map(c => `COALESCE(SUM("${c}"), 0) AS "s_${c}"`)];
+  const ext = spec.extremes ?? [];
+  const cols = [
+    'COUNT(*) AS n',
+    ...spec.sums.map(c => `COALESCE(SUM("${c}"), 0) AS "s_${c}"`),
+    ...ext.flatMap(c => [
+      `COALESCE(MIN("${c}"), 0) AS "min_${c}"`,
+      `COALESCE(MAX("${c}"), 0) AS "max_${c}"`,
+    ]),
+  ];
   const r = db.all(`SELECT ${cols.join(', ')} FROM "${tbl}" WHERE store_id = ?`, [storeId])[0] as
     | Record<string, unknown>
     | undefined;
   return {
     rows: Number(r?.n ?? 0),
-    sums: Object.fromEntries(spec.sums.map(c => [c, Number(r?.[`s_${c}`] ?? 0)])),
+    sums: {
+      ...Object.fromEntries(spec.sums.map(c => [c, Number(r?.[`s_${c}`] ?? 0)])),
+      ...Object.fromEntries(
+        ext.flatMap(c => [
+          [`min:${c}`, Number(r?.[`min_${c}`] ?? 0)],
+          [`max:${c}`, Number(r?.[`max_${c}`] ?? 0)],
+        ])
+      ),
+    },
   };
 }
 
@@ -349,7 +370,7 @@ export function analyticsImportFinishOp(
         `${tbl}: rows ${have.rows} (ledger ${ledgerRows[tbl] ?? 0}) != ${want.rows}`,
         409
       );
-    for (const c of ANALYTICS_TABLES[tbl].sums)
+    for (const c of Object.keys(have.sums))
       if (have.sums[c] !== want.sums?.[c])
         throw new MoneyError(
           'ANALYTICS_IMPORT_MISMATCH',
@@ -365,4 +386,25 @@ export function analyticsImportFinishOp(
       Date.now(),
     ]);
   return { done: true, tables: out };
+}
+
+/**
+ * Wipe this store's five analytics tables and the copy ledger (including the done-marker) so the copy can start from a clean
+ * slate. PRE-MARKER ONLY: before the D1 marker the DO's analytics tables hold nothing but copied rows (the API writes them to
+ * Postgres until then), so nothing native is lost. The refusal after the marker is enforced where the D1 binding is: the
+ * `__analytics` cutover route (apps/api/src/cf/cutover.ts) reads the marker and answers 409 before this op can run.
+ * `confirm` must equal the store id.
+ */
+export function analyticsImportResetOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { reset: true; deleted: Record<string, number> } {
+  if (a.confirm !== storeId) throw new MoneyError('BAD_ARGS', 'confirm must be the store id', 400);
+  ensureLedger(db);
+  const deleted: Record<string, number> = {};
+  for (const tbl of Object.keys(ANALYTICS_TABLES))
+    deleted[tbl] = db.run(`DELETE FROM "${tbl}" WHERE store_id = ?`, [storeId]).changes;
+  db.run(`DELETE FROM ${LEDGER}`, []);
+  return { reset: true, deleted };
 }
