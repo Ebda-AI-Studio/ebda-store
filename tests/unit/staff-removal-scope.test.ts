@@ -44,6 +44,7 @@ vi.mock('@ebda/database', () => {
   };
 });
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _r: any, n: any) => {
     req.user = { userId: 'owner-a', role: 'store_admin' };
     n();

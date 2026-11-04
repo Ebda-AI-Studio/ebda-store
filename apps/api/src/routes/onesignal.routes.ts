@@ -10,6 +10,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import {
@@ -18,6 +19,8 @@ import {
   OneSignalRequestError,
 } from '../services/onesignal.service';
 import { config } from '../config';
+import { auditLog } from '../middleware/security';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -33,10 +36,12 @@ const broadcastSchema = z.object({
   bodyAr: z.string().trim().min(1).max(2000),
   // OneSignal accepts any URL but we validate to keep typos out and surface
   // a clean 422 rather than a downstream OneSignal error.
+  // BE:S-17: https only. `z.string().url()` accepts `javascript:` / `data:` / `http:`, which a push tap would open.
   url: z
     .string()
     .url()
     .max(2000)
+    .refine(v => /^https:\/\//i.test(v), { message: 'url must start with https://' })
     .optional()
     .or(z.literal('').transform(() => undefined)),
 });
@@ -144,6 +149,7 @@ router.delete(
 
 const adminStoreMiddleware = [
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   // Marketing push broadcast is a Professional-tier feature. Without this gate
@@ -176,6 +182,18 @@ router.post(
         url: parsed.url,
       });
 
+      await auditLog({
+        action: 'push.broadcast.sent',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'store',
+        resourceId: storeId,
+        // the copy itself is merchant content and can be long: record sizes and the target only
+        details: { titleLength: parsed.titleEn.length, hasUrl: Boolean(parsed.url) },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.json({ success: true, data: result });
     } catch (error) {
       if (error instanceof OneSignalNotConfiguredError) {
@@ -190,11 +208,16 @@ router.post(
         return;
       }
       if (error instanceof OneSignalRequestError) {
+        logger.warn(
+          { status: error.status, body: String(error.body ?? '').slice(0, 500) },
+          '[onesignal] provider request failed'
+        );
         res.status(502).json({
           success: false,
           error: {
             code: 'PUSH_PROVIDER_ERROR',
-            message: `OneSignal returned ${error.status}: ${error.body || 'unknown error'}`,
+            // BE:S-17: the upstream body is logged, never returned to the merchant.
+            message: 'The push provider could not complete the request. Try again later.',
           },
         });
         return;
@@ -231,11 +254,16 @@ router.get(
         return;
       }
       if (error instanceof OneSignalRequestError) {
+        logger.warn(
+          { status: error.status, body: String(error.body ?? '').slice(0, 500) },
+          '[onesignal] provider request failed'
+        );
         res.status(502).json({
           success: false,
           error: {
             code: 'PUSH_PROVIDER_ERROR',
-            message: `OneSignal returned ${error.status}: ${error.body || 'unknown error'}`,
+            // BE:S-17: the upstream body is logged, never returned to the merchant.
+            message: 'The push provider could not complete the request. Try again later.',
           },
         });
         return;

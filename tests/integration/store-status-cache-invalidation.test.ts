@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: { user?: unknown }, _res: unknown, next: () => void) => {
     (req as { user: unknown }).user = { userId: 'test-super', role: 'super_admin' };
     next();

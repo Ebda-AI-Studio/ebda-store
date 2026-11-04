@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { runInTenantContext } from '@ebda/database';
 import { listSlugRedirects, deleteSlugRedirect } from '../services/slug-redirect.service';
 
@@ -50,6 +51,7 @@ router.delete(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('seo'), // BE:S-9
   async (req, res, next) => {
     try {
       await runInTenantContext(req.params.storeId, () =>

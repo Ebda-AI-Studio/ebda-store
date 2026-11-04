@@ -5,11 +5,13 @@
 import { cfBindings, type AccountBrief, type AccountsRpc, type AccountState } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { getUserState } from './definer';
+import { invalidateAccountState, resetLiveIdentityCache } from './identity-live-cache';
 
 let override: AccountsRpc | undefined;
 /** Test seam. */
 export function configureIdentityClient(fake?: AccountsRpc): void {
   override = fake;
+  resetLiveIdentityCache();
 }
 
 function rpc(): AccountsRpc {
@@ -45,15 +47,25 @@ export async function getAccountsBrief(userIds: string[]): Promise<AccountBrief[
 
 export const getAccountState = (userId: string): Promise<AccountState | null> =>
   call('getAccountState', r => r.getAccountState?.(userId));
+// The state changers below drop the cached account state (lib/identity-live-cache.ts, NEVER-stale class) in `finally`:
+// even a call that threw may have landed upstream, and a stale "active" must not outlive it.
+async function thenInvalidate<T>(match: { userId: string }, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } finally {
+    invalidateAccountState(match.userId);
+  }
+}
 export const setAccountStatus = (
   userId: string,
   status: 'active' | 'inactive' | 'suspended',
   reason: string
-) => call('setStatus', r => r.setStatus?.(userId, status, reason));
+) =>
+  thenInvalidate({ userId }, () => call('setStatus', r => r.setStatus?.(userId, status, reason)));
 export const revokeIdentitySession = (sid: string, reason: string) =>
   call('revokeSession', r => r.revokeSession?.(sid, reason));
 export const revokeIdentityUser = (userId: string, reason: string) =>
-  call('revokeUser', r => r.revokeUser?.(userId, reason));
+  thenInvalidate({ userId }, () => call('revokeUser', r => r.revokeUser?.(userId, reason)));
 export const createIdentity = (input: Parameters<NonNullable<AccountsRpc['createUser']>>[0]) =>
   call('createUser', r => r.createUser?.(input));
 export const resendIdentityVerification = (email: string) =>
@@ -67,7 +79,10 @@ export const setAccountRole = (
   role: 'store_admin' | 'staff',
   reason: string,
   ifCurrentRole?: 'store_admin' | 'staff'
-) => call('setRole', r => r.setRole?.(userId, role, reason, ifCurrentRole));
+) =>
+  thenInvalidate({ userId }, () =>
+    call('setRole', r => r.setRole?.(userId, role, reason, ifCurrentRole))
+  );
 export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
 /** Integrator clients (identity v1.3) die with their store. Idempotent, so a retry is safe. */
 export const deleteStoreClients = (storeId: string) =>

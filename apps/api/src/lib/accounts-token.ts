@@ -16,6 +16,7 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 import { cfBindings } from '../cf/bindings';
+import { resetLiveIdentityCache } from './identity-live-cache';
 import type { StoreClaim } from './identity-directory';
 
 export const ACCOUNTS_ISSUER = 'https://accounts.ebda.app';
@@ -150,6 +151,7 @@ let revocationOverride: ((sid: string) => Promise<boolean>) | undefined;
 /** Test seam for the revocation check. */
 export function configureRevocationCheck(f?: (sid: string) => Promise<boolean>): void {
   revocationOverride = f;
+  resetLiveIdentityCache();
 }
 export const sessionRevoked = (sid: string): Promise<boolean> =>
   revocationOverride ? revocationOverride(sid) : isAccountsSessionRevoked(sid);
