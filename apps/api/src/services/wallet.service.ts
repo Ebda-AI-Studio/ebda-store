@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { storeCustomerWhere } from '../lib/store-customer';
 import {
   currentStoreId,
   prisma,
@@ -94,20 +95,7 @@ async function onClient<T>(
   return withMoneyTx(prisma, fn);
 }
 
-/**
- * Prisma `where` for "this user is a customer of this store". Customer
- * accounts are store-scoped (`users.store_id`). Never matches an admin/staff
- * row, and never matches another store's shopper.
- */
-export function storeCustomerWhere(storeId: string, customerId: string): Prisma.UserWhereInput {
-  return {
-    id: customerId,
-    role: 'customer',
-    // Top-level `storeId` (the tenant guard refuses an `OR`). A legacy customer row with
-    // `store_id` NULL is invisible from any store scope under RLS, so it never matched here.
-    storeId,
-  };
-}
+export { storeCustomerWhere };
 
 function assertValidInput(input: ApplyEntryInput): void {
   if (!Number.isSafeInteger(input.amount) || input.amount === 0) {

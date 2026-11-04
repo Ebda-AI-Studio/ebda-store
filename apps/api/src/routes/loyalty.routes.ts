@@ -7,6 +7,7 @@ import { LoyaltyService } from '../services/loyalty.service';
 import { LoyaltyTransactionType, prisma } from '@ebda/database';
 import { tenantContext } from '../middleware/tenant-context';
 import { rangeOrLegacyDays } from '../lib/report-range';
+import { assertStoreCustomer } from '../lib/store-customer';
 
 // TWO routers, deliberately. The admin half is mounted ONLY at the bare
 // '/stores' prefix; the customer half is the only thing mounted at '/public'
@@ -71,7 +72,7 @@ const updateSettingsSchema = z.object({
 });
 
 const awardPointsSchema = z.object({
-  points: z.number().int(),
+  points: z.number().int().min(-1_000_000).max(1_000_000),
   type: z.enum(['earn_manual', 'earn_referral', 'earn_review', 'earn_birthday', 'adjust'] as const),
   description: z.string().optional(),
 });
@@ -187,6 +188,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, customerId } = req.params;
+      await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
       const points = await LoyaltyService.getCustomerPoints(storeId, customerId);
 
       if (!points) {
@@ -234,7 +236,8 @@ router.get(
       const limitNum = Math.min(100, Math.max(1, parseInt((limit as string) || '50') || 50));
       const skip = (pageNum - 1) * limitNum;
 
-      const where: any = { storeId };
+      // SEC-CUSTOMER-SCOPE-1: the joined customer PII must belong to this store.
+      const where: any = { storeId, customer: { storeId, role: 'customer' } };
       if (type && typeof type === 'string' && type !== 'all') {
         where.type = type as LoyaltyTransactionType;
       }
