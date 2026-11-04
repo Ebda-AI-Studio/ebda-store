@@ -34,7 +34,13 @@ import { passkeyAssertion, type PasskeyMode } from './passkeys';
 import { signInMessageKey } from './sign-in-error';
 import { safeSignInReturn } from './sign-in-return';
 import { PUBLIC_PATHS } from './public-paths';
-import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
+import {
+  AccountsError,
+  accountsLogin,
+  accountsLoginMfa,
+  accountsLogout,
+  establishApiSession,
+} from './accounts';
 
 interface User {
   id: string;
@@ -263,12 +269,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Exchange an identity-service access token for the Store session and finish signing in. */
   async function finishSignIn(accessToken: string, enrollSecondFactor = false): Promise<void> {
     const user = await establishApiSession<User>(accessToken);
-    rememberGrant({ access_token: accessToken });
-    // Check if user is admin or staff
+    // Check if user is admin or staff BEFORE anything is armed: a refused customer must not keep a live refresh timer.
     const adminRoles = ['super_admin', 'store_admin', 'staff'];
     if (!adminRoles.includes(user.role)) {
+      // End both sessions the sign-in just created (best effort); the accessDenied message still reaches the page.
+      clearStoredSession();
+      await Promise.allSettled([performLogout(API_URL, null), accountsLogout(accessToken)]);
       throw new Error(t('accessDenied'));
     }
+    rememberGrant({ access_token: accessToken });
     storeSession({ user });
     // A platform admin without a second factor has no admin power yet (Ruling ID-15): send them to enrol one.
     // A platform admin who must enrol a second factor does that first; the Chat return is not honoured over it.

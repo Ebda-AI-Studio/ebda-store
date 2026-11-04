@@ -4,6 +4,11 @@
  * shared cookie it renews serves every other tab. The reactive refresh-on-401 in api.ts stays as the fallback.
  */
 export const PROACTIVE_LEAD_MS = 60_000;
+/**
+ * Never refresh sooner than this after arming. A short-lived token, or a device clock far ahead of the server's, used to
+ * give a delay of 0: each refresh re-armed an immediate refresh and the tab hammered accounts until it throttled.
+ */
+export const PROACTIVE_MIN_DELAY_MS = 30_000;
 
 export interface ProactiveDeps {
   refresh: () => Promise<unknown>;
@@ -31,7 +36,7 @@ export function disarmProactiveRefresh(): void {
   visibilityHandler = undefined;
 }
 
-/** `expiresAtMs` is the token's expiry as epoch milliseconds. */
+/** `expiresAtMs` is the token's expiry as epoch milliseconds ON THIS DEVICE'S CLOCK (see `grantExpiryMs`). */
 export function armProactiveRefresh(
   expiresAtMs: number,
   deps: Partial<ProactiveDeps> & Pick<ProactiveDeps, 'refresh'>
@@ -44,12 +49,13 @@ export function armProactiveRefresh(
     }).catch(() => {
       // A failed proactive refresh is not a sign-out: the reactive refresh on the next 401 decides.
     });
-  const delay = Math.max(0, expiresAtMs - PROACTIVE_LEAD_MS - Date.now());
+  const delay = Math.max(PROACTIVE_MIN_DELAY_MS, expiresAtMs - PROACTIVE_LEAD_MS - Date.now());
+  const dueAtMs = Date.now() + delay;
   timer = setTimeout(run, delay);
   if (typeof document !== 'undefined') {
     // Background tabs throttle timers: catch up the moment the tab is visible again and the token is due.
     visibilityHandler = () => {
-      if (document.visibilityState === 'visible' && Date.now() >= expiresAtMs - PROACTIVE_LEAD_MS) {
+      if (document.visibilityState === 'visible' && Date.now() >= dueAtMs) {
         run();
       }
     };
@@ -57,23 +63,34 @@ export function armProactiveRefresh(
   }
 }
 
-/** Epoch ms when a grant expires: its `expires_at` (seconds or ms), else the JWT `exp`, else a 4-minute guess. */
+/**
+ * Epoch ms, on THIS device's clock, when a grant expires. Computed from the token's LIFETIME relative to the moment it was
+ * received (JWT `exp - iat`, which does not depend on the device clock), never `exp - Date.now()`: a skewed device clock made
+ * that difference zero or negative forever. Without a readable JWT it falls back to the server's `expires_at` clamped to a sane
+ * lifetime, else 4 minutes. `armProactiveRefresh` additionally enforces PROACTIVE_MIN_DELAY_MS.
+ */
 export function grantExpiryMs(grant: { access_token?: string; expires_at?: number }): number {
   const norm = (n: number) => (n < 1e12 ? n * 1000 : n);
+  const now = Date.now();
+  try {
+    const payload = JSON.parse(
+      atob((grant.access_token ?? '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    if (typeof payload.exp === 'number' && typeof payload.iat === 'number') {
+      const life = norm(payload.exp) - norm(payload.iat);
+      if (life > 0) return now + life;
+    }
+  } catch {
+    // not a JWT we can read
+  }
   if (
     typeof grant.expires_at === 'number' &&
     Number.isFinite(grant.expires_at) &&
     grant.expires_at > 0
   ) {
-    return norm(grant.expires_at);
+    const remaining = norm(grant.expires_at) - now;
+    // Clock-skew guard: a non-positive or absurd remainder says the clocks disagree, not that the token lives that long.
+    if (remaining > PROACTIVE_LEAD_MS && remaining <= 24 * 3_600_000) return now + remaining;
   }
-  try {
-    const payload = JSON.parse(
-      atob((grant.access_token ?? '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
-    );
-    if (typeof payload.exp === 'number') return norm(payload.exp);
-  } catch {
-    // not a JWT we can read
-  }
-  return Date.now() + 4 * 60_000;
+  return now + 4 * 60_000;
 }

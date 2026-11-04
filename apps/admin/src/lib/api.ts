@@ -230,16 +230,21 @@ export function refreshAccessToken(): Promise<string | null> {
       rememberGrant(grant);
       return grant.access_token;
     } catch (error) {
-      // 401 NO_SESSION: the session is gone for good (password changed, signed out elsewhere). Say so and leave once,
-      // instead of a burst of failing calls and a silent logout. A no-op on public pages.
-      if (error instanceof AccountsError && error.status === 401 && error.code === 'NO_SESSION') {
-        handleSessionEnded();
+      if (error instanceof AccountsError) {
+        // 401 NO_SESSION: the session is gone for good (password changed, signed out elsewhere). Say so and leave once,
+        // but ONLY when this page had a signed-in session that was revoked mid-use (`lastGrant`): the first-load session
+        // check and calls that straggle in after a deliberate sign-out are not "your session ended".
+        if (error.status === 401 && error.code === 'NO_SESSION') {
+          if (lastGrant) handleSessionEnded();
+          return null;
+        }
+        // A throttle or a server outage is not "signed out": it must reach the caller or the credential-clear fires anyway.
+        if (error.status === 429 || error.status >= 500) throw new RefreshThrottledError();
+        // Any other refusal means there is no session to keep.
+        return null;
       }
-      // A throttle is not "signed out": it must reach the caller or the credential-clear fires anyway.
-      if (error instanceof AccountsError && error.status === 429) throw new RefreshThrottledError();
-      // 401 NO_SESSION (signed out / revoked) and every other refusal mean there is no session to keep.
-      if (error instanceof AccountsError && error.status === 503) throw new RefreshThrottledError();
-      return null;
+      // Not an answer from the service at all (offline, DNS, aborted fetch): transient, never a sign-out.
+      throw new RefreshThrottledError();
     }
   })().finally(() => {
     refreshInFlight = null;
