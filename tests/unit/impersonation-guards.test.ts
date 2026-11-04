@@ -24,7 +24,7 @@ vi.mock('@api/lib/logger', () => ({
 
 const { rejectImpersonated } = await import('@api/middleware/auth');
 const { auditLog } = await import('@api/middleware/security');
-const { runAsImpersonator, enterImpersonation } = await import('@api/lib/impersonation-context');
+const { runWithImpersonation: runAsImpersonator } = await import('@api/lib/impersonation-context');
 
 function runGuard(user: Record<string, unknown>) {
   let status = 0;
@@ -83,19 +83,28 @@ describe('auditLog names the impersonator', () => {
     expect(inserted[1].details.impersonatedBy).toBe('sa2');
   });
 
-  it('the scope entered by authenticate (enterWith) reaches code that runs after next()', async () => {
+  it('the scope authenticate opens reaches async code that runs after next()', async () => {
     inserted.length = 0;
     await new Promise<void>(resolve => {
-      // what `authenticate` does, then the handler continuing asynchronously
-      setImmediate(() => {
-        enterImpersonation('sa9');
+      // what `authenticate` does: the rest of the request runs INSIDE the scope
+      runAsImpersonator('sa9', () =>
         setTimeout(async () => {
           await auditLog({ action: 'x', resourceType: 'y' });
           resolve();
-        }, 1);
-      });
+        }, 1)
+      );
     });
     expect(inserted[0].details.impersonatedBy).toBe('sa9');
+  });
+});
+
+describe('workerd-safe: no AsyncLocalStorage.enterWith in code that runs on Workers', () => {
+  it('lib/impersonation-context.ts does not call it (workerd throws "enterWith() is not implemented")', () => {
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/lib/impersonation-context.ts'),
+      'utf8'
+    );
+    expect(src.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\.enterWith\(/);
   });
 });
 
@@ -105,10 +114,22 @@ const SRC = path.resolve(__dirname, '../../apps/api/src/routes');
 /** The registration of `router.<method>(<path>, ...)` up to the handler (`async (`), i.e. its middleware chain. */
 function chainOf(file: string, method: string, routePath: string): string {
   const text = readFileSync(path.join(SRC, file), 'utf8');
-  const start = text.indexOf(`router.${method}(\n  '${routePath}',`);
-  if (start < 0) throw new Error(`route not found: ${method} ${routePath} in ${file}`);
-  const end = text.indexOf('async (', start);
-  return text.slice(start, end);
+  const re = new RegExp(
+    `router\\.${method}\\(\\s*'${routePath.replace(/[/:.]/g, c => '\\' + c)}',`
+  );
+  const m = re.exec(text);
+  if (!m) throw new Error(`route not found: ${method} ${routePath} in ${file}`);
+  const rest = text.slice(m.index);
+  const ends = [rest.indexOf('async ('), rest.indexOf('(_req')].filter(i => i > 0);
+  return rest.slice(0, Math.min(...ends));
+}
+
+/** The guard is either named in the chain or comes with billing's `writeGuard` array (which contains it, see billing.routes.ts). */
+function guarded(file: string, chain: string): boolean {
+  if (chain.includes('rejectImpersonated')) return true;
+  if (file !== 'billing.routes.ts' || !chain.includes('...writeGuard')) return false;
+  const text = readFileSync(path.join(SRC, file), 'utf8');
+  return /const writeGuard = \[[^\]]*rejectImpersonated/.test(text);
 }
 
 const GUARDED: Array<[string, string, string, string]> = [
@@ -128,14 +149,66 @@ const GUARDED: Array<[string, string, string, string]> = [
   ['payment-settings.routes.ts', 'post', '/store/:storeId/:provider/test', 'test credentials'],
   ['store.routes.ts', 'put', '/:id/domain', 'repoint the live domain'],
   ['staff.routes.ts', 'post', '/', 'add staff'],
+  // billing: every money / stored-card write (reads keep the plain guard)
+  ...[
+    ['post', '/checkout'],
+    ['get', '/checkout/return'],
+    ['put', '/trial-plan'],
+    ['post', '/card-setup'],
+    ['post', '/payment-method'],
+    ['post', '/payment-claims'],
+    ['post', '/instapay-plan'],
+    ['post', '/receipts'],
+    ['post', '/receipts/:receiptId/submit'],
+    ['post', '/change-plan'],
+    ['post', '/cancel'],
+    ['post', '/resume'],
+    ['post', '/checkout/stub-confirm'],
+  ].map(
+    ([m, p]) => ['billing.routes.ts', m, p, 'billing write'] as [string, string, string, string]
+  ),
+  // other credential / payout writes an owner can reach
+  ['agent-credential.routes.ts', 'post', '/:id/integrations/agent-key', 'mint an agent key'],
+  ['agent-credential.routes.ts', 'delete', '/:id/integrations/agent-key', 'revoke an agent key'],
+  ['merchant-webhooks.routes.ts', 'post', '/:id/rotate-secret', 'rotate a webhook secret'],
+  [
+    'shipping-carrier.routes.ts',
+    'put',
+    '/:storeId/shipping-carriers/configs/:carrier',
+    'carrier credentials',
+  ],
+  [
+    'shipping-carrier.routes.ts',
+    'delete',
+    '/:storeId/shipping-carriers/configs/:carrier',
+    'carrier credentials',
+  ],
+  [
+    'shipping-carrier.routes.ts',
+    'post',
+    '/:storeId/shipping-carriers/webhook-secret/:carrier/rotate',
+    'carrier webhook secret',
+  ],
+  ['eta.routes.ts', 'put', '/:storeId/eta/connection', 'tax-authority credentials'],
+  ['eta.routes.ts', 'post', '/:storeId/eta/connection/check', 'tax-authority credentials'],
+  ['affiliate.routes.ts', 'post', '/:storeId/affiliates/:id/payouts', 'affiliate payout'],
 ];
 
 describe('the audit list (S-2) has the guard in its own chain', () => {
   it.each(GUARDED)('%s %s %s (%s)', (file, method, routePath) => {
-    expect(chainOf(file, method, routePath)).toContain('rejectImpersonated');
+    expect(guarded(file, chainOf(file, method, routePath))).toBe(true);
   });
 
-  it('11 routes here + the 14 that already had it: the table is not empty', () => {
-    expect(GUARDED.length).toBe(11);
+  it('the table is not empty', () => {
+    expect(GUARDED.length).toBeGreaterThan(30);
+  });
+
+  it('every billing write route in billing.routes.ts is in the table (no write added without the guard)', () => {
+    const text = readFileSync(path.join(SRC, 'billing.routes.ts'), 'utf8');
+    const writes = [...text.matchAll(/router\.(post|put|patch|delete)\(\s*'([^']+)'/g)].map(
+      m => m[2]
+    );
+    const listed = GUARDED.filter(g => g[0] === 'billing.routes.ts').map(g => g[2]);
+    expect(writes.filter(w => !listed.includes(w))).toEqual([]);
   });
 });

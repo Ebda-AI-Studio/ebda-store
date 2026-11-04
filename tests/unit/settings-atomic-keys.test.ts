@@ -3,7 +3,8 @@
  * merged against a copy read at the START of its request, so the slower writer put the other's key back to its old value.
  * The merge now happens against the row as it is at WRITE time. The fake database below is a single mutable row; the first
  * (`getById`) read of every writer waits at a barrier so BOTH writers have started before either writes, which is exactly the
- * interleaving that used to lose a key.
+ * interleaving that used to lose a key. The Postgres path is ONE SQL statement per write (the `/stores` router has no request
+ * transaction, so a lock-then-update pair would not hold): the fake applies each statement as a single synchronous step.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -15,9 +16,6 @@ const db = vi.hoisted(() => ({
     settings: {} as Record<string, unknown>,
   },
   barrier: undefined as Promise<void> | undefined,
-  // `SELECT ... FOR UPDATE` on the stores row: held from the locking read until the same writer's update lands
-  lock: Promise.resolve() as Promise<void>,
-  unlock: undefined as (() => void) | undefined,
 }));
 
 vi.mock('@ebda/database', () => {
@@ -28,20 +26,24 @@ vi.mock('@ebda/database', () => {
       return structuredClone(db.row);
     },
     update: async ({ data }: { data: Record<string, unknown> }) => {
-      db.row = { ...db.row, ...structuredClone(data) } as typeof db.row;
-      const saved = structuredClone(db.row);
-      db.unlock?.(); // the transaction commits with the write
-      db.unlock = undefined;
-      return saved;
+      // Prisma ignores `undefined` fields
+      const defined = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+      db.row = { ...db.row, ...structuredClone(defined) } as typeof db.row;
+      return structuredClone(db.row);
     },
   };
-  const $queryRaw = async () => {
-    const prev = db.lock;
-    let release!: () => void;
-    db.lock = new Promise<void>(r => (release = r));
-    await prev; // a second writer waits here until the first has written
-    db.unlock = release;
+  // The two SQL statements the Postgres path issues. Each is ONE synchronous step here, as it is one atomic statement in Postgres:
+  //   UPDATE stores SET settings = coalesce(settings,'{}') || $patch   (merge)
+  //   UPDATE stores SET settings = jsonb_set(..., ARRAY[$key], $value)  (one key)
+  const $queryRaw = async (strings: TemplateStringsArray, ...vals: unknown[]) => {
+    expect(strings.join('?')).toContain('||');
+    db.row.settings = { ...db.row.settings, ...JSON.parse(vals[0] as string) };
     return [{ settings: structuredClone(db.row.settings) }];
+  };
+  const $executeRaw = async (strings: TemplateStringsArray, ...vals: unknown[]) => {
+    expect(strings.join('?')).toContain('jsonb_set');
+    db.row.settings = { ...db.row.settings, [vals[0] as string]: JSON.parse(vals[1] as string) };
+    return 1;
   };
   const prisma = { store };
   return {
@@ -53,6 +55,7 @@ vi.mock('@ebda/database', () => {
       fn({
         store,
         $queryRaw,
+        $executeRaw,
         product: { count: async () => 0 },
         category: { count: async () => 0 },
         order: { count: async () => 0 },
@@ -100,8 +103,6 @@ function twoWritersStartTogether<A, B>(a: () => Promise<A>, b: () => Promise<B>)
 beforeEach(() => {
   db.row = { id: ID, slug: 'demo', domain: null, settings: { currency: 'EGP' } };
   db.barrier = undefined;
-  db.lock = Promise.resolve();
-  db.unlock = undefined;
 });
 
 describe('settings writers merge against the live row (BE:F-2)', () => {

@@ -14,7 +14,7 @@
  * an audit row, so it is written only by `PUT /stores/:id/gold-rates/payment-policy`, never the generic route.
  *
  * `mcpWriteEnabled` (BE:S-8, Ruling FP-1) is the merchant's MCP write switch: it is written only by
- * `PUT /stores/:id/integrations/merchant-mcp/write-switch` (audit row, atomic jsonb_set), never the generic route.
+ * `PUT /stores/:id/integrations/merchant-mcp/write-switch` (audit row; one atomic `jsonb_set` statement on a Postgres store, a write-time read-merge on a Durable Object store, Ruling FP-5), never the generic route.
  */
 export const SERVER_OWNED_SETTINGS_KEYS = [
   'ebdaWhatsApp',

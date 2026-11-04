@@ -1117,10 +1117,11 @@ router.put(
 // PUT /stores/:id/branding-bundle - the branding page's Save as ONE request (BE:F-3).
 //
 // The page used to fire five independent PUTs (branding, theme, contact, social, settings). A 429 in the middle left the store
-// half saved, with only a partial-failure toast. Every part here is optional and validated by the SAME schema as its own route;
-// the parts run in order inside the request's single transaction, so any failure rolls ALL of it back and the client gets one
-// error. `settings` goes through the shallow merge of `PUT /:id` (live row, server-owned keys kept), so the page sends only
-// the keys it owns.
+// half saved, with only a partial-failure toast. Every part here is optional and validated by the SAME schema as its own route.
+// `StoreService.updateBrandingBundle` applies them in ONE database transaction on a Postgres store (any failure rolls all of it
+// back); on a D1 + Durable Object store the parts apply in order and a failure leaves the earlier ones written (Ruling FP-8).
+// This router has NO request transaction (storeScopeContext), so the transaction is opened in the service, not here. `settings`
+// goes through the shallow merge of `PUT /:id` (live row, server-owned keys kept), so the page sends only the keys it owns.
 const brandingBundleSchema = z
   .object({
     branding: brandingSchema.optional(),
@@ -1144,24 +1145,16 @@ router.put(
       const body = brandingBundleSchema.parse(req.body);
       const raw = (req.body ?? {}) as Record<string, unknown>;
 
-      if (body.branding) await StoreService.updateBranding(id, body.branding);
-      if (body.theme) await StoreService.updateTheme(id, body.theme as Record<string, unknown>);
-      if (body.contact) await StoreService.updateContactInfo(id, body.contact);
-      if (body.social) {
-        const existing = await StoreService.getById(id);
-        await StoreService.updateSocialLinks(
-          id,
-          mergeSocialLinks(existing.socialLinks, body.social, raw.social ?? {})
-        );
-      }
-      if (body.settings !== undefined || body.blogEnabled !== undefined) {
-        await StoreService.update(id, {
-          ...(body.settings !== undefined && { settings: body.settings as Prisma.InputJsonValue }),
-          ...(body.blogEnabled !== undefined && { blogEnabled: body.blogEnabled }),
-        });
-      }
-
-      const store = await StoreService.getById(id);
+      const store = await StoreService.updateBrandingBundle(id, {
+        branding: body.branding,
+        theme: body.theme as Record<string, unknown> | undefined,
+        contact: body.contact,
+        social: body.social
+          ? stored => mergeSocialLinks(stored, body.social, raw.social ?? {})
+          : undefined,
+        settings: body.settings as Prisma.InputJsonValue | undefined,
+        blogEnabled: body.blogEnabled,
+      });
       res.json({ success: true, data: { store } });
     } catch (error) {
       next(error);

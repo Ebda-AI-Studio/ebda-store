@@ -9,7 +9,7 @@ import { withIdentityTimeout } from '../lib/identity-timeout';
 import { accountStateCached } from '../lib/identity-live-cache';
 import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
-import { enterImpersonation } from '../lib/impersonation-context';
+import { runWithImpersonation } from '../lib/impersonation-context';
 import { recordTiming } from '../lib/request-timing';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
@@ -336,11 +336,15 @@ export async function authenticate(
     }
 
     req.user = payload;
-    // BE:S-2: every audit row written for the rest of this request names the impersonating super_admin.
-    if (payload.impersonatedBy) enterImpersonation(payload.impersonatedBy);
     // Expose the jti on the request so downstream middleware (e.g. logout)
     // can denylist this specific token without re-decoding.
     (req as any).tokenJti = decoded?.jti;
+    // BE:S-2: every audit row written for the rest of this request names the impersonating super_admin. `run`, not
+    // `enterWith` (not implemented on workerd), see lib/impersonation-context.ts.
+    if (payload.impersonatedBy) {
+      runWithImpersonation(payload.impersonatedBy, () => next());
+      return;
+    }
     next();
   } catch (err) {
     if (err instanceof AppError) return next(err);
@@ -454,6 +458,11 @@ export async function optionalAuthenticate(
     );
   }
 
+  // Same attribution as `authenticate`: an impersonated request that reaches a public route names the impersonator in its audit rows.
+  if (req.user?.impersonatedBy) {
+    runWithImpersonation(req.user.impersonatedBy, () => next());
+    return;
+  }
   next();
 }
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { tenantContext } from '../middleware/tenant-context';
@@ -43,6 +43,7 @@ router.get(
 router.put(
   '/:storeId/eta/connection',
   ...guard,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const connection = await EtaReceiptService.saveConnection(
@@ -61,6 +62,7 @@ router.put(
 router.post(
   '/:storeId/eta/connection/check',
   ...guard,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({

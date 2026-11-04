@@ -67,10 +67,7 @@ const svc = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   getById: vi.fn(),
-  updateBranding: vi.fn(),
-  updateTheme: vi.fn(),
-  updateContactInfo: vi.fn(),
-  updateSocialLinks: vi.fn(),
+  updateBrandingBundle: vi.fn(),
   setStatus: vi.fn(),
   updateTemplate: vi.fn(),
 }));
@@ -160,7 +157,7 @@ describe('status and template bodies (BE:S-15)', () => {
 });
 
 describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
-  it('runs every part the page sent, in order, from ONE request', async () => {
+  it('hands every part the page sent to ONE service call', async () => {
     const res = await request(app)
       .put(`/stores/${STORE_ID}/branding-bundle`)
       .send({
@@ -171,29 +168,27 @@ describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
         blogEnabled: true,
       });
     expect(res.status).toBe(200);
-    expect(svc.updateBranding).toHaveBeenCalledTimes(1);
-    expect(svc.updateContactInfo).toHaveBeenCalledTimes(1);
-    expect(svc.updateTheme).not.toHaveBeenCalled(); // untouched parts are not written
-    // social merges over the stored links, keeping the key the body omitted
-    expect(svc.updateSocialLinks.mock.calls[0][1]).toMatchObject({
-      facebook: 'https://f.b/x',
-      instagram: 'https://instagram.com/x',
-    });
-    // settings + blogEnabled ride one StoreService.update (shallow merge against the live row)
-    expect(svc.update).toHaveBeenCalledTimes(1);
-    expect(svc.update.mock.calls[0][1]).toMatchObject({
+    expect(svc.updateBrandingBundle).toHaveBeenCalledTimes(1);
+    const parts = svc.updateBrandingBundle.mock.calls[0][1];
+    expect(parts).toMatchObject({
+      branding: { name: 'Shop' },
+      contact: { email: 'a@b.com' },
       settings: { contact: { addressLink: true } },
       blogEnabled: true,
     });
+    expect(parts.theme).toBeUndefined(); // untouched parts are not written
+    // social merges over the STORED links (the service passes them in), keeping the key the body omitted
+    expect(
+      parts.social({ facebook: 'https://f.b/x', instagram: 'https://old.example/i' })
+    ).toMatchObject({ facebook: 'https://f.b/x', instagram: 'https://instagram.com/x' });
   });
 
-  it('a failing part ends the request with one error: later parts never run (the request transaction rolls back)', async () => {
-    svc.updateContactInfo.mockRejectedValueOnce(new Error('boom'));
+  it('a failing bundle is one error response', async () => {
+    svc.updateBrandingBundle.mockRejectedValueOnce(new Error('boom'));
     const res = await request(app)
       .put(`/stores/${STORE_ID}/branding-bundle`)
-      .send({ branding: { name: 'Shop' }, contact: { email: 'a@b.com' }, blogEnabled: true });
+      .send({ branding: { name: 'Shop' } });
     expect(res.status).toBe(500);
-    expect(svc.update).not.toHaveBeenCalled();
   });
 
   it('an unknown top-level key is refused (strict)', async () => {
@@ -201,7 +196,7 @@ describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
       .put(`/stores/${STORE_ID}/branding-bundle`)
       .send({ branding: { name: 'Shop' }, ownerId: 'someone-else' });
     expect(res.status).toBe(400);
-    expect(svc.updateBranding).not.toHaveBeenCalled();
+    expect(svc.updateBrandingBundle).not.toHaveBeenCalled();
   });
 
   it('the bundle settings go through the same checks as PUT /:id (a planted ebdaWhatsApp is refused)', async () => {
@@ -209,7 +204,7 @@ describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
       .put(`/stores/${STORE_ID}/branding-bundle`)
       .send({ settings: { ebdaWhatsApp: { linked: true } } });
     expect(res.status).toBe(400);
-    expect(svc.update).not.toHaveBeenCalled();
+    expect(svc.updateBrandingBundle).not.toHaveBeenCalled();
   });
 });
 

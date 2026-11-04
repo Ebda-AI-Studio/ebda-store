@@ -6,6 +6,7 @@ import {
   acrossStores,
   withStore,
   withUser,
+  runInTenantContext,
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
@@ -277,30 +278,57 @@ async function countStoreRows(
 }
 
 /**
- * The CURRENT `settings` JSON, read at write time inside the writer's own call (BE:F-2).
+ * `Store.settings` writers, BE:F-2 (Ruling FP-5).
  *
- * The lost update came from merging against a copy read minutes earlier (a page mounted, another surface wrote, the page saved
- * its stale whole copy). Reading the live row here narrows the server-side window to one statement pair: on Postgres the row is
- * locked (`FOR UPDATE`, held to the end of the request transaction) so two concurrent writers serialise and BOTH keys survive;
- * on a Durable Object store (`updateStoreThrough` hands a stand-in that serves only `store.*`) it is a plain fresh read.
- * RESIDUAL (Ruling FP-5): on the DO path two writers inside the same few milliseconds can still interleave, because the D1 +
- * DO pair has no row lock to take. Cost if wrong: one key written in that window is lost, instead of every key written during
- * the page's lifetime.
+ * The lost update came from merging against a copy read minutes earlier (a page mounted, another surface wrote, the page saved its
+ * stale whole copy). Two paths, by where the store is written:
+ *
+ * - POSTGRES-authoritative store: ONE SQL statement does the merge (`settings = coalesce(settings,'{}') || patch`, or `jsonb_set`
+ *   for one key), so it is atomic in the database whatever the transaction shape. This matters: the `/stores` router has NO
+ *   request transaction (it runs under `storeScopeContext`), so every query is its own transaction and a `SELECT ... FOR UPDATE`
+ *   followed by a separate UPDATE would release its lock between the two. Never write that pair here.
+ * - D1 + Durable Object store (`storeWritesToDo`): there is no single statement across D1 and the DO, so the writer reads the row
+ *   at write time (`readLiveSettings`) and writes the merge. RESIDUAL: two writers inside the same few milliseconds can still
+ *   interleave and one key is lost. Cost if wrong: one key written in that window is lost, instead of every key written during the
+ *   page's lifetime.
  */
 async function readLiveSettings(
   tx: Parameters<Parameters<typeof updateStoreThrough>[1]>[0],
-  storeId: string,
-  onDo: boolean
+  storeId: string
 ): Promise<Record<string, unknown>> {
-  const raw = tx as unknown as {
-    $queryRaw?: (q: TemplateStringsArray, ...v: unknown[]) => Promise<Array<{ settings: unknown }>>;
-  };
-  if (!onDo && typeof raw.$queryRaw === 'function') {
-    const rows = await raw.$queryRaw`SELECT settings FROM stores WHERE id = ${storeId} FOR UPDATE`;
-    return (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
-  }
   const row = await tx.store.findUnique({ where: { id: storeId }, select: { settings: true } });
   return (row?.settings as Record<string, unknown> | null) ?? {};
+}
+
+/** Atomic shallow merge of `patch` into `stores.settings` (Postgres path). Returns the resulting settings. */
+async function mergeSettingsAtomic(
+  storeId: string,
+  patch: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const rows = await withStore(
+    storeId,
+    tx => tx.$queryRaw<Array<{ settings: unknown }>>`
+      UPDATE stores
+      SET settings = coalesce(settings, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb,
+          updated_at = now()
+      WHERE id = ${storeId}
+      RETURNING settings`
+  );
+  await syncStoreFields(storeId, ['settings']);
+  return (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
+}
+
+/** Atomic replace of ONE top-level `settings` key (Postgres path). */
+async function setSettingsKeyAtomic(storeId: string, key: string, value: unknown): Promise<void> {
+  await withStore(
+    storeId,
+    tx => tx.$executeRaw`
+      UPDATE stores
+      SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), ARRAY[${key}]::text[], ${JSON.stringify(value)}::jsonb),
+          updated_at = now()
+      WHERE id = ${storeId}`
+  );
+  await syncStoreFields(storeId, ['settings']);
 }
 
 export class StoreService {
@@ -662,22 +690,26 @@ export class StoreService {
       }
     }
 
-    // Merge settings instead of replacing entirely. BE:F-2: the merge happens against the row as it is NOW, inside the writer's
-    // own call (see readLiveSettings), and `incoming` holds only the keys the client sent.
+    // Merge settings instead of replacing entirely. BE:F-2: the merge happens against the row as it is NOW (see the note above
+    // readLiveSettings): ONE atomic SQL statement on a Postgres store, a write-time read on a DO store. `incoming` holds only the
+    // keys the client sent; server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
     const incoming =
       data.settings && typeof data.settings === 'object'
         ? (data.settings as Record<string, unknown>)
         : undefined;
     const onDo = incoming ? await storeWritesToDo(storeId) : false;
+    const atomicPatch = incoming && !onDo ? stripServerOwnedSettings(incoming) : undefined;
 
     const updatedStore = await updateStoreThrough(storeId, async tx => {
-      // Server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
-      const mergedSettings = incoming
-        ? (mergeClientSettings(
-            await readLiveSettings(tx, storeId, onDo),
-            incoming
-          ) as Prisma.InputJsonValue)
-        : data.settings;
+      const mergedSettings =
+        incoming && onDo
+          ? (mergeClientSettings(
+              await readLiveSettings(tx, storeId),
+              incoming
+            ) as Prisma.InputJsonValue)
+          : incoming
+            ? undefined // written below by the atomic statement
+            : data.settings;
       return tx.store.update({
         where: { id: storeId },
         data: {
@@ -723,6 +755,13 @@ export class StoreService {
         },
       });
     });
+
+    if (atomicPatch && Object.keys(atomicPatch).length > 0) {
+      (updatedStore as { settings: unknown }).settings = await mergeSettingsAtomic(
+        storeId,
+        atomicPatch
+      );
+    }
 
     // Invalidate store cache (best-effort)
     try {
@@ -1516,22 +1555,76 @@ export class StoreService {
   }
 
   /**
-   * Replace ONE top-level `settings` key (BE:F-2): read the live row inside the writer's own call (readLiveSettings), splice the
-   * key, write, bust the caches. Used by the single-purpose setters so none of them writes back a copy read earlier.
+   * Replace ONE top-level `settings` key (BE:F-2): one atomic `jsonb_set` statement on a Postgres store, a write-time read-merge
+   * on a DO store (see readLiveSettings), then bust the caches. Used by the single-purpose setters so none of them writes back a
+   * copy read earlier.
    */
   private static async setSettingsKey(storeId: string, key: string, value: unknown) {
     const store = await this.getById(storeId);
-    const onDo = await storeWritesToDo(storeId);
-    const updatedStore = await updateStoreThrough(storeId, async tx => {
-      const live = await readLiveSettings(tx, storeId, onDo);
-      return tx.store.update({
-        where: { id: storeId },
-        data: { settings: { ...live, [key]: value } as Prisma.InputJsonValue },
+    let updatedStore;
+    if (await storeWritesToDo(storeId)) {
+      updatedStore = await updateStoreThrough(storeId, async tx => {
+        const live = await readLiveSettings(tx, storeId);
+        return tx.store.update({
+          where: { id: storeId },
+          data: { settings: { ...live, [key]: value } as Prisma.InputJsonValue },
+        });
       });
-    });
+    } else {
+      await setSettingsKeyAtomic(storeId, key, value);
+      updatedStore = await this.getById(storeId);
+    }
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
+  }
+
+  /**
+   * The branding page's Save as ONE unit (BE:F-3). Every part runs in ONE database transaction on a Postgres store
+   * (`runInTenantContext`; each `withStore` inside reuses it), so a failure in any part rolls ALL of it back. The `/stores`
+   * router has no request transaction of its own (it runs under `storeScopeContext`), so the transaction is opened here.
+   *
+   * D1 + Durable Object store (`storeWritesToDo`): D1 and the DO cannot share a transaction, so the parts apply in order and a
+   * failure leaves the earlier parts written (Ruling FP-8). Cost if wrong: a merchant sees one error and finds part of the page
+   * saved; saving again converges because every part is an idempotent write.
+   *
+   * Caches are busted AFTER the commit so a read between the bust and the commit cannot re-cache the old values.
+   */
+  static async updateBrandingBundle(
+    storeId: string,
+    parts: {
+      branding?: Parameters<typeof StoreService.updateBranding>[1];
+      theme?: Record<string, unknown>;
+      contact?: Parameters<typeof StoreService.updateContactInfo>[1];
+      /** Given the stored social links, returns the merged links to write. */
+      social?: (stored: unknown) => Prisma.InputJsonValue;
+      settings?: Prisma.InputJsonValue;
+      blogEnabled?: boolean;
+    }
+  ) {
+    const before = await this.getById(storeId);
+    const run = async () => {
+      if (parts.branding) await this.updateBranding(storeId, parts.branding);
+      if (parts.theme) await this.updateTheme(storeId, parts.theme);
+      if (parts.contact) await this.updateContactInfo(storeId, parts.contact);
+      if (parts.social) {
+        const stored = await this.getById(storeId);
+        await this.updateSocialLinks(storeId, parts.social(stored.socialLinks));
+      }
+      if (parts.settings !== undefined || parts.blogEnabled !== undefined) {
+        await this.update(storeId, {
+          ...(parts.settings !== undefined && { settings: parts.settings }),
+          ...(parts.blogEnabled !== undefined && { blogEnabled: parts.blogEnabled }),
+        });
+      }
+    };
+    const onDo = await storeWritesToDo(storeId);
+    if (onDo) await run();
+    else await runInTenantContext(storeId, run);
+    const after = await this.getById(storeId);
+    await StoreService.invalidateCache(before);
+    await bustStoreCaches(after.id, after.slug, after.domain);
+    return after;
   }
 
   static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
