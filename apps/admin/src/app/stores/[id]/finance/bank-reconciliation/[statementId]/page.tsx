@@ -7,7 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, intlLocaleForUi } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ const major = minorToMajor;
 
 function fmt(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB');
+  return new Date(iso).toLocaleDateString(intlLocaleForUi('en-GB'));
 }
 
 const MATCH_BADGE: Record<MatchStatus, string> = {

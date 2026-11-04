@@ -1,3 +1,4 @@
+import { assertActiveVariantPrice } from '../lib/sellable-price';
 import { prisma } from '@ebda/database';
 import { GoldRateService } from './gold-rate/gold-rate.service';
 import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
@@ -523,6 +524,16 @@ export class VariantService {
     const typedBarcode = input.barcode?.trim() ? parseBarcodeOrThrow(input.barcode) : undefined;
     if (typedBarcode) await assertBarcodeAvailable(storeId, typedBarcode);
 
+    // QA-PRICE-ZERO-1: a new variant of an ACTIVE product is orderable at once, so its effective price (own override, else
+    // the product's) must be above zero. A draft product may hold placeholders; a gold row is the repricer's.
+    if (product.status === 'active') {
+      assertActiveVariantPrice({
+        price: input.price,
+        productPrice: product.price,
+        productPricingMode: product.pricingMode,
+      });
+    }
+
     // Create variant
     const createVariantRow = (db: Pick<typeof prisma, 'productVariant'>) =>
       db.productVariant.create({
@@ -633,10 +644,22 @@ export class VariantService {
         id: variantId,
         product: { id: productId, storeId, deletedAt: null },
       },
+      include: { product: { select: { status: true, price: true, pricingMode: true } } },
     });
 
     if (!variant) {
       throw new AppError(404, 'NOT_FOUND', 'Variant not found');
+    }
+
+    // QA-PRICE-ZERO-1: the variant as it will be after this update must not be orderable for free on an active product.
+    if (variant.product.status === 'active') {
+      assertActiveVariantPrice({
+        isActive: input.isActive ?? variant.isActive,
+        price: input.price !== undefined ? input.price : variant.price,
+        productPrice: variant.product.price,
+        productPricingMode: variant.product.pricingMode,
+        variantPricingMode: variant.pricingMode,
+      });
     }
 
     // BARCODE-1: validate a changed barcode; '' clears it.

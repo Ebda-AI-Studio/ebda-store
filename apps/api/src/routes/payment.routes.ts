@@ -1,7 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
-import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@ebda/shared';
+import {
+  INSTAPAY_DEFAULT_EXPIRY_HOURS,
+  goldAllowsDeferredPayment,
+  storefrontOrigin,
+} from '@ebda/shared';
+import { assertGoldPaymentAllowed } from '../services/gold-rate/payment-policy';
 import { z } from 'zod/v3';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -228,8 +233,16 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
       ? envDefault
       : (providers[0] ?? (codConfig ? 'cod' : instapayConfig ? 'instapay' : null));
 
+  // Ruling SHARIA-GOLD-1: a cart with gold hides COD + installments unless the merchant allowed them. The
+  // storefront only hides the options; the API refuses them (assertGoldPaymentAllowed) whatever it shows.
+  const goldStore = storeId
+    ? await prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    : null;
+  const goldPrepaidOnly = !goldAllowsDeferredPayment(goldStore?.settings);
+
   return {
     providers,
+    goldPrepaidOnly,
     /** Per online provider, the methods the merchant enabled. */
     methods: methodsByProvider,
     cod: codConfig,
@@ -423,6 +436,27 @@ router.post(
         // or a legacy pending row without a stored paymentUrl — fall through
         // and create. The abandoned pending invoice is driven terminal by the
         // daily auto-cancel reconciler.
+      }
+
+      // Ruling SHARIA-GOLD-1: the second server-side gate. An order priced from gold lines can only be paid
+      // up front online unless the store allows COD / installments; the provider and the method the shopper
+      // picked are judged here even if the checkout was bypassed.
+      const orderHasGold = order.items.some(
+        (i: { goldSnapshot?: unknown }) => i.goldSnapshot !== null && i.goldSnapshot !== undefined
+      );
+      let goldPrepaidOnly = false;
+      if (orderHasGold) {
+        const storeRow = await withStore(order.storeId, tx =>
+          tx.store.findUnique({ where: { id: order.storeId }, select: { settings: true } })
+        );
+        goldPrepaidOnly = !goldAllowsDeferredPayment(storeRow?.settings);
+        assertGoldPaymentAllowed({
+          hasGold: true,
+          storeSettings: storeRow?.settings,
+          provider: data.provider,
+          // Fawry's adapter defaults to settings.methods[0] (`payatfawry`, a reference paid at an outlet later) when no method is sent.
+          method: data.method ?? (data.provider === 'fawry' ? 'payatfawry' : undefined),
+        });
       }
 
       // Customer wallet (D1): `order.total` is the order VALUE; the part paid
@@ -784,7 +818,15 @@ router.post(
               : data.errorUrl
             : `${storefrontBaseUrl}/checkout/error`,
           webhookUrl: paymentWebhookUrl(providerName, order.storeId),
-          ...(data.method ? { metadata: { method: data.method } } : {}),
+          ...(data.method || goldPrepaidOnly
+            ? {
+                metadata: {
+                  ...(data.method ? { method: data.method } : {}),
+                  // Gold, prepaid only: a gateway page that offers every method must leave installments out.
+                  ...(goldPrepaidOnly ? { excludeBnpl: 'true' } : {}),
+                },
+              }
+            : {}),
         };
 
         // THE PROVIDER CALL — no transaction is open. It throws on provider-not-

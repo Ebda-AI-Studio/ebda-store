@@ -245,7 +245,12 @@ export default function StoreProductsPage() {
   }
 
   const storeName = store?.name ?? t('fallbackStore');
-  const hasActiveFilters = Boolean(search) || statusFilter !== 'all' || Boolean(categoryFilter);
+  // 'active' is the DEFAULT status view, not a filter the merchant chose: an empty catalog must read as
+  // "add your first product", not "adjust your filters" (audit P-2).
+  const hasActiveFilters =
+    Boolean(search) ||
+    (statusFilter !== 'all' && statusFilter !== 'active') ||
+    Boolean(categoryFilter);
 
   return (
     <AdminLayout
@@ -269,6 +274,9 @@ export default function StoreProductsPage() {
         products={products}
         loading={loading}
         hasActiveFilters={hasActiveFilters}
+        onShowDrafts={
+          statusFilter === 'active' ? () => handleStatusFilterChange('draft') : undefined
+        }
         onRequestDelete={product => {
           setProductToDelete(product);
           setIsDeleteModalOpen(true);

@@ -42,6 +42,7 @@ import { generateOrderNumber } from '../utils/order-number';
 import { countPriorCouponUses, type CouponLimitTx } from '../lib/coupon-per-customer-limit';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
 import { assertGoldLinesPriceable, assertSameRates } from './gold-rate/gate';
+import { assertGoldPaymentAllowed } from './gold-rate/payment-policy';
 import { redactOrderForCustomer } from './gold-rate/public';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { canSeeWholesaleOnly } from '../lib/audience';
@@ -98,9 +99,7 @@ import { SmsConsentService } from './sms-consent.service';
 import {
   assertStockHoldCapNotExceeded,
   HOLD_CAPPED_PAYMENT_METHODS,
-  openUnpaidGatewayHoldCap,
-  openUnpaidHoldCap,
-  openUnpaidHoldIpCap,
+  resolveStoreHoldCaps,
 } from '../lib/stock-hold-cap';
 import {
   storeDb,
@@ -1309,6 +1308,13 @@ export class OrderService {
         select: { settings: true, timezone: true },
       })
     );
+    // Ruling SHARIA-GOLD-1: a gold order is prepaid online unless the merchant allowed COD / installments.
+    // The check runs here, in the request that creates the order, whatever the checkout showed.
+    assertGoldPaymentAllowed({
+      hasGold: goldGate.snapshots.size > 0,
+      storeSettings: storeForMinOrder?.settings,
+      provider: data.paymentMethod,
+    });
     const minimumOrderFilsRaw = (storeForMinOrder?.settings as Record<string, unknown> | null)?.[
       'minimumOrderFils'
     ];
@@ -1737,12 +1743,20 @@ export class OrderService {
           // sent — gateway/unknown labels against the looser cap. Only
           // `manualHoldAdmitted` (the tight-cap methods) unlocks COD/InstaPay later.
           if (!paidInFullByWallet) {
-            await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
-              phone: data.shippingAddress.phone,
-              email:
-                typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
-              ip: requestContext?.checkoutIp ?? null,
-            });
+            await assertStockHoldCapNotExceeded(
+              tx,
+              storeId,
+              data.paymentMethod,
+              {
+                phone: data.shippingAddress.phone,
+                email:
+                  typeof data.shippingAddress.email === 'string'
+                    ? data.shippingAddress.email
+                    : null,
+                ip: requestContext?.checkoutIp ?? null,
+              },
+              resolveStoreHoldCaps(storeForMinOrder?.settings)
+            );
           }
           // The public checkout (`POST /public/orders`) and the MCP `place_order`
           // tool reach this with NO tenant context, and `backorder_lines` (written
@@ -2531,10 +2545,11 @@ export class OrderService {
     // (read from the DO's own products) and written as the first line of the order notes, exactly like the Postgres path.
     // A quote never refuses on it.
     let orderNotes: string | undefined = data.notes;
+    // ONE primary-key read of the store row, shared by the delivery note and the per-store hold caps (QA-HOLDS-1).
+    const storeRow = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
+    );
     if (!isQuote) {
-      const storeRow = await withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
-      );
       const leads = await (
         await storeDb(storeId)
       ).product.findMany({
@@ -2578,11 +2593,8 @@ export class OrderService {
       shippingAddress: data.shippingAddress,
       billingAddress: data.billingAddress,
       checkoutIp: c.requestContext?.checkoutIp ?? undefined,
-      holdCaps: {
-        manual: openUnpaidHoldCap(),
-        gateway: openUnpaidGatewayHoldCap(),
-        ip: openUnpaidHoldIpCap(),
-      },
+      // QA-HOLDS-1: env defaults, overridable per store (Store.settings.stockHoldCaps, bounded)
+      holdCaps: resolveStoreHoldCaps(storeRow?.settings),
       wholesaleEntitled: wholesale,
       loyaltyFeatureEnabled: loyaltyOn,
       backorderEnabled: backorderOn,
@@ -4147,6 +4159,19 @@ export class OrderService {
       })),
       { requireQuote: false }
     );
+    // Ruling SHARIA-GOLD-1: the manual-order path is held to the same prepaid-gold rule as checkout.
+    if (adminGoldGate.snapshots.size > 0) {
+      const adminStore = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+      );
+      assertGoldPaymentAllowed({
+        hasGold: true,
+        storeSettings: adminStore?.settings,
+        // BOTH fields: `{ paymentMethod: 'cod', paymentProvider: 'paymob' }` must not bypass the prepaid rule.
+        provider: data.paymentProvider,
+        method: data.paymentMethod,
+      });
+    }
     const adminResolver = await PriceResolver.forBuyer(
       storeId,
       pricingOpts.buyer ?? ANONYMOUS_BUYER,

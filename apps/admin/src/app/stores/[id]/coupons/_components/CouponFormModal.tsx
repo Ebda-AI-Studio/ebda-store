@@ -20,6 +20,9 @@ interface CouponFormModalProps {
   onClose: () => void;
   storeId: string;
   customerGroups: CustomerGroupOption[];
+  /** Why the server refused the save (already in the admin language). */
+  saveError?: string | null;
+  onDismissError?: () => void;
 }
 
 /**
@@ -36,6 +39,8 @@ export function CouponFormModal({
   onClose,
   storeId,
   customerGroups,
+  saveError,
+  onDismissError,
 }: CouponFormModalProps) {
   const tModal = useT('coupons.modal');
   const tForm = useT('coupons.form');
@@ -73,6 +78,19 @@ export function CouponFormModal({
       }
     >
       <form id={FORM_ID} onSubmit={onSubmit} className="space-y-6">
+        {saveError ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-ink"
+          >
+            {saveError}
+            {onDismissError ? (
+              <button type="button" onClick={onDismissError} className="ms-3 underline">
+                ×
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {/* Basic Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -170,12 +188,12 @@ export function CouponFormModal({
                 : tForm('valueAmountLabel')}
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              dir="ltr"
               required
-              min="0"
-              max={formData.type === 'percentage' ? 100 : undefined}
               value={formData.value}
-              onChange={e => onChange({ ...formData, value: parseFloat(e.target.value) || 0 })}
+              onChange={e => onChange({ ...formData, value: e.target.value })}
               disabled={formData.type === 'free_shipping'}
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted"
             />

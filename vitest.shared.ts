@@ -62,6 +62,8 @@ export function workspaceAliases(root: string): Record<string, string> {
     '@shared': path.resolve(root, './packages/shared'),
     // Pure brand module only — keeps marketing bundles free of the shared barrel.
     '@ebda/shared/brand': path.resolve(root, './packages/shared/src/brand'),
+    // Pure contact-enquiry contract (marketing form + API share it; zero deps).
+    '@ebda/shared/contact-enquiry': path.resolve(root, './packages/shared/src/contact-enquiry'),
     // Pure legal-policy registry (marketing imports it without the shared barrel).
     '@ebda/shared/legal': path.resolve(root, './packages/shared/src/legal'),
     // The 3D viewer subpath (apps map it in tsconfig `paths`; vite needs it here).

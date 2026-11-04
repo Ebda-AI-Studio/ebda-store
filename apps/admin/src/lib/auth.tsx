@@ -20,6 +20,7 @@ import {
   readStoredRefreshToken,
   markSessionEvidence,
   clearStoredSession,
+  rememberGrant,
 } from './api';
 import {
   isIosWebkit,
@@ -30,7 +31,16 @@ import {
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { passkeyAssertion, type PasskeyMode } from './passkeys';
-import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
+import { signInMessageKey } from './sign-in-error';
+import { safeSignInReturn } from './sign-in-return';
+import { PUBLIC_PATHS } from './public-paths';
+import {
+  AccountsError,
+  accountsLogin,
+  accountsLoginMfa,
+  accountsLogout,
+  establishApiSession,
+} from './accounts';
 
 interface User {
   id: string;
@@ -76,6 +86,10 @@ const API_URL = `${getApiUrl()}/api/v1`;
  */
 export function postLoginDestination(): string {
   if (typeof window === 'undefined') return '/';
+  // Another Ebda product (Chat) sent the person here with ?return=<url>: honored ONLY for an https URL on the explicit
+  // host allowlist (Ruling SIGNIN-RETURN-1); the result is an absolute URL, which `goAfterSignIn` navigates to.
+  const external = safeSignInReturn(new URLSearchParams(window.location.search).get('return'));
+  if (external) return external;
   const raw = new URLSearchParams(window.location.search).get('returnTo');
   const dest = safeInternalPath(raw, '/');
   if (dest === '/login' || dest.startsWith('/login/') || dest.startsWith('/login?')) {
@@ -84,22 +98,25 @@ export function postLoginDestination(): string {
   return dest;
 }
 
-/**
- * Pages reachable with no session. `/login` plus the self-serve funnel
- * (`/signup`, `/verify-email`) and password recovery (`/forgot-password`,
- * `/reset-password`): a visitor must be able to create an account, recover
- * one, and open the emailed links before any session exists.
- */
-export const PUBLIC_PATHS: readonly string[] = [
-  '/login',
-  '/signup',
-  '/verify-email',
-  '/forgot-password',
-  '/reset-password',
-];
+/** Go where `postLoginDestination()` said: an absolute https URL leaves the app, anything else is an in-app route. */
+export function goAfterSignIn(
+  router: { push: (href: string) => void; replace: (href: string) => void },
+  dest: string,
+  how: 'push' | 'replace' = 'push'
+): void {
+  if (/^https:\/\//i.test(dest)) window.location.assign(dest);
+  else router[how](dest);
+}
+
+export { PUBLIC_PATHS } from './public-paths';
+
+/** Dev-only visual previews (no session needed). Empty in production builds. */
+export const DEV_PREVIEW_PATHS: readonly string[] =
+  process.env.NODE_ENV === 'development' ? ['/dev-preview/order-alerts'] : [];
 
 export function isPublicPath(pathname: string | null | undefined): boolean {
-  return !!pathname && PUBLIC_PATHS.includes(pathname.replace(/\/+$/, '') || '/');
+  const p = pathname ? pathname.replace(/\/+$/, '') || '/' : '';
+  return !!p && (PUBLIC_PATHS.includes(p) || DEV_PREVIEW_PATHS.includes(p));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -252,25 +269,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Exchange an identity-service access token for the Store session and finish signing in. */
   async function finishSignIn(accessToken: string, enrollSecondFactor = false): Promise<void> {
     const user = await establishApiSession<User>(accessToken);
-    // Check if user is admin or staff
+    // Check if user is admin or staff BEFORE anything is armed: a refused customer must not keep a live refresh timer.
     const adminRoles = ['super_admin', 'store_admin', 'staff'];
     if (!adminRoles.includes(user.role)) {
+      // End both sessions the sign-in just created (best effort); the accessDenied message still reaches the page.
+      clearStoredSession();
+      await Promise.allSettled([performLogout(API_URL, null), accountsLogout(accessToken)]);
       throw new Error(t('accessDenied'));
     }
+    rememberGrant({ access_token: accessToken });
     storeSession({ user });
     // A platform admin without a second factor has no admin power yet (Ruling ID-15): send them to enrol one.
-    router.push(enrollSecondFactor ? '/account/security' : postLoginDestination());
+    // A platform admin who must enrol a second factor does that first; the Chat return is not honoured over it.
+    goAfterSignIn(router, enrollSecondFactor ? '/account/security' : postLoginDestination());
   }
 
   /** Map an identity-service refusal to the page's existing messages. */
   function signInError(e: unknown, fallback: string): Error {
     if (e instanceof AccountsError) {
-      if (e.code === 'EMAIL_NOT_VERIFIED') return new Error(t('emailNotVerified'));
-      if (e.status === 429) return new Error(t('tooManyAttempts'));
-      if (e.status === 401 || e.status === 403) return new Error(e.message || fallback);
-      return new Error(t('serverError'));
+      // Our own sentence for every refusal; the service's raw English never reaches the page (audit A-1).
+      return new Error(t(signInMessageKey(e.status, e.code)));
     }
-    return e instanceof Error ? e : new Error(fallback);
+    // A network failure ('Failed to fetch') is not a sentence for a merchant either.
+    return new Error(fallback);
   }
 
   async function login(email: string, password: string): Promise<void | MfaChallenge> {

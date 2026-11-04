@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { intlLocaleForUi } from '@/lib/format';
 
 interface StaffMember {
   membershipId: string;
@@ -73,7 +74,7 @@ export default function StoreStaffPage() {
 
   function formatDate(date: string | null) {
     if (!date) return t('formatDate.never');
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString(intlLocaleForUi(), {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

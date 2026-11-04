@@ -48,6 +48,11 @@ vi.mock('@ebda/database', () => {
     withStore: async (id: string, fn: (tx: unknown) => unknown) =>
       fn({
         store: {
+          updateMany: async ({ where, data }: any) => {
+            const r = h.pg.get(where.id);
+            if (r) Object.assign(r, data);
+            return { count: r ? 1 : 0 };
+          },
           findUnique: async ({ select }: any) => {
             const r = h.pg.get(id);
             return r ? Object.fromEntries(Object.keys(select).map(k => [k, r[k] ?? null])) : null;
@@ -277,6 +282,34 @@ describe('Store write on a Durable Object store (no Postgres)', () => {
         data: { status: 'active' },
       } as never)
     ).rejects.toMatchObject({ statusCode: 501 });
+  });
+  it('NZ-D21: an immediate DO status / plan write also lands in Postgres, so a later entitlement copy-back cannot undo it', async () => {
+    await updateStoreThrough(S, tx =>
+      (tx as any).store.update({ where: { id: S }, data: { status: 'suspended' } })
+    );
+    expect(h.pg.get(S)).toMatchObject({ status: 'suspended' });
+    expect(d1row(S).status).toBe('suspended');
+    // a later billing write copies Postgres' entitlement state back: the suspension must survive it
+    await syncStoreEntitlement(S);
+    expect(d1row(S).status).toBe('suspended');
+    expect(doProfile(S)).toBeDefined();
+    // the compare-and-set path (billing restore) is mirrored too, and only when the row matched
+    const n = await storeUpdateMany(BASE, {
+      where: { id: S, status: 'suspended' },
+      data: { status: 'active', billingSuspendedReason: null },
+    } as never);
+    expect(n.count).toBe(1);
+    expect(h.pg.get(S)).toMatchObject({ status: 'active' });
+    await storeUpdateMany(BASE, {
+      where: { id: S, status: 'suspended' },
+      data: { status: 'inactive' },
+    } as never);
+    expect(h.pg.get(S)).toMatchObject({ status: 'active' }); // no match, no Postgres write
+    // a non-entitlement field never touches Postgres
+    await updateStoreThrough(S, tx =>
+      (tx as any).store.update({ where: { id: S }, data: { heroTitle: 'Hi' } })
+    );
+    expect(h.pg.get(S)).not.toHaveProperty('heroTitle');
   });
   it('updateStoreThrough serves store.update, and any other model is a loud 501', async () => {
     const out = await updateStoreThrough(S, tx =>

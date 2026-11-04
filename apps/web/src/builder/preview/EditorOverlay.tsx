@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  ADMIN_TARGETS,
   BUILDER_PROTOCOL,
   acceptMessage,
   parentToChildSchema,
@@ -144,6 +145,11 @@ function imagesOf(target: CanvasTarget | null): ImageHandle[] {
       out.push({ key, sectionId: target.sectionId, blockId: target.blockId, box });
   }
   return out;
+}
+
+/** Where the name chip goes: 24px above the box, or just under it when there is no room above. */
+export function chipTopFor(box: { top: number; height: number }): number {
+  return box.top >= 24 ? box.top - 24 : box.top + box.height + 4;
 }
 
 const COPY = {
@@ -283,6 +289,15 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest('[contenteditable]:not([contenteditable="false"])')) return;
+      // A hint's "add products" link asks the admin to open that page; the canvas never navigates.
+      const action = target?.closest<HTMLElement>('[data-builder-action="open-admin"]');
+      if (action) {
+        e.preventDefault();
+        const to = action.getAttribute('data-builder-target');
+        if ((ADMIN_TARGETS as readonly string[]).includes(to ?? ''))
+          post({ type: 'open-admin', target: to } as Omit<ChildToParent, 'protocol'>);
+        return;
+      }
       const hit = targetOf(target, docRef.current);
       // Inside the canvas a click selects; it never navigates or submits.
       if (target?.closest('a, button, form')) e.preventDefault();
@@ -498,8 +513,9 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     if (!box) return null;
     const label = labelFor(docRef.current, target, locale);
     const pageWidth = document.documentElement.clientWidth;
-    // The chip sits on the box's inline-start edge, above it (inside it at the page top).
-    const chipTop = box.top >= 24 ? box.top - 24 : box.top;
+    // The chip sits on the box's inline-start edge, OUTSIDE it: above, or below at the page top, so
+    // it never covers the section's own content (a long store name in the header).
+    const chipTop = chipTopFor(box);
     const chipStart = isRtl ? Math.max(0, pageWidth - (box.left + box.width)) : box.left;
     return (
       <>

@@ -32,6 +32,11 @@
       "types": "./src/brand/index.ts",
       "default": "./src/brand/index.ts"
     },
+    "./contact-enquiry": {
+      "types": "./src/contact-enquiry.ts",
+      "require": "./dist/contact-enquiry.js",
+      "default": "./src/contact-enquiry.ts"
+    },
     "./wa-me-messages": {
       "types": "./src/whatsapp/wa-me-messages.ts",
       "default": "./src/whatsapp/wa-me-messages.ts"

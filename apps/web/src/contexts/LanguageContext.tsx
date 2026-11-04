@@ -339,6 +339,9 @@ export const translations = {
   'Save {n}% when you buy it in a bundle': 'وفّر {n}% لما تشتريه في باقة',
   'Out of 5, read the reviews': 'من 5، اقرا التقييمات',
   'Clear filter': 'مسح الفلتر',
+  'Add products': 'ضيف منتجات',
+  'Add categories': 'ضيف أقسام',
+  'Add a picture to this slide': 'ضيف صورة للشريحة دي',
   'Only you see this in the editor. Visitors do not see an empty section.':
     'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',
 

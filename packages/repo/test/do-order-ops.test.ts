@@ -279,4 +279,84 @@ describe('order money operations: the door', () => {
       r.n(`SELECT count(*) n FROM orders WHERE sms_opt_in = 0 AND source = 'web' AND notes IS NULL`)
     ).toBe(1);
   });
+
+  // QA-COUPON-1 / QA-HOLDS-1 on the Durable Object path (the storefront-shaped COD payload).
+  it('QA-COUPON-1: a COD order with a percentage coupon is charged EXACTLY the quoted total (cap and expectedTotal agree)', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, max_discount, min_order_amount, scope_product_ids, scope_category_ids) VALUES ('q', 's1', 'QA20', 'x', 'percentage', 20, 30000, 2000, '[]', '[]')`
+    );
+    const payload = r.order({
+      paymentMethod: 'cod',
+      couponCode: 'qa20', // storefront sends what the validate response returned; matching is case-insensitive
+      shippingAddress: { phone: '01012345678', email: 'a@b.com' },
+      lines: [{ productId: 'sku', quantity: 3 }],
+    });
+    const quote = r.op('quoteOrder', payload);
+    const placed = r.op('createOrder', { ...payload, expectedTotal: quote.total });
+    expect(quote.discount).toBe(900); // 20% of 4500
+    expect(placed.total).toBe(quote.total);
+    expect(placed.discount).toBe(quote.discount);
+    expect(r.n(`SELECT coupon_discount n FROM orders`)).toBe(900);
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBe(1);
+  });
+
+  it('QA-COUPON-1: an expectedTotal that does not match what would be charged is refused, nothing is written', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids) VALUES ('q', 's1', 'QA20', 'x', 'percentage', 20, '[]', '[]')`
+    );
+    // the buyer saw the coupon price (3600); the order is placed WITHOUT the coupon (the dropped-coupon failure)
+    const code = r.code(
+      'createOrder',
+      r.order({
+        paymentMethod: 'cod',
+        expectedTotal: 3600,
+        lines: [{ productId: 'sku', quantity: 3 }],
+      })
+    );
+    expect(code).toBe('PRICE_CHANGED');
+    expect(r.n(`SELECT count(*) n FROM orders`)).toBe(0);
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(10);
+  });
+
+  it('QA-COUPON-1: a percentage coupon stored with value 0 is refused, never silently "applied"', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids) VALUES ('z', 's1', 'ZERO', 'x', 'percentage', 0, '[]', '[]')`
+    );
+    expect(r.code('quoteOrder', r.order({ couponCode: 'ZERO' }))).toBe('COUPON_INVALID');
+    expect(r.code('createOrder', r.order({ couponCode: 'ZERO' }))).toBe('COUPON_INVALID');
+    expect(r.n(`SELECT count(*) n FROM orders`)).toBe(0);
+  });
+
+  it('QA-HOLDS-1: eight COD orders from one egress IP with different phones are accepted; the 40th-window ceiling still refuses', () => {
+    const r = rig(100);
+    const from = (phone: string) =>
+      r.order({
+        paymentMethod: 'cod',
+        checkoutIp: '41.40.1.1',
+        shippingAddress: { phone },
+        holdCaps: { manual: 2, ip: 8 },
+      });
+    for (let i = 0; i < 8; i++)
+      r.op('createOrder', { ...from(`0101234567${i}`), holdCaps: { manual: 2, gateway: 5 } });
+    expect(r.n(`SELECT count(*) n FROM orders`)).toBe(8); // default ceiling is 40, not 8
+    expect(r.code('createOrder', from('01099999999'))).toBe('TOO_MANY_OPEN_ORDERS'); // explicit ceiling of 8
+  });
+
+  it('QA-HOLDS-1: holds older than the IP window stop counting toward the IP ceiling (a slow-confirming merchant never blocks today)', () => {
+    const r = rig(50);
+    const o = (phone: string) =>
+      r.order({
+        paymentMethod: 'cod',
+        checkoutIp: '41.40.1.1',
+        shippingAddress: { phone },
+        holdCaps: { manual: 2, ip: 3, ipWindowHours: 24 },
+      });
+    for (let i = 0; i < 3; i++) r.op('createOrder', o(`0101234567${i}`));
+    expect(r.code('createOrder', o('01011111111'))).toBe('TOO_MANY_OPEN_ORDERS');
+    r.raw.exec(`UPDATE orders SET created_at = created_at - 25 * 3600 * 1000`); // yesterday's, still pending
+    expect(r.code('createOrder', o('01011111111'))).toBe('no error');
+  });
 });

@@ -15,6 +15,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StatsGrid } from './_components/StatsGrid';
+import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
@@ -139,6 +140,8 @@ export default function StoreDetailPage() {
         )}
       />
 
+      <OrderAlertsPromptCard storeId={store.id} />
+
       <StatsGrid storeId={store.id} />
 
       <div className="mt-8">
@@ -159,6 +162,7 @@ export default function StoreDetailPage() {
             setIsEditing(false);
             resetEditForm();
           }}
+          onActivate={() => setIsEditing(true)}
         />
         <div className="space-y-6">
           <StoreOwnerCard owner={store.owner} />

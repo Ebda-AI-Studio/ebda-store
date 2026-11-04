@@ -80,4 +80,47 @@ describe('refreshAccessToken (identity service)', () => {
       expect(await refreshSession()).toBe('throttled');
     }
   });
+
+  it('offline (fetch rejects) and a 500 are transient: throttled, never rejected, never "session ended"', async () => {
+    localStorage.setItem('hadSession', '1');
+    const ended = vi.fn();
+    vi.doMock('../session-ended', () => ({ handleSessionEnded: ended }));
+    for (const failure of [
+      () => Promise.reject(new TypeError('Failed to fetch')),
+      () => Promise.resolve(json(500, { success: false, error: { code: 'SERVER_ERROR' } })),
+    ]) {
+      vi.resetModules();
+      vi.doMock('../session-ended', () => ({ handleSessionEnded: ended }));
+      vi.stubGlobal('fetch', vi.fn(failure));
+      const { refreshSession, getFreshAccessToken } = await import('../api');
+      expect(await refreshSession()).toBe('throttled');
+      // the realtime socket's token source throws (transient) instead of answering null (= revoked)
+      await expect(getFreshAccessToken()).rejects.toThrow();
+    }
+    expect(ended).not.toHaveBeenCalled();
+  });
+
+  it('"session ended" only when a signed-in session is revoked mid-use, not on a first-load check', async () => {
+    localStorage.setItem('hadSession', '1');
+    const ended = vi.fn();
+    vi.doMock('../session-ended', () => ({ handleSessionEnded: ended }));
+    const noSession = () =>
+      json(401, { success: false, error: { code: 'NO_SESSION', message: 'x' } });
+
+    // first load: nobody was signed in on this page yet
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(noSession()));
+    const api = await import('../api');
+    expect(await api.refreshAccessToken()).toBeNull();
+    expect(ended).not.toHaveBeenCalled();
+
+    // signed in, then revoked mid-use
+    api.rememberGrant({ access_token: 'tok', expires_at: Date.now() + 600_000 });
+    expect(await api.refreshAccessToken()).toBeNull();
+    expect(ended).toHaveBeenCalledTimes(1);
+
+    // after a deliberate sign-out the stored session is cleared: stragglers stay quiet
+    api.clearStoredSession();
+    expect(await api.refreshAccessToken()).toBeNull();
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
 });

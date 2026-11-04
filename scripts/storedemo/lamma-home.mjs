@@ -140,8 +140,8 @@ export function buildLammaHome(base, ctx) {
       'I started cooking for the building on Fridays and it grew from there. Every dish is made the day before delivery, in small batches.',
     storyAr:
       'بدأت أطبخ لجيراني يوم الجمعة وكبرت من هنا. كل طبق بيتعمل قبل التوصيل بيوم، على دفعات صغيرة.',
-    hygiene: 'Licensed kitchen, valid health certificate (demo text)',
-    hygieneAr: 'مطبخ مرخّص — شهادة صحة سارية (نص توضيحي)',
+    hygiene: 'A small home kitchen, every order prepared fresh',
+    hygieneAr: 'مطبخ بيتي صغير، وكل طلب بيتحضّر طازة',
     years: 14,
     storyLink: '/about',
   });

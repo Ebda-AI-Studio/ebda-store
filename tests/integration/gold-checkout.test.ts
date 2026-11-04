@@ -94,6 +94,12 @@ describe.skipIf(!hasDb)(
     beforeAll(async () => {
       owner = ownerPool();
       fx = await seedBundleStore(`gold-co-${suffix}`);
+      // These gold suites pay by cash on delivery to stay off the gateway, so the store opts in to deferred payment for gold
+      // (Ruling SHARIA-GOLD-1: the merchant switch). The prepaid-only default has its own tests (gold payment policy).
+      await owner.query(
+        `update stores set settings = coalesce(settings, '{}'::jsonb) || '{"goldAllowDeferredPayment": true}'::jsonb where id = $1`,
+        [fx.storeId]
+      );
       gold = await createProduct(owner, fx.storeId, { ...SPEC, price: 1 });
       fixed = await seedProduct(fx.storeId, `${suffix}-fixed`, { price: 1_921_800, inventory: 50 });
       await setRate(576323);

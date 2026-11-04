@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { BRAND, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
+import { ContactForm } from './ContactForm';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { OfficeBlock } from './OfficeBlock';
@@ -14,58 +15,80 @@ export function ContactPage({ locale }: { locale: Locale }) {
   return (
     <>
       <Header locale={locale} page="contact" />
-      <main id="main" className="wrap legal">
-        <header className="legal-head">
+      <main id="main" className="ab">
+        <header className="wrap ab-hero">
           <h1>{p.title}</h1>
-          <p className="legal-notice">{p.lead}</p>
+          <p className="ab-lead">{p.lead}</p>
         </header>
-        <article className="legal-doc">
-          <section aria-labelledby="contact-email-h">
-            <h2 id="contact-email-h">{p.emailH}</h2>
-            <p>{p.emailP}</p>
-            <p>
-              <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
-            </p>
-          </section>
-          <section aria-labelledby="contact-wa-h">
-            <h2 id="contact-wa-h">{p.whatsappH}</h2>
-            <p>{p.whatsappP}</p>
-            <p>
-              <SiteLink href={whatsappUrl()} locale={locale}>
-                <bdi dir="ltr">{whatsappDisplay()}</bdi>
-              </SiteLink>
-            </p>
-          </section>
-          <section aria-labelledby="contact-help-h">
-            <h2 id="contact-help-h">{p.helpH}</h2>
-            <p>{p.helpP}</p>
-            <p>
-              <SiteLink href={`https://${BRAND.domains.help}${en ? '/en/' : '/'}`} locale={locale}>
-                {p.helpLink}
-              </SiteLink>
-              {' · '}
-              <SiteLink href={`https://${BRAND.domains.status}${en ? '/en' : ''}`} locale={locale}>
-                {p.statusLink}
-              </SiteLink>
-            </p>
-          </section>
-          <section aria-labelledby="contact-sec-h">
-            <h2 id="contact-sec-h">{p.securityH}</h2>
-            <p>{p.securityP}</p>
-            <p>
-              <a href={`mailto:${SECURITY_EMAIL}`}>{SECURITY_EMAIL}</a>
-              {' · '}
-              <a href="/.well-known/security.txt">security.txt</a>
-            </p>
-          </section>
-          <section aria-labelledby="contact-office-h">
-            <OfficeBlock locale={locale} headingId="contact-office-h" />
-          </section>
-          <p className="muted small">{p.company}</p>
-          <p className="legal-back">
-            <Link href={HOME[locale]}>{c.legalPages.back}</Link>
-          </p>
-        </article>
+        <section className="ab-sec ab-m8" aria-labelledby="contact-form-h">
+          <div className="wrap cf-wrap">
+            <h2 className="ab-h2" id="contact-form-h">
+              {p.form.h}
+            </h2>
+            <p className="cf-lead">{p.form.lead}</p>
+            <ContactForm locale={locale} />
+          </div>
+        </section>
+        <section className="ab-sec ab-mr" aria-labelledby="contact-other-h">
+          <div className="wrap legal">
+            <h2 className="ab-h2" id="contact-other-h">
+              {p.otherH}
+            </h2>
+            <article className="legal-doc">
+              <section aria-labelledby="contact-email-h">
+                <h2 id="contact-email-h">{p.emailH}</h2>
+                <p>{p.emailP}</p>
+                <p>
+                  <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
+                </p>
+              </section>
+              <section aria-labelledby="contact-wa-h">
+                <h2 id="contact-wa-h">{p.whatsappH}</h2>
+                <p>{p.whatsappP}</p>
+                <p>
+                  <SiteLink href={whatsappUrl()} locale={locale}>
+                    <bdi dir="ltr">{whatsappDisplay()}</bdi>
+                  </SiteLink>
+                </p>
+              </section>
+              <section aria-labelledby="contact-help-h">
+                <h2 id="contact-help-h">{p.helpH}</h2>
+                <p>{p.helpP}</p>
+                <p>
+                  <SiteLink
+                    href={`https://${BRAND.domains.help}${en ? '/en/' : '/'}`}
+                    locale={locale}
+                  >
+                    {p.helpLink}
+                  </SiteLink>
+                  {' · '}
+                  <SiteLink
+                    href={`https://${BRAND.domains.status}${en ? '/en' : ''}`}
+                    locale={locale}
+                  >
+                    {p.statusLink}
+                  </SiteLink>
+                </p>
+              </section>
+              <section aria-labelledby="contact-sec-h">
+                <h2 id="contact-sec-h">{p.securityH}</h2>
+                <p>{p.securityP}</p>
+                <p>
+                  <a href={`mailto:${SECURITY_EMAIL}`}>{SECURITY_EMAIL}</a>
+                  {' · '}
+                  <a href="/.well-known/security.txt">security.txt</a>
+                </p>
+              </section>
+              <section aria-labelledby="contact-office-h">
+                <OfficeBlock locale={locale} headingId="contact-office-h" />
+              </section>
+              <p className="muted small">{p.company}</p>
+              <p className="legal-back">
+                <Link href={HOME[locale]}>{c.legalPages.back}</Link>
+              </p>
+            </article>
+          </div>
+        </section>
       </main>
       <Footer locale={locale} />
     </>

@@ -20,9 +20,16 @@ interface ShareProductRowProps {
   /** Defaults to the current page (read after hydration). */
   url?: string;
   className?: string;
+  /** The page already carries a WhatsApp "ask or share" button: no second WhatsApp pill here. */
+  hasWhatsAppAsk?: boolean;
 }
 
-export function ShareProductRow({ productName, url, className = '' }: ShareProductRowProps) {
+export function ShareProductRow({
+  productName,
+  url,
+  className = '',
+  hasWhatsAppAsk = false,
+}: ShareProductRowProps) {
   const { isRtl, t } = useLanguage();
   const currentUrl = useCurrentUrl();
   const shareUrl = url ?? currentUrl;
@@ -90,18 +97,20 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
   return (
     <div className={`flex items-center gap-2 ${className}`} dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="flex items-center gap-2">
-        <a
-          href={whatsappHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t('Share on WhatsApp', 'مشاركة على واتساب')}
-          className={pill}
-        >
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path d={whatsappIcon} />
-          </svg>
-          {t('WhatsApp', 'واتساب')}
-        </a>
+        {!hasWhatsAppAsk && (
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t('Share on WhatsApp', 'مشاركة على واتساب')}
+            className={pill}
+          >
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path d={whatsappIcon} />
+            </svg>
+            {t('WhatsApp', 'واتساب')}
+          </a>
+        )}
         <button
           type="button"
           onClick={handleCopy}

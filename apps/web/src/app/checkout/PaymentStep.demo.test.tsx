@@ -56,4 +56,12 @@ describe('PaymentStep on a demo store', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('طرق دفع');
     expect(container.textContent).toContain('طريقة الدفع');
   });
+  it('a gold cart with nothing but deferred methods says it must be paid online, and cannot be placed', () => {
+    const { container } = render(
+      <PaymentStep {...props} selectedProvider="" goldNeedsOnlinePayment />
+    );
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('لازم يتدفع أونلاين');
+    expect(container.textContent).not.toContain('مفيش طرق دفع');
+    expect(container.querySelector('button[type="submit"]')?.hasAttribute('disabled')).toBe(true);
+  });
 });

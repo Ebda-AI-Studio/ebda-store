@@ -1,4 +1,10 @@
 import { normalizePhoneForStorage } from '../../../shared/src/region';
+import {
+  GOLD_PREPAID_ERROR_CODE,
+  GOLD_PREPAID_MESSAGE,
+  checkGoldPayment,
+  goldAllowsDeferredPayment,
+} from '../../../shared/src/commerce/payment-policy';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { decrementProduct, decrementVariant, forceDecrementVariant, recordMovement } from './stock';
 import { issueSaleDocument } from './fiscal';
@@ -32,8 +38,10 @@ export interface HoldCaps {
   manual?: number;
   /** same, any other payment label (default 5) */
   gateway?: number;
-  /** open unpaid orders per checkout IP (default 8: shared CGNAT) */
+  /** open unpaid orders per checkout IP (default 40: shared CGNAT, QA-HOLDS-1) */
   ip?: number;
+  /** only holds created in the last N hours count toward the IP cap (default 24, QA-HOLDS-1) */
+  ipWindowHours?: number;
 }
 /**
  * TRUST BOUNDARY: this core trusts `buyer`/`customerId`, `wholesaleEntitled`, `loyaltyFeatureEnabled`,
@@ -622,6 +630,15 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         return {};
       }
     })();
+    // Ruling SHARIA-GOLD-1 (the Postgres twin is assertGoldPaymentAllowed): gold is prepaid online unless the merchant allowed COD / installments.
+    if (
+      !checkGoldPayment({
+        hasGold: gold !== null,
+        allowDeferred: goldAllowsDeferredPayment(settings),
+        provider: input.paymentMethod,
+      }).ok
+    )
+      throw new MoneyError(GOLD_PREPAID_ERROR_CODE, GOLD_PREPAID_MESSAGE.en, 409);
     const minOrder = typeof settings.minimumOrderFils === 'number' ? settings.minimumOrderFils : 0;
     if (minOrder > 0 && subtotal < minOrder)
       throw new MoneyError(
@@ -656,6 +673,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         [input.storeId, input.couponCode]
       )[0];
       if (!c || !c.is_active) throw new MoneyError('COUPON_INVALID', 'coupon is not valid', 409);
+      // QA-COUPON-1: parity with CouponService.getByCode, a percentage/fixed coupon with no value is refused, never "applied".
+      if (c.type !== 'free_shipping' && !((c.value as number) > 0))
+        throw new MoneyError('COUPON_INVALID', 'coupon has no discount value', 409);
       if (
         (c.starts_at !== null && (c.starts_at as number) > now) ||
         (c.expires_at !== null && (c.expires_at as number) <= now)
@@ -848,7 +868,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     if (!fullyWalletPaid && (who.phone || who.email || input.checkoutIp)) {
       const manual = MANUAL.has(input.paymentMethod ?? 'cod');
       const cap = manual ? (input.holdCaps?.manual ?? 2) : (input.holdCaps?.gateway ?? 5);
-      const ipCap = input.holdCaps?.ip ?? 8;
+      const ipCap = input.holdCaps?.ip ?? 40;
+      const ipWindowMs = (input.holdCaps?.ipWindowHours ?? 24) * 3_600_000;
       if (who.phone || who.email) {
         const n = db.all(
           `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND ((? IS NOT NULL AND json_extract(shipping_address, '$.phone') = ?) OR (? IS NOT NULL AND lower(json_extract(shipping_address, '$.email')) = ?))`,
@@ -859,8 +880,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
       if (input.checkoutIp) {
         const n = db.all(
-          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND checkout_ip = ?`,
-          [input.storeId, input.checkoutIp]
+          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND checkout_ip = ? AND created_at >= ?`,
+          [input.storeId, input.checkoutIp, now - ipWindowMs]
         )[0].n as number;
         if (n >= ipCap)
           throw new MoneyError('TOO_MANY_OPEN_ORDERS', 'too many unpaid open orders', 429);

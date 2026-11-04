@@ -47,6 +47,8 @@ interface ProductsTableProps {
   products: Product[];
   loading: boolean;
   hasActiveFilters: boolean;
+  /** Empty default Active view: switch to the Drafts view. */
+  onShowDrafts?: () => void;
   onRequestDelete: (product: Product) => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -59,6 +61,7 @@ export function ProductsTable({
   products,
   loading,
   hasActiveFilters,
+  onShowDrafts,
   onRequestDelete,
   selectedIds,
   onToggleSelect,
@@ -90,7 +93,12 @@ export function ProductsTable({
 
   if (products.length === 0) {
     return (
-      <EmptyProductsState storeId={storeId} hasActiveFilters={hasActiveFilters} listUrl={listUrl} />
+      <EmptyProductsState
+        storeId={storeId}
+        hasActiveFilters={hasActiveFilters}
+        listUrl={listUrl}
+        onShowDrafts={onShowDrafts}
+      />
     );
   }
 

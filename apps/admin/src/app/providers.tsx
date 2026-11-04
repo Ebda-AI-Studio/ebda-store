@@ -1,7 +1,6 @@
 'use client';
 
 import { ReactNode, Suspense } from 'react';
-import dynamic from 'next/dynamic';
 import { ToastProvider } from '@ebda/ui';
 import { usePathname } from 'next/navigation';
 import { AuthProvider, useAuth, isPublicPath } from '../lib/auth';
@@ -12,13 +11,8 @@ import { FocusModeProvider } from '../contexts/FocusModeContext';
 import { PwaInstallHint } from '../components/PwaInstallHint';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { UpsellDialog } from '../components/billing/UpsellDialog';
+import { PushClickListener } from '../components/PushClickListener';
 import { EbdaFunnelTracking } from '../components/EbdaFunnelTracking';
-// OneSignalInit is a render-null leaf that only runs post-auth — keep the heavy
-// react-onesignal lib out of the first-load bundle (irrelevant on the login page).
-const OneSignalInit = dynamic(
-  () => import('../components/OneSignalInit').then(m => m.OneSignalInit),
-  { ssr: false }
-);
 
 function AuthenticatedProviders({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -35,9 +29,9 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
         <Suspense>
           <FocusModeProvider>
             <ToastProvider>
-              <OneSignalInit />
               <PwaInstallHint />
               <UpsellDialog />
+              <PushClickListener />
               {children}
             </ToastProvider>
           </FocusModeProvider>

@@ -66,3 +66,7 @@ Order again (the customer's own last products), deals today (`on_sale`), a cart 
 ## Status of the build (Phase B4)
 
 Built: skin id, tokens and gates, the header, the pack, the four platform pieces, the three mixes, the reorder source, the date chips, the demo and its catalogue, the scenario matrix and the pack. Rulings B4-1 to B4-14 are in `docs/RULINGS.md`. Not verified without a device: a real-phone walk; production: nothing is deployed from this branch.
+
+## Storefront audit 2026-11-03 (PREMIUM-36)
+
+The maker line of the showroom is real copy with no placeholder tag and no invented licence claim (`scripts/storedemo/lamma-home.mjs`).

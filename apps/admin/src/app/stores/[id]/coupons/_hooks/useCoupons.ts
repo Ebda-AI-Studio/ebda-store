@@ -8,6 +8,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 import { roundToMinor } from '@ebda/shared';
+import { parseCouponValue } from './coupon-value';
 interface UseCouponsResult {
   coupons: Coupon[];
   isLoading: boolean;
@@ -17,6 +18,9 @@ interface UseCouponsResult {
   setFilterActive: (value: CouponStatusFilter) => void;
   fetchCoupons: () => Promise<void>;
   saveCoupon: (data: CouponFormData, editingId: string | null) => Promise<boolean>;
+  /** The server's (already localized) reason the last save was refused; null once a save succeeds. */
+  saveError: string | null;
+  clearSaveError: () => void;
   deleteCoupon: (couponId: string) => Promise<void>;
   toggleActive: (couponId: string) => Promise<void>;
 }
@@ -31,6 +35,13 @@ function majorStringToMinor(v: string): number {
  * send null to actually clear it, the way customerGroupId / minQuantity
  * already do. Exported so the money conversions are testable without a DOM.
  */
+function couponValueForPayload(formData: CouponFormData): number {
+  if (formData.type === 'free_shipping') return 0;
+  const n = parseCouponValue(formData.value);
+  if (Number.isNaN(n)) return 0;
+  return formData.type === 'fixed' ? roundToMinor(n) : n;
+}
+
 export function buildCouponPayload(formData: CouponFormData, intent: 'create' | 'update') {
   return {
     code: formData.code,
@@ -41,7 +52,8 @@ export function buildCouponPayload(formData: CouponFormData, intent: 'create' | 
     type: formData.type,
     // `fixed` coupons: the input is in EGP → store as piastres (×100, via roundToMinor).
     // `percentage` coupons: the value is a percent (e.g. 5 = 5%), stored as-is.
-    value: formData.type === 'fixed' ? roundToMinor(formData.value) : formData.value,
+    // free_shipping carries no value; an unreadable entry is sent as 0 so the API refuses it by name (never a silent save).
+    value: couponValueForPayload(formData),
     // Clearing a limit/date must remove the restriction (null), not
     // silently no-op (undefined) — same convention as the text fields
     // above. A cleared minOrderAmount/expiresAt/usageLimit makes the
@@ -79,6 +91,7 @@ export function useCoupons(storeId: string): UseCouponsResult {
   // Bumped after a save/delete/toggle: the fetch effect owns EVERY request, so the refetch reads
   // the CURRENT filter, not the one captured when the mutation started (issue 2443).
   const [refreshKey, setRefreshKey] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const beginRequest = useLatestRequest();
   const fetchCoupons = useCallback(async () => {
     const isLatest = beginRequest();
@@ -126,9 +139,12 @@ export function useCoupons(storeId: string): UseCouponsResult {
 
         if (error) {
           console.error('Failed to save coupon:', error.message);
+          // QA-PRICE-ZERO-1: a refusal (e.g. a 0% coupon) used to leave the modal open with no word. Show the reason.
+          setSaveError(error.message || null);
           return false;
         }
 
+        setSaveError(null);
         setRefreshKey(k => k + 1);
         return true;
       } catch (error) {
@@ -176,6 +192,8 @@ export function useCoupons(storeId: string): UseCouponsResult {
     setFilterActive,
     fetchCoupons,
     saveCoupon,
+    saveError,
+    clearSaveError: () => setSaveError(null),
     deleteCoupon,
     toggleActive,
   };

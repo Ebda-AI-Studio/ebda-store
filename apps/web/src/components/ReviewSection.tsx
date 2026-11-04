@@ -9,7 +9,7 @@ import { Button } from '@ebda/ui';
 import { api } from '../lib/api';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { API_URL } from '../lib/api';
+import { API_URL, hasSessionHint } from '../lib/api';
 import { formatDate as formatStoreDate } from '../lib/format-date';
 import { SectionRetryNotice } from './SectionRetryNotice';
 import { countText, VERIFIED_REVIEWS } from '../lib/plural';
@@ -187,8 +187,14 @@ export default function ReviewSection({ storeId, productId }: Props) {
     text: string;
   } | null>(null);
 
-  // Check auth by attempting to fetch profile (cookie-based auth)
+  // Check auth by attempting to fetch profile (cookie-based auth). Only a browser that has held a
+  // session asks: a guest's PDP view made a raw /auth/me call and logged a 401 in the console
+  // (audit 2026-11-03 #15). The write form needs a signed-in customer, who has the hint.
   useEffect(() => {
+    if (typeof window !== 'undefined' && !hasSessionHint()) {
+      setIsLoggedIn(false);
+      return;
+    }
     if (typeof window !== 'undefined') {
       fetch(`${API_URL}/auth/me`, { credentials: 'include' })
         .then(res => setIsLoggedIn(res.ok))

@@ -449,10 +449,11 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
     });
     expect(r.corrected).toEqual([]);
   });
-  it('NZ-D18: a do store whose domain differs from Postgres is ALERT-ONLY (D1 authoritative, nothing re-opened or copied)', async () => {
+  it('NZ-D21: a do store domain is NEVER compared with Postgres (stale by design): no alert, no Postgres read', async () => {
     sqlite
       .prepare("UPDATE stores SET domain='mine.example.com', domain_status='active' WHERE id=?")
       .run(A);
+    let reads = 0;
     const r = await reconcileStoreDirectory({
       pgAll: async () => [
         {
@@ -465,13 +466,36 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
         },
       ],
       pgLive: async () => [{ id: A }],
-      pgDomains: async () => ({ domain: 'stale.example.com', pendingDomain: null }),
+      pgDomains: async () => (reads++, { domain: 'stale.example.com', pendingDomain: null }),
       alert: () => undefined,
     });
-    expect(r.alertOnly.map(a => a.id)).toEqual([A]);
+    expect(reads).toBe(0);
+    expect(r.alertOnly).toEqual([]);
     expect(r.corrected).toEqual([]);
     expect(sqlite.prepare('SELECT domain FROM stores WHERE id=?').get(A)).toMatchObject({
       domain: 'mine.example.com',
     });
+  });
+  it('NZ-D21: closing a do row for a deleted Postgres store never LOOSENS a stricter D1 status', async () => {
+    sqlite.prepare("UPDATE stores SET status='suspended' WHERE id=?").run(A);
+    await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: false,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [], // deleted in Postgres, status still `active` there
+      alert: () => undefined,
+    });
+    expect(d1Status()).toBe('suspended');
+    expect(
+      (sqlite.prepare('SELECT deleted_at FROM stores WHERE id=?').get(A) as { deleted_at: unknown })
+        .deleted_at
+    ).not.toBeNull();
   });
 });

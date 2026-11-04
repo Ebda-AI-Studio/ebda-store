@@ -13,6 +13,7 @@ import type { ProductCarouselProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import DahabProductCard from './ProductCard';
 import { ChevronIcon, DAHAB_CONTAINER, DahabSectionHeading, pick } from './ui';
+import { CARD_CAROUSEL_SIZES } from '../../lib/image-sizes';
 
 export function DahabProductCarousel({
   products,
@@ -73,7 +74,7 @@ export function DahabProductCarousel({
                 showCardPrice={showCardPrice}
                 showLabel={showLabel}
                 showHover={showHover}
-                imageSizes="(min-width: 1024px) 25vw, (min-width: 640px) 31vw, 46vw"
+                imageSizes={CARD_CAROUSEL_SIZES}
               />
             </div>
           ))}

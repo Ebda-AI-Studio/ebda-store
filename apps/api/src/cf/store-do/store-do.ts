@@ -239,6 +239,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       const closed = this.closedOr({
         ok: false as const,
         code: 'STORE_CLOSED',
+        status: 410,
         message: 'store is closed',
       });
       if (closed) return closed;
@@ -518,6 +519,11 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     for (const t of storeTables(sqlx))
       tables[t] = sqlx.exec(`SELECT * FROM "${t}" ORDER BY ${exportOrder(sqlx, t)}`).toArray();
     return { tables };
+  }
+
+  /** READ-ONLY money-in-flight gate for the all-or-nothing merchant erasure preflight (Ruling NZ-D20). Writes and closes nothing. */
+  async moneyInFlight(): Promise<Record<string, number>> {
+    return moneyInFlightOnDo(this.sync) as unknown as Record<string, number>;
   }
 
   /** Merchant: wipe the whole DO (rows, alarm). Customer: delete/scrub the registry rows that match. */

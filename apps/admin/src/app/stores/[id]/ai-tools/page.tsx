@@ -92,13 +92,15 @@ interface MasterSweep {
 const POLL_MS = 4000;
 
 export default function AiToolsPage() {
+  const t = useT('aiTools');
   // Feature gate: bulk_operations covers AI catalogue sweeps; absent from
   // PLAN_BASELINE by default and enabled via super-admin override per store.
-  const { gate } = useRequireFeature('bulk_operations');
+  const { gate } = useRequireFeature('bulk_operations', {
+    pageTitle: t('title'),
+  });
 
   const params = useParams();
   const storeId = params?.id as string;
-  const t = useT('aiTools');
 
   const [jobs, setJobs] = useState<BulkAiJob[]>([]);
   const [activeJob, setActiveJob] = useState<BulkAiJobDetail | null>(null);
