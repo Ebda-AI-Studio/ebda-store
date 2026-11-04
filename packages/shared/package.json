@@ -34,6 +34,7 @@
     },
     "./contact-enquiry": {
       "types": "./src/contact-enquiry.ts",
+      "require": "./dist/contact-enquiry.js",
       "default": "./src/contact-enquiry.ts"
     },
     "./wa-me-messages": {
