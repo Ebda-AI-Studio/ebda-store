@@ -48,9 +48,9 @@
     "test": "identity track"
   },
   "ebda_ai_usage_count": {
-    "target": "analytics",
-    "replacement": "analytics.aiUsageCount(storeId, window) over Analytics Engine SQL",
-    "test": "packages/repo/test/contract/analytics.contract.ts"
+    "target": "d1",
+    "replacement": "countAiUsage(): prisma.aiUsage.count over D1 ai_usage (family ai-usage, Ruling NZ-AN-1); the definer stays only for the Postgres leg until the marker",
+    "test": "tests/unit/ai-usage-on-d1.test.ts"
   },
   "ebda_ar_norm": {
     "target": "store-do",

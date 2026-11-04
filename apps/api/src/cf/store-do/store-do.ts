@@ -131,15 +131,46 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    */
   async fetch(request: Request): Promise<Response> {
     // A closed store's data is a retained legal record: the cutover surface may not import into it or WIPE it (__unseal).
-    if (isStoreClosed(this.sync) && /\/__(import|unseal)\b/.test(new URL(request.url).pathname))
+    if (
+      isStoreClosed(this.sync) &&
+      /\/__(import|unseal|analytics)\b/.test(new URL(request.url).pathname)
+    )
       return new Response(JSON.stringify({ ok: false, code: 'STORE_CLOSED' }), {
         status: 423,
         headers: { 'content-type': 'application/json' },
       });
+    // Ruling NZ-AN-1: the per-store analytics copy. Three named ops only, never a free op name; bound to the store in the URL.
+    const copy = /^\/cutover\/stores\/([^/]+)\/__analytics$/.exec(new URL(request.url).pathname);
+    if (copy) return this.analyticsCopy(copy[1], request);
     return handleStoreAdmin(request, {
       sql: this.ctx.storage.sql as never,
       transactionSync: fn => this.ctx.storage.transactionSync(fn),
     });
+  }
+
+  /** `__analytics`: {op, args} for analyticsImportStatus / analyticsImport / analyticsImportFinish (bearer-checked in cf/cutover.ts). */
+  private async analyticsCopy(storeId: string, request: Request): Promise<Response> {
+    const reply = (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    let body: { op?: unknown; args?: unknown };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return reply({ ok: false, code: 'BAD_JSON' }, 400);
+    }
+    const ALLOWED = ['analyticsImportStatus', 'analyticsImport', 'analyticsImportFinish'];
+    if (typeof body.op !== 'string' || !ALLOWED.includes(body.op))
+      return reply({ ok: false, code: 'OP_NOT_ALLOWED' }, 400);
+    try {
+      this.bind(storeId);
+    } catch {
+      return reply({ ok: false, code: 'STORE_MISMATCH' }, 403);
+    }
+    const a = answerMoneyOp(this.sync, storeId, body.op, JSON.stringify(body.args ?? {}));
+    return reply(a, a.ok ? 200 : (a.status ?? 400));
   }
 
   /** Schema version this instance runs (the id of the last applied migration). */

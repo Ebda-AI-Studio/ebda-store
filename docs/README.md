@@ -304,6 +304,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [runbooks/STAGING-DEPLOYMENT.md](runbooks/STAGING-DEPLOYMENT.md) - Staging deployment + promotion flow
 - [runbooks/SUPER-ADMIN-PLAYBOOK.md](runbooks/SUPER-ADMIN-PLAYBOOK.md) - Super-admin playbook
+- [runbooks/analytics-cutover.md](runbooks/analytics-cutover.md) - Per-store analytics to the StoreDO, AiUsage to D1 (controller runs it)
+- [runbooks/platform-family-cutover.md](runbooks/platform-family-cutover.md) - Platform table family cutover, Postgres to D1 (controller runs it)
 - [runbooks/drop-legacy-app-role.md](runbooks/drop-legacy-app-role.md) - Drop the unused legacy app login role (production Neon)
 - [runbooks/ebda-names-rollout.md](runbooks/ebda-names-rollout.md) - Rollout: Ebda names replace the inherited service, token and env names
 - [runbooks/google-search-console-indexing.md](runbooks/google-search-console-indexing.md) - Google Search Console — Indexing Guide for demo-merchant.com

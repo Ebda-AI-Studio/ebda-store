@@ -1,7 +1,7 @@
 /**
  * The cutover admin surface on the API Worker (Rulings CUTOVER-2/3/4, docs/runbooks/cutover-cf.md):
  *
- *   /cutover/stores/<storeId>/{__import,__verify,__seal,__status,__unseal,__rebase,__diff}
+ *   /cutover/stores/<storeId>/{__import,__verify,__seal,__status,__unseal,__rebase,__diff,__analytics}
  *
  * The bearer check against CUTOVER_IMPORT_SECRET happens HERE, before the StoreDO sees the request, with
  * the constant-time compare that lives next to the handler (packages/cf-migrate, shared with the rehearsal
@@ -22,6 +22,8 @@ const ACTIONS = {
   __unseal: 'POST',
   __rebase: 'POST',
   __diff: 'POST',
+  // Ruling NZ-AN-1: the per-store analytics copy (scripts/cf/copy-analytics-to-do.mjs): status / import batch / finish
+  __analytics: 'POST',
   __status: 'GET',
   // verify-store.mjs asks every DO for its table list (the DO must hold no table the cutover did not look at); without this
   // entry the Worker answered 404 and verify refused every store on the deployed API (found live 2026-10-31).

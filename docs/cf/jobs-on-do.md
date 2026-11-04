@@ -54,3 +54,7 @@ Ported: `review-request`, `review-moderation`, `invoice-email`, `order-capi-conv
 ## Money jobs, shipment and order fan-outs (Ruling CF-JOBS-4, money half)
 
 `shipment-create`, `order-created-fanout`, `order-status-changed-fanout`, `order-refunded-fanout`, `accounting-post-{expense,po-receive,stock-adjustment}-journal`, `warehouse-reconcile-{sweep-cron,on-demand}` and `stock-reorder-scan-{cron,on-demand}` serve a DO store through the DO ops in `packages/repo/src/do/{job-ops,books-journals}.ts` (claims are one conditional statement in one section). `MONEY_JOBS` is empty and `PORTED_MONEY_JOBS` lists every money job.
+
+## Analytics-owning jobs and the Store row (Rulings NZ-AN-1, NZ-AN-2)
+
+`gsc-ingest-cron` / `-on-demand` and `search-log-purge-daily` are PORTED jobs: the GSC metric and the search log are per-store StoreDO tables read and written through `lib/analytics-backend.ts` (the DO once the D1 marker `platform_cutover.analytics` exists, Postgres before). The two crons list every store (DO stores included) and are `ALL_STORES_JOBS`. A job reads a DO store's `Store` row with `withStoreDb(storeId, db => db.store.findUnique(...))` / `lazyStoreDb`, never `withStore` / `prisma.store`. `JOBS_ON_DO=1` is set by the controller after `docs/runbooks/analytics-cutover.md`.
