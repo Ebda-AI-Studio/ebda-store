@@ -13,7 +13,7 @@
  *     (grants.service `applyPendingGrants`, account.service manual payment) and alert on a lost race.
  * Rows are the raw D1 shape here (epoch-ms integers, snake_case): callers convert with `fromMs`.
  */
-import { acrossStores, type Prisma } from '@ebda/database';
+import { acrossStores, notifyModelWrite, type Prisma } from '@ebda/database';
 import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { platformFamilyOnD1 } from './cutover';
@@ -25,6 +25,8 @@ interface RawD1 {
       run(): Promise<{ meta?: { changes?: number } }>;
     };
   };
+  /** Atomic: all statements commit or none do. */
+  batch?(stmts: unknown[]): Promise<Array<{ meta?: { changes?: number } }>>;
 }
 
 function raw(): RawD1 {
@@ -211,4 +213,171 @@ export async function acrossBilling<T>(
 ): Promise<Array<{ storeId?: string; value: T }>> {
   if (await onD1()) return [{ value: await fn(undefined) }];
   return acrossStores(storeId => fn(storeId), opts);
+}
+
+/** D1 `batch`: every statement commits together or none does. Returns the rows changed by each statement. */
+export async function d1Batch(stmts: Array<{ sql: string; params: unknown[] }>): Promise<number[]> {
+  const d1 = raw();
+  if (!d1.batch)
+    throw new AppError(503, 'PLATFORM_DB_NO_BATCH', 'Platform database has no batch()');
+  const res = await d1.batch(stmts.map(st => d1.prepare(st.sql).bind(...st.params)));
+  return res.map(r => Number(r.meta?.changes ?? 0));
+}
+
+export interface ManualPaymentD1 {
+  eventId: string;
+  idempotencyKey: string;
+  storeId: string;
+  subscriptionId: string | null;
+  planCode: string;
+  interval: string;
+  periodStart: Date;
+  periodEnd: Date;
+  amountMinor: number;
+  providerRef: string;
+  vatMinor: number;
+  vat: unknown | null;
+  raw: unknown;
+  anchorDay: number;
+  billingMethod: string;
+  /** `updated_at` of the subscription row this payment was computed from (null = there was none). */
+  expectedSubUpdatedAt: Date | null;
+  now: Date;
+}
+
+/**
+ * Ledger row + subscription change of a manual payment as ONE atomic D1 batch (Ruling NZ-10-2). Both statements carry the
+ * same compare-and-set on the subscription row the period was computed from, so a concurrent change (a grant, a renewal)
+ * makes BOTH miss; the second statement additionally requires that THIS batch inserted the ledger row. Returns
+ * 'applied', 'duplicate' (the key already existed) or 'conflict' (the subscription moved: nothing was written; retry).
+ */
+export async function commitManualPaymentD1(
+  a: ManualPaymentD1
+): Promise<'applied' | 'duplicate' | 'conflict'> {
+  const nowMs = a.now.getTime();
+  const cas = `(NOT EXISTS (SELECT 1 FROM store_subscriptions WHERE store_id = ?2)
+        OR EXISTS (SELECT 1 FROM store_subscriptions WHERE store_id = ?2 AND updated_at IS ?3))`;
+  const changes = await d1Batch([
+    {
+      sql: `INSERT INTO billing_events (id, store_id, subscription_id, type, plan_code, billing_interval, for_period_end, amount_minor, currency, provider, provider_ref, idempotency_key, status, vat_minor, vat, raw, created_at, updated_at)
+            SELECT ?1, ?2, ?4, 'manual_payment', ?5, ?6, ?7, ?8, 'EGP', 'manual', ?9, ?10, 'succeeded', ?11, ?12, ?13, ?14, ?14
+             WHERE ${cas}
+            ON CONFLICT (idempotency_key) DO NOTHING`,
+      params: [
+        a.eventId,
+        a.storeId,
+        a.expectedSubUpdatedAt ? a.expectedSubUpdatedAt.getTime() : null,
+        a.subscriptionId,
+        a.planCode,
+        a.interval,
+        a.periodEnd.getTime(),
+        a.amountMinor,
+        a.providerRef,
+        a.idempotencyKey,
+        a.vatMinor,
+        a.vat === null ? null : JSON.stringify(a.vat),
+        JSON.stringify(a.raw),
+        nowMs,
+      ],
+    },
+    {
+      sql: `INSERT INTO store_subscriptions (id, store_id, plan_code, status, billing_interval, current_period_start, current_period_end, billing_anchor_day, trial_ends_at, pending_plan_code, cancel_at_period_end, dunning_attempts, next_retry_at, billing_method, created_at, updated_at)
+            SELECT ?1, ?2, ?3, 'active', ?4, ?5, ?6, ?7, NULL, NULL, 0, 0, NULL, ?8, ?9, ?9
+             WHERE EXISTS (SELECT 1 FROM billing_events WHERE id = ?10 AND created_at = ?9 AND store_id = ?2)
+            ON CONFLICT (store_id) DO UPDATE SET
+              plan_code = excluded.plan_code, status = 'active', billing_interval = excluded.billing_interval,
+              current_period_start = excluded.current_period_start, current_period_end = excluded.current_period_end,
+              billing_anchor_day = excluded.billing_anchor_day, trial_ends_at = NULL, pending_plan_code = NULL,
+              cancel_at_period_end = 0, dunning_attempts = 0, next_retry_at = NULL,
+              billing_method = excluded.billing_method, updated_at = excluded.updated_at`,
+      params: [
+        a.subscriptionId ?? crypto.randomUUID(),
+        a.storeId,
+        a.planCode,
+        a.interval,
+        a.periodStart.getTime(),
+        a.periodEnd.getTime(),
+        a.anchorDay,
+        a.billingMethod,
+        nowMs,
+        a.eventId,
+      ],
+    },
+  ]);
+  if (changes[0] === 1 && changes[1] >= 1) {
+    // wa-plan: observer notified here (raw D1 write; tests/unit/wa-plan-observer-wiring.test.ts)
+    notifyModelWrite(
+      'StoreSubscription',
+      'update',
+      {
+        where: { storeId: a.storeId },
+        data: { planCode: a.planCode, status: 'active', currentPeriodEnd: a.periodEnd },
+      },
+      { storeId: a.storeId }
+    );
+    return 'applied';
+  }
+  const existing = await all<{ id: string }>(
+    'SELECT id FROM billing_events WHERE idempotency_key = ?1 AND store_id = ?2',
+    a.idempotencyKey,
+    a.storeId
+  );
+  return existing.length ? 'duplicate' : 'conflict';
+}
+
+export interface GrantBatchD1 {
+  storeId: string;
+  status: string;
+  currentPeriodEnd: Date | null;
+  trialEndsAt: Date | null;
+  /** The chain, oldest first: each grant moves the end from `before` to `after`. */
+  grants: Array<{ id: string; before: Date; after: Date }>;
+  trialing: boolean;
+  now: Date;
+}
+
+/**
+ * Apply N pending free-month grants and move the subscription as ONE atomic batch. The subscription update goes first and
+ * is guarded by (the period and status this call read) AND (all N grants still pending); the grant updates then require
+ * that the subscription now ends where the chain ends. So either everything applies or nothing does: a concurrent
+ * renewal or grant makes the guard miss and the grants simply stay `pending` for the next sweep. Returns grants applied.
+ */
+export async function applyGrantsBatchD1(a: GrantBatchD1): Promise<number> {
+  const end = a.grants[a.grants.length - 1].after;
+  const ids = a.grants.map(g => g.id);
+  const marks = ids.map((_, i) => `?${i + 8}`).join(', ');
+  const nowMs = a.now.getTime();
+  const subStmt = {
+    sql: `UPDATE store_subscriptions
+             SET current_period_end = ?1, ${a.trialing ? 'trial_ends_at = ?1,' : ''} updated_at = ?2
+           WHERE store_id = ?3 AND status = ?4 AND current_period_end IS ?5 AND trial_ends_at IS ?6
+             AND (SELECT COUNT(*) FROM billing_grants WHERE id IN (${marks}) AND status = 'pending') = ?7`,
+    params: [
+      end.getTime(),
+      nowMs,
+      a.storeId,
+      a.status,
+      a.currentPeriodEnd ? a.currentPeriodEnd.getTime() : null,
+      a.trialEndsAt ? a.trialEndsAt.getTime() : null,
+      ids.length,
+      ...ids,
+    ],
+  };
+  const grantStmts = a.grants.map(g => ({
+    sql: `UPDATE billing_grants SET status = 'applied', applied_at = ?1, period_end_before = ?2, period_end_after = ?3
+           WHERE id = ?4 AND status = 'pending'
+             AND EXISTS (SELECT 1 FROM store_subscriptions WHERE store_id = ?5 AND current_period_end = ?6 AND updated_at = ?1)`,
+    params: [nowMs, g.before.getTime(), g.after.getTime(), g.id, a.storeId, end.getTime()],
+  }));
+  const changes = await d1Batch([subStmt, ...grantStmts]);
+  const applied = changes[0] === 1 ? changes.slice(1).reduce((n, c) => n + c, 0) : 0;
+  if (applied > 0)
+    // wa-plan: observer notified here (raw D1 write; tests/unit/wa-plan-observer-wiring.test.ts)
+    notifyModelWrite(
+      'StoreSubscription',
+      'update',
+      { where: { storeId: a.storeId }, data: { currentPeriodEnd: end } },
+      { storeId: a.storeId }
+    );
+  return applied;
 }

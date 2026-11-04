@@ -7,11 +7,40 @@ import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
+vi.mock('../../apps/api/src/services/alerts.service', () => ({
+  sendAlert: vi.fn(async () => undefined),
+}));
+vi.mock('../../apps/api/src/services/billing/billing-notify', () => ({
+  runBillingEffects: vi.fn(async () => undefined),
+}));
+const storeUpdateMock = vi.hoisted(() => vi.fn(async () => ({})));
+vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  storeUpdate: storeUpdateMock,
+}));
+vi.mock('@ebda/database', async importOriginal => {
+  const real = await importOriginal<typeof import('@ebda/database')>();
+  return {
+    ...real,
+    // the D1 path needs no Postgres transaction: run the callback on the routed `prisma` proxy
+    withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(real.prisma),
+    currentStoreId: () => '11111111-1111-4111-8111-111111111111',
+  };
+});
 
-import { prisma, setModelRouter } from '@ebda/database';
+import {
+  prisma,
+  routeTx,
+  setModelRouter,
+  withMoneyTx,
+  scopeTransaction,
+  afterTxCommit,
+} from '@ebda/database';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
 import {
+  assertFamilyWritableOnPostgres,
+  platformFamilyOnD1ForWrite,
+  freezeKey,
   OFF_TTL_MS,
   cutoverKey,
   platformFamilyOnD1,
@@ -115,6 +144,128 @@ describe('family table list', () => {
   });
 });
 
+const freeze = (db: DatabaseSync) =>
+  db
+    .prepare(`INSERT INTO system_settings (id, key, value) VALUES ('f1', ?, '{}')`)
+    .run(freezeKey('billing'));
+
+describe('freeze (no write is silently lost between the snapshot and the flip)', () => {
+  it('a write is refused while frozen and the family has not moved; reads are not', async () => {
+    const r = rig();
+    freeze(r.db);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    const pg = vi.fn(async () => 'pg');
+    await expect(platformRouter.route('storeSubscription', 'update', [], pg)).rejects.toMatchObject(
+      {
+        statusCode: 503,
+        code: 'PLATFORM_FAMILY_FROZEN',
+      }
+    );
+    await expect(platformRouter.route('billingEvent', 'createMany', [], pg)).rejects.toMatchObject({
+      statusCode: 503,
+    });
+    expect(pg).not.toHaveBeenCalled();
+    expect(await platformRouter.route('storeSubscription', 'findUnique', [], pg)).toBe('pg');
+    await expect(assertFamilyWritableOnPostgres('billing')).rejects.toMatchObject({
+      statusCode: 503,
+    });
+  });
+
+  it('a write never trusts a cached "off": the moment the marker exists it goes to D1', async () => {
+    const r = rig();
+    seedPlans(r.db);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    expect(await platformFamilyOnD1('billing')).toBe(false); // cached off for OFF_TTL_MS
+    cutover(r.db);
+    expect(await platformFamilyOnD1('billing')).toBe(false); // a READ may still be stale ...
+    expect(await platformFamilyOnD1ForWrite('billing')).toBe(true); // ... a WRITE is not
+    await prisma.plan.create({
+      data: { code: 'x', nameEn: 'x', nameAr: 'x', featureTier: 'free', limits: {} },
+    });
+    expect(
+      (r.db.prepare('SELECT COUNT(*) n FROM plans WHERE code = ?').get('x') as { n: number }).n
+    ).toBe(1);
+  });
+
+  it('a write between BEGIN and flip is refused (frozen), a write after the flip lands in D1: never in Postgres', async () => {
+    const r = rig();
+    seedPlans(r.db);
+    r.store(STORE, 'a');
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    const pg = vi.fn(async () => 'pg-write');
+    freeze(r.db); // script: FREEZE
+    await expect(platformRouter.route('storeSubscription', 'create', [], pg)).rejects.toMatchObject(
+      { statusCode: 503 }
+    );
+    cutover(r.db); // script: FLIP (the freeze is still up for the settle window)
+    await prisma.storeSubscription.create({ data: { storeId: STORE, planCode: 'growth' } });
+    expect(pg).not.toHaveBeenCalled();
+    expect(
+      (r.db.prepare('SELECT COUNT(*) n FROM store_subscriptions').get() as { n: number }).n
+    ).toBe(1);
+  });
+});
+
+describe('raw transactions are routed (no billing model reaches Postgres after the flip)', () => {
+  const rawTx = () => ({
+    storeSubscription: { findUnique: vi.fn(async () => 'PG-ROW') },
+    $queryRaw: vi.fn(async () => []),
+  });
+
+  it('routeTx / withMoneyTx / scopeTransaction hand callers a client whose billing models route', async () => {
+    const r = rig();
+    seedPlans(r.db);
+    r.store(STORE, 'a');
+    cutover(r.db);
+    r.db
+      .prepare(
+        `INSERT INTO store_subscriptions (id, store_id, plan_code) VALUES ('s1', ?, 'growth')`
+      )
+      .run(STORE);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    const read = async (tx: {
+      storeSubscription: { findUnique: (a: unknown) => Promise<unknown> };
+    }) => tx.storeSubscription.findUnique({ where: { storeId: STORE } });
+
+    expect(await read(routeTx(rawTx()) as never)).toMatchObject({ planCode: 'growth' });
+    const viaMoney = await withMoneyTx(
+      { $transaction: (fn: (t: unknown) => unknown) => fn(rawTx()) } as never,
+      t => read(t as never)
+    );
+    expect(viaMoney).toMatchObject({ planCode: 'growth' });
+    const gucTx = {
+      ...rawTx(),
+      $executeRaw: vi.fn(async () => 0),
+      $queryRawUnsafe: vi.fn(async () => []),
+    };
+    const viaScope = await scopeTransaction(gucTx as never, { storeId: STORE, userId: STORE2 }, t =>
+      read(t as never)
+    );
+    expect(viaScope).toMatchObject({ planCode: 'growth' });
+  });
+
+  it('before the flip the same client reaches Postgres; a non-billing property is untouched', async () => {
+    const r = rig();
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    const tx = rawTx() as typeof rawTx extends () => infer T ? T : never;
+    const routed = routeTx(tx) as typeof tx;
+    expect(await routed.storeSubscription.findUnique()).toBe('PG-ROW');
+    await routed.$queryRaw();
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('after-commit hooks registered through the wrapper reach the transaction they belong to', async () => {
+    let seen: unknown;
+    await withMoneyTx(
+      { $transaction: (fn: (t: unknown) => unknown) => fn(rawTx()) } as never,
+      async t => {
+        seen = afterTxCommit(t as object, () => undefined);
+      }
+    );
+    expect(seen).toBe(true);
+  });
+});
+
 describe('cutover switch', () => {
   it('no binding -> Postgres, no marker read', async () => {
     expect(await platformFamilyOnD1('billing')).toBe(false);
@@ -146,7 +297,7 @@ describe('cutover switch', () => {
   it('an unreadable marker fails closed with 503, never Postgres', async () => {
     setCfBindings({
       PLATFORM_DB: {
-        prepare: () => ({ bind: () => ({ first: async () => Promise.reject(new Error('down')) }) }),
+        prepare: () => ({ bind: () => ({ all: async () => Promise.reject(new Error('down')) }) }),
       },
     } as never);
     await expect(platformFamilyOnD1('billing')).rejects.toMatchObject({ statusCode: 503 });

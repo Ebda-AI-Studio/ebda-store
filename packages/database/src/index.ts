@@ -10,6 +10,8 @@ import {
   ambientScope as ambientScopeImpl,
 } from './tenant-scope';
 import { setTenantGucs as setTenantGucsImpl } from './tenant-gucs';
+import { getModelRouter, routeTx, routedDelegate } from './tx-route';
+export { setModelRouter, type ModelRouter, routeTx } from './tx-route';
 import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
 import { dropHiddenStores } from './job-store-guard';
@@ -48,6 +50,7 @@ export {
   GLOBAL_MODELS,
   setDbHopObserver,
   setModelWriteObserver,
+  notifyModelWrite,
   type ModelWriteEvent,
 } from './tenant-guard';
 export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
@@ -162,7 +165,7 @@ function transactionWithGucs(gucs: TenantGucs) {
       const fn = arg as (tx: TenantTx) => Promise<unknown>;
       return base(async (tx: TenantTx) => {
         await applyGucs(tx, gucs);
-        return fn(tx);
+        return fn(routeTx(tx));
       }, opts);
     }
     if (Array.isArray(arg)) {
@@ -394,59 +397,6 @@ export function currentTenantGucs(): TenantGucs | undefined {
 }
 
 /**
- * NEON-ZERO-1: models whose rows moved to Cloudflare D1. The API registers a router once at boot; every
- * `prisma.<model>.<method>(...)` / `tx.<model>.<method>(...)` (the `withStore` transaction IS this proxy) then asks
- * `route` first. `route` answers from D1 once the table family's cutover marker exists and otherwise calls `postgres()`,
- * so nothing changes until the controller has run the copy (no dual-read: one marker, one source). Routed models are
- * never usable inside an array `$transaction([...])` (the call is async); there are none today.
- */
-export interface ModelRouter {
-  models: ReadonlySet<string>;
-  route(
-    model: string,
-    method: string,
-    args: unknown[],
-    postgres: () => Promise<unknown>
-  ): Promise<unknown>;
-}
-let modelRouter: ModelRouter | undefined;
-export function setModelRouter(router: ModelRouter | undefined): void {
-  modelRouter = router;
-}
-const ROUTED_METHODS = new Set([
-  'findUnique',
-  'findUniqueOrThrow',
-  'findFirst',
-  'findFirstOrThrow',
-  'findMany',
-  'create',
-  'createMany',
-  'update',
-  'updateMany',
-  'upsert',
-  'delete',
-  'deleteMany',
-  'count',
-  'aggregate',
-  'groupBy',
-]);
-function routedDelegate(model: string, postgres: () => unknown, router: ModelRouter): object {
-  return new Proxy(
-    {},
-    {
-      get(_t, method) {
-        if (typeof method !== 'string' || !ROUTED_METHODS.has(method))
-          return (postgres() as Record<string | symbol, unknown>)[method];
-        return (...args: unknown[]) =>
-          router.route(model, method, args, async () =>
-            (postgres() as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](...args)
-          );
-      },
-    }
-  );
-}
-
-/**
  * Proxy-wrapped Prisma client.
  *
  * Which client it talks to is decided PER ACCESS (`basePrisma()`): the
@@ -466,6 +416,7 @@ export const prisma = new Proxy({} as AppPrismaClient, {
   get(_target, prop) {
     // NEON-ZERO-1: a model the API has moved to D1 resolves per CALL (the cutover switch is read then), and only
     // the Postgres branch of that call touches `basePrisma()` - a D1-served call never needs a Postgres client.
+    const modelRouter = getModelRouter();
     if (modelRouter && typeof prop === 'string' && modelRouter.models.has(prop))
       return routedDelegate(prop, () => proxiedGet(prop), modelRouter);
     return proxiedGet(prop);
@@ -536,6 +487,14 @@ function proxiedGet(prop: string | symbol): unknown {
     // `$connect` / `$disconnect` / `$on` / `$extends` / `$use` are called as
     // `prisma.$x()`, i.e. with the proxy as `this`; they must act on the
     // client resolved NOW, not on whatever the proxy resolves to later.
+    if (prop === '$transaction' && typeof value === 'function' && getModelRouter()) {
+      // a raw client handed to a callback must route the D1 models too (tx-route.ts)
+      const bound = value.bind(target) as (...a: unknown[]) => unknown;
+      return (arg: unknown, opts?: unknown) =>
+        typeof arg === 'function'
+          ? bound((tx: object) => (arg as (t: object) => unknown)(routeTx(tx)), opts)
+          : bound(arg, opts);
+    }
     return typeof value === 'function' && typeof prop === 'string' && prop[0] === '$'
       ? value.bind(target)
       : value;
@@ -721,7 +680,7 @@ export async function withTenantContext<T>(
       await applyGucs(tx, { storeId });
       // Ambient for the code-level tenant guard (and the proxy), like runInTenantContext.
       txGucs.set(tx as object, { storeId });
-      return tenantStorage.run(tx, () => settleInScope(() => fn(tx)));
+      return tenantStorage.run(tx, () => settleInScope(() => fn(routeTx(tx))));
     },
     { maxWait: 10000, timeout: 30000 }
   );
@@ -891,7 +850,7 @@ export async function scopeTransaction<Tx extends object, T>(
 ): Promise<T> {
   await setTenantGucsImpl(tx as unknown as Parameters<typeof setTenantGucsImpl>[0], gucs);
   txGucs.set(tx, { ...gucs });
-  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(tx)));
+  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(routeTx(tx))));
 }
 
 /**
@@ -1078,7 +1037,7 @@ export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<
   // Hatch 'owner-role-tx' (R-EBDA-003): the role was just proven to bypass RLS, so the
   // code-level tenant guard stands aside for this transaction only.
   return guardHatch.run('owner-role-tx', () =>
-    client.$transaction(tx => fn(tx), { maxWait: 10000, timeout: 30000 })
+    client.$transaction(tx => fn(routeTx(tx)), { maxWait: 10000, timeout: 30000 })
   );
 }
 

@@ -15,7 +15,7 @@ the script writes the row. There is never a dual read.
 1. The code is deployed (`curl /health` commit equals the tip of `main`; check every pipeline the merge triggers).
 2. D1 schema applied: `wrangler d1 migrations apply ebda-platform --remote -c apps/api/wrangler.jsonc`.
 3. D1 `stores` already holds every store (the directory reconcile ran). The script's FK pre-check fails otherwise and lists the stores.
-4. Low traffic: writes that land in Postgres during the last seconds before the flip are lost (see step 4).
+4. Pick a quiet minute: the family is FROZEN for about a minute (45 s drain + copy + 12 s settle). Every write to it answers a retryable 503 (provider webhooks retry; the daily billing cycle retries on its next tick). Reads keep working.
 5. A fresh Neon dump exists (`com.forceai.neon-backup`) and the D1 backup sweep ran (`STORE_BACKUPS` manifest lists `billing_events`).
 
 ## Steps
@@ -29,9 +29,7 @@ node scripts/cf/cutover-platform-family.mjs $F --commit   # 2. copy (idempotent 
 node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 counts
 ```
 
-`--commit` refuses when the marker exists. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1 with
-the switch untouched and can simply be re-run. After the flip it re-digests Postgres: exit code 2 + a table list means a
-Postgres write landed in the flip window; re-apply those rows in D1 by hand (query Postgres on `updated_at`).
+`--commit` refuses when the marker exists. Order: FREEZE -> wait `--drain-ms` (45 s) -> open the Postgres snapshot -> copy -> verify -> flip -> wait `--settle-ms` (12 s) -> lift the freeze -> re-digest Postgres on a NEW connection. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1, lifts the freeze, leaves the switch untouched and can simply be re-run. Exit code 2 + a table list after the flip means a write still reached Postgres; re-apply those rows in D1 by hand. `--unfreeze` lifts a freeze left behind by a killed run; `--status` shows marker and freeze.
 
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 

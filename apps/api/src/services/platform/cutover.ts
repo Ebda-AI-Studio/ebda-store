@@ -6,10 +6,18 @@
  * family. Until then every call is served by Postgres exactly as before this change, so merging the code moves nothing
  * (Ruling NEON-ZERO-2: no dual-read, no split-brain: one marker, one source of truth per family).
  *
- * Staleness class of the marker read: BOUNDED, one-way. "On" is cached for the life of the isolate (the marker is never
- * removed, a rollback is a new deploy). "Off" is re-read at most every OFF_TTL_MS per isolate, so the flip reaches every
- * isolate within that window; the runbook runs the copy at low traffic. Binding absent (Node, unit tests, local dev) ->
- * always off. Marker unreadable -> 503 (fail closed: serving from the wrong store is worse than an error).
+ * Staleness class of the marker read: "on" is cached for the life of the isolate (the marker is never removed, a rollback
+ * is a new deploy). "Off" is cached at most OFF_TTL_MS for READS (a read may be served by Postgres for that long after the
+ * flip: stale, never lost). A WRITE never trusts the cached "off": `familyStateForWrite` reads the marker and the freeze
+ * flag from D1 on every write until the marker is seen, so a write after the flip always goes to D1.
+ *
+ * The copy runs behind a FREEZE (`system_settings.platform_freeze.<family>`, written by the script before it reads
+ * Postgres): while it exists and the marker does not, every write to the family is refused with a retryable 503
+ * (`PLATFORM_FAMILY_FROZEN`), so nothing can land in Postgres between the copy's snapshot and the flip.
+ *
+ * Binding absent (Node, unit tests, local dev) -> always off and writable. Marker unreadable -> 503 (fail closed: serving
+ * from the wrong store is worse than an error). No shared in-flight promise: a promise created in one request must not
+ * be awaited from another on workerd, so only resolved values are shared.
  */
 import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
@@ -32,52 +40,97 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
 
 export const OFF_TTL_MS = 10_000;
 export const cutoverKey = (family: PlatformFamily) => `platform_cutover.${family}`;
+export const freezeKey = (family: PlatformFamily) => `platform_freeze.${family}`;
 
 interface MarkerD1 {
   prepare(sql: string): {
-    bind(...v: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> };
+    bind(...v: unknown[]): {
+      all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>;
+    };
   };
 }
 
 const on = new Set<PlatformFamily>();
 const offUntil = new Map<PlatformFamily, number>();
-const inflight = new Map<PlatformFamily, Promise<boolean>>();
 
 /** Test seam. */
 export function resetCutoverCache(): void {
   on.clear();
   offUntil.clear();
-  inflight.clear();
 }
 
+const binding = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATFORM_DB;
+const unreadable = () =>
+  new AppError(503, 'PLATFORM_CUTOVER_UNREADABLE', 'Platform database is unavailable');
+
+async function readKeys(
+  d1: MarkerD1,
+  family: PlatformFamily
+): Promise<{ moved: boolean; frozen: boolean }> {
+  try {
+    const rows =
+      (
+        await d1
+          .prepare('SELECT key FROM system_settings WHERE key IN (?1, ?2)')
+          .bind(cutoverKey(family), freezeKey(family))
+          .all<{ key: string }>()
+      ).results ?? [];
+    return {
+      moved: rows.some(r => r.key === cutoverKey(family)),
+      frozen: rows.some(r => r.key === freezeKey(family)),
+    };
+  } catch {
+    throw unreadable();
+  }
+}
+
+/** READ path: cached "on" for good, cached "off" for OFF_TTL_MS. */
 export async function platformFamilyOnD1(family: PlatformFamily): Promise<boolean> {
   if (on.has(family)) return true;
-  const d1 = (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATFORM_DB;
+  const d1 = binding();
   if (!d1) return false;
   if ((offUntil.get(family) ?? 0) > Date.now()) return false;
-  let p = inflight.get(family);
-  if (!p) {
-    p = (async () => {
-      try {
-        const row = await d1
-          .prepare('SELECT 1 AS ok FROM system_settings WHERE key = ?1')
-          .bind(cutoverKey(family))
-          .first<{ ok: number }>();
-        if (row) {
-          on.add(family);
-          return true;
-        }
-        offUntil.set(family, Date.now() + OFF_TTL_MS);
-        return false;
-      } catch {
-        throw new AppError(503, 'PLATFORM_CUTOVER_UNREADABLE', 'Platform database is unavailable');
-      } finally {
-        inflight.delete(family);
-      }
-    })();
-    inflight.set(family, p);
+  const { moved } = await readKeys(d1, family);
+  if (moved) {
+    on.add(family);
+    return true;
   }
-  return p;
+  offUntil.set(family, Date.now() + OFF_TTL_MS);
+  return false;
+}
+
+/**
+ * WRITE path: where this write goes, never from a stale "off". Postgres is returned only after a fresh read showed no
+ * marker AND no freeze; a freeze without a marker refuses the write (retryable 503).
+ */
+export async function platformFamilyOnD1ForWrite(family: PlatformFamily): Promise<boolean> {
+  if (on.has(family)) return true;
+  const d1 = binding();
+  if (!d1) return false;
+  const { moved, frozen } = await readKeys(d1, family);
+  if (moved) {
+    on.add(family);
+    return true;
+  }
+  if (frozen)
+    throw new AppError(
+      503,
+      'PLATFORM_FAMILY_FROZEN',
+      'This data is being moved; retry in a minute',
+      { retryable: true, family }
+    );
+  return false;
+}
+
+/** For a raw SQL write that bypasses the router (Postgres-only branch): throws when the family is frozen or moved. */
+export async function assertFamilyWritableOnPostgres(family: PlatformFamily): Promise<void> {
+  if (await platformFamilyOnD1ForWrite(family))
+    throw new AppError(
+      503,
+      'PLATFORM_FAMILY_MOVED',
+      'This data moved to D1; the Postgres write was refused',
+      { retryable: true, family }
+    );
 }
 
 export function familyOfModel(model: string): PlatformFamily | undefined {

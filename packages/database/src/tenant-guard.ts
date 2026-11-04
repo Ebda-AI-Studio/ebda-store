@@ -559,6 +559,19 @@ const WRITE_OPERATIONS = new Set([
   'delete',
   'deleteMany',
 ]);
+/**
+ * Tell the write observer about a write that did not go through the Prisma client extension: a D1-served model call
+ * (services/platform/router.ts) or a raw D1 statement. The observer (Ebda Chat's `store.plan_changed`, catalog and
+ * consent events) must see EVERY write whichever store holds the row.
+ */
+export function notifyModelWrite(
+  model: string,
+  operation: string,
+  args: unknown,
+  result: unknown
+): void {
+  observeWrite(model, operation, args, result);
+}
 function observeWrite(model: string, operation: string, args: unknown, result: unknown): void {
   const obs = modelWriteObserver;
   if (!obs || !WRITE_OPERATIONS.has(operation)) return;

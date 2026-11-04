@@ -1,5 +1,6 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { registerTxHooks, runCommitHooks } from './tx-hooks';
+import { routeTx } from './tx-route';
 
 /**
  * Wraps `prisma.$transaction` with the money-safe defaults required by
@@ -21,7 +22,7 @@ export function withMoneyTx<T>(
     const result = await (prisma.$transaction as (...args: unknown[]) => Promise<T>)(
       (tx: Prisma.TransactionClient) => {
         registerTxHooks(tx as object, hooks);
-        return fn(tx);
+        return fn(routeTx(tx));
       },
       {
         maxWait: opts?.maxWait ?? 10000,
