@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { platformDb } from '../lib/platform-directory';
 import { z } from 'zod/v3';
 import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';

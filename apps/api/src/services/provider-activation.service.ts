@@ -9,6 +9,7 @@
  *
  * The credentials never leave the server: every result here is a status, a code and a time.
  */
+import { onD1 } from './platform/billing-d1';
 import {
   acrossStoresFlat,
   prisma,

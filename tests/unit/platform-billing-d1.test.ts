@@ -409,6 +409,7 @@ describe('cutover switch', () => {
         'answerEngineProviderConfig',
         'storeUsageSnapshot',
         'ciInsight',
+        'store', // directory-column READS only (NZ-TX-2, services/platform/router.ts)
       ].sort()
     );
     setModelRouter(undefined);

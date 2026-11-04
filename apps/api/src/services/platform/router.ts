@@ -13,9 +13,13 @@ import {
   notifyModelWrite,
   setModelRouter,
   setRoutedModelGuard,
+  setPlatformOperatorVerifier,
   type ModelRouter,
 } from '@ebda/database';
 import { requirePlatformDb } from '../../lib/platform-db';
+import { cfBindings } from '../../cf/bindings';
+import { getAccountState } from '../../lib/identity-client';
+import { D1_FIELDS } from '../../lib/store-columns';
 import {
   FAMILY_MODELS,
   familyOfModel,
@@ -61,7 +65,40 @@ function touchesPlatformVat(method: string, arg: unknown): boolean {
   return (method === 'updateMany' || method === 'deleteMany') && typeof a.where?.key !== 'string';
 }
 
-const MODELS: ReadonlySet<string> = new Set(Object.values(FAMILY_MODELS).flat());
+const MODELS: ReadonlySet<string> = new Set([...Object.values(FAMILY_MODELS).flat(), 'store']);
+
+/**
+ * `Store` is split between D1 `stores` (the directory + mirror columns, D1_FIELDS) and the Durable Object. A READ that
+ * names ONLY directory columns (select / where / orderBy) is answered by D1 once the access family is there (D1 `stores` is
+ * the directory of record); anything that needs a DO column, a relation or a whole row stays on its Postgres path.
+ */
+const STORE_READS = new Set(['findUnique', 'findFirst', 'findMany', 'count']);
+function onlyDirectoryColumns(where: unknown): boolean {
+  if (where === undefined || where === null) return true;
+  if (typeof where !== 'object') return false;
+  return Object.entries(where as Record<string, unknown>).every(([k, v]) =>
+    k === 'AND' || k === 'OR' || k === 'NOT'
+      ? (Array.isArray(v) ? v : [v]).every(onlyDirectoryColumns)
+      : D1_FIELDS.has(k)
+  );
+}
+function storeReadServedByD1(method: string, arg: unknown): boolean {
+  if (!STORE_READS.has(method)) return false;
+  const a = (arg ?? {}) as {
+    where?: unknown;
+    select?: Record<string, unknown>;
+    include?: unknown;
+    orderBy?: unknown;
+  };
+  if (a.include) return false;
+  if (method !== 'count') {
+    if (!a.select) return false;
+    if (!Object.entries(a.select).every(([k, v]) => !v || D1_FIELDS.has(k))) return false;
+  }
+  const orderBy = Array.isArray(a.orderBy) ? a.orderBy : a.orderBy ? [a.orderBy] : [];
+  if (!orderBy.every(o => Object.keys(o as object).every(k => D1_FIELDS.has(k)))) return false;
+  return onlyDirectoryColumns(a.where);
+}
 
 /**
  * A family that must not be on D1 unless another one already is. `payments` (claims, receipts) is confirmed inside the
@@ -86,6 +123,19 @@ async function assertFamilyOrder(family: PlatformFamily): Promise<void> {
 export const platformRouter: ModelRouter = {
   models: MODELS,
   async route(model, method, args, postgres) {
+    if (model === 'store') {
+      if (
+        storeReadServedByD1(method, args[0]) &&
+        cfBindings()?.PLATFORM_DB &&
+        (await platformFamilyOnD1('access'))
+      ) {
+        const client = await requirePlatformDb();
+        return (client.store as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](
+          ...args
+        );
+      }
+      return postgres();
+    }
     const family = familyOfModel(model);
     if (!family) return postgres();
     const onD1 = WRITES.has(method)
@@ -115,15 +165,14 @@ export const platformRouter: ModelRouter = {
 
 export function registerPlatformRouter(): void {
   setModelRouter(platformRouter);
-  // A call that reaches the POSTGRES client for a model whose family this isolate knows is on D1 bypassed the router.
-  setRoutedModelGuard((model, operation) => {
-    const camel = model[0].toLowerCase() + model.slice(1);
-    const family = MODELS.has(camel) ? familyOfModel(camel) : undefined;
-    if (family && isFamilyCachedOnD1(family))
-      throw new Error(
-        `ROUTED_MODEL_ON_POSTGRES: ${model}.${operation} reached Postgres after ${family} moved to D1 (a raw transaction that was not wrapped with routeTx?)`
-      );
+  // The identity service decides "an ACTIVE super_admin" (Rulings ID-1/ID-2) where it is bound: no Postgres round trip.
+  setPlatformOperatorVerifier(async userId => {
+    if (!cfBindings()?.ACCOUNTS) return undefined;
+    const a = await getAccountState(userId);
+    return !!a && a.status === 'active' && a.role === 'super_admin';
   });
+  // The scope resolver (withStore / withUser / acrossStores without a request transaction) is registered once in
+  // lib/store-scope-resolver.ts (Ruling NZ-INTEG-1).
 }
 
 registerPlatformRouter();

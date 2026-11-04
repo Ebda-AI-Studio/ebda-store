@@ -698,6 +698,16 @@ export async function withTenantContext<T>(
 }
 
 /**
+ * A USER scope without a store and without a long-lived transaction: the per-query counterpart of `userContext`'s request
+ * transaction. Every Postgres query in `fn` opens its own short `runInTenantContext(undefined, ..., userId)`, so a request
+ * that never touches a user-keyed Postgres table never opens a Postgres connection at all (Workers with D1 serving the
+ * platform data). Atomicity across several Postgres writes is NOT provided: use it only where that is acceptable.
+ */
+export function runInUserScope<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return storeScope.run({ userId }, () => settleInScope(fn));
+}
+
+/**
  * Scope every Prisma call in `fn` to `storeId` under RLS WITHOUT holding one
  * transaction open for the whole of `fn`.
  *
@@ -726,16 +736,6 @@ export function runInStoreScope<T>(
     throw new Error('Invalid store ID format');
   }
   return storeScope.run({ storeId, userId }, () => settleInScope(fn));
-}
-
-/**
- * NEON-ZERO (Ruling NZ-C-1): a USER scope with no store and no long-lived transaction. Like `runInStoreScope`, a `prisma` call
- * inside runs in its own short tenant transaction carrying `app.current_user_id`, so a request that never touches Postgres
- * (the super-admin hub once its platform families are on D1) never opens a connection, and a handler that still does keeps
- * the user-keyed RLS it had under the request transaction.
- */
-export function runInUserScope<T>(userId: string, fn: () => Promise<T>): Promise<T> {
-  return storeScope.run({ userId }, () => settleInScope(fn));
 }
 
 // ---------------------------------------------------------------------------
@@ -782,36 +782,38 @@ export async function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promis
   const run = () => fn(prisma as unknown as TenantTx);
   if (currentTenantGucs()?.storeId === storeId) return run();
   if (!tenantStorage.getStore() && storeScope.getStore()?.storeId === storeId) return run();
-  // NEON-ZERO (Ruling NZ-C-3): a store served by its Durable Object has no Postgres rows to scope to, so a caller outside any
-  // request transaction (the super-admin hub, a job step) gets the lazy per-query store scope instead of a BEGIN that cannot connect.
-  if (
-    !tenantStorage.getStore() &&
-    storeScopeResolver &&
-    (await storeScopeResolver(storeId)) === 'no-pg'
-  )
-    return runInStoreScope(storeId, run);
+  // NEON-ZERO (NZ-TX-2, one resolver): a store whose data is not in Postgres (served by its Durable Object) needs no Postgres
+  // transaction just to be scoped; a caller outside any request transaction (the super-admin hub, a job step) gets the lazy
+  // per-query store scope. A Postgres store keeps `runInTenantContext` (BEGIN + set_config), so tenant scoping is never skipped.
+  if (!tenantStorage.getStore() && (await lazyForStore(storeId)))
+    return runInStoreScope(storeId, async () => run());
   return runInTenantContext(storeId, run);
 }
 
 /**
- * Registered once by the API at boot: says whether a store must NOT open a Postgres transaction ('no-pg': its data is in its
- * Durable Object / D1). Unregistered (Node scripts, unit tests) = every store keeps the Postgres transaction.
+ * ONE resolver for every `withStore` / `withUser` / `acrossStores` call that has NO ambient transaction (NEON-ZERO-1, Rulings
+ * NZ-TX-2 + NZ-C-3, reconciled in NZ-INTEG-1). It decides whether the call opens a Postgres transaction (the default: BEGIN +
+ * `set_config`, atomic) or only carries the scope, each Postgres query then running in its own short transaction WITH the
+ * GUCs (a call that never touches Postgres never connects). Registered once by the API (`lib/store-scope-resolver.ts`);
+ * unregistered (Node scripts, unit tests) = every call keeps the Postgres transaction.
+ *  - `lazyForStore`: true for a store served by its Durable Object. An unreadable flag THROWS (never a guess).
+ *  - `lazyForUser`: true when the platform data (billing, access, platform families) is on D1, so the user scope needs no BEGIN.
+ *  - `hubStoreIds`: the store ids a hub (user-scope) cross-store view covers, or undefined to use the directory definer.
  */
-/** Registered by the API: the store ids a hub (user-scope) cross-store view covers, or undefined to use the directory definer. */
-let hubStoreLister: (() => Promise<string[] | undefined>) | undefined;
-export function setHubStoreLister(fn: (() => Promise<string[] | undefined>) | undefined): void {
-  hubStoreLister = fn;
+export interface ScopeResolver {
+  lazyForStore(storeId: string): Promise<boolean>;
+  lazyForUser(): boolean | Promise<boolean>;
+  hubStoreIds?(): Promise<string[] | undefined>;
 }
-
-export type StoreScopeResolver = (storeId: string) => Promise<'pg' | 'no-pg'>;
-let storeScopeResolver: StoreScopeResolver | undefined;
-export function setStoreScopeResolver(r: StoreScopeResolver | undefined): void {
-  storeScopeResolver = r;
+let scopeResolver: ScopeResolver | undefined;
+export function setScopeResolver(r: ScopeResolver | undefined): void {
+  scopeResolver = r;
 }
+const lazyForStore = async (storeId: string): Promise<boolean> =>
+  scopeResolver ? scopeResolver.lazyForStore(storeId) : false;
 /** The per-store scope runner `acrossStores` uses (same decision as `withStore`). */
 async function runInStoreTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
-  if (storeScopeResolver && (await storeScopeResolver(storeId)) === 'no-pg')
-    return runInStoreScope(storeId, fn);
+  if (await lazyForStore(storeId)) return runInStoreScope(storeId, fn);
   return runInTenantContext(storeId, fn);
 }
 
@@ -821,7 +823,7 @@ async function runInStoreTx<T>(storeId: string, fn: () => Promise<T>): Promise<T
  * `app.current_user_id`. Reuses the ambient transaction when it already carries
  * this user (and store, if one is given).
  */
-export function withUser<T>(
+export async function withUser<T>(
   userId: string,
   fn: (tx: TenantTx) => Promise<T>,
   storeId?: string
@@ -830,6 +832,13 @@ export function withUser<T>(
   const ambient = currentTenantGucs();
   if (ambient?.userId === userId && (storeId === undefined || ambient.storeId === storeId)) {
     return run();
+  }
+  if (scopeResolver && !tenantStorage.getStore()) {
+    if (storeId === undefined) {
+      if (await scopeResolver.lazyForUser()) return runInUserScope(userId, async () => run());
+    } else if (await scopeResolver.lazyForStore(storeId)) {
+      return runInStoreScope(storeId, async () => run(), userId);
+    }
   }
   return runInTenantContext(storeId, run, userId);
 }
@@ -919,14 +928,25 @@ export async function scopeTransaction<Tx extends object, T>(
  */
 export function asPlatformOperator<T>(userId: string, fn: () => Promise<T>): Promise<T> {
   return withUser(userId, async () => {
-    const rows = await prisma.$queryRaw<
-      Array<{ ok: boolean }>
-    >`SELECT public.ebda_is_super_admin() AS ok`;
-    if (rows[0]?.ok !== true) {
+    // NEON-ZERO-1: where the identity service is the authority for accounts, it answers "is this an active super_admin"
+    // (one RPC, the same fact `ebda_is_super_admin()` read from Postgres); the SQL definer stays the default elsewhere.
+    const ok =
+      (await platformOperatorVerifier?.(userId)) ??
+      (await prisma.$queryRaw<Array<{ ok: boolean }>>`SELECT public.ebda_is_super_admin() AS ok`)[0]
+        ?.ok === true;
+    if (!ok) {
       throw new Error('asPlatformOperator: the acting user is not an active super_admin');
     }
     return guardHatch.run('platform-operator', () => settleInScope(fn));
   });
+}
+
+/** Resolves true/false for a user, or `undefined` when it cannot decide (the SQL definer then decides). */
+let platformOperatorVerifier: ((userId: string) => Promise<boolean | undefined>) | undefined;
+export function setPlatformOperatorVerifier(
+  fn: ((userId: string) => Promise<boolean | undefined>) | undefined
+): void {
+  platformOperatorVerifier = fn;
 }
 
 export interface AcrossStoresOptions {
@@ -968,7 +988,7 @@ export async function acrossStores<T>(
     !opts.filter &&
     !tenantStorage.getStore() &&
     storeScope.getStore()?.storeId === undefined
-      ? await hubStoreLister?.()
+      ? await scopeResolver?.hubStoreIds?.()
       : undefined;
   const storeIds = opts.storeIds
     ? dropHiddenStores(opts.storeIds, id => id, 'acrossStores')
