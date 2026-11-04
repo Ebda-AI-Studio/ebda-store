@@ -965,7 +965,7 @@ export async function seedGold(prisma, storeId, userId, spec, productIdBySlug, G
       feedPremiumBps: 0,
       maxAgeMinutes: 1560,
       jumpConfirmBps: 500,
-      roundingStep: 100,
+      roundingStep: 1000,
       showBreakdown: gold.showBreakdown === true,
     },
     actor

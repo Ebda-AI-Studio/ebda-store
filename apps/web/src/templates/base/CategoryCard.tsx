@@ -6,6 +6,9 @@ import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
+import { MissingImage } from '../shared/MissingImage';
+import Image from 'next/image';
+import { CATEGORY_TILE_SIZES } from '../../lib/image-sizes';
 
 export default function MinimalCategoryCard({
   category,
@@ -37,20 +40,15 @@ export default function MinimalCategoryCard({
           rather than soft. Named cardShape overrides both aspect + radius. */}
       <div className={`relative ${aspectClass} bg-muted/30 overflow-hidden ${radiusClass} mb-3`}>
         {category.image ? (
-          <img
+          <Image
             src={category.image}
             alt=""
-            className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
-            loading="lazy"
+            fill
+            sizes={CATEGORY_TILE_SIZES}
+            className="object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted/40">
-            <div className="w-16 h-16 rounded-full bg-foreground/5 flex items-center justify-center">
-              <span className="text-2xl font-light text-foreground/70 tracking-wide">
-                {displayName.charAt(0).toUpperCase()}
-              </span>
-            </div>
-          </div>
+          <MissingImage label={displayName} />
         )}
 
         {isOverlay && (

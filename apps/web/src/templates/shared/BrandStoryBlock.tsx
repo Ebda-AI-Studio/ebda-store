@@ -55,6 +55,50 @@ export function BrandStoryBlock({
 
   const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings, store.look);
 
+  // Audit 2026-11-03 #6: a store with a description but no image got a 30 px heading and ONE 14 px
+  // line floating in ~250 px of white. With no image the story is a designed band instead: the
+  // sentence IS the content, set large and centred between two short rules on a soft tint, so a
+  // thin store reads as editorial rather than empty. A long text stays a readable column.
+  if (!image && text) {
+    const short = text.length <= 160;
+    return (
+      <section
+        aria-label={isRtl ? headingAr : headingEn}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        data-story-band
+        className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
+        style={sectionBgStyle(spacingSettings?.bgColor, store.theme)}
+      >
+        <div className={innerContainerClass}>
+          <div className="mx-auto flex max-w-3xl flex-col items-center rounded-[var(--radius)] bg-foreground/[0.04] px-6 py-12 text-center sm:px-12 sm:py-16">
+            <span aria-hidden="true" className="mb-5 h-px w-12 bg-foreground/30" />
+            <h2 className="text-sm font-semibold text-foreground/70">
+              {isRtl ? headingAr : headingEn}
+            </h2>
+            <p
+              className={`mt-4 text-foreground ${
+                short
+                  ? 'text-2xl font-medium leading-snug sm:text-3xl'
+                  : 'text-base leading-relaxed text-foreground/80 sm:text-lg'
+              } ${short ? '' : 'line-clamp-6'}`}
+            >
+              {text}
+            </p>
+            {ctaHref && (
+              <StoreAnchor
+                href={ctaHref}
+                className="mt-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[hsl(var(--primary))] transition-colors hover:text-[hsl(var(--primary))]/80"
+              >
+                {isRtl ? ctaTextAr : ctaTextEn}
+              </StoreAnchor>
+            )}
+            <span aria-hidden="true" className="mt-5 h-px w-12 bg-foreground/30" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label={isRtl ? headingAr : headingEn}
