@@ -13,6 +13,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
+import { RowActions } from '@/components/RowActions';
+import { BottomSheet } from '@/components/mobile/BottomSheet';
+import { useConfirm } from '@/hooks/useConfirm';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { dateTimeLocalValue } from '@/lib/form-text';
@@ -94,6 +97,7 @@ export default function PromotionsPage() {
   const params = useParams();
   const storeId = params.id as string;
   const t = useT('promotions.page');
+  const askConfirm = useConfirm();
 
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
@@ -214,9 +218,12 @@ export default function PromotionsPage() {
   };
 
   const remove = async (promo: Promotion) => {
-    if (!window.confirm(t('deleteConfirm', { name: promo.name }))) {
-      return;
-    }
+    const ok = await askConfirm({
+      object: t('deleteDialog.object', { name: promo.name }),
+      consequence: t('deleteDialog.consequence'),
+      confirmLabel: t('deleteDialog.confirmLabel'),
+    });
+    if (!ok) return;
     setError(null);
     try {
       const { error } = await apiDelete(`/api/v1/stores/${storeId}/promotions/${promo.id}`);
@@ -290,22 +297,19 @@ export default function PromotionsPage() {
       alignEnd: true,
       mobileActions: true,
       cell: promo => (
-        <>
-          <button
-            type="button"
-            onClick={() => openEdit(promo)}
-            className="text-primary hover:underline"
-          >
-            {t('edit')}
-          </button>
-          <button
-            type="button"
-            onClick={() => void remove(promo)}
-            className="ms-3 text-destructive-ink hover:underline"
-          >
-            {t('delete')}
-          </button>
-        </>
+        <RowActions
+          menuLabel={t('rowMenu', { name: promo.name })}
+          primary={
+            <button
+              type="button"
+              onClick={() => openEdit(promo)}
+              className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium hover:bg-muted"
+            >
+              {t('edit')}
+            </button>
+          }
+          items={[{ label: t('delete'), destructive: true, onSelect: () => void remove(promo) }]}
+        />
       ),
     },
   ];
@@ -320,7 +324,7 @@ export default function PromotionsPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+          className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >
           {t('addNew')}
         </button>
@@ -342,6 +346,13 @@ export default function PromotionsPage() {
           <div className="rounded-md border border-dashed py-12 text-center">
             <p className="text-sm font-medium">{t('emptyTitle')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="mt-4 min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              {t('addFirst')}
+            </button>
           </div>
         ) : (
           <DataTable<Promotion>
@@ -353,19 +364,44 @@ export default function PromotionsPage() {
         )}
 
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-background p-5 shadow-lg">
-              <h2 className="mb-4 text-lg font-semibold">
-                {editing ? t('editTitle') : t('createTitle')}
-              </h2>
-
+          <BottomSheet
+            open
+            onClose={() => setShowModal(false)}
+            title={editing ? t('editTitle') : t('createTitle')}
+            footer={
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="min-h-11 flex-1 rounded-lg border border-border px-4 py-2 text-foreground hover:bg-muted"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  form="promotion-form"
+                  disabled={saving || !form.name.trim() || !form.value || !(Number(form.value) > 0)}
+                  className="min-h-11 flex-1 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {saving ? t('saving') : t('save')}
+                </button>
+              </div>
+            }
+          >
+            <form
+              id="promotion-form"
+              onSubmit={e => {
+                e.preventDefault();
+                void save();
+              }}
+            >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium">{t('name')}</span>
                   <input
                     value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -374,7 +410,7 @@ export default function PromotionsPage() {
                     value={form.nameAr}
                     onChange={e => setForm({ ...form, nameAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -385,7 +421,7 @@ export default function PromotionsPage() {
                   <input
                     value={form.description}
                     onChange={e => setForm({ ...form, description: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -394,7 +430,7 @@ export default function PromotionsPage() {
                     value={form.descriptionAr}
                     onChange={e => setForm({ ...form, descriptionAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -405,7 +441,7 @@ export default function PromotionsPage() {
                   <select
                     value={form.type}
                     onChange={e => setForm({ ...form, type: e.target.value as PromotionType })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   >
                     <option value="percentage">{t('typePercentage')}</option>
                     <option value="fixed">{t('typeFixed')}</option>
@@ -422,7 +458,7 @@ export default function PromotionsPage() {
                     step={form.type === 'percentage' ? 1 : 0.01}
                     value={form.value}
                     onChange={e => setForm({ ...form, value: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 {form.type === 'percentage' && (
@@ -434,7 +470,7 @@ export default function PromotionsPage() {
                       step={0.01}
                       value={form.maxDiscount}
                       onChange={e => setForm({ ...form, maxDiscount: e.target.value })}
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-md border border-input px-3 py-2 text-sm"
                     />
                   </label>
                 )}
@@ -450,7 +486,7 @@ export default function PromotionsPage() {
                     step={1}
                     value={form.priority}
                     onChange={e => setForm({ ...form, priority: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -459,7 +495,7 @@ export default function PromotionsPage() {
                     type="datetime-local"
                     value={form.startsAt}
                     onChange={e => setForm({ ...form, startsAt: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -468,7 +504,7 @@ export default function PromotionsPage() {
                     type="datetime-local"
                     value={form.expiresAt}
                     onChange={e => setForm({ ...form, expiresAt: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -491,7 +527,7 @@ export default function PromotionsPage() {
                   <select
                     value={form.customerGroupId}
                     onChange={e => setForm({ ...form, customerGroupId: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   >
                     <option value="">{t('allCustomers')}</option>
                     {groups.map(g => (
@@ -509,7 +545,7 @@ export default function PromotionsPage() {
                     step={0.01}
                     value={form.minOrderAmount}
                     onChange={e => setForm({ ...form, minOrderAmount: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -523,7 +559,7 @@ export default function PromotionsPage() {
                     step={1}
                     value={form.minQuantity}
                     onChange={e => setForm({ ...form, minQuantity: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="mt-6 flex items-center gap-2 text-sm">
@@ -558,26 +594,8 @@ export default function PromotionsPage() {
                   removeLabel={t('scopeRemove')}
                 />
               </div>
-
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-md border px-3 py-2 text-sm"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void save()}
-                  disabled={saving || !form.name.trim() || !form.value}
-                  className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                >
-                  {saving ? t('saving') : t('save')}
-                </button>
-              </div>
-            </div>
-          </div>
+            </form>
+          </BottomSheet>
         )}
       </div>
     </AdminLayout>
