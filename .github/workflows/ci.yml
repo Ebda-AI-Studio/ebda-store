@@ -21,13 +21,18 @@ name: CI
 # Every `runs-on` reads repo variable EBDA_RUNS_ON (the Umbra org runner when set,
 # Ruling CI-UMBRA-1) and falls back to GitHub-hosted `ubuntu-latest` when unset.
 # Delete the variable to go back to hosted runners. tests/unit/workflow-hosted-runners-only.test.ts
-# allows only that exact form.
+# allows only that exact form (or the LIGHT form below).
+#
+# Ruling CI-SPLIT-1: the cheap jobs (changes, guards, lint, typecheck, notify-failure) read
+# EBDA_RUNS_ON_LIGHT first, then EBDA_RUNS_ON. Set EBDA_RUNS_ON_LIGHT to '"ubuntu-24.04"' and they run on GitHub-hosted
+# runners while the minute-heavy jobs stay on EBDA_RUNS_ON; unset, they follow EBDA_RUNS_ON exactly as before.
 #
 # setup-node's `cache: npm` restores/saves the GitHub Actions cache over the network.
 # On the Umbra runners (one VM, one user) ~/.npm already persists locally, so that
 # cache cost 1.5-2.5 min per job restore and a 10 min hanging post-step save. Every
-# setup-node therefore uses `cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}`:
-# npm cache on hosted runners only. setup-node v7 skips caching when `cache` is empty
+# setup-node therefore uses `cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}`
+# (light jobs: the same test against `vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON`, hosted when empty or
+# '"ubuntu-24.04"'): npm cache on hosted runners only. setup-node v7 skips caching when `cache` is empty
 # (src/main.ts `if (cache)`), and package.json has no packageManager field, so its
 # auto-cache fallback does not apply.
 on:
@@ -98,7 +103,7 @@ jobs:
     name: Detect affected workspaces
     if: github.event_name == 'pull_request'
     # ubuntu-latest became 26.04 (2026-11); Playwright 1.60 unsupported — Ruling CI-HOSTED-2
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     outputs:
       code: ${{ steps.affected.outputs.code }}
@@ -143,8 +148,8 @@ jobs:
     name: Repo guards
     # Ruling CI-HOSTED-1: deliberately NO `if` here (the always-on PR check; tests/unit/ci-lean-structure and
     # merge-gate derive the required list from it). Residual: ~1.5 hosted min per scheduled run.
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 15
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -163,7 +168,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+          cache: ${{ ((vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '' || (vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '"ubuntu-24.04"') && 'npm' || '' }}
 
       # Migration ordering (Ruling MIG-ORD-1): a PR may not add a migration
       # folder whose 14-digit timestamp sorts at or before main's newest, and
@@ -223,8 +228,8 @@ jobs:
     name: Lint
     needs: [changes]
     if: needs.changes.outputs.lint != ''
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 15
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -240,7 +245,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+          cache: ${{ ((vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '' || (vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '"ubuntu-24.04"') && 'npm' || '' }}
 
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
@@ -266,8 +271,8 @@ jobs:
     name: Type Check
     needs: [changes]
     if: needs.changes.outputs.typecheck != ''
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 20
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -283,7 +288,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+          cache: ${{ ((vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '' || (vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '"ubuntu-24.04"') && 'npm' || '' }}
 
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
@@ -1619,7 +1624,7 @@ jobs:
 
   notify-failure:
     name: Notify on failure (main and nightly)
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     needs:
       [

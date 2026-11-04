@@ -43,9 +43,14 @@ describe('workflow wiring', () => {
       const t = readFileSync(path.join(WF, f), 'utf8');
       expect(t, f).not.toMatch(/uses:\s*actions\/cache/);
       for (const m of t.matchAll(/^\s*cache:\s*(.*)$/gm)) {
-        expect(m[1].trim(), `${f}: setup-node cache`).toBe(
-          "${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}"
-        );
+        // Heavy jobs test EBDA_RUNS_ON; light jobs (Ruling CI-SPLIT-1) test the selector they actually run on.
+        expect(
+          [
+            "${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}",
+            "${{ ((vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '' || (vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON) == '\"ubuntu-24.04\"') && 'npm' || '' }}",
+          ],
+          `${f}: setup-node cache`
+        ).toContain(m[1].trim());
       }
     }
   });

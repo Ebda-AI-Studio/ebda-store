@@ -57,18 +57,56 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
   // when the repo variable EBDA_RUNS_ON is set; with the variable unset every job
   // falls back to GitHub-hosted `ubuntu-24.04`. This is the ONLY allowed form,
   // so deleting the variable is the single switch back to hosted runners.
+  // Ruling CI-SPLIT-1 adds a second switch for LIGHT jobs: EBDA_RUNS_ON_LIGHT, then EBDA_RUNS_ON, then hosted. Unset =
+  // identical to the heavy switch, so the same one-variable fallback holds.
   const ALLOWED = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
-  it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-24.04 fallback', () => {
+  const ALLOWED_LIGHT = `\${{ fromJSON(vars.EBDA_RUNS_ON_LIGHT || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  it('every runs-on is the EBDA_RUNS_ON switch (or the LIGHT switch) with an ubuntu-24.04 fallback', () => {
     // Ruling OFFMACHINE-1: the off-machine database backup must NOT depend on the Umbra fleet (the Mac and the CI guest are
     // exactly what it protects against), so db-backup.yml alone pins the literal GitHub-hosted runner.
     const bad = runsOnValues().filter(
-      r => r.value !== ALLOWED && !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
+      r =>
+        r.value !== ALLOWED &&
+        r.value !== ALLOWED_LIGHT &&
+        !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
     );
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
       'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-24.04)'
     ).toEqual([]);
   });
+});
+
+// Ruling CI-SPLIT-1: the LIGHT switch is for cheap jobs only (hosted minutes cost money), each with a hard timeout.
+describe('the LIGHT runner switch is confined to light jobs', () => {
+  const LIGHT_CI_JOBS = ['changes', 'guards', 'lint', 'typecheck', 'notify-failure'];
+  const jobBlocks = (file: string) =>
+    fs
+      .readFileSync(path.join(WORKFLOWS, file), 'utf8')
+      .split('\njobs:\n')[1]
+      .split(/^(?=  [A-Za-z0-9_-]+:\s*$)/m)
+      .filter(b => /^  [A-Za-z0-9_-]+:/.test(b))
+      .map(b => ({ name: /^  ([A-Za-z0-9_-]+):/.exec(b)![1], body: b }));
+
+  it('in ci.yml exactly the light jobs use it, with timeout <= 10', () => {
+    const onLight = jobBlocks('ci.yml').filter(j => j.body.includes('vars.EBDA_RUNS_ON_LIGHT'));
+    expect(onLight.map(j => j.name).sort()).toEqual([...LIGHT_CI_JOBS].sort());
+    for (const j of onLight) {
+      const t = Number(/^ {4}timeout-minutes: (\d+)/m.exec(j.body)?.[1]);
+      expect(t, `${j.name} timeout`).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it.each(workflowFiles.filter(f => /^cf-.*-deploy\.yml$/.test(f)))(
+    '%s: every job uses it, light <= 10 min and deploy <= 20 min',
+    f => {
+      for (const j of jobBlocks(f)) {
+        expect(j.body, `${f}:${j.name}`).toContain('vars.EBDA_RUNS_ON_LIGHT');
+        const t = Number(/^ {4}timeout-minutes: (\d+)/m.exec(j.body)?.[1]);
+        expect(t, `${f}:${j.name} timeout`).toBeLessThanOrEqual(j.name === 'deploy' ? 20 : 10);
+      }
+    }
+  );
 });
 
 describe('nothing under .github mentions a self-hosted runner or its switches', () => {
