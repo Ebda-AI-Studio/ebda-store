@@ -1,4 +1,6 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import { requirePlatformDb } from '../lib/platform-db';
+import { d1StoreBriefs, platformDb as platformDirectoryDb } from '../lib/platform-directory';
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { customerAuthRoute } from '../lib/customer-auth';
@@ -2440,6 +2442,42 @@ export async function loadUsageHistoryRows(
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
+  // `store_usage_snapshots` is on D1 once the `ai-usage` family moved (Ruling NZ-INTEG-1): one global read, no per-store Postgres
+  // transaction. The routed delegate has no `include`, so the store's slug / name / plan come from the D1 directory.
+  if (await platformFamilyOnD1('ai-usage')) {
+    const d1db = await requirePlatformDb(); // D1 has no RLS: the platform client directly, no store scope to open
+    const periods: Array<{ periodStart: Date }> = await d1db.storeUsageSnapshot.groupBy({
+      by: ['periodStart'],
+      orderBy: { periodStart: 'desc' },
+      take: months,
+    });
+    if (periods.length === 0) return [];
+    const snaps: Awaited<ReturnType<typeof loadUsageHistoryRows>> =
+      await d1db.storeUsageSnapshot.findMany({
+        where: { periodStart: { in: periods.map(p => p.periodStart) } },
+        orderBy: [{ periodStart: 'desc' }],
+      });
+    const d1 = platformDirectoryDb();
+    const briefs = new Map(
+      (d1
+        ? await d1StoreBriefs(
+            d1,
+            snaps.map(r => r.storeId)
+          )
+        : []
+      ).map(b => [b.id, b])
+    );
+    return snaps.map(r => ({
+      ...r,
+      store: briefs.has(r.storeId)
+        ? {
+            slug: briefs.get(r.storeId)!.slug,
+            name: briefs.get(r.storeId)!.name,
+            plan: briefs.get(r.storeId)!.plan,
+          }
+        : null,
+    }));
+  }
   const perStore = await acrossStores(
     storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
     { storeIds: await boundedFanoutStoreIds() }

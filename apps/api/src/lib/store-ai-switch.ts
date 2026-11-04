@@ -19,6 +19,7 @@ export const AI_DISABLED_BY_MERCHANT_CODE = 'AI_DISABLED_BY_MERCHANT';
 
 /** A store that cannot be read is NOT enabled: fail closed. */
 export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
+  // Through the store's backend (Ruling NZ-INTEG-1, NZ-AN-2): a DO store answers from its profile / D1 directory, never Postgres.
   const row = await readInStoreContext(storeId, async () =>
     (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
