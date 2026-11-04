@@ -5,6 +5,8 @@ import { storeDb } from '../lib/repo-factory';
 import { csvField } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
+import { writeLimiter } from '../middleware/security';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { StoreMailer } from '../services/store-mailer.service';
 import { storeHidesPoweredBy } from '../services/email.service';
@@ -20,6 +22,9 @@ import logger from '../lib/logger';
  */
 /** Each recipient is one `send()` in this request; stays well under the 1,000-subrequest cap. */
 const BROADCAST_MAX_RECIPIENTS = 400;
+
+/** BE:E-5: exports and the broadcast read are bounded (a tenant-sized list must never be loaded whole). */
+const EXPORT_MAX_ROWS = 50_000;
 
 const router = Router();
 
@@ -98,6 +103,7 @@ router.get(
       ).newsletterSubscriber.findMany({
         where: { storeId },
         orderBy: { subscribedAt: 'desc' },
+        take: EXPORT_MAX_ROWS,
         select: {
           email: true,
           language: true,
@@ -150,6 +156,7 @@ router.get(
       ).newsletterSubscriber.findMany({
         where: { storeId },
         orderBy: { subscribedAt: 'desc' },
+        take: EXPORT_MAX_ROWS,
         select: {
           email: true,
           language: true,
@@ -211,6 +218,8 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('email_campaigns'), // BE:S-5: the same plan gate as the campaigns twin
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -259,6 +268,8 @@ router.post(
       ).newsletterSubscriber.findMany({
         where,
         select: { id: true, email: true, language: true },
+        // one past the cap is enough to refuse (BE:E-5): never load the whole list
+        take: BROADCAST_MAX_RECIPIENTS + 1,
       });
 
       // One provider call per subscriber inside this single request (Worker subrequest budget):

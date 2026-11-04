@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
+import { PageState } from '@/components/PageState';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
@@ -92,6 +93,7 @@ export default function InsightsDashboardPage() {
 
   const [data, setData] = useState<InsightsDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -100,23 +102,22 @@ export default function InsightsDashboardPage() {
         if (apiError) setError(apiError.message);
         else if (d) setData(d);
       })
-      .catch(() => setError('Failed to load insights dashboard'));
-  }, [storeId]);
+      .catch(() => setError(t('loadFailed')));
+  }, [storeId, reloadKey]);
 
-  if (error) {
+  if (error || !data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!data) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
+        <PageState
+          loading={!error}
+          error={error}
+          onRetry={() => {
+            setError(null);
+            setReloadKey(k => k + 1);
+          }}
+        >
+          {null}
+        </PageState>
       </AdminLayout>
     );
   }

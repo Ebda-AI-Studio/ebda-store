@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { pctToBps } from './pct';
@@ -54,6 +55,7 @@ export default function CustomerGroupsPage() {
   const params = useParams();
   const storeId = params.id as string;
   const t = useT('customerGroups.page');
+  const askConfirm = useConfirm();
 
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,9 +149,12 @@ export default function CustomerGroupsPage() {
   };
 
   const remove = async (group: CustomerGroup) => {
-    if (!window.confirm(t('deleteConfirm', { name: group.name, count: group.customerCount }))) {
-      return;
-    }
+    const ok = await askConfirm({
+      object: t('deleteDialog.object', { name: group.name }),
+      consequence: t('deleteDialog.consequence', { count: group.customerCount }),
+      confirmLabel: t('deleteDialog.confirmLabel'),
+    });
+    if (!ok) return;
     setError(null);
     try {
       await apiDelete(`/api/v1/stores/${storeId}/customer-groups/${group.id}`);

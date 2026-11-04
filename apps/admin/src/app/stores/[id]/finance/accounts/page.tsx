@@ -87,7 +87,7 @@ export default function AccountsPage() {
           setTree(data);
         }
       })
-      .catch(() => setError('Failed to load chart of accounts'));
+      .catch(() => setError(t('loadFailed')));
   }
 
   useEffect(() => {

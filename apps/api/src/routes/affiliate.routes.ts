@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { refuseDemoStore } from '../middleware/demo-store';
@@ -422,6 +422,7 @@ router.get(
 router.post(
   '/:storeId/affiliates/:id/payouts',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = payoutSchema.parse(req.body);

@@ -153,3 +153,7 @@ accepted what: Users -> the merchant -> **Policy acceptances**. Rulings LEGAL-4/
 
 - [`ROLLBACK.md`](../ROLLBACK.md) — code + DB rollback
 - [`STAGING-DEPLOYMENT.md`](STAGING-DEPLOYMENT.md) — promotion flow
+
+## Platform queue pages (email-queue, sms-queue, webhook-events) — 2026-11-04
+
+These three super-admin pages used to call `/admin/...` without the `/api/v1` prefix, so they 404ed in production (UX:PL-1 / BE:F-1). They now call `/api/v1/admin/email-queue/*`, `/api/v1/admin/sms-queue/*` and `/api/v1/admin/webhook-events/*`; `tests/unit/admin-api-prefix.test.ts` fails the build for any admin `api*()` call (quoted or template literal) whose path does not start with `/api/v1`. Retry-all, discard-corrupt, refund, replay-an-already-processed-webhook, VAT enable, tax-verification revoke and cancel-subscription now ask through the shared confirm dialog (named object, one-sentence consequence, outcome-named button) instead of the browser's native `confirm()`.

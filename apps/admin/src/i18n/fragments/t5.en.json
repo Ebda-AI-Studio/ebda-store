@@ -1,0 +1,217 @@
+{
+  "products": {
+    "new": {
+      "title": "New product",
+      "subtitle": "Start with the essentials and finish the rest after you add the product",
+      "sections": {
+        "essentials": "Essentials",
+        "moreDetails": "More details",
+        "moreDetailsHint": "Description, discount, cost, search words and badge. Not needed now.",
+        "englishCopy": "English copy (optional)",
+        "arabicCopy": "Arabic copy (optional)",
+        "badge": "Badge on the product card",
+        "pricing": "Discount and cost",
+        "inventory": "Inventory"
+      },
+      "fields": {
+        "nameArOptional": "Product name in Arabic (optional)",
+        "nameOptional": "Product name in English (optional)",
+        "nameAr": "Product name",
+        "name": "Product name",
+        "category": "Category",
+        "noCategory": "No category",
+        "productStatus": "Status",
+        "badgeLabel": "Badge in English",
+        "badgeLabelAr": "Badge in Arabic",
+        "descriptionAr": "Description in Arabic",
+        "description": "Description in English"
+      },
+      "statusOptions": {
+        "draft": "Draft (hidden from the store)",
+        "active": "Visible in the store",
+        "archived": "Archived"
+      },
+      "actions": {
+        "create": "Add the product",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "createFailed": "We could not add the product. Try again.",
+        "priceMin": "The price must be more than zero."
+      },
+      "toast": {
+        "created": "Product added"
+      }
+    },
+    "edit": {
+      "viewInStore": "View in store",
+      "moreMenu": "More product options",
+      "createdBanner": "Product added. Next step: add sizes or colours if it has any.",
+      "addVariants": "Add variants",
+      "toast": {
+        "saved": "Product saved"
+      },
+      "actions": {
+        "saveProduct": "Save product"
+      },
+      "fields": {
+        "priceMinError": "The price must be more than zero."
+      },
+      "faqs": {
+        "deletedToast": "Question deleted",
+        "undo": "Undo"
+      },
+      "tabs": {
+        "label": "Product page sections",
+        "edit": "Edit",
+        "overview": "Overview"
+      },
+      "deleteDialog": {
+        "object": "Product “{name}”",
+        "consequence": "It is removed from the store and new orders, and cannot be restored.",
+        "confirmLabel": "Delete product",
+        "done": "Product deleted",
+        "failed": "We could not delete the product. Try again."
+      }
+    },
+    "variants": {
+      "simpleForm": {
+        "deleteDialog": {
+          "object": "Variant “{name}”",
+          "consequence": "It will be removed from the product and cannot be restored.",
+          "confirmLabel": "Delete variant"
+        }
+      }
+    },
+    "recommendations": {
+      "aiSuggestions": {
+        "demoteDialog": {
+          "object": "{count} AI-promoted product(s)",
+          "consequence": "They leave the manual cross-sell list and the storefront falls back to AI picks.",
+          "confirmLabel": "Remove suggestions"
+        }
+      }
+    },
+    "model3d": {
+      "removeDialog": {
+        "object": "The product's 3D model",
+        "consequence": "Shoppers will see photos only.",
+        "confirmLabel": "Remove the model"
+      }
+    },
+    "list": {
+      "actions": {
+        "overview": "Overview",
+        "menu": "Options for product {name}"
+      }
+    }
+  },
+  "customerGroups": {
+    "page": {
+      "deleteDialog": {
+        "object": "Group “{name}”",
+        "consequence": "{count} customer(s) become ungrouped. The customers themselves are kept.",
+        "confirmLabel": "Delete group"
+      }
+    }
+  },
+  "promotions": {
+    "page": {
+      "deleteDialog": {
+        "object": "Promotion “{name}”",
+        "consequence": "It stops immediately and cannot be restored.",
+        "confirmLabel": "Delete promotion"
+      },
+      "addNew": "Add a promotion",
+      "addFirst": "Add your first promotion",
+      "rowMenu": "Options for promotion {name}"
+    }
+  },
+  "bundles": {
+    "page": {
+      "deactivateDialog": {
+        "object": "Product set “{name}”",
+        "consequence": "It stops selling; existing carts and orders keep their reference to it.",
+        "confirmLabel": "Stop selling the set"
+      },
+      "title": "Product sets",
+      "subtitle": "Sell a fixed group of products as one item at one price.",
+      "addNew": "Add a set",
+      "addFirst": "Add your first set",
+      "rowMenu": "Options for set {name}"
+    }
+  },
+  "coupons": {
+    "page": {
+      "loadFailed": "We could not load the coupons. Check your connection and try again.",
+      "deleteFailed": "We could not delete the coupon. Try again.",
+      "toggleFailed": "We could not change the coupon status. Try again."
+    },
+    "actions": {
+      "menu": "Options for coupon {code}",
+      "deleteDialog": {
+        "object": "Coupon {code}",
+        "consequence": "Customers can no longer use it and it cannot be restored.",
+        "confirmLabel": "Delete coupon"
+      }
+    },
+    "modal": {
+      "valueInvalid": "Enter the discount value; it must be more than zero.",
+      "valuePercentMax": "The percentage must be between 1 and 100.",
+      "saveFailed": "We could not save the coupon. Try again."
+    }
+  },
+  "orders": {
+    "list": {
+      "newOrder": "New phone order",
+      "moreMenu": "More order options",
+      "errors": {
+        "invoiceLoad": "Could not open the invoice",
+        "invoiceLoadHttp": "The server returned error {status}. Try again."
+      },
+      "confirm": {
+        "markPaidLabel": "Mark order as paid",
+        "bulkMarkPaidLabel": "Mark orders as paid",
+        "instapayLabel": "Yes, the money arrived"
+      }
+    },
+    "detail": {
+      "cancelDialog": {
+        "object": "Order {number}",
+        "consequence": "The order is cancelled and its status cannot be restored.",
+        "confirmLabel": "Cancel the order"
+      },
+      "actions": {
+        "cancel": "Cancel order"
+      }
+    }
+  },
+  "categories": {
+    "page": {
+      "moreMenu": "More category options"
+    },
+    "table": {
+      "missingArabicName": "Arabic name missing",
+      "rowMenu": "Options for category {name}"
+    }
+  },
+  "customers": {
+    "page": {
+      "moreMenu": "More customer options"
+    }
+  },
+  "tags": {
+    "page": {
+      "emptyAction": "Go to products"
+    }
+  },
+  "wallet": {
+    "emptyAction": "Go to customers"
+  },
+  "loyalty": {
+    "transactions": {
+      "loadFailed": "We could not load the points transactions.",
+      "retry": "Try again"
+    }
+  }
+}

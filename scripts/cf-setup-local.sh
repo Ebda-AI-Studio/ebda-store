@@ -138,7 +138,7 @@ EOF
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOShardedTagCache", "DOQueueHandler"] }],
 ${ROUTES_JSON}
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
   "logpush": true
 }
 EOF

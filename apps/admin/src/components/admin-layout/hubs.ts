@@ -190,7 +190,11 @@ export const HUBS: HubDefinition[] = [
     urlPrefixes: ['/finance'],
     buildTabs: (storeId, labels) => [
       { label: labels.financeDashboard, href: `/stores/${storeId}/finance/dashboard` },
-      { label: labels.accounts, href: `/stores/${storeId}/finance/accounts` },
+      {
+        label: labels.accounts,
+        href: `/stores/${storeId}/finance/accounts`,
+        groupStart: true,
+      },
       { label: labels.journal, href: `/stores/${storeId}/finance/journal` },
       { label: labels.expenses, href: `/stores/${storeId}/finance/expenses` },
       { label: labels.reports, href: `/stores/${storeId}/finance/reports` },

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { reportRangeQueryString } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
@@ -45,6 +46,7 @@ export default function AnalyticsPage() {
     lowStockProducts,
     isLoading,
     error,
+    cashflowLocked,
     refetch,
   } = useAnalytics({ storeId, period, customRange });
   const periodLabel = tPeriods(period);
@@ -110,10 +112,31 @@ export default function AnalyticsPage() {
           />
 
           {/* Inventory snapshot + Cashflow trend side by side */}
-          {(stockSnapshot || cashflow.length > 0) && (
+          {(stockSnapshot || cashflow.length > 0 || cashflowLocked) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               {stockSnapshot && <InventorySnapshotCard snapshot={stockSnapshot} />}
-              <CashflowChart data={cashflow} periodLabel={periodLabel} />
+              {cashflowLocked ? (
+                <div
+                  className="rounded-xl border bg-card p-6 shadow-sm"
+                  role="status"
+                  data-testid="cashflow-locked"
+                >
+                  <h3 className="text-base font-semibold text-foreground">
+                    {tErrors('cashflowLockedTitle')}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {tErrors('cashflowLockedBody')}
+                  </p>
+                  <Link
+                    href={`/stores/${storeId}/billing`}
+                    className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-primary-ink underline underline-offset-2"
+                  >
+                    {tErrors('cashflowLockedCta')}
+                  </Link>
+                </div>
+              ) : (
+                <CashflowChart data={cashflow} periodLabel={periodLabel} />
+              )}
             </div>
           )}
 

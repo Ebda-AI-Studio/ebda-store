@@ -167,3 +167,24 @@ describe('admin order coupon override — route boundary (#1370)', () => {
     expect(createAdminOrder.mock.calls[0][2].overrideCouponRules).toBeUndefined();
   });
 });
+
+describe('admin order custom shipping fee — audit (BE:S-23)', () => {
+  it('records who set a custom shipping fee, and nothing when none was set', async () => {
+    const { auditLog } = await import('@api/middleware/security');
+    createAdminOrder.mockResolvedValue({ id: 'o1', orderNumber: 'N-1' });
+    const res = await post({ ...BASE, couponCode: undefined, shippingOverride: 2500 });
+    expect(res.status).toBe(200);
+    expect(auditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'order.shipping_override',
+        userId: 'admin-1',
+        storeId: STORE_ID,
+        resourceId: 'o1',
+        details: { orderNumber: 'N-1', shippingOverride: 2500 },
+      })
+    );
+    vi.mocked(auditLog).mockClear();
+    await post({ ...BASE, couponCode: undefined });
+    expect(auditLog).not.toHaveBeenCalled();
+  });
+});

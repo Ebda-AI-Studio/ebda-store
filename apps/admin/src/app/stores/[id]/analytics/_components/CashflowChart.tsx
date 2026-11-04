@@ -83,7 +83,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
       </svg>
 
       {/* Min/Max legend */}
-      <div className="flex justify-between mt-1 text-[10px] text-muted-foreground tabular-nums">
+      <div className="flex justify-between mt-1 text-xs text-muted-foreground tabular-nums">
         <span>{data[0]?.day?.toString().slice(0, 10) ?? ''}</span>
         <span>{data[data.length - 1]?.day?.toString().slice(0, 10) ?? ''}</span>
       </div>
