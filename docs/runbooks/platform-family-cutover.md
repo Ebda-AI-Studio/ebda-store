@@ -47,6 +47,11 @@ node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 count
 - Billing webhooks are NOT refused: Paymob documents no retry for a failed delivery and Kashier's is unverified, so a 503 could lose a payment notification. The webhook is authenticated first (signature / HMAC; a bad one is rejected and stored nowhere), then stored durably as `billing_webhook_events.outcome = 'deferred'` (idempotent on provider + event id) and answered 200 `{ outcome: 'deferred' }`. Once the freeze is lifted the queue is applied exactly once (confirm-before-apply runs then): by the first webhook after the freeze, by the `*/15` cron job `billing-deferred-webhooks`, and by the daily billing cycle. A live redelivery that wins the race takes the deferred row over (one flip `deferred -> processing`); a failed apply puts the row back. `sweepStuckCharges` still asks the gateway about renewals pending over an hour. The copy script sets deferred rows aside during the copy and puts back the ones Postgres does not already know.
 - The freeze row carries `expiresAt` (`--freeze-ttl-ms`, default 15 min). If the script dies without lifting it the API IGNORES it after that and pages (P1); SIGINT/SIGTERM lift it; a failed lift is loud and exits non-zero (`--unfreeze` removes it).
 
+## Secrets in the cutover
+
+- Deferred billing webhooks are stored with the raw body DROPPED and the parsed event (card token included) ENCRYPTED with the app's encryption key; `detail` is set to NULL the moment the event is applied.
+- Rows the script sets aside are written to `.cutover-stash/<family>-<time>.ndjson` BEFORE they are deleted: AES-256-GCM per line with the key in `CUTOVER_STASH_KEY` (>= 32 chars; the run refuses to set rows aside without it), mode 0600, deleted once the rows are back in D1. If a run dies, `--restore-stash <file>` puts them back (same key, same `--d1` flags).
+
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 
 - `--status` shows `marker: PRESENT`, D1 counts equal the dry-run PG counts.
