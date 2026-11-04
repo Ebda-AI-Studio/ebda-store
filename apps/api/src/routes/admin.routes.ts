@@ -2193,7 +2193,7 @@ export async function loadUsageHistoryRowsAcrossStores(months: number) {
       take: months,
     });
     if (periods.length === 0) return [];
-    const snaps: Awaited<ReturnType<typeof prisma.storeUsageSnapshot.findMany>> =
+    const snaps: Awaited<ReturnType<typeof loadUsageHistoryRows>> =
       await d1db.storeUsageSnapshot.findMany({
         where: { periodStart: { in: periods.map(p => p.periodStart) } },
         orderBy: [{ periodStart: 'desc' }],
