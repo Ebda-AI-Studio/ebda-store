@@ -270,6 +270,41 @@ describe('raw transactions are routed (no billing model reaches Postgres after t
   });
 });
 
+describe('copy script: set-aside rows are restored idempotently and never lose a known event', () => {
+  it('billing deferred row: restore twice = one row; a (provider, event_id) Postgres already holds wins', async () => {
+    const { ASIDE } = await import('../../scripts/cf/cutover-platform-family.mjs');
+    const r = rig();
+    const lit = (v: unknown) =>
+      v === null
+        ? 'NULL'
+        : typeof v === 'number'
+          ? String(v)
+          : `'${String(v).replace(/'/g, "''")}'`;
+    const row = {
+      id: 'd1',
+      provider: 'kashier',
+      event_id: 'e1',
+      event_type: 'charge.succeeded',
+      outcome: 'deferred',
+      detail: '{}',
+      received_at: 5,
+    };
+    r.db.exec(ASIDE.billing_webhook_events.restore(row, lit));
+    r.db.exec(ASIDE.billing_webhook_events.restore(row, lit));
+    expect(r.db.prepare('SELECT COUNT(*) n FROM billing_webhook_events').get()).toEqual({ n: 1 });
+    // Postgres already applied e2: the copied row stays processed, the deferred duplicate is dropped
+    r.db
+      .prepare(
+        `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome) VALUES ('pg', 'kashier', 'e2', 't', 'processed')`
+      )
+      .run();
+    r.db.exec(ASIDE.billing_webhook_events.restore({ ...row, id: 'd2', event_id: 'e2' }, lit));
+    expect(
+      r.db.prepare(`SELECT outcome FROM billing_webhook_events WHERE event_id = 'e2'`).all()
+    ).toEqual([{ outcome: 'processed' }]);
+  });
+});
+
 describe('cutover switch', () => {
   it('no binding -> Postgres, no marker read', async () => {
     expect(await platformFamilyOnD1('billing')).toBe(false);

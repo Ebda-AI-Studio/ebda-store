@@ -22,6 +22,8 @@
 //      slipped into Postgres; the script prints the tables and exits 2 so the row can be re-applied by hand.
 // Postgres is opened READ ONLY (lib/pg.mjs refuses a prod URL without --allow-prod-read) and rolled back.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cli, fmtMs } from './lib/cli.mjs';
 import { connectReadOnly } from './lib/pg.mjs';
@@ -42,6 +44,21 @@ export const FAMILIES = {
     'billing_webhook_events',
     'store_lifecycle_emails',
   ],
+};
+
+/**
+ * D1-only rows a table may hold DURING the freeze (written by the API, not part of the Postgres copy). Before the copy they
+ * are set aside (written to a durable NDJSON file FIRST, then deleted by id so a row that arrives meanwhile is never
+ * touched); after the copy they are put back, in a `finally` too, with SQL that is idempotent and never loses state.
+ */
+export const ASIDE = {
+  billing_webhook_events: {
+    cols: ['id', 'provider', 'event_id', 'event_type', 'outcome', 'detail', 'received_at'],
+    where: "outcome = 'deferred'",
+    // a (provider, event_id) Postgres already holds was applied there: dropping the deferred row IS the dedupe
+    restore: (r, lit) =>
+      `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at) VALUES (${[r.id, r.provider, r.event_id, r.event_type, r.outcome, r.detail, r.received_at].map(lit).join(', ')}) ON CONFLICT (provider, event_id) DO NOTHING;`,
+  },
 };
 
 const markerKey = family => `platform_cutover.${family}`;
@@ -73,6 +90,9 @@ async function main() {
     'settle-ms': { type: 'string', default: '12000' },
     // a freeze carries its own expiry: if this script dies without lifting it the API ignores it after this long and pages
     'freeze-ttl-ms': { type: 'string', default: '900000' },
+    // where the set-aside rows are written BEFORE they are deleted (kept after the run)
+    'stash-dir': { type: 'string', default: '.cutover-stash' },
+    'restore-stash': { type: 'string' },
   });
   const tables = FAMILIES[args.family];
   if (!tables) throw new Error(`pass --family <${Object.keys(FAMILIES).join('|')}>`);
@@ -96,6 +116,19 @@ async function main() {
   const liftFreeze = () =>
     d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(fkey)};`]);
 
+  if (args['restore-stash']) {
+    const lines = fs
+      .readFileSync(args['restore-stash'], 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(l => JSON.parse(l));
+    const sql = lines.map(({ table, row }) => ASIDE[table].restore(row, lit));
+    if (sql.length) await d1Statements(d, sql);
+    console.log(
+      `restored ${sql.length} set-aside row(s) from ${args['restore-stash']} (idempotent)`
+    );
+    return;
+  }
   if (args.unfreeze) {
     await liftFreeze();
     console.log(`freeze ${fkey} lifted.`);
@@ -237,24 +270,54 @@ async function main() {
     `FROZEN ${args.family}: writes are refused (503, retryable). Draining ${args['drain-ms']} ms ...`
   );
   let flipped = false;
+  const stashFile = path.join(
+    args['stash-dir'],
+    `${args.family}-${new Date().toISOString().replace(/[:.]/g, '-')}.ndjson`
+  );
+  const aside = [];
+  let putBackDone = false;
+  // idempotent: runs after the copy AND in the finally, so an abort never leaves a callback / webhook only in memory
+  const putBack = async () => {
+    if (putBackDone) return;
+    const sql = aside.flatMap(({ table, rows }) => rows.map(r => ASIDE[table].restore(r, lit)));
+    if (sql.length) await d1Statements(d, sql);
+    putBackDone = true;
+    if (sql.length)
+      console.log(`  ${sql.length} set-aside row(s) put back (already-known ones dropped)`);
+  };
   const before = {};
   let famNames = [];
   try {
     await sleep(Number(args['drain-ms']));
     const { client, fam } = await open();
     famNames = fam.map(b => b.name);
-    // 2b. billing: webhooks deferred during the freeze live in the dedupe table and could collide with a Postgres row of
-    // the same (provider, event_id) on copy. Set them aside, copy, then put back those Postgres does not already know
-    // (one it knows was already applied: dropping it IS the dedupe).
-    let deferred = [];
-    if (tables.includes('billing_webhook_events')) {
-      deferred = await d1Query(
+    // 2b. set aside the D1-only rows (see ASIDE): durable file first, then delete exactly those ids
+    for (const bt of fam) {
+      const spec = ASIDE[bt.name];
+      if (!spec) continue;
+      const rows = await d1Query(
         d,
-        `SELECT id, provider, event_id, event_type, outcome, detail, received_at FROM billing_webhook_events WHERE outcome = 'deferred'`
+        `SELECT ${spec.cols.join(', ')} FROM ${q(bt.name)} WHERE ${spec.where}`
       );
-      if (deferred.length)
-        await d1Statements(d, [`DELETE FROM billing_webhook_events WHERE outcome = 'deferred';`]);
-      console.log(`  ${deferred.length} deferred webhook(s) set aside`);
+      if (rows.length) {
+        fs.mkdirSync(path.dirname(stashFile), { recursive: true });
+        const fd = fs.openSync(stashFile, 'a');
+        fs.writeSync(
+          fd,
+          rows.map(r => JSON.stringify({ table: bt.name, row: r })).join('\n') + '\n'
+        );
+        fs.fsyncSync(fd);
+        fs.closeSync(fd);
+        for (let i = 0; i < rows.length; i += 400)
+          await d1Statements(d, [
+            `DELETE FROM ${q(bt.name)} WHERE id IN (${rows
+              .slice(i, i + 400)
+              .map(r => lit(r.id))
+              .join(', ')});`,
+          ]);
+        aside.push({ table: bt.name, rows });
+      }
+      console.log(`  ${rows.length} ${bt.name} row(s) set aside (${stashFile})`);
     }
     // 3. copy (idempotent upserts, FK order)
     let stmts = [];
@@ -278,16 +341,7 @@ async function main() {
       console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
     }
 
-    if (deferred.length) {
-      await d1Statements(
-        d,
-        deferred.map(
-          r =>
-            `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at) VALUES (${[r.id, r.provider, r.event_id, r.event_type, r.outcome, r.detail, r.received_at].map(lit).join(', ')}) ON CONFLICT (provider, event_id) DO NOTHING;`
-        )
-      );
-      console.log(`  ${deferred.length} deferred webhook(s) put back (already-known ones dropped)`);
-    }
+    await putBack();
     // 4. verify: count + digest on both sides, foreign keys
     const results = await d1QueryMany(d, [
       ...fam.map(
@@ -338,6 +392,11 @@ async function main() {
       `FLIPPED: ${key} written. Waiting ${args['settle-ms']} ms so every isolate sees it ...`
     );
   } finally {
+    await putBack().catch(e =>
+      console.error(
+        `!!! PUT-BACK FAILED (${e.message}); run: --restore-stash ${stashFile} (same --d1 flags)`
+      )
+    );
     if (!flipped) {
       await lift();
       if (!frozenNow) console.log('freeze lifted (nothing was flipped).');
