@@ -972,6 +972,8 @@ router.post(
       // typically happens after fulfilment — forcing `confirmed` there regressed
       // the order's status and lost fulfilment progress.
       const money = await storeMoney(storeId);
+      // the payment row that was actually flipped (on a Durable Object store: the one the section updated)
+      let flipped = { paymentId: codPayment.id, fromStatus: codPayment.status as string };
       if (money) {
         // Durable Object store (Ruling NZ-A-2): the same writes in ONE section there.
         const done = await money.codMarkPaid({ orderIds: [orderId] });
@@ -982,6 +984,7 @@ router.post(
           });
           return;
         }
+        flipped = { paymentId: done.updated[0].paymentId, fromStatus: done.updated[0].fromStatus };
       } else {
         await prisma.$transaction([
           prisma.payment.update({
@@ -1000,11 +1003,11 @@ router.post(
 
       // Append-only audit row for the COD completion.
       await (money ? recordPaymentEventForStore : recordPaymentEvent)({
-        paymentId: codPayment.id,
+        paymentId: flipped.paymentId,
         storeId: order.storeId,
         orderId,
         eventType: 'status_change',
-        fromStatus: codPayment.status,
+        fromStatus: flipped.fromStatus as typeof codPayment.status,
         toStatus: 'completed',
         provider: 'cod',
         triggeredByUserId: user.userId,
@@ -1288,9 +1291,22 @@ router.post(
       // still-pending order to `confirmed`; never regress a further-along
       // (processing/shipped/delivered) order that's being paid after fulfilment.
       const money = await storeMoney(storeId);
+      // The orders that were actually flipped, with the payment row and prior status that were flipped. On a Durable Object
+      // store this is the section's answer (an order that was paid / cancelled in the meantime is skipped there); events,
+      // fan-out and counts below come from it, never from the requested list.
+      let flippedOrders = codOrders.map(o => ({
+        order: o,
+        paymentId: o.payments[0].id,
+        fromStatus: o.payments[0].status as string,
+      }));
       if (money) {
         // Durable Object store (Ruling NZ-A-2): the whole batch in ONE section there.
-        await money.codMarkPaid({ orderIds: codOrders.map(o => o.id) });
+        const done = await money.codMarkPaid({ orderIds: codOrders.map(o => o.id) });
+        const byOrder = new Map(done.updated.map(u => [u.orderId, u]));
+        flippedOrders = codOrders.flatMap(o => {
+          const u = byOrder.get(o.id);
+          return u ? [{ order: o, paymentId: u.paymentId, fromStatus: u.fromStatus }] : [];
+        });
       } else {
         const updates = codOrders.flatMap(order => [
           prisma.payment.update({
@@ -1313,13 +1329,13 @@ router.post(
       // (Promise.allSettled) so a transient log-write failure on one row
       // doesn't break the bulk action for the others.
       await Promise.allSettled(
-        codOrders.map(o =>
+        flippedOrders.map(({ order: o, paymentId, fromStatus }) =>
           (money ? recordPaymentEventForStore : recordPaymentEvent)({
-            paymentId: o.payments[0].id,
+            paymentId,
             storeId: o.storeId,
             orderId: o.id,
             eventType: 'status_change',
-            fromStatus: o.payments[0].status,
+            fromStatus: fromStatus as (typeof o.payments)[0]['status'],
             toStatus: 'completed',
             provider: 'cod',
             triggeredByUserId: user.userId,
@@ -1332,7 +1348,7 @@ router.post(
       // receives the paid notification. Promise.allSettled so
       // one failed enqueue doesn't block the response or the others.
       await Promise.allSettled(
-        codOrders.map(o =>
+        flippedOrders.map(({ order: o }) =>
           inngest
             .send({
               name: 'order/created',
@@ -1354,21 +1370,21 @@ router.post(
         userId: user.userId,
         resourceType: 'order',
         details: {
-          count: codOrders.length,
-          orderNumbers: codOrders.map(o => o.orderNumber).join(', '),
+          count: flippedOrders.length,
+          orderNumbers: flippedOrders.map(f => f.order.orderNumber).join(', '),
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      logger.info({ count: codOrders.length, storeId }, '[COD] Bulk orders marked as paid');
+      logger.info({ count: flippedOrders.length, storeId }, '[COD] Bulk orders marked as paid');
 
       res.json({
         success: true,
         data: {
-          message: `${codOrders.length} order(s) marked as paid`,
-          updated: codOrders.length,
-          skipped: orderIds.length - codOrders.length,
+          message: `${flippedOrders.length} order(s) marked as paid`,
+          updated: flippedOrders.length,
+          skipped: orderIds.length - flippedOrders.length,
         },
       });
     } catch (error) {
@@ -1651,22 +1667,24 @@ router.post(
             refundReference: status.refundReference ?? null,
           }
         );
-        await recordPaymentEventForStore({
-          paymentId: payment.id,
-          storeId,
-          orderId,
-          eventType: 'reconciliation',
-          fromStatus: payment.status as typeof payment.status,
-          toStatus: null,
-          provider: payment.provider,
-          triggeredByUserId: user.userId,
-          details: {
-            reason: 'manual_refund_status_refresh',
-            providerStatus: status.status,
-            refundId: payment.refundId,
-            outcome: applied.outcome,
-          },
-        });
+        // the section records its own event for what it applied; this one only notes an applied refresh
+        if (applied.outcome === 'applied')
+          await recordPaymentEventForStore({
+            paymentId: payment.id,
+            storeId,
+            orderId,
+            eventType: 'reconciliation',
+            fromStatus: payment.status as typeof payment.status,
+            toStatus: null,
+            provider: payment.provider,
+            triggeredByUserId: user.userId,
+            details: {
+              reason: 'manual_refund_status_refresh',
+              providerStatus: status.status,
+              refundId: payment.refundId,
+              outcome: applied.outcome,
+            },
+          });
         await auditLog({
           action: 'order.refund_status_refreshed',
           userId: user.userId,
