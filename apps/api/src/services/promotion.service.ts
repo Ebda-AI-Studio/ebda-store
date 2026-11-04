@@ -6,6 +6,7 @@
  * targeting evaluator (Task 2), not here — this is persistence only.
  */
 import { prisma } from '@ebda/database';
+import { assertCustomerGroupInStore } from '../lib/customer-group-scope';
 import { AppError } from '../middleware/error-handler';
 import { searchNameIds } from './product-search.service';
 
@@ -89,6 +90,7 @@ export class PromotionService {
 
   static async create(storeId: string, data: CreatePromotionData) {
     this.validateValue(data.type, data.value);
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
     const promotion = await prisma.promotion.create({
       data: {
@@ -125,6 +127,7 @@ export class PromotionService {
     const type = data.type ?? (existing.type as CreatePromotionData['type']);
     const value = data.value ?? existing.value;
     this.validateValue(type, value);
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
     const promotion = await prisma.promotion.update({
       where: { id: promotionId, storeId },

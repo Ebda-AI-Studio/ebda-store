@@ -1,4 +1,5 @@
 import { assertCouponValue } from '../lib/sellable-price';
+import { assertCustomerGroupInStore } from '../lib/customer-group-scope';
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
@@ -178,6 +179,8 @@ export class CouponService {
       throw new AppError(409, 'DUPLICATE_CODE', 'A coupon with this code already exists');
     }
 
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
+
     const coupon = await prisma.coupon.create({
       data: {
         storeId,
@@ -212,6 +215,8 @@ export class CouponService {
     if (data.type !== undefined || data.value !== undefined) {
       assertCouponValue(data.type ?? current.type, data.value ?? current.value);
     }
+
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
     // Check for duplicate code if changing code
     if (data.code) {
