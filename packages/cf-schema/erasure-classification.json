@@ -1498,5 +1498,54 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "findings over k-anonymous cohort cells; no store, order or buyer identifier"
+  },
+  "store-do:search_query_daily": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:product_daily_views": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:qr_scan_daily": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:gsc_daily_metrics": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:notification_logs": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["recipient_phone_hash", "recipient_email_hash"],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: unsalted SHA-256 of the recipient; goes with the store. A shopper-subject match by hash is a residual (DO SQLite has no sha256)"
+  },
+  "d1:ai_usage": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: feature, token counts, model, cost; subject_id is a catalogue object id, never a person",
+    "reviewedNotPii": ["input_tokens", "output_tokens"]
   }
 }

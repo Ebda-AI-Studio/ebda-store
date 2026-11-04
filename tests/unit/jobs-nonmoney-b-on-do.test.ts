@@ -53,6 +53,9 @@ const h = vi.hoisted(() => {
   };
 });
 
+// the Store row is read through the store's backend (Ruling NZ-AN-1, N-13): same stub as the platform one
+h.doDb.store = h.platform.store;
+
 vi.mock('@ebda/database', async () =>
   (await import('./helpers/database-mock')).databaseMock({
     prisma: h.pg,

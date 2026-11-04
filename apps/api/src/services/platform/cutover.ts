@@ -23,7 +23,7 @@ import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
 
-export type PlatformFamily = 'billing' | 'access' | 'platform' | 'inbox';
+export type PlatformFamily = 'billing' | 'access' | 'platform' | 'inbox' | 'ai-usage' | 'analytics';
 
 /** Prisma model names (delegate form) that each family owns. */
 export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
@@ -55,6 +55,11 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   // The payment-webhook inbox: reached only through SQL definers (services/platform/inbox-d1.ts), its own marker because
   // its writers (provider callbacks) run on a different cadence from the admin surface.
   inbox: ['webhookEvent'],
+  // Ruling NZ-AN-1: the AI quota counts usage across stores, so `ai_usage` is one platform table on D1 (append-only)
+  'ai-usage': ['aiUsage'],
+  // Ruling NZ-AN-1: no routed model. The marker + freeze only gate WHEN a Durable Object store's per-store analytics tables
+  // (search/product-view/qr/notification/gsc) start being served by its DO (lib/analytics-backend.ts)
+  analytics: [],
 };
 
 export const OFF_TTL_MS = 10_000;

@@ -91,6 +91,16 @@ import {
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import {
+  analyticsImportFinishOp,
+  analyticsImportOp,
+  analyticsImportStatusOp,
+  qrScanRecordOp,
+  searchInsightsOp,
+  searchLogPurgeOp,
+  searchLogRecordOp,
+  viewRecordOp,
+} from './analytics-ops';
+import {
   expenseDraftOp,
   expenseTransitionOp,
   lastPaidSalesOp,
@@ -241,7 +251,15 @@ export type MoneyOpName =
   | 'vectorCommit'
   | 'vectorStale'
   | 'vectorVisible'
-  | 'expenseTransition';
+  | 'expenseTransition'
+  | 'searchLogRecord'
+  | 'searchLogPurge'
+  | 'searchInsights'
+  | 'qrScanRecord'
+  | 'viewRecord'
+  | 'analyticsImportStatus'
+  | 'analyticsImport'
+  | 'analyticsImportFinish';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -344,6 +362,14 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'vectorStale',
   'vectorVisible',
   'expenseTransition',
+  'searchLogRecord',
+  'searchLogPurge',
+  'searchInsights',
+  'qrScanRecord',
+  'viewRecord',
+  'analyticsImportStatus',
+  'analyticsImport',
+  'analyticsImportFinish',
 ];
 
 const TABLE = '_money_ops';
@@ -737,6 +763,15 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  /** Per-store analytics on the DO (Ruling NZ-AN-1): see `analytics-ops.ts`. */
+  searchLogRecord: (db, storeId, a) => searchLogRecordOp(db, storeId, a),
+  searchLogPurge: (db, storeId, a) => searchLogPurgeOp(db, storeId, a),
+  searchInsights: (db, storeId, a) => searchInsightsOp(db, storeId, a),
+  qrScanRecord: (db, storeId, a) => qrScanRecordOp(db, storeId, a),
+  viewRecord: (db, storeId, a) => viewRecordOp(db, storeId, a),
+  analyticsImportStatus: (db, storeId) => analyticsImportStatusOp(db, storeId),
+  analyticsImport: (db, storeId, a) => analyticsImportOp(db, storeId, a),
+  analyticsImportFinish: (db, storeId, a) => analyticsImportFinishOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),

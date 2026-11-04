@@ -1,4 +1,8 @@
 import type { JobDef } from '../../jobs/types';
+import { analyticsOnDo } from '../../analytics-backend';
+import { aiUsageTotals } from '../../../services/usage-aggregates.service';
+import { platformFamilyOnD1 } from '../../../services/platform/cutover';
+import { withStoreDb } from '../../jobs/store-db';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
 import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
 import { storeMoney, storeRepo } from '../../repo-factory';
@@ -62,27 +66,36 @@ export async function collectDoStoreUsage(
   start: Date,
   end: Date
 ): Promise<Array<Record<string, number | bigint | string>>> {
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { deletedAt: true } })
+  const store = await withStoreDb(storeId, db =>
+    db.store.findUnique({ where: { id: storeId }, select: { deletedAt: true } })
   );
   if (!store || store.deletedAt) return [];
   const money = await storeMoney(storeId);
   if (!money) throw new Error(`store-usage-snapshot: no money client for DO store ${storeId}`);
   const c = await money.usageCounts({ startMs: start.getTime(), endMs: end.getTime() });
-  const [a] = await withStore(
-    storeId,
-    tx =>
-      tx.$queryRaw<
-        Array<{
-          product_views: bigint;
-          ai_calls: bigint;
-          ai_billable_calls: bigint;
-          ai_tokens_in: bigint;
-          ai_tokens_out: bigint;
-          ai_cost_micros: bigint;
-          ai_unpriced_calls: bigint;
-        }>
-      >`
+  // Ruling NZ-AN-1: product views live in the store's DO (`usageCounts.productViews`) and AI usage is one platform table on D1,
+  // each once its cutover marker exists. Before a marker the number is still in Postgres (the store-scoped query below), so a
+  // snapshot taken between the deploy and the copy is not silently zero.
+  const viewsOnDo = await analyticsOnDo(storeId, 'read');
+  const aiOnD1 = await platformFamilyOnD1('ai-usage');
+  const ai = aiOnD1 ? await aiUsageTotals(storeId, start, end) : undefined;
+  const [a] =
+    viewsOnDo && aiOnD1
+      ? []
+      : await withStore(
+          storeId,
+          tx =>
+            tx.$queryRaw<
+              Array<{
+                product_views: bigint;
+                ai_calls: bigint;
+                ai_billable_calls: bigint;
+                ai_tokens_in: bigint;
+                ai_tokens_out: bigint;
+                ai_cost_micros: bigint;
+                ai_unpriced_calls: bigint;
+              }>
+            >`
       SELECT
         (SELECT COALESCE(SUM(v.count), 0) FROM product_daily_views v
           WHERE v.store_id = ${storeId} AND v.date >= ${start} AND v.date < ${end}) AS product_views,
@@ -101,7 +114,7 @@ export async function collectDoStoreUsage(
           WHERE a.store_id = ${storeId} AND a.created_at >= ${start} AND a.created_at < ${end}
             AND a.cached_hit = false AND a.cost_micros IS NULL) AS ai_unpriced_calls
     `
-  );
+        );
   return [
     {
       store_id: storeId,
@@ -115,13 +128,13 @@ export async function collectDoStoreUsage(
       customers: c.customers,
       sessions_proxy: c.sessionsProxy,
       carts_with_items: c.cartsWithItems,
-      product_views: a?.product_views ?? 0,
-      ai_calls: a?.ai_calls ?? 0,
-      ai_billable_calls: a?.ai_billable_calls ?? 0,
-      ai_tokens_in: a?.ai_tokens_in ?? 0,
-      ai_tokens_out: a?.ai_tokens_out ?? 0,
-      ai_cost_micros: a?.ai_cost_micros ?? 0,
-      ai_unpriced_calls: a?.ai_unpriced_calls ?? 0,
+      product_views: viewsOnDo ? c.productViews : (a?.product_views ?? 0),
+      ai_calls: ai ? ai.calls : (a?.ai_calls ?? 0),
+      ai_billable_calls: ai ? ai.billableCalls : (a?.ai_billable_calls ?? 0),
+      ai_tokens_in: ai ? ai.tokensIn : (a?.ai_tokens_in ?? 0),
+      ai_tokens_out: ai ? ai.tokensOut : (a?.ai_tokens_out ?? 0),
+      ai_cost_micros: ai ? ai.costMicros : (a?.ai_cost_micros ?? 0),
+      ai_unpriced_calls: ai ? ai.unpricedCalls : (a?.ai_unpriced_calls ?? 0),
     },
   ];
 }
@@ -247,7 +260,9 @@ export const storeUsageSnapshot: JobDef = inngest.createFunction(
           FROM stores s
           WHERE s.id = ${storeId} AND s.deleted_at IS NULL
         `;
-          }, acrossOpts(event)).then(toJsonSafeRows)
+          }, acrossOpts(event))
+            .then(r => withAiUsageFromD1(r, start, end))
+            .then(toJsonSafeRows)
     );
 
     let written = 0;
@@ -310,3 +325,35 @@ export const storeUsageSnapshot: JobDef = inngest.createFunction(
     return { periodStart: periodStart.slice(0, 10), stores: written };
   }
 );
+
+/**
+ * Ruling NZ-AN-1: once the `ai-usage` family is on D1 the Postgres `ai_usage` table is frozen history, so the AI columns of a
+ * Postgres store's row come from D1 (the same definitions); before the marker the joined SQL above is the truth.
+ */
+async function withAiUsageFromD1<
+  T extends {
+    store_id: string;
+    ai_calls: bigint;
+    ai_billable_calls: bigint;
+    ai_tokens_in: bigint;
+    ai_tokens_out: bigint;
+    ai_cost_micros: bigint;
+    ai_unpriced_calls: bigint;
+  },
+>(rows: T[], start: Date, end: Date): Promise<T[]> {
+  if (!(await platformFamilyOnD1('ai-usage'))) return rows;
+  const out: T[] = [];
+  for (const r of rows) {
+    const ai = await aiUsageTotals(r.store_id, start, end);
+    out.push({
+      ...r,
+      ai_calls: BigInt(ai.calls),
+      ai_billable_calls: BigInt(ai.billableCalls),
+      ai_tokens_in: BigInt(ai.tokensIn),
+      ai_tokens_out: BigInt(ai.tokensOut),
+      ai_cost_micros: BigInt(ai.costMicros),
+      ai_unpriced_calls: BigInt(ai.unpricedCalls),
+    });
+  }
+  return out;
+}

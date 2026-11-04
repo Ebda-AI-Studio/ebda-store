@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { withStore } from '@ebda/database';
-import { sweepStoresDb, withStoreRw } from '../../jobs/store-db';
+
+import { sweepStoresDb, withStoreRw, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -127,8 +127,8 @@ const queueDepthWatchFn = inngest.createFunction(
     });
     const labels = new Map<string, { name: string; slug?: string }>();
     for (const id of new Set([...queued, ...running].map(j => j.storeId))) {
-      const st = await withStore(id, tx =>
-        tx.store.findUnique({ where: { id }, select: { name: true, slug: true } })
+      const st = await withStoreDb(id, db =>
+        db.store.findUnique({ where: { id }, select: { name: true, slug: true } })
       );
       labels.set(id, { name: st?.name ?? id, slug: st?.slug ?? undefined });
     }

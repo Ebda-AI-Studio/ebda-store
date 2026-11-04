@@ -16,6 +16,7 @@
  * Zero-customer stores: every function returns 0 cleanly — no throws.
  */
 
+import { analyticsRead } from '../../lib/analytics-backend';
 import { prisma } from '@ebda/database';
 import { storeDb, storeWriter } from '../../lib/repo-factory';
 import { RfmSegment } from '@ebda/database';
@@ -493,13 +494,19 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     // productViews: sum of ProductDailyView.count for this store on this calendar day.
     // `date` in product_daily_views is a DATE stored at UTC midnight (regionDayStart output),
     // so an exact equality match on dayStart gives the right rows.
-    const productViewsAgg = await prisma.productDailyView.aggregate({
+    const viewsArgs = {
       where: {
         storeId,
         date: dayStart, // exact match — DATE column stored as Cairo-day-start instant
       },
-      _sum: { count: true },
-    });
+      _sum: { count: true as const },
+    };
+    // Ruling NZ-AN-1: the store's DO once its analytics moved, else Postgres
+    const productViewsAgg = await analyticsRead(
+      storeId,
+      r => r.productDailyView.aggregate(viewsArgs),
+      () => prisma.productDailyView.aggregate(viewsArgs)
+    );
     const productViews = productViewsAgg._sum.count ?? 0;
 
     computedRows.push({

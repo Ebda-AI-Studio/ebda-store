@@ -143,6 +143,10 @@ export function usageCountsOp(
          AND NOT EXISTS (SELECT 1 FROM cart_items ci WHERE ci.cart_id = c.id)`,
       [storeId, start, end]
     ),
+    productViews: one(
+      'SELECT COALESCE(SUM(count), 0) AS n FROM product_daily_views WHERE store_id = ? AND date >= ? AND date < ?',
+      [storeId, start, end]
+    ),
     cartsWithItems: one(
       `SELECT COUNT(*) AS n FROM carts c WHERE c.store_id = ? AND c.created_at >= ? AND c.created_at < ?
          AND EXISTS (SELECT 1 FROM cart_items ci WHERE ci.cart_id = c.id)`,

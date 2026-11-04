@@ -85,8 +85,8 @@ export async function sweepStoresDb<T>(
  */
 export async function storeNameOf(storeId: string): Promise<string> {
   try {
-    const s = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
+    const s = await withStoreDb(storeId, db =>
+      db.store.findUnique({ where: { id: storeId }, select: { name: true } })
     );
     return s?.name ?? storeId;
   } catch {

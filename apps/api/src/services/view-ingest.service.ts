@@ -19,6 +19,7 @@
  */
 
 import { withStore } from '@ebda/database';
+import { analyticsMoney } from '../lib/analytics-backend';
 import { regionDayStart } from '@ebda/shared';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
@@ -88,6 +89,12 @@ export async function recordProductView(
   const date = dayStart();
 
   try {
+    // Ruling NZ-AN-1: a Durable Object store counts in its own DO once the analytics copy flipped (lib/analytics-backend.ts)
+    const money = await analyticsMoney(storeId, 'write');
+    if (money) {
+      await money.viewRecord({ dayMs: date.getTime(), productId });
+      return true;
+    }
     // Single-round-trip upsert: increment count or create a new row for today.
     // Runs outside a tenant request context (public storefront beacon), so it
     // enters the store's scope itself.

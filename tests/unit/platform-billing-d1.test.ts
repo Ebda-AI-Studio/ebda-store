@@ -314,9 +314,10 @@ describe('cutover switch', () => {
     await expect(platformFamilyOnD1('billing')).rejects.toMatchObject({ statusCode: 503 });
   });
 
-  it('the router is registered on the prisma proxy for exactly the moved models (billing, access, platform, inbox)', () => {
+  it('the router is registered on the prisma proxy for exactly the moved models (billing, access, platform, inbox, ai-usage)', () => {
     expect([...platformRouter.models].sort()).toEqual(
       [
+        'aiUsage', // Ruling NZ-AN-1: the platform-wide AI usage family
         'billingEvent',
         'billingGrant',
         'billingReferral',

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
@@ -94,8 +95,8 @@ export async function handleGoldRateStalenessWatch(
           // Marked AFTER the send (below): a send that throws leaves it unset and the next run retries.
           if (await wasSent(sentinel)) return { sent: false, kind };
 
-          const info = await withStore(storeId, tx =>
-            tx.store.findUnique({
+          const info = await withStoreDb(storeId, db =>
+            db.store.findUnique({
               where: { id: storeId },
               select: { name: true, slug: true, owner: { select: { email: true } } },
             })

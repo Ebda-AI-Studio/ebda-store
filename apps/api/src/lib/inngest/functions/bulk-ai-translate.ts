@@ -120,7 +120,7 @@ const bulkAiTranslateFn = inngest.createFunction(
           where: { storeId },
           select: { id: true },
         });
-        const store = await prisma.store.findUnique({
+        const store = await lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { id: true },
         });
@@ -392,7 +392,7 @@ const bulkAiTranslateFn = inngest.createFunction(
             }
 
             // item.kind === 'store'
-            const store = await prisma.store.findUnique({
+            const store = await lazyStoreDb(item.id).store.findUnique({
               where: { id: item.id },
               select: { name: true, nameAr: true, description: true, descriptionAr: true },
             });

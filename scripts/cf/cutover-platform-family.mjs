@@ -60,6 +60,9 @@ export const FAMILIES = {
   ],
   // The payment-webhook inbox. A provider callback is never refused: during the freeze it is recorded straight into D1.
   inbox: ['webhook_events'],
+  // Ruling NZ-AN-1: platform-wide AI usage (the quota counts across stores). The per-store analytics tables use
+  // scripts/cf/copy-analytics-to-do.mjs instead (same marker/freeze keys, family `analytics`).
+  'ai-usage': ['ai_usage'],
 };
 
 /** Families whose Postgres rows are EMPTIED after the flip (fail closed: Postgres policies/definers that still read them deny). */

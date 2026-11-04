@@ -26,8 +26,8 @@ describe('StoreDO schema', () => {
     }
   });
 
-  it('the decision tables of the plan exist: 122 models + store_profile, store_config, commerce_outcomes, d1_outbox, do_flags', () => {
-    expect(tableNames(db).length).toBe(122 + 5);
+  it('the decision tables of the plan exist: 127 models + store_profile, store_config, commerce_outcomes, d1_outbox, do_flags', () => {
+    expect(tableNames(db).length).toBe(127 + 5);
   });
 
   it('enum CHECK, boolean CHECK, json_valid CHECK and FK ON DELETE all bite', () => {

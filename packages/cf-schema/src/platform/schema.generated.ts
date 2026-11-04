@@ -5,6 +5,25 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
+export const aiUsage = sqliteTable('ai_usage', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  feature: text('feature').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  cachedHit: integer('cached_hit', { mode: 'boolean' }).notNull().default(false),
+  model: text('model'),
+  costMicros: integer('cost_micros'),
+  subjectType: text('subject_type'),
+  subjectId: text('subject_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const answerEngineProviderConfigs = sqliteTable('answer_engine_provider_configs', {
   id: text('id')
     .primaryKey()
