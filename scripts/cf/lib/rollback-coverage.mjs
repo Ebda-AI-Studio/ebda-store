@@ -7,7 +7,7 @@ import { DO_DERIVED_TABLE } from '../../../packages/cf-migrate/src/coverage.mjs'
 
 export const DISCARDABLE_CF_ONLY = new Set([
   'entity_index', // rebuilt from the store tables
-  'platform_audit_log', // Postgres has no such table; the trail starts with the first live admin action
+  'platform_audit_log', // Postgres has no such table: store-less audit_logs rows are copied in by `--family audit` (N-10d); rows born in D1 after the flip are lost by a rollback (export first)
   '_migrations',
   '_identity',
   '_idempotency', // keyed write replay results, 24 h

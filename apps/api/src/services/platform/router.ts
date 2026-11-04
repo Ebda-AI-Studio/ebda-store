@@ -23,7 +23,9 @@ import {
   platformFamilyOnD1,
   platformFamilyOnD1ForWrite,
   isFamilyCachedOnD1,
+  type PlatformFamily,
 } from './cutover';
+import { AppError } from '../../middleware/error-handler';
 
 const WRITES = new Set([
   'create',
@@ -62,6 +64,26 @@ function touchesPlatformVat(method: string, arg: unknown): boolean {
 
 const MODELS: ReadonlySet<string> = new Set(Object.values(FAMILY_MODELS).flat());
 
+/**
+ * A family that must not be on D1 unless another one already is. `payments` (claims, receipts) is confirmed inside the
+ * billing ledger flow: with the claim on D1 and the ledger still on Postgres, a Postgres rollback would leave a claim
+ * `confirmed` against an event that does not exist. The copy script refuses the same order; this makes the code refuse it
+ * too (fail closed, retryable 503) if the markers are ever set out of order by hand.
+ */
+export const FAMILY_REQUIRES: Partial<Record<PlatformFamily, PlatformFamily>> = {
+  payments: 'billing',
+};
+async function assertFamilyOrder(family: PlatformFamily): Promise<void> {
+  const need = FAMILY_REQUIRES[family];
+  if (need && !(await platformFamilyOnD1(need)))
+    throw new AppError(
+      503,
+      'PLATFORM_FAMILY_ORDER',
+      `${family} is on D1 but ${need} is not: refusing to serve a split money flow`,
+      { retryable: true, family }
+    );
+}
+
 export const platformRouter: ModelRouter = {
   models: MODELS,
   async route(model, method, args, postgres) {
@@ -79,6 +101,7 @@ export const platformRouter: ModelRouter = {
           'ebda.vat: only a super_admin may change the platform VAT setting'
         );
     }
+    await assertFamilyOrder(family);
     const client = await requirePlatformDb();
     const result = await (client[model] as Record<string, (...a: unknown[]) => Promise<unknown>>)[
       method

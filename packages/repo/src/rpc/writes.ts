@@ -91,6 +91,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'CatalogImportItem',
   'CiHintLog',
   'CiStoreGate',
+  // the per-store audit trail (NEON-ZERO N-10d): appended by services/audit-sink.ts, which only ever `create`s
+  'AuditLog',
   // per-store analytics (Ruling NZ-AN-1): the gsc ingest upserts and the notification log write through the generic path; the counters use the analytics ops
   'SearchQueryDaily',
   'ProductDailyView',
@@ -120,7 +122,36 @@ const WRITE_GUARD: WriteGuard = { writable: DO_WRITABLE_MODELS, stock: STOCK_COL
 export const PROC_MODEL = '$proc';
 const KEY = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 type Proc = (sql: SqlRunner, args: Record<string, unknown>) => unknown;
+export const AUDIT_MIN_PURGE_AGE_MS = 30 * 86_400_000;
 export const DO_PROCS: Record<string, Proc> = {
+  /** Replace the `details` JSON of ONE audit row of this store (the MCP denial-count flush). Returns rows changed. */
+  auditSetDetails(sql, a) {
+    const { id, storeId, details } = a as { id: unknown; storeId: unknown; details: unknown };
+    if (typeof id !== 'string' || !id) throw procErr('id');
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (!details || typeof details !== 'object' || Array.isArray(details)) throw procErr('details');
+    const json = JSON.stringify(details);
+    if (json.length > 16_384) throw procErr('details');
+    sql.run('UPDATE audit_logs SET details = ? WHERE id = ? AND store_id = ?', [json, id, storeId]);
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /** Retention: delete rows older than `before` (epoch ms, at least 30 days ago) up to and including `upToId`. */
+  auditPurge(sql, a) {
+    const { before, upToId } = a as { before: unknown; upToId: unknown };
+    if (typeof before !== 'number' || !Number.isFinite(before)) throw procErr('before');
+    if (before > Date.now() - AUDIT_MIN_PURGE_AGE_MS)
+      throw procErr('before (younger than 30 days)');
+    if (typeof upToId !== 'string') throw procErr('upToId');
+    sql.run('DELETE FROM audit_logs WHERE created_at < ? AND id <= ?', [before, upToId]);
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /** Erasure: null `user_id` on every audit row of one user (the row stays, the person goes). */
+  auditUnlinkUser(sql, a) {
+    const { userId } = a as { userId: unknown };
+    if (typeof userId !== 'string' || !userId) throw procErr('userId');
+    sql.run('UPDATE audit_logs SET user_id = NULL WHERE user_id = ?', [userId]);
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
   /**
    * products.ai_field_sources: merge `set` (field -> 'ai'|'human') into the row AS IT IS NOW and drop `remove`, so a stamp
    * another writer committed on a different key survives (review N1). Returns the merged map, or null when no such row.
@@ -278,6 +309,13 @@ export function checkMutation(m: DoMutation): DoQueryResult | undefined {
     if (!isWrite(q.op)) return refuse('OP_NOT_ALLOWED', `op ${String(q.op)}`);
     if (!DO_WRITABLE_MODELS.has(q.model))
       return refuse('MODEL_NOT_WRITABLE', `${q.model} is not ported to the StoreDO write path`);
+    // the audit trail is APPEND-ONLY on the generic path: `create` and nothing else. The three narrow edits it needs
+    // (count flush, retention purge, erasure unlink) are named procedures below (NEON-ZERO N-10d security review).
+    if (q.model === 'AuditLog' && q.op !== 'create')
+      return refuse(
+        'AUDIT_APPEND_ONLY',
+        `AuditLog.${String(q.op)} is not allowed on the generic write path`
+      );
     const a = (q.args ?? {}) as Record<string, unknown>;
     // only the VALUES a write stores are checked (a `where: { inventory: 0 }` filter is a read of stock, not a write)
     if ([a.data, a.create, a.update].some(v => touchesStock(q.model, v)))

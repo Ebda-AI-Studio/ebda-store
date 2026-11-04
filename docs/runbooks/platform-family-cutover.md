@@ -12,6 +12,10 @@ NEON-ZERO-1 item N-10. Run by the CONTROLLER (this repo never holds production c
 | `platform` | system_settings, store_features, legal_acceptances, legal_notice_sends, legal_notice_deliveries, provider_verifications, provider_verification_events, provider_activation_requests, merchant_api_keys, SlugRedirect | N-10b; run AFTER `billing` (system_settings carries the markers)       |
 | `inbox`    | webhook_events                                                                                                                                                                                                       | N-10b; callbacks are recorded into D1 during the freeze, never refused |
 
+| `payments` | instapay_receipts, manual_payment_claims | N-10d, MONEY; run AFTER `billing` (the script and the router refuse otherwise). Order receipts of DO stores are not copied: pass `--accept-skipped-do-receipts <count the dry run prints>` |
+| `ops` | answer_engine_provider_configs, store_usage_snapshots, ci_insights | N-10d; no money coupling |
+| `audit` | Postgres `audit_logs` rows with no store -> D1 `platform_audit_log` | N-10d; NEVER refuses a write: the freeze only redirects new store-less rows to D1 (see below) |
+
 Each family: `node scripts/cf/cutover-platform-family.mjs --family <name> --d1 ebda-platform --d1-target remote --d1-config apps/api/wrangler.jsonc --pg-url "$CUTOVER_PG_URL"` (dry run), then the same plus `--commit`. One family at a time; `--status` shows marker and freeze.
 
 ## How the switch works
@@ -70,6 +74,18 @@ to D1 after the flip are not in Postgres. After real traffic the answer is forwa
 - Scripts or consoles that read or write `store_subscriptions` / `billing_*` / `plans` in Postgres after the flip read stale data. Use D1.
 - No row-level security on these tables after the flip (Ruling NZ-10-4): every query keeps its `storeId` filter.
 - The Neon dump keeps a frozen copy of these tables; D1 export + Time Travel (backup sweep) is the live backup.
+
+## The `audit` family (N-10d)
+
+`--family audit` has its own flow. There is no write freeze: from the moment it starts, new store-less audit rows are written to D1 (the sink reads `platform_freeze.audit` as "new home"), so no audit write is ever refused or lost. It then drains (45 s), copies EVERY Postgres store-less `audit_logs` row into `platform_audit_log` (upsert by id), verifies the rows older than the start instant by count + digest, writes `platform_cutover.audit`, settles, lifts the redirect and re-counts Postgres on a new connection (exit 2 = a write bypassed the sink). Before the flip it also re-imports every Postgres audit row of each DO store into its StoreDO (`POST /cutover/stores/<id>/__auditimport`, the one write a sealed store accepts: INSERT OR IGNORE by id, so a re-run is safe) and verifies per store that the DO holds every row; needs `--do-url` and `CUTOVER_IMPORT_SECRET`. Prod measure 2026-11-04: 48 such rows, all for one store. Stores on their DO write their audit rows to the StoreDO from the deploy of this code (no marker): they were already READ from the DO.
+
+Audit writes that fail are retried through the jobs queue (`audit-write-retry`); a dead letter is parked at R2 `audit-dead-letter/<id>.json` and pages P1. After the flip the audit viewer reads D1 (`GET /admin/audit-logs?storeId=` for one DO store).
+
+## `payments` order of operations
+
+`billing` first (marker present), then `payments`. During the `payments` freeze a claim or receipt write answers the same retryable 503; reads keep working. After the flip a manual payment confirms its claim and approves its receipt in D1 after the ledger row (idempotent on the event id).
+
+After the `payments` flip the cron `payments-reconcile` (every 15 minutes) repairs half-done manual payments: a submitted receipt without a claim is linked to the claim that holds its reference or rolled back to draft; a pending claim whose payment is already in the ledger is confirmed and its receipt approved. Anything else (for example a confirmed claim with no ledger event) pages P1 and is left untouched.
 
 ## Family `access` (store membership: `store_staff`, `staff_invites`)
 
