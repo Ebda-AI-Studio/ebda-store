@@ -3,6 +3,7 @@ import { imagesBinding, type ImagesBindingLike } from '../lib/images/icon-resize
 import { renderVariants, TRANSFORMATIONS_PER_IMAGE } from '../lib/images/variants';
 import { canHaveVariants } from '@ebda/shared';
 import { StorageService } from './storage.service';
+import { fetchWithTimeout } from '../lib/fetch-timeout';
 
 const DEADLINE_MS = 15_000;
 
@@ -72,7 +73,7 @@ export async function backfillImageVariants(opts: {
       continue;
     }
     try {
-      const res = await fetch(item.url);
+      const res = await fetchWithTimeout(item.url);
       if (!res.ok) throw new Error(`fetch ${res.status}`);
       const n = await generateImageVariants(item.key, Buffer.from(await res.arrayBuffer()));
       if (n > 0) generated++;
