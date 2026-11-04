@@ -11,6 +11,7 @@ import {
   markImported,
   initializeCustomerPoints,
   listMembers,
+  loadLoyaltyConfig,
   listStoreTransactions,
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
@@ -440,8 +441,14 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     }),
   loyaltyImportState: (db, _storeId, a) =>
     importState(db, { customerId: typeof a.customerId === 'string' ? a.customerId : undefined }),
-  loyaltyMarkImported: (db, _storeId, a) =>
-    markImported(db, { customerId: typeof a.customerId === 'string' ? a.customerId : undefined }),
+  // never records anything for a store without loyalty config (nothing was imported, nothing may be created)
+  loyaltyMarkImported: (db, storeId, a) => {
+    const cfg = loadLoyaltyConfig(db, storeId);
+    if (!cfg || !cfg.enabled) return { done: false };
+    return markImported(db, {
+      customerId: typeof a.customerId === 'string' ? a.customerId : undefined,
+    });
+  },
   /**
    * OrderService.create (Ruling CF-ORDERS-1): stock reserve, hold cap, coupon limit, loyalty redeem, wallet debit and the
    * order rows are ONE section. The caller never supplies `storeId` (bound by the DO) nor `now` (the DO clock).

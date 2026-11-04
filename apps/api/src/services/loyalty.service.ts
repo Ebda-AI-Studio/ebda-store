@@ -183,6 +183,8 @@ const doPointsRow = (r: DoLoyaltyPointsRow) => ({
 
 /** Per isolate: customers / stores whose Postgres history this isolate already saw imported (the DO flag is the truth). */
 const importedSeen = new Set<string>();
+/** Per-request time the store-wide import may spend (the Worker limit is 30 s). */
+const IMPORT_BUDGET_MS = 15_000;
 
 export class LoyaltyService {
   /**
@@ -190,6 +192,12 @@ export class LoyaltyService {
    * review bonuses, manual awards, pre-cutover rows) is imported into the DO ledger, in the DO's own section, idempotently
    * (semantic dedupe in `importLedgerRows`). There is no window in which the DO answers for a customer whose history it lacks,
    * and no deploy ordering: the first touch does it. A flag on the DO makes later touches one cheap read.
+   *
+   * Scope: the customer must be a customer account of THIS store (SEC-CUSTOMER-SCOPE-1, `assertStoreCustomer`, 404
+   * CUSTOMER_NOT_FOUND) before anything is read from Postgres or sent to the DO, so every caller (admin routes, storefront
+   * self paths, the order create) is covered here and not call site by call site. A READ never makes a member: with no
+   * Postgres rows only the done flag is written, and a store whose loyalty is off (no config row, or switched off) is left
+   * untouched and not flagged.
    */
   static async ensureDoHistory(
     storeId: string,
@@ -200,6 +208,7 @@ export class LoyaltyService {
     if (importedSeen.has(key)) return;
     const m = money ?? (await storeMoney(storeId));
     if (!m) return;
+    await assertStoreCustomer(storeId, customerId);
     if ((await m.loyaltyImportState({ customerId })).done) {
       importedSeen.add(key);
       return;
@@ -217,9 +226,15 @@ export class LoyaltyService {
         createdAt: true,
       },
     });
-    const batches = Math.max(1, Math.ceil(rows.length / 500));
+    if (rows.length === 0) {
+      // nothing to import: only the flag (a no-op on a store without loyalty config); NO points row is created
+      if ((await m.loyaltyMarkImported({ customerId })).done) importedSeen.add(key);
+      return;
+    }
+    const batches = Math.ceil(rows.length / 500);
+    let imported = true;
     for (let i = 0; i < batches; i++) {
-      await m.loyaltyImport({
+      const r = await m.loyaltyImport({
         customerId,
         markDone: i === batches - 1,
         rows: rows.slice(i * 500, (i + 1) * 500).map(t => ({
@@ -232,11 +247,20 @@ export class LoyaltyService {
           createdAt: t.createdAt.getTime(),
         })),
       });
+      if (r.disabled) imported = false;
     }
-    importedSeen.add(key);
+    if (imported) importedSeen.add(key);
   }
 
-  /** The same for a store-wide read (members, stats, the transaction log): every customer with Postgres history. */
+  /**
+   * The same for a store-wide read (members, stats, the transaction log): every customer with Postgres history.
+   *
+   * Bounded: each customer is flagged on the DO when done, so progress survives across requests. A request works for at most
+   * IMPORT_BUDGET_MS (15 s, under the Worker's 30 s); if the store has more customers than that allows it answers
+   * 503 LOYALTY_IMPORT_IN_PROGRESS (retry) and the next request continues where the flags stop. ESTIMATE, not measured: about
+   * 4 round trips per customer at ~5 ms is ~20 ms, so one request moves ~700 customers; a pre-launch store has a few.
+   * A stray row (a user who is not this store's customer, e.g. from before SEC-CUSTOMER-SCOPE-1) is skipped, never imported.
+   */
   static async ensureDoStoreHistory(storeId: string, money: MoneyClient): Promise<void> {
     const key = `${storeId}:*`;
     if (importedSeen.has(key)) return;
@@ -248,10 +272,29 @@ export class LoyaltyService {
       where: { storeId },
       distinct: ['customerId'],
       select: { customerId: true },
+      orderBy: { customerId: 'asc' },
     });
-    for (const c of customers) await LoyaltyService.ensureDoHistory(storeId, c.customerId, money);
-    await money.loyaltyMarkImported({});
-    importedSeen.add(key);
+    const deadline = Date.now() + IMPORT_BUDGET_MS;
+    for (const c of customers) {
+      if (Date.now() > deadline)
+        throw new AppError(
+          503,
+          'LOYALTY_IMPORT_IN_PROGRESS',
+          'Loyalty history is being moved to the new ledger. Try again in a few seconds.',
+          {
+            retryAfterSeconds: 5,
+            messageAr: 'بنحوّل سجل النقاط للنظام الجديد، جرّب تاني كمان ثواني',
+            messageEn: 'Loyalty history is being moved. Try again in a few seconds.',
+          }
+        );
+      try {
+        await LoyaltyService.ensureDoHistory(storeId, c.customerId, money);
+      } catch (err) {
+        if (err instanceof AppError && err.code === 'CUSTOMER_NOT_FOUND') continue;
+        throw err;
+      }
+    }
+    if ((await money.loyaltyMarkImported({})).done) importedSeen.add(key);
   }
 
   /**

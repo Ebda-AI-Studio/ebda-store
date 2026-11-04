@@ -984,6 +984,7 @@ export function importState(db: SyncSql, a: { customerId?: string }): { done: bo
 
 /** Record that a customer's (or the whole store's) Postgres history is in the DO. */
 export function markImported(db: SyncSql, a: { customerId?: string }): { done: true } {
+  // (callers inside importLedgerRows already hold a config; the op door below re-checks it)
   const name = a.customerId ? `loyalty_import:${a.customerId}` : 'loyalty_import_store';
   db.run(
     'INSERT INTO do_flags (name, value) VALUES (?, 1) ON CONFLICT (name) DO UPDATE SET value = 1',
@@ -1017,7 +1018,7 @@ export function importLedgerRows(
     markDone?: boolean;
     now?: number;
   }
-): { inserted: number; skipped: number; newBalance: number } {
+): { inserted: number; skipped: number; newBalance: number; disabled?: true } {
   requireId(a.storeId, 'storeId');
   requireId(a.customerId, 'customerId');
   if (!Array.isArray(a.rows) || a.rows.length > 500)
@@ -1025,9 +1026,11 @@ export function importLedgerRows(
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
     const cfg = loadLoyaltyConfig(db, a.storeId);
-    // history is imported even for a store whose loyalty is off (no config row): tiers then use the defaults
-    const settings = cfg?.settings ?? DEFAULT_LOYALTY_SETTINGS;
-    ensurePointsRow(db, a.storeId, a.customerId, now);
+    // An import never creates or enables anything by itself: a store with no config row, or with loyalty switched off, is
+    // left untouched (and NOT marked imported, so the first touch after it is switched on does the import).
+    if (!cfg || !cfg.enabled) return { inserted: 0, skipped: 0, newBalance: 0, disabled: true };
+    const settings = cfg.settings;
+    let rowEnsured = false;
     let inserted = 0;
     let skipped = 0;
     let dPoints = 0;
@@ -1047,6 +1050,11 @@ export function importLedgerRows(
           r.orderId,
           a.storeId,
         ])[0];
+      // a points row appears only when at least one ledger row is really inserted (a read must never make a member)
+      if (!rowEnsured) {
+        ensurePointsRow(db, a.storeId, a.customerId, now);
+        rowEnsured = true;
+      }
       db.run(
         `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1071,6 +1079,14 @@ export function importLedgerRows(
         if (!tagged && r.points > 0) dEarned += r.points;
         if (!tagged && r.points < 0) dRedeemed += -r.points;
       }
+    }
+    if (inserted === 0) {
+      if (a.markDone) markImported(db, { customerId: a.customerId });
+      const cur = db.all(
+        'SELECT points FROM loyalty_points WHERE store_id = ? AND customer_id = ?',
+        [a.storeId, a.customerId]
+      )[0];
+      return { inserted, skipped, newBalance: (cur?.points as number | undefined) ?? 0 };
     }
     const lp = db.all(
       'SELECT total_earned FROM loyalty_points WHERE store_id = ? AND customer_id = ?',

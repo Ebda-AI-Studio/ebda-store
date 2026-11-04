@@ -105,12 +105,70 @@ describe('LoyaltyService.ensureDoHistory (FP-2: no DO answer without the custome
     expect(money.loyaltyImport).not.toHaveBeenCalled();
   });
 
-  it('a customer with no Postgres rows still gets the done flag', async () => {
+  it('a customer with no Postgres rows gets ONLY the done flag: no import call, so no points row is created by a read', async () => {
     findMany.mockResolvedValue([]);
+    (money as any).loyaltyMarkImported = vi.fn(async () => ({ done: true }));
     await LoyaltyService.ensureDoHistory('s-lazy', 'c-empty', money as never);
-    expect(money.loyaltyImport).toHaveBeenCalledWith(
-      expect.objectContaining({ customerId: 'c-empty', rows: [], markDone: true })
+    expect(money.loyaltyImport).not.toHaveBeenCalled();
+    expect((money as any).loyaltyMarkImported).toHaveBeenCalledWith({ customerId: 'c-empty' });
+  });
+
+  it('a customer who is not this store customer is refused before anything is read or sent', async () => {
+    const { assertStoreCustomer } = await import('@api/lib/store-customer');
+    (assertStoreCustomer as any).mockRejectedValueOnce(
+      Object.assign(new Error('x'), { code: 'CUSTOMER_NOT_FOUND', statusCode: 404 })
     );
+    await expect(
+      LoyaltyService.ensureDoHistory('s-lazy', 'c-stranger', money as never)
+    ).rejects.toMatchObject({ code: 'CUSTOMER_NOT_FOUND' });
+    expect(findMany).not.toHaveBeenCalled();
+    expect(money.loyaltyImport).not.toHaveBeenCalled();
+  });
+
+  it('a store whose loyalty is off (import answers disabled) is not cached as imported', async () => {
+    (money.loyaltyImport as any).mockResolvedValue({
+      inserted: 0,
+      skipped: 0,
+      newBalance: 0,
+      disabled: true,
+    });
+    await LoyaltyService.ensureDoHistory('s-off', 'c-off', money as never);
+    await LoyaltyService.ensureDoHistory('s-off', 'c-off', money as never);
+    expect(money.loyaltyImport).toHaveBeenCalledTimes(2); // retried on the next touch, nothing remembered
+  });
+
+  it('the store-wide import skips a stray (non-customer) row and answers 503 when the time budget is spent', async () => {
+    findMany.mockReset();
+    findMany
+      .mockResolvedValueOnce([{ customerId: 'stray' }, { customerId: 'ok' }]) // distinct customers
+      .mockResolvedValue([t('a', 'ok', 5)]); // the ok customer's rows
+    const { assertStoreCustomer } = await import('@api/lib/store-customer');
+    (assertStoreCustomer as any).mockImplementation(async (_s: string, c: string) => {
+      if (c === 'stray') throw Object.assign(new Error('x'), { code: 'CUSTOMER_NOT_FOUND' });
+    });
+    (money as any).loyaltyMarkImported = vi.fn(async () => ({ done: true }));
+    // AppError instance needed by the catch: use the real class through the service's own import
+    const { AppError } = await import('@api/middleware/error-handler');
+    (assertStoreCustomer as any).mockImplementation(async (_s: string, c: string) => {
+      if (c === 'stray') throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'x');
+    });
+    await LoyaltyService.ensureDoStoreHistory('s-store', money as never);
+    expect(money.loyaltyImport).toHaveBeenCalledTimes(1);
+    expect(money.loyaltyImport).toHaveBeenCalledWith(expect.objectContaining({ customerId: 'ok' }));
+
+    // budget spent: the very first customer check trips the deadline
+    const spy = vi.spyOn(Date, 'now');
+    spy.mockReturnValueOnce(0).mockReturnValue(10 * 60_000);
+    findMany.mockReset();
+    findMany.mockResolvedValueOnce([{ customerId: 'a' }, { customerId: 'b' }]);
+    await expect(
+      LoyaltyService.ensureDoStoreHistory('s-big', money as never)
+    ).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'LOYALTY_IMPORT_IN_PROGRESS',
+    });
+    spy.mockRestore();
+    (assertStoreCustomer as any).mockReset();
   });
 
   it('getCustomerPoints imports first, then reads', async () => {

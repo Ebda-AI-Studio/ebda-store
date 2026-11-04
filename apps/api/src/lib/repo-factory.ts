@@ -459,7 +459,7 @@ export interface MoneyClient {
     total: number;
   }>;
   loyaltyImportState(a: { customerId?: string }): Promise<{ done: boolean }>;
-  loyaltyMarkImported(a: { customerId?: string }): Promise<{ done: true }>;
+  loyaltyMarkImported(a: { customerId?: string }): Promise<{ done: boolean }>;
   loyaltyImport(a: {
     customerId: string;
     markDone?: boolean;
@@ -472,7 +472,7 @@ export interface MoneyClient {
       expiresAt?: number | null;
       createdAt: number;
     }>;
-  }): Promise<{ inserted: number; skipped: number; newBalance: number }>;
+  }): Promise<{ inserted: number; skipped: number; newBalance: number; disabled?: true }>;
   /** WalletService.applyEntry on the DO (Ruling WALLET-GL-1): ledger row + balance + GL in one section. */
   walletEntry(
     a: {

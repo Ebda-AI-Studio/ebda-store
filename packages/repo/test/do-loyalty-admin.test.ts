@@ -338,4 +338,56 @@ describe('loyalty on the DO: manual award, members, stats, history', () => {
     ).toBe('INSUFFICIENT_POINTS/409');
     expect(r2.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
   });
+
+  it('a READ never makes a member: an import with no rows creates no points row and a non-member stays joinable', () => {
+    const r = rig();
+    expect(r.op('loyaltyImport', { customerId: 'c1', rows: [], markDone: true })).toMatchObject({
+      inserted: 0,
+      newBalance: 0,
+    });
+    expect(r.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
+    expect(r.op('loyaltyImportState', { customerId: 'c1' })).toEqual({ done: true });
+    expect(r.op('loyaltyCustomerPoints', { customerId: 'c1', ...feature })).toBeNull();
+    // join still grants the signup bonus, once
+    expect(
+      r.op('loyaltyInit', { customerId: 'c1', giveSignupBonus: true, ...feature }).row.points
+    ).toBe(100);
+    expect(r.code('loyaltyInit', { customerId: 'c1', giveSignupBonus: true, ...feature })).toBe(
+      'ALREADY_EXISTS/400'
+    );
+  });
+
+  it('a duplicate-only import (nothing inserted) creates no points row either', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO loyalty_transactions (id, store_id, customer_id, type, points, created_at) VALUES ('x1','s1','c1','earn_manual',5,1000)`
+    );
+    const out = r.op('loyaltyImport', {
+      customerId: 'c1',
+      rows: [{ id: 'x1', type: 'earn_manual', points: 5, createdAt: 1000 }],
+    });
+    expect(out).toMatchObject({ inserted: 0, skipped: 1 });
+    expect(r.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
+  });
+
+  it('a store with loyalty off or no config row: import and mark create and flag nothing', () => {
+    const off = rig(0);
+    const rows = [{ id: 'p1', type: 'earn_manual', points: 5, createdAt: 1 }];
+    expect(off.op('loyaltyImport', { customerId: 'c1', rows, markDone: true })).toMatchObject({
+      inserted: 0,
+      disabled: true,
+    });
+    expect(off.op('loyaltyMarkImported', { customerId: 'c1' })).toEqual({ done: false });
+    expect(off.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
+    expect(off.q('SELECT count(*) AS n FROM loyalty_transactions')[0].n).toBe(0);
+    expect(off.op('loyaltyImportState', { customerId: 'c1' })).toEqual({ done: false });
+    const none = rig();
+    none.raw.exec('DELETE FROM store_config');
+    expect(none.op('loyaltyImport', { customerId: 'c1', rows, markDone: true })).toMatchObject({
+      disabled: true,
+    });
+    expect(
+      none.q('SELECT count(*) AS n FROM do_flags WHERE name LIKE ?', 'loyalty_import%')[0].n
+    ).toBe(0);
+  });
 });
