@@ -821,7 +821,7 @@ async function runInStoreTx<T>(storeId: string, fn: () => Promise<T>): Promise<T
  * `app.current_user_id`. Reuses the ambient transaction when it already carries
  * this user (and store, if one is given).
  */
-export function withUser<T>(
+export async function withUser<T>(
   userId: string,
   fn: (tx: TenantTx) => Promise<T>,
   storeId?: string
@@ -831,7 +831,22 @@ export function withUser<T>(
   if (ambient?.userId === userId && (storeId === undefined || ambient.storeId === storeId)) {
     return run();
   }
+  // NEON-ZERO (Ruling NZ-C-3): a user-keyed call with no store, once the platform families are on D1, uses the lazy user scope
+  // (a model the router answers never opens Postgres; any leftover Postgres call is its own short transaction).
+  if (
+    storeId === undefined &&
+    !tenantStorage.getStore() &&
+    userScopeNoPg &&
+    (await userScopeNoPg())
+  )
+    return runInUserScope(userId, run);
   return runInTenantContext(storeId, run, userId);
+}
+
+let userScopeNoPg: (() => Promise<boolean>) | undefined;
+/** Registered by the API at boot: true when user-keyed calls must not open a Postgres transaction. */
+export function setUserScopeNoPg(fn: (() => Promise<boolean>) | undefined): void {
+  userScopeNoPg = fn;
 }
 
 /**

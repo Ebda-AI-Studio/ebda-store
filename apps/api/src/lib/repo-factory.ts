@@ -32,6 +32,7 @@
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
+import { hubOnD1 } from './platform-hub';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import {
@@ -139,7 +140,9 @@ export type WritableModel =
   | 'bundleItem'
   | 'auditLog'
   | 'address'
-  | 'storeTaxProfile';
+  | 'storeTaxProfile'
+  | 'paymentConfig'
+  | 'shippingCarrierConfig';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -1675,9 +1678,11 @@ async function d1StoreWrite(
  */
 export async function syncStoreEntitlement(storeId: string): Promise<void> {
   const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
-  const row = (await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select })
-  )) as Record<string, unknown> | null;
+  const row = (
+    (await hubOnD1())
+      ? await (await storeDb(storeId)).store.findUnique({ where: { id: storeId }, select })
+      : await withStore(storeId, tx => tx.store.findUnique({ where: { id: storeId }, select }))
+  ) as Record<string, unknown> | null;
   if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(row))) === 0)
     throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found in the directory');
@@ -1736,6 +1741,10 @@ async function mirrorEntitlementToPg(
     ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
   );
   if (Object.keys(patch).length === 0) return;
+  // Ruling NZ-C-13: once the platform families are on D1, Postgres is no longer the entitlement source (D1 + the DO are); the
+  // copy would be a Postgres connection with Postgres dead. Cost if wrong: before Neon is removed, a hand repair that reads
+  // Postgres sees the pre-change entitlement; `syncStoreEntitlement` reads the DO record in that mode so no copy-back is stale.
+  if (await hubOnD1()) return;
   await withStore(storeId, async tx => {
     await (tx as unknown as StoreUpdateManyClient).store.updateMany({
       where: { id: storeId },

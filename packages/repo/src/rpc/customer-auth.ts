@@ -37,6 +37,7 @@ const SYNC_OPS = {
   setStatus: A.setStatus,
   profiles: A.profiles,
   newest: A.newest,
+  search: A.search,
   expiredDeleted: A.expiredDeleted,
   exportCustomer: A.exportCustomer,
   importRows: A.importRows,

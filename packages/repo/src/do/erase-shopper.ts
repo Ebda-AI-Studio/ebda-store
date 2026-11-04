@@ -211,6 +211,11 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
         [storeId, JSON.stringify(buyerKeys)]
       );
       flag(0);
+      // 3c. notification log rows (NZ-AN-1): `recipient_phone_hash` is the suite buyer key, so the shopper's own keys delete them.
+      db.run(
+        'DELETE FROM notification_logs WHERE store_id = ? AND recipient_phone_hash IN (SELECT value FROM json_each(?))',
+        [storeId, JSON.stringify(buyerKeys)]
+      );
     }
 
     // 4. orders keep money history, lose identity
@@ -228,7 +233,7 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
 
     // 6. pure-PII rows
     db.run('DELETE FROM addresses WHERE user_id = ?', [userId]);
-    db.run('DELETE FROM onesignal_subscriptions WHERE user_id = ?', [userId]);
+    // onesignal_subscriptions: admin/staff push devices live on the platform D1 (Ruling NZ-C-11); a shopper has none.
     db.run('DELETE FROM abandoned_carts WHERE store_id = ? AND customer_id = ?', [storeId, userId]);
     db.run('DELETE FROM carts WHERE store_id = ? AND customer_id = ?', [storeId, userId]);
     db.run('DELETE FROM wishlists WHERE store_id = ? AND user_id = ?', [storeId, userId]);

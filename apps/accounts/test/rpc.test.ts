@@ -41,6 +41,70 @@ describe('Accounts RPC for the Store', () => {
     await expect(rpc().setStatus(u.id, 'bogus' as never, 'x')).rejects.toThrow();
   });
 
+  it('updateProfile edits name / phone, clears a phone, keeps sessions, and never touches credentials', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    expect(
+      await rpc().updateProfile(u.id, {
+        firstName: ' Nour ',
+        lastName: 'Ali',
+        phone: '+201001112223',
+      })
+    ).toEqual({ ok: true });
+    expect(
+      await env.DB.prepare(`SELECT first_name, last_name, phone FROM users WHERE id = ?1`)
+        .bind(u.id)
+        .first()
+    ).toMatchObject({ first_name: 'Nour', last_name: 'Ali', phone: '+201001112223' });
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(200);
+    await rpc().updateProfile(u.id, { phone: null });
+    expect(
+      await env.DB.prepare(`SELECT phone FROM users WHERE id = ?1`).bind(u.id).first()
+    ).toMatchObject({ phone: null });
+    expect((await call('/login', { json: { email: u.email, password: u.password } })).status).toBe(
+      200
+    );
+    await expect(rpc().updateProfile(u.id, { role: 'super_admin' } as never)).rejects.toThrow();
+    await expect(rpc().updateProfile('not-a-uuid', { firstName: 'x' })).rejects.toThrow();
+  });
+
+  it('updateProfile changes the e-mail (case-folded), ends sessions, and reports a collision as a typed result', async () => {
+    const u = await seedUser();
+    const other = await seedUser({ email: 'taken@example.com' });
+    const s = await login(u);
+    expect(await rpc().updateProfile(u.id, { email: 'TAKEN@example.com' })).toEqual({
+      ok: false,
+      code: 'EMAIL_TAKEN',
+    });
+    expect(
+      await env.DB.prepare(`SELECT email FROM users WHERE id = ?1`).bind(u.id).first()
+    ).toMatchObject({ email: u.email });
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(200);
+    expect(await rpc().updateProfile(u.id, { email: 'New.Name@Example.com' })).toEqual({
+      ok: true,
+    });
+    expect(
+      await env.DB.prepare(`SELECT email FROM users WHERE id = ?1`).bind(u.id).first()
+    ).toMatchObject({ email: 'new.name@example.com' });
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
+    // the same e-mail as its own (case aside) is not a collision and not a change
+    expect(await rpc().updateProfile(other.id, { email: 'TAKEN@example.com' })).toEqual({
+      ok: true,
+    });
+  });
+
+  it('updateProfile refuses an unknown, erased or customer account', async () => {
+    const c = await seedUser({ role: 'customer' });
+    expect(await rpc().updateProfile(c.id, { firstName: 'x' })).toEqual({
+      ok: false,
+      code: 'NOT_FOUND',
+    });
+    expect(await rpc().updateProfile(crypto.randomUUID(), { firstName: 'x' })).toEqual({
+      ok: false,
+      code: 'NOT_FOUND',
+    });
+  });
+
   it('eraseUser removes the identity and every session with it; a stale token and cookie are dead; idempotent', async () => {
     const u = await seedUser();
     const s = await login(u);

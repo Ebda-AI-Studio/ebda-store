@@ -23,12 +23,33 @@
         "auditLog": 2
       }
     },
+    "apps/api/src/mcp/tools/order.tools.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 1
+      }
+    },
     "apps/api/src/routes/notification.routes.ts": {
       "kind": "pg-branch",
       "guardFile": "apps/api/src/lib/analytics-backend.ts",
       "reason": "NZ-AN-1: notification log list/count/stats. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
       "models": {
         "notificationLog": 4
+      }
+    },
+    "apps/api/src/routes/payment-settings.routes.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 7
+      }
+    },
+    "apps/api/src/routes/payment.routes.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 2
       }
     },
     "apps/api/src/services/abandoned-cart.service.ts": {
@@ -169,6 +190,20 @@
         "notificationEventConfig": 1
       }
     },
+    "apps/api/src/services/onboarding-instapay.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 1
+      }
+    },
+    "apps/api/src/services/onboarding.service.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 4
+      }
+    },
     "apps/api/src/services/order.service.ts": {
       "kind": "pg-branch",
       "reason": "create / rollbackForPaymentFailure / createAdminOrder: after `storeMoney()` early return (CF-ORDERS-1, CF-R4-2); the interactive-transaction body is the Postgres branch.",
@@ -183,11 +218,47 @@
         "bundleItem": 1
       }
     },
+    "apps/api/src/services/payment-providers/cod.provider.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 1
+      }
+    },
+    "apps/api/src/services/payment-providers/instapay.service.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 1
+      }
+    },
+    "apps/api/src/services/payment-providers/payment.factory.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 1
+      }
+    },
     "apps/api/src/services/product.service.ts": {
       "kind": "pg-branch",
       "reason": "update(): the `tx` body is the Postgres transaction path; a DO store takes updateOnDo (CF-WRITES-2).",
       "models": {
         "productCategory": 1
+      }
+    },
+    "apps/api/src/services/provider-verification.service.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "paymentConfig": 1,
+        "shippingCarrierConfig": 1
+      }
+    },
+    "apps/api/src/services/shipping-carrier.service.ts": {
+      "kind": "platform",
+      "reason": "UNPORTED provider-config flow (PaymentConfig/ShippingCarrierConfig became DO-writable only for the Test connection re-run): this site still reads or writes the Postgres row directly, so a DO store's config saved here is not what storeDb sees. Port it before the store is flipped to do.",
+      "models": {
+        "shippingCarrierConfig": 3
       }
     },
     "apps/api/src/services/sms-queue.service.ts": {

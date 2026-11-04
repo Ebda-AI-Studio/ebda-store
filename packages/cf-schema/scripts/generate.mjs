@@ -771,6 +771,8 @@ const ANALYTICS_STORE_TABLES = [
   'gsc_daily_metrics',
 ];
 const ANALYTICS_PLATFORM_TABLES = ['ai_usage'];
+// Ruling NZ-C-11: admin push devices (family ops), added after 0001 went live.
+const ONESIGNAL_PLATFORM_TABLES = ['onesignal_subscriptions'];
 const onlyTables = (db, names) => ({
   ...db,
   tables: db.tables.filter(t => names.includes(t.name)),
@@ -802,6 +804,10 @@ function main() {
     'migrations/platform/0005_ai_usage.sql': emitSql(
       onlyTables(out.d1, ANALYTICS_PLATFORM_TABLES),
       'D1 ai_usage (Ruling NZ-AN-1), for a D1 that already ran 0001'
+    ),
+    'migrations/platform/0006_onesignal_subscriptions.sql': emitSql(
+      onlyTables(out.d1, ONESIGNAL_PLATFORM_TABLES),
+      'D1 onesignal_subscriptions (Ruling NZ-C-11), for a D1 that already ran 0001'
     ),
     ...Object.fromEntries(
       Object.entries(LATE_COLUMN_MIGRATIONS).map(([n, name]) => [

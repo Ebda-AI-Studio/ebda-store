@@ -70,7 +70,13 @@ export const FAMILIES = {
   // run counts them and refuses --commit until --accept-skipped-do-receipts <that count> acknowledges the number.
   payments: ['instapay_receipts', 'manual_payment_claims'],
   // N-10d. Non-money platform tables.
-  ops: ['answer_engine_provider_configs', 'store_usage_snapshots', 'ci_insights'],
+  // NZ-C-11 adds the admin push devices (user-keyed, no store, no FK: users live in identity).
+  ops: [
+    'answer_engine_provider_configs',
+    'store_usage_snapshots',
+    'ci_insights',
+    'onesignal_subscriptions',
+  ],
   // N-10d. The audit trail: Postgres `audit_logs` rows with NO store -> D1 `platform_audit_log` (own flow below: `auditCutover`).
   audit: [],
 };

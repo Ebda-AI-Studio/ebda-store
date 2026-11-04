@@ -177,6 +177,68 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   }
 
   /**
+   * Edit the profile facts of a merchant / staff / super-admin account (a Store super-admin action). Only the fields passed
+   * change; `phone: null` clears it. The e-mail is one global, case-folded namespace: a collision returns
+   * `{ ok: false, code: 'EMAIL_TAKEN' }` and changes nothing. An e-mail change is a recovery-channel change, so it ends every
+   * session (like setRole). Customers are not reachable here (they live in their store). Credentials are never touched.
+   */
+  async updateProfile(
+    userId: string,
+    input: { firstName?: string; lastName?: string; phone?: string | null; email?: string },
+    reason = 'profile-update'
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'EMAIL_TAKEN' }> {
+    z.string().uuid().parse(userId);
+    const v = z
+      .object({
+        firstName: z.string().trim().min(1).max(100).optional(),
+        lastName: z.string().trim().min(1).max(100).optional(),
+        phone: z.string().trim().max(40).nullable().optional(),
+        email: z.string().trim().toLowerCase().email().max(254).optional(),
+      })
+      .strict()
+      .parse(input);
+    const cur = await this.env.DB.prepare(
+      `SELECT email FROM users WHERE id = ?1 AND role != 'customer' AND deleted_at IS NULL`
+    )
+      .bind(userId)
+      .first<{ email: string }>();
+    if (!cur) return { ok: false, code: 'NOT_FOUND' };
+    const emailChanged = v.email !== undefined && v.email !== cur.email.toLowerCase();
+    if (emailChanged) {
+      const taken = await this.env.DB.prepare(
+        `SELECT 1 AS n FROM users WHERE lower(email) = ?1 AND id != ?2 AND deleted_at IS NULL`
+      )
+        .bind(v.email, userId)
+        .first();
+      if (taken) return { ok: false, code: 'EMAIL_TAKEN' };
+    }
+    const sets: string[] = [];
+    const args: unknown[] = [];
+    const add = (col: string, val: unknown) => {
+      args.push(val);
+      sets.push(`${col} = ?${args.length + 1}`);
+    };
+    if (v.firstName !== undefined) add('first_name', v.firstName);
+    if (v.lastName !== undefined) add('last_name', v.lastName);
+    if (v.phone !== undefined) add('phone', v.phone === null || v.phone === '' ? null : v.phone);
+    if (emailChanged) add('email', v.email);
+    if (sets.length === 0) return { ok: true };
+    add('updated_at', new Date().toISOString());
+    try {
+      await this.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?1`)
+        .bind(userId, ...args)
+        .run();
+    } catch (e) {
+      // the unique index users_email_lower caught a race the pre-check could not
+      if (/UNIQUE|constraint/i.test(String((e as Error)?.message)))
+        return { ok: false, code: 'EMAIL_TAKEN' };
+      throw e;
+    }
+    if (emailChanged) await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+    return { ok: true };
+  }
+
+  /**
    * Delete an identity (erasure, hard delete). Idempotent. Sessions, refresh tokens, codes and passkeys go with it (foreign
    * keys), so no token or refresh cookie of this user can ever be honoured again, and the Store cannot re-create its profile
    * row from a deleted identity (it reconciles only from an identity that still exists).

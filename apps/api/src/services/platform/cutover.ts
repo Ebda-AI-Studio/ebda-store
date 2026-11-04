@@ -69,7 +69,8 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   // marker may already exist in production: adding models to a flipped family would serve them empty).
   payments: ['instapayReceipt', 'manualPaymentClaim'],
   // N-10d. Non-money platform tables: per-store monthly usage snapshots, platform CI findings, answer-engine provider keys.
-  ops: ['answerEngineProviderConfig', 'storeUsageSnapshot', 'ciInsight'],
+  // NZ-C-11: + oneSignalSubscription, the admin / staff / super_admin push devices (user-keyed, no store).
+  ops: ['answerEngineProviderConfig', 'storeUsageSnapshot', 'ciInsight', 'oneSignalSubscription'],
   // N-10d. The audit trail has no Prisma model on D1 (it is written through `services/audit-sink.ts`, never the router);
   // the marker only says "store-less audit rows go to D1 platform_audit_log and DO-store rows to their StoreDO".
   audit: [],

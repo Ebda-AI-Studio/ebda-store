@@ -372,7 +372,9 @@ class ShippingCarrierService {
     /** false: report only (a non-active mode's check must not replace the active proof). */
     persist = true
   ) {
-    const row = await prisma.shippingCarrierConfig.findUnique({
+    const row = await (
+      await storeDb(storeId)
+    ).shippingCarrierConfig.findUnique({
       where: { storeId_carrier: { storeId, carrier } },
     });
     if (!row) {
@@ -391,7 +393,9 @@ class ShippingCarrierService {
     );
     const latency = Date.now() - startedAt;
     if (persist) {
-      await prisma.shippingCarrierConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).shippingCarrierConfig.update({
         where: { id: row.id, storeId },
         data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
       });

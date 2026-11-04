@@ -11,8 +11,13 @@ vi.mock('@api/cf/bindings', () => ({ cfBindings: () => undefined }));
 const { withIdentityTimeout, IDENTITY_LIVE_TIMEOUT_MS } = await import('@api/lib/identity-timeout');
 const { accountStateCached, invalidateAccountState, resetLiveIdentityCache, LIVE_IDENTITY_TTL_MS } =
   await import('@api/lib/identity-live-cache');
-const { configureIdentityClient, setAccountStatus, setAccountRole, revokeIdentityUser } =
-  await import('@api/lib/identity-client');
+const {
+  configureIdentityClient,
+  setAccountStatus,
+  setAccountRole,
+  revokeIdentityUser,
+  updateIdentityProfile,
+} = await import('@api/lib/identity-client');
 
 beforeEach(() => resetLiveIdentityCache());
 afterEach(() => {
@@ -118,6 +123,7 @@ describe('the Store paths that change an account drop the cache (FP-4)', () => {
       (f: ReturnType<typeof fakeRpc>) => setAccountStatus('u1', 'suspended', 'r'),
     ],
     ['setAccountRole', () => setAccountRole('u1', 'staff', 'r')],
+    ['updateIdentityProfile', () => updateIdentityProfile('u1', { firstName: 'N' })],
     ['revokeIdentityUser', () => revokeIdentityUser('u1', 'r')],
   ])('%s invalidates, even when the call throws', async (_name, call) => {
     const rpc = fakeRpc();
@@ -140,6 +146,7 @@ function fakeRpc() {
   return Object.assign(state, {
     setStatus: maybe,
     setRole: maybe,
+    updateProfile: maybe,
     revokeUser: maybe,
   }) as never as {
     fail: boolean;

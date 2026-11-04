@@ -25,6 +25,9 @@ import {
   type PlatformFamily,
 } from './cutover';
 import { AppError } from '../../middleware/error-handler';
+import { storeRepo } from '../../lib/repo-factory';
+import { hubOnD1 } from '../../lib/platform-hub';
+import { d1All } from './billing-d1';
 
 const WRITES = new Set([
   'create',
@@ -61,7 +64,101 @@ function touchesPlatformVat(method: string, arg: unknown): boolean {
   return (method === 'updateMany' || method === 'deleteMany') && typeof a.where?.key !== 'string';
 }
 
-const MODELS: ReadonlySet<string> = new Set(Object.values(FAMILY_MODELS).flat());
+/**
+ * Ruling NZ-C-15: `prisma.store.<read>({ where: { id } })` for a store served by its Durable Object is answered by that DO (the
+ * Postgres `stores` row of a DO store is sealed and, once Postgres is gone, does not exist). ~190 service call sites read the
+ * store this way inside `withStore`; routing them here fixes the class instead of porting each. A Postgres store (and every
+ * call without a literal id, or a write) goes to Postgres exactly as before. A store with no directory row is Postgres until
+ * the platform families move, and `null` after (a real 404, never a Postgres connection). `include` of a relation the DO cannot
+ * join throws its own clear error. Cost if wrong: a caller that relied on a stale Postgres row of a DO store now reads the DO.
+ */
+const STORE_READS = new Set(['findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow']);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** D1 `stores` column of each Store field a by-owner list may select (anything else is refused loudly, never read from Postgres). */
+const OWNER_LIST_COLS: Record<string, string> = {
+  id: 'id',
+  name: 'name',
+  nameAr: 'name_ar',
+  slug: 'slug',
+  domain: 'domain',
+  status: 'status',
+  plan: 'plan',
+  ownerId: 'owner_id',
+  createdAt: 'created_at',
+  billingSuspendedReason: 'billing_suspended_reason',
+  isDemo: 'is_demo',
+};
+
+async function routeStoreOwnerList(method: string, args: unknown[]): Promise<unknown> {
+  const a = (args[0] ?? {}) as {
+    where?: { ownerId?: unknown; deletedAt?: unknown };
+    select?: Record<string, boolean>;
+    take?: number;
+  };
+  const owner = a.where?.ownerId;
+  if (typeof owner !== 'string' || a.where?.deletedAt !== null)
+    throw new AppError(501, 'STORE_READ_UNSUPPORTED', 'This store list is not served by D1');
+  if (method === 'count') {
+    const r = await d1All<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM stores WHERE owner_id = ?1 AND deleted_at IS NULL',
+      owner
+    );
+    return Number(r[0]?.n ?? 0);
+  }
+  const keys = Object.entries(a.select ?? { id: true })
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  const bad = keys.filter(k => !(k in OWNER_LIST_COLS));
+  if (bad.length)
+    throw new AppError(
+      501,
+      'STORE_READ_UNSUPPORTED',
+      `Store field(s) not served by D1: ${bad.join(', ')}`
+    );
+  const rows = await d1All<Record<string, unknown>>(
+    `SELECT ${keys.map(k => `${OWNER_LIST_COLS[k]} AS ${k}`).join(', ')} FROM stores WHERE owner_id = ?1 AND deleted_at IS NULL ORDER BY created_at ASC, id LIMIT ${Math.min(Math.max(a.take ?? 200, 1), 500)}`,
+    owner
+  );
+  return rows.map(r => {
+    const o: Record<string, unknown> = { ...r };
+    if ('createdAt' in o) o.createdAt = new Date(Number(o.createdAt));
+    if ('isDemo' in o) o.isDemo = Number(o.isDemo) === 1;
+    return o;
+  });
+}
+
+async function routeStoreRead(
+  method: string,
+  args: unknown[],
+  postgres: () => Promise<unknown>
+): Promise<unknown> {
+  // Before the platform families move, every Store read is Postgres exactly as before (callers such as the store delete test
+  // for the Postgres row's existence on purpose).
+  if (!(await hubOnD1())) return postgres();
+  if (method === 'findMany' || method === 'count') {
+    const w = (args[0] as { where?: { ownerId?: unknown } } | undefined)?.where;
+    return typeof w?.ownerId === 'string' ? routeStoreOwnerList(method, args) : postgres();
+  }
+  const id = (args[0] as { where?: { id?: unknown } } | undefined)?.where?.id;
+  if (!STORE_READS.has(method) || typeof id !== 'string' || !UUID.test(id)) return postgres();
+  let repo;
+  try {
+    repo = await storeRepo(id);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) {
+      if (method.endsWith('OrThrow')) throw err;
+      return null;
+    }
+    throw err;
+  }
+  if (repo.backend !== 'do') return postgres();
+  return (repo.db.store as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[
+    method
+  ](...args);
+}
+
+const MODELS: ReadonlySet<string> = new Set([...Object.values(FAMILY_MODELS).flat(), 'store']);
 
 /**
  * A family that must not be on D1 unless another one already is. `payments` (claims, receipts) is confirmed inside the
@@ -86,6 +183,7 @@ async function assertFamilyOrder(family: PlatformFamily): Promise<void> {
 export const platformRouter: ModelRouter = {
   models: MODELS,
   async route(model, method, args, postgres) {
+    if (model === 'store') return routeStoreRead(method, args, postgres);
     const family = familyOfModel(model);
     if (!family) return postgres();
     const onD1 = WRITES.has(method)

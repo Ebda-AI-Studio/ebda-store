@@ -16,6 +16,7 @@ import {
   revokeIdentityUser,
   setAccountRole,
   setAccountStatus,
+  updateIdentityProfile,
 } from '../lib/identity-client';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
@@ -100,6 +101,7 @@ import {
   hubOwnedStores,
   hubOwners,
   hubStorePage,
+  hubSearchCustomers,
   hubStoresById,
   hubUsers,
 } from '../lib/platform-hub';
@@ -1023,12 +1025,33 @@ router.get(
         );
         const pageRows = filtered ? kept.slice(skip, skip + limit) : kept;
         const total = filtered ? kept.length : ids.length;
+        // Customers live in their store's DO: a search (>= 3 chars) also fans out over the stores' customer directories.
+        const wantsCustomers =
+          typeof search === 'string' &&
+          search.trim().length >= 3 &&
+          (!role || role === 'all' || role === 'customer');
+        const customerSearch = wantsCustomers
+          ? await hubSearchCustomers(search as string)
+          : { hits: [], truncated: false };
         res.json({
           success: true,
           data: {
-            users: await hubUsers(pageRows),
-            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-            ...(truncated ? { truncated: true, cap: HUB_FANOUT_CAP } : {}),
+            users: [
+              ...(await hubUsers(role === 'customer' ? [] : pageRows)),
+              ...customerSearch.hits.map(c => ({
+                ...c,
+                stores: [{ id: c.storeId, name: c.storeName, slug: '' }],
+              })),
+            ],
+            pagination: {
+              page,
+              limit,
+              total: total + customerSearch.hits.length,
+              totalPages: Math.ceil((total + customerSearch.hits.length) / limit),
+            },
+            ...(truncated || customerSearch.truncated
+              ? { truncated: true, cap: HUB_FANOUT_CAP }
+              : {}),
           },
         });
         return;
@@ -1358,31 +1381,19 @@ router.put(
       // change a profile row the identity service ignores); status and role go to the identity service first.
       const identityManaged = existing.storeId === null && existing.role !== 'customer';
       if (
-        onHub &&
-        (data.firstName !== undefined || data.lastName !== undefined || data.phone !== undefined)
-      ) {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'MANAGED_BY_IDENTITY',
-            message:
-              'Name and phone of this account are managed by the sign-in service; only status and role can be changed here.',
-          },
-        });
-        return;
-      }
-      if (
         identityManaged &&
         (data.password ||
           data.role === 'customer' ||
-          (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
+          // with the hub on D1 the e-mail is edited through the identity service (`updateProfile`, below)
+          (!onHub && data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
       ) {
         res.status(409).json({
           success: false,
           error: {
             code: 'MANAGED_BY_IDENTITY',
-            message:
-              'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password and email.',
+            message: onHub
+              ? 'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password.'
+              : 'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password and email.',
           },
         });
         return;
@@ -1397,6 +1408,39 @@ router.put(
           },
         });
         return;
+      }
+      // Name, phone and e-mail of an identity-managed account are the identity service's rows: a collision is the same 409 as below.
+      if (
+        onHub &&
+        (data.firstName !== undefined ||
+          data.lastName !== undefined ||
+          data.phone !== undefined ||
+          (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
+      ) {
+        const r = await updateIdentityProfile(
+          id,
+          {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phone: data.phone,
+            email: data.email ? data.email.toLowerCase() : undefined,
+          },
+          'admin-update'
+        );
+        if (!r.ok) {
+          if (r.code === 'EMAIL_TAKEN') {
+            res.status(409).json({
+              success: false,
+              error: { code: 'EMAIL_TAKEN', message: 'Another user already has this email' },
+            });
+          } else {
+            res.status(404).json({
+              success: false,
+              error: { code: 'NOT_FOUND', message: 'User not found' },
+            });
+          }
+          return;
+        }
       }
       if (identityManaged && data.status !== undefined && data.status !== existing.status) {
         await setAccountStatus(id, data.status, 'admin-update');

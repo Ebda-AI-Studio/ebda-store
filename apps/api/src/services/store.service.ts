@@ -10,6 +10,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
+import { hubOnD1 } from '../lib/platform-hub';
 import {
   copyStoreSettings,
   storeDb,
@@ -869,11 +870,16 @@ export class StoreService {
     const wasOnDo = await storeWritesToDo(storeId);
     // N-18 (Ruling NZ-D14): a store created on D1 + its DO has NO Postgres row, so the Postgres phase (getById, the raw SQL deletes)
     // has nothing to act on and is skipped; only the DO close, the owner-family check (D1), and finishStoreDeletion apply.
-    const pgRow = wasOnDo
-      ? await withStore(storeId, tx =>
-          tx.store.findUnique({ where: { id: storeId }, select: { id: true } })
-        )
-      : true;
+    // Once the platform families are on D1 a DO store has no Postgres row by definition (Ruling NZ-C-15 routes Store reads to the DO,
+    // so the probe below would find the DO's record and wrongly take the Postgres delete path).
+    const pgRow =
+      wasOnDo && !(await hubOnD1())
+        ? await withStore(storeId, tx =>
+            tx.store.findUnique({ where: { id: storeId }, select: { id: true } })
+          )
+        : wasOnDo
+          ? null
+          : true;
     const doNative = wasOnDo && !pgRow;
     const store = doNative
       ? await (async () => {

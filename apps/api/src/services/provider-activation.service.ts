@@ -17,7 +17,7 @@ import {
   storeDirectory,
   withStore,
 } from '@ebda/database';
-import { storeDb, storeRepo } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { asOperator, platformHubOnD1 } from '../lib/platform-scope';
 import { listDirectoryStores } from './platform/directory-d1';
 import { gateRead } from './platform/access-d1';
@@ -321,34 +321,26 @@ export async function runTestForStore(
   const entry = getProviderEntry(provider);
   if (!entry || entry.manual)
     throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
-  if ((await storeRepo(storeId)).backend === 'do') {
-    // The connection test is stored on the provider's config row, and a Durable Object store's payment / carrier config is not a
-    // DO-writable model yet: refuse loudly rather than run a gateway call whose result cannot be recorded.
-    throw new AppError(
-      501,
-      'PROVIDER_TEST_UNSUPPORTED_ON_DO',
-      'Re-running the connection test is not available for this store yet'
-    );
-  }
   if (entry.kind === 'payments') {
-    const row = await withStore(storeId, () =>
-      prisma.paymentConfig.findFirst({ where: { provider, storeId } })
-    );
+    // the store's own backend (its Durable Object or Postgres): the result is recorded where the config row lives
+    const row = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({ where: { provider, storeId } });
     if (!row)
       throw new AppError(404, 'NOT_FOUND', 'The store has not saved credentials for this provider');
     // The gateway call holds no transaction: read, call, then a short write.
     const { result, stored } = await runConnectionTest(row);
-    await withStore(storeId, () =>
-      prisma.paymentConfig.update({
-        where: { id: row.id, storeId },
-        data: {
-          connectionTest: stored as unknown as Prisma.InputJsonValue,
-          healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',
-          lastHealthCheck: new Date(stored.at),
-          updatedBy: actor.userId,
-        },
-      })
-    );
+    await (
+      await storeWriter(storeId)
+    ).paymentConfig.update({
+      where: { id: row.id, storeId },
+      data: {
+        connectionTest: stored as unknown as Prisma.InputJsonValue,
+        healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',
+        lastHealthCheck: new Date(stored.at),
+        updatedBy: actor.userId,
+      },
+    });
     clearProviderCaches(storeId);
   } else {
     await runInStoreScope(storeId, () =>

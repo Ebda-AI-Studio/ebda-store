@@ -551,6 +551,29 @@ export function profiles(db: SyncSql, a: { ids: string[] }): Res<CustomerPublic[
   );
 }
 
+/**
+ * Super-admin customer search (Ruling NZ-C-12): not-deleted customers whose email or phone contains `q` (>= 3 chars, LIKE
+ * wildcards escaped), newest first, at most `limit` (<= 25). An exact email uses the unique index; the rest is a bounded scan
+ * of ONE store's customers, which the hub only runs inside its capped, pooled fan-out.
+ */
+export function search(db: SyncSql, a: { q: string; limit?: number }): Res<CustomerPublic[]> {
+  const q = String(a.q ?? '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 100);
+  if (q.length < 3) return ok([]);
+  const limit = Math.min(Math.max(1, (a.limit ?? 10) | 0), 25);
+  const like = `%${q.replace(/[\\%_]/g, m => `\\${m}`)}%`;
+  return ok(
+    db
+      .all(
+        `SELECT ${PUBLIC_COLS} FROM _cauth_users WHERE deleted_at IS NULL AND (email = ? OR lower(email) LIKE ? ESCAPE '\\' OR coalesce(phone, '') LIKE ? ESCAPE '\\') ORDER BY created_at DESC LIMIT ?`,
+        [q, like, like, limit]
+      )
+      .map(toPublic)
+  );
+}
+
 /** Newest registered, not-deleted customers (the admin "registered but never ordered" union), optionally within `ids`. */
 export function newest(db: SyncSql, a: { limit: number; ids?: string[] }): Res<CustomerPublic[]> {
   const limit = Math.min(Math.max(1, a.limit | 0), 5000);

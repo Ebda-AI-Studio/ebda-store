@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { inviteIdentity } from '../lib/identity-client';
 import { hubFanout, hubOnD1, hubOwners, hubStorePage } from '../lib/platform-hub';
 import bcrypt from 'bcryptjs';
 import {
@@ -193,18 +194,43 @@ export class ProvisioningService {
       // Postgres path. If the COMMIT itself fails after the store exists, the store is rolled back (below).
       let finished: string | undefined;
       try {
-        return await withMoneyTx(prisma, async tx => {
-          const owner = await ensureAdminUser(
-            {
-              email: ownerEmail,
-              passwordHash,
-              firstName: nameParts[0],
-              lastName: nameParts.slice(1).join(' ') || '',
-              role: 'store_admin',
-              emailVerified: false,
-            },
-            tx
-          );
+        // Ruling NZ-C-14: with the platform families on D1 the owner is found-or-created in the IDENTITY service (invite: the
+        // owner sets their own password from the mailed code; an existing account is used as is), with no Postgres transaction.
+        // The store create below rolls back through `rollbackDoStore` on any later failure, as before.
+        const hub = await hubOnD1();
+        const body = async (tx?: Prisma.TransactionClient) => {
+          const owner = hub
+            ? await (async () => {
+                const asked = crypto.randomUUID();
+                const r = await inviteIdentity({
+                  id: asked,
+                  email: ownerEmail.toLowerCase(),
+                  firstName: nameParts[0],
+                  lastName: nameParts.slice(1).join(' ') || '',
+                  role: 'store_admin',
+                  language: 'en',
+                });
+                return {
+                  id: r.id,
+                  created: r.created,
+                  role: 'store_admin',
+                  status: 'active',
+                  email: ownerEmail,
+                  firstName: nameParts[0],
+                  lastName: nameParts.slice(1).join(' ') || '',
+                };
+              })()
+            : await ensureAdminUser(
+                {
+                  email: ownerEmail,
+                  passwordHash,
+                  firstName: nameParts[0],
+                  lastName: nameParts.slice(1).join(' ') || '',
+                  role: 'store_admin',
+                  emailVerified: false,
+                },
+                tx!
+              );
           const { timezone: requestedZone, ...settingsRest } = settings ?? {};
           const id = await insertDoStore({
             name: storeName,
@@ -262,7 +288,8 @@ export class ProvisioningService {
             owner,
             isNewUser: owner.created,
           };
-        });
+        };
+        return hub ? await body() : await withMoneyTx(prisma, tx => body(tx));
       } catch (e) {
         if (finished) await rollbackDoStore(finished, 'owner-commit');
         throw e;
@@ -468,7 +495,8 @@ export class ProvisioningService {
       owner: {
         id: result.owner.id,
         email: result.owner.email,
-        temporaryPassword: result.isNewUser ? tempPassword : undefined,
+        temporaryPassword:
+          result.isNewUser && !(onDo && (await hubOnD1())) ? tempPassword : undefined,
       },
       urls: {
         storefront: storefrontOrigin({ slug: result.store.slug, domain }),

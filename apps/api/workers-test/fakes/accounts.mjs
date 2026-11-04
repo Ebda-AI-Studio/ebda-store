@@ -34,6 +34,9 @@ export default class FakeAccounts extends WorkerEntrypoint {
       createdAt: new Date(0).toISOString(),
     }));
   }
+  async inviteUser(input) {
+    return { id: input.id, created: true };
+  }
   async eraseUser() {
     return { erased: true, remaining: 0 };
   }
@@ -43,4 +46,7 @@ export default class FakeAccounts extends WorkerEntrypoint {
     return false;
   }
   async setStatus() {}
+  async updateProfile() {
+    return { ok: true };
+  }
 }

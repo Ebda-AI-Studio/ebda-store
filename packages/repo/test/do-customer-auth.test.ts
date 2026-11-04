@@ -400,3 +400,20 @@ describe('operator status change (setStatus) and directory reads', () => {
     expect(A.expiredDeleted(db, { before: T0 + 10, limit: 10 })).toMatchObject({ data: [] });
   });
 });
+
+describe('search (super-admin customer search, Ruling NZ-C-12)', () => {
+  it('matches email or phone, needs 3 characters, escapes wildcards, skips deleted', () => {
+    const db = fx();
+    reg(db, 'ana.hassan@x.com', 'u1', 'v1');
+    reg(db, 'omar@x.com', 'u2', 'v2');
+    const ids = (q: string) => {
+      const r = A.search(db, { q });
+      return r.ok ? r.data.map(c => c.id).sort() : [];
+    };
+    expect(ids('hassan')).toEqual(['u1']);
+    expect(ids('@x.com')).toEqual(['u1', 'u2']);
+    expect(ids('ab')).toEqual([]);
+    expect(ids('%%%')).toEqual([]);
+    expect(ids('_____')).toEqual([]);
+  });
+});

@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 132,
+      "tables": 131,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -45,7 +45,6 @@
         "notification_configs": 8,
         "notification_event_configs": 6,
         "push_subscriptions": 9,
-        "onesignal_subscriptions": 6,
         "notification_logs": 13,
         "abandoned_carts": 23,
         "abandoned_cart_configs": 16,
@@ -140,7 +139,7 @@
       }
     },
     "d1": {
-      "tables": 30,
+      "tables": 31,
       "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
@@ -152,6 +151,7 @@
         "legal_notice_sends": 6,
         "legal_notice_deliveries": 8,
         "store_features": 7,
+        "onesignal_subscriptions": 6,
         "ai_usage": 11,
         "store_usage_snapshots": 21,
         "ci_insights": 12,

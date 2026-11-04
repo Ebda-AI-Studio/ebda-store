@@ -7,7 +7,7 @@
  * creates the Postgres row first and syncs the directory after, and `withStore` there must keep working. An unreadable
  * flag (503) propagates: never a guess. Import once at boot (app.ts).
  */
-import { setHubStoreLister, setStoreScopeResolver } from '@ebda/database';
+import { setHubStoreLister, setStoreScopeResolver, setUserScopeNoPg } from '@ebda/database';
 import { hubFanoutStoreIds, hubOnD1 } from './platform-hub';
 import { backendFor } from './store-backend';
 import { AppError } from '../middleware/error-handler';
@@ -26,3 +26,4 @@ setStoreScopeResolver(resolveStoreScope);
 
 // The hub (user scope, no store) lists its stores from D1 once the platform families moved; otherwise undefined = the definer.
 setHubStoreLister(async () => ((await hubOnD1()) ? (await hubFanoutStoreIds()).ids : undefined));
+setUserScopeNoPg(() => hubOnD1());

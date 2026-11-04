@@ -49,6 +49,8 @@ const apiVars = {
   TAP_SECRET_KEY: 's',
   TAP_WEBHOOK_SECRET: 'dev-only-tap-webhook-secret',
   BUILD_COMMIT_SHA: 'test-sha',
+  // configured so the route sweep measures the routes, not the "not configured" 503 of the alert bridge
+  ALERTS_WEBHOOK_TOKEN: 'workers-test-alerts-token',
   WEB_URL: 'http://localhost:3000',
   ADMIN_URL: 'http://localhost:3001',
   API_URL: 'http://localhost:8787',

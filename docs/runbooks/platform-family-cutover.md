@@ -13,7 +13,7 @@ NEON-ZERO-1 item N-10. Run by the CONTROLLER (this repo never holds production c
 | `inbox`    | webhook_events                                                                                                                                                                                                       | N-10b; callbacks are recorded into D1 during the freeze, never refused |
 
 | `payments` | instapay_receipts, manual_payment_claims | N-10d, MONEY; run AFTER `billing` (the script and the router refuse otherwise). Order receipts of DO stores are not copied: pass `--accept-skipped-do-receipts <count the dry run prints>` |
-| `ops` | answer_engine_provider_configs, store_usage_snapshots, ci_insights | N-10d; no money coupling |
+| `ops` | answer_engine_provider_configs, store_usage_snapshots, ci_insights, onesignal_subscriptions | N-10d (+ onesignal_subscriptions, NZ-C-11: apply D1 migration `0006_onesignal_subscriptions.sql` first; if the `ops` marker is ALREADY set, copy this table by hand before relying on it, it reads empty until then); no money coupling |
 | `audit` | Postgres `audit_logs` rows with no store -> D1 `platform_audit_log` | N-10d; NEVER refuses a write: the freeze only redirects new store-less rows to D1 (see below) |
 
 Each family: `node scripts/cf/cutover-platform-family.mjs --family <name> --d1 ebda-platform --d1-target remote --d1-config apps/api/wrangler.jsonc --pg-url "$CUTOVER_PG_URL"` (dry run), then the same plus `--commit`. One family at a time; `--status` shows marker and freeze.

@@ -9083,7 +9083,7 @@
     },
     "OneSignalSubscription": {
       "table": "onesignal_subscriptions",
-      "db": "store-do",
+      "db": "d1",
       "pk": ["id"],
       "uniques": [["userId", "playerId"]],
       "fields": {
