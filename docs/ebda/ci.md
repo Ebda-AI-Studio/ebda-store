@@ -14,6 +14,13 @@ self-hosted label, `vars.USE_SELF_HOSTED` or `SCHEDULED_ON_CLOUD` reappears.
 > fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
 > feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
 
+## Per-PR runner routing (Ruling CI-ROUTE-1)
+
+A pull request labelled `ci-umbra` runs every job of every PR workflow on the Umbra runners; unlabelled PRs and all
+push/schedule events use `vars.EBDA_RUNS_ON` (unset = GitHub-hosted `ubuntu-24.04`). One PR never splits across runners, and
+the setup-node remote cache is used only when the job really runs hosted. Add the label before the push, or re-run the
+workflow after labelling (`labeled` is not a trigger, so label changes cost no minutes). If Umbra is down, remove the label.
+
 ## Lanes
 
 | Trigger                     | Runs                                                                                                                                                                                                                                          |

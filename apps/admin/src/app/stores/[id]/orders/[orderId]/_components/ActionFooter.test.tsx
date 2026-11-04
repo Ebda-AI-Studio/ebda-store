@@ -107,7 +107,7 @@ function renderFooter(
   canRefund = true,
   userRole?: 'super_admin' | 'store_admin' | 'customer' | 'staff'
 ) {
-  return render(
+  const view = render(
     <ActionFooter
       userRole={userRole}
       order={order}
@@ -119,6 +119,10 @@ function renderFooter(
       onPrintInvoice={() => {}}
     />
   );
+  // Cancel, refunds and the diagnostics live in the "..." menu (placement standard rule 7), so open it: every
+  // assertion below then checks the whole footer, menu included.
+  fireEvent.click(screen.getByLabelText('more'));
+  return view;
 }
 
 describe('ActionFooter — money-safety button visibility (renders the real DOM via jsdom)', () => {
@@ -316,6 +320,7 @@ describe('ActionFooter — InstaPay awaiting confirmation', () => {
     expect(screen.queryByText('markPaid')).toBeNull();
     expect(screen.queryByTestId('payment-link-button')).toBeNull();
     expect(screen.queryByTestId('refresh-payment-button')).toBeNull();
+    fireEvent.click(screen.getByLabelText('more'));
     // it can only be cancelled otherwise: never advanced to processing/shipped from here
     expect(screen.getByText('cancel')).toBeTruthy();
     expect(screen.queryByText('processing')).toBeNull();
@@ -365,5 +370,31 @@ describe('ActionFooter: refunds are owner-only', () => {
   it('Ebda super-admin gets no InstaPay refund record', () => {
     renderFooter(paidInstapay, () => {}, true, 'super_admin');
     expect(screen.queryByTestId('instapay-refund-button')).toBeNull();
+  });
+});
+
+describe('ActionFooter - cancel placement (UX:O-3)', () => {
+  it('Cancel is not in the main row beside the primary, only in the "..." menu, after a divider', () => {
+    const order = baseOrder({
+      status: 'confirmed',
+      paymentStatus: 'unpaid',
+      payments: [payment({ provider: 'cod', status: 'pending' })],
+    });
+    render(
+      <ActionFooter
+        order={order}
+        storeId="store-1"
+        isUpdating={false}
+        canRefund
+        onStatusChange={() => {}}
+        onMarkPaid={() => {}}
+        onPrintInvoice={() => {}}
+      />
+    );
+    expect(screen.queryByText('cancel')).toBeNull();
+    fireEvent.click(screen.getByLabelText('more'));
+    const items = screen.getAllByRole('menuitem');
+    expect(items[items.length - 1].textContent).toBe('cancel');
+    expect(screen.getByRole('separator')).toBeTruthy();
   });
 });
