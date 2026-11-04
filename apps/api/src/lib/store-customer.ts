@@ -1,5 +1,5 @@
 import type { Prisma } from '@ebda/database';
-import { prisma } from '@ebda/database';
+import { withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -25,9 +25,14 @@ export function storeCustomerWhere(storeId: string, customerId: string): Prisma.
 /** 404 CUSTOMER_NOT_FOUND unless `customerId` is a customer account of `storeId`. Same answer for "no such id", "staff id" and "other store". */
 export async function assertStoreCustomer(storeId: string, customerId: string): Promise<void> {
   if (!storeId || !customerId) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
-  const customer = await prisma.user.findFirst({
-    where: storeCustomerWhere(storeId, customerId),
-    select: { id: true },
-  });
+  // `users` is under RLS (ebda_tenant_isolation: store_id = app.current_store_id), so a caller with no ambient store scope
+  // (Inngest job, webhook) would see zero rows and get a false 404. withStore reuses the ambient tx when already scoped to
+  // this store and opens the scope otherwise.
+  const customer = await withStore(storeId, tx =>
+    tx.user.findFirst({
+      where: storeCustomerWhere(storeId, customerId),
+      select: { id: true },
+    })
+  );
   if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
 }

@@ -28,6 +28,7 @@ const db = vi.hoisted(() => ({
   users: [] as U[],
   lp: [] as LP[],
   tx: [] as unknown[],
+  scoped: null as string | null, // store the RLS GUC is set to (null = no ambient scope)
 }));
 
 const h = vi.hoisted(() => ({
@@ -39,8 +40,10 @@ vi.mock('@ebda/database', () => {
     Object.entries(w).every(([k, v]) => (u as unknown as Record<string, unknown>)[k] === v);
   const prisma = {
     user: {
+      // users is under RLS: no rows unless the store scope matches users.store_id.
       findFirst: async ({ where }: { where: Record<string, unknown> }) =>
-        db.users.find(u => matchUser(u, where)) ?? null,
+        db.users.find(u => db.scoped !== null && u.storeId === db.scoped && matchUser(u, where)) ??
+        null,
     },
     loyaltyPoints: {
       findUnique: async ({
@@ -80,8 +83,18 @@ vi.mock('@ebda/database', () => {
     Prisma: {},
     LoyaltyTransactionType: {},
     withMoneyTx: vi.fn(),
-    withStore: async (_s: string, fn: (tx: any) => unknown) =>
-      fn({ store: { findUnique: async () => ({ loyaltySettings: {} }) } }),
+    withStore: async (s: string, fn: (tx: any) => unknown) => {
+      const prev = db.scoped;
+      db.scoped = s; // reuses/opens the store scope like the real withStore
+      try {
+        return await fn({
+          ...prisma,
+          store: { findUnique: async () => ({ loyaltySettings: {} }) },
+        });
+      } finally {
+        db.scoped = prev;
+      }
+    },
   };
 });
 vi.mock('@api/services/feature.service', () => ({
@@ -107,6 +120,12 @@ beforeEach(() => {
 });
 
 describe('assertStoreCustomer', () => {
+  it('resolves with NO ambient store scope (job/webhook caller) by opening the scope itself', async () => {
+    expect(db.scoped).toBeNull();
+    await expect(assertStoreCustomer(STORE_A, CUST_A)).resolves.toBeUndefined();
+    expect(db.scoped).toBeNull();
+  });
+
   it('passes for a customer of the store', async () => {
     await expect(assertStoreCustomer(STORE_A, CUST_A)).resolves.toBeUndefined();
   });
