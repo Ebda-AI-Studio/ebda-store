@@ -32,6 +32,7 @@
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
+import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import {
@@ -77,6 +78,7 @@ export type StoreReads = {
 
 /** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
 export type WritableModel =
+  | 'paymentConfig'
   | 'product'
   | 'productVariant'
   | 'productOption'
@@ -1668,6 +1670,18 @@ async function d1StoreWrite(
  */
 export async function syncStoreEntitlement(storeId: string): Promise<void> {
   const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
+  if (await platformFamilyOnD1('access')) {
+    // D1 is the source: copy ITS current row to the Durable Object (nothing is read from Postgres, nothing is written to D1).
+    const d1Row = (await (
+      await requirePlatformDb()
+    ).store.findUnique({
+      where: { id: storeId },
+      select,
+    })) as Record<string, unknown> | null;
+    if (!d1Row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+    await copyStoreSettings(storeId, d1Row);
+    return;
+  }
   const row = (await withStore(storeId, tx =>
     tx.store.findUnique({ where: { id: storeId }, select })
   )) as Record<string, unknown> | null;
@@ -1729,6 +1743,8 @@ async function mirrorEntitlementToPg(
     ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
   );
   if (Object.keys(patch).length === 0) return;
+  // The access family is on D1: D1 `stores` IS the record of the entitlement fields, there is no Postgres copy to keep in step.
+  if (await platformFamilyOnD1('access')) return;
   await withStore(storeId, async tx => {
     await (tx as unknown as StoreUpdateManyClient).store.updateMany({
       where: { id: storeId },

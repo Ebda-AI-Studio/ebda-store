@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { prisma, Prisma } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
@@ -262,6 +263,7 @@ router.get(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -284,7 +286,9 @@ router.get(
       }
 
       // Get store-specific configs
-      const storeConfigs = await prisma.paymentConfig.findMany({
+      const storeConfigs = await (
+        await storeDb(storeId)
+      ).paymentConfig.findMany({
         where: { storeId },
         orderBy: { provider: 'asc' },
       });
@@ -337,6 +341,7 @@ router.post(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -357,7 +362,9 @@ router.post(
       }
 
       // Check if provider already exists for this store
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: data.provider,
           storeId,
@@ -374,7 +381,9 @@ router.post(
 
       // If setting as default, unset other defaults for this store
       if (data.isDefault) {
-        await prisma.paymentConfig.updateMany({
+        await (
+          await storeWriter(storeId)
+        ).paymentConfig.updateMany({
           where: { storeId, isDefault: true },
           data: { isDefault: false },
         });
@@ -395,7 +404,9 @@ router.post(
       // Encrypt credentials before storing
       const encryptedCreds = encryptCredentials(data);
 
-      const config = await prisma.paymentConfig.create({
+      const config = await (
+        await storeWriter(storeId)
+      ).paymentConfig.create({
         data: {
           storeId,
           provider: data.provider,
@@ -474,6 +485,7 @@ router.put(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -493,7 +505,9 @@ router.put(
         return;
       }
 
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: provider,
           storeId,
@@ -510,7 +524,9 @@ router.put(
 
       // If setting as default, unset other defaults for this store
       if (data.isDefault) {
-        await prisma.paymentConfig.updateMany({
+        await (
+          await storeWriter(storeId)
+        ).paymentConfig.updateMany({
           where: { storeId, isDefault: true, id: { not: existing.id } },
           data: { isDefault: false },
         });
@@ -573,7 +589,9 @@ router.put(
         );
       }
 
-      const config = await prisma.paymentConfig.update({
+      const config = await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: updateData,
       });
@@ -627,6 +645,7 @@ router.delete(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -646,7 +665,9 @@ router.delete(
         return;
       }
 
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: provider,
           storeId,
@@ -661,7 +682,9 @@ router.delete(
         return;
       }
 
-      await prisma.paymentConfig.delete({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.delete({
         where: { id: existing.id, storeId },
       });
 
@@ -710,6 +733,7 @@ router.post(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -729,7 +753,9 @@ router.post(
         return;
       }
 
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: provider,
           storeId,
@@ -752,7 +778,9 @@ router.post(
         throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
       }
 
-      const config = await prisma.paymentConfig.update({
+      const config = await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: {
           isEnabled: enabled,
@@ -801,7 +829,10 @@ const credentialUpdateSchema = z.object({
 
 /** Loads the store and repeats the inline ownership check the other store routes make. */
 async function loadOwnedStore(req: Request, storeId: string) {
-  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { id: true, ownerId: true },
+  });
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   const user = getAuthUser(req);
   if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
@@ -832,7 +863,9 @@ router.put(
       const entry = connectableEntry(provider);
       assertMayConfigure(provider, user.role);
 
-      const existing = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({ where: { provider, storeId } });
       const update = applyCredentialUpdate(entry, existing, {
         mode: body.mode,
         fields: body.fields,
@@ -850,8 +883,12 @@ router.put(
         updatedBy: user.userId,
       };
       const config = existing
-        ? await prisma.paymentConfig.update({ where: { id: existing.id, storeId }, data })
-        : await prisma.paymentConfig.create({
+        ? await (
+            await storeWriter(storeId)
+          ).paymentConfig.update({ where: { id: existing.id, storeId }, data })
+        : await (
+            await storeWriter(storeId)
+          ).paymentConfig.create({
             data: {
               ...data,
               storeId,
@@ -893,7 +930,9 @@ router.put(
         // Only the ACTIVE mode's proof is stored (the enable gate reads it); checking the other
         // mode just reports, so it can neither void a live proof nor mark a live gateway down.
         if ((body.mode === 'sandbox') === config.testMode) {
-          finalConfig = await prisma.paymentConfig.update({
+          finalConfig = await (
+            await storeWriter(storeId)
+          ).paymentConfig.update({
             where: { id: config.id, storeId },
             data: {
               connectionTest: stored as unknown as Prisma.InputJsonValue,
@@ -962,7 +1001,9 @@ router.post(
       const { user } = await loadOwnedStore(req, storeId);
       connectableEntry(provider);
       assertMayConfigure(provider, user.role);
-      const existing = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({ where: { provider, storeId } });
       if (!existing) {
         throw new AppError(404, 'NOT_FOUND', 'Save the credentials before testing the connection');
       }
@@ -971,7 +1012,9 @@ router.post(
       const latency = Date.now() - startedAt;
       await reportConnectionCheck({ storeId, provider, mode: stored.mode, code: result.code });
 
-      await prisma.paymentConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: {
           connectionTest: stored as unknown as Prisma.InputJsonValue,

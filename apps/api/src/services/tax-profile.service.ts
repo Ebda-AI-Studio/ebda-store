@@ -16,6 +16,8 @@ import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { storeUpdate } from '../lib/repo-factory';
+import { doStoreIdList } from '../lib/store-backend';
+import type { TaxReviewRow } from '../lib/definer';
 
 /**
  * Egypt VAT gate (ruling TAX-2): the merchant's VAT-registration profile and
@@ -145,6 +147,62 @@ async function loadOrCreate(storeId: string) {
     data: { storeId },
     select: { id: true, status: true },
   });
+}
+
+/**
+ * The super-admin review queue on a Worker (no Postgres definer): the profile of every store served by its Durable Object, read
+ * through the normal per-store path, bounded (REVIEW_QUEUE_STORES stores, 8 at a time). INTERIM: an indexed queue in D1 replaces
+ * the fan-out (docs/plans/2026-11-02-neon-zero.md, N-10d); it is correct and bounded now, not scalable to 100k stores.
+ */
+const REVIEW_QUEUE_STORES = 500;
+
+export async function taxReviewQueueFromStores(
+  adminUserId: string,
+  status: string | null
+): Promise<TaxReviewRow[]> {
+  const ids = (await doStoreIdList()).slice(0, REVIEW_QUEUE_STORES);
+  const names = new Map(
+    (
+      await prisma.store.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, slug: true },
+      })
+    ).map(s => [s.id, s])
+  );
+  const profiles: Array<{ id: string; p: TaxProfileView }> = [];
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: 8 }, async () => {
+      while (next < ids.length) {
+        const id = ids[next++]!;
+        const p = await withUser(adminUserId, () => TaxProfileService.get(id), id).catch(
+          () => null
+        );
+        if (p && (status ? p.status === status : p.status !== 'none')) profiles.push({ id, p });
+      }
+    })
+  );
+  const trnCount = new Map<string, number>();
+  for (const { p } of profiles)
+    if (p.taxRegistrationNumber && (p.status === 'pending' || p.status === 'verified'))
+      trnCount.set(p.taxRegistrationNumber, (trnCount.get(p.taxRegistrationNumber) ?? 0) + 1);
+  return profiles
+    .map(({ id, p }) => ({
+      storeId: id,
+      storeName: names.get(id)?.name ?? id,
+      storeSlug: names.get(id)?.slug ?? '',
+      status: p.status,
+      taxRegistrationNumber: p.taxRegistrationNumber,
+      legalName: p.legalName,
+      submittedAt: p.submittedAt,
+      reviewedAt: p.reviewedAt,
+      verifiedAt: p.verifiedAt,
+      rejectionReason: p.rejectionReason,
+      documentCount: p.documents.length,
+      duplicateTrnStores: Math.max(0, (trnCount.get(p.taxRegistrationNumber ?? '') ?? 1) - 1),
+    }))
+    .sort((a, b) => (a.submittedAt?.getTime() ?? Infinity) - (b.submittedAt?.getTime() ?? Infinity))
+    .slice(0, 500);
 }
 
 export class TaxProfileService {

@@ -82,6 +82,9 @@ export default defineConfig(async () => {
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
+            // route-sweep.test.ts: SWEEP_FILTER=<regex> limits it to some routes, SWEEP_STRICT=1 makes a 5xx a red test
+            SWEEP_FILTER: process.env.SWEEP_FILTER ?? '',
+            SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
             ...apiVars,
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
@@ -105,6 +108,21 @@ export default defineConfig(async () => {
             EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
           },
           workers: [
+            {
+              name: 'accounts-stub',
+              modules: true,
+              compatibilityDate: '2026-08-01',
+              script: `
+                import { WorkerEntrypoint } from 'cloudflare:workers';
+                export default class extends WorkerEntrypoint {
+                  async getAccountState(id) {
+                    return { id, email: id + '@exit-test.invalid', emailVerified: true, mfaEnabled: id.startsWith('super-'),
+                      mfaEnrolledAt: null, status: 'active', role: id.startsWith('super-') ? 'super_admin' : 'store_admin',
+                      firstName: 'T', lastName: 'T', phone: null, language: 'en' };
+                  }
+                  async fetch() { return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } }); }
+                }`,
+            },
             {
               name: 'api',
               modulesRoot: here('./dist-cf'),
@@ -132,6 +150,9 @@ export default defineConfig(async () => {
               hyperdrives: {
                 HYPERDRIVE: LOCAL_DB,
               },
+              // The identity service (Service Binding ACCOUNTS): the route sweep needs the account facts (MFA enrolled, active)
+              // that the real one answers from D1 `ebda-identity`. A user named `super-*` is an enrolled platform admin.
+              serviceBindings: { ACCOUNTS: 'accounts-stub' },
               queueProducers: {
                 EMAIL_QUEUE: { queueName: 'ebda-email' },
                 SMS_QUEUE: { queueName: 'ebda-sms' },

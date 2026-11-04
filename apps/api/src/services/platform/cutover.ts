@@ -36,6 +36,9 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
     'billingReminder',
     'billingWebhookEvent',
     'storeLifecycleEmail',
+    // the InstaPay claims and receipts of a subscription payment (and the order receipts of a Postgres store)
+    'manualPaymentClaim',
+    'instapayReceipt',
   ],
   // NEON-ZERO-1 (N-6/N-7): store membership. The access gate, staff, staff invites and owner/staff listings.
   access: ['storeStaff', 'staffInvite'],

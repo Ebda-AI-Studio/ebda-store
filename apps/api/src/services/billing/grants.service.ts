@@ -666,7 +666,13 @@ export async function listGrants(limit = 200) {
     Boolean
   );
   const idSet = new Set(ids);
-  const stores = (await storeDirectory()).filter(x => idSet.has(x.id));
+  // D1: the names come from the directory in D1 (one indexed read); Postgres keeps the RLS-bypassing definer.
+  const stores = (await onD1())
+    ? await prisma.store.findMany({
+        where: { id: { in: [...idSet] } },
+        select: { id: true, name: true, slug: true },
+      })
+    : (await storeDirectory()).filter(x => idSet.has(x.id));
   const name = new Map(stores.map(s => [s.id, s]));
   const [total, founding, referral] = await Promise.all([
     prisma.billingGrant.aggregate({ _sum: { valueMinor: true } }),

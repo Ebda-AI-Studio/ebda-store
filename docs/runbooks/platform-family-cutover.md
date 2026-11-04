@@ -87,3 +87,17 @@ Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
   `GET /payments/:id/events` is 404 for them; accept a fresh invitation; `SELECT count(*) FROM store_staff` in D1 equals the dry-run PG count and
   Postgres `store_staff` is empty. NOT verifiable until the request transaction is lazy: an admin GET with Postgres stopped.
 - Rollback: only before traffic (`--delete-marker`); the emptied Postgres rows come back from the dump.
+
+## Platform and billing routes with Postgres dead (Rulings NZ-PR-1..4)
+
+- NZ-PR-1 - `withStore`/`withUser`/`userContext` open a per-query lazy scope (no Postgres transaction) when the store is on a DO
+  or the platform D1 is bound; an unknown store id stays lazy so the handler answers 404 STORE_NOT_FOUND. Cost if wrong: a
+  handler that needs a real RLS transaction on a PG store would run without GUCs; PG stores keep the old transaction path.
+- NZ-PR-2 - `store` reads that name only D1-mirrored columns are answered from D1 when the access family is cut over.
+  Cost if wrong: a column missing from `D1_FIELDS` silently falls through to Postgres (the sweep catches it).
+- NZ-PR-3 - `asPlatformOperator` and `requireMfaEnrolled` verify the super_admin through the ACCOUNTS identity service, not
+  `ebda_is_super_admin()`. Cost if wrong: an identity outage denies admin routes (fail closed).
+- NZ-PR-4 - the tax review queue fans out over DO stores (500 max, 8 concurrent) as an interim until tax profiles move.
+  Cost if wrong: queue is bounded and may omit stores beyond 500.
+- Residual: `GET /admin/tax-verification/:storeId` and its document file route still read `StoreTaxProfile`/`StoreTaxDocument`
+  from Postgres (no DO read model exists for them); owner = the tax-on-DO work.

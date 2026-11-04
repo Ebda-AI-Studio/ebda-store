@@ -331,6 +331,9 @@ describe('cutover switch', () => {
         'plan',
         'staffInvite',
         'storeLifecycleEmail',
+        'manualPaymentClaim',
+        'instapayReceipt',
+        'store', // directory-column READS only (NZ-TX-2, services/platform/router.ts)
         'storeStaff',
         'storeSubscription',
         'systemSetting',

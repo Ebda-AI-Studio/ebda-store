@@ -12,9 +12,15 @@ import {
   notifyModelWrite,
   setModelRouter,
   setRoutedModelGuard,
+  setPlatformOperatorVerifier,
+  setScopeResolver,
   type ModelRouter,
 } from '@ebda/database';
 import { requirePlatformDb } from '../../lib/platform-db';
+import { cfBindings } from '../../cf/bindings';
+import { backendFor } from '../../lib/store-backend';
+import { getAccountState } from '../../lib/identity-client';
+import { D1_FIELDS } from '../../lib/store-columns';
 import {
   FAMILY_MODELS,
   familyOfModel,
@@ -33,11 +39,57 @@ const WRITES = new Set([
   'deleteMany',
 ]);
 
-const MODELS: ReadonlySet<string> = new Set(Object.values(FAMILY_MODELS).flat());
+const MODELS: ReadonlySet<string> = new Set([...Object.values(FAMILY_MODELS).flat(), 'store']);
+
+/**
+ * `Store` is split between D1 `stores` (the directory + mirror columns, D1_FIELDS) and the Durable Object. A READ that
+ * names ONLY directory columns (select / where / orderBy) is answered by D1 once the access family is there (D1 `stores` is
+ * the directory of record); anything that needs a DO column, a relation or a whole row stays on its Postgres path.
+ */
+const STORE_READS = new Set(['findUnique', 'findFirst', 'findMany', 'count']);
+function onlyDirectoryColumns(where: unknown): boolean {
+  if (where === undefined || where === null) return true;
+  if (typeof where !== 'object') return false;
+  return Object.entries(where as Record<string, unknown>).every(([k, v]) =>
+    k === 'AND' || k === 'OR' || k === 'NOT'
+      ? (Array.isArray(v) ? v : [v]).every(onlyDirectoryColumns)
+      : D1_FIELDS.has(k)
+  );
+}
+function storeReadServedByD1(method: string, arg: unknown): boolean {
+  if (!STORE_READS.has(method)) return false;
+  const a = (arg ?? {}) as {
+    where?: unknown;
+    select?: Record<string, unknown>;
+    include?: unknown;
+    orderBy?: unknown;
+  };
+  if (a.include) return false;
+  if (method !== 'count') {
+    if (!a.select) return false;
+    if (!Object.entries(a.select).every(([k, v]) => !v || D1_FIELDS.has(k))) return false;
+  }
+  const orderBy = Array.isArray(a.orderBy) ? a.orderBy : a.orderBy ? [a.orderBy] : [];
+  if (!orderBy.every(o => Object.keys(o as object).every(k => D1_FIELDS.has(k)))) return false;
+  return onlyDirectoryColumns(a.where);
+}
 
 export const platformRouter: ModelRouter = {
   models: MODELS,
   async route(model, method, args, postgres) {
+    if (model === 'store') {
+      if (
+        storeReadServedByD1(method, args[0]) &&
+        cfBindings()?.PLATFORM_DB &&
+        (await platformFamilyOnD1('access'))
+      ) {
+        const client = await requirePlatformDb();
+        return (client.store as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](
+          ...args
+        );
+      }
+      return postgres();
+    }
     const family = familyOfModel(model);
     if (!family) return postgres();
     const onD1 = WRITES.has(method)
@@ -58,6 +110,27 @@ export const platformRouter: ModelRouter = {
 
 export function registerPlatformRouter(): void {
   setModelRouter(platformRouter);
+  // The identity service decides "an ACTIVE super_admin" (Rulings ID-1/ID-2) where it is bound: no Postgres round trip.
+  setPlatformOperatorVerifier(async userId => {
+    if (!cfBindings()?.ACCOUNTS) return undefined;
+    const a = await getAccountState(userId);
+    return !!a && a.status === 'active' && a.role === 'super_admin';
+  });
+  // NZ-TX-2: a withStore / withUser call with no ambient transaction opens no Postgres transaction on a Worker whose platform
+  // data is in D1 (user scope) or for a store served by its Durable Object (store scope).
+  setScopeResolver({
+    lazyForUser: () => !!cfBindings()?.PLATFORM_DB,
+    // A store served by its Durable Object, or an id the directory does not know (the handler then answers 404 STORE_NOT_FOUND
+    // itself): neither needs a Postgres transaction. Only a Postgres store keeps one.
+    lazyForStore: async storeId => {
+      if (!cfBindings()?.PLATFORM_DB) return false;
+      try {
+        return (await backendFor(storeId)) === 'do';
+      } catch (err) {
+        return (err as { code?: string }).code === 'STORE_NOT_FOUND';
+      }
+    },
+  });
   // A call that reaches the POSTGRES client for a model whose family this isolate knows is on D1 bypassed the router.
   setRoutedModelGuard((model, operation) => {
     const camel = model[0].toLowerCase() + model.slice(1);

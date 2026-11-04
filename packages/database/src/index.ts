@@ -128,7 +128,7 @@ function isScopedOp(v: unknown): v is ScopedOp {
 }
 
 function scopedOp(
-  storeId: string,
+  storeId: string | undefined,
   exec: () => Promise<unknown>,
   userId?: string
 ): ScopedOp & Promise<unknown> {
@@ -698,6 +698,16 @@ export async function withTenantContext<T>(
 }
 
 /**
+ * A USER scope without a store and without a long-lived transaction: the per-query counterpart of `userContext`'s request
+ * transaction. Every Postgres query in `fn` opens its own short `runInTenantContext(undefined, ..., userId)`, so a request
+ * that never touches a user-keyed Postgres table never opens a Postgres connection at all (Workers with D1 serving the
+ * platform data). Atomicity across several Postgres writes is NOT provided: use it only where that is acceptable.
+ */
+export function runInUserScope<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return storeScope.run({ userId }, () => settleInScope(fn));
+}
+
+/**
  * Scope every Prisma call in `fn` to `storeId` under RLS WITHOUT holding one
  * transaction open for the whole of `fn`.
  *
@@ -772,7 +782,29 @@ export function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>):
   const run = () => fn(prisma as unknown as TenantTx);
   if (currentTenantGucs()?.storeId === storeId) return run();
   if (!tenantStorage.getStore() && storeScope.getStore()?.storeId === storeId) return run();
+  // NEON-ZERO-1: a store whose data is not in Postgres needs no Postgres transaction just to be scoped.
+  if (scopeResolver && !tenantStorage.getStore())
+    return scopeResolver
+      .lazyForStore(storeId)
+      .then(lazy =>
+        lazy ? runInStoreScope(storeId, async () => run()) : runInTenantContext(storeId, run)
+      );
   return runInTenantContext(storeId, run);
+}
+
+/**
+ * NEON-ZERO-1 (NZ-TX-2): decides whether a `withStore` / `withUser` call that has NO ambient transaction opens a Postgres
+ * transaction (the default) or only carries the scope, each Postgres query then running in its own short transaction (a call
+ * that never touches Postgres never connects). Registered once by the API. `lazyForStore` is asked per store (a store served
+ * by its Durable Object); `lazyForUser` per call (a Worker whose platform data is in D1).
+ */
+export interface ScopeResolver {
+  lazyForStore(storeId: string): Promise<boolean>;
+  lazyForUser(): boolean;
+}
+let scopeResolver: ScopeResolver | undefined;
+export function setScopeResolver(r: ScopeResolver | undefined): void {
+  scopeResolver = r;
 }
 
 /**
@@ -790,6 +822,18 @@ export function withUser<T>(
   const ambient = currentTenantGucs();
   if (ambient?.userId === userId && (storeId === undefined || ambient.storeId === storeId)) {
     return run();
+  }
+  if (scopeResolver && !tenantStorage.getStore()) {
+    if (storeId === undefined && scopeResolver.lazyForUser())
+      return runInUserScope(userId, async () => run());
+    if (storeId !== undefined)
+      return scopeResolver
+        .lazyForStore(storeId)
+        .then(lazy =>
+          lazy
+            ? runInStoreScope(storeId, async () => run(), userId)
+            : runInTenantContext(storeId, run, userId)
+        );
   }
   return runInTenantContext(storeId, run, userId);
 }
@@ -879,14 +923,25 @@ export async function scopeTransaction<Tx extends object, T>(
  */
 export function asPlatformOperator<T>(userId: string, fn: () => Promise<T>): Promise<T> {
   return withUser(userId, async () => {
-    const rows = await prisma.$queryRaw<
-      Array<{ ok: boolean }>
-    >`SELECT public.ebda_is_super_admin() AS ok`;
-    if (rows[0]?.ok !== true) {
+    // NEON-ZERO-1: where the identity service is the authority for accounts, it answers "is this an active super_admin"
+    // (one RPC, the same fact `ebda_is_super_admin()` read from Postgres); the SQL definer stays the default elsewhere.
+    const ok =
+      (await platformOperatorVerifier?.(userId)) ??
+      (await prisma.$queryRaw<Array<{ ok: boolean }>>`SELECT public.ebda_is_super_admin() AS ok`)[0]
+        ?.ok === true;
+    if (!ok) {
       throw new Error('asPlatformOperator: the acting user is not an active super_admin');
     }
     return guardHatch.run('platform-operator', () => settleInScope(fn));
   });
+}
+
+/** Resolves true/false for a user, or `undefined` when it cannot decide (the SQL definer then decides). */
+let platformOperatorVerifier: ((userId: string) => Promise<boolean | undefined>) | undefined;
+export function setPlatformOperatorVerifier(
+  fn: ((userId: string) => Promise<boolean | undefined>) | undefined
+): void {
+  platformOperatorVerifier = fn;
 }
 
 export interface AcrossStoresOptions {

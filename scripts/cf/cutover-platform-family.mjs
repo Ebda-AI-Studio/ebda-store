@@ -42,6 +42,8 @@ export const FAMILIES = {
     'billing_reminders',
     'billing_webhook_events',
     'store_lifecycle_emails',
+    'manual_payment_claims',
+    'instapay_receipts',
   ],
   // N-6/N-7: store membership (the access gate, staff, staff invites). Keep in step with FAMILY_MODELS.access.
   access: ['store_staff', 'staff_invites'],

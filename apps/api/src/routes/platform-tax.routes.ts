@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { platformDb } from '../lib/platform-directory';
 import { z } from 'zod/v3';
 import { withUser } from '@ebda/database';
 import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
-import { TaxProfileService } from '../services/tax-profile.service';
+import { TaxProfileService, taxReviewQueueFromStores } from '../services/tax-profile.service';
 import { getPlatformVat, updatePlatformVat } from '../services/platform-vat.service';
 import { taxProfilesForReview } from '../lib/definer';
 import { sendTaxDocument } from './tax.routes';
@@ -43,7 +44,10 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status } = parseInput(queueQuerySchema, req.query);
-      const profiles = await withUser(req.user!.userId, () => taxProfilesForReview(status ?? null));
+      // A Worker with D1 has no Postgres definer to ask: the queue is read from the stores' Durable Objects (bounded).
+      const profiles = platformDb()
+        ? await taxReviewQueueFromStores(req.user!.userId, status ?? null)
+        : await withUser(req.user!.userId, () => taxProfilesForReview(status ?? null));
       res.json({ success: true, data: { profiles } });
     } catch (error) {
       next(error);

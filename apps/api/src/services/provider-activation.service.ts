@@ -9,6 +9,7 @@
  *
  * The credentials never leave the server: every result here is a status, a code and a time.
  */
+import { onD1 } from './platform/billing-d1';
 import {
   acrossStoresFlat,
   asPlatformOperator,
@@ -17,6 +18,7 @@ import {
   runInStoreScope,
   runInTenantContext,
   storeDirectory,
+  withStore,
 } from '@ebda/database';
 import { BRAND, getProviderEntry, isActivationRequestable, ACTIVATION_HOURS } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -264,6 +266,40 @@ export async function notifyOpsOfRequest(args: {
 export async function listAllRequests(
   status?: ActivationStatus
 ): Promise<AdminActivationRequest[]> {
+  // D1 (platform family): ONE query over every store's requests, the names from the directory in D1, the connection
+  // test of each row read in its store's own scope. No per-store Postgres transaction, no Postgres directory definer.
+  if (await onD1('platform')) {
+    const found = await prisma.providerActivationRequest.findMany({
+      where: status ? { status } : {},
+      orderBy: { requestedAt: 'desc' },
+      take: 500,
+    });
+    const names = new Map(
+      (
+        await prisma.store.findMany({
+          where: { id: { in: [...new Set(found.map(r => r.storeId))] } },
+          select: { id: true, name: true, slug: true },
+        })
+      ).map(s => [s.id, s])
+    );
+    const out: AdminActivationRequest[] = [];
+    for (const r of found) {
+      const entry = getProviderEntry(r.provider);
+      if (!entry) continue;
+      const conn = await withStore(r.storeId, () =>
+        loadConnection(r.storeId, r.provider, entry.kind)
+      );
+      out.push({
+        ...toPublic(r),
+        storeId: r.storeId,
+        storeName: names.get(r.storeId)?.name ?? r.storeId,
+        storeSlug: names.get(r.storeId)?.slug ?? '',
+        kind: entry.kind,
+        lastTest: conn ? lastTestOf(conn) : null,
+      });
+    }
+    return out.sort((x, y) => y.requestedAt.localeCompare(x.requestedAt));
+  }
   const stores = new Map((await storeDirectory()).map(s => [s.id, s]));
   const rows = await acrossStoresFlat(async storeId => {
     const found = await prisma.providerActivationRequest.findMany({

@@ -2079,31 +2079,47 @@ export async function listLedger(args: {
   type LedgerRow = Prisma.BillingEventGetPayload<{
     include: { store: { select: { name: true; slug: true } } };
   }>;
-  const { rows } = await pageAcrossStores<LedgerRow>({
-    storeIds: args.storeId ? [args.storeId] : undefined,
-    skip: 0,
-    take,
-    orderKey: r => r.createdAt,
-    fetch: async window => {
-      // Each fetch runs inside one store's scope (pageAcrossStores): that store.
-      const where = {
-        storeId: currentStoreId(),
-        ...(args.status ? { status: args.status } : {}),
-        ...(args.type ? { type: args.type } : {}),
-        ...(args.before ? { createdAt: { lt: args.before } } : {}),
-      };
-      const [found, total] = await Promise.all([
-        prisma.billingEvent.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          take: window,
-          include: { store: { select: { name: true, slug: true } } },
-        }),
-        prisma.billingEvent.count({ where }),
-      ]);
-      return { rows: found, total };
-    },
-  });
+  // D1: ONE indexed query over the whole ledger (no per-store fan-out, no Postgres scope per store).
+  const d1Rows = (await onD1())
+    ? await prisma.billingEvent.findMany({
+        where: {
+          ...(args.storeId ? { storeId: args.storeId } : {}),
+          ...(args.status ? { status: args.status } : {}),
+          ...(args.type ? { type: args.type } : {}),
+          ...(args.before ? { createdAt: { lt: args.before } } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+        include: { store: { select: { name: true, slug: true } } },
+      })
+    : null;
+  const { rows } = d1Rows
+    ? { rows: d1Rows as LedgerRow[] }
+    : await pageAcrossStores<LedgerRow>({
+        storeIds: args.storeId ? [args.storeId] : undefined,
+        skip: 0,
+        take,
+        orderKey: r => r.createdAt,
+        fetch: async window => {
+          // Each fetch runs inside one store's scope (pageAcrossStores): that store.
+          const where = {
+            storeId: currentStoreId(),
+            ...(args.status ? { status: args.status } : {}),
+            ...(args.type ? { type: args.type } : {}),
+            ...(args.before ? { createdAt: { lt: args.before } } : {}),
+          };
+          const [found, total] = await Promise.all([
+            prisma.billingEvent.findMany({
+              where,
+              orderBy: { createdAt: 'desc' },
+              take: window,
+              include: { store: { select: { name: true, slug: true } } },
+            }),
+            prisma.billingEvent.count({ where }),
+          ]);
+          return { rows: found, total };
+        },
+      });
   const stuckBefore = Date.now() - 3_600_000;
   return rows.map(r => ({
     id: r.id,

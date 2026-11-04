@@ -28,6 +28,8 @@ export type WriteOp = (typeof WRITE_OPS)[number];
 
 /** Non-money catalogue, content and cart models whose writes the StoreDO accepts in D1 (and R2). Everything else is a money op. */
 export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
+  // a store's payment gateway configuration (credentials are ciphertext; the route holds the key): its own table in the DO
+  'PaymentConfig',
   'Product',
   'ProductVariant',
   'ProductOption',

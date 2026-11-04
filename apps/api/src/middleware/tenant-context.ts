@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { runInStoreScope, runInTenantContext } from '@ebda/database';
+import { runInStoreScope, runInTenantContext, runInUserScope } from '@ebda/database';
+import { cfBindings } from '../cf/bindings';
 import { withDeferredWork } from '../lib/after-tenant-commit';
 import { backendFor } from '../lib/store-backend';
 import { resolvePublicStoreId } from '../utils/store-helpers';
@@ -493,8 +494,30 @@ export function userContext(
       }, next);
       return;
     }
+    // NEON-ZERO-1 (NZ-TX-2): on a Worker whose platform data is in D1 the user-keyed request (the whole /admin namespace, the
+    // account's own addresses) opens NO Postgres transaction up front: the scope carries the user, and a Postgres query a
+    // handler still makes on a user-keyed table runs in its own short transaction. A deployment with no D1 (Node, local
+    // dev) keeps the request transaction.
+    if (cfBindings()?.PLATFORM_DB) {
+      openUserScope(res, next, userId);
+      return;
+    }
     openUserTransaction(res, next, storeId, userId);
   };
+}
+
+function openUserScope(res: Response, next: NextFunction, userId: string): void {
+  runRequestInTransaction(
+    res,
+    next,
+    (body, releaseResponse) =>
+      withDeferredWork(
+        { storeId: undefined, userId, noPgTx: true },
+        () => runInUserScope(userId, body),
+        releaseResponse
+      ),
+    { userId, middleware: 'userContext', backend: 'do' }
+  );
 }
 
 function openUserTransaction(

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { requirePlatformDb } from './platform-db';
 import {
+  d1Run,
   entityStoreIdD1,
   onD1 as onBillingD1,
   planSubscriberCountsD1,
@@ -132,6 +133,26 @@ export interface AuditEntry {
  * Append-only: `ebda_app` still reads its store's rows through the policy.
  */
 export async function insertAuditLog(entry: AuditEntry): Promise<void> {
+  // NEON-ZERO-1: a PLATFORM event (no store) goes to the platform audit trail in D1; a store's own rows live in its
+  // Durable Object. Postgres is not asked on a Worker that has D1.
+  if (!entry.storeId && platformDb()) {
+    await d1Run(
+      `INSERT INTO platform_audit_log (id, actor_id, action, target_type, target_id, store_id, meta, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7)`,
+      randomUUID(),
+      entry.userId ?? null,
+      entry.action,
+      entry.resourceType,
+      entry.resourceId ?? null,
+      JSON.stringify({
+        ...(entry.details && typeof entry.details === 'object' ? entry.details : {}),
+        ...(entry.ip ? { ip: entry.ip } : {}),
+        ...(entry.userAgent ? { userAgent: entry.userAgent } : {}),
+      }),
+      Date.now()
+    );
+    return;
+  }
   await prisma.$queryRaw`
     SELECT public.ebda_audit_log_insert(
       ${randomUUID()}, ${entry.action}, ${entry.userId ?? null}, ${entry.storeId ?? null},
