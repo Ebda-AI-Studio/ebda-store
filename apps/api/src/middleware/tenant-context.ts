@@ -165,6 +165,7 @@ function isAnonymousSafeRead(req: Request): boolean {
   const m = req.method.toUpperCase();
   return (
     (m === 'GET' || m === 'HEAD') &&
+    !req.user && // an upstream authenticate already ran: not anonymous
     !req.headers.authorization &&
     !req.headers.cookie &&
     ADMIN_STORE_PATH_RE.test(req.originalUrl ?? req.url ?? '')

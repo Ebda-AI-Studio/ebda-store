@@ -106,6 +106,21 @@ describe('tenantContext opens the transaction lazily (BE:E-1)', () => {
     expect(m.authenticateAccounts).not.toHaveBeenCalled();
   });
 
+  it('a request an upstream authenticate already identified (req.user) keeps its transaction', async () => {
+    const a = express();
+    a.use((req, _res, next) => {
+      (req as unknown as { user: unknown }).user = { userId: 'u1', role: 'store_admin' };
+      next();
+    });
+    const r = express.Router();
+    r.param('storeId', tenantContext);
+    r.get('/:storeId/things', (_q, res) => void res.json({ ok: true }));
+    a.use('/stores', r);
+    await request(a).get(`/stores/${STORE}/things`);
+    expect(m.runInTenantContext).toHaveBeenCalledTimes(1);
+    expect(m.runInStoreScope).not.toHaveBeenCalled();
+  });
+
   it('a cookie-only request keeps the transaction', async () => {
     await request(app()).get(`/stores/${STORE}/things`).set('Cookie', 'ebda_session=x');
     expect(m.runInTenantContext).toHaveBeenCalledTimes(1);

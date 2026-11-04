@@ -20,6 +20,7 @@ import {
 import { postEntry } from '../../apps/api/src/services/accounting/journal.service';
 
 vi.mock('../../apps/api/src/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };
     next();
