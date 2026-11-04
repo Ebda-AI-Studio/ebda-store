@@ -1,8 +1,12 @@
-# Ebda Store (ابدأ ستور)
+# Ebda AI Studio (ابدأ ستوديو)
 
-Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). Not to be confused with any unrelated site with a similar name: this is the Egyptian store builder at https://ebda.app, made by Ebda AI Studio.
+Ebda AI Studio — ابدأ ستوديو (ebda.app) makes two products: Ebda Store (ابدأ ستور), an online store builder for sellers in Egypt, and Ebda Chat (ابدأ شات), a shared customer inbox on WhatsApp. Not to be confused with any unrelated site with a similar name: this is the Egyptian studio at https://ebda.app.
 
-> Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
+## Ebda Store
+
+Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app).
+
+> Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 
 Five templates (Qamar for fashion, Souq for electronics and retail, Jasmine for beauty and care, Lamma for groceries and food, Dahab for jewellery), three looks each, and a visual editor that edits the real storefront on a phone-sized canvas. Every template has a live demo store you can open and shop without signing up.
 
@@ -13,8 +17,9 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - [Ebda Chat (Arabic)](https://ebda.app/whatsapp/) ([English](https://ebda.app/en/whatsapp/)): Ebda Chat, the second product of Ebda AI Studio: a shared WhatsApp inbox, orders and cash-on-delivery confirmations linked to Ebda Store, consent-based campaigns and an AI agent, on Meta's official WhatsApp Business Platform; one Ebda AI Studio sign-in for both products; app at https://wa.ebda.app
 - [Ebda Store vs Zid](https://ebda.app/en/compare/zid/) ([Arabic](https://ebda.app/compare/zid/)), [vs Shopify](https://ebda.app/en/compare/shopify/) ([Arabic](https://ebda.app/compare/shopify/)), [vs Wuilt](https://ebda.app/en/compare/wuilt/) ([Arabic](https://ebda.app/compare/wuilt/)), [vs YouCan](https://ebda.app/en/compare/youcan/) ([Arabic](https://ebda.app/compare/youcan/)), [vs EasyOrders](https://ebda.app/en/compare/easyorders/) ([Arabic](https://ebda.app/compare/easyorders/)), [vs ExpandCart](https://ebda.app/en/compare/expandcart/) ([Arabic](https://ebda.app/compare/expandcart/)): balanced comparisons for a seller in Egypt, including what Ebda Store does not have yet (as of November 2026; Wuilt, YouCan and ExpandCart figures read from their public pages on 2 November 2026, including where they are cheaper; EasyOrders prices could not be verified and are not shown)
 - [Full capability list for AI assistants](https://ebda.app/llms-full.txt)
-- [Home (Arabic, Egyptian colloquial)](https://ebda.app/): how it works in four steps, five templates with three looks each as working phone previews (open a product, add to cart), features, payments and shipping, pricing and plan comparison, FAQ
-- [Home (English)](https://ebda.app/en/): the same in English
+- [Ebda AI Studio home (Arabic)](https://ebda.app/) ([English](https://ebda.app/en/)): the studio and its two products, Ebda Store and Ebda Chat, each with its own sign-up
+- [Ebda Store landing (Arabic, Egyptian colloquial)](https://ebda.app/store/): how it works in four steps, five templates with three looks each as working phone previews (open a product, add to cart), features, payments and shipping, pricing and plan comparison, FAQ
+- [Ebda Store landing (English)](https://ebda.app/en/store/): the same in English
 - [About Ebda AI Studio](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda Store, the Ebda AI Studio story, contact
 - [Fashion store](https://ebda.app/for/fashion/)
 - [Electronics store](https://ebda.app/for/electronics/)

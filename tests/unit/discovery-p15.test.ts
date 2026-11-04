@@ -71,7 +71,7 @@ describe('help and docs pages (site-kit shell)', () => {
   it('Arabic pages use ar_EG and the Arabic studio name', () => {
     const html = page({ lang: 'ar' });
     expect(meta(html, 'og:locale')).toBe('ar_EG');
-    expect(JSON.stringify(jsonLd(html)['@graph'][0])).toContain('ابدأ استوديو للذكاء الاصطناعي');
+    expect(JSON.stringify(jsonLd(html)['@graph'][0])).toContain('ابدأ ستوديو');
   });
   it('JSON-LD cannot close its own script element', () => {
     const html = page({ title: 'a </script><b> | Help' });
@@ -101,21 +101,21 @@ describe('status page', () => {
   }
 });
 
-describe('marketing redirects (audit M-164)', () => {
+describe('marketing redirects (audit M-164; one hop with the trailing slash, audit 2026-11-03 P1-9)', () => {
   const rules = readFileSync(path.join(ROOT, 'apps/marketing/public/_redirects'), 'utf8')
     .split('\n')
     .filter(l => l.trim() && !l.startsWith('#'))
     .map(l => l.trim().split(/\s+/));
   const from = new Set(rules.map(r => r[0]));
   it.each([
-    ['/pricing', '/#pricing'],
-    ['/pricing/', '/#pricing'],
-    ['/en/pricing', '/en/#pricing'],
-    ['/en/pricing/', '/en/#pricing'],
-    ['/compare', '/#pricing'],
-    ['/compare/', '/#pricing'],
-    ['/en/compare', '/en/#pricing'],
-    ['/en/compare/', '/en/#pricing'],
+    ['/pricing', '/store/#pricing'],
+    ['/pricing/', '/store/#pricing'],
+    ['/en/pricing', '/en/store/#pricing'],
+    ['/en/pricing/', '/en/store/#pricing'],
+    ['/compare', '/store/#pricing'],
+    ['/compare/', '/store/#pricing'],
+    ['/en/compare', '/en/store/#pricing'],
+    ['/en/compare/', '/en/store/#pricing'],
   ])('%s -> %s in one permanent hop', (src, dest) => {
     expect(rules.find(r => r[0] === src)).toEqual([src, dest, '301']);
     // one hop: the destination (without its fragment) is never itself a redirect source

@@ -9500,7 +9500,7 @@
     "title": "Tax archive",
     "subtitle": "Fiscal documents kept for the tax authority, store by store.",
     "storeTitle": "Store documents",
-    "retention": "Fiscal documents are kept for 6 years, even after a store is deleted.",
+    "retention": "Fiscal documents are kept for 7 years, even after a store is deleted.",
     "columns": {
       "store": "Store",
       "documents": "Documents",

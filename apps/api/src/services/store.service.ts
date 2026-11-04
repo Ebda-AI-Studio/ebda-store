@@ -14,6 +14,8 @@ import {
   storeDb,
   storeRepo,
   storeUpdateOnDo,
+  closeDoIfNoMoney,
+  reopenDoAfterFailedDelete,
   storeWritesToDo,
   syncStoreFields,
 } from '../lib/repo-factory';
@@ -67,6 +69,7 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
+import { finishStoreDeletion } from '../lib/store-delete-post-commit';
 import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
@@ -741,6 +744,8 @@ export class StoreService {
    */
   static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
+    // Decided BEFORE the Postgres delete (Ruling NZ-D14): the post-commit teardown must know whether the store lived on its DO.
+    const wasOnDo = await storeWritesToDo(storeId);
     // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
     // owner still has other live stores would strand the paid period and re-parent the
     // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
@@ -764,6 +769,10 @@ export class StoreService {
     // The owner's identity (credential + sessions) lives in the shared identity service. If this deletion also removes the
     // owner's profile row, the identity is deactivated FIRST (ends their sessions at once) and erased only after the commit;
     // if the transaction fails the identity is re-activated (compensating rollback).
+    // Placed after every refusal that precedes the Postgres delete (the billing-parent check), so nothing can leave it closed.
+    // A DO store's money lives in the DO, not in its stale Postgres copy. ONE atomic DO call checks money in flight and closes the
+    // store (Ruling NZ-D17): refused -> 409 and nothing else is touched. A failed delete below reopens only what this call closed.
+    const doClose = wasOnDo ? await closeDoIfNoMoney(storeId) : null;
     let deactivatedOwnerId: string | null = null;
     let erasedOwnerId: string | null = null;
 
@@ -913,6 +922,19 @@ export class StoreService {
         );
       });
     } catch (err) {
+      // Compensating rollback (Ruling NZ-D17): the Postgres delete failed, so the DO this call closed is reopened (only its own flag).
+      if (doClose?.token) {
+        await reopenDoAfterFailedDelete(storeId, doClose.token).catch(e =>
+          sendAlert({
+            level: 'p1',
+            scope: 'platform',
+            source: 'store.delete.reopen_failed',
+            title: 'Store delete failed and the Durable Object could not be reopened',
+            body: `store ${storeId} is CLOSED but still exists: reopen it by hand (do_flags closed + closed_by_delete). ${e instanceof Error ? e.message : ''}`,
+            context: { storeId },
+          }).catch(() => undefined)
+        );
+      }
       if (deactivatedOwnerId) {
         await setAccountStatus(deactivatedOwnerId, 'active', 'store-delete-rolled-back').catch(e =>
           logger.error(
@@ -946,6 +968,9 @@ export class StoreService {
         )
       );
     }
+
+    // Ruling NZ-D14: lookups read D1 and a DO store keeps its data in the DO; neither is touched by the Postgres delete above.
+    await finishStoreDeletion({ storeId, wasOnDo });
 
     // Invalidate store cache (best-effort, post-commit)
     try {

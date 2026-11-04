@@ -89,12 +89,21 @@ describe('nothing under .github mentions a self-hosted runner or its switches', 
     expect(files.length).toBeGreaterThan(4);
   });
 
+  // Ruling CI-NODE-MODULES-1 (Umbra-only CI, Ahmad 2026-11-03): the npm-ci composite action may branch on
+  // `runner.environment == 'self-hosted'` to reuse node_modules on the runner. That exact expression in that one
+  // file is the only exemption; a runs-on label, the old switches or any other self-hosted mention still fails.
+  const EXEMPT: Record<string, RegExp> = {
+    '.github/actions/npm-ci/action.yml': /runner\.environment\s*==\s*'self-hosted'/g,
+  };
+
   it.each(files.map(f => [path.relative(ROOT, f), f] as const))('%s', (_rel, file) => {
-    const code = fs
+    let code = fs
       .readFileSync(file, 'utf8')
       .split('\n')
       .filter(l => !/^\s*#/.test(l))
       .join('\n');
+    const exempt = EXEMPT[_rel.split(path.sep).join('/')];
+    if (exempt) code = code.replace(exempt, '');
     for (const re of FORBIDDEN) {
       expect(code, `${_rel} matches ${re}`).not.toMatch(re);
     }

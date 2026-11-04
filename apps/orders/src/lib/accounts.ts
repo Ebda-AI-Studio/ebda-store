@@ -2,7 +2,7 @@
  * Browser client for the shared identity service (accounts.ebda.app, Rulings ID-1/ID-2).
  *
  * The identity service owns the credentials and the long-lived session (a host-only HttpOnly cookie on accounts.ebda.app);
- * this app only ever holds a 15-minute access token for the Store (`aud=store`). After each sign-in or silent refresh the
+ * this app only ever holds a 5-minute access token for the Store (`aud=store`). After each sign-in or silent refresh the
  * token is exchanged for the Store API's own HttpOnly cookie with `POST /auth/session`, so every existing request keeps
  * working unchanged. No password or refresh token is ever stored in JS.
  */

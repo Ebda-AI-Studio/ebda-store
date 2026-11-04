@@ -1,0 +1,266 @@
+/* Islamic-geometry motifs (Ruling MKT-STUDIO-C-1): small, quiet SVG ornaments from the same girih family as the studio home
+   hero (8-fold star = Ebda Store, 12-point star = Ebda Chat; never a two-triangle star, Ruling MKT-NO-HEXAGRAM-1). Static files in public/motifs/, no JS. Every motif is symmetric or
+   positioned with logical properties so Arabic RTL and English LTR read the same. Pure decoration: aria-hidden by nature
+   (background images and pseudo-elements), absolutely positioned so no copy or layout moves on the pages that only get motifs. */
+
+:root {
+  --arch-poly-56: polygon(
+    0% 56px,
+    3.6% 43.6px,
+    7.1% 37.6px,
+    10.7% 32.7px,
+    14.3% 28.4px,
+    17.9% 24.6px,
+    21.4% 21px,
+    25% 17.8px,
+    28.6% 14.7px,
+    32.1% 11.8px,
+    35.7% 9.2px,
+    39.3% 6.7px,
+    42.9% 4.3px,
+    46.4% 2.1px,
+    50% 0px,
+    53.6% 2.1px,
+    57.1% 4.3px,
+    60.7% 6.7px,
+    64.3% 9.2px,
+    67.9% 11.8px,
+    71.4% 14.7px,
+    75% 17.8px,
+    78.6% 21px,
+    82.1% 24.6px,
+    85.7% 28.4px,
+    89.3% 32.7px,
+    92.9% 37.6px,
+    96.4% 43.6px,
+    100% 56px,
+    100% 100%,
+    0 100%
+  );
+}
+
+/* ---------- studio home: one motif per section ---------- */
+.sh-sec {
+  position: relative;
+  isolation: isolate;
+}
+.sh-sec::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -22px;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translateX(-50%);
+  background: var(--sh-medal) center / contain no-repeat;
+}
+#studio {
+  --sh-medal: url(/motifs/m8.svg);
+}
+#products {
+  --sh-medal: url(/motifs/mr.svg);
+}
+#start {
+  --sh-medal: url(/motifs/mq.svg);
+}
+#trust {
+  --sh-medal: url(/motifs/mr.svg);
+}
+.sh-label::after {
+  content: '';
+  display: block;
+  width: 168px;
+  height: 17px;
+  margin-top: 16px;
+  background: url(/motifs/orn.svg) center / contain no-repeat;
+}
+.studio-home #start::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess8.svg) 0 0 / 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 15%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 15%, transparent 78%);
+}
+.sh-facts li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.sh-facts li::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  align-self: center;
+  background: url(/motifs/bullet.svg) center / contain no-repeat;
+}
+.sh-win-in::before,
+.sh-win-in::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: url(/motifs/corner.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+.sh-win-in::before {
+  inset-block-start: 14px;
+  left: 50%;
+  margin-left: -9px;
+}
+.sh-win-in::after {
+  inset-block-end: 9px;
+  inset-inline-end: 9px;
+}
+
+/* ---------- the footer edge on the studio home, the Store landing and the Chat page: a narrow pattern band ---------- */
+body:has(.studio-home, main > .hero, .wa-head) .site-footer {
+  position: relative;
+}
+body:has(.studio-home, main > .hero, .wa-head) .site-footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 16px;
+  background: url(/motifs/strip8-dark.svg) center top / 40px 16px repeat-x;
+}
+body:has(.wa-head) .site-footer::before {
+  background-image: url(/motifs/strip12-dark.svg);
+}
+
+/* ---------- Ebda Store landing (/store): decoration only, all absolutely positioned ---------- */
+body:has(main > .hero) main > .section {
+  position: relative;
+  isolation: isolate;
+}
+body:has(main > .hero) main > .section::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 4px;
+  left: 50%;
+  width: 292px;
+  height: 36px;
+  transform: translateX(-50%);
+  background: url(/motifs/d8.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+body:has(main > .hero) main > .section:nth-of-type(even)::before {
+  background-image: url(/motifs/d12.svg);
+}
+body:has(main > .hero) #features {
+  isolation: isolate;
+}
+body:has(main > .hero) #features::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess8.svg) 0 0 / 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 10%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 10%, transparent 75%);
+}
+body:has(main > .hero) .plan::after,
+body:has(.wa-head) .plan::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: 10px;
+  width: 16px;
+  height: 16px;
+  background: url(/motifs/corner.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+
+/* ---------- Ebda Chat page: the same art level, in Chat's 12-point-star family ---------- */
+body:has(.wa-head) .page-sec {
+  position: relative;
+  isolation: isolate;
+}
+body:has(.wa-head) .page-sec::before {
+  content: '';
+  position: absolute;
+  inset-block-start: calc(-0.5 * clamp(40px, 6vw, 72px) - 16px);
+  left: 50%;
+  width: 262px;
+  height: 32px;
+  transform: translateX(-50%);
+  background: url(/motifs/d12.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+body:has(.wa-head) .page-sec > h2::after {
+  content: '';
+  display: block;
+  width: 120px;
+  height: 12px;
+  margin-top: 12px;
+  background: url(/motifs/orn.svg) center / contain no-repeat;
+}
+body:has(.wa-head) #features::after {
+  content: '';
+  position: absolute;
+  inset: -24px -16px;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess12.svg) 0 0 / 40px 69.3px;
+  -webkit-mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, #000 10%, transparent 80%);
+  mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, #000 10%, transparent 80%);
+}
+.wa-head::after {
+  content: '';
+  height: 16px;
+  background: url(/motifs/strip12.svg) center / 40px 16px repeat-x;
+  opacity: 0.9;
+}
+
+/* ---------- the mihrab arch: ONE signature use, the two hero windows of the studio home (generic pointed arch; no dome, minaret or crescent) ---------- */
+.sh-win::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 56px;
+  z-index: 2;
+  pointer-events: none;
+  background: url(/motifs/arch-cap.svg) 0 0 / 100% 100% no-repeat;
+}
+
+/* ---------- the official Arabic wordmark as a soft watermark (Ruling MKT-SCRIPT-1): ONE placement, the hero's empty side, never repeated, rotated or over copy ---------- */
+.sh-hero::before {
+  content: '';
+  display: none;
+  position: absolute;
+  z-index: -2;
+  pointer-events: none;
+  width: clamp(260px, 22vw, 340px);
+  aspect-ratio: 1.111;
+  inset-block-start: 6%;
+  inset-inline-end: clamp(48px, 6vw, 96px);
+  background: url(/motifs/mark-studio.svg) center / contain no-repeat;
+}
+@media (min-width: 1360px) {
+  .sh-hero::before {
+    display: block;
+  }
+}
+
+/* ---------- worn gold-foil (Ruling MKT-FOIL-1): used sparingly on a few headings and the hero hairlines; flat gold stays elsewhere ---------- */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .sh-win h2,
+  body:has(main > .hero) #features h2,
+  body:has(main > .hero) #pricing h2,
+  body:has(.wa-head) #features h2,
+  body:has(.wa-head) .wa-close h2 {
+    background: url(/motifs/foil.svg) 0 0 / 256px 256px;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}
+.sh-eyebrow::before {
+  height: 2px;
+  background: url(/motifs/foil.svg) 0 0 / 256px 256px;
+}

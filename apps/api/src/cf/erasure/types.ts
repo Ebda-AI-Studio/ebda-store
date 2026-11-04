@@ -94,7 +94,11 @@ export interface SuppressionPort {
 
 export interface StoreDoStub {
   exportSubject(s: Subject): Promise<{ tables: Record<string, Array<Record<string, unknown>>> }>;
-  eraseSubject(s: Subject): Promise<{ erased: Record<string, number>; remaining: number }>;
+  eraseSubject(s: Subject): Promise<{
+    erased: Record<string, number>;
+    remaining: number;
+    refused?: Record<string, number>;
+  }>;
 }
 
 export interface ErasureEnv {

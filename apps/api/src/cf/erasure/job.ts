@@ -70,14 +70,29 @@ export async function runErasure(
     errors: [],
   };
   await ledger.put(ledgerKey(entry.requestId), JSON.stringify(entry));
-  for (const surface of surfaces) {
+  // A MERCHANT erasure runs the StoreDO surface FIRST, as the gate (Ruling NZ-D17): the DO refuses while money is in flight, and a
+  // refusal must stop the job BEFORE identity, media or customer-intelligence data is touched (no partial erasure).
+  const ordered =
+    subject.kind === 'merchant'
+      ? [
+          ...surfaces.filter(x => x.name === 'store-do'),
+          ...surfaces.filter(x => x.name !== 'store-do'),
+        ]
+      : surfaces;
+  for (const surface of ordered) {
     try {
       const r = await surface.eraseSubject(subject);
       entry.surfaces.push(r);
       if (r.remaining > 0)
-        entry.errors.push(`${r.surface}: ${r.remaining} record(s) remain after erase`);
+        entry.errors.push(
+          `${r.surface}: ${r.remaining} record(s) remain after erase${r.note ? ` (${r.note})` : ''}`
+        );
     } catch (e) {
       entry.errors.push(`${surface.name}: ${(e as Error).message}`);
+    }
+    if (subject.kind === 'merchant' && surface.name === 'store-do' && entry.errors.length) {
+      entry.errors.push('later surfaces not run: the store gate failed');
+      break;
     }
   }
   entry.status = entry.errors.length ? 'failed' : 'done';
