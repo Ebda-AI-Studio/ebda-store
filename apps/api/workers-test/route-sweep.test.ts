@@ -26,7 +26,13 @@ const e = env as unknown as {
     prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } };
   };
   TEST_PLATFORM_MIGRATIONS: unknown[];
+  /** Test-worker bindings (vitest.workers.config.mts): the host's env does not reach workerd's `process.env`. */
+  SWEEP_STRICT?: string;
+  SWEEP_FILTER?: string;
 };
+
+/** `SWEEP_FILTER=<regex>` runs only the routes whose `METHOD /path` matches (the strict assertion then covers that subset). */
+const inSubset = (line: string) => !e.SWEEP_FILTER || new RegExp(e.SWEEP_FILTER).test(line);
 
 const BASE = 'https://api.ebda.app/api/v1';
 const ZERO = '00000000-0000-4000-8000-000000000001';
@@ -177,7 +183,9 @@ describe.skipIf(e.E2E_DB === '1')(
         .replace(/\/$/, '/');
 
     it('every GET route (public anonymous, merchant as store_admin, /admin as super_admin)', async () => {
-      const gets = (ROUTES as string[]).filter(r => r.startsWith('GET ')).map(r => r.slice(4));
+      const gets = (ROUTES as string[])
+        .filter(r => r.startsWith('GET ') && inSubset(r))
+        .map(r => r.slice(4));
       await pool(gets, 8, async route => {
         const isPublic = route.startsWith('/public') || route.startsWith('/stores/public');
         const isAdminNs = route.startsWith('/admin') || route.startsWith('/internal');
@@ -192,12 +200,12 @@ describe.skipIf(e.E2E_DB === '1')(
           headers
         );
       });
-      expect(results.length).toBeGreaterThan(300);
+      if (!e.SWEEP_FILTER) expect(results.length).toBeGreaterThan(300);
     }, 600_000);
 
     it('GET as a logged-in storefront customer (customer-scoped reads)', async () => {
       const mine = (ROUTES as string[])
-        .filter(r => r.startsWith('GET '))
+        .filter(r => r.startsWith('GET ') && inSubset(r))
         .map(r => r.slice(4))
         .filter(r =>
           /^\/(auth\/me|addresses|me\/|public\/orders|public\/customers|public\/wishlist|public\/cart|public\/loyalty|public\/wallet)/.test(
@@ -214,7 +222,9 @@ describe.skipIf(e.E2E_DB === '1')(
     }, 300_000);
 
     it('every mutating route with an empty JSON body (validation must answer before any Postgres read)', async () => {
-      const writes = (ROUTES as string[]).filter(r => !r.startsWith('GET ')).map(r => r.split(' '));
+      const writes = (ROUTES as string[])
+        .filter(r => !r.startsWith('GET ') && inSubset(r))
+        .map(r => r.split(' '));
       await pool(writes, 8, async ([method, route]) => {
         const isPublic =
           route!.startsWith('/public') ||
@@ -429,8 +439,12 @@ describe.skipIf(e.E2E_DB === '1')(
       console.log(
         `SWEEP_SUMMARY total=${results.length} ok2xx=${results.filter(r => r.status >= 200 && r.status < 300).length} expected4xx=${results.filter(r => EXPECTED_4XX.has(r.status)).length} failing=${bad.length} odd=${odd.length}`
       );
-      if (process.env.SWEEP_STRICT === '1')
-        expect(bad.map(r => `${r.method} ${r.route} ${r.status}`)).toEqual([]);
+      if (e.SWEEP_STRICT === '1') {
+        const lines = bad.map(r => `${r.method} ${r.route} ${r.status}`);
+        // eslint-disable-next-line no-console
+        if (lines.length) console.log('SWEEP_FAILING\n' + lines.join('\n'));
+        expect(lines, 'routes answering 5xx or hanging').toEqual([]);
+      }
     });
   }
 );
