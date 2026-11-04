@@ -186,12 +186,9 @@ router.get(
       //     for) the storeId in the URL
       const role = req.user!.role;
       if (role === 'customer') {
+        // Another customer's return answers exactly like a missing one: no existence oracle.
         if (returnRequest.customerId !== req.user!.userId) {
-          res.status(403).json({
-            success: false,
-            error: { code: 'FORBIDDEN', message: 'Access denied' },
-          });
-          return;
+          throw new AppError(404, 'NOT_FOUND', 'Return request not found');
         }
       } else if (role === 'store_admin' || role === 'super_admin') {
         const access = await checkStoreAccess(storeId, req.user!);

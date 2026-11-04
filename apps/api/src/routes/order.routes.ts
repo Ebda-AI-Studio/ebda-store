@@ -647,12 +647,9 @@ router.get(
 
       const order = await OrderService.getById(storeId, id);
 
+      // Another customer's order answers exactly like a missing one: no existence oracle.
       if (!isStoreViewer && order.customerId !== req.user?.userId) {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Not authorized to view this order' },
-        });
-        return;
+        throw new AppError(404, 'NOT_FOUND', 'Order not found');
       }
 
       res.json({
@@ -2358,7 +2355,7 @@ router.get(
       // For non-viewer callers verify ownership
       if (!isStoreViewer) {
         if (!user || order.customerId !== user.userId) {
-          res.status(403).json({ success: false, error: { message: 'Forbidden' } });
+          res.status(404).json({ success: false, error: { message: 'Order not found' } });
           return;
         }
       }

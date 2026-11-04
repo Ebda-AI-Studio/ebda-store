@@ -32,17 +32,43 @@ describe('requireCustomerStoreMatch (MAP-HIGH, customer token vs URL store)', ()
   });
 });
 
-describe('the dual-use store routes mount it right after authenticate', () => {
+describe('every customer-facing route with a URL :storeId mounts it right after authentication', () => {
+  const src = (file: string) => readFileSync(path.join(API, 'routes', file), 'utf8');
   const count = (file: string) =>
-    (
-      readFileSync(path.join(API, 'routes', file), 'utf8').match(
-        /authenticate,\s*requireCustomerStoreMatch,/g
-      ) ?? []
-    ).length;
-  it('order routes: list, detail, my/list, timeline, create', () => {
-    expect(count('order.routes.ts')).toBe(5);
+    (src(file).match(/(?:optionalAuthenticate|authenticate),\s*requireCustomerStoreMatch,/g) ?? [])
+      .length;
+  const table: Array<[string, number]> = [
+    ['order.routes.ts', 5], // list, detail, my/list, timeline, create
+    ['return.routes.ts', 3], // list, create, detail
+    ['shipping-carrier.routes.ts', 1], // public order tracking
+    ['review.routes.ts', 1], // create review
+    ['loyalty.routes.ts', 3], // my-points, my-transactions, join
+    ['wallet.routes.ts', 2], // public wallet, wallet transactions
+    ['coupon.routes.ts', 1], // public coupon validate (optional auth)
+  ];
+  it.each(table)('%s mounts it on %i route(s)', (file, n) => {
+    expect(count(file)).toBe(n);
   });
-  it('return routes: list, create, detail', () => {
-    expect(count('return.routes.ts')).toBe(3);
+  it('the cart router applies it to every handler', () => {
+    expect(src('cart.routes.ts')).toMatch(/router\.use\(requireCustomerStoreMatch\)/);
+  });
+});
+
+describe("another customer's order or return answers 404, never 403 (no existence oracle)", () => {
+  const src = (file: string) => readFileSync(path.join(API, 'routes', file), 'utf8');
+  it('order detail, timeline and tracking', () => {
+    expect(src('order.routes.ts')).not.toContain('Not authorized to view this order');
+    expect(src('order.routes.ts')).not.toMatch(/error: \{ message: 'Forbidden' \}/);
+    expect(src('order.routes.ts')).toMatch(
+      /order\.customerId !== req\.user\?\.userId\) \{\s*throw new AppError\(404, 'NOT_FOUND', 'Order not found'\)/
+    );
+    expect(src('shipping-carrier.routes.ts')).toMatch(
+      /order\.customerId !== user\.userId\) \{\s*res\.status\(404\)/
+    );
+  });
+  it('return detail', () => {
+    expect(src('return.routes.ts')).toMatch(
+      /returnRequest\.customerId !== req\.user!\.userId\) \{\s*throw new AppError\(404, 'NOT_FOUND', 'Return request not found'\)/
+    );
   });
 });
