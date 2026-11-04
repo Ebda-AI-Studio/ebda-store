@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
@@ -197,7 +198,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     displayNameAr: string | null;
   } | null = null;
   const codRecord = storeId
-    ? await prisma.paymentConfig.findFirst({
+    ? await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: { storeId, provider: 'cod' as const, isEnabled: true },
       })
     : null;
@@ -243,7 +246,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
   // Ruling SHARIA-GOLD-1: a cart with gold hides COD + installments unless the merchant allowed them. The
   // storefront only hides the options; the API refuses them (assertGoldPaymentAllowed) whatever it shows.
   const goldStore = storeId
-    ? await prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    ? await (
+        await storeDb(storeId)
+      ).store.findUnique({ where: { id: storeId }, select: { settings: true } })
     : null;
   const goldPrepaidOnly = !goldAllowsDeferredPayment(goldStore?.settings);
 
@@ -588,7 +593,9 @@ router.post(
           // ==========================================
           // Look up COD config for fee
           // The store's own COD row only (no platform-level row exists for the app role, R-EBDA-007).
-          const codConfig = await prisma.paymentConfig.findFirst({
+          const codConfig = await (
+            await storeDb(order.storeId)
+          ).paymentConfig.findFirst({
             where: { storeId: order.storeId, provider: 'cod', isEnabled: true },
           });
 

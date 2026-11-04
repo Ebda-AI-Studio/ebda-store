@@ -10,7 +10,7 @@
  * COD payment config, subscription).
  */
 import { recordReferral } from './billing/grants.service';
-import { storeDb, storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
@@ -127,7 +127,9 @@ export class OnboardingService {
         products: await (
           await storeDb(store.id)
         ).product.count({ where: { storeId: store.id, deletedAt: null } }),
-        cod: await prisma.paymentConfig.count({
+        cod: await (
+          await storeDb(store.id)
+        ).paymentConfig.count({
           where: { storeId: store.id, provider: 'cod', isEnabled: true },
         }),
         planCode:
@@ -344,11 +346,15 @@ export class OnboardingService {
    * "choose payment methods" item done: the merchant has now chosen.
    */
   static async setPaymentMethods(storeId: string, methods: { cod: boolean }) {
-    const existing = await prisma.paymentConfig.findFirst({
+    const existing = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({
       where: { storeId, provider: 'cod' },
       select: { id: true },
     });
-    const otherEnabled = await prisma.paymentConfig.count({
+    const otherEnabled = await (
+      await storeDb(storeId)
+    ).paymentConfig.count({
       where: { storeId, isEnabled: true, provider: { not: 'cod' } },
     });
     if (!methods.cod && otherEnabled === 0) {
@@ -359,12 +365,16 @@ export class OnboardingService {
       );
     }
     if (existing) {
-      await prisma.paymentConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: { isEnabled: methods.cod },
       });
     } else {
-      await prisma.paymentConfig.create({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.create({
         data: {
           storeId,
           provider: 'cod',
@@ -400,7 +410,9 @@ export class OnboardingService {
       // Billing first (Ruling EBDA-FUNNEL-5): an active trial with a saved card,
       // a pay-at-trial-end trial, a paid plan, or an admin-granted plan.
       await assertStoreMayGoLive(storeId);
-      const methods = await prisma.paymentConfig.count({ where: { storeId, isEnabled: true } });
+      const methods = await (
+        await storeDb(storeId)
+      ).paymentConfig.count({ where: { storeId, isEnabled: true } });
       if (methods === 0) {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');
       }

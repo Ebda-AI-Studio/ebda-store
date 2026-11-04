@@ -16,7 +16,8 @@
  * transaction AFTER the provider call, never inside a request transaction.
  * COD and InstaPay have no provider behind them and are never breakered.
  */
-import { runInTenantContext, prisma } from '@ebda/database';
+import { storeWriter } from '../../lib/repo-factory';
+import { withStore } from '@ebda/database';
 import logger from '../../lib/logger';
 import { circuitBreaker } from '../circuit-breaker.service';
 import { AppError } from '../../middleware/error-handler';
@@ -116,8 +117,9 @@ async function persistHealth(storeId: string, provider: string): Promise<void> {
   if (lastWritten.get(key) === health) return;
   lastWritten.set(key, health);
   try {
-    await runInTenantContext(storeId, () =>
-      prisma.paymentConfig.updateMany({
+    // withStore: the store's short transaction on Postgres, no Postgres at all for a store on its Durable Object
+    await withStore(storeId, async () =>
+      (await storeWriter(storeId)).paymentConfig.updateMany({
         where: { storeId, provider: provider as never },
         data: { healthStatus: health, lastHealthCheck: new Date() },
       })

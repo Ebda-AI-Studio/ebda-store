@@ -5,7 +5,7 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { TAX_NOT_VERIFIED_CODE } from '@ebda/shared';
 import { TaxProfileService } from './tax-profile.service';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate } from '../lib/repo-factory';
 
 /**
  * Issue 2212: `taxRatePercent` (and taxEnabled/taxIncludedInPrice) ride the
@@ -48,16 +48,16 @@ export class TaxService {
    * Get store tax settings
    */
   static async getSettings(storeId: string): Promise<TaxSettings> {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: {
-          taxEnabled: true,
-          taxIncludedInPrice: true,
-          defaultTaxRate: true,
-        },
-      })
-    );
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
+      where: { id: storeId },
+      select: {
+        taxEnabled: true,
+        taxIncludedInPrice: true,
+        defaultTaxRate: true,
+      },
+    });
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');

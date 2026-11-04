@@ -9,6 +9,7 @@
  *
  * The credentials never leave the server: every result here is a status, a code and a time.
  */
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { onD1 } from './platform/billing-d1';
 import {
   acrossStoresFlat,
@@ -113,7 +114,9 @@ function requestableEntry(provider: string) {
 /** The stored connection row (credentials ciphertext included) of a store's provider, or null. */
 async function loadConnection(storeId: string, provider: string, kind: 'payments' | 'shipping') {
   if (kind === 'payments') {
-    const row = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+    const row = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({ where: { provider, storeId } });
     if (!row) return null;
     return { kind, row, test: row.connectionTest };
   }
@@ -339,15 +342,15 @@ export async function runTestForStore(
   if (!entry || entry.manual)
     throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
   if (entry.kind === 'payments') {
-    const row = await runInTenantContext(storeId, () =>
-      prisma.paymentConfig.findFirst({ where: { provider, storeId } })
-    );
+    const row = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({ where: { provider, storeId } });
     if (!row)
       throw new AppError(404, 'NOT_FOUND', 'The store has not saved credentials for this provider');
     // The gateway call holds no transaction: read, call, then a short write.
     const { result, stored } = await runConnectionTest(row);
-    await runInTenantContext(storeId, () =>
-      prisma.paymentConfig.update({
+    await withStore(storeId, async () =>
+      (await storeWriter(storeId)).paymentConfig.update({
         where: { id: row.id, storeId },
         data: {
           connectionTest: stored as unknown as Prisma.InputJsonValue,

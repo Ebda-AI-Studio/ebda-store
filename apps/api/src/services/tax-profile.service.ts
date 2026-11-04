@@ -15,7 +15,7 @@ import { StorageService } from './storage.service';
 import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 import { doStoreIdList } from '../lib/store-backend';
 import type { TaxReviewRow } from '../lib/definer';
 
@@ -138,15 +138,31 @@ const EXT: Record<(typeof TAX_DOCUMENT_MIME_TYPES)[number], string> = {
 };
 
 async function loadOrCreate(storeId: string) {
-  const existing = await prisma.storeTaxProfile.findUnique({
+  const existing = await (
+    await storeDb(storeId)
+  ).storeTaxProfile.findUnique({
     where: { storeId },
     select: { id: true, status: true },
   });
   if (existing) return existing;
-  return prisma.storeTaxProfile.create({
-    data: { storeId },
-    select: { id: true, status: true },
-  });
+  try {
+    return await (
+      await storeWriter(storeId)
+    ).storeTaxProfile.create({
+      data: { storeId },
+      select: { id: true, status: true },
+    });
+  } catch (err) {
+    // two first requests raced: the unique (store_id) refused the second; the row exists now
+    const again = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
+      where: { storeId },
+      select: { id: true, status: true },
+    });
+    if (again) return again;
+    throw err;
+  }
 }
 
 /**
@@ -207,7 +223,9 @@ export async function taxReviewQueueFromStores(
 
 export class TaxProfileService {
   static async get(storeId: string): Promise<TaxProfileView> {
-    const p = await prisma.storeTaxProfile.findUnique({
+    const p = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
       where: { storeId },
       select: PROFILE_SELECT,
     });
@@ -221,7 +239,9 @@ export class TaxProfileService {
   ): Promise<TaxProfileView> {
     const current = await loadOrCreate(storeId);
     assertEditable(current.status);
-    const p = await prisma.storeTaxProfile.update({
+    const p = await (
+      await storeWriter(storeId)
+    ).storeTaxProfile.update({
       where: { storeId },
       data: { taxRegistrationNumber: data.taxRegistrationNumber, legalName: data.legalName },
       select: PROFILE_SELECT,
@@ -258,7 +278,9 @@ export class TaxProfileService {
         'Upload a PDF, JPG or PNG. / ارفع ملف PDF أو JPG أو PNG.'
       );
     }
-    const count = await prisma.storeTaxDocument.count({
+    const count = await (
+      await storeDb(storeId)
+    ).storeTaxDocument.count({
       where: { storeId, profileId: current.id },
     });
     if (count >= TAX_DOCUMENT_MAX_COUNT) {
@@ -280,7 +302,9 @@ export class TaxProfileService {
     });
     let doc;
     try {
-      doc = await prisma.storeTaxDocument.create({
+      doc = await (
+        await storeWriter(storeId)
+      ).storeTaxDocument.create({
         data: {
           storeId,
           profileId: current.id,
@@ -318,12 +342,14 @@ export class TaxProfileService {
   static async deleteDocument(storeId: string, documentId: string, actor: Actor): Promise<void> {
     const current = await loadOrCreate(storeId);
     assertEditable(current.status);
-    const doc = await prisma.storeTaxDocument.findFirst({
+    const doc = await (
+      await storeDb(storeId)
+    ).storeTaxDocument.findFirst({
       where: { id: documentId, storeId },
       select: { id: true, storageKey: true, kind: true },
     });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-    await prisma.storeTaxDocument.delete({ where: { id: doc.id, storeId } });
+    await (await storeWriter(storeId)).storeTaxDocument.delete({ where: { id: doc.id, storeId } });
     const storageKey = doc.storageKey;
     void deferAfterTenantCommit('taxProfile.deletePrivateObject', () =>
       StorageService.deletePrivate(storageKey)
@@ -347,7 +373,9 @@ export class TaxProfileService {
     storeId: string,
     documentId: string
   ): Promise<{ body: Buffer; mimeType: string; fileName: string }> {
-    const doc = await prisma.storeTaxDocument.findFirst({
+    const doc = await (
+      await storeDb(storeId)
+    ).storeTaxDocument.findFirst({
       where: { id: documentId, storeId },
       select: { storageKey: true, mimeType: true, fileName: true },
     });
@@ -357,7 +385,9 @@ export class TaxProfileService {
   }
 
   static async submit(storeId: string, actor: Actor): Promise<TaxProfileView> {
-    const current = await prisma.storeTaxProfile.findUnique({
+    const current = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
       where: { storeId },
       select: {
         id: true,
@@ -383,7 +413,9 @@ export class TaxProfileService {
       );
     }
     const now = new Date();
-    const p = await prisma.storeTaxProfile.update({
+    const p = await (
+      await storeWriter(storeId)
+    ).storeTaxProfile.update({
       where: { storeId },
       data: {
         status: 'pending',
@@ -422,7 +454,9 @@ export class TaxProfileService {
     return withUser(
       actor.userId,
       async () => {
-        const current = await prisma.storeTaxProfile.findUnique({
+        const current = await (
+          await storeDb(storeId)
+        ).storeTaxProfile.findUnique({
           where: { storeId },
           select: { id: true, status: true },
         });
@@ -475,7 +509,9 @@ export class TaxProfileService {
             rejectionReason: decision.reason,
           };
         }
-        const p = await prisma.storeTaxProfile.update({
+        const p = await (
+          await storeWriter(storeId)
+        ).storeTaxProfile.update({
           where: { storeId },
           data,
           select: PROFILE_SELECT,
@@ -508,7 +544,9 @@ export class TaxProfileService {
 
   /** Is this store's VAT registration verified? (the settings write gate) */
   static async isVerified(storeId: string): Promise<boolean> {
-    const p = await prisma.storeTaxProfile.findUnique({
+    const p = await (
+      await storeDb(storeId)
+    ).storeTaxProfile.findUnique({
       where: { storeId },
       select: { status: true },
     });

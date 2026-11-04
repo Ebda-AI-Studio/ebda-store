@@ -55,6 +55,8 @@ const { mockPrisma, mockClearCache, mockAuditLog, currentUser, decryptSpy } = vi
       delete: vi.fn(),
     },
     store: { findUnique: vi.fn() },
+    // the atomic batch: each op is already a promise on the mock
+    $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
   mockClearCache: vi.fn(),
   mockAuditLog: vi.fn(),
@@ -291,7 +293,10 @@ describe('POST /payment-settings/store/:storeId — isDefault is exclusive per s
 
     await request(app).post(`${BASE}/store/${STORE_ID}`).send({ provider: 'cod' });
 
-    expect(mockPrisma.paymentConfig.updateMany).not.toHaveBeenCalled();
+    // the batch carries a no-op unset (`id in []`), never one that touches a real default
+    expect(mockPrisma.paymentConfig.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { storeId: STORE_ID, isDefault: true } })
+    );
   });
 });
 
