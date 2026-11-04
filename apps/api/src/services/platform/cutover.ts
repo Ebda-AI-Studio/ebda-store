@@ -66,7 +66,7 @@ export const OFF_TTL_MS = 10_000;
 export const cutoverKey = (family: PlatformFamily) => `platform_cutover.${family}`;
 export const freezeKey = (family: PlatformFamily) => `platform_freeze.${family}`;
 
-interface MarkerD1 {
+export interface MarkerD1 {
   prepare(sql: string): {
     bind(...v: unknown[]): {
       all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>;
@@ -88,51 +88,76 @@ const binding = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.
 const unreadable = () =>
   new AppError(503, 'PLATFORM_CUTOVER_UNREADABLE', 'Platform database is unavailable');
 
-const expiredFreezeAlerted = new Set<PlatformFamily>();
+const expiredFreezeAlerted = new Set<string>();
 
 /**
- * The marker and the freeze. A freeze row carries `{"expiresAt": <epoch ms>}`: past that instant it is IGNORED (a script
- * killed without lifting it must not stop billing for ever) and a P1 names it, once per isolate.
+ * ONE marker + freeze mechanism for every cutover (billing/access/platform/inbox/ai-usage/analytics families AND the per-store
+ * customer-auth marker of lib/customer-auth.ts, Ruling NZ-INTEG-1): the keys differ, the semantics do not. `markers` are the
+ * `system_settings` keys whose presence means "moved"; `freezes` are the keys whose presence (unexpired) means "frozen".
+ * A freeze row carries `{"expiresAt": <epoch ms>}`: past that instant it is IGNORED (a script killed without lifting it must not
+ * stop the platform for ever) and a P1 names it, once per isolate per key. Unreadable D1 -> `unreadable()` (fail closed).
  */
-async function readKeys(
+export interface CutoverKeys {
+  markers: readonly string[];
+  freezes: readonly string[];
+  unreadable: () => AppError;
+  /** The operator command that removes the named freeze key (for the P1). */
+  unfreezeHint: (freezeKey: string) => string;
+  alertTitle: string;
+}
+
+export async function readCutoverKeys(
   d1: MarkerD1,
-  family: PlatformFamily
+  k: CutoverKeys
 ): Promise<{ moved: boolean; frozen: boolean }> {
+  const keys = [...k.markers, ...k.freezes];
   try {
     const rows =
       (
         await d1
-          .prepare('SELECT key, value FROM system_settings WHERE key IN (?1, ?2)')
-          .bind(cutoverKey(family), freezeKey(family))
+          .prepare(
+            `SELECT key, value FROM system_settings WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(',')})`
+          )
+          .bind(...keys)
           .all<{ key: string; value: string }>()
       ).results ?? [];
-    const freeze = rows.find(r => r.key === freezeKey(family));
-    let frozen = !!freeze;
-    if (freeze) {
+    let frozen = false;
+    for (const r of rows) {
+      if (!k.freezes.includes(r.key)) continue;
       let expiresAt = Number.POSITIVE_INFINITY;
       try {
-        const parsed = JSON.parse(freeze.value) as { expiresAt?: unknown };
+        const parsed = JSON.parse(r.value) as { expiresAt?: unknown };
         if (typeof parsed.expiresAt === 'number') expiresAt = parsed.expiresAt;
       } catch {
         /* a freeze without a readable expiry is honoured */
       }
       if (expiresAt <= Date.now()) {
-        frozen = false;
-        if (!expiredFreezeAlerted.has(family)) {
-          expiredFreezeAlerted.add(family);
+        if (!expiredFreezeAlerted.has(r.key)) {
+          expiredFreezeAlerted.add(r.key);
           void sendAlert({
             level: 'p1',
-            title: 'Platform cutover: an expired freeze was left behind',
-            body: `${freezeKey(family)} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: node scripts/cf/cutover-platform-family.mjs --family ${family} --unfreeze`,
+            title: k.alertTitle,
+            body: `${r.key} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: ${k.unfreezeHint(r.key)}`,
           }).catch(() => undefined);
         }
+        continue;
       }
+      frozen = true;
     }
-    return { moved: rows.some(r => r.key === cutoverKey(family)), frozen };
+    return { moved: rows.some(r => k.markers.includes(r.key)), frozen };
   } catch {
-    throw unreadable();
+    throw k.unreadable();
   }
 }
+
+const readKeys = (d1: MarkerD1, family: PlatformFamily) =>
+  readCutoverKeys(d1, {
+    markers: [cutoverKey(family)],
+    freezes: [freezeKey(family)],
+    unreadable,
+    unfreezeHint: () => `node scripts/cf/cutover-platform-family.mjs --family ${family} --unfreeze`,
+    alertTitle: 'Platform cutover: an expired freeze was left behind',
+  });
 
 /** Is the family frozen right now? Always a fresh read (no cache); false without a platform D1 binding. */
 export async function isFamilyFrozen(family: PlatformFamily): Promise<boolean> {

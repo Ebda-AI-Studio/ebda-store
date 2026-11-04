@@ -49,7 +49,6 @@ import {
 } from '@ebda/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/error-handler';
-import { checkStoreAccess } from '../middleware/store-access';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
 import {
   codCollectMinor,

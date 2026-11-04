@@ -7,7 +7,7 @@
  * writes them, after copying and verifying the store's rows. Before the marker every call is served by Postgres exactly as
  * before (Ruling NEON-ZERO-2: one marker, one source of truth, no dual read).
  *
- * ONE freeze mechanism: #407's (platform/cutover.ts, feat/nz-platform-d1 7ed916be5), ported here per store. The freeze row
+ * ONE freeze mechanism: platform/cutover.ts `readCutoverKeys` (#407's), keyed per store here. The freeze row
  * carries an expiry, "off" is never cached while frozen, a write is refused while marker + freeze coexist, and the script
  * follows freeze -> drain -> snapshot -> copy -> verify -> flip -> settle -> drift check on a NEW connection -> lift.
  * Marker unreadable -> 503 (fail closed).
@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo } from './store-backend';
-import { sendAlert } from '../services/alerts.service';
+import { readCutoverKeys, resetCutoverCache, type MarkerD1 } from '../services/platform/cutover';
 
 export const OFF_TTL_MS = 10_000;
 export const markerKey = (storeId: string) => `customer_auth_cutover.${storeId}`;
@@ -25,24 +25,18 @@ export const freezeKey = (storeId: string) => `customer_auth_freeze.${storeId}`;
 /** Written by the script while ANY store is frozen: unscoped Postgres-era tokens (reset links) cannot name their store. */
 export const ANY_FREEZE_KEY = 'customer_auth_freeze.__any';
 
-interface MarkerD1 {
-  prepare(sql: string): {
-    bind(...v: unknown[]): { all<T = Record<string, unknown>>(): Promise<{ results?: T[] }> };
-  };
-}
 const d1 = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATFORM_DB;
 
-// Freeze + marker semantics are #407's (cutover.ts, head 7ed916be5), ported verbatim in behaviour: a freeze row carries
-// `{"expiresAt": <epoch ms>}` and past it is IGNORED with a P1 (once per isolate); "off" is never cached while a freeze
-// exists; a WRITE never trusts a cached "off" and is refused (retryable 503) while a freeze exists, marker or not.
+// Freeze + marker semantics are platform/cutover.ts's `readCutoverKeys` (ONE mechanism, Ruling NZ-INTEG-1); only the keys
+// are per store here. "off" is never cached while a freeze exists; a WRITE never trusts a cached "off" and is refused
+// (retryable 503) while a freeze exists, marker or not.
 const on = new Set<string>();
 const offUntil = new Map<string, number>();
-const expiredAlerted = new Set<string>();
 /** Test seam. */
 export function resetCustomerAuthCaches(): void {
   on.clear();
   offUntil.clear();
-  expiredAlerted.clear();
+  resetCutoverCache();
 }
 
 const unreadable = () =>
@@ -54,55 +48,15 @@ const frozenError = () =>
   });
 
 /** Marker (store or global) and freeze (store or any) in ONE read. */
-async function readKeys(
-  db: MarkerD1,
-  storeId: string | null
-): Promise<{ moved: boolean; frozen: boolean }> {
-  const keys = storeId
-    ? [markerKey(storeId), GLOBAL_MARKER_KEY, freezeKey(storeId), ANY_FREEZE_KEY]
-    : [ANY_FREEZE_KEY];
-  try {
-    const rows =
-      (
-        await db
-          .prepare(
-            `SELECT key, value FROM system_settings WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(',')})`
-          )
-          .bind(...keys)
-          .all<{ key: string; value: string }>()
-      ).results ?? [];
-    let frozen = false;
-    for (const r of rows) {
-      if (r.key !== ANY_FREEZE_KEY && r.key !== (storeId ? freezeKey(storeId) : '')) continue;
-      let expiresAt = Number.POSITIVE_INFINITY;
-      try {
-        const parsed = JSON.parse(r.value) as { expiresAt?: unknown };
-        if (typeof parsed.expiresAt === 'number') expiresAt = parsed.expiresAt;
-      } catch {
-        /* a freeze without a readable expiry is honoured */
-      }
-      if (expiresAt <= Date.now()) {
-        if (!expiredAlerted.has(r.key)) {
-          expiredAlerted.add(r.key);
-          void sendAlert({
-            level: 'p1',
-            title: 'Customer auth cutover: an expired freeze was left behind',
-            body: `${r.key} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: node scripts/cf/cutover-customer-auth.mjs --unfreeze --store <id> (same --d1 flags)`,
-          }).catch(() => undefined);
-        }
-        continue;
-      }
-      frozen = true;
-    }
-    return {
-      moved:
-        !!storeId && rows.some(r => r.key === markerKey(storeId) || r.key === GLOBAL_MARKER_KEY),
-      frozen,
-    };
-  } catch {
-    throw unreadable();
-  }
-}
+const readKeys = (db: MarkerD1, storeId: string | null) =>
+  readCutoverKeys(db, {
+    markers: storeId ? [markerKey(storeId), GLOBAL_MARKER_KEY] : [],
+    freezes: storeId ? [freezeKey(storeId), ANY_FREEZE_KEY] : [ANY_FREEZE_KEY],
+    unreadable,
+    unfreezeHint: () =>
+      'node scripts/cf/cutover-customer-auth.mjs --unfreeze --store <id> (same --d1 flags)',
+    alertTitle: 'Customer auth cutover: an expired freeze was left behind',
+  });
 
 /** READ path: true when this store's customers are served by its StoreDO. "On" is cached for good; "off" for OFF_TTL_MS, never while frozen. */
 export async function customerAuthOnDo(storeId: string): Promise<boolean> {

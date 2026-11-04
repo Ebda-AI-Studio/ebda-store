@@ -998,7 +998,8 @@ export function exportCustomer(
 } | null> {
   const u = userById(db, a.userId);
   if (!u) return ok(null);
-  const passkeys = passkeyList(db, a).data.map(p => ({
+  const pk = passkeyList(db, a);
+  const passkeys = (pk.ok ? pk.data : []).map(p => ({
     id: p.id,
     name: p.name,
     createdAt: p.createdAt,
