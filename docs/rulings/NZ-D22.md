@@ -35,3 +35,22 @@ Postgres first; (d) D1 `plans` must hold the plan rows (the subscription FK): im
 checked against production (no production SQL was run); (e) a read-merge on a DO store can lose one key to a writer in the
 same few milliseconds (the #400 residual, unchanged). Cost if wrong: turning the flag on early creates stores whose admin
 returns 404 STORE_NOT_FOUND until N-6 lands; a missing D1 plan row fails the create (503, the D1 row is removed again).
+
+**Amendment 2026-11-04 (Opus review of #408, six findings fixed).** (1) The D1 owner-store reads are gated on
+`storeCreateOnDo()`: flag OFF = Postgres only (the unchanged behaviour); flag ON = the UNION by id (lists) / the MAX (counts) of
+Postgres and D1, an unreachable Postgres counting as "no Postgres stores", so a store whose directory mirror failed is still
+counted (no second Growth trial, no plan-gate bypass). (2) The D1 + DO provisioning path keeps the owner's
+`ensureAdminUser` in a Postgres transaction that stays open until the store exists, so a failed create leaves no owner row (a
+retry gets its temporary password); a failed COMMIT after the store exists rolls the store back. (3) The store row and its
+subscription / trial row are ONE atomic D1 batch BEFORE the DO bootstrap; a rollback that itself fails is a P1 alert
+(`store.create.do_rollback_failed`) plus an error log. A reconciler sweep of "`do` rows with no subscription" is NOT added:
+stores migrated from Postgres are `do` rows whose subscription is still in Postgres, so it would delete real stores; N-10
+adds it once subscriptions are in D1. (4) Only `UNIQUE constraint failed` is a taken address, and it answers `SLUG_TAKEN` on
+both create paths; NOT NULL / CHECK failures are a 503. (5) The whole-value copy of a raw settings write carries the row's
+`updated_at`; the DO ignores a copy older than the one it holds (`applyStoreSettings`). (6) `getEntitlements` called with
+`known` now also looks for the subscription in D1 when Postgres has none (inline; PR #407's module is not on main, replace the
+read when it lands). (d) The plan gate is enforced atomically in the D1 insert (`INSERT ... WHERE count < allowance`, an
+account's allowance from `ownerStoreAllowance`), so it fails CLOSED, unlike the Redis creation lock; the allowance count is
+D1-only, and the Postgres-aware pre-check (`assertOwnerMayCreateStore`) still runs first. Cost if wrong: an owner whose
+Postgres store never reached the D1 directory could exceed the allowance by that one store in the narrow race between the
+pre-check and the insert.

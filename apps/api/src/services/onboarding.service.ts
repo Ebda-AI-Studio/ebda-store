@@ -32,8 +32,8 @@ import { bustStoreCaches, StoreService } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
-import { assertOwnerMayCreateStore } from './plan-limit.service';
-import { countOwnerStores } from '../lib/store-create-do';
+import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
+import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
 import {
@@ -262,6 +262,14 @@ export class OnboardingService {
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          maxOwnedStores:
+            owner.isSuperAdmin || !storeCreateOnDo()
+              ? null
+              : Math.min(
+                  MAX_SELF_SERVE_STORES_PER_OWNER,
+                  (await ownerStoreAllowance(owner.userId)).allowance ??
+                    MAX_SELF_SERVE_STORES_PER_OWNER
+                ),
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',

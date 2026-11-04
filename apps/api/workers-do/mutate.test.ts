@@ -212,4 +212,24 @@ describe('StoreDO.mutate procedures and the settings copy (PR D1b)', () => {
       code: 'STORE_MISMATCH',
     });
   });
+  it('applySettings ignores a copy OLDER than the one the DO holds (out-of-order whole-value copies)', async () => {
+    const stub = stubFor('ord-1');
+    await stub.mutate('ord-1', { ops: [{ model: 'StorePage', op: 'count' }] });
+    await runInDurableObject(stub, async d => {
+      d.ctx.storage.sql.exec(
+        "INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES ('ord-1', 'S', 's', 'u')"
+      );
+    });
+    const { encodeRpc } = await import('@ebda-src/repo');
+    const newer = new Date(Date.now() + 60_000);
+    const older = new Date(Date.now() + 30_000);
+    await stub.applySettings('ord-1', encodeRpc({ heroTitle: 'new', updatedAt: newer }));
+    await stub.applySettings('ord-1', encodeRpc({ heroTitle: 'old', updatedAt: older }));
+    const row = await runInDurableObject(stub, async d =>
+      d.ctx.storage.sql
+        .exec("SELECT hero_title, updated_at FROM store_profile WHERE store_id = 'ord-1'")
+        .one()
+    );
+    expect(row).toEqual({ hero_title: 'new', updated_at: newer.getTime() });
+  });
 });

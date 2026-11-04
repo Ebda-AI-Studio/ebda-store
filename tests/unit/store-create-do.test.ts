@@ -23,6 +23,8 @@ const h = vi.hoisted(() => ({
   failBootstrap: false,
   failCoa: false,
   coaCalls: [] as string[],
+  alert: vi.fn(async () => undefined),
+  failDelete: false,
 }));
 
 vi.mock('@ebda/database', () => {
@@ -76,26 +78,39 @@ vi.mock('../../apps/api/src/services/accounting/account.service', () => ({
   },
 }));
 vi.mock('../../apps/api/src/services/alerts.service', () => ({
-  sendAlert: vi.fn(async () => undefined),
+  sendAlert: h.alert,
 }));
 
 import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
 import {
   countOwnerStores,
-  countOwnerStoresCreatedSinceD1,
+  countOwnerStoresCreatedSince,
   finishDoStoreCreate,
   insertDoStore,
-  listOwnerStoresD1,
+  ownerStores,
   storeCreateOnDo,
   type NewDoStore,
 } from '../../apps/api/src/lib/store-create-do';
 
 let sqlite: DatabaseSync;
 const fakeD1 = () => ({
+  batch: async (stmts: Array<{ run(): Promise<unknown> }>) => {
+    sqlite.exec('BEGIN');
+    try {
+      const out: unknown[] = [];
+      for (const st of stmts) out.push(await st.run());
+      sqlite.exec('COMMIT');
+      return out;
+    } catch (e) {
+      sqlite.exec('ROLLBACK');
+      throw e;
+    }
+  },
   prepare: (sql: string) => ({
     bind: (...v: unknown[]) => {
       const run = async () => {
         await Promise.resolve();
+        if (h.failDelete && /^\s*delete/i.test(sql)) throw new Error('d1 down');
         if (/^\s*select/i.test(sql)) return { results: sqlite.prepare(sql).all(...(v as never[])) };
         return { meta: { changes: Number(sqlite.prepare(sql).run(...(v as never[])).changes) } };
       };
@@ -152,6 +167,8 @@ beforeEach(() => {
   h.failBootstrap = false;
   h.failCoa = false;
   h.coaCalls.length = 0;
+  h.alert.mockClear();
+  h.failDelete = false;
   setCfBindings({ PLATFORM_DB: fakeD1(), STORE_DO: {} } as never);
   process.env.STORE_CREATE_ON_DO = '1';
 });
@@ -170,13 +187,9 @@ describe('storeCreateOnDo', () => {
 });
 
 describe('insertDoStore + finishDoStoreCreate (Postgres poisoned)', () => {
-  it('writes the D1 row as `do`, bootstraps the DO, the trial subscription in D1, seeds the chart, returns the record', async () => {
-    const id = await insertDoStore(input());
-    const rec = await finishDoStoreCreate(id, {
-      slug: 'nour',
-      plan: 'professional',
-      trial: {},
-    });
+  it('writes the D1 store + trial subscription in ONE batch, bootstraps the DO, seeds the chart, returns the record', async () => {
+    const id = await insertDoStore(input({ trial: {} }));
+    const rec = await finishDoStoreCreate(id, { slug: 'nour' });
     expect(d1Stores()).toEqual([
       expect.objectContaining({
         id,
@@ -197,66 +210,138 @@ describe('insertDoStore + finishDoStoreCreate (Postgres poisoned)', () => {
     expect(doDb.prepare('SELECT provider, is_enabled FROM payment_configs').all()).toEqual([
       { provider: 'cod', is_enabled: 1 },
     ]);
-    // the subscription is a D1 row (the trial: Growth for 14 days, the chosen plan pending)
     expect(
-      sqlite.prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id = ?').all(id)
-    ).toEqual([{ plan_code: 'growth', status: 'trialing' }]);
+      sqlite
+        .prepare(
+          'SELECT plan_code, status, pending_plan_code, billing_interval FROM store_subscriptions WHERE store_id = ?'
+        )
+        .all(id)
+    ).toEqual([
+      {
+        plan_code: 'growth',
+        status: 'trialing',
+        pending_plan_code: 'growth',
+        billing_interval: 'monthly',
+      },
+    ]);
     expect(h.coaCalls).toEqual([id]);
     expect(rec).toMatchObject({ id, name: 'Nour', slug: 'nour', ownerId: 'owner-1' });
   });
 
   it('a second store for the owner (no trial) rides its plan: active subscription, no trial', async () => {
     const id = await insertDoStore(input({ slug: 'two', plan: 'enterprise' }));
-    await finishDoStoreCreate(id, { slug: 'two', plan: 'enterprise' });
     const sub = sqlite
-      .prepare(
-        'SELECT plan_code, status, trial_ends_at FROM store_subscriptions WHERE store_id = ?'
-      )
+      .prepare('SELECT status, trial_ends_at FROM store_subscriptions WHERE store_id = ?')
       .get(id) as Record<string, unknown>;
-    expect(sub.status).toBe('active');
-    expect(sub.trial_ends_at).toBeNull();
+    expect(sub).toEqual({ status: 'active', trial_ends_at: null });
   });
 
-  it('a taken slug is a 409 and nothing reaches the DO', async () => {
+  it('a taken slug is SLUG_TAKEN (409), the same code the Postgres path answers; nothing reaches the DO', async () => {
     await insertDoStore(input());
-    await expect(insertDoStore(input())).rejects.toMatchObject({ statusCode: 409 });
+    await expect(insertDoStore(input())).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'SLUG_TAKEN',
+    });
     expect(h.bootstrapCalls).toBe(1);
     expect(d1Stores()).toHaveLength(1);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM store_subscriptions').get()).toEqual({ n: 1 });
   });
 
-  it('a DO bootstrap failure removes the D1 row again (nothing resolvable without a bootstrapped DO)', async () => {
+  it('a NOT NULL / CHECK failure is NOT reported as a taken slug', async () => {
+    await expect(insertDoStore(input({ status: 'bogus' as never }))).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'STORE_DIRECTORY_UNAVAILABLE',
+    });
+    expect(d1Stores()).toEqual([]);
+  });
+
+  it('the plan gate is ATOMIC in the insert: past the allowance the second create is refused and leaves nothing', async () => {
+    await insertDoStore(input({ slug: 'g1', maxOwnedStores: 1 }));
+    await expect(insertDoStore(input({ slug: 'g2', maxOwnedStores: 1 }))).rejects.toMatchObject({
+      code: 'STORE_LIMIT_REACHED',
+    });
+    expect(d1Stores()).toHaveLength(1);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM store_subscriptions').get()).toEqual({ n: 1 });
+    // unlimited (null) and operator creates are not gated
+    await expect(insertDoStore(input({ slug: 'g3', maxOwnedStores: null }))).resolves.toBeTruthy();
+  });
+
+  it('a DO bootstrap failure removes the D1 row (and its subscription) again', async () => {
     h.failBootstrap = true;
     await expect(insertDoStore(input())).rejects.toMatchObject({ code: 'BOOTSTRAP_REFUSED' });
     expect(d1Stores()).toEqual([]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM store_subscriptions').get()).toEqual({ n: 0 });
     h.failBootstrap = false;
-    await expect(insertDoStore(input())).resolves.toBeTruthy(); // the slug is free again
+    await expect(insertDoStore(input())).resolves.toBeTruthy();
+  });
+
+  it('a bootstrap failure whose ROLLBACK also fails is a P1 alert, never silent', async () => {
+    h.failBootstrap = true;
+    h.failDelete = true;
+    await expect(insertDoStore(input())).rejects.toMatchObject({ code: 'BOOTSTRAP_REFUSED' });
+    expect(h.alert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'store.create.do_rollback_failed' })
+    );
+    expect(d1Stores()).toHaveLength(1); // the orphan is exactly what the alert tells the operator to remove
   });
 
   it('a failure after the insert (chart of accounts) removes the D1 row and its subscription', async () => {
     const id = await insertDoStore(input());
     h.failCoa = true;
-    await expect(finishDoStoreCreate(id, { slug: 'nour', plan: 'professional' })).rejects.toThrow(
-      'coa down'
-    );
+    await expect(finishDoStoreCreate(id, { slug: 'nour' })).rejects.toThrow('coa down');
     expect(d1Stores()).toEqual([]);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM store_subscriptions').get()).toEqual({ n: 0 });
   });
 });
 
-describe('owner store reads come from D1', () => {
-  it('lists, counts and counts-since from the directory (soft-deleted excluded from the live list only)', async () => {
+describe('owner store reads (flag-gated; drift between the backends)', () => {
+  const pgStores =
+    (...ids: string[]) =>
+    async () =>
+      ids.map(id => ({ id, createdAt: new Date(1) }));
+
+  it('flag ON: the union of Postgres and D1 by id, counts are the max (a store missing from D1 still counts)', async () => {
     const a = await insertDoStore(input({ slug: 'a1' }));
-    await insertDoStore(input({ slug: 'a2' }));
     await insertDoStore(input({ slug: 'b1', ownerId: 'owner-2' }));
-    sqlite.prepare('UPDATE stores SET deleted_at = 1 WHERE id = ?').run(a);
-    expect((await listOwnerStoresD1('owner-1'))!.length).toBe(1);
-    expect(await countOwnerStores('owner-1', async () => 99)).toBe(1);
-    expect(await countOwnerStoresCreatedSinceD1('owner-1', new Date(Date.now() - 60_000))).toBe(2);
+    // pg-001 never reached the D1 directory (failed mirror); `a` has no Postgres row
+    const list = await ownerStores('owner-1', pgStores('pg-001'));
+    expect(list.map(r => r.id).sort()).toEqual([a, 'pg-001'].sort());
+    expect(await countOwnerStores('owner-1', async () => 5)).toBe(5);
+    expect(await countOwnerStores('owner-1', async () => 0)).toBe(1);
+    expect(
+      await countOwnerStoresCreatedSince('owner-1', new Date(Date.now() - 60_000), async () => 3)
+    ).toBe(3);
+    expect(
+      await countOwnerStoresCreatedSince('owner-1', new Date(Date.now() - 60_000), async () => 0)
+    ).toBe(1);
   });
-  it('falls back to the caller (Postgres) only where D1 is unbound', async () => {
-    h.d1 = undefined;
-    expect(await listOwnerStoresD1('owner-1')).toBeUndefined();
-    expect(await countOwnerStores('owner-1', async () => 7)).toBe(7);
-    expect(await countOwnerStoresCreatedSinceD1('owner-1', new Date())).toBeUndefined();
+  it('flag ON: an unreachable Postgres is "no Postgres stores", D1 still answers', async () => {
+    await insertDoStore(input({ slug: 'a1' }));
+    const down = async (): Promise<never> => {
+      throw new Error('pg down');
+    };
+    expect((await ownerStores('owner-1', down)).length).toBe(1);
+    expect(await countOwnerStores('owner-1', down)).toBe(1);
+  });
+  it('flag OFF: Postgres only, D1 is never consulted (the drift case: a store missing from Postgres-side counts is unchanged behaviour)', async () => {
+    await insertDoStore(input({ slug: 'a1' }));
+    process.env.STORE_CREATE_ON_DO = '0';
+    expect((await ownerStores('owner-1', pgStores('pg-001'))).map(r => r.id)).toEqual(['pg-001']);
+    expect(await countOwnerStores('owner-1', async () => 0)).toBe(0);
+    expect(await countOwnerStoresCreatedSince('owner-1', new Date(0), async () => 0)).toBe(0);
+  });
+});
+
+describe('getEntitlements for a caller that already knows the plan (`known`)', () => {
+  it('reads the D1 subscription of a store with no Postgres row (trial, not a derived plan)', async () => {
+    const id = await insertDoStore(input({ trial: {} }));
+    const { getEntitlements } = await import('../../apps/api/src/services/plan-entitlements');
+    const fakeTx = { storeSubscription: { findUnique: async () => null } } as never;
+    const e = await getEntitlements(id, fakeTx, { legacyPlan: 'professional' });
+    expect(e).toMatchObject({
+      status: 'trialing',
+      subscribedPlanCode: 'growth',
+      derivedFromLegacyPlan: false,
+    });
   });
 });

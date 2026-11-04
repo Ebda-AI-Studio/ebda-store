@@ -71,7 +71,7 @@ async function patchGuide(
   }
   const rows =
     'manual' in change
-      ? await prisma.$queryRaw<Array<{ settings: unknown }>>`
+      ? await prisma.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
           UPDATE stores SET settings = jsonb_set(
             COALESCE(settings, '{}'::jsonb), '{setupGuide}',
             COALESCE(settings->'setupGuide', '{}'::jsonb) || jsonb_build_object(
@@ -79,15 +79,18 @@ async function patchGuide(
                         || jsonb_build_object(${change.manual.key}::text, ${change.manual.done}::boolean)
             ), true)
           WHERE id = ${storeId}
-          RETURNING settings`
-      : await prisma.$queryRaw<Array<{ settings: unknown }>>`
+          RETURNING settings, updated_at AS "updatedAt"`
+      : await prisma.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
           UPDATE stores SET settings = jsonb_set(
             COALESCE(settings, '{}'::jsonb), '{setupGuide}',
             COALESCE(settings->'setupGuide', '{}'::jsonb)
               || jsonb_build_object('dismissed', ${change.dismissed}::boolean), true)
           WHERE id = ${storeId}
-          RETURNING settings`;
-  await copyStoreSettings(storeId, { settings: rows?.[0]?.settings ?? {} });
+          RETURNING settings, updated_at AS "updatedAt"`;
+  await copyStoreSettings(storeId, {
+    settings: rows?.[0]?.settings ?? {},
+    ...(rows?.[0]?.updatedAt instanceof Date ? { updatedAt: rows[0].updatedAt } : {}),
+  });
 }
 
 export class SetupGuideService {

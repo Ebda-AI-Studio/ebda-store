@@ -103,6 +103,18 @@ import { StoreService } from '../../apps/api/src/services/store.service';
 
 let sqlite: DatabaseSync;
 const fakeD1 = () => ({
+  batch: async (stmts: Array<{ run(): Promise<unknown> }>) => {
+    sqlite.exec('BEGIN');
+    try {
+      const out: unknown[] = [];
+      for (const st of stmts) out.push(await st.run());
+      sqlite.exec('COMMIT');
+      return out;
+    } catch (e) {
+      sqlite.exec('ROLLBACK');
+      throw e;
+    }
+  },
   prepare: (sql: string) => ({
     bind: (...v: unknown[]) => {
       const run = async () => {

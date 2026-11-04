@@ -93,7 +93,7 @@ export async function getEntitlements(
   known?: { legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE }
 ): Promise<Entitlements | null> {
   // N-18: a store created on D1 + its DO has no Postgres row. Its plan, subscription and plan row are read from the platform D1
-  // (where `writeNewStoreSubscription` wrote them); a store WITH a Postgres row is unchanged (Postgres stays authoritative for it
+  // (where `newSubscriptionRow` wrote them, in the store's own D1 batch); a store WITH a Postgres row is unchanged (Postgres stays authoritative for it
   // until N-10 moves every billing reader and writer together).
   const run = async (db: Tx): Promise<Entitlements | null> => {
     const store =
@@ -113,9 +113,18 @@ export async function getEntitlements(
       : null;
     if (!store && (!d1Store || d1Store.deletedAt)) return null;
     const plan0 = (store ?? d1Store) as { plan: keyof typeof STORE_PLAN_TO_PLAN_CODE };
-    const sub = fromD1
+    let sub = fromD1
       ? await fromD1.storeSubscription.findUnique({ where: { storeId } })
       : await db.storeSubscription.findUnique({ where: { storeId } });
+    // A caller that already read the plan (`known`) never saw the Postgres-row check above: a store with no Postgres row has no
+    // Postgres subscription either, so look in D1 (a store WITH a Postgres row and no subscription stays derived from its plan).
+    if (!sub && !fromD1 && known !== undefined) {
+      const platform = await platformDb();
+      if (platform) {
+        sub = await platform.storeSubscription.findUnique({ where: { storeId } });
+        if (sub) fromD1 = platform;
+      }
+    }
     const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[plan0.plan];
     const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
     const effectiveCode = status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;

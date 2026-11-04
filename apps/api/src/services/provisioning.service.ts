@@ -33,7 +33,12 @@ import {
   isBuiltSkin,
 } from '@ebda/shared';
 import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
-import { finishDoStoreCreate, insertDoStore, storeCreateOnDo } from '../lib/store-create-do';
+import {
+  finishDoStoreCreate,
+  insertDoStore,
+  rollbackDoStore,
+  storeCreateOnDo,
+} from '../lib/store-create-do';
 
 // ==========================================
 // Store Provisioning Service
@@ -59,6 +64,8 @@ export interface ProvisionStoreInput {
   growthTrial?: boolean;
   /** Self-serve only: the plan + interval chosen at signup, billed at trial end. */
   trialChoice?: TrialChoice;
+  /** D1 path only: atomic plan gate (the owner's store allowance; null/absent = unlimited). */
+  maxOwnedStores?: number | null;
   /** Initial storefront skin: must be one a BUILT look renders with. Defaults to the registry default (Qamar). */
   template?: string;
   storeNameAr?: string;
@@ -180,71 +187,82 @@ export class ProvisioningService {
     const onDo = storeCreateOnDo();
     const provisionOnDo = async () => {
       const nameParts = ownerName.trim().split(' ');
-      const owner = await withMoneyTx(prisma, tx =>
-        ensureAdminUser(
-          {
-            email: ownerEmail,
-            passwordHash,
-            firstName: nameParts[0],
-            lastName: nameParts.slice(1).join(' ') || '',
-            role: 'store_admin',
-            emailVerified: false,
-          },
-          tx
-        )
-      );
-      const { timezone: requestedZone, ...settingsRest } = settings ?? {};
-      const id = await insertDoStore({
-        name: storeName,
-        nameAr: storeNameAr ?? null,
-        slug,
-        domain: domain ?? null,
-        domainProvider: input.domainProvider ?? null,
-        ownerId: owner.id,
-        status,
-        plan,
-        template,
-        ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
-        settings: {
-          theme: settingsRest.theme || 'default',
-          currency: settingsRest.currency || REGION.currency,
-          ...settingsRest,
-          defaultLanguage:
-            (settingsRest as { defaultLanguage?: string }).defaultLanguage || REGION.defaultLocale,
-        },
-        theme: {},
-        layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
-        vatRateHundredths: REGION.defaultVatBps,
-        cod: {
-          name: 'Cash on Delivery',
-          nameAr: 'الدفع عند الاستلام',
-          currency: REGION.currency,
-        },
-      });
-      const created = await finishDoStoreCreate(id, {
-        slug,
-        domain: domain ?? null,
-        plan,
-        trial: input.growthTrial ? { choice: input.trialChoice } : undefined,
-        extra: async () => {
-          await (
-            await storeWriter(id)
-          ).category.create({
-            data: {
-              storeId: id,
-              name: 'Products',
-              slug: 'products',
-              description: 'All products',
-              position: 0,
+      // The owner is found-or-created in a Postgres transaction that stays OPEN until the D1 + DO create succeeded: a failed create
+      // rolls the owner back too (a retry is then a fresh account that gets its temporary password), as on the single-transaction
+      // Postgres path. If the COMMIT itself fails after the store exists, the store is rolled back (below).
+      let finished: string | undefined;
+      try {
+        return await withMoneyTx(prisma, async tx => {
+          const owner = await ensureAdminUser(
+            {
+              email: ownerEmail,
+              passwordHash,
+              firstName: nameParts[0],
+              lastName: nameParts.slice(1).join(' ') || '',
+              role: 'store_admin',
+              emailVerified: false,
+            },
+            tx
+          );
+          const { timezone: requestedZone, ...settingsRest } = settings ?? {};
+          const id = await insertDoStore({
+            name: storeName,
+            nameAr: storeNameAr ?? null,
+            slug,
+            domain: domain ?? null,
+            domainProvider: input.domainProvider ?? null,
+            ownerId: owner.id,
+            status,
+            plan,
+            template,
+            ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
+            settings: {
+              theme: settingsRest.theme || 'default',
+              currency: settingsRest.currency || REGION.currency,
+              ...settingsRest,
+              defaultLanguage:
+                (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                REGION.defaultLocale,
+            },
+            theme: {},
+            layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
+            vatRateHundredths: REGION.defaultVatBps,
+            trial: input.growthTrial ? { choice: input.trialChoice } : undefined,
+            maxOwnedStores: input.maxOwnedStores ?? null,
+            cod: {
+              name: 'Cash on Delivery',
+              nameAr: 'الدفع عند الاستلام',
+              currency: REGION.currency,
             },
           });
-        },
-      });
-      return {
-        store: created as { id: string; name: string; slug: string; domain: string | null },
-        owner,
-        isNewUser: owner.created,
-      };
+          const created = await finishDoStoreCreate(id, {
+            slug,
+            domain: domain ?? null,
+            extra: async () => {
+              await (
+                await storeWriter(id)
+              ).category.create({
+                data: {
+                  storeId: id,
+                  name: 'Products',
+                  slug: 'products',
+                  description: 'All products',
+                  position: 0,
+                },
+              });
+            },
+          });
+          finished = id;
+          return {
+            store: created as { id: string; name: string; slug: string; domain: string | null },
+            owner,
+            isNewUser: owner.created,
+          };
+        });
+      } catch (e) {
+        if (finished) await rollbackDoStore(finished, 'owner-commit');
+        throw e;
+      }
     };
 
     let result;

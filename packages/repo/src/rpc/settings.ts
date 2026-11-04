@@ -26,6 +26,15 @@ export function applyStoreSettings(
   const profileCols = cols('store_profile');
   const configCols = cols('store_config');
   const out = { profile: [] as string[], config: [] as string[], directoryOnly: [] as string[] };
+  // Ordering (N-19): a copy that carries `updatedAt` (the whole RETURNING value of a raw settings write) is applied only if it is
+  // not OLDER than what the DO already holds, so two copies landing out of order cannot leave the DO on the older value.
+  const stamp = fields.updatedAt;
+  if (stamp instanceof Date && profileCols.has('updated_at')) {
+    const cur = sql.all('SELECT "updated_at" AS t FROM "store_profile" WHERE "store_id" = ?', [
+      storeId,
+    ])[0];
+    if (cur && typeof cur.t === 'number' && cur.t > stamp.getTime()) return out;
+  }
   const sets: Record<'store_profile' | 'store_config', Array<[string, unknown]>> = {
     store_profile: [],
     store_config: [],

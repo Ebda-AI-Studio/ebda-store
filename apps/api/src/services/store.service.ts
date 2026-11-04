@@ -32,7 +32,8 @@ import { AppError } from '../middleware/error-handler';
 import {
   finishDoStoreCreate,
   insertDoStore,
-  listOwnerStoresD1,
+  countOwnerStores,
+  ownerStores,
   storeCreateOnDo,
 } from '../lib/store-create-do';
 import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
@@ -81,6 +82,7 @@ import {
   assertOwnerMayCreateStore,
   assertPlanAllows,
   assertWithinLimit,
+  ownerStoreAllowance,
 } from './plan-limit.service';
 import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
@@ -305,6 +307,9 @@ async function readLiveSettings(
   return (row?.settings as Record<string, unknown> | null) ?? {};
 }
 
+const stamp = (row?: { updatedAt?: Date }) =>
+  row?.updatedAt instanceof Date ? { updatedAt: row.updatedAt } : {};
+
 /** Atomic shallow merge of `patch` into `stores.settings` (Postgres path). Returns the resulting settings. */
 async function mergeSettingsAtomic(
   storeId: string,
@@ -312,16 +317,17 @@ async function mergeSettingsAtomic(
 ): Promise<Record<string, unknown>> {
   const rows = await withStore(
     storeId,
-    tx => tx.$queryRaw<Array<{ settings: unknown }>>`
+    tx => tx.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
       UPDATE stores
       SET settings = coalesce(settings, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb,
           updated_at = now()
       WHERE id = ${storeId}
-      RETURNING settings`
+      RETURNING settings, updated_at AS "updatedAt"`
   );
   const settings = (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
-  // N-19: the DO copy (a Node / dev store whose DO is not yet the writer) gets the WHOLE resulting value from RETURNING, never a re-read.
-  await copyStoreSettings(storeId, { settings });
+  // N-19: the DO copy (a Node / dev store whose DO is not yet the writer) gets the WHOLE resulting value from RETURNING, never a
+  // re-read, stamped with the row's updated_at so the DO ignores a copy older than the one it holds.
+  await copyStoreSettings(storeId, { settings, ...stamp(rows?.[0]) });
   return settings;
 }
 
@@ -329,14 +335,14 @@ async function mergeSettingsAtomic(
 async function setSettingsKeyAtomic(storeId: string, key: string, value: unknown): Promise<void> {
   const rows = await withStore(
     storeId,
-    tx => tx.$queryRaw<Array<{ settings: unknown }>>`
+    tx => tx.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
       UPDATE stores
       SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), ARRAY[${key}]::text[], ${JSON.stringify(value)}::jsonb),
           updated_at = now()
       WHERE id = ${storeId}
-      RETURNING settings`
+      RETURNING settings, updated_at AS "updatedAt"`
   );
-  await copyStoreSettings(storeId, { settings: rows?.[0]?.settings ?? {} });
+  await copyStoreSettings(storeId, { settings: rows?.[0]?.settings ?? {}, ...stamp(rows?.[0]) });
 }
 
 export class StoreService {
@@ -527,11 +533,9 @@ export class StoreService {
     const merchantCreate = !opts.platformOperator
       ? {
           firstStore:
-            (onDo
-              ? ((await listOwnerStoresD1(ownerId)) ?? []).length
-              : await withUser(ownerId, tx =>
-                  tx.store.count({ where: { ownerId, deletedAt: null } })
-                )) === 0,
+            (await countOwnerStores(ownerId, () =>
+              withUser(ownerId, tx => tx.store.count({ where: { ownerId, deletedAt: null } }))
+            )) === 0,
         }
       : null;
 
@@ -604,12 +608,15 @@ export class StoreService {
         theme: newTheme,
         layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
         vatRateHundredths: REGION.defaultVatBps,
+        trial: merchantCreate?.firstStore ? {} : undefined,
+        // atomic plan gate, fails closed (the Redis creation lock fails open): the insert itself refuses past the allowance
+        maxOwnedStores: opts.platformOperator
+          ? null
+          : (await ownerStoreAllowance(ownerId)).allowance,
       });
       const created = await finishDoStoreCreate(id, {
         slug,
         domain: data.domain ?? null,
-        plan,
-        trial: merchantCreate?.firstStore ? {} : undefined,
       });
       // The owner row is identity (Postgres until the identity track moves it): not read on this path.
       return { ...created, owner: { id: ownerId } } as typeof created & { owner: { id: string } };
@@ -891,13 +898,14 @@ export class StoreService {
     // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
     if (store.ownerId) {
       const family = sortOwnerStores(
-        (doNative ? await listOwnerStoresD1(store.ownerId) : undefined) ??
-          (await withUser(store.ownerId, tx =>
+        await ownerStores(store.ownerId, () =>
+          withUser(store.ownerId!, tx =>
             tx.store.findMany({
               where: { ownerId: store.ownerId!, deletedAt: null },
               select: { id: true, createdAt: true },
             })
-          ))
+          )
+        )
       );
       if (family.length > 1 && family[0].id === storeId) {
         throw new AppError(

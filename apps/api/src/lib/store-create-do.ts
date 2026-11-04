@@ -15,25 +15,27 @@
 import { randomUUID } from 'node:crypto';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
-import { platformDb, requirePlatformDb } from './platform-db';
+import { platformDb } from './platform-db';
 import { storeDb } from './repo-factory';
 import { invalidateStoreDirectory } from './store-directory';
-import { retireStoreDirectoryRow } from './store-directory-sync';
 import { seedCoaForStore } from '../services/accounting/account.service';
 import { storeDo } from './store-backend';
-import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
-import { startSignupTrial, type TrialChoice } from '../services/billing/trial';
+import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from '../services/billing/trial';
+import { addDays, TRIAL_DAYS, TRIAL_PLAN_CODE } from '../services/billing/period';
+import { STORE_PLAN_TO_PLAN_CODE } from '@ebda/shared';
+import logger from './logger';
+import { sendAlert } from '../services/alerts.service';
 
 type LegacyPlan = 'free' | 'starter' | 'professional' | 'enterprise';
 
+interface D1Stmt {
+  run(): Promise<unknown>;
+  first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results: T[] }>;
+}
 interface D1Like {
-  prepare(sql: string): {
-    bind(...v: unknown[]): {
-      run(): Promise<unknown>;
-      first<T>(): Promise<T | null>;
-      all<T>(): Promise<{ results: T[] }>;
-    };
-  };
+  prepare(sql: string): { bind(...v: unknown[]): D1Stmt };
+  batch(stmts: unknown[]): Promise<Array<{ meta?: { changes?: number } }>>;
 }
 const d1 = (): D1Like | undefined =>
   (cfBindings() as { PLATFORM_DB?: D1Like } | undefined)?.PLATFORM_DB;
@@ -61,10 +63,15 @@ export interface NewDoStore {
   theme: Record<string, unknown>;
   layoutSettings: Record<string, unknown>;
   vatRateHundredths: number;
+  /** Signup trial (first store): Growth for 14 days, the chosen plan waits in pending_plan_code. */
+  trial?: { choice?: TrialChoice };
+  /** Atomic plan gate: the insert is refused unless the owner has fewer than this many live stores in D1 (fails closed). */
+  maxOwnedStores?: number | null;
   cod?: { name: string; nameAr: string; currency: string };
 }
 
-const isUnique = (e: unknown) => /UNIQUE|constraint/i.test(e instanceof Error ? e.message : '');
+const isUnique = (e: unknown) =>
+  /UNIQUE constraint failed/i.test(e instanceof Error ? e.message : String(e));
 
 /** Steps 1 and 2. Returns the new store id. */
 export async function insertDoStore(input: NewDoStore): Promise<string> {
@@ -91,16 +98,30 @@ export async function insertDoStore(input: NewDoStore): Promise<string> {
     ...(input.timezone ? { timezone: input.timezone } : {}),
   };
   const names = Object.keys(cols);
+  const cols2 = names.map(n => `"${n}"`).join(', ');
+  const limited = typeof input.maxOwnedStores === 'number';
+  const storeStmt = db
+    .prepare(
+      limited
+        ? `INSERT INTO "stores" (${cols2}) SELECT ${names.map(() => '?').join(', ')} WHERE (SELECT COUNT(*) FROM "stores" WHERE "owner_id" = ? AND "deleted_at" IS NULL) < ?`
+        : `INSERT INTO "stores" (${cols2}) VALUES (${names.map(() => '?').join(', ')})`
+    )
+    .bind(...names.map(n => cols[n]), ...(limited ? [input.ownerId, input.maxOwnedStores] : []));
+  // The subscription (and trial) rows go in the SAME atomic batch as the store: no window where a store exists without them.
+  const sub = newSubscriptionRow(id, input.plan, input.trial, new Date(now));
+  const subNames = Object.keys(sub);
+  const subStmt = db
+    .prepare(
+      `INSERT INTO "store_subscriptions" (${subNames.map(n => `"${n}"`).join(', ')}) SELECT ${subNames.map(() => '?').join(', ')} WHERE EXISTS (SELECT 1 FROM "stores" WHERE "id" = ?)`
+    )
+    .bind(...subNames.map(n => sub[n]), id);
   try {
-    await db
-      .prepare(
-        `INSERT INTO "stores" (${names.map(n => `"${n}"`).join(', ')}) VALUES (${names.map(() => '?').join(', ')})`
-      )
-      .bind(...names.map(n => cols[n]))
-      .run();
+    const res = await db.batch([storeStmt, subStmt]);
+    if (res[0]?.meta?.changes === 0)
+      throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
   } catch (e) {
-    if (isUnique(e))
-      throw new AppError(409, 'ALREADY_EXISTS', 'A store with this address already exists');
+    if (e instanceof AppError) throw e;
+    if (isUnique(e)) throw new AppError(409, 'SLUG_TAKEN', 'This store address is already taken');
     throw new AppError(503, 'STORE_DIRECTORY_UNAVAILABLE', 'Store directory write failed');
   }
 
@@ -136,11 +157,7 @@ export async function insertDoStore(input: NewDoStore): Promise<string> {
     if (!r.ok) throw new AppError(r.status ?? 502, r.code, `store bootstrap refused: ${r.code}`);
   } catch (e) {
     // Compensation: a directory row without a bootstrapped DO would resolve to a store that cannot serve.
-    await db
-      .prepare('DELETE FROM "stores" WHERE "id" = ?')
-      .bind(id)
-      .run()
-      .catch(() => undefined);
+    await rollbackDoStore(id, 'bootstrap');
     throw e instanceof AppError
       ? e
       : new AppError(502, 'STORE_BOOTSTRAP_FAILED', 'Store setup failed');
@@ -149,23 +166,60 @@ export async function insertDoStore(input: NewDoStore): Promise<string> {
 }
 
 /**
- * Step 3: the subscription row (and the signup trial) of a store that has no Postgres row. The existing ports
- * (`syncSubscriptionFromLegacyPlan`, `startSignupTrial`) take any client exposing `storeSubscription`; the platform D1 client
- * does (create / upsert / update / findUnique). THE single place N-10 swaps when the billing readers move to D1.
+ * The `store_subscriptions` row of a new store with no Postgres row (what `syncSubscriptionFromLegacyPlan` + `startSignupTrial` write,
+ * computed once so it goes in the store's own atomic D1 batch). THE single place N-10 swaps when the billing writers move to D1.
  */
-export async function writeNewStoreSubscription(
+export function newSubscriptionRow(
   storeId: string,
   plan: LegacyPlan,
-  trial?: { choice?: TrialChoice }
-): Promise<void> {
-  const platform = await requirePlatformDb();
-  const db = { storeSubscription: platform.storeSubscription } as never;
-  await syncSubscriptionFromLegacyPlan(db, storeId, plan);
-  if (trial) await startSignupTrial(db, storeId, trial.choice);
+  trial: { choice?: TrialChoice } | undefined,
+  now: Date
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    id: randomUUID(),
+    store_id: storeId,
+    plan_code: STORE_PLAN_TO_PLAN_CODE[plan],
+    status: 'active',
+  };
+  if (!trial) return base;
+  const choice = trial.choice ?? DEFAULT_TRIAL_CHOICE;
+  const end = addDays(now, TRIAL_DAYS);
+  return {
+    ...base,
+    plan_code: TRIAL_PLAN_CODE,
+    status: 'trialing',
+    trial_ends_at: end.getTime(),
+    current_period_start: now.getTime(),
+    current_period_end: end.getTime(),
+    pending_plan_code: choice.planCode,
+    billing_interval: choice.interval,
+  };
 }
 
 /**
- * Steps 3 and 4 plus the directory cache bust, with compensation: if either fails the D1 directory row is removed again (the slug is
+ * Remove a just-created store from D1 (its subscription cascades). A failed rollback is NEVER silent: it would leave a `do` row
+ * with a bootstrapped DO, a reserved slug and a count against the owner, so it is a P1 alert plus an error log. (No reconciler sweep:
+ * stores migrated from Postgres are `do` rows whose subscription is still in Postgres, so "do row without a subscription" is not
+ * yet a safe orphan test; N-10 adds it.)
+ */
+export async function rollbackDoStore(storeId: string, stage: string): Promise<void> {
+  try {
+    await d1()!.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(storeId).run();
+  } catch (e) {
+    logger.error({ err: e, storeId, stage }, '[STORE_CREATE_DO] rollback failed: orphan do row');
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'store.create.do_rollback_failed',
+      title: 'Store create failed and its D1 row could not be removed',
+      body: `store ${storeId} (failed at ${stage}) is a D1 'do' row with a bootstrapped Durable Object: delete the stores row by hand.`,
+      context: { storeId, stage },
+    }).catch(() => undefined);
+  }
+}
+
+/**
+ * The chart of accounts, extra default rows and the directory cache bust, with compensation: if either fails the D1 directory row is removed again (the slug is
  * freed; the DO keeps only its bootstrap rows and its random id is never reused). Returns the stored record (D1 + DO), no Postgres.
  */
 export async function finishDoStoreCreate(
@@ -173,18 +227,15 @@ export async function finishDoStoreCreate(
   input: {
     slug: string;
     domain?: string | null;
-    plan: LegacyPlan;
-    trial?: { choice?: TrialChoice };
     /** More default rows (provisioning's category); inside the same compensation. */
     extra?: () => Promise<void>;
   }
 ): Promise<Record<string, unknown>> {
   try {
-    await writeNewStoreSubscription(storeId, input.plan, input.trial);
     await seedCoaForStore(storeId);
     await input.extra?.();
   } catch (e) {
-    await retireStoreDirectoryRow(storeId, { soft: false }).catch(() => undefined);
+    await rollbackDoStore(storeId, 'finish');
     throw e;
   }
   // A slug probed before this store existed is negatively cached in the directory: clear it so the new store resolves at once.
@@ -195,7 +246,7 @@ export async function finishDoStoreCreate(
   return created as Record<string, unknown>;
 }
 
-/** D1 read of an owner's live stores, oldest first (the plan gate and the owned-store count read this, not Postgres). */
+/** D1 read of an owner's live stores (raw; undefined where D1 is unbound). */
 export async function listOwnerStoresD1(
   ownerId: string
 ): Promise<Array<{ id: string; createdAt: Date }> | undefined> {
@@ -207,24 +258,51 @@ export async function listOwnerStoresD1(
   return results.map(r => ({ id: r.id, createdAt: new Date(Number(r.created_at)) }));
 }
 
-/** Number of live stores an owner has: D1 where bound, else the caller's Postgres count. */
-export async function countOwnerStores(
-  ownerId: string,
-  fallback: () => Promise<number>
-): Promise<number> {
-  const rows = await listOwnerStoresD1(ownerId);
-  return rows ? rows.length : fallback();
+/** A Postgres read that may be unreachable once stores live only in D1: that is "no Postgres stores", not a failure. */
+async function pgTolerant<T>(read: () => Promise<T>, empty: T): Promise<T> {
+  try {
+    return await read();
+  } catch (e) {
+    logger.warn({ err: e }, '[STORE_CREATE_DO] postgres owner-store read failed; using D1 only');
+    return empty;
+  }
 }
 
-/** Stores an owner created since `since`, soft-deleted ones included (the squatting loop the daily cap stops). D1 only; undefined where unbound. */
-export async function countOwnerStoresCreatedSinceD1(
+/**
+ * The owner's live stores. Flag OFF: Postgres only (unchanged). Flag ON: while both backends can hold stores, the UNION of
+ * Postgres and D1 by id, so a store whose directory mirror failed (or whose Postgres row is gone) is still counted.
+ */
+export async function ownerStores(
   ownerId: string,
-  since: Date
-): Promise<number | undefined> {
-  if (!(await platformDb())) return undefined;
+  pg: () => Promise<Array<{ id: string; createdAt: Date }>>
+): Promise<Array<{ id: string; createdAt: Date }>> {
+  if (!storeCreateOnDo()) return pg();
+  const [fromPg, fromD1] = await Promise.all([pgTolerant(pg, []), listOwnerStoresD1(ownerId)]);
+  const byId = new Map(fromPg.map(r => [r.id, r]));
+  for (const r of fromD1 ?? []) if (!byId.has(r.id)) byId.set(r.id, r);
+  return [...byId.values()];
+}
+
+/** Number of live stores an owner has (see `ownerStores`: max of the backends when the flag is on). */
+export async function countOwnerStores(
+  ownerId: string,
+  pg: () => Promise<number>
+): Promise<number> {
+  if (!storeCreateOnDo()) return pg();
+  const [a, b] = await Promise.all([pgTolerant(pg, 0), listOwnerStoresD1(ownerId)]);
+  return Math.max(a, b?.length ?? 0);
+}
+
+/** Stores an owner created since `since`, soft-deleted included (the squatting loop the daily cap stops); max of the backends when the flag is on. */
+export async function countOwnerStoresCreatedSince(
+  ownerId: string,
+  since: Date,
+  pg: () => Promise<number>
+): Promise<number> {
+  if (!storeCreateOnDo()) return pg();
   const row = await d1()!
     .prepare('SELECT COUNT(*) AS n FROM stores WHERE owner_id = ? AND created_at >= ?')
     .bind(ownerId, since.getTime())
     .first<{ n: number }>();
-  return Number(row?.n ?? 0);
+  return Math.max(await pgTolerant(pg, 0), Number(row?.n ?? 0));
 }
