@@ -76,7 +76,7 @@ Estimated Monthly Cost (current scale): ~$26/mo
 
 1. Click "New Project"
 2. Select "Deploy from GitHub repo"
-3. Choose `Whisky-11/ebda-store`
+3. Choose `Ebda-AI-Studio/ebda-store`
 4. Select the `main` branch
 
 ### 1.3 Configure Service
@@ -701,7 +701,7 @@ harmless to leave in place.
 
 ## CI deploy token: minimum scope, and where it can be reached from (Ruling DEPLOY-PARITY-1)
 
-`Whisky-11/ebda-store` is a Free-plan private repo: GitHub offers no required reviewers, no environment protection and no
+`Ebda-AI-Studio/ebda-store` is a Free-plan private repo: GitHub offers no required reviewers, no environment protection and no
 enforced CODEOWNERS here, so the controls are in code. They are enforced by tests and a required check:
 
 - **A pull request can never reach a deploy secret.** `tests/unit/deploy-secrets-never-on-pr.test.ts` fails the build if any

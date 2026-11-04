@@ -5,13 +5,13 @@
   "description": "Ebda Store by Ebda AI Studio — self-serve e-commerce platform for Egypt",
   "author": "Ebda AI Studio <ahlan@ebda.app>",
   "license": "UNLICENSED",
-  "homepage": "https://github.com/Whisky-11/ebda-store",
+  "homepage": "https://github.com/Ebda-AI-Studio/ebda-store",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Whisky-11/ebda-store.git"
+    "url": "https://github.com/Ebda-AI-Studio/ebda-store.git"
   },
   "bugs": {
-    "url": "https://github.com/Whisky-11/ebda-store/issues"
+    "url": "https://github.com/Ebda-AI-Studio/ebda-store/issues"
   },
   "engines": {
     "node": ">=20.3.0",
