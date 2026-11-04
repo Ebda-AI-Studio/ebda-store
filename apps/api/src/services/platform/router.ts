@@ -165,6 +165,16 @@ export const platformRouter: ModelRouter = {
 
 export function registerPlatformRouter(): void {
   setModelRouter(platformRouter);
+  // A call that reaches the POSTGRES client for a model whose family this isolate knows is on D1 bypassed the router
+  // (NEON-ZERO-1 runtime guard; the registration was dropped by a merge, tests/unit/platform-billing-d1-money.test.ts).
+  setRoutedModelGuard((model, operation) => {
+    const camel = model[0].toLowerCase() + model.slice(1);
+    const family = MODELS.has(camel) ? familyOfModel(camel) : undefined;
+    if (family && isFamilyCachedOnD1(family))
+      throw new Error(
+        `ROUTED_MODEL_ON_POSTGRES: ${model}.${operation} reached Postgres after ${family} moved to D1 (a raw transaction that was not wrapped with routeTx?)`
+      );
+  });
   // The identity service decides "an ACTIVE super_admin" (Rulings ID-1/ID-2) where it is bound: no Postgres round trip.
   setPlatformOperatorVerifier(async userId => {
     if (!cfBindings()?.ACCOUNTS) return undefined;

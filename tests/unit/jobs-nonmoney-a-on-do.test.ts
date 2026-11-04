@@ -588,7 +588,8 @@ describe('watchers, scans and rollups on the DO', () => {
   it('ai-autofill-sweep lists the DO store itself and sweeps it through its DO, FBT recompute included', async () => {
     const { sweepAutofillStore } = await import('@api/lib/inngest/functions/ai-autofill-sweep');
     const d = h.doBox.current;
-    h.platformStore.findUnique.mockResolvedValue({ theme: {}, aiFeaturesEnabled: true });
+    // The autopilot toggle and the merchant AI switch are read through the store's own backend (NZ-INTEG-1): the DO's profile row.
+    d.seed('store', { id: DO_STORE, theme: {}, aiFeaturesEnabled: true });
     const res = await sweepAutofillStore(DO_STORE);
     expect(res).toMatchObject({ products: 0 });
     expect(h.recalcFbt).toHaveBeenCalledWith(DO_STORE);
