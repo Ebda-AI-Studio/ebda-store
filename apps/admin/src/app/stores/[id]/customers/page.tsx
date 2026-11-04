@@ -10,6 +10,7 @@ import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet, apiFetch } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
+import { RowActions } from '../../../../components/RowActions';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { SearchInput } from '@/components/SearchInput';
@@ -419,38 +420,20 @@ export default function StoreCustomersPage() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <div className="flex items-center gap-2">
-          {/* Owners only (SEC-14): the API answers 403 to staff, so do not offer the button. */}
-          {canExport && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleExport}
-              disabled={isLoading || isExporting || customers.length === 0}
-            >
-              <svg
-                className="h-4 w-4 me-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              {isExporting ? t('exporting') : t('exportXlsx')}
-            </Button>
-          )}
-          <Link href={`/stores/${storeId}`}>
-            <Button type="button" variant="outline">
-              {t('backToStore')}
-            </Button>
-          </Link>
-        </div>
+        // Rule 2: customers are made by orders, so the page has no primary; export (owners only, SEC-14: the API
+        // answers 403 to staff) is the one extra action and lives in the "..." menu.
+        canExport ? (
+          <RowActions
+            menuLabel={t('moreMenu')}
+            items={[
+              {
+                label: isExporting ? t('exporting') : t('exportXlsx'),
+                onSelect: handleExport,
+                disabled: isLoading || isExporting || customers.length === 0,
+              },
+            ]}
+          />
+        ) : undefined
       }
     >
       <div className="space-y-4">

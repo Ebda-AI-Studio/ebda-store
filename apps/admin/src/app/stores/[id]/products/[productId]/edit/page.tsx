@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
-import { Button, Input, Textarea, Select } from '@ebda/ui';
+import { Badge, Button, Input, Textarea, Select, buttonVariants, cn, useToast } from '@ebda/ui';
+import { storefrontOrigin } from '@ebda/shared';
+import { StickySaveBar } from '@/components/StickySaveBar';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ProductInfoSections, ProductSidebar } from '../_components/ProductInfoSections';
+import { Product3dModelCard } from '../_components/Product3dModelCard';
+import { RowActions } from '@/components/RowActions';
 import {
   recommendedSizeTextForTemplate,
   type TemplateId,
@@ -25,7 +31,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../../../components/AITranslateMissingButton';
 import { useAuth } from '../../../../../../lib/auth';
-import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../lib/api';
 import { productTextFields } from '../../../../../../lib/product-payload';
 import { sanitizeReturnTo } from '../../../../../../lib/return-to';
 import { EditSidebar } from './_components/EditSidebar';
@@ -119,6 +125,40 @@ export default function EditProductPage() {
   const tStatusOptions = useT('products.edit.statusOptions');
   const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
+  const toast = useToast();
+  const askConfirm = useConfirm();
+  // The old read-only product page is folded in here as the "overview" tab (UX:PE-3); the old URL redirects to it.
+  const [tab, setTab] = useState<'edit' | 'overview'>(
+    searchParams.get('tab') === 'overview' ? 'overview' : 'edit'
+  );
+  const tTabs = useT('products.edit.tabs');
+  const tDetail = useT('products.detail');
+  const statusBadge = (status: string) => (
+    <Badge variant={status === 'active' ? 'default' : 'secondary'}>
+      {tDetail(`status.${status}` as 'status.active')}
+    </Badge>
+  );
+  const deleteProduct = async () => {
+    if (!product) return;
+    const ok = await askConfirm({
+      object: t('deleteDialog.object', { name: product.name }),
+      consequence: t('deleteDialog.consequence'),
+      confirmLabel: t('deleteDialog.confirmLabel'),
+    });
+    if (!ok) return;
+    const { error: delError } = await apiDelete(`/api/v1/stores/${storeId}/products/${product.id}`);
+    if (delError) {
+      toast.error(t('deleteDialog.failed'));
+      return;
+    }
+    toast.success(t('deleteDialog.done'));
+    router.push(returnTo);
+  };
+  const formRef = useRef<HTMLFormElement>(null);
+  const [storeHost, setStoreHost] = useState<{ slug: string; domain?: string | null } | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
+  /** Arrived from the create flow: show the one next step (variants). */
+  const justCreated = searchParams.get('created') === '1';
 
   // Plain products-list URL — the fallback whenever `returnTo` is absent or
   // doesn't point back into this store's product list (open-redirect guard).
@@ -242,6 +282,11 @@ export default function EditProductPage() {
         if (storeResult.data?.store?.template) {
           setStoreTemplate(storeResult.data.store.template);
         }
+        const st = (storeResult.data?.store ?? null) as {
+          slug?: string;
+          domain?: string | null;
+        } | null;
+        if (st?.slug) setStoreHost({ slug: st.slug, domain: st.domain });
 
         if (categoriesResult.data?.categories) {
           setCategories(categoriesResult.data.categories);
@@ -345,6 +390,32 @@ export default function EditProductPage() {
 
     fetchProductAndCategories();
   }, [productId, storeId, isAuthenticated, t]);
+
+  // StickySaveBar (rule 5): dirty = anything differs from the snapshot taken once the product finished loading.
+  const snapshot = JSON.stringify([
+    formData,
+    discountType,
+    discountValue,
+    images,
+    facts,
+    personalisation,
+  ]);
+  const [baseline, setBaseline] = useState<string | null>(null);
+  useEffect(() => {
+    if (!loading && product && baseline === null) setBaseline(snapshot);
+  }, [loading, product, baseline, snapshot]);
+  const dirty = baseline !== null && snapshot !== baseline;
+  const resetForm = useCallback(() => {
+    if (baseline === null) return;
+    const [f, dt, dv, im, fa, pe] = JSON.parse(baseline);
+    setFormData(f);
+    setDiscountType(dt);
+    setDiscountValue(dv);
+    setImages(im);
+    setFacts(fa);
+    setPersonalisation(pe);
+    setPriceError(null);
+  }, [baseline]);
 
   const updateField = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -485,9 +556,18 @@ export default function EditProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!product) return;
+    if (!product || saving) return;
 
     setError(null);
+    // UX:PN-3 - gold-priced products never send a price; everything else needs at least 0.01.
+    if (product.pricingMode !== 'gold_rate') {
+      const priceNum = parseFloat(formData.price);
+      if (!Number.isFinite(priceNum) || priceNum < 0.01) {
+        setPriceError(tFields('priceMinError'));
+        return;
+      }
+    }
+    setPriceError(null);
     setSaving(true);
 
     try {
@@ -610,20 +690,18 @@ export default function EditProductPage() {
 
       if (apiError) {
         setError(apiError.message);
+        setSaving(false);
         return;
       }
 
-      // Return to the products list after a successful edit (matches the
-      // create flow), so the merchant lands back where they can keep working
-      // through their catalog instead of on the single-product detail page.
-      // `returnTo` (when present and same-store) restores the exact
-      // filtered+searched+paginated list view the merchant came from.
-      // invalidate App Router cache so the destination list re-fetches the saved row
-      router.refresh();
+      // Return to the products list after a successful edit so the merchant keeps working through the catalog.
+      // `returnTo` (when present and same-store) restores the exact filtered list view. No router.refresh() and no
+      // setSaving(false) on success: the bar stays busy until the route changes (UX:PN-1), and the list refetches
+      // on mount.
+      toast.success(t('toast.saved'));
       router.push(returnTo);
     } catch {
       setError(t('updateFailed'));
-    } finally {
       setSaving(false);
     }
   };
@@ -686,40 +764,98 @@ export default function EditProductPage() {
       subtitle={t('subtitle', { storeName: product?.store?.name || t('fallbackStore') })}
       actions={
         product ? (
-          // flex-wrap so both buttons stay visible at narrow viewport
-          // widths instead of pushing one off-screen.
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/stores/${storeId}/products/${product.id}/variants`}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-            >
-              {t('manageVariants')}
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
+          // Rule 2: the save lives in the sticky bar; the header holds one outline link + the "..." menu.
+          <div className="flex flex-wrap items-center gap-2">
+            {storeHost && (
+              <a
+                href={`${storefrontOrigin(storeHost)}/products/${product.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11')}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
-            </Link>
-            <Link
-              href={`/stores/${storeId}/products/${product.id}/recommendations`}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-            >
-              {t('recommendations')}
-            </Link>
+                {t('viewInStore')}
+              </a>
+            )}
+            <RowActions
+              menuLabel={t('moreMenu')}
+              items={[
+                {
+                  label: t('manageVariants'),
+                  href: `/stores/${storeId}/products/${product.id}/variants`,
+                },
+                {
+                  label: t('recommendations'),
+                  href: `/stores/${storeId}/products/${product.id}/recommendations`,
+                },
+                {
+                  label: t('deleteDialog.confirmLabel'),
+                  destructive: true,
+                  onSelect: () => void deleteProduct(),
+                },
+              ]}
+            />
           </div>
         ) : undefined
       }
     >
-      <form onSubmit={handleSubmit}>
+      {product && (
+        <div role="tablist" aria-label={tTabs('label')} className="mb-6 flex gap-2">
+          {(['edit', 'overview'] as const).map(id => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                'min-h-11 rounded-lg px-4 text-sm font-medium transition-colors',
+                tab === id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              )}
+            >
+              {tTabs(id)}
+            </button>
+          ))}
+        </div>
+      )}
+      {product && tab === 'overview' && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <ProductInfoSections
+              // The edit loader keeps the API's raw product, which carries the overview fields.
+              product={product as unknown as Parameters<typeof ProductInfoSections>[0]['product']}
+              statusBadge={statusBadge(product.status)}
+              fallbackSku={tDetail('fallbackSku')}
+            />
+            <Product3dModelCard storeId={storeId} productId={product.id} />
+          </div>
+          <div className="space-y-6">
+            <ProductSidebar
+              product={product as unknown as Parameters<typeof ProductSidebar>[0]['product']}
+            />
+          </div>
+        </div>
+      )}
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className={tab === 'overview' ? 'hidden' : undefined}
+      >
+        {justCreated && product && (
+          <div
+            role="status"
+            className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success-ink/30 bg-success/10 p-4 text-sm text-success-ink"
+          >
+            <span>{t('createdBanner')}</span>
+            <Link
+              href={`/stores/${storeId}/products/${product.id}/variants`}
+              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'min-h-11')}
+            >
+              {t('addVariants')}
+            </Link>
+          </div>
+        )}
         {error && (
           <div className="mb-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
             {error}
@@ -923,9 +1059,13 @@ export default function EditProductPage() {
                   label={tFields('price')}
                   type="number"
                   step="0.01"
-                  min={0}
+                  min={0.01}
                   value={formData.price}
-                  onChange={e => updateField('price', e.target.value)}
+                  onChange={e => {
+                    updateField('price', e.target.value);
+                    if (priceError) setPriceError(null);
+                  }}
+                  error={priceError ?? undefined}
                   placeholder={tFields('pricePlaceholder')}
                   required={product?.pricingMode !== 'gold_rate'}
                   disabled={product?.pricingMode === 'gold_rate'}
@@ -1270,15 +1410,18 @@ export default function EditProductPage() {
             onBadgeLabelChange={value => updateField('badgeLabel', value)}
             badgeLabelAr={formData.badgeLabelAr}
             onBadgeLabelArChange={value => updateField('badgeLabelAr', value)}
-            saving={saving}
-            // Cancel returns to the LIST (returnTo), not the product view page —
-            // the merchant is bailing out of editing back to where they were.
-            onCancel={() => router.push(returnTo)}
             storeId={storeId}
             productName={formData.name}
             productDescription={formData.description}
           />
         </div>
+        <StickySaveBar
+          dirty={dirty}
+          saving={saving}
+          onReset={resetForm}
+          onSave={() => formRef.current?.requestSubmit()}
+          saveLabel={t('actions.saveProduct')}
+        />
       </form>
     </AdminLayout>
   );

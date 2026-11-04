@@ -1,7 +1,7 @@
 import { storeDb } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { authenticate, customerUserId } from '../middleware/auth';
+import { authenticate, customerUserId, rejectImpersonated } from '../middleware/auth';
 import { requirePermission, hasPermission, type Role } from '../middleware/rbac';
 import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -14,6 +14,12 @@ import { AppError } from '../middleware/error-handler';
 const router = Router({ mergeParams: true });
 
 // Validation schemas
+// BE:S-28: the free text of the admin actions lands in the audit log and in the customer's email, so it is bounded.
+const approveBodySchema = z.object({ notes: z.string().trim().max(1000).optional() });
+const rejectBodySchema = z.object({ reason: z.string().trim().min(1).max(1000) });
+const trackingBodySchema = z.object({ trackingNumber: z.string().trim().min(1).max(100) });
+const completeBodySchema = z.object({ refundMethod: z.string().trim().min(1).max(50) });
+
 /** Task 8b: per RETURN ITEM id, the refund the merchant chose instead of the computed one. Strict; the service checks the range. */
 const overridesSchema = z.record(
   z.string().uuid(),
@@ -280,7 +286,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { notes } = req.body;
+      const { notes } = approveBodySchema.parse(req.body ?? {});
 
       const returnRequest = await ReturnService.approve(storeId, id, req.user!.userId, notes);
 
@@ -316,15 +322,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { reason } = req.body;
+      const { reason: rawReason } = req.body ?? {};
 
-      if (!reason) {
+      if (!rawReason) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Rejection reason is required' },
         });
         return;
       }
+
+      const { reason } = rejectBodySchema.parse({ reason: rawReason });
 
       const returnRequest = await ReturnService.reject(storeId, id, req.user!.userId, reason);
 
@@ -422,6 +430,7 @@ router.get(
 router.post(
   '/admin/:id/complete',
   authenticate,
+  rejectImpersonated, // Ruling FP-3: completing a return sends money back; an impersonated session is read-only here
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
@@ -429,15 +438,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { refundMethod } = req.body;
+      const { refundMethod: rawMethod } = req.body ?? {};
 
-      if (!refundMethod) {
+      if (!rawMethod) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Refund method is required' },
         });
         return;
       }
+
+      const { refundMethod } = completeBodySchema.parse({ refundMethod: rawMethod });
 
       // Reject an unrecognised method instead of passing it through. The
       // service branches on a known set, and anything outside it silently took
@@ -545,7 +556,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { trackingNumber } = req.body;
+      const { trackingNumber } = trackingBodySchema.parse(req.body ?? {});
 
       const returnRequest = await ReturnService.updateTracking(storeId, id, trackingNumber);
 

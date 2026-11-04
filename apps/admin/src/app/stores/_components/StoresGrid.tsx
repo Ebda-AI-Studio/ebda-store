@@ -71,7 +71,7 @@ export function StoresGrid({ stores }: StoresGridProps) {
                 2026-05-22 (Ahmad): no public tier list, agency model. The
                 Store.plan enum stays in DB as internal tracking but doesn't
                 appear in any UI. */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="text-center">
                 <p className="text-lg font-bold text-foreground">{store._count?.products || 0}</p>
                 <p className="text-xs text-muted-foreground">{t('products')}</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input, Select } from '@ebda/ui';
+import { Input, Select } from '@ebda/ui';
 import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AICategorySuggestions } from '../../../../../../../components/AICategorySuggestions';
@@ -33,8 +33,6 @@ interface EditSidebarProps {
   onBadgeLabelChange: (value: string) => void;
   badgeLabelAr: string;
   onBadgeLabelArChange: (value: string) => void;
-  saving: boolean;
-  onCancel: () => void;
   /** Tenant scope for AI calls. */
   storeId: string;
   /** Product name + description, fed to category-suggest endpoint. */
@@ -59,15 +57,12 @@ export function EditSidebar({
   onBadgeLabelChange,
   badgeLabelAr,
   onBadgeLabelArChange,
-  saving,
-  onCancel,
   storeId,
   productName,
   productDescription,
 }: EditSidebarProps) {
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
-  const tActions = useT('products.edit.actions');
 
   return (
     <div className="space-y-6">
@@ -151,17 +146,6 @@ export function EditSidebar({
             dir="rtl"
           />
           <p className="text-xs text-muted-foreground">{tFields('badgeLabelHint')}</p>
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <div className="space-y-3">
-          <Button type="submit" className="w-full" isLoading={saving}>
-            {tActions('saveChanges')}
-          </Button>
-          <Button type="button" variant="outline" className="w-full" onClick={onCancel}>
-            {tActions('cancel')}
-          </Button>
         </div>
       </div>
     </div>

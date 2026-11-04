@@ -32,7 +32,7 @@ import {
   balanceProductLanguages,
   revertProductBalance,
 } from '../services/ai-autofill.service';
-import { withSavepoint } from '../lib/savepoint';
+import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 import { storeUpdate } from '../lib/repo-factory';
 
@@ -517,24 +517,11 @@ const bulkTranslateSchema = z.object({
   direction: z.enum(['to_ar', 'to_en']),
 });
 
-// Helper: when inngest is unreachable (DNS / outage / wrong key), the
-// job row was created but no one will ever process it. Mark it failed
-// so the merchant sees an actionable error instead of a stuck "queued"
-// row that lingers forever.
-async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
-  const message = err instanceof AppError ? err.message : 'Failed to enqueue job';
-  try {
-    // Savepointed: best-effort inside the request's tenant transaction — a
-    // swallowed failure must not abort it (issue 2215's class).
-    await withSavepoint(async () =>
-      (await storeWriter(currentStoreId())).bulkAiJob.update({
-        where: { id: jobId, storeId: currentStoreId() },
-        data: { status: 'failed', errorMessage: message, completedAt: new Date() },
-      })
-    );
-  } catch {
-    // best-effort
-  }
+// Helper: when the job start fails (Cloudflare Workflows/Queues unreachable or unbound), the job
+// row was created but no one will ever process it. Mark it failed so the merchant sees an
+// actionable error instead of a stuck "queued" row that lingers forever (lib/jobs/enqueue-fail.ts).
+function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
+  return markJobFailedOnEnqueueError(currentStoreId(), jobId, err);
 }
 
 router.post(

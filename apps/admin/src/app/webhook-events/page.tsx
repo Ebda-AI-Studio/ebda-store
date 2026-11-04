@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { withNumerals } from '@ebda/shared';
 
@@ -41,6 +42,7 @@ function statusVariant(status: string): 'success' | 'warning' | 'destructive' | 
 
 export default function WebhookEventsPage() {
   const t = useT('webhookEvents');
+  const askConfirm = useConfirm();
   const [events, setEvents] = useState<WebhookEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -93,7 +95,13 @@ export default function WebhookEventsPage() {
       // before re-firing the payment event (idempotency-safe, but deliberate).
       if (!force && res.error.code === 'WEBHOOK_ALREADY_PROCESSED') {
         setReplaying(null);
-        if (window.confirm(t('confirmAlreadyProcessed'))) {
+        const ok = await askConfirm({
+          object: t('replayObject'),
+          consequence: t('confirmAlreadyProcessed'),
+          confirmLabel: t('replayAction'),
+          tone: 'default',
+        });
+        if (ok) {
           return replay(id, true);
         }
         setMessage(t('replayCancelled'));

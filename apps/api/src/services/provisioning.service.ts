@@ -273,8 +273,11 @@ export class ProvisioningService {
             data: {
               storeId: store.id,
               name: 'Products',
+              // BE:F-5: Arabic-default storefronts showed the English name for the default category.
+              nameAr: 'المنتجات',
               slug: 'products',
               description: 'All products',
+              descriptionAr: 'كل المنتجات',
               position: 0,
             },
           });

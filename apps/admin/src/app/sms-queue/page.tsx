@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { withNumerals } from '@ebda/shared';
 
 /**
@@ -29,6 +30,7 @@ interface FailedSms {
 
 export default function SmsQueuePage() {
   const t = useT('smsQueue');
+  const askConfirm = useConfirm();
   const [messages, setMessages] = useState<FailedSms[]>([]);
   const [stats, setStats] = useState<{ pending: number; failed: number; corrupt?: number } | null>(
     null
@@ -68,7 +70,13 @@ export default function SmsQueuePage() {
   }, [fetchFailed]);
 
   const retryAll = async () => {
-    if (!window.confirm(t('confirmRetry'))) return;
+    const ok = await askConfirm({
+      object: t('confirmRetryObject'),
+      consequence: t('confirmRetry'),
+      confirmLabel: t('retryAll'),
+      tone: 'default',
+    });
+    if (!ok) return;
     setRetrying(true);
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
@@ -95,7 +103,12 @@ export default function SmsQueuePage() {
   // Unreadable entries set aside by "Retry all" — they cannot be replayed,
   // so the only actions are to see how many there are and discard.
   const discardCorrupt = async () => {
-    if (!window.confirm(t('corrupt.confirmDiscard'))) return;
+    const ok = await askConfirm({
+      object: t('corrupt.discardObject'),
+      consequence: t('corrupt.confirmDiscard'),
+      confirmLabel: t('corrupt.discard'),
+    });
+    if (!ok) return;
     setDiscarding(true);
     setMessage(null);
     const res = await apiPost<{ discarded: number }>('/api/v1/admin/sms-queue/corrupt/discard', {});

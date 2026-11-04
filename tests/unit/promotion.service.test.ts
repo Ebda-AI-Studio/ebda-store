@@ -23,7 +23,11 @@ const { mockPromotion, mockSearchNameIds } = vi.hoisted(() => ({
 }));
 
 vi.mock('@ebda/database', () => ({
-  prisma: { promotion: mockPromotion },
+  prisma: {
+    promotion: mockPromotion,
+    // BE:S-25: the targeted customer group must belong to the store
+    customerGroup: { findFirst: vi.fn().mockResolvedValue({ id: 'g1' }) },
+  },
 }));
 // The Arabic-normalised name search is raw SQL (covered by
 // tests/integration/product-search-normalised.test.ts); here only its wiring.

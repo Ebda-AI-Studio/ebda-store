@@ -6,6 +6,8 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { FormFooter } from '@/components/FormFooter';
+import { PageState } from '@/components/PageState';
 import { apiGet, apiPost } from '@/lib/api';
 import { isVariantProduct } from '@/lib/variant-product';
 import { formatPrice } from '@/lib/format';
@@ -72,7 +74,6 @@ export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const t = useT('stock.purchaseOrders');
   const tNew = useT('stock.purchaseOrders.new');
-  const tc = useT('common');
 
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -86,6 +87,8 @@ export default function NewPurchaseOrderPage() {
   const [lines, setLines] = useState<POLineItem[]>([{ ...EMPTY_LINE }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -93,16 +96,23 @@ export default function NewPurchaseOrderPage() {
     // `{ success, data }` envelope, so `data` IS the supplier array —
     // reading `data.data` double-unwrapped to undefined and the dropdown
     // was always empty (#831 sweep).
-    apiGet<SupplierOption[]>(`/api/v1/stores/${storeId}/suppliers?isActive=true`).then(
-      ({ data }) => {
-        if (data) setSuppliers(data ?? []);
-      }
-    );
-    // Load products for line item selects
-    apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?limit=200`).then(({ data }) => {
-      if (data) setProducts(data.products ?? []);
-    });
-  }, [storeId]);
+    // A failed load must not look like "no suppliers" (CU-1): PageState shows the error with a retry.
+    setLoadState('loading');
+    Promise.all([
+      apiGet<SupplierOption[]>(`/api/v1/stores/${storeId}/suppliers?isActive=true`),
+      apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?limit=200`),
+    ])
+      .then(([sup, prod]) => {
+        if (sup.error || prod.error) {
+          setLoadState('error');
+          return;
+        }
+        setSuppliers(sup.data ?? []);
+        setProducts(prod.data?.products ?? []);
+        setLoadState('ready');
+      })
+      .catch(() => setLoadState('error'));
+  }, [storeId, reloadKey]);
 
   function updateLine(i: number, patch: Partial<POLineItem>) {
     setLines(cur => cur.map((line, idx) => (idx === i ? { ...line, ...patch } : line)));
@@ -249,12 +259,12 @@ export default function NewPurchaseOrderPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supplierId) {
-      setError('Please select a supplier.');
+      setError(tNew('supplierRequired'));
       return;
     }
     const validLines = lines.filter(l => l.productId && l.qty && l.unitCost);
     if (validLines.length === 0) {
-      setError('Add at least one line item with product, quantity, and unit cost.');
+      setError(tNew('linesRequired'));
       return;
     }
     if (validLines.some(l => productHasVariants(l.productId) && !l.variantId)) {
@@ -308,110 +318,112 @@ export default function NewPurchaseOrderPage() {
   }
 
   return (
-    <AdminLayout title={tNew('title')}>
-      <form onSubmit={handleSubmit} className="max-w-4xl space-y-5">
-        {/* Supplier + Expected date */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">
-              {t('supplier')} <span className="text-red-500">*</span>
-            </span>
-            <select
-              value={supplierId}
-              onChange={e => setSupplierId(e.target.value)}
-              required
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-            >
-              <option value="">— {tNew('selectSupplier')} —</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+    <AdminLayout
+      title={tNew('title')}
+      parent={{ label: t('title'), href: `/stores/${storeId}/stock/purchase-orders` }}
+    >
+      <PageState
+        loading={loadState === 'loading'}
+        error={loadState === 'error' ? tNew('loadFailed') : null}
+        onRetry={() => setReloadKey(k => k + 1)}
+      >
+        <form onSubmit={handleSubmit} className="max-w-4xl space-y-5">
+          {/* Supplier + Expected date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="space-y-1">
+              <span className="text-sm font-medium">
+                {t('supplier')} <span className="text-red-500">*</span>
+              </span>
+              <select
+                value={supplierId}
+                onChange={e => setSupplierId(e.target.value)}
+                required
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              >
+                <option value="">— {tNew('selectSupplier')} —</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="space-y-1">
-            <span className="text-sm font-medium">{tNew('expectedDateLabel')}</span>
-            <input
-              type="date"
-              value={expectedDate}
-              onChange={e => setExpectedDate(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-            />
-          </label>
-        </div>
-
-        {/* Notes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">{tNew('notesLabel')}</span>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder={tNew('notesPlaceholder')}
-            />
-          </label>
-          <label className="space-y-1" dir="rtl">
-            <span className="text-sm font-medium">{tNew('notesArLabel')}</span>
-            <textarea
-              value={notesAr}
-              onChange={e => setNotesAr(e.target.value)}
-              rows={2}
-              dir="rtl"
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder={t('notesArPlaceholder')}
-            />
-          </label>
-        </div>
-
-        {/* Line items */}
-        <div>
-          <DataTable<POLineItem>
-            ariaLabel={tNew('lineItemsTableLabel')}
-            columns={lineColumns}
-            rows={lines}
-            rowKey={(_l, i) => String(i)}
-          />
-          {/* DataTable has no footer concept, so the subtotal is a summary bar
-              right below the table — visible on both layouts. */}
-          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
-            <span>{tNew('subtotal')}</span>
-            <span className="font-mono font-semibold">{formatPrice(subtotalFils)}</span>
+            <label className="space-y-1">
+              <span className="text-sm font-medium">{tNew('expectedDateLabel')}</span>
+              <input
+                type="date"
+                value={expectedDate}
+                onChange={e => setExpectedDate(e.target.value)}
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              />
+            </label>
           </div>
-        </div>
 
-        <div>
-          <button
-            type="button"
-            onClick={addLine}
-            className="px-3 py-1.5 border border-border rounded text-sm"
-          >
-            {tNew('addItem')}
-          </button>
-        </div>
+          {/* Notes */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="space-y-1">
+              <span className="text-sm font-medium">{tNew('notesLabel')}</span>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={2}
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                placeholder={tNew('notesPlaceholder')}
+              />
+            </label>
+            <label className="space-y-1" dir="rtl">
+              <span className="text-sm font-medium">{tNew('notesArLabel')}</span>
+              <textarea
+                value={notesAr}
+                onChange={e => setNotesAr(e.target.value)}
+                rows={2}
+                dir="rtl"
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                placeholder={t('notesArPlaceholder')}
+              />
+            </label>
+          </div>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
+          {/* Line items */}
+          <div>
+            <DataTable<POLineItem>
+              ariaLabel={tNew('lineItemsTableLabel')}
+              columns={lineColumns}
+              rows={lines}
+              rowKey={(_l, i) => String(i)}
+            />
+            {/* DataTable has no footer concept, so the subtotal is a summary bar
+              right below the table — visible on both layouts. */}
+            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+              <span>{tNew('subtotal')}</span>
+              <span className="font-mono font-semibold">{formatPrice(subtotalFils)}</span>
+            </div>
+          </div>
 
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-          >
-            {submitting ? tc('saving') : tNew('submit')}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders`)}
-            className="px-4 py-2 border border-border rounded text-sm"
-          >
-            {tc('cancel')}
-          </button>
-        </div>
-      </form>
+          <div>
+            <button
+              type="button"
+              onClick={addLine}
+              className="px-3 py-1.5 border border-border rounded text-sm"
+            >
+              {tNew('addItem')}
+            </button>
+          </div>
+
+          {error && (
+            <div role="alert" className="text-destructive-ink text-sm">
+              {error}
+            </div>
+          )}
+
+          <FormFooter
+            primaryLabel={tNew('submit')}
+            cancelHref={`/stores/${storeId}/stock/purchase-orders`}
+            saving={submitting}
+          />
+        </form>
+      </PageState>
     </AdminLayout>
   );
 }

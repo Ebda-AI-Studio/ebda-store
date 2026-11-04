@@ -134,7 +134,7 @@ export async function handleOrderCreatedStuckSweep(
           `${veryStale.length} PAID order(s) still have no order/created fanout after ` +
           `> ${3 * STUCK_ORDER_NOTIFY_MINUTES}m — no confirmation email, admin push, ` +
           `WhatsApp notify, CAPI, or accounting journal entry. Re-send isn't landing; ` +
-          `investigate Inngest delivery.`,
+          `check the Cloudflare job dispatch (Worker logs, JOBS_WORKFLOW / JOBS_QUEUE).`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
           oldestCreatedAt: veryStale[0]

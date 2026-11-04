@@ -71,7 +71,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                 {/* Backorder enrichment — shown when Batch 2 data is present */}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(product.openBackorderCount ?? 0) > 0 && (
-                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-warning/10 text-warning-ink">
                       {t('openBackorders', { count: product.openBackorderCount ?? 0 })}
                     </span>
                   )}

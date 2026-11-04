@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { reportRangeQueryString } from '@ebda/shared';
 import { apiGet } from '../../../../../lib/api';
 import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
+import { isPlanGateError } from '../../../../../lib/route-feature-gates';
 import type {
   CashflowPoint,
   DashboardStats,
@@ -57,6 +58,7 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cashflowLocked, setCashflowLocked] = useState(false);
   // Latest-request-wins: switching period while a slower earlier request is
   // still in flight must not let that stale response overwrite the new one
   // (the page would show the OLD range under the NEW pill).
@@ -121,6 +123,12 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
         setCashflow(cashflowResult.data.trend ?? []);
       }
 
+      // BE:S-4 - cashflow (and the stock snapshot) are owner + accounting.basic only. A plan or role refusal there is
+      // a LOCKED section, not a failed page: it must never read as an error banner with raw API text.
+      const refused = (e: { status?: number; code?: string } | null) =>
+        !!e && (isPlanGateError(e) || e.status === 403);
+      setCashflowLocked(refused(cashflowResult.error));
+
       const failed = [
         dashboardResult,
         salesResult,
@@ -128,7 +136,7 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
         ordersResult,
         stockResult,
         cashflowResult,
-      ].find(r => r.error);
+      ].find(r => r.error && !(r === cashflowResult && refused(r.error)));
       // `''` (a failure with no message) is still an error: the page renders its
       // own translated fallback. Only `null` means "everything loaded".
       if (failed?.error) setError(failed.error.message ?? '');
@@ -166,6 +174,7 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
     lowStockProducts,
     isLoading,
     error,
+    cashflowLocked,
     refetch: fetchAnalytics,
   };
 }

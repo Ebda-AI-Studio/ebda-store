@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
+import { ErrorState } from '@/components/ErrorState';
+import { AdminSkeletonPage } from '@/components/AdminSkeleton';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
@@ -67,7 +69,7 @@ export default function InsightsFunnelPage() {
           if (apiError) setError(apiError.message);
           else if (d) setData(d);
         })
-        .catch(() => setError('Failed to load funnel data'))
+        .catch(() => setError(t('loadFailed')))
         .finally(() => setLoading(false));
     },
     [storeId]
@@ -200,9 +202,9 @@ export default function InsightsFunnelPage() {
           ))}
         </div>
 
-        {loading && <div className="text-sm text-muted-foreground">{tc('loading')}</div>}
+        {loading && <AdminSkeletonPage variants={['cards', 'table']} />}
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <ErrorState message={error} onRetry={() => fetchData(window)} />}
 
         {!loading && data && steps.length > 0 && (
           <>
@@ -253,7 +255,7 @@ export default function InsightsFunnelPage() {
 
             {/* Revenue + abandoned summary */}
             {totals && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('revenue')}
@@ -273,7 +275,7 @@ export default function InsightsFunnelPage() {
                     </p>
                   ) : (
                     <>
-                      <p className="text-2xl font-semibold font-mono text-amber-600">
+                      <p className="text-2xl font-semibold font-mono text-warning-ink">
                         {totals.ordersAbandoned}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -302,7 +304,7 @@ export default function InsightsFunnelPage() {
           </>
         )}
 
-        {!loading && data?.days.length === 0 && (
+        {!loading && !error && data?.days.length === 0 && (
           <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
             {t('noDataYet')}
           </div>

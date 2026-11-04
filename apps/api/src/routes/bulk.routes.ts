@@ -15,6 +15,7 @@ import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { tenantContext } from '../middleware/tenant-context';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 
 import { fromMinor, excelMoneyFormat } from '@ebda/shared';
 const router = Router();
@@ -377,10 +378,15 @@ router.post(
         select: { id: true, status: true, createdAt: true },
       });
 
-      await inngest.send({
-        name: 'bulk-import/started',
-        data: { jobId: job.id, storeId },
-      });
+      try {
+        await inngest.send({
+          name: 'bulk-import/started',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedOnEnqueueError(storeId, job.id, err, 'bulkImportJob');
+        throw err;
+      }
 
       await auditLog({
         action: 'bulk.import.queued',
@@ -465,10 +471,15 @@ router.post(
         select: { id: true, status: true, createdAt: true },
       });
 
-      await inngest.send({
-        name: 'bulk-import/started',
-        data: { jobId: job.id, storeId },
-      });
+      try {
+        await inngest.send({
+          name: 'bulk-import/started',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedOnEnqueueError(storeId, job.id, err, 'bulkImportJob');
+        throw err;
+      }
 
       await auditLog({
         action: 'bulk.import.queued',

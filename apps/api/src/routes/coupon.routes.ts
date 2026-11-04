@@ -28,7 +28,7 @@ const router = Router();
 router.param('storeId', tenantContext);
 
 // Validation schemas
-export const createCouponSchema = z.object({
+const couponBaseSchema = z.object({
   code: z
     .string()
     .min(1)
@@ -80,7 +80,21 @@ export const createCouponSchema = z.object({
   scopeCategoryIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
-export const updateCouponSchema = createCouponSchema.partial();
+/** BE:S-24: a percentage coupon is a whole percent, 1 to 100 (the Int column and the discount maths assume it). */
+const percentageRule = (v: { type?: string; value?: number }, ctx: z.RefinementCtx) => {
+  if (
+    v.type === 'percentage' &&
+    v.value !== undefined &&
+    (!Number.isInteger(v.value) || v.value < 1 || v.value > 100)
+  )
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['value'],
+      message: 'A percentage coupon must be a whole number from 1 to 100',
+    });
+};
+export const createCouponSchema = couponBaseSchema.superRefine(percentageRule);
+export const updateCouponSchema = couponBaseSchema.partial().superRefine(percentageRule);
 
 // Same cart-item shape as promotion.routes.ts's preview endpoint — kept
 // local (not imported) since each router already owns its own validation
@@ -301,6 +315,7 @@ router.patch(
 router.post(
   '/public/:storeId/coupons/validate',
   couponValidateLimiter,
+  requireFeature('coupons'), // BE:S-29 / D7: a store without the coupons feature cannot be probed for codes
   // Distinct-code budget shared with /orders/quote + /orders (enumeration needs distinct codes).
   couponValidateDistinctLimiter,
   // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
