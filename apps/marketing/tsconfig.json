@@ -14,6 +14,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@ebda/shared/brand": ["../../packages/shared/src/brand"],
+      "@ebda/shared/contact-enquiry": ["../../packages/shared/src/contact-enquiry"],
       "@ebda/shared/legal": ["../../packages/shared/src/legal"],
       "@ebda/ui/model3d": ["../../packages/ui/src/model3d"],
       "@ebda/shared/tracking-browser": ["../../packages/shared/src/tracking/browser"]

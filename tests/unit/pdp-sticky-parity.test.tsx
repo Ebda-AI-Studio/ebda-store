@@ -158,8 +158,9 @@ async function renderPdp(p: Record<string, unknown>) {
   act(() =>
     ctx.all.forEach(cb => cb([{ isIntersecting: false, boundingClientRect: { top: -10 } }]))
   );
-  const sticky = screen.getByTestId('sticky-atc');
-  const stickyBtn = sticky.querySelector('button') as HTMLButtonElement;
+  // A sold-out product has no sticky bar at all (audit 2026-11-03 #6): the inline button is its one state.
+  const sticky = screen.queryByTestId('sticky-atc') as HTMLElement;
+  const stickyBtn = sticky?.querySelector('button') as HTMLButtonElement;
   // The main button by its own hook, never by matching the sticky bar's label.
   const main = screen.getByTestId('pdp-add') as HTMLButtonElement;
   return { sticky, stickyBtn, main };
@@ -241,9 +242,16 @@ describe('default PDP sticky bar mirrors the main add button', () => {
     }
   );
 
-  it('out of stock: same label and both disabled', async () => {
-    const { stickyBtn, main } = await renderPdp(product({ inStock: false, inventory: 0 }));
-    expectMirror(main, stickyBtn, 'Out of stock', true);
+  it('out of stock: ONE disabled "Out of stock" button, no second bar, stepper disabled, no repeated label', async () => {
+    const { sticky, main } = await renderPdp(product({ inStock: false, inventory: 0 }));
+    expect(sticky).toBeNull();
+    expect(screen.queryByTestId('sticky-atc')).toBeNull();
+    expect(main.textContent?.trim()).toBe('Out of stock');
+    expect(main.disabled).toBe(true);
+    expect((screen.getByLabelText('Decrease quantity') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Increase quantity') as HTMLButtonElement).disabled).toBe(true);
+    // The label appears once: the button. The stock text beside the stepper only says "pre-order".
+    expect(screen.getAllByText('Out of stock')).toHaveLength(1);
   });
 
   it('pre-order (out of stock, accepts backorder): same label, both enabled', async () => {

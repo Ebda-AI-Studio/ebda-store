@@ -2,7 +2,7 @@
 
 import type { ProductGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getGridColsClass, getDisplayTitle } from '../shared';
+import { getGridColsClass, getDisplayTitle, fitDesktopColumns } from '../shared';
 import ProductCard from './ProductCard';
 
 export default function MinimalProductGrid({
@@ -24,7 +24,7 @@ export default function MinimalProductGrid({
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
-  const gridCols = getGridColsClass(columns);
+  const gridCols = getGridColsClass(fitDesktopColumns(products.length, columns) as 2 | 3 | 4 | 5);
 
   return (
     <section

@@ -1284,12 +1284,36 @@ html {
 @media (max-width: 767px) {
   html {
     scroll-padding-bottom: calc(var(--bottom-tab-h) + env(safe-area-inset-bottom) + 0.75rem);
+    /* The body's bottom padding (layout.tsx pb-32) reserved for the tab bar. The shop wrapper's
+     * min-height subtracts it (ShopChrome), so on a SHORT page the footer ends above the bar
+     * instead of sitting at the viewport floor under it (audit 2026-11-03 #6). The body rules
+     * below that change the padding change this variable with them. */
+    --chrome-reserve: 8rem;
+  }
+  html[data-tab-bar='off'] body:not([data-sticky-atc='1']):not([data-sticky-cart]) {
+    --chrome-reserve: 0px;
+  }
+  body[data-sticky-atc='1'],
+  body[data-sticky-cart='1'] {
+    --chrome-reserve: calc(8rem + 4.25rem);
+  }
+  body[data-sticky-cart='blocked'] {
+    --chrome-reserve: calc(8rem + 4.25rem + 1.5rem);
   }
   html[data-task-bar] {
     scroll-padding-bottom: calc(var(--sticky-bar-h, 61px) + 0.75rem);
   }
   html[data-task-bar] [data-bottom-tab-bar] {
     display: none;
+  }
+  /* The cookie strip sits on whatever fixed bar is the bottom layer: above the tab bar, above a task
+   * bar (its measured height), or at the edge on a route with no bar (audit 2026-11-03 #6: it
+   * floated a tab-bar's height over empty page or over the PDP buy bar). */
+  html[data-task-bar] [data-cookie-banner] {
+    bottom: var(--sticky-bar-h, 61px);
+  }
+  html[data-tab-bar='off']:not([data-task-bar]) [data-cookie-banner] {
+    bottom: env(safe-area-inset-bottom);
   }
   /* TEMPLATES-MOCK-5: no tab bar on this route (BottomTabBar sets it), so no reserved strip under the footer. */
   html[data-tab-bar='off'] body:not([data-sticky-atc='1']):not([data-sticky-cart]) {
@@ -1751,6 +1775,25 @@ html[dir='rtl'] [data-look='lamma.notebook'],
 [data-look='jasmine.apothecary']
   [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *)
   img {
+  mix-blend-mode: multiply;
+}
+/* PREMIUM-33 (audit 2026-11-03 b, souq): every action on Night souq is brass (Ruling B2-18) except the hero's
+   white photo button, which read as the odd one out. The hero action takes the same brass pair as the cards. */
+[data-look='souq.night'] a[data-cta='button'],
+[data-look='souq.night'] a[data-cta='button']:hover {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+[data-look='souq.night'] a[data-cta='button']:hover {
+  filter: brightness(1.08);
+}
+/* PREMIUM-34 (audit 2026-11-03 b, jasmine): merchant photos are shot on white, and on Bloom's white card the white
+   photo read as a second white frame inside the first. The photo area gets a blush matte (the pink page mixed
+   toward white) and the photo multiplies into it, so the card is one white frame around one pink-toned tile. */
+[data-look='jasmine.bloom'] [data-part='card-image'] {
+  background-color: color-mix(in srgb, hsl(var(--background)) 62%, white);
+}
+[data-look='jasmine.bloom'] [data-part='card-image'] img {
   mix-blend-mode: multiply;
 }
 /* Clinic's featured active (fix wave 1): a finished clinical panel, not a grey tile beside floating

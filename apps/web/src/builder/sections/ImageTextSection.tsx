@@ -17,6 +17,7 @@ import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import { displayedImageKey, imageMarker } from '../render/image-key';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export interface ImageTextSettings extends SectionPaddingMaxWidthVisibility {
   image?: string;
@@ -95,10 +96,10 @@ export function ImageTextSection({
         className="relative w-full overflow-hidden"
         style={sectionBgStyle(settings.bgColor, store.theme)}
       >
-        <img
+        <ResponsiveImg
           src={image}
           alt={alt}
-          loading="lazy"
+          sizes="100vw"
           className="absolute inset-0 h-full w-full object-cover"
           {...imageMarker(editorMode, imageKey)}
         />
@@ -149,10 +150,11 @@ export function ImageTextSection({
         {showImageColumn && (
           <div className={imageFirst ? 'md:order-1' : 'md:order-2'}>
             {image ? (
-              <img
+              <ResponsiveImg
                 src={image}
                 alt={alt}
-                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 600px"
+                maxWidth={1280}
                 className={`w-full rounded-[var(--radius)] object-cover ${ASPECT[settings.imageAspect ?? 'square']}`}
                 {...imageMarker(editorMode, imageKey)}
               />

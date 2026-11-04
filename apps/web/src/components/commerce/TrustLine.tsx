@@ -50,7 +50,24 @@ export function TrustLine({
   if (!cod && !returns) return null;
 
   return (
-    <p data-testid="pdp-trust-line" className={`${className} text-sm text-muted-foreground`}>
+    // Audit 2026-11-03 #13: 12 px grey was the only trust cue. Body size, the ink token (>= 4.5:1
+    // on every ground), a check mark, and room to wrap: it is a reason to buy, not a footnote.
+    <p
+      data-testid="pdp-trust-line"
+      className={`${className} flex flex-wrap items-center gap-x-1 text-base leading-6 text-foreground`}
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="me-1 h-4 w-4 shrink-0 text-muted-foreground"
+      >
+        <path d="M20 6L9 17l-5-5" />
+      </svg>
       {cod && <span data-trust="cod">{cod}</span>}
       {cod && returns && <span aria-hidden="true"> · </span>}
       {returns && (

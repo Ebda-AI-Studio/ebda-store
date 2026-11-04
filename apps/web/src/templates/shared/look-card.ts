@@ -94,11 +94,13 @@ export function overPhotoHeartCls(material: 'soft' | 'bare', wishlisted: boolean
   const ink = wishlisted
     ? 'text-[rgb(20_20_20)]'
     : 'text-[rgb(20_20_20/0.78)] hover:text-[rgb(20_20_20)]';
+  // Audit 2026-11-03 #9: the plate is OPAQUE white with a hairline ring (it was 85-95% white, which read
+  // as a grey square over a photo). It keeps the look's own radius (Ruling LB-c).
   // `bare` (Atelier): no disc, but a plate in the look's own radius behind the glyph, so it is
   // >= 3:1 over a dark photo too (a11y P1-8: the plate-less glyph measured 2.38:1).
   return material === 'bare'
-    ? `before:absolute before:-inset-1 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] bg-white/85 transition-colors duration-[var(--duration-base)] cursor-pointer ${ink}`
-    : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-white/95 shadow-[0_8px_20px_-8px_rgb(20_20_20/0.30)] transition-[background-color,color] duration-[var(--duration-base)] hover:bg-white cursor-pointer ${ink}`;
+    ? `before:absolute before:-inset-1 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] bg-white ring-1 ring-black/5 transition-colors duration-[var(--duration-base)] cursor-pointer ${ink}`
+    : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-white shadow-[0_8px_20px_-8px_rgb(20_20_20/0.30)] ring-1 ring-black/5 transition-[background-color,color] duration-[var(--duration-base)] hover:bg-white cursor-pointer ${ink}`;
 }
 
 /**

@@ -40,6 +40,16 @@ const HEADER_MIN_PX = 68;
  * header arrives (Qamar lookbook moved 27 px: CLS 0.100-0.151 on slow 3G, budget 0.1). A look missing here keeps
  * HEADER_MIN_PX. Re-measure when a look's header changes.
  */
+/**
+ * The same, for a store that uploaded its own logo (audit 2026-11-03 #8: the QA store, Qamar Atelier, reserved
+ * the table's 92 px and its real header is 68: every page moved 24 px up on load, CLS 0.07-0.10 on cart alone).
+ * The table above was measured on the showroom, whose built-in lockup is taller than an uploaded logo (the
+ * logo is absolutely centred on phones, so it adds no row height). Measured live: qa-merchant-test, 390 px,
+ * `main` top 68. A look not listed here with an uploaded logo keeps its LOOK_HEADER_PX value: NOT MEASURED.
+ */
+const LOOK_HEADER_WITH_LOGO_PX: Record<string, number> = {
+  'qamar.atelier': 68,
+};
 const LOOK_HEADER_PX: Record<string, number> = {
   'qamar.atelier': 92,
   'qamar.lookbook': 95,
@@ -363,7 +373,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
     return (
       <CardStepperProvider>
         <div
-          className="flex min-h-screen flex-col bg-background"
+          className="flex min-h-[calc(100dvh-var(--chrome-reserve,0px))] flex-col bg-background md:min-h-screen"
           data-ui-uppercase={store?.theme?.uppercaseStyle ? 'true' : undefined}
         >
           {/* announcement slot: reserves its row so the bar arriving later does not push the page down */}
@@ -391,7 +401,14 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             <div
               aria-hidden
               className="border-b"
-              style={{ minHeight: LOOK_HEADER_PX[store?.look ?? ''] ?? HEADER_MIN_PX }}
+              style={{
+                minHeight:
+                  (branding.logo || branding.logoAr
+                    ? LOOK_HEADER_WITH_LOGO_PX[store?.look ?? '']
+                    : undefined) ??
+                  LOOK_HEADER_PX[store?.look ?? ''] ??
+                  HEADER_MIN_PX,
+              }}
             />
           </div>
           <main role="main" className="flex-1">
@@ -414,7 +431,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
     // underneath it'). Removed; body-pb is the single source of truth.
     <CardStepperProvider>
       <div
-        className="flex min-h-screen flex-col bg-background"
+        className="flex min-h-[calc(100dvh-var(--chrome-reserve,0px))] flex-col bg-background md:min-h-screen"
         data-ui-uppercase={store?.theme?.uppercaseStyle ? 'true' : undefined}
       >
         {/* `data-zone` wrappers let the per-store typography rules in

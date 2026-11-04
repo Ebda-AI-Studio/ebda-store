@@ -1,3 +1,4 @@
+import { backfillImageVariants } from '../services/image-variants.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
@@ -89,6 +90,43 @@ router.put(
         userAgent: req.headers['user-agent'],
       });
       res.json({ success: true, data: { gate } });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/**
+ * One-off backfill of resized image variants for images uploaded before PREMIUM-2 (Ruling PREMIUM-2).
+ * Resumable: call with the returned `nextCursor` until it is null, once per store.
+ *   POST /admin/images/backfill-variants   { storeId, cursor?, limit?, dryRun? }
+ */
+const backfillBody = z
+  .object({
+    storeId: z.string().uuid(),
+    cursor: z.string().max(2048).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict();
+
+router.post(
+  '/images/backfill-variants',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = parseInput(backfillBody, req.body);
+      const r = await backfillImageVariants(body);
+      await auditLog({
+        action: 'images.variants_backfill',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: body.storeId,
+        details: { ...r, dryRun: !!body.dryRun },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: r });
     } catch (e) {
       next(e);
     }

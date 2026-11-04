@@ -11,6 +11,7 @@ import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { countText, ITEMS } from '../../lib/plural';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { Sheet } from '@/components/ui/Sheet';
+import { PriceRangeSlider } from './PriceRangeSlider';
 
 import { roundToMinor } from '@ebda/shared';
 interface SortOption {
@@ -98,6 +99,15 @@ interface ProductsFilterSidebarProps {
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** One chip look for every filter value (facet value, category): a pill, 44 px tall, the active
+ *  one filled with the store primary. Replaces full-width grey bars + 24 px checkboxes. */
+const CHIP_BASE =
+  'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background cursor-pointer';
+const CHIP_ON = 'filter-active border-primary bg-primary text-primary-foreground font-semibold';
+const CHIP_OFF =
+  'border-[hsl(var(--filter-fg)/0.2)] bg-transparent text-[hsl(var(--filter-fg)/0.9)] hover:border-[hsl(var(--filter-fg)/0.45)] hover:text-[hsl(var(--filter-fg))]';
+const chip = (on: boolean) => `${CHIP_BASE} ${on ? CHIP_ON : CHIP_OFF}`;
+
 /**
  * One variant-option facet axis (e.g. "Size") with a checkbox per value.
  *
@@ -129,34 +139,22 @@ function FacetGroup({
   );
   return (
     <div>
-      <h3 className="mb-3 text-lg font-medium text-[hsl(var(--filter-fg))]">{facetLabel}</h3>
-      <div className="space-y-2">
+      <h3 className="mb-3 text-base font-semibold text-[hsl(var(--filter-fg))]">{facetLabel}</h3>
+      <div className="flex flex-wrap gap-2">
         {facet.values.map(v => {
           const isChecked = selectedValues.includes(v.value);
           const valueLabel = localizeOptionValue(v.value, v.valueAr, isArabic);
           const checkboxId = `facet-${facet.name}-${v.value}-${surface}`;
           return (
-            <label
-              key={v.value}
-              htmlFor={checkboxId}
-              className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition ${
-                isChecked
-                  ? 'filter-active bg-primary text-primary-foreground font-semibold'
-                  : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.9)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
-              }`}
-            >
+            <label key={v.value} htmlFor={checkboxId} className={chip(isChecked)}>
+              {/* A real checkbox stays the control (keyboard, screen reader, label): the chip is
+                  its skin. Multi-value facet: the sheet stays open per tick, "View results" is done. */}
               <input
                 id={checkboxId}
                 type="checkbox"
                 checked={isChecked}
-                onChange={() => {
-                  // Multi-value facet — do NOT close the mobile sheet on each
-                  // tick (shopper may pick several sizes). The "View results"
-                  // button is the explicit done action.
-                  onOptionToggle?.(facet.name, v.value);
-                }}
-                className="h-6 w-6 shrink-0 accent-primary rounded"
-                aria-label={valueLabel}
+                onChange={() => onOptionToggle?.(facet.name, v.value)}
+                className="sr-only"
               />
               <span>{valueLabel}</span>
             </label>
@@ -341,56 +339,21 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         priceMin !== undefined &&
         priceMax !== undefined && (
           <div>
-            <h3 className="mb-3 text-lg font-medium text-[hsl(var(--filter-fg))]">
+            <h3 className="mb-3 text-base font-semibold text-[hsl(var(--filter-fg))]">
               {t('Price range', 'مجال السعر')}
             </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--filter-fg)/0.8)]">
-                <span>{money(roundToMinor(priceMin))}</span>
-                <span>{money(roundToMinor(priceMax))}</span>
-              </div>
-              <div className="relative h-1.5 rounded-full bg-[hsl(var(--filter-fg)/0.25)]">
-                <div
-                  className="absolute h-full rounded-full bg-primary"
-                  style={{
-                    insetInlineStart: `${
-                      ((priceMin - priceFloor) / Math.max(1, priceCeil - priceFloor)) * 100
-                    }%`,
-                    insetInlineEnd: `${
-                      ((priceCeil - priceMax) / Math.max(1, priceCeil - priceFloor)) * 100
-                    }%`,
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="range"
-                  min={priceFloor}
-                  max={priceCeil}
-                  step={priceStep}
-                  value={priceMin}
-                  onChange={e => {
-                    const v = Math.min(Number(e.target.value), priceMax);
-                    onPriceChange(v, priceMax);
-                  }}
-                  className="h-11 w-full accent-primary"
-                  aria-label={t('Minimum price', 'الحد الأدنى للسعر')}
-                />
-                <input
-                  type="range"
-                  min={priceFloor}
-                  max={priceCeil}
-                  step={priceStep}
-                  value={priceMax}
-                  onChange={e => {
-                    const v = Math.max(Number(e.target.value), priceMin);
-                    onPriceChange(priceMin, v);
-                  }}
-                  className="h-11 w-full accent-primary"
-                  aria-label={t('Maximum price', 'الحد الأقصى للسعر')}
-                />
-              </div>
-            </div>
+            <PriceRangeSlider
+              idPrefix={`price-${mobile ? 'm' : 'd'}`}
+              floor={priceFloor}
+              ceil={priceCeil}
+              min={priceMin}
+              max={priceMax}
+              step={priceStep}
+              onChange={onPriceChange}
+              format={v => money(roundToMinor(v))}
+              minLabel={t('Minimum price', 'الحد الأدنى للسعر')}
+              maxLabel={t('Maximum price', 'الحد الأقصى للسعر')}
+            />
           </div>
         )}
 
@@ -442,31 +405,19 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       </form>
 
       <div>
-        <h3 className="mb-3 text-lg font-medium text-[hsl(var(--filter-fg))]">
+        <h3 className="mb-3 text-base font-semibold text-[hsl(var(--filter-fg))]">
           {t('Categories', translations['Categories'])}
         </h3>
-        <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => (mobile ? closeAfter(onCategoryChange)('') : onCategoryChange(''))}
             aria-pressed={!categoryFilter}
-            className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition ${
-              !categoryFilter
-                ? 'filter-active bg-primary text-primary-foreground font-semibold'
-                : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.9)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
-            }`}
+            className={chip(!categoryFilter)}
           >
             <span>{t('All', 'الكل')}</span>
             {meta && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  !categoryFilter
-                    ? 'bg-[hsl(var(--filter-fg)/0.2)]'
-                    : 'bg-[hsl(var(--filter-fg)/0.12)]'
-                }`}
-              >
-                {meta.total}
-              </span>
+              <span className="text-xs tabular-nums opacity-75">{localize(meta.total)}</span>
             )}
           </button>
           {categories
@@ -479,22 +430,12 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   mobile ? closeAfter(onCategoryChange)(cat.slug) : onCategoryChange(cat.slug)
                 }
                 aria-pressed={categoryFilter === cat.slug}
-                className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition ${
-                  categoryFilter === cat.slug
-                    ? 'filter-active bg-primary text-primary-foreground font-semibold'
-                    : 'bg-[hsl(var(--filter-fg)/0.08)] text-[hsl(var(--filter-fg)/0.9)] hover:bg-[hsl(var(--filter-fg)/0.15)] hover:text-[hsl(var(--filter-fg))]'
-                }`}
+                className={chip(categoryFilter === cat.slug)}
               >
                 <span>{language === 'ar' && cat.nameAr ? cat.nameAr : cat.name}</span>
                 {cat.productCount !== undefined && (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      categoryFilter === cat.slug
-                        ? 'bg-[hsl(var(--filter-fg)/0.2)]'
-                        : 'bg-[hsl(var(--filter-fg)/0.12)]'
-                    }`}
-                  >
-                    {cat.productCount}
+                  <span className="text-xs tabular-nums opacity-75">
+                    {localize(cat.productCount)}
                   </span>
                 )}
               </button>
@@ -511,7 +452,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
     <aside
-      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:p-4 lg:sticky lg:top-[calc(var(--header-h,0px)+1rem)] lg:max-h-[calc(100dvh-var(--header-h,0px)-2rem)] lg:overflow-y-auto lg:border lg:border-input lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
+      className="w-full shrink-0 lg:w-64 lg:rounded-[var(--radius)] lg:p-4 lg:sticky lg:top-[calc(var(--header-h,0px)+1rem)] lg:max-h-[calc(100dvh-var(--header-h,0px)-2rem)] lg:overflow-y-auto lg:border lg:border-[hsl(var(--filter-fg)/0.12)] lg:bg-[hsl(var(--filter-bg))] lg:text-[hsl(var(--filter-fg))]"
       style={sidebarVars}
       data-zone="filters"
       // merchant filter colours: the active chip gets an ink ring so it never blends into a

@@ -64,3 +64,7 @@ Skin-type and concern **chips** (tags source), the **routine steps** section wit
 ## Status of the build (Phase B3)
 
 Built: skin id, tokens and gates, the logo-forward header, the pack and the three playful details, the four platform pieces, the three mixes, the `storedemo-jasmine` demo and its catalogue, the scenario matrix and the pack. Rulings B3-1 to B3-10 are in `docs/RULINGS.md`.
+
+## Storefront audit 2026-11-03 (PREMIUM-30, PREMIUM-34, PREMIUM-35)
+
+The header lockup keeps its whole Latin word (an inline lockup stacks on a phone; a line that cannot fit collapses, never an ellipsis). Bloom card photos sit on a blush matte and multiply into it. A Clinic routine-step product row is a card row, not an underlined link.
