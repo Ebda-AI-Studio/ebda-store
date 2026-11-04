@@ -1,6 +1,7 @@
 import type { Prisma } from '@ebda/database';
 import { withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import { customerAuthRoute } from './customer-auth';
 
 /**
  * Store-customer membership (Ruling SEC-CUSTOMER-SCOPE-1).
@@ -25,6 +26,13 @@ export function storeCustomerWhere(storeId: string, customerId: string): Prisma.
 /** 404 CUSTOMER_NOT_FOUND unless `customerId` is a customer account of `storeId`. Same answer for "no such id", "staff id" and "other store". */
 export async function assertStoreCustomer(storeId: string, customerId: string): Promise<void> {
   if (!storeId || !customerId) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+  // N-9: a customer of a store served by its StoreDO is that DO's (`users` in Postgres is not consulted).
+  const route = await customerAuthRoute(storeId, { write: false });
+  if (route.kind === 'do') {
+    const u = await route.client.call<unknown | null>('getProfile', { userId: customerId });
+    if (!u) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+    return;
+  }
   // `users` is under RLS (ebda_tenant_isolation: store_id = app.current_store_id), so a caller with no ambient store scope
   // (Inngest job, webhook) would see zero rows and get a false 404. withStore reuses the ambient tx when already scoped to
   // this store and opens the scope otherwise.

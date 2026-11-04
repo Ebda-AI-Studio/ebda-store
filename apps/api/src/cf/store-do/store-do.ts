@@ -38,6 +38,10 @@ import {
   decodeRpc,
   ensureStockOpsSchema,
   type StockAnswer,
+  answerAuthOp,
+  ensureCustomerAuthSchema,
+  purgeCustomerAuth,
+  type AuthAnswer,
   ensureIdempotencySchema,
   ensurePaymentSchema,
   scrubReceiptsForOrders,
@@ -61,6 +65,7 @@ import {
 } from '@ebda-src/repo';
 import * as repo from './repo';
 import { StoreError } from './repo';
+import bcrypt from 'bcryptjs';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { exportOrder, storeTables } from './tables';
 import {
@@ -101,6 +106,11 @@ export interface R2Like {
   get(key: string): Promise<{ text(): Promise<string> } | null>;
 }
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** bcrypt of 32 random bytes whose plaintext was discarded: compared when the account is unknown (same constant as auth.service). */
+const AUTH_VERIFIER = {
+  compare: (plain: string, hash: string) => bcrypt.compare(plain, hash),
+  dummyHash: '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha',
+};
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export class StoreDO extends DurableObject<Record<string, unknown>> {
@@ -122,6 +132,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureIdempotencySchema(doSqlRunner(ctx.storage));
       ensureStockOpsSchema(this.sync);
       ensureMoneyOpsSchema(this.sync);
+      ensureCustomerAuthSchema(this.sync);
     });
   }
 
@@ -297,6 +308,27 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /**
+   * Storefront CUSTOMER authentication (NEON-ZERO-1 N-9, Ruling NZ-A3): one named operation = one synchronous section over the
+   * `_cauth_*` tables (packages/repo/src/do/customer-auth.ts). Password verification runs HERE (bcryptjs), so a hash never
+   * crosses the RPC boundary. A refusal is an ANSWER. A closed store refuses everything but reads of state.
+   */
+  async authOp(storeId: string, op: string, argsJson: string): Promise<AuthAnswer> {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    if (
+      isStoreClosed(this.sync) &&
+      !/^(userState|getProfile|exportCustomer|exportRowsPage|counts|isLive)$/.test(op)
+    )
+      return { ok: false, code: 'STORE_CLOSED', status: 410, message: 'store is closed' };
+    return answerAuthOp(this.sync, AUTH_VERIFIER, op, argsJson);
+  }
+
+  /**
    * The settings copy (Ruling CF-WRITES-2): the API writes the authoritative `Store` row first, then sends the changed
    * fields here as an RPC JSON string. Applied to `store_profile` / `store_config`; D1-only fields are reported, not stored.
    */
@@ -432,6 +464,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         purgeErasureLedger(this.sync);
       } catch (err) {
         console.error('erasure ledger purge failed', err);
+      }
+      // Customer-auth retention (N-9): expired / used tokens and long-revoked refresh rows.
+      try {
+        purgeCustomerAuth(this.sync);
+      } catch (err) {
+        console.error('customer auth purge failed', err);
       }
       const storeId = this.boundStoreId();
       if (storeId) await this.backupNow(storeId);
