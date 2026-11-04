@@ -44,6 +44,12 @@ import {
   inlineEmailStyles,
   type EmailDir,
 } from './email-templates/_layout';
+import {
+  contactEnquiryHtml,
+  contactEnquiryReceipt,
+  contactEnquiryText,
+  type ContactEnquiryData,
+} from './email-templates/contact-enquiry';
 import { orderRefundedTemplate } from './email-templates/order-refunded';
 import {
   orderCancelledNotChargedTemplate,
@@ -1280,6 +1286,35 @@ export class EmailService {
       subject: `Contact Form: ${oneLine(data.subject)}`,
       content: this.contactFormTemplate(data),
       replyTo: data.email,
+    });
+  }
+
+  /**
+   * A studio service enquiry from the public /contact form (Ruling CONTACT-FORM-1), to the studio inbox
+   * (`BRAND.supportEmail`), reply-to the visitor. Sent directly, NOT through the retry queue: the caller
+   * answers the visitor from this promise, so a failed send must reject (never claim success).
+   */
+  static async sendContactEnquiry(data: ContactEnquiryData): Promise<void> {
+    await this.sendPlatform({
+      to: BRAND.supportEmail,
+      subject: `Studio enquiry: ${oneLine(data.topicLabel)} - ${oneLine(data.name)}`,
+      content: contactEnquiryHtml(data),
+      text: contactEnquiryText(data),
+      replyTo: data.email,
+      language: 'en',
+    });
+  }
+
+  /** The visitor's short receipt for the enquiry above, in the language of the page they used. */
+  static async sendContactEnquiryReceipt(
+    to: string,
+    data: Pick<ContactEnquiryData, 'name' | 'requestId' | 'lang'>
+  ): Promise<void> {
+    await this.sendPlatform({
+      to,
+      subject: contactEnquiryReceipt.subject[data.lang],
+      content: contactEnquiryReceipt[data.lang](data),
+      language: data.lang,
     });
   }
 
