@@ -325,6 +325,8 @@ export async function commitManualPaymentD1(
   return existing.length ? 'duplicate' : 'conflict';
 }
 
+const GRANT_CHUNK = 50;
+
 export interface GrantBatchD1 {
   storeId: string;
   status: string;
@@ -343,6 +345,26 @@ export interface GrantBatchD1 {
  * renewal or grant makes the guard miss and the grants simply stay `pending` for the next sweep. Returns grants applied.
  */
 export async function applyGrantsBatchD1(a: GrantBatchD1): Promise<number> {
+  // D1 caps bound parameters per statement (~100): the guard binds 7 + one per grant, so cut the chain into chunks. Each
+  // chunk is atomic on its own and starts from the end the previous chunk left; a miss stops the rest (still pending).
+  if (a.grants.length > GRANT_CHUNK) {
+    let applied = 0;
+    let current: GrantBatchD1 = a;
+    for (let i = 0; i < a.grants.length; i += GRANT_CHUNK) {
+      const part = a.grants.slice(i, i + GRANT_CHUNK);
+      const n = await applyGrantsBatchD1({ ...current, grants: part });
+      applied += n;
+      if (n !== part.length) break;
+      const end = part[part.length - 1].after;
+      current = {
+        ...current,
+        currentPeriodEnd: end,
+        trialEndsAt: a.trialing ? end : a.trialEndsAt,
+        now: new Date(a.now.getTime() + 1),
+      };
+    }
+    return applied;
+  }
   const end = a.grants[a.grants.length - 1].after;
   const ids = a.grants.map(g => g.id);
   const marks = ids.map((_, i) => `?${i + 8}`).join(', ');
@@ -389,4 +411,19 @@ export async function idempotencyKeyStoreD1(key: string): Promise<string | null>
     key
   );
   return rows[0]?.store_id ?? null;
+}
+
+/** Stores whose directory tier (`stores.plan`) differs from the tier of the plan their subscription names. */
+export async function planTierDriftD1(
+  limit: number
+): Promise<Array<{ storeId: string; current: string; tier: string }>> {
+  return all<{ storeId: string; current: string; tier: string }>(
+    `SELECT s.id AS storeId, s.plan AS current, p.feature_tier AS tier
+       FROM store_subscriptions ss
+       JOIN stores s ON s.id = ss.store_id
+       JOIN plans p ON p.code = ss.plan_code
+      WHERE s.deleted_at IS NULL AND s.plan <> p.feature_tier
+      LIMIT ?1`,
+    limit
+  );
 }

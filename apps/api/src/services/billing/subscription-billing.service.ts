@@ -38,7 +38,7 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { sendAlert } from '../alerts.service';
-import { acrossBilling, onD1 } from '../platform/billing-d1';
+import { acrossBilling, onD1, planTierDriftD1 } from '../platform/billing-d1';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -414,6 +414,13 @@ async function applyCardSaved(tx: Tx, row: LedgerRow, o: Outcome, now: Date): Pr
 async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): Promise<void> {
   if (row.type !== 'renewal') return; // a declined checkout/upgrade changes nothing
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
+  // A previous attempt downgraded the subscription in D1 and its Postgres tier write (or the status flip) did not
+  // survive: the retry finds the subscription already `canceled` on the free plan and would stop here, leaving paid
+  // features on `stores`. Repeat the (idempotent) tier write.
+  if (sub?.status === 'canceled' && sub.planCode === FREE_PLAN_CODE && (await onD1())) {
+    await applyPlan(tx, row.storeId, FREE_PLAN_CODE);
+    return;
+  }
   if (
     !sub ||
     !row.forPeriodEnd ||
@@ -457,6 +464,23 @@ const WEBHOOK_CLAIM_STALE_MS = 120_000;
 /** D1 settle lease marker (stored in `failure_reason` while a success is being applied) and how long it holds. */
 const SETTLE_LEASE = 'settling';
 const SETTLE_LEASE_MS = 120_000;
+
+/**
+ * Repeat the idempotent parts of a success whose subscription write already committed: the tier on `stores` and the
+ * notifications the interrupted attempt never sent.
+ */
+async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect[]): Promise<void> {
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
+  const planCode = row.type === 'card_setup' ? null : (row.planCode ?? sub?.planCode ?? null);
+  if (planCode) await applyPlan(tx, row.storeId, planCode);
+  if (row.type === 'checkout' || row.type === 'upgrade') {
+    effects.push({ kind: 'plan_changed', storeId: row.storeId });
+    effects.push({ kind: 'payment_recorded', storeId: row.storeId });
+    effects.push({ kind: 'subscription_paid', storeId: row.storeId, billingEventId: row.id });
+  } else if (row.type === 'renewal') {
+    effects.push({ kind: 'payment_recorded', storeId: row.storeId });
+  }
+}
 
 /** Did an earlier, interrupted settlement of this success already move the subscription? (D1 lease path only.) */
 async function alreadyApplied(tx: Tx, row: LedgerRow & { createdAt: Date }): Promise<boolean> {
@@ -535,31 +559,39 @@ export async function settleInTx(
         data: { failureReason: SETTLE_LEASE },
       });
       if (leased.count === 0) return { transitioned: false };
+      let flippedOk = false;
       try {
-        // A previous attempt applied the subscription and then died before flipping the status (its lease expired):
-        // apply nothing twice, just finish the flip.
-        if (!(await alreadyApplied(tx, row))) await applySuccess(tx, row, o, now, effects);
-      } catch (err) {
-        await tx.billingEvent
-          .updateMany({
-            where: { id: eventId, storeId: row.storeId, failureReason: SETTLE_LEASE },
-            data: { failureReason: row.failureReason },
-          })
-          .catch(undo =>
-            logger.error({ err: undo, eventId }, '[billing] could not release a settle lease')
-          );
-        throw err;
+        if (await alreadyApplied(tx, row)) {
+          // A previous attempt moved the subscription (D1 committed) but its Postgres half or its status flip did not
+          // survive. The Postgres half (stores.plan) and the effects are idempotent: repeat them, apply nothing twice.
+          await healAppliedSuccess(tx, row, effects);
+        } else {
+          await applySuccess(tx, row, o, now, effects);
+        }
+        const flipped = await tx.billingEvent.updateMany({
+          where: {
+            id: eventId,
+            storeId: row.storeId,
+            status: { in: ['pending', 'failed'] },
+            failureReason: SETTLE_LEASE,
+          },
+          data: settled,
+        });
+        flippedOk = flipped.count === 1;
+        return { transitioned: flippedOk };
+      } finally {
+        // Whatever went wrong (the apply, the flip, a rolled-back transaction), the lease is released so the next try
+        // is not held up for SETTLE_LEASE_MS.
+        if (!flippedOk)
+          await tx.billingEvent
+            .updateMany({
+              where: { id: eventId, storeId: row.storeId, failureReason: SETTLE_LEASE },
+              data: { failureReason: row.failureReason },
+            })
+            .catch(undo =>
+              logger.error({ err: undo, eventId }, '[billing] could not release a settle lease')
+            );
       }
-      const flipped = await tx.billingEvent.updateMany({
-        where: {
-          id: eventId,
-          storeId: row.storeId,
-          status: { in: ['pending', 'failed'] },
-          failureReason: SETTLE_LEASE,
-        },
-        data: settled,
-      });
-      return { transitioned: flipped.count === 1 };
     }
     const upd = await tx.billingEvent.updateMany({
       where: { id: eventId, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
@@ -1281,8 +1313,12 @@ export async function expireStaleCheckouts(now: Date): Promise<number> {
           type: { in: ['checkout', 'card_setup'] },
           status: 'pending',
           createdAt: { lt: cutoff },
-          // a row holding the D1 settle lease is being paid, not abandoned
-          OR: [{ failureReason: null }, { failureReason: { not: SETTLE_LEASE } }],
+          // a row holding a LIVE D1 settle lease is being paid, not abandoned; a stale lease (its settler died) expires
+          OR: [
+            { failureReason: null },
+            { failureReason: { not: SETTLE_LEASE } },
+            { updatedAt: { lt: new Date(now.getTime() - SETTLE_LEASE_MS) } },
+          ],
         },
         data: { status: 'failed', failureReason: 'abandoned' },
       }),
@@ -1326,6 +1362,9 @@ export async function runBillingCycle(
     );
     // M-023: settle / hand on charges whose outcome never arrived, BEFORE the due list is read (a given-up
     // renewal enters dunning and may be due again today).
+    await reconcilePlanTiers().catch(err =>
+      logger.error({ err }, '[billing] plan tier reconciliation failed')
+    );
     await sweepStuckCharges(now, provider).catch(err =>
       logger.error({ err }, '[billing] stuck-charge sweep failed')
     );
@@ -2222,4 +2261,40 @@ export async function listSubscriptionsForAdmin(
       currentPeriodEnd: sub.currentPeriodEnd,
       nextCharge: nextChargeOf(sub, plans, vat),
     }));
+}
+
+// ───────────────────── plan tier reconciliation (D1 subscription vs `stores.plan`) ─────────────────────
+
+/**
+ * On D1 the subscription and the tier on `stores` are written by two systems with no shared transaction. This compares
+ * them (one D1 query: the directory mirror vs the tier of the plan the subscription names) and repairs `stores.plan` to the
+ * SUBSCRIPTION's tier, which is the money truth. Raises one P1 naming the stores. Capped per run; D1 only.
+ */
+export async function reconcilePlanTiers(
+  limit = 200
+): Promise<{ checked: number; repaired: number }> {
+  if (!(await onD1())) return { checked: 0, repaired: 0 };
+  const drift = await planTierDriftD1(limit);
+  let repaired = 0;
+  for (const d of drift) {
+    try {
+      await withStore(d.storeId, tx =>
+        storeUpdate(tx, { where: { id: d.storeId }, data: { plan: d.tier as never } })
+      );
+      repaired++;
+    } catch (err) {
+      logger.error({ err, storeId: d.storeId }, '[billing] plan tier repair failed');
+    }
+  }
+  if (drift.length)
+    void sendAlert({
+      level: 'p1',
+      title:
+        'Billing: stores.plan disagreed with the subscription (repaired to the subscription tier)',
+      body: `${drift.length} store(s), ${repaired} repaired: ${drift
+        .slice(0, 10)
+        .map(d => `${d.storeId} ${d.current}->${d.tier}`)
+        .join(', ')}`,
+    }).catch(() => undefined);
+  return { checked: drift.length, repaired };
 }

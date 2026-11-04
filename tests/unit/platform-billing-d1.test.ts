@@ -197,7 +197,11 @@ describe('freeze (no write is silently lost between the snapshot and the flip)',
     await expect(platformRouter.route('storeSubscription', 'create', [], pg)).rejects.toMatchObject(
       { statusCode: 503 }
     );
-    cutover(r.db); // script: FLIP (the freeze is still up for the settle window)
+    cutover(r.db); // script: FLIP (the freeze is still up for the settle window: still refused, no mixed backends)
+    await expect(
+      prisma.storeSubscription.create({ data: { storeId: STORE, planCode: 'growth' } })
+    ).rejects.toMatchObject({ statusCode: 503 });
+    r.db.prepare('DELETE FROM system_settings WHERE key = ?').run(freezeKey('billing')); // script: lift
     await prisma.storeSubscription.create({ data: { storeId: STORE, planCode: 'growth' } });
     expect(pg).not.toHaveBeenCalled();
     expect(

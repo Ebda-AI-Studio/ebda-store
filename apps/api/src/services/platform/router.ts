@@ -8,13 +8,19 @@
  * docs/plans/2026-11-02-neon-zero.md section N-10 (Ruling NZ-10-2) with the replacement (one atomic statement, `$batch`,
  * a compare-and-set, or a compensating write).
  */
-import { notifyModelWrite, setModelRouter, type ModelRouter } from '@ebda/database';
+import {
+  notifyModelWrite,
+  setModelRouter,
+  setRoutedModelGuard,
+  type ModelRouter,
+} from '@ebda/database';
 import { requirePlatformDb } from '../../lib/platform-db';
 import {
   FAMILY_MODELS,
   familyOfModel,
   platformFamilyOnD1,
   platformFamilyOnD1ForWrite,
+  isFamilyCachedOnD1,
 } from './cutover';
 
 const WRITES = new Set([
@@ -52,6 +58,15 @@ export const platformRouter: ModelRouter = {
 
 export function registerPlatformRouter(): void {
   setModelRouter(platformRouter);
+  // A call that reaches the POSTGRES client for a model whose family this isolate knows is on D1 bypassed the router.
+  setRoutedModelGuard((model, operation) => {
+    const camel = model[0].toLowerCase() + model.slice(1);
+    const family = MODELS.has(camel) ? familyOfModel(camel) : undefined;
+    if (family && isFamilyCachedOnD1(family))
+      throw new Error(
+        `ROUTED_MODEL_ON_POSTGRES: ${model}.${operation} reached Postgres after ${family} moved to D1 (a raw transaction that was not wrapped with routeTx?)`
+      );
+  });
 }
 
 registerPlatformRouter();

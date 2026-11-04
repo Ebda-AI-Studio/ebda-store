@@ -34,16 +34,18 @@ describe('routed models and transactions', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('every raw-transaction entry point of @ebda/database wraps the client with routeTx', () => {
-    const idx = fs.readFileSync(path.join(ROOT, 'packages/database/src/index.ts'), 'utf8');
-    const money = fs.readFileSync(
-      path.join(ROOT, 'packages/database/src/with-money-tx.ts'),
-      'utf8'
-    );
-    expect(money).toMatch(/fn\(routeTx\(tx\)\)/);
-    // transactionWithGucs, withTenantContext, scopeTransaction and the `$transaction` passthrough
-    expect(idx.match(/routeTx\(tx\)/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
-    // no entry point hands `fn(tx)` raw any more
-    expect(idx).not.toMatch(/\bfn\(tx\)/);
+  it('no file of @ebda/database hands a caller an unwrapped raw transaction client', () => {
+    // the runtime half is the guard registered by services/platform/router.ts (tests/unit/platform-billing-d1-money.test.ts)
+    const offenders: string[] = [];
+    let routed = 0;
+    for (const f of walk(path.join(ROOT, 'packages/database/src'))) {
+      const src = fs.readFileSync(f, 'utf8');
+      routed += (src.match(/routeTx\(tx\)/g) ?? []).length;
+      if (/\b(?:fn|callback|cb|run)\(tx\)/.test(src) && !/tx-route\.ts$/.test(f))
+        offenders.push(path.relative(ROOT, f));
+    }
+    expect(offenders).toEqual([]);
+    // transactionWithGucs, withTenantContext, scopeTransaction, withOwnerTx, the `$transaction` passthrough, withMoneyTx
+    expect(routed).toBeGreaterThanOrEqual(6);
   });
 });

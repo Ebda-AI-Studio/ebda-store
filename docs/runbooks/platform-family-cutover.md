@@ -31,6 +31,12 @@ node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 count
 
 `--commit` refuses when the marker exists. Order: FREEZE -> wait `--drain-ms` (45 s) -> open the Postgres snapshot -> copy -> verify -> flip -> wait `--settle-ms` (12 s) -> lift the freeze -> re-digest Postgres on a NEW connection. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1, lifts the freeze, leaves the switch untouched and can simply be re-run. Exit code 2 + a table list after the flip means a write still reached Postgres; re-apply those rows in D1 by hand. `--unfreeze` lifts a freeze left behind by a killed run; `--status` shows marker and freeze.
 
+## What the freeze does to callers (about a minute)
+
+- Every write answers `503 PLATFORM_FAMILY_FROZEN` with `details.retryable`, `retryAfterSeconds: 30` and `details.messageAr` (the admin UI shows it). Reads keep working.
+- Provider webhooks: the repo already relies on the gateway redelivering after a 5xx (Ruling PROVIDERS-17: billing "answers 500 ... so Kashier redelivers"). The retry schedule and how long Kashier / Paymob keep retrying is NOT VERIFIED here (their docs are the source); the freeze (~60-70 s) is far shorter than any retry window we know of. Backstops if one is lost: confirm-before-apply on redelivery, `sweepStuckCharges` (renewals pending > 1 h are asked at the gateway) and `expireStaleCheckouts`. Pick a quiet minute anyway.
+- The freeze row carries `expiresAt` (`--freeze-ttl-ms`, default 15 min). If the script dies without lifting it the API IGNORES it after that and pages (P1); SIGINT/SIGTERM lift it; a failed lift is loud and exits non-zero (`--unfreeze` removes it).
+
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 
 - `--status` shows `marker: PRESENT`, D1 counts equal the dry-run PG counts.
