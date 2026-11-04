@@ -34,6 +34,14 @@ import {
   storefrontOrigin,
 } from '@ebda/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
+
+const ORDER_SHIPPING_OVERRIDE_AUDIT_ACTION = 'order.shipping_override';
+/** Audit actions that exist for the merchant only; the customer timeline skips them (BE:S-26). */
+const CUSTOMER_HIDDEN_AUDIT_ACTIONS = new Set<string>([
+  COUPON_OVERRIDE_AUDIT_ACTION,
+  'order.moq_override',
+  ORDER_SHIPPING_OVERRIDE_AUDIT_ACTION,
+]);
 import { InvoiceService } from '../services/invoice.service';
 import { hasPermission, requirePermission, type Role } from '../middleware/rbac';
 import { hasCapturedPayment } from '../services/order-refund-gating';
@@ -2062,7 +2070,8 @@ const adminOrderSchema = z
 router.post(
   '/admin',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  // BE:S-33: Ebda's super-admin never places or edits a store's orders (ruling ORDER-MONEY-SUPERADMIN), like status / mark-paid.
+  authorize('store_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -2083,6 +2092,18 @@ router.post(
         { role: user.role },
         { buyer }
       );
+
+      // BE:S-23: the custom shipping fee is recorded with who set it (the service already refused staff).
+      if (typeof data.shippingOverride === 'number') {
+        await auditLog({
+          action: ORDER_SHIPPING_OVERRIDE_AUDIT_ACTION,
+          userId: user.userId,
+          storeId,
+          resourceType: 'order',
+          resourceId: order.id,
+          details: { orderNumber: order.orderNumber, shippingOverride: data.shippingOverride },
+        });
+      }
 
       res.json({
         success: true,
@@ -2359,7 +2380,8 @@ router.get(
       for (const a of audits) {
         // A coupon-rule override (#1370) is the merchant's internal record —
         // who waived which rule and why — never shown to the customer.
-        if (!isStoreViewer && a.action === COUPON_OVERRIDE_AUDIT_ACTION) continue;
+        // BE:S-26: the merchant's internal override records (coupon waiver, MOQ waiver, custom shipping fee) are never shown to the customer.
+        if (!isStoreViewer && CUSTOMER_HIDDEN_AUDIT_ACTIONS.has(a.action)) continue;
         auditKinds.add(a.action);
         const d = a.details as Record<string, any>;
         rows.push({

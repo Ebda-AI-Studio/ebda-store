@@ -674,7 +674,15 @@ export class WarehouseService {
     productId: string,
     variantId: string | null
   ): Promise<void> {
-    if (variantId) return;
+    if (variantId) {
+      // BE:S-25: the caller verified the product belongs to the store; the variant must belong to THAT product.
+      const own = await prisma.productVariant.findFirst({
+        where: { id: variantId, productId },
+        select: { id: true },
+      });
+      if (!own) throw new AppError(404, 'VARIANT_NOT_FOUND', 'Variant not found');
+      return;
+    }
     const variantCount = await prisma.productVariant.count({ where: { productId } });
     if (variantCount > 0) {
       throw new AppError(

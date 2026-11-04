@@ -180,6 +180,9 @@ const SEO_INSTRUCTION =
   'You write SEO meta for Egyptian e-commerce stores. Output only valid JSON ' +
   'matching this shape exactly: {"title": string, "titleAr": string, ' +
   '"description": string, "descriptionAr": string, "keywords": string[]}. ' +
+  // BE:F-4: the fields are language-typed. Without this the model put Arabic into the English fields (QA P2-2).
+  '"title" and "description" MUST be written in ENGLISH. "titleAr" and "descriptionAr" MUST be written in ARABIC script. ' +
+  'Never put Arabic text in "title" or "description", and never put English sentences in "titleAr" or "descriptionAr". ' +
   `Title under ${META_TITLE_MAX} characters. Description under ${META_DESCRIPTION_MAX} characters. ` +
   'Keywords: 5-10 short Egypt + GCC search phrases. Do not mention prices ' +
   'or out-of-stock status. Match how Egyptian shoppers actually search. ' +
@@ -350,6 +353,35 @@ export const seoSuggestionSchema = z.object({
   descriptionAr: z.string().max(2000),
   keywords: z.array(z.string().max(120)).max(50),
 });
+
+/** Share of the letters in `text` that are Arabic script; `null` when it has no letters at all (nothing to judge). */
+function arabicLetterShare(text: string): number | null {
+  const letters = text.match(/\p{L}/gu);
+  if (!letters || letters.length === 0) return null;
+  const arabic = letters.filter(c => /[\u0600-\u06FF]/.test(c)).length;
+  return arabic / letters.length;
+}
+
+/**
+ * BE:F-4: `title` / `description` must be English and the `*Ar` pair Arabic. A field with no letters is not judged. The
+ * thresholds are loose on purpose (brand names and product codes stay Latin inside Arabic copy and vice versa).
+ */
+export function seoLanguagesOk(s: {
+  title: string;
+  titleAr: string;
+  description: string;
+  descriptionAr: string;
+}): boolean {
+  for (const en of [s.title, s.description]) {
+    const share = arabicLetterShare(en);
+    if (share !== null && share > 0.3) return false;
+  }
+  for (const ar of [s.titleAr, s.descriptionAr]) {
+    const share = arabicLetterShare(ar);
+    if (share !== null && share < 0.5) return false;
+  }
+  return true;
+}
 
 export const sectionContentSchema = z.object({
   kicker: z.string().max(200),
@@ -536,27 +568,44 @@ export class AIService {
       systemInstruction,
       generationConfig: { responseMimeType: 'application/json' },
     });
-    let res;
-    try {
-      res = await model.generateContent(userPrompt);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI SEO generation failed');
+    // One retry when the model puts the wrong language in a field (BE:F-4); every attempt is metered.
+    let parsed: SeoSuggestion | null = null;
+    for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+      let res;
+      try {
+        res = await model.generateContent(userPrompt);
+      } catch (err) {
+        rethrowAsAppError(err, 'AI SEO generation failed');
+      }
+      const raw = stripJsonFences(res.response.text());
+
+      const candidate: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
+        storeId: input.storeId,
+        kind: 'SEO',
+      });
+
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'seo',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+      if (seoLanguagesOk(candidate)) parsed = candidate;
+      else
+        logger.warn(
+          { storeId: input.storeId, kind: input.kind, attempt },
+          '[AI] SEO suggestion had the wrong language in a field'
+        );
     }
-    const raw = stripJsonFences(res.response.text());
-
-    const parsed: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
-      storeId: input.storeId,
-      kind: 'SEO',
-    });
-
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'seo',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
+    if (!parsed) {
+      throw new AppError(
+        422,
+        'AI_WRONG_LANGUAGE',
+        'The AI answered in the wrong language. Try again.'
+      );
+    }
 
     await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
     return { suggestion: parsed, cached: false };

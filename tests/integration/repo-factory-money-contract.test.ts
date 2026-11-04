@@ -132,7 +132,9 @@ interface Fx {
   names: Record<string, string>;
 }
 let n = 0;
-async function fixtures(opts: { points?: number; totalEarned?: number } = {}): Promise<Fx> {
+async function fixtures(
+  opts: { points?: number; totalEarned?: number; member?: boolean } = {}
+): Promise<Fx> {
   const k = `${sfx}${++n}`;
   const user = await prisma.user.create({
     data: {
@@ -141,6 +143,8 @@ async function fixtures(opts: { points?: number; totalEarned?: number } = {}): P
       firstName: 'L',
       lastName: 'Y',
       role: 'customer',
+      // L-1: the admin award / list paths require a customer ACCOUNT of this store (SEC-CUSTOMER-SCOPE-1)
+      ...(opts.member ? { storeId: STORE } : {}),
       status: 'active',
       emailVerified: true,
     },
@@ -218,6 +222,7 @@ beforeAll(async () => {
         slug: `d2b-${sfx}`,
         ownerId: userId,
         status: 'active',
+        loyaltyEnabled: true,
         loyaltySettings: SETTINGS as never,
       },
     })
@@ -337,5 +342,70 @@ describe('loyalty (LoyaltyService)', () => {
     expect(t.out.ok.recredit.pointsRecredited).toBe(120);
     expect(t.out.ok.replay.pointsRecredited).toBe(0);
     expect(t.out.ok.nothingSpent).toBeNull();
+  });
+});
+
+describe('loyalty admin reads + manual awards (L-1, Ruling FP-2)', () => {
+  // both backends start these scenarios with no loyalty rows, so the store-wide list and stats are comparable
+  beforeEach(async () => {
+    await prisma.loyaltyTransaction.deleteMany({ where: { storeId: STORE } });
+    await prisma.loyaltyPoints.deleteMany({ where: { storeId: STORE } });
+    sqlite.prepare('DELETE FROM loyalty_transactions').run();
+    sqlite.prepare('DELETE FROM loyalty_points').run();
+  });
+
+  it('awardBonusPoints then getCustomerPoints / history / members / stats read the same ledger on both backends', async () => {
+    const big = await fixtures({ points: 900, totalEarned: 900, member: true });
+    const small = await fixtures({ points: 120, totalEarned: 120, member: true });
+    const t = await parity(small, async () => ({
+      award: await LoyaltyService.awardBonusPoints(STORE, small.cust, 250, 'earn_manual', 'gift'),
+      deduct: await LoyaltyService.awardBonusPoints(STORE, small.cust, -20, 'adjust', 'fix'),
+      points: await LoyaltyService.getCustomerPoints(STORE, small.cust),
+      history: await LoyaltyService.getTransactionHistory(STORE, small.cust),
+      members: await LoyaltyService.listMembers(STORE, {}),
+      silver: await LoyaltyService.listMembers(STORE, { tier: 'silver' }),
+      stats: await LoyaltyService.getStats(STORE),
+      storeLog: await LoyaltyService.listStoreTransactions(STORE, {
+        page: 1,
+        limit: 10,
+        type: 'earn_manual',
+      }),
+    }));
+    void big;
+    expect(t.out.ok.award.newBalance).toBe(350);
+    expect(t.out.ok.deduct.newBalance).toBe(330);
+    expect(t.out.ok.members.members).toHaveLength(2);
+    expect(t.out.ok.stats.totalMembers).toBe(2);
+  });
+
+  it('a manual award is spendable: award, then the order redeem sees the points', async () => {
+    const fx = await fixtures({ member: true });
+    const t = await parity(fx, async () => {
+      await LoyaltyService.awardBonusPoints(STORE, fx.cust, 200, 'earn_manual', 'gift');
+      return LoyaltyService.getCustomerPoints(STORE, fx.cust);
+    });
+    expect(t.out.ok.points).toBe(200);
+  });
+
+  it('awardBonusPoints refuses a user who is not this store customer, the same on both', async () => {
+    const stranger = await fixtures(); // no storeId on the account
+    const t = await parity(stranger, () =>
+      LoyaltyService.awardBonusPoints(STORE, stranger.cust, 10, 'earn_manual', 'x')
+    );
+    expect(t.out.err.code).toBe('CUSTOMER_NOT_FOUND');
+    expect(t.state.points).toEqual([]);
+  });
+
+  it('initializeCustomerPoints (signup bonus once) and awardReviewBonus (once per review / product) match', async () => {
+    const fx = await fixtures({ member: true });
+    const t = await parity(fx, async () => ({
+      init: await LoyaltyService.initializeCustomerPoints(STORE, fx.cust, true),
+      again: await settle(() => LoyaltyService.initializeCustomerPoints(STORE, fx.cust, true)),
+      review: await LoyaltyService.awardReviewBonus(STORE, fx.cust, fx.o1, fx.o2),
+      reviewAgain: await LoyaltyService.awardReviewBonus(STORE, fx.cust, fx.o1, fx.o2),
+    }));
+    expect(t.out.ok.init.points).toBe(100);
+    expect(t.out.ok.review).toEqual({ awarded: true, points: 50 });
+    expect(t.out.ok.reviewAgain).toEqual({ awarded: false, points: 0 });
   });
 });

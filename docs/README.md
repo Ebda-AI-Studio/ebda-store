@@ -12,6 +12,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [CHANGELOG-2026-10-16-ahmad-decisions.md](CHANGELOG-2026-10-16-ahmad-decisions.md) - Changelog — Ahmad's 2026-10-16 decisions (branch `fix/ahmad-decisions-1016`)
 - [CHANGELOG-2026-10-16-followups-b0-46.md](CHANGELOG-2026-10-16-followups-b0-46.md) - Changelog — B0-46 follow-up fixes (branch `fix/followups-b0-46`)
+- [CHANGELOG-2026-11-04-admin-fix-t2-api-domain.md](CHANGELOG-2026-11-04-admin-fix-t2-api-domain.md) - Admin fix pass, T2 (API domain), 2026-11-04
 - [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) - Database backup, restore & disaster recovery
 - [DB-INDEX-MIGRATIONS.md](DB-INDEX-MIGRATIONS.md) - DB index migrations — lock procedure
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Ebda Store - Production Deployment Guide
@@ -30,6 +31,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## api - API references
 
 - [api/b2b-wholesale.md](api/b2b-wholesale.md) - B2B wholesale pricing API
+- [api/loyalty.md](api/loyalty.md) - Loyalty API (admin and storefront)
 - [api/lifecycle-emails.md](api/lifecycle-emails.md) - Lifecycle emails (self-serve onboarding)
 - [api/openapi.yaml](api/openapi.yaml) - openapi
 - [api/studio-enquiry.md](api/studio-enquiry.md) - Studio service-enquiry form (contact page, mail-only)
@@ -88,6 +90,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
+- [cf/loyalty-do-migration.md](cf/loyalty-do-migration.md) - Loyalty on Durable Object stores: one-off ledger migration (Ruling FP-2)
+- [cf/default-category-backfill.md](cf/default-category-backfill.md) - Default category Arabic name: backfill for DO stores
 - [cf/opus-review-closure.md](cf/opus-review-closure.md) - Opus review of #356 closed item by item with the proving test and its result, the leftovers closed, and the merge point for feat/cf-r6b (INFRA-CF-1)
 - [cf/r6a-on-do.md](cf/r6a-on-do.md) - The last three Postgres-only flows on the store Durable Object: palette search, campaigns, shopper erasure; InstaPay receipts at cutover (INFRA-CF-1 PR R6a)
 - [cf/payments-on-do.md](cf/payments-on-do.md) - Payments, webhooks, refunds, ledger and gold repricing on the store Durable Object (INFRA-CF-1 PR D2b-3)
@@ -184,6 +188,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [merchant/acceptable-use.md](merchant/acceptable-use.md) - What you may and may not sell / ما يجوز بيعه وما لا يجوز
 - [merchant/gold-and-payments.md](merchant/gold-and-payments.md) - Gold orders and installments / طلبات الدهب والتقسيط
 - [merchant/inventory.md](merchant/inventory.md) - Inventory: variant stock, adjustments & scanning — المخزون: مخزون التنويعات والتعديلات والمسح
+- [merchant/loyalty.md](merchant/loyalty.md) - Loyalty points
 - [merchant/orders.md](merchant/orders.md) - Orders (and the Orders app) — الطلبات (وتطبيق الطلبات)
 - [merchant/product-details.md](merchant/product-details.md) - Product details: swatches, facts, personalisation, delivery time and size guides — تفاصيل المنتج
 - [merchant/provider-activation.md](merchant/provider-activation.md) - Connecting a payment or shipping service / ربط خدمة دفع أو شحن

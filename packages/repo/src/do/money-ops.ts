@@ -1,6 +1,15 @@
 import { runKeyed, ensureKeyedSchema } from './keyed-op';
 import {
+  awardBonusPoints,
+  awardReviewBonus,
   earnPointsFromPurchase,
+  getCustomerPoints,
+  getLoyaltyStats,
+  getTransactionHistory,
+  importLedgerRows,
+  initializeCustomerPoints,
+  listMembers,
+  listStoreTransactions,
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
 } from './loyalty';
@@ -132,6 +141,15 @@ export type MoneyOpName =
   | 'loyaltyEarn'
   | 'loyaltyReverseEarned'
   | 'loyaltyReverseRedeemed'
+  | 'loyaltyAward'
+  | 'loyaltyInit'
+  | 'loyaltyReviewBonus'
+  | 'loyaltyCustomerPoints'
+  | 'loyaltyHistory'
+  | 'loyaltyMembers'
+  | 'loyaltyStats'
+  | 'loyaltyStoreTransactions'
+  | 'loyaltyImport'
   | 'createOrder'
   | 'confirmPayment'
   | 'cancel'
@@ -223,6 +241,15 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
   'loyaltyReverseRedeemed',
+  'loyaltyAward',
+  'loyaltyInit',
+  'loyaltyReviewBonus',
+  'loyaltyCustomerPoints',
+  'loyaltyHistory',
+  'loyaltyMembers',
+  'loyaltyStats',
+  'loyaltyStoreTransactions',
+  'loyaltyImport',
   'createOrder',
   'confirmPayment',
   'cancel',
@@ -341,6 +368,69 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     reverseEarnedPointsFromOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
   loyaltyReverseRedeemed: (db, storeId, a) =>
     reverseRedeemedPointsFromOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  /** L-1: manual / referral / birthday award (LoyaltyService.awardBonusPoints). */
+  loyaltyAward: (db, storeId, a) =>
+    awardBonusPoints(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      points: a.points as number,
+      type: a.type as string,
+      description: typeof a.description === 'string' ? a.description : null,
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyInit: (db, storeId, a) =>
+    initializeCustomerPoints(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      giveSignupBonus: a.giveSignupBonus !== false,
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyReviewBonus: (db, storeId, a) =>
+    awardReviewBonus(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      productId: id(a.productId, 'productId'),
+      reviewId: id(a.reviewId, 'reviewId'),
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyCustomerPoints: (db, storeId, a) =>
+    getCustomerPoints(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyHistory: (db, storeId, a) =>
+    getTransactionHistory(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      page: a.page as number | undefined,
+      limit: a.limit as number | undefined,
+    }),
+  loyaltyMembers: (db, storeId, a) =>
+    listMembers(db, {
+      storeId,
+      page: a.page as number | undefined,
+      limit: a.limit as number | undefined,
+      tier: typeof a.tier === 'string' ? a.tier : undefined,
+    }),
+  loyaltyStats: (db, storeId) => getLoyaltyStats(db, { storeId }),
+  loyaltyStoreTransactions: (db, storeId, a) =>
+    listStoreTransactions(db, {
+      storeId,
+      page: a.page as number | undefined,
+      limit: a.limit as number | undefined,
+      type: typeof a.type === 'string' ? a.type : undefined,
+      customerId: typeof a.customerId === 'string' ? a.customerId : undefined,
+      from: typeof a.from === 'number' ? a.from : null,
+      to: typeof a.to === 'number' ? a.to : null,
+    }),
+  /** FP-2 one-off migration: Postgres-only ledger rows of a DO store, idempotent by transaction id. */
+  loyaltyImport: (db, storeId, a) =>
+    importLedgerRows(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      rows: Array.isArray(a.rows) ? (a.rows as never) : [],
+    }),
   /**
    * OrderService.create (Ruling CF-ORDERS-1): stock reserve, hold cap, coupon limit, loyalty redeem, wallet debit and the
    * order rows are ONE section. The caller never supplies `storeId` (bound by the DO) nor `now` (the DO clock).

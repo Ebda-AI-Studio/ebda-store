@@ -4,7 +4,7 @@ import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { LoyaltyService } from '../services/loyalty.service';
-import { LoyaltyTransactionType, prisma } from '@ebda/database';
+import { LoyaltyTransactionType } from '@ebda/database';
 import { tenantContext } from '../middleware/tenant-context';
 import { rangeOrLegacyDays } from '../lib/report-range';
 import { assertStoreCustomer } from '../lib/store-customer';
@@ -71,10 +71,16 @@ const updateSettingsSchema = z.object({
     .optional(),
 });
 
-const awardPointsSchema = z.object({
-  points: z.number().int().min(-1_000_000).max(1_000_000),
+// BE:S-27: a whole, non-zero number of points, at most 100 000 either way.
+export const awardPointsSchema = z.object({
+  points: z
+    .number()
+    .int()
+    .min(-100_000)
+    .max(100_000)
+    .refine(n => n !== 0, { message: 'points must not be zero' }),
   type: z.enum(['earn_manual', 'earn_referral', 'earn_review', 'earn_birthday', 'adjust'] as const),
-  description: z.string().optional(),
+  description: z.string().max(500).optional(),
 });
 
 // ==========================================
@@ -234,35 +240,15 @@ router.get(
 
       const pageNum = Math.max(1, parseInt((page as string) || '1') || 1);
       const limitNum = Math.min(100, Math.max(1, parseInt((limit as string) || '50') || 50));
-      const skip = (pageNum - 1) * limitNum;
 
-      // SEC-CUSTOMER-SCOPE-1: the joined customer PII must belong to this store.
-      const where: any = { storeId, customer: { storeId, role: 'customer' } };
-      if (type && typeof type === 'string' && type !== 'all') {
-        where.type = type as LoyaltyTransactionType;
-      }
-      if (customerId && typeof customerId === 'string') {
-        where.customerId = customerId;
-      }
-      if (range.from || range.to) {
-        where.createdAt = {};
-        if (range.from) where.createdAt.gte = range.from;
-        if (range.to) where.createdAt.lte = range.to;
-      }
-
-      const [transactions, total] = await Promise.all([
-        prisma.loyaltyTransaction.findMany({
-          where,
-          include: {
-            customer: { select: { id: true, firstName: true, lastName: true, email: true } },
-            order: { select: { id: true, orderNumber: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: limitNum,
-        }),
-        prisma.loyaltyTransaction.count({ where }),
-      ]);
+      const { transactions, total } = await LoyaltyService.listStoreTransactions(storeId, {
+        page: pageNum,
+        limit: limitNum,
+        type: typeof type === 'string' ? type : undefined,
+        customerId: typeof customerId === 'string' ? customerId : undefined,
+        from: range.from,
+        to: range.to,
+      });
 
       res.json({
         success: true,
@@ -381,6 +367,7 @@ publicRouter.get(
 publicRouter.get(
   '/:storeId/loyalty/my-transactions',
   authenticate,
+  requireFeature('loyalty'), // BE:S-29 / D7
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -413,6 +400,7 @@ publicRouter.get(
 publicRouter.post(
   '/:storeId/loyalty/join',
   authenticate,
+  requireFeature('loyalty'), // BE:S-29 / D7
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

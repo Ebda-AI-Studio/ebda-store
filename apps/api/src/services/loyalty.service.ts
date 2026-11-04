@@ -4,7 +4,12 @@ import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
 import { fromMinor, minorToDecimalString } from '@ebda/shared';
-import { storeMoney, storeUpdate } from '../lib/repo-factory';
+import {
+  storeMoney,
+  storeUpdate,
+  type DoLoyaltyPointsRow,
+  type MoneyClient,
+} from '../lib/repo-factory';
 import { assertStoreCustomer } from '../lib/store-customer';
 // Default loyalty settings structure
 export interface LoyaltySettings {
@@ -164,6 +169,18 @@ function orderNotFoundAsNull(err: unknown): null {
   throw err;
 }
 
+/** DO rows carry epoch-ms timestamps; the API (and the Postgres path) return Dates. */
+const asDate = (ms: number | null | undefined): Date | null => (ms == null ? null : new Date(ms));
+const mergeDoSettings = (stored: unknown): LoyaltySettings => ({
+  ...DEFAULT_LOYALTY_SETTINGS,
+  ...(stored as Partial<LoyaltySettings>),
+});
+const doPointsRow = (r: DoLoyaltyPointsRow) => ({
+  ...r,
+  createdAt: new Date(r.createdAt),
+  updatedAt: new Date(r.updatedAt),
+});
+
 export class LoyaltyService {
   /**
    * Get store loyalty settings
@@ -249,6 +266,27 @@ export class LoyaltyService {
     storeId: string,
     customerId: string
   ): Promise<CustomerPointsInfo | null> {
+    // L-1 (Ruling FP-2): a DO store's balance lives on its Durable Object.
+    const money = await storeMoney(storeId);
+    if (money) {
+      const featureEnabled = await featureService.isFeatureEnabled(storeId, 'loyalty');
+      const r = await money.loyaltyCustomerPoints({ customerId, featureEnabled });
+      if (!r) return null;
+      const settings = mergeDoSettings(r.settings);
+      const tierInfo = this.getTierInfo(r.row.totalEarned, settings);
+      return {
+        id: r.row.id,
+        customerId: r.row.customerId,
+        points: r.row.points,
+        totalEarned: r.row.totalEarned,
+        totalRedeemed: r.row.totalRedeemed,
+        tier: r.row.tier,
+        tierMultiplier: tierInfo.multiplier,
+        nextTier: tierInfo.nextTier,
+        pointsToNextTier: tierInfo.pointsToNext,
+        pointsValue: settings.pointsValue,
+      };
+    }
     const [loyalty, store, loyaltyEnabled] = await Promise.all([
       prisma.loyaltyPoints.findUnique({
         where: {
@@ -329,6 +367,29 @@ export class LoyaltyService {
     };
 
     await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
+
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.loyaltyInit({
+        customerId,
+        giveSignupBonus,
+        featureEnabled: loyaltyEnabled,
+      });
+      const doSettings = mergeDoSettings(r.settings);
+      const tierInfo = this.getTierInfo(r.row.totalEarned, doSettings);
+      return {
+        id: r.row.id,
+        customerId: r.row.customerId,
+        points: r.row.points,
+        totalEarned: r.row.totalEarned,
+        totalRedeemed: r.row.totalRedeemed,
+        tier: r.row.tier,
+        tierMultiplier: tierInfo.multiplier,
+        nextTier: tierInfo.nextTier,
+        pointsToNextTier: tierInfo.pointsToNext,
+        pointsValue: doSettings.pointsValue,
+      };
+    }
 
     // Check if already exists
     const existing = await prisma.loyaltyPoints.findUnique({
@@ -977,6 +1038,18 @@ export class LoyaltyService {
     // SEC-CUSTOMER-SCOPE-1: the id is a global user uuid; it must be THIS store's customer before any row is created.
     await assertStoreCustomer(storeId, customerId);
 
+    // L-1 (Ruling FP-2): on a DO store the award lands in the ledger the DO redeem reads.
+    const money = await storeMoney(storeId);
+    if (money) {
+      return money.loyaltyAward({
+        customerId,
+        points,
+        type,
+        description,
+        featureEnabled: loyaltyEnabled,
+      });
+    }
+
     const settings = {
       ...DEFAULT_LOYALTY_SETTINGS,
       ...(store.loyaltySettings as Partial<LoyaltySettings>),
@@ -1044,6 +1117,13 @@ export class LoyaltyService {
     productId: string,
     reviewId: string
   ): Promise<{ awarded: boolean; points: number }> {
+    const money = await storeMoney(storeId);
+    if (money) {
+      const featureEnabled = await featureService.isFeatureEnabled(storeId, 'loyalty');
+      if (!featureEnabled) return { awarded: false, points: 0 };
+      await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
+      return money.loyaltyReviewBonus({ customerId, productId, reviewId, featureEnabled });
+    }
     const [store, loyaltyEnabled] = await Promise.all([
       withStore(storeId, tx =>
         tx.store.findUnique({
@@ -1152,6 +1232,19 @@ export class LoyaltyService {
 
     await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
 
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.loyaltyHistory({ customerId, page, limit });
+      return {
+        transactions: r.transactions.map(t => ({
+          ...t,
+          expiresAt: asDate(t.expiresAt),
+          createdAt: new Date(t.createdAt),
+        })),
+        pagination: r.pagination,
+      };
+    }
+
     const [transactions, total] = await Promise.all([
       prisma.loyaltyTransaction.findMany({
         where: { storeId, customerId },
@@ -1194,6 +1287,26 @@ export class LoyaltyService {
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
 
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.loyaltyMembers({ page, limit, tier: options?.tier });
+      // SEC-CUSTOMER-SCOPE-1: the name/email join is Postgres identity, scoped to this store's customer accounts.
+      const customers = await withStore(storeId, tx =>
+        tx.user.findMany({
+          where: { id: { in: r.members.map(m => m.customerId) }, role: 'customer', storeId },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      );
+      const byId = new Map(customers.map(c => [c.id, c]));
+      return {
+        members: r.members.flatMap(m => {
+          const customer = byId.get(m.customerId);
+          return customer ? [{ ...doPointsRow(m), customer }] : [];
+        }),
+        pagination: r.pagination,
+      };
+    }
+
     // SEC-CUSTOMER-SCOPE-1: never list (or join PII of) a user who is not this store's customer, even if a stray row exists.
     const where: Prisma.LoyaltyPointsWhereInput = {
       storeId,
@@ -1235,9 +1348,158 @@ export class LoyaltyService {
   }
 
   /**
+   * Store-level transaction log with the customer's name/email and the order number (admin, `GET .../loyalty/transactions`).
+   * SEC-CUSTOMER-SCOPE-1: the joined PII must belong to this store's customers on both backends.
+   */
+  static async listStoreTransactions(
+    storeId: string,
+    q: {
+      page: number;
+      limit: number;
+      type?: string;
+      customerId?: string;
+      from?: Date | null;
+      to?: Date | null;
+    }
+  ) {
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.loyaltyStoreTransactions({
+        page: q.page,
+        limit: q.limit,
+        type: q.type,
+        customerId: q.customerId,
+        from: q.from ? q.from.getTime() : null,
+        to: q.to ? q.to.getTime() : null,
+      });
+      const customers = await withStore(storeId, tx =>
+        tx.user.findMany({
+          where: {
+            id: { in: [...new Set(r.transactions.map(t => t.customerId))] },
+            role: 'customer',
+            storeId,
+          },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        })
+      );
+      const byId = new Map(customers.map(c => [c.id, c]));
+      return {
+        total: r.total,
+        transactions: r.transactions.flatMap(t => {
+          const customer = byId.get(t.customerId);
+          return customer
+            ? [{ ...t, expiresAt: asDate(t.expiresAt), createdAt: new Date(t.createdAt), customer }]
+            : [];
+        }),
+      };
+    }
+    const where: Prisma.LoyaltyTransactionWhereInput = {
+      storeId,
+      customer: { storeId, role: 'customer' },
+    };
+    if (q.type && q.type !== 'all') where.type = q.type as LoyaltyTransactionType;
+    if (q.customerId) where.customerId = q.customerId;
+    if (q.from || q.to) {
+      where.createdAt = {};
+      if (q.from) where.createdAt.gte = q.from;
+      if (q.to) where.createdAt.lte = q.to;
+    }
+    const [transactions, total] = await Promise.all([
+      prisma.loyaltyTransaction.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+          order: { select: { id: true, orderNumber: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (q.page - 1) * q.limit,
+        take: q.limit,
+      }),
+      prisma.loyaltyTransaction.count({ where }),
+    ]);
+    return { transactions, total };
+  }
+
+  /**
+   * One-off migration (Ruling FP-2, `docs/cf/loyalty-do-migration.md`): copy the Postgres ledger rows of a DO-backed store
+   * into its Durable Object. Idempotent (the DO skips rows it already holds). `dryRun` (the default) only reports what Postgres
+   * holds and what the DO shows today; nothing is written. Postgres rows are never deleted.
+   */
+  static async migrateLedgerToDo(
+    storeId: string,
+    opts: { dryRun?: boolean } = {}
+  ): Promise<{
+    dryRun: boolean;
+    customers: number;
+    rows: number;
+    pgPoints: number;
+    inserted: number;
+    skipped: number;
+    doStatsBefore: Awaited<ReturnType<MoneyClient['loyaltyStats']>>;
+    doStatsAfter: Awaited<ReturnType<MoneyClient['loyaltyStats']>> | null;
+  }> {
+    const dryRun = opts.dryRun !== false;
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(400, 'NOT_A_DO_STORE', 'This store is not on its Durable Object');
+    const doStatsBefore = await money.loyaltyStats();
+    const rows = await prisma.loyaltyTransaction.findMany({
+      where: { storeId },
+      orderBy: [{ customerId: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        customerId: true,
+        orderId: true,
+        type: true,
+        points: true,
+        description: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
+    const byCustomer = new Map<string, typeof rows>();
+    for (const r of rows)
+      byCustomer.set(r.customerId, [...(byCustomer.get(r.customerId) ?? []), r]);
+    let inserted = 0;
+    let skipped = 0;
+    if (!dryRun) {
+      for (const [customerId, list] of byCustomer) {
+        for (let i = 0; i < list.length; i += 500) {
+          const r = await money.loyaltyImport({
+            customerId,
+            rows: list.slice(i, i + 500).map(t => ({
+              id: t.id,
+              orderId: t.orderId,
+              type: t.type,
+              points: t.points,
+              description: t.description,
+              expiresAt: t.expiresAt ? t.expiresAt.getTime() : null,
+              createdAt: t.createdAt.getTime(),
+            })),
+          });
+          inserted += r.inserted;
+          skipped += r.skipped;
+        }
+      }
+    }
+    return {
+      dryRun,
+      customers: byCustomer.size,
+      rows: rows.length,
+      pgPoints: rows.reduce((n, r) => n + r.points, 0),
+      inserted,
+      skipped,
+      doStatsBefore,
+      doStatsAfter: dryRun ? null : await money.loyaltyStats(),
+    };
+  }
+
+  /**
    * Get loyalty program statistics
    */
   static async getStats(storeId: string) {
+    const money = await storeMoney(storeId);
+    if (money) return money.loyaltyStats();
     const [totalMembers, tierCounts, totalPointsIssued, totalPointsRedeemed] = await Promise.all([
       prisma.loyaltyPoints.count({ where: { storeId } }),
       prisma.loyaltyPoints.groupBy({
