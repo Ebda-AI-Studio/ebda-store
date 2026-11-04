@@ -12,7 +12,7 @@
  * zones are RLS-protected): routes mount it behind `tenantContext`; other
  * callers wrap it in `readInStoreContext`.
  */
-import { prisma, withStore } from '@ebda/database';
+import { prisma } from '@ebda/database';
 import { copyStoreSettings, storeDb, storeUpdate, storeWritesToDo } from '../lib/repo-factory';
 import {
   getLook,
@@ -95,8 +95,8 @@ async function patchGuide(
 
 export class SetupGuideService {
   static async get(storeId: string): Promise<SetupGuideState> {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
+    const store = await storeDb(storeId).then(db =>
+      db.store.findUnique({
         where: { id: storeId },
         select: { logo: true, theme: true, look: true, domain: true, settings: true },
       })

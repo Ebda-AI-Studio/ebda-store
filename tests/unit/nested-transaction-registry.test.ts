@@ -112,7 +112,6 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
 const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'services/barcode-scan.service.ts',
   'services/bulk.service.ts',
-  'services/customer-group.service.ts',
   'services/inventory.service.ts',
   'services/loyalty-automation.service.ts',
   'services/loyalty.service.ts',

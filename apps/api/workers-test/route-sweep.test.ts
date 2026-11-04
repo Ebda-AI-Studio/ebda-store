@@ -17,7 +17,9 @@ import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
-import ROUTES from './route-table.json';
+import ALL_ROUTES from './route-table.json';
+
+const ROUTES: string[] = ALL_ROUTES as string[];
 
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };

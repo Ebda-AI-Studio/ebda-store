@@ -11,7 +11,7 @@
  * model round trip, so a merchant who flips it off is obeyed on the very next call.
  */
 import type { NextFunction, Request, Response } from 'express';
-import { prisma } from '@ebda/database';
+import { storeDb } from './repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { readInStoreContext } from './store-scoped-read';
 
@@ -19,8 +19,11 @@ export const AI_DISABLED_BY_MERCHANT_CODE = 'AI_DISABLED_BY_MERCHANT';
 
 /** A store that cannot be read is NOT enabled: fail closed. */
 export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
-  const row = await readInStoreContext(storeId, () =>
-    prisma.store.findUnique({ where: { id: storeId }, select: { aiFeaturesEnabled: true } })
+  const row = await readInStoreContext(storeId, async () =>
+    (await storeDb(storeId)).store.findUnique({
+      where: { id: storeId },
+      select: { aiFeaturesEnabled: true },
+    })
   );
   return row?.aiFeaturesEnabled === true;
 }

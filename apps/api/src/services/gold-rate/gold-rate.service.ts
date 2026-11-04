@@ -77,10 +77,12 @@ export class GoldRateService {
   /** Current rates, settings, ages, pending rows: what the admin rate page reads. Never cached. */
   static async getState(storeId: string) {
     const now = new Date();
+    // Plain model reads on the store's own backend (the Durable Object, or the `prisma` proxy for a Postgres store).
+    const db = await storeDb(storeId);
     const [settings, current, pending, goldProducts] = await Promise.all([
-      loadSettings(root(), storeId),
-      loadCurrentRates(root(), storeId),
-      prisma.goldRate.findMany({
+      loadSettings(db as unknown as Prisma.TransactionClient, storeId),
+      loadCurrentRates(db as unknown as Prisma.TransactionClient, storeId),
+      db.goldRate.findMany({
         where: { storeId, status: 'pending' },
         orderBy: { createdAt: 'desc' },
         take: 6,
@@ -94,7 +96,7 @@ export class GoldRateService {
           feedReference: true,
         },
       }),
-      (await storeDb(storeId)).product.count({
+      db.product.count({
         where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
       }),
     ]);
@@ -142,7 +144,9 @@ export class GoldRateService {
         OR: [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: id } }],
       };
     }
-    const rows = await prisma.goldRate.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).goldRate.findMany({
       where: { storeId, ...(opts.karat ? { karat: opts.karat } : {}), ...cursorWhere },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,

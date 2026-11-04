@@ -1,5 +1,6 @@
 import { prisma } from '@ebda/database';
 import { customerRows } from '../lib/customer-directory';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { matchingCustomers } from './admin-search.service';
 
 /**
@@ -45,15 +46,17 @@ export async function searchOrderCustomers(storeId: string, q: string) {
   const guestRows =
     guestIds.length === 0
       ? []
-      : await prisma.$queryRaw<
-          Array<{
-            first_name: string | null;
-            last_name: string | null;
-            email: string | null;
-            phone: string | null;
-            order_id: string;
-          }>
-        >`
+      : (await storeRepo(storeId)).backend === 'do'
+        ? await guestRowsFromDo(storeId, guestIds)
+        : await prisma.$queryRaw<
+            Array<{
+              first_name: string | null;
+              last_name: string | null;
+              email: string | null;
+              phone: string | null;
+              order_id: string;
+            }>
+          >`
     SELECT DISTINCT ON (
       COALESCE(LOWER(shipping_address->>'email'), shipping_address->>'phone', id::text)
     )
@@ -86,4 +89,44 @@ export async function searchOrderCustomers(storeId: string, q: string) {
   // they're more useful for repeat-order attribution.
   const customers = [...registered, ...guests].slice(0, 10);
   return customers;
+}
+
+/**
+ * The DO twin of the guest `DISTINCT ON` statement above: the matched guest orders are read flat and de-duplicated in memory by
+ * lowercased email, else phone, else order id (first seen wins), capped at 10.
+ */
+async function guestRowsFromDo(storeId: string, guestIds: string[]) {
+  const orders = await (
+    await storeDb(storeId)
+  ).order.findMany({
+    where: { storeId, customerId: null, deletedAt: null, id: { in: guestIds } },
+    select: { id: true, shippingAddress: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const seen = new Set<string>();
+  const out: Array<{
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    order_id: string;
+  }> = [];
+  for (const o of orders) {
+    const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' ? v : null);
+    const email = str(a.email);
+    const phone = str(a.phone);
+    const key = (email !== null ? email.toLowerCase() : null) ?? phone ?? o.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      first_name: str(a.firstName),
+      last_name: str(a.lastName),
+      email,
+      phone,
+      order_id: o.id,
+    });
+    if (out.length >= 10) break;
+  }
+  return out;
 }

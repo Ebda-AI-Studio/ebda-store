@@ -104,10 +104,21 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'WishlistItem',
   'Bundle',
   'BundleItem',
-  // the platform tax-verification decision (NEON-ZERO group C, Ruling NZ-C-7)
-  'StoreTaxProfile',
-  // shopper address book, per store (Ruling NZ-SF-5)
+  // shopper address book (Ruling NZ-SF-5) and the platform tax-verification decision (group C, Ruling NZ-C-7: StoreTaxProfile)
+  // per-store admin CRUD (NEON-ZERO-1 N-11 group B, Ruling NZ-N11-1): merchant-edited config/marketing rows, never a stock column
+  'CustomerGroup',
   'Address',
+  'CustomerAddress',
+  'Coupon',
+  'Promotion',
+  'TaxRate',
+  'StoreTaxProfile',
+  'StoreTaxDocument',
+  'WholesaleApplication',
+  'ProductModel',
+  'ProductModelBinding',
+  'StoreWhatsAppLink',
+  'GoldRateSettings',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

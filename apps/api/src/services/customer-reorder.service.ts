@@ -1,5 +1,4 @@
 import { storeDb } from '../lib/repo-factory';
-import { prisma } from '@ebda/database';
 
 /** Orders looked at, and products returned, by "order again" (Ruling B4-8). */
 export const REORDER_ORDERS = 3;

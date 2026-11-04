@@ -1,4 +1,4 @@
-import { withStore } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { lookupStore } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 
@@ -31,12 +31,12 @@ export async function resolveStoreBySlug(slug: string): Promise<McpStore> {
   // not deleted), then the row is read inside that store's own scope.
   const hit = await lookupStore({ slug }, ['active']);
   const store = hit
-    ? await withStore(hit.id, tx =>
-        tx.store.findUnique({
-          where: { id: hit.id },
-          select: { id: true, name: true, slug: true, currency: true, domain: true },
-        })
-      )
+    ? await (
+        await storeDb(hit.id)
+      ).store.findUnique({
+        where: { id: hit.id },
+        select: { id: true, name: true, slug: true, currency: true, domain: true },
+      })
     : null;
 
   if (!store) {

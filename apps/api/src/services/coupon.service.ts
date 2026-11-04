@@ -1,6 +1,7 @@
 import { assertCouponValue } from '../lib/sellable-price';
 import { assertCustomerGroupInStore } from '../lib/customer-group-scope';
-import { prisma, Prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import type { Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
@@ -95,13 +96,13 @@ export class CouponService {
     }
 
     const [coupons, total] = await Promise.all([
-      prisma.coupon.findMany({
+      (await storeDb(storeId)).coupon.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.coupon.count({ where }),
+      (await storeDb(storeId)).coupon.count({ where }),
     ]);
 
     return {
@@ -116,7 +117,9 @@ export class CouponService {
   }
 
   static async getById(storeId: string, couponId: string) {
-    const coupon = await prisma.coupon.findFirst({
+    const coupon = await (
+      await storeDb(storeId)
+    ).coupon.findFirst({
       where: { id: couponId, storeId },
     });
 
@@ -128,7 +131,9 @@ export class CouponService {
   }
 
   static async getByCode(storeId: string, code: string) {
-    const coupon = await prisma.coupon.findFirst({
+    const coupon = await (
+      await storeDb(storeId)
+    ).coupon.findFirst({
       where: {
         storeId,
         code: { equals: code, mode: 'insensitive' },
@@ -168,7 +173,9 @@ export class CouponService {
     // QA-PRICE-ZERO-1: a coupon that discounts nothing (or everything) is refused at the door.
     assertCouponValue(data.type, data.value);
     // Check for duplicate code
-    const existingCoupon = await prisma.coupon.findFirst({
+    const existingCoupon = await (
+      await storeDb(storeId)
+    ).coupon.findFirst({
       where: {
         storeId,
         code: { equals: data.code, mode: 'insensitive' },
@@ -181,7 +188,9 @@ export class CouponService {
 
     await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
-    const coupon = await prisma.coupon.create({
+    const coupon = await (
+      await storeWriter(storeId)
+    ).coupon.create({
       data: {
         storeId,
         code: data.code.toUpperCase(),
@@ -220,7 +229,9 @@ export class CouponService {
 
     // Check for duplicate code if changing code
     if (data.code) {
-      const existingCoupon = await prisma.coupon.findFirst({
+      const existingCoupon = await (
+        await storeDb(storeId)
+      ).coupon.findFirst({
         where: {
           storeId,
           code: { equals: data.code, mode: 'insensitive' },
@@ -233,7 +244,9 @@ export class CouponService {
       }
     }
 
-    const coupon = await prisma.coupon.update({
+    const coupon = await (
+      await storeWriter(storeId)
+    ).coupon.update({
       where: { id: couponId, storeId },
       data: {
         code: data.code?.toUpperCase(),
@@ -264,7 +277,9 @@ export class CouponService {
   static async delete(storeId: string, couponId: string) {
     await this.getById(storeId, couponId);
 
-    await prisma.coupon.delete({
+    await (
+      await storeWriter(storeId)
+    ).coupon.delete({
       where: { id: couponId, storeId },
     });
   }
@@ -272,7 +287,9 @@ export class CouponService {
   static async toggleActive(storeId: string, couponId: string) {
     const coupon = await this.getById(storeId, couponId);
 
-    const updatedCoupon = await prisma.coupon.update({
+    const updatedCoupon = await (
+      await storeWriter(storeId)
+    ).coupon.update({
       where: { id: couponId, storeId },
       data: { isActive: !coupon.isActive },
     });
@@ -281,7 +298,9 @@ export class CouponService {
   }
 
   static async incrementUsage(storeId: string, couponId: string) {
-    await prisma.coupon.update({
+    await (
+      await storeWriter(storeId)
+    ).coupon.update({
       where: { id: couponId, storeId },
       data: { usageCount: { increment: 1 } },
     });

@@ -134,7 +134,9 @@ router.post(
       const { storeId } = req.params;
       const { section, existingTitle, existingTitleAr } = sectionSchema.parse(req.body);
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -279,7 +281,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
     const { storeId } = req.params;
     const { kind, id } = seoSchema.parse(req.body);
 
-    const store = await prisma.store.findUnique({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { name: true, nameAr: true, description: true, descriptionAr: true },
     });
@@ -402,7 +406,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true },
       });
@@ -488,7 +494,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { logo: true },
       });
@@ -721,7 +729,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true },
       });
@@ -1694,7 +1704,7 @@ router.get('/results/geo', async (req: Request, res: Response, next: NextFunctio
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [store, totalProducts, productsWithCitation] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { llmsTxt: true, aboutJson: true },
       }),
@@ -1806,17 +1816,14 @@ router.get(
     try {
       const storeId = (req.params as { storeId: string }).storeId;
 
-      const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
-        (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
-        (await storeDb(currentStoreId())).aiRecommendation
-          .findMany({
-            where: { storeId },
-            distinct: ['sourceProductId'],
-            select: { sourceProductId: true },
-          })
-          .then(rows => rows.length),
-        (await storeDb(currentStoreId())).aiRecommendation.count({ where: { storeId } }),
+      const db = await storeDb(storeId);
+      const [totalProducts, recSources] = await Promise.all([
+        db.product.count({ where: { storeId, deletedAt: null } }),
+        // no `distinct` (not served by the DO client): the distinct sources are counted in memory
+        db.aiRecommendation.findMany({ where: { storeId }, select: { sourceProductId: true } }),
       ]);
+      const totalRecs = recSources.length;
+      const distinctSourcesWithRecs = new Set(recSources.map(r => r.sourceProductId)).size;
 
       res.json({
         success: true,
@@ -1921,7 +1928,7 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
       categoriesWithMeta,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaTitle: true, metaDescription: true },
       }),
@@ -2116,7 +2123,7 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
       categoriesWithAeo,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaDescriptionAeo: true },
       }),

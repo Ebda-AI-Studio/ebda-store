@@ -14,6 +14,8 @@ import { writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { GoldRateService } from '../services/gold-rate/gold-rate.service';
 import { StoreService } from '../services/store.service';
+import { AppError } from '../middleware/error-handler';
+import { storeDb } from '../lib/repo-factory';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 
@@ -144,7 +146,10 @@ router.get(
   ...readChain,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const store = await StoreService.getById(req.params.storeId);
+      const store = await (
+        await storeDb(req.params.storeId)
+      ).store.findUnique({ where: { id: req.params.storeId }, select: { settings: true } });
+      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
       res.json({
         success: true,
         data: { allowDeferred: goldAllowsDeferredPayment(store.settings) },
