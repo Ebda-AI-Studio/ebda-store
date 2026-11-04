@@ -1,4 +1,5 @@
-import { prisma, Prisma } from '@ebda/database';
+import { Prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { zoneForAddress } from '@ebda/shared';
 
@@ -129,6 +130,7 @@ interface ListShippingZonesOptions {
 
 export class ShippingService {
   static async list(storeId: string, options: ListShippingZonesOptions = {}) {
+    const db = await storeDb(storeId);
     const { page = 1, limit = 50, isActive } = options;
     const skip = (page - 1) * limit;
 
@@ -139,13 +141,13 @@ export class ShippingService {
     }
 
     const [zones, total] = await Promise.all([
-      prisma.shippingZone.findMany({
+      db.shippingZone.findMany({
         where,
         skip,
         take: limit,
         orderBy: { position: 'asc' },
       }),
-      prisma.shippingZone.count({ where }),
+      db.shippingZone.count({ where }),
     ]);
 
     return {
@@ -160,7 +162,8 @@ export class ShippingService {
   }
 
   static async getById(storeId: string, zoneId: string) {
-    const zone = await prisma.shippingZone.findFirst({
+    const db = await storeDb(storeId);
+    const zone = await db.shippingZone.findFirst({
       where: { id: zoneId, storeId },
     });
 
@@ -172,13 +175,15 @@ export class ShippingService {
   }
 
   static async create(storeId: string, data: CreateShippingZoneData) {
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
     // Get the highest position for this store
-    const maxPosition = await prisma.shippingZone.aggregate({
+    const maxPosition = await db.shippingZone.aggregate({
       where: { storeId },
       _max: { position: true },
     });
 
-    const zone = await prisma.shippingZone.create({
+    const zone = await w.shippingZone.create({
       data: {
         storeId,
         name: data.name,
@@ -199,9 +204,10 @@ export class ShippingService {
   }
 
   static async update(storeId: string, zoneId: string, data: UpdateShippingZoneData) {
+    const w = await storeWriter(storeId);
     await this.getById(storeId, zoneId);
 
-    const zone = await prisma.shippingZone.update({
+    const zone = await w.shippingZone.update({
       where: { id: zoneId, storeId },
       data: {
         name: data.name,
@@ -222,17 +228,19 @@ export class ShippingService {
   }
 
   static async delete(storeId: string, zoneId: string) {
+    const w = await storeWriter(storeId);
     await this.getById(storeId, zoneId);
 
-    await prisma.shippingZone.delete({
+    await w.shippingZone.delete({
       where: { id: zoneId, storeId },
     });
   }
 
   static async toggleActive(storeId: string, zoneId: string) {
+    const w = await storeWriter(storeId);
     const zone = await this.getById(storeId, zoneId);
 
-    const updatedZone = await prisma.shippingZone.update({
+    const updatedZone = await w.shippingZone.update({
       where: { id: zoneId, storeId },
       data: { isActive: !zone.isActive },
     });
@@ -241,8 +249,10 @@ export class ShippingService {
   }
 
   static async reorder(storeId: string, zoneIds: string[]) {
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
     // Verify all zones belong to this store
-    const zones = await prisma.shippingZone.findMany({
+    const zones = await db.shippingZone.findMany({
       where: { storeId, id: { in: zoneIds } },
     });
 
@@ -251,9 +261,9 @@ export class ShippingService {
     }
 
     // Update positions
-    await prisma.$transaction(
+    await w.$transaction(
       zoneIds.map((id, index) =>
-        prisma.shippingZone.update({
+        w.shippingZone.update({
           where: { id, storeId },
           data: { position: index },
         })
@@ -282,13 +292,14 @@ export class ShippingService {
     orderTotal: number,
     governorate?: string
   ) {
+    const db = await storeDb(storeId);
     // Fetch active zones and per-area rates in parallel
     const [zones, areaRates] = await Promise.all([
-      prisma.shippingZone.findMany({
+      db.shippingZone.findMany({
         where: { storeId, isActive: true },
         orderBy: { position: 'asc' },
       }),
-      prisma.shippingAreaRate.findMany({
+      db.shippingAreaRate.findMany({
         where: { storeId, isActive: true },
       }),
     ]);
@@ -374,7 +385,8 @@ export class ShippingService {
    * Get public shipping zones for storefront
    */
   static async getPublicZones(storeId: string) {
-    const zones = await prisma.shippingZone.findMany({
+    const db = await storeDb(storeId);
+    const zones = await db.shippingZone.findMany({
       where: { storeId, isActive: true },
       orderBy: { position: 'asc' },
       select: {

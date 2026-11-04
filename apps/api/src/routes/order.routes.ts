@@ -62,7 +62,7 @@ import { InstapayReceiptService } from '../services/payment-providers/instapay-r
 import multer from 'multer';
 import { INSTAPAY_RECEIPT_MAX_BYTES, instapayRefundRecordSchema } from '@ebda/shared';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
-import { runInTenantContext } from '@ebda/database';
+
 import { config } from '../config';
 import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
@@ -78,6 +78,7 @@ import {
 import { rangeOrLegacyDays } from '../lib/report-range';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 import { redactOrderForCustomer } from '../services/gold-rate/public';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router({ mergeParams: true });
 
@@ -551,7 +552,7 @@ const updateStatusSchema = z.object({
 const getSessionId = (req: Request): string => {
   const sessionId = req.headers['x-session-id'] as string;
   if (!sessionId) {
-    throw Object.assign(new Error('Session ID required'), { statusCode: 400 });
+    throw new AppError(400, 'SESSION_REQUIRED', 'Session ID required');
   }
   return sessionId;
 };
@@ -1593,7 +1594,7 @@ router.post(
       // Call the provider's GetRefundStatus. Optional on IPaymentProvider —
       // PaymentService.getRefundStatus refuses gracefully when the chosen
       // provider doesn't implement it.
-      const status = await runInTenantContext(storeId, () =>
+      const status = await runInStoreCtx(storeId, () =>
         PaymentService.getRefundStatus(
           payment.refundId!,
           payment.provider as PaymentProvider,
@@ -1928,7 +1929,7 @@ router.post(
       // the client as a real error.
       let result;
       try {
-        result = await runInTenantContext(storeId, async () =>
+        result = await runInStoreCtx(storeId, async () =>
           PaymentService.refund({
             transactionId: payment.transactionId!,
             amount: data.amount,

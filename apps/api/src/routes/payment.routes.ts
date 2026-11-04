@@ -14,7 +14,7 @@ import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
@@ -59,6 +59,7 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
 // ==========================================
@@ -529,7 +530,7 @@ router.post(
 
       if (data.provider === 'cod' || data.provider === 'instapay') {
         // No network: one short tenant transaction.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -862,7 +863,7 @@ router.post(
         };
 
         // Short transaction to record: the Payment row + its audit event + the audit log.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -928,7 +929,7 @@ router.post(
         // under ebda_app the rollback would read no rows and do nothing
         // (PR 2301 audit, same class as the MCP place_order rollbacks).
         const rb = rollbackContext;
-        await runInTenantContext(rb.storeId, () =>
+        await runInStoreCtx(rb.storeId, () =>
           OrderService.rollbackForPaymentFailure(rb.storeId, rb.orderId, rb.sessionId)
         ).catch(rbErr =>
           logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
@@ -1228,7 +1229,7 @@ router.post(
 
       // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
       // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
-      const refund = await runInTenantContext(refundStoreId, () =>
+      const refund = await runInStoreCtx(refundStoreId, () =>
         PaymentService.refund({
           transactionId: data.transactionId,
           amount: data.amount,
@@ -1240,7 +1241,7 @@ router.post(
       // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
       // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
       // a pre-refund snapshot.
-      await runInTenantContext(refundStoreId, async () => {
+      await runInStoreCtx(refundStoreId, async () => {
         await auditLog({
           action: 'payment.refunded',
           userId: user.userId,
