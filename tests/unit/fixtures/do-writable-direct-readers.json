@@ -159,7 +159,7 @@
       "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1).",
       "models": {
         "product": 2,
-        "productVariant": 1
+        "productVariant": 2
       }
     }
   }

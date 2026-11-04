@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { validateRegistration } from './validate-registration';
 import { useRouter } from 'next/navigation';
@@ -25,6 +25,18 @@ export default function RegisterClient() {
     password: '',
     confirmPassword: '',
   });
+
+  // QA P2-1: every field writes through the functional updater, so an autofill / fast typing burst that fires several
+  // onChange events against one render can never overwrite a sibling field with a stale copy (the first name vanished).
+  const setField = (key: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  // The submit button stays disabled until the page has hydrated: before that, typed text lives only in the DOM and a
+  // submit would send the still-empty state.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,14 +115,14 @@ export default function RegisterClient() {
                   label={t('First name', 'الاسم الأول')}
                   autoComplete="given-name"
                   value={formData.firstName}
-                  onChange={e => setFormData({ ...formData, firstName: e.target.value })}
+                  onChange={setField('firstName')}
                   required
                 />
                 <Input
                   label={t('Last name', 'اسم العائلة')}
                   autoComplete="family-name"
                   value={formData.lastName}
-                  onChange={e => setFormData({ ...formData, lastName: e.target.value })}
+                  onChange={setField('lastName')}
                   required
                 />
               </div>
@@ -120,7 +132,7 @@ export default function RegisterClient() {
                 type="email"
                 autoComplete="email"
                 value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                onChange={setField('email')}
                 required
               />
 
@@ -129,7 +141,7 @@ export default function RegisterClient() {
                 type="password"
                 autoComplete="new-password"
                 value={formData.password}
-                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                onChange={setField('password')}
                 required
               />
 
@@ -138,7 +150,7 @@ export default function RegisterClient() {
                 type="password"
                 autoComplete="new-password"
                 value={formData.confirmPassword}
-                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={setField('confirmPassword')}
                 required
               />
 
@@ -167,7 +179,13 @@ export default function RegisterClient() {
                 </label>
               </div>
 
-              <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                isLoading={isLoading}
+                disabled={!hydrated}
+              >
                 {t('Create account', 'إنشاء حساب')}
               </Button>
             </form>

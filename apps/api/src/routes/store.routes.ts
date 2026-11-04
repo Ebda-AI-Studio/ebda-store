@@ -14,6 +14,7 @@ import {
 } from '@ebda/database';
 import { StoreService } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
+import { toSafeStoreResponse } from '../lib/store-response';
 import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
@@ -43,10 +44,7 @@ import {
   reservedSettingsKeys,
   ECHOED_SERVER_OWNED_KEYS,
 } from '@ebda/shared';
-import {
-  maskMarketingPixelSecrets,
-  preserveMaskedPixelSecrets,
-} from '../lib/marketing-pixels-secrets';
+import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
 import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
@@ -640,8 +638,7 @@ router.get(
       // treated as "unchanged" (see PUT /marketing-pixels).
       const safeStore = store
         ? {
-            ...store,
-            marketingPixels: maskMarketingPixelSecrets(store.marketingPixels),
+            ...toSafeStoreResponse(store),
             // Super-admin only: how the owner found Ebda. ip / user agent / Meta ids stay server-side.
             ...(isSuperAdmin
               ? { owner: { ...store.owner, acquisition: acquisitionForAdmin(store.owner) } }
@@ -762,7 +759,7 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -818,7 +815,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -920,7 +917,7 @@ router.patch(
           logger.warn({ err, storeId: req.params.id }, '[store.status] audit log write failed');
         });
 
-      res.json({ success: true, data: store });
+      res.json({ success: true, data: toSafeStoreResponse(store) });
     } catch (error) {
       next(error);
     }
@@ -958,7 +955,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1028,7 +1025,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1052,7 +1049,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1106,7 +1103,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1155,7 +1152,7 @@ router.put(
         settings: body.settings as Prisma.InputJsonValue | undefined,
         blogEnabled: body.blogEnabled,
       });
-      res.json({ success: true, data: { store } });
+      res.json({ success: true, data: { store: toSafeStoreResponse(store) } });
     } catch (error) {
       next(error);
     }
@@ -1178,7 +1175,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1225,7 +1222,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1262,7 +1259,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1297,7 +1294,7 @@ router.get(
 
       if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
-      res.json({ success: true, data: store });
+      res.json({ success: true, data: toSafeStoreResponse(store) });
     } catch (error) {
       next(error);
     }
@@ -1322,7 +1319,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1359,9 +1356,7 @@ router.put(
 
       // Mask secrets again on the way back out so the response can't leak the
       // freshly-stored token.
-      const safeStore = store
-        ? { ...store, marketingPixels: maskMarketingPixelSecrets(store.marketingPixels) }
-        : store;
+      const safeStore = toSafeStoreResponse(store);
 
       res.json({
         success: true,
