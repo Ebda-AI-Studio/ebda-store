@@ -78,7 +78,6 @@ export type StoreReads = {
 
 /** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
 export type WritableModel =
-  | 'paymentConfig'
   | 'product'
   | 'productVariant'
   | 'productOption'

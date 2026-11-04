@@ -99,5 +99,4 @@ Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
   `ebda_is_super_admin()`. Cost if wrong: an identity outage denies admin routes (fail closed).
 - NZ-PR-4 - the tax review queue fans out over DO stores (500 max, 8 concurrent) as an interim until tax profiles move.
   Cost if wrong: queue is bounded and may omit stores beyond 500.
-- Residual: `GET /admin/tax-verification/:storeId` and its document file route still read `StoreTaxProfile`/`StoreTaxDocument`
-  from Postgres (no DO read model exists for them); owner = the tax-on-DO work.
+- Residual (DO model gap, owners: tax-on-DO and payments-on-DO work): `GET /admin/tax-verification/:storeId` (+ document file) read `StoreTaxProfile`/`StoreTaxDocument`, and `/payment-settings/store/:storeId` GET/PUT/DELETE/toggle use `prisma.paymentConfig`, from Postgres. `PaymentConfig` is NOT made DO-writable here: 9 other direct readers (checkout, onboarding, COD, instapay) would split-brain.
