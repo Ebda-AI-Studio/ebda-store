@@ -4,7 +4,7 @@ Sweep: `apps/api/workers-test/route-sweep.test.ts`, Postgres dead, all markers s
 `SWEEP_ONLY="<regex>,<regex>"` (matched against `METHOD /path`; bound through `vitest.workers.config.mts`), and
 `SWEEP_STRICT=1` now really asserts (both are Worker bindings; `process.env` is empty inside workerd).
 
-Group B subset (341 requests): before 109 failing (5xx or no answer), after 10 failing, 108 2xx, 223 expected 4xx.
+Group B subset (341 requests): before 109 failing (5xx or no answer), after 12 failing (merged with integ at e4d9fbcdb), 109 2xx, 220 expected 4xx.
 
 Left, with the reason (none is a Postgres read of per-store data that can move to storeDb):
 
