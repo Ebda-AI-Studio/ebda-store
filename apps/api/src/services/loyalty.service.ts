@@ -5,6 +5,7 @@ import { featureService } from './feature.service';
 
 import { fromMinor, minorToDecimalString } from '@ebda/shared';
 import { storeMoney, storeUpdate } from '../lib/repo-factory';
+import { assertStoreCustomer } from '../lib/store-customer';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -326,6 +327,8 @@ export class LoyaltyService {
       ...DEFAULT_LOYALTY_SETTINGS,
       ...(store.loyaltySettings as Partial<LoyaltySettings>),
     };
+
+    await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
 
     // Check if already exists
     const existing = await prisma.loyaltyPoints.findUnique({
@@ -971,6 +974,9 @@ export class LoyaltyService {
       throw new AppError(400, 'LOYALTY_DISABLED', 'Loyalty program is not enabled');
     }
 
+    // SEC-CUSTOMER-SCOPE-1: the id is a global user uuid; it must be THIS store's customer before any row is created.
+    await assertStoreCustomer(storeId, customerId);
+
     const settings = {
       ...DEFAULT_LOYALTY_SETTINGS,
       ...(store.loyaltySettings as Partial<LoyaltySettings>),
@@ -1090,6 +1096,8 @@ export class LoyaltyService {
       return { awarded: false, points: 0 };
     }
 
+    await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
+
     // Get or create loyalty record
     let loyalty = await prisma.loyaltyPoints.findUnique({
       where: { storeId_customerId: { storeId, customerId } },
@@ -1142,6 +1150,8 @@ export class LoyaltyService {
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
 
+    await assertStoreCustomer(storeId, customerId); // SEC-CUSTOMER-SCOPE-1
+
     const [transactions, total] = await Promise.all([
       prisma.loyaltyTransaction.findMany({
         where: { storeId, customerId },
@@ -1184,7 +1194,11 @@ export class LoyaltyService {
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.LoyaltyPointsWhereInput = { storeId };
+    // SEC-CUSTOMER-SCOPE-1: never list (or join PII of) a user who is not this store's customer, even if a stray row exists.
+    const where: Prisma.LoyaltyPointsWhereInput = {
+      storeId,
+      customer: { storeId, role: 'customer' },
+    };
     if (options?.tier) {
       where.tier = options.tier;
     }
