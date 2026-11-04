@@ -31,6 +31,12 @@ node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 count
 
 `--commit` refuses when the marker exists. Order: FREEZE -> wait `--drain-ms` (45 s) -> open the Postgres snapshot -> copy -> verify -> flip -> wait `--settle-ms` (12 s) -> lift the freeze -> re-digest Postgres on a NEW connection. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1, lifts the freeze, leaves the switch untouched and can simply be re-run. Exit code 2 + a table list after the flip means a write still reached Postgres; re-apply those rows in D1 by hand. `--unfreeze` lifts a freeze left behind by a killed run; `--status` shows marker and freeze.
 
+## What the freeze does to callers (about a minute)
+
+- Every write answers `503 PLATFORM_FAMILY_FROZEN` with `details.retryable`, `retryAfterSeconds: 30` and `details.messageAr` (the admin UI shows it). Reads keep working.
+- Provider webhooks: the repo already relies on the gateway redelivering after a 5xx (Ruling PROVIDERS-17: billing "answers 500 ... so Kashier redelivers"). The retry schedule and how long Kashier / Paymob keep retrying is NOT VERIFIED here (their docs are the source); the freeze (~60-70 s) is far shorter than any retry window we know of. Backstops if one is lost: confirm-before-apply on redelivery, `sweepStuckCharges` (renewals pending > 1 h are asked at the gateway) and `expireStaleCheckouts`. Pick a quiet minute anyway.
+- The freeze row carries `expiresAt` (`--freeze-ttl-ms`, default 15 min). If the script dies without lifting it the API IGNORES it after that and pages (P1); SIGINT/SIGTERM lift it; a failed lift is loud and exits non-zero (`--unfreeze` removes it).
+
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 
 - `--status` shows `marker: PRESENT`, D1 counts equal the dry-run PG counts.
@@ -54,9 +60,9 @@ to D1 after the flip are not in Postgres. After real traffic the answer is forwa
 
 Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
 
-- **Freeze.** The generic freeze/drain/settle of the script applies (`--drain-ms`, `--settle-ms`): every Postgres WRITE of `storeStaff` /
-  `staffInvite` (add/remove staff, invite, accept, revoke) answers 503 `PLATFORM_FAMILY_FROZEN` until the script lifts it. The API ignores a freeze
-  older than 10 minutes (P1 alert); the script refuses to flip after `--max-freeze-ms` (8 min). `--unfreeze` removes a left-over one.
+- **Freeze.** The generic freeze/drain/settle of the script applies (`--drain-ms`, `--settle-ms`, `--freeze-ttl-ms`): every WRITE of `storeStaff` /
+  `staffInvite` (add/remove staff, invite, accept, revoke) answers 503 `PLATFORM_FAMILY_FROZEN` until the script lifts it. The freeze expires
+  (`expiresAt`, P1 alert); the script refuses to flip after 80% of the TTL. `--unfreeze` removes a left-over one.
 - **Directory check.** Before anything is written the script compares D1 `stores` with Postgres for every PG-backed store (owner, status, billing
   suspension, deleted) and refuses on a difference or a missing store: the gate decides on those D1 columns after the flip. Fix with the directory
   reconcile and re-run. DO stores (D1 `storage_backend = 'do'`) are skipped; the column exists only in D1.

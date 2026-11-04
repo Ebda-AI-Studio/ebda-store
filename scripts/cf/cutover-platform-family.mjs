@@ -105,11 +105,11 @@ async function main() {
     unfreeze: { type: 'boolean', default: false },
     'drain-ms': { type: 'string', default: '45000' },
     'settle-ms': { type: 'string', default: '12000' },
-    // The API treats a freeze older than 10 minutes as stuck (alert + not frozen): abort before the flip well inside that.
-    'max-freeze-ms': { type: 'string', default: '480000' },
     // `access` only: a WRITE connection used once, after the flip, to empty the migrated Postgres rows.
     'pg-write-url': { type: 'string' },
     'allow-prod-write': { type: 'boolean', default: false },
+    // a freeze carries its own expiry: if this script dies without lifting it the API ignores it after this long and pages
+    'freeze-ttl-ms': { type: 'string', default: '900000' },
   });
   const tables = FAMILIES[args.family];
   if (!tables) throw new Error(`pass --family <${Object.keys(FAMILIES).join('|')}>`);
@@ -128,7 +128,7 @@ async function main() {
     )[0];
   const setFreeze = () =>
     d1Statements(d, [
-      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(fkey)}, '{}', 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
+      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(fkey)}, ${lit(JSON.stringify({ expiresAt: Date.now() + Number(args['freeze-ttl-ms']), by: 'cutover-platform-family' }))}, 'cutover', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`,
     ]);
   const liftFreeze = () =>
     d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(fkey)};`]);
@@ -272,8 +272,30 @@ async function main() {
 
   // 2. FREEZE and drain BEFORE the snapshot: a snapshot opened earlier would not see the writes the drain waits for,
   //    and a write after it would be lost.
+  let frozenNow = false;
+  const lift = async () => {
+    if (!frozenNow) return;
+    try {
+      await liftFreeze();
+      frozenNow = false;
+    } catch (e) {
+      // LOUD: a freeze left behind stops every write to the family until it expires (the API ignores it after its
+      // expiresAt and pages). Non-zero exit; the operator must run --unfreeze.
+      console.error(`!!! COULD NOT LIFT THE FREEZE ${fkey}: ${e.message}`);
+      console.error(
+        `!!! run: node scripts/cf/cutover-platform-family.mjs --family ${args.family} --unfreeze (same --d1 flags)`
+      );
+      process.exitCode = 1;
+    }
+  };
+  for (const sig of ['SIGINT', 'SIGTERM'])
+    process.once(sig, () => {
+      console.error(`${sig}: lifting the freeze before exit`);
+      lift().finally(() => process.exit(130));
+    });
   await setFreeze();
   const frozenAt = Date.now();
+  frozenNow = true;
   console.log(
     `FROZEN ${args.family}: writes are refused (503, retryable). Draining ${args['drain-ms']} ms ...`
   );
@@ -372,9 +394,11 @@ async function main() {
         `verification failed (${bad.join(', ')}); the switch was NOT flipped and the freeze is lifted. Re-run.`
       );
 
-    if (Date.now() - frozenAt > Number(args['max-freeze-ms']))
+    // The API ignores the freeze after --freeze-ttl-ms: never flip when more than 80% of it is gone (the drift check and the
+    // emptying still have to run inside it).
+    if (Date.now() - frozenAt > 0.8 * Number(args['freeze-ttl-ms']))
       throw new Error(
-        `the freeze is older than --max-freeze-ms (${args['max-freeze-ms']}): the API may already treat it as stuck. Not flipping; re-run.`
+        `the freeze has used 80% of --freeze-ttl-ms (${args['freeze-ttl-ms']}): not flipping; re-run.`
       );
     // 5. flip
     const value = JSON.stringify({
@@ -392,8 +416,8 @@ async function main() {
     );
   } finally {
     if (!flipped) {
-      await liftFreeze().catch(() => {});
-      console.log('freeze lifted (nothing was flipped).');
+      await lift();
+      if (!frozenNow) console.log('freeze lifted (nothing was flipped).');
     }
   }
   await sleep(Number(args['settle-ms']));
@@ -445,7 +469,8 @@ async function main() {
       await w.end();
     }
   }
-  await liftFreeze();
+  await lift();
+  if (frozenNow) throw new Error('the freeze is still up (see above); run --unfreeze');
   console.log('freeze lifted.');
   if (drift.length) {
     console.log(

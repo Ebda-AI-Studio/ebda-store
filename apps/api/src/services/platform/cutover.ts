@@ -42,12 +42,6 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
 };
 
 export const OFF_TTL_MS = 10_000;
-/**
- * A freeze older than this is STUCK (the script died between freeze and lift): a stuck freeze would refuse every write of the
- * family for ever, which is an outage. It is then ignored (Postgres stays authoritative while no marker exists, so ignoring it
- * loses nothing) and a P1 alert fires once per isolate. The script aborts before the flip long before this (--max-freeze-ms).
- */
-export const FREEZE_MAX_AGE_MS = 10 * 60_000;
 export const cutoverKey = (family: PlatformFamily) => `platform_cutover.${family}`;
 export const freezeKey = (family: PlatformFamily) => `platform_freeze.${family}`;
 
@@ -60,20 +54,25 @@ interface MarkerD1 {
 }
 
 const on = new Set<PlatformFamily>();
-const staleAlerted = new Set<PlatformFamily>();
 const offUntil = new Map<PlatformFamily, number>();
 
 /** Test seam. */
 export function resetCutoverCache(): void {
   on.clear();
   offUntil.clear();
-  staleAlerted.clear();
+  expiredFreezeAlerted.clear();
 }
 
 const binding = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATFORM_DB;
 const unreadable = () =>
   new AppError(503, 'PLATFORM_CUTOVER_UNREADABLE', 'Platform database is unavailable');
 
+const expiredFreezeAlerted = new Set<PlatformFamily>();
+
+/**
+ * The marker and the freeze. A freeze row carries `{"expiresAt": <epoch ms>}`: past that instant it is IGNORED (a script
+ * killed without lifting it must not stop billing for ever) and a P1 names it, once per isolate.
+ */
 async function readKeys(
   d1: MarkerD1,
   family: PlatformFamily
@@ -82,23 +81,30 @@ async function readKeys(
     const rows =
       (
         await d1
-          .prepare('SELECT key, created_at FROM system_settings WHERE key IN (?1, ?2)')
+          .prepare('SELECT key, value FROM system_settings WHERE key IN (?1, ?2)')
           .bind(cutoverKey(family), freezeKey(family))
-          .all<{ key: string; created_at: number | null }>()
+          .all<{ key: string; value: string }>()
       ).results ?? [];
     const freeze = rows.find(r => r.key === freezeKey(family));
     let frozen = !!freeze;
-    if (freeze && Date.now() - Number(freeze.created_at ?? 0) > FREEZE_MAX_AGE_MS) {
-      frozen = false;
-      if (!staleAlerted.has(family)) {
-        staleAlerted.add(family);
-        void sendAlert({
-          level: 'p1',
-          source: 'platform.cutover.freeze_stuck',
-          title: `platform_freeze.${family} is older than 10 minutes`,
-          body: 'A cutover script died between freeze and lift. The freeze is ignored while no marker exists; remove it with --unfreeze.',
-          context: { family, ageMs: Date.now() - Number(freeze.created_at ?? 0) },
-        }).catch(() => undefined);
+    if (freeze) {
+      let expiresAt = Number.POSITIVE_INFINITY;
+      try {
+        const parsed = JSON.parse(freeze.value) as { expiresAt?: unknown };
+        if (typeof parsed.expiresAt === 'number') expiresAt = parsed.expiresAt;
+      } catch {
+        /* a freeze without a readable expiry is honoured */
+      }
+      if (expiresAt <= Date.now()) {
+        frozen = false;
+        if (!expiredFreezeAlerted.has(family)) {
+          expiredFreezeAlerted.add(family);
+          void sendAlert({
+            level: 'p1',
+            title: 'Platform cutover: an expired freeze was left behind',
+            body: `${freezeKey(family)} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: node scripts/cf/cutover-platform-family.mjs --family ${family} --unfreeze`,
+          }).catch(() => undefined);
+        }
       }
     }
     return { moved: rows.some(r => r.key === cutoverKey(family)), frozen };
@@ -107,41 +113,51 @@ async function readKeys(
   }
 }
 
-/** READ path: cached "on" for good, cached "off" for OFF_TTL_MS. */
+/** Sync view for guards: has this isolate already seen the marker? */
+export const isFamilyCachedOnD1 = (family: PlatformFamily): boolean => on.has(family);
+
+const frozenError = (family: PlatformFamily) =>
+  new AppError(503, 'PLATFORM_FAMILY_FROZEN', 'This data is being moved; retry in a minute', {
+    retryable: true,
+    family,
+    retryAfterSeconds: 30,
+    messageAr: 'جارٍ نقل بيانات الاشتراكات الآن، أعد المحاولة بعد دقيقة.',
+  });
+
+/**
+ * READ path: cached "on" for good; "off" is cached for OFF_TTL_MS, but NEVER while a freeze row exists (the flip is
+ * imminent: every read re-checks, so no isolate keeps reading Postgres for the cache's lifetime after the marker).
+ */
 export async function platformFamilyOnD1(family: PlatformFamily): Promise<boolean> {
   if (on.has(family)) return true;
   const d1 = binding();
   if (!d1) return false;
   if ((offUntil.get(family) ?? 0) > Date.now()) return false;
-  const { moved } = await readKeys(d1, family);
+  const { moved, frozen } = await readKeys(d1, family);
   if (moved) {
     on.add(family);
     return true;
   }
-  offUntil.set(family, Date.now() + OFF_TTL_MS);
+  if (!frozen) offUntil.set(family, Date.now() + OFF_TTL_MS);
   return false;
 }
 
 /**
- * WRITE path: where this write goes, never from a stale "off". Postgres is returned only after a fresh read showed no
- * marker AND no freeze; a freeze without a marker refuses the write (retryable 503).
+ * WRITE path: where this write goes, never from a stale "off". While a freeze exists EVERY write is refused (retryable
+ * 503), marker or not: with the marker present but the freeze still up, isolates that have not seen the marker would
+ * otherwise write Postgres while others write D1 (mixed backends). Only after the script lifts the freeze do writes
+ * flow, and by then every isolate resolves the marker.
  */
 export async function platformFamilyOnD1ForWrite(family: PlatformFamily): Promise<boolean> {
   if (on.has(family)) return true;
   const d1 = binding();
   if (!d1) return false;
   const { moved, frozen } = await readKeys(d1, family);
+  if (frozen) throw frozenError(family);
   if (moved) {
     on.add(family);
     return true;
   }
-  if (frozen)
-    throw new AppError(
-      503,
-      'PLATFORM_FAMILY_FROZEN',
-      'This data is being moved; retry in a minute',
-      { retryable: true, family }
-    );
   return false;
 }
 

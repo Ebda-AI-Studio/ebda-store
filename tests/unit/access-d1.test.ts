@@ -13,7 +13,6 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
 import { prisma } from '@ebda/database';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
 import {
-  FREEZE_MAX_AGE_MS,
   cutoverKey,
   freezeKey,
   resetCutoverCache,
@@ -280,16 +279,16 @@ describe('routing through the prisma proxy', () => {
   });
 });
 
-describe('copy-window freeze', () => {
-  const freezeAt = (r: ReturnType<typeof rig>, ageMs: number) =>
+describe('copy-window freeze (#407 mechanism, access family)', () => {
+  const freezeFor = (r: ReturnType<typeof rig>, expiresInMs: number) =>
     r.db
-      .prepare(`INSERT INTO system_settings (id, key, value, created_at) VALUES ('f1', ?, '{}', ?)`)
-      .run(freezeKey('access'), Date.now() - ageMs);
+      .prepare(`INSERT INTO system_settings (id, key, value) VALUES ('f1', ?, ?)`)
+      .run(freezeKey('access'), JSON.stringify({ expiresAt: Date.now() + expiresInMs }));
 
-  it('a WRITE is refused 503 retryable while frozen, a READ is not; the marker wins over the freeze', async () => {
+  it('a WRITE is refused 503 retryable while frozen (marker or not), a READ before the marker is served by Postgres', async () => {
     const r = rig();
     r.store(S1, 's1');
-    freezeAt(r, 1000);
+    freezeFor(r, 60_000);
     setCfBindings({ PLATFORM_DB: r.d1 } as never);
     const pg = vi.fn(async () => 'pg');
     await expect(
@@ -298,20 +297,29 @@ describe('copy-window freeze', () => {
     expect(pg).not.toHaveBeenCalled();
     expect(await platformRouter.route('storeStaff', 'findMany', [], pg)).toBe('pg');
 
-    r.marker(); // flipped: D1 serves, the freeze no longer matters
+    r.marker(); // marker + freeze: still refused until the script lifts it (no mixed backends)
+    await expect(
+      prisma.storeStaff.create({ data: { storeId: S1, userId: U1 } })
+    ).rejects.toMatchObject({ code: 'PLATFORM_FAMILY_FROZEN' });
+    r.db.prepare('DELETE FROM system_settings WHERE key = ?').run(freezeKey('access'));
     await prisma.storeStaff.create({ data: { storeId: S1, userId: U1 } });
     expect(r.seats(S1)).toBe(1);
   });
 
-  it('a STUCK freeze (older than the max age) is ignored and raises a P1 once', async () => {
+  it('an EXPIRED freeze is ignored and raises a P1 once', async () => {
     const r = rig();
-    freezeAt(r, FREEZE_MAX_AGE_MS + 1000);
+    freezeFor(r, -1000);
     setCfBindings({ PLATFORM_DB: r.d1 } as never);
     const pg = vi.fn(async () => 'pg');
     expect(await platformRouter.route('staffInvite', 'create', [], pg)).toBe('pg');
     expect(await platformRouter.route('staffInvite', 'create', [], pg)).toBe('pg');
     expect(sendAlert).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
+  });
+
+  it('the access models are in the routed set (raw-tx clients route through them too)', () => {
+    expect(platformRouter.models.has('storeStaff')).toBe(true);
+    expect(platformRouter.models.has('staffInvite')).toBe(true);
   });
 });
 
