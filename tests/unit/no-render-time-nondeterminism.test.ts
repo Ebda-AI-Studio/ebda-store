@@ -20,7 +20,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import ts from 'typescript';
 
 const RENDER_INITIALISERS = new Set(['useMemo', 'useState', 'useReducer', 'useRef']);
@@ -59,11 +59,20 @@ function fnName(fn: ts.Node): string | undefined {
 }
 
 /**
+ * Directory classification uses the path RELATIVE to the repo root: a checkout or worktree directory named
+ * `...templates` / `...hooks` must not turn every file into a render-path file.
+ */
+export function repoRelative(file: string, root: string = ROOT): string {
+  return isAbsolute(file) ? relative(root, file) : file;
+}
+
+/**
  * Plain `.ts` modules under `templates/` are helpers the skins' components call during render
  * (resolveBottomBar read the clock this way, FU46 final review I-1), so a clock read ANYWHERE in
  * one is render path: the scanner cannot follow the call, the file location stands for it.
  */
-const isTemplateHelper = (file: string) => /[\\/]templates[\\/]/.test(file) && /\.ts$/.test(file);
+const isTemplateHelper = (file: string) =>
+  /(^|[\\/])templates[\\/]/.test(repoRelative(file)) && /\.ts$/.test(file);
 
 function isRenderPath(node: ts.Node, helperFile = false): boolean {
   if (helperFile) return true;
@@ -109,7 +118,7 @@ export function scanSource(file: string, text: string): string[] {
   );
   const clientFile =
     /^\s*(['"])use client\1/m.test(text.slice(0, 400)) ||
-    /[\\/](components|templates|hooks|contexts)[\\/]/.test(file);
+    /(^|[\\/])(components|templates|hooks|contexts)[\\/]/.test(repoRelative(file));
   if (!clientFile) return [];
   const helperFile = isTemplateHelper(file);
   const hits: string[] = [];
@@ -312,5 +321,14 @@ describe('no render-time window.location / Date in any Next app (B0-46)', () => 
         )
       ).toEqual([]);
     });
+  });
+});
+
+describe('directory classification is repo-relative', () => {
+  it('a repo root named like a client directory does not make every file a client/render file', () => {
+    const root = join(sep, 'w', 'ebda-store__fix-templates-hooks');
+    const file = join(root, 'apps', 'api', 'src', 'lib', 'clock.ts');
+    expect(repoRelative(file, root)).toBe(join('apps', 'api', 'src', 'lib', 'clock.ts'));
+    expect(scanSource(file, 'export const t = () => Date.now();')).toEqual([]);
   });
 });
