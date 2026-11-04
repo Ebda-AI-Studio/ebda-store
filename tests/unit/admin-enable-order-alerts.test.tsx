@@ -83,7 +83,12 @@ describe('<EnableOrderAlertsButton>', () => {
 
   it('push not configured -> says unavailable, SDK stays unloaded', async () => {
     apiGet.mockResolvedValue({ data: { enabled: false, appId: '' }, error: null });
-    render(<EnableOrderAlertsButton />);
+    // push-opt-in memoises the loaded SDK per page: an earlier case already loaded it, so this one needs a fresh module.
+    vi.resetModules();
+    const { EnableOrderAlertsButton: Fresh } =
+      await import('../../apps/admin/src/components/EnableOrderAlertsButton');
+    sdkLoaded.mockClear();
+    render(<Fresh />);
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('unavailable'));
     expect(sdkLoaded).not.toHaveBeenCalled();
