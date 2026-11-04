@@ -65,6 +65,13 @@
         "product": 1
       }
     },
+    "apps/api/src/services/accounting/reorder-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "the reorder scan: a store on its Durable Object takes the storeMoney() reorderUpsert section (Ruling NZ-A-1); the remaining tx read is the Postgres upsert branch inside its tenant transaction.",
+      "models": {
+        "reorderSuggestion": 1
+      }
+    },
     "apps/api/src/services/accounting/stock-adjustment.service.ts": {
       "kind": "pg-branch",
       "reason": "createAdjustment / postAdjustment: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
@@ -111,6 +118,14 @@
         "productOption": 1,
         "productVariant": 1,
         "product": 1
+      }
+    },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {
@@ -196,14 +211,6 @@
       "models": {
         "product": 2,
         "productVariant": 2
-      }
-    },
-    "apps/api/src/services/bundle.service.ts": {
-      "kind": "platform",
-      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
-      "models": {
-        "bundle": 3,
-        "bundleItem": 1
       }
     }
   }

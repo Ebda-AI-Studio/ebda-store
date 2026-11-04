@@ -491,3 +491,69 @@ export function vectorVisibleOp(
 export function vectorStaleOp(db: SyncSql, storeId: string): { stale: boolean } {
   return { stale: hasStaleVectors(db, storeId) };
 }
+
+/**
+ * The merchant marks cash-on-delivery orders as paid (NEON-ZERO-1 group A, Ruling NZ-A-2): the twin of the single and the
+ * bulk `mark-paid` route writes, ONE section for the whole batch like the Postgres `$transaction`. Per order: the COD payment
+ * becomes `completed` (paid now), the order `paymentStatus` becomes `paid`, and only a still-`pending` order advances to
+ * `confirmed` (a further-along order keeps its fulfilment status). An order that is already paid, cancelled or refunded, or has
+ * no COD payment, is SKIPPED (the answer lists what was actually updated), so a double click or a race books nothing twice.
+ */
+export function codMarkPaidOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): {
+  updated: Array<{
+    orderId: string;
+    paymentId: string;
+    fromStatus: string;
+    orderNumber: string;
+  }>;
+} {
+  const ids = a.orderIds;
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > 50 ||
+    ids.some(x => typeof x !== 'string' || x.length === 0 || x.length > 128)
+  )
+    throw new MoneyError('BAD_ARGS', 'orderIds', 400);
+  const now = Date.now();
+  return db.transactionSync(() => {
+    const updated: Array<{
+      orderId: string;
+      paymentId: string;
+      fromStatus: string;
+      orderNumber: string;
+    }> = [];
+    for (const orderId of ids as string[]) {
+      const o = db.all(
+        'SELECT id, status, payment_status, order_number FROM orders WHERE id = ? AND store_id = ?',
+        [orderId, storeId]
+      )[0];
+      if (!o || o.payment_status === 'paid' || o.status === 'cancelled' || o.status === 'refunded')
+        continue;
+      const p = db.all(
+        "SELECT id, status FROM payments WHERE order_id = ? AND provider = 'cod' ORDER BY created_at, id LIMIT 1",
+        [orderId]
+      )[0];
+      if (!p) continue;
+      db.run(
+        "UPDATE payments SET status = 'completed', paid_at = ?1, updated_at = ?1 WHERE id = ?2",
+        [now, p.id]
+      );
+      db.run(
+        "UPDATE orders SET payment_status = 'paid', status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END, updated_at = ?1 WHERE id = ?2 AND store_id = ?3",
+        [now, orderId, storeId]
+      );
+      updated.push({
+        orderId,
+        paymentId: p.id as string,
+        fromStatus: p.status as string,
+        orderNumber: o.order_number as string,
+      });
+    }
+    return { updated };
+  });
+}

@@ -106,6 +106,7 @@ import {
   lastPaidSalesOp,
   orderAnonymizeOp,
   orderStampOp,
+  codMarkPaidOp,
   r2ReferencesOp,
   usageCountsOp,
   vectorCommitOp,
@@ -188,6 +189,7 @@ export type MoneyOpName =
   | 'fanoutDisarm'
   | 'paymentEventRecord'
   | 'abandonStamp'
+  | 'codMarkPaid'
   | 'trialBalance'
   | 'periodGlCredits'
   | 'accountTotals'
@@ -298,6 +300,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fanoutDisarm',
   'paymentEventRecord',
   'abandonStamp',
+  'codMarkPaid',
   'trialBalance',
   'periodGlCredits',
   'accountTotals',
@@ -762,6 +765,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
+  codMarkPaid: (db, storeId, a) => codMarkPaidOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
   /** Per-store analytics on the DO (Ruling NZ-AN-1): see `analytics-ops.ts`. */
   searchLogRecord: (db, storeId, a) => searchLogRecordOp(db, storeId, a),

@@ -745,6 +745,10 @@ export interface MoneyClient {
   }): Promise<{ recorded: true }>;
   /** The payment-abandonment stamp: once, only while the order is unpaid and unstamped. */
   abandonStamp(a: { orderId: string }): Promise<{ stamped: boolean }>;
+  /** COD mark-paid (single and bulk) in ONE section; skips paid / cancelled / refunded / non-COD orders (Ruling NZ-A-2). */
+  codMarkPaid(a: { orderIds: string[] }): Promise<{
+    updated: Array<{ orderId: string; paymentId: string; fromStatus: string; orderNumber: string }>;
+  }>;
   /** Stamp an order once for a job (`reviewRequestSentAt`): false when an earlier run already did (Ruling CF-JOBS-4). */
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
@@ -1285,6 +1289,7 @@ export function makeMoneyClient(
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
     paymentEventRecord: a => call('paymentEventRecord', a),
     abandonStamp: a => call('abandonStamp', a),
+    codMarkPaid: a => call('codMarkPaid', a),
     trialBalance: () => call('trialBalance', {}),
     orderStamp: a => call('orderStamp', a),
     orderAnonymize: a => call('orderAnonymize', a),

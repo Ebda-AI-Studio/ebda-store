@@ -56,7 +56,9 @@ import {
   matchRefundToClaim,
   inSettlementTx,
 } from '../services/payment-providers/refund-settle';
-import { recordPaymentEvent } from '../services/payment-event.service';
+import { recordPaymentEvent, recordPaymentEventForStore } from '../services/payment-event.service';
+import { storeDb, storeMoney } from '../lib/repo-factory';
+import { listAuditWithActors } from '../lib/audit-actors';
 import { InstapayService } from '../services/payment-providers/instapay.service';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import multer from 'multer';
@@ -78,7 +80,7 @@ import {
 import { rangeOrLegacyDays } from '../lib/report-range';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 import { redactOrderForCustomer } from '../services/gold-rate/public';
-import { runInStoreCtx } from '../lib/jobs/store-db';
+import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router({ mergeParams: true });
 
@@ -183,22 +185,22 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const db = await storeDb(storeId);
 
-      const store = await prisma.store.findUnique({
+      const store = await db.store.findUnique({
         where: { id: storeId },
         select: { name: true, slug: true },
       });
       if (!store) {
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
-
       // Same filters as the list on screen (status, date range, search).
       const filters = parseOrderListFilters(req, res);
       if (!filters) return;
 
       // Fetch up to cap+1 to detect truncation. Include items + first payment
       // for the Line Items sheet and the payment provider/method columns.
-      const fetched = await prisma.order.findMany({
+      const fetched = await db.order.findMany({
         where: await OrderService.listWhere(storeId, filters),
         select: {
           id: true,
@@ -220,9 +222,7 @@ router.get(
           customerNotes: true,
           shippingAddress: true,
           createdAt: true,
-          customer: {
-            select: { firstName: true, lastName: true, email: true, phone: true },
-          },
+          customerId: true,
           payments: {
             select: { provider: true, method: true },
             orderBy: { createdAt: 'asc' },
@@ -246,9 +246,13 @@ router.get(
         orderBy: { createdAt: 'desc' },
         take: MAX_ORDERS_SCANNED + 1,
       });
-
       const truncated = fetched.length > MAX_ORDERS_SCANNED;
       const orders = truncated ? fetched.slice(0, MAX_ORDERS_SCANNED) : fetched;
+      // `Order.customer` is a join into the platform database, which a Durable Object cannot do: attach the shoppers beside the rows.
+      const shoppers = await customersById(
+        storeId,
+        orders.map(o => o.customerId)
+      );
 
       // ---- Build workbook ----
       const workbook = new (await loadExcelJS()).Workbook();
@@ -328,11 +332,12 @@ router.get(
 
       for (const order of orders) {
         const addr = (order.shippingAddress ?? null) as ShippingAddressShape | null;
-        const firstName = order.customer?.firstName ?? addr?.firstName ?? '';
-        const lastName = order.customer?.lastName ?? addr?.lastName ?? '';
+        const buyer = shoppers.get(order.customerId ?? '');
+        const firstName = buyer?.firstName ?? addr?.firstName ?? '';
+        const lastName = buyer?.lastName ?? addr?.lastName ?? '';
         const customerName = `${firstName} ${lastName}`.trim();
-        const email = order.customer?.email ?? addr?.email ?? '';
-        const phone = order.customer?.phone ?? addr?.phone ?? '';
+        const email = buyer?.email ?? addr?.email ?? '';
+        const phone = buyer?.phone ?? addr?.phone ?? '';
         const payment = order.payments?.[0];
 
         // Orders sheet row
@@ -431,7 +436,6 @@ router.get(
           ['Search', filters.search],
         ])
       );
-
       const filenameSafe = (store.slug || store.name || 'orders').replace(/[^a-z0-9-]/gi, '-');
       const filename = exportFilename(`${filenameSafe}-orders`, range, 'xlsx', dayOf);
 
@@ -915,9 +919,10 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
 
-      const order = await prisma.order.findFirst({
+      const order = await db.order.findFirst({
         where: { id: orderId, storeId },
         include: { payments: true },
       });
@@ -966,22 +971,35 @@ router.post(
       // delivered) untouched. COD cash is collected AT delivery, so marking paid
       // typically happens after fulfilment — forcing `confirmed` there regressed
       // the order's status and lost fulfilment progress.
-      await prisma.$transaction([
-        prisma.payment.update({
-          where: { id: codPayment.id },
-          data: { status: 'completed', paidAt: new Date() },
-        }),
-        prisma.order.update({
-          where: { id: orderId, storeId },
-          data: {
-            paymentStatus: 'paid',
-            ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
-          },
-        }),
-      ]);
+      const money = await storeMoney(storeId);
+      if (money) {
+        // Durable Object store (Ruling NZ-A-2): the same writes in ONE section there.
+        const done = await money.codMarkPaid({ orderIds: [orderId] });
+        if (done.updated.length === 0) {
+          res.status(409).json({
+            success: false,
+            error: { code: 'ORDER_NOT_PAYABLE', message: 'The order can no longer be marked paid' },
+          });
+          return;
+        }
+      } else {
+        await prisma.$transaction([
+          prisma.payment.update({
+            where: { id: codPayment.id },
+            data: { status: 'completed', paidAt: new Date() },
+          }),
+          prisma.order.update({
+            where: { id: orderId, storeId },
+            data: {
+              paymentStatus: 'paid',
+              ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
+            },
+          }),
+        ]);
+      }
 
       // Append-only audit row for the COD completion.
-      await recordPaymentEvent({
+      await (money ? recordPaymentEventForStore : recordPaymentEvent)({
         paymentId: codPayment.id,
         storeId: order.storeId,
         orderId,
@@ -1239,13 +1257,14 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const { orderIds } = z
         .object({ orderIds: z.array(z.string().uuid()).min(1).max(50) })
         .parse(req.body);
 
       // Fetch all orders with their COD payments
-      const orders = await prisma.order.findMany({
+      const orders = await db.order.findMany({
         where: {
           id: { in: orderIds },
           storeId,
@@ -1268,28 +1287,34 @@ router.post(
       // Build update operations. As in single mark-paid: only advance a
       // still-pending order to `confirmed`; never regress a further-along
       // (processing/shipped/delivered) order that's being paid after fulfilment.
-      const updates = codOrders.flatMap(order => [
-        prisma.payment.update({
-          where: { id: order.payments[0].id },
-          data: { status: 'completed', paidAt: new Date() },
-        }),
-        prisma.order.update({
-          where: { id: order.id, storeId },
-          data: {
-            paymentStatus: 'paid',
-            ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
-          },
-        }),
-      ]);
+      const money = await storeMoney(storeId);
+      if (money) {
+        // Durable Object store (Ruling NZ-A-2): the whole batch in ONE section there.
+        await money.codMarkPaid({ orderIds: codOrders.map(o => o.id) });
+      } else {
+        const updates = codOrders.flatMap(order => [
+          prisma.payment.update({
+            where: { id: order.payments[0].id },
+            data: { status: 'completed', paidAt: new Date() },
+          }),
+          prisma.order.update({
+            where: { id: order.id, storeId },
+            data: {
+              paymentStatus: 'paid',
+              ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
+            },
+          }),
+        ]);
 
-      await prisma.$transaction(updates);
+        await prisma.$transaction(updates);
+      }
 
       // Append-only audit rows — one per payment flipped. Fire-and-forget
       // (Promise.allSettled) so a transient log-write failure on one row
       // doesn't break the bulk action for the others.
       await Promise.allSettled(
         codOrders.map(o =>
-          recordPaymentEvent({
+          (money ? recordPaymentEventForStore : recordPaymentEvent)({
             paymentId: o.payments[0].id,
             storeId: o.storeId,
             orderId: o.id,
@@ -1374,9 +1399,10 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
 
-      const order = await prisma.order.findFirst({
+      const order = await db.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
         include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
       });
@@ -1421,6 +1447,7 @@ router.post(
           metadata: payment.metadata,
           amount: payment.amount,
           currency: payment.currency,
+          transactionId: payment.transactionId,
         },
         order: {
           id: order.id,
@@ -1489,6 +1516,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const body = z
         .object({
@@ -1497,7 +1525,7 @@ router.post(
         })
         .strict()
         .parse(req.body);
-      const payment = await prisma.payment.findFirst({
+      const payment = await db.payment.findFirst({
         where: { orderId, order: { storeId } },
         orderBy: { createdAt: 'desc' },
         select: { id: true },
@@ -1566,12 +1594,13 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
 
       // Find the most-recent payment row that has a refundId (i.e. has
       // been refunded via the provider). Skips COD / status-button-only
       // refunds which have no provider refund record to ask about.
-      const payment = await prisma.payment.findFirst({
+      const payment = await db.payment.findFirst({
         where: {
           orderId,
           order: { storeId },
@@ -1605,6 +1634,60 @@ router.post(
       const prevMeta = (payment.metadata as Record<string, unknown>) || {};
       const prevStatus = (prevMeta.refundStatus as string | undefined) || 'pending';
       const statusChanged = prevStatus !== status.status;
+
+      // Durable Object store (Ruling NZ-A-4): the provider's answer settles through the refund-webhook section there
+      // (arithmetic, payment row, whole-order reversal on a full refund), so none of the Postgres write below runs.
+      if (await storeMoney(storeId)) {
+        if (!payment.transactionId) {
+          throw new AppError(400, 'NO_REFUND_RECORD', 'This payment has no provider reference');
+        }
+        const applied = await PaymentService.applyPolledRefundOnDo(
+          storeId,
+          { provider: payment.provider, transactionId: payment.transactionId },
+          {
+            refundId: status.refundId ?? payment.refundId,
+            status: status.status,
+            amount: status.refundedAmount ?? status.amount ?? null,
+            refundReference: status.refundReference ?? null,
+          }
+        );
+        await recordPaymentEventForStore({
+          paymentId: payment.id,
+          storeId,
+          orderId,
+          eventType: 'reconciliation',
+          fromStatus: payment.status as typeof payment.status,
+          toStatus: null,
+          provider: payment.provider,
+          triggeredByUserId: user.userId,
+          details: {
+            reason: 'manual_refund_status_refresh',
+            providerStatus: status.status,
+            refundId: payment.refundId,
+            outcome: applied.outcome,
+          },
+        });
+        await auditLog({
+          action: 'order.refund_status_refreshed',
+          userId: user.userId,
+          resourceType: 'order',
+          resourceId: orderId,
+          details: { refundId: payment.refundId, providerStatus: status.status, statusChanged },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        res.json({
+          success: true,
+          data: {
+            providerStatus: status.status,
+            refundStatus: status.status,
+            refundedAmount: status.refundedAmount,
+            refundReference: status.refundReference,
+            statusChanged,
+          },
+        });
+        return;
+      }
 
       // Update Payment.metadata with the fresh status. If the provider says the refund completed and our Payment row isn't
       // marked refunded yet (out-of-band path), promote it now.
@@ -1771,7 +1854,7 @@ router.post(
         // mirroring payment-confirm.service.ts: a refresh racing another path
         // that already moved the order to a terminal state must not regress
         // it, and must not fire reversals it cannot commit.
-        const currentOrder = await prisma.order.findFirst({
+        const currentOrder = await db.order.findFirst({
           where: { id: orderId, storeId },
           select: { status: true },
         });
@@ -1866,10 +1949,11 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const data = refundViaProviderSchema.parse(req.body ?? {});
 
-      const order = await prisma.order.findFirst({
+      const order = await db.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
         include: {
           payments: {
@@ -1930,11 +2014,16 @@ router.post(
       let result;
       try {
         result = await runInStoreCtx(storeId, async () =>
-          PaymentService.refund({
-            transactionId: payment.transactionId!,
-            amount: data.amount,
-            reason: data.reason,
-          })
+          // the store id selects the store's backend (a Durable Object store refunds through its own section)
+          PaymentService.refund(
+            {
+              transactionId: payment.transactionId!,
+              amount: data.amount,
+              reason: data.reason,
+            },
+            undefined,
+            storeId
+          )
         );
       } catch (refundError) {
         const refundMessage =
@@ -2152,6 +2241,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const { notifyVia, provider, method } = issuePaymentLinkSchema.parse(req.body ?? {});
 
@@ -2167,17 +2257,9 @@ router.post(
         return;
       }
 
-      const order = await prisma.order.findFirst({
+      const order = await db.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
-        include: {
-          items: true,
-          customer: {
-            select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-          },
-          store: {
-            select: { id: true, slug: true, domain: true, name: true, nameAr: true },
-          },
-        },
+        include: { items: true },
       });
 
       if (!order) {
@@ -2187,6 +2269,14 @@ router.post(
         });
         return;
       }
+      const orderCustomer = order.customerId
+        ? ((await customersById(storeId, [order.customerId])).get(order.customerId) ?? null)
+        : null;
+      // `Store` is a platform row a Durable Object order cannot join: read it beside the order (NEON-ZERO-1, Ruling NZ-A-3).
+      const orderStore = await db.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, slug: true, domain: true, name: true, nameAr: true },
+      });
 
       if (order.paymentStatus === 'paid') {
         res.status(400).json({
@@ -2215,15 +2305,15 @@ router.post(
       // Same storefront URL resolution the public checkout uses, so the
       // payment-success / payment-error callbacks land on the correct
       // tenant domain whether they have a custom domain or platform slug.
-      const storefrontBaseUrl = order.store ? storefrontOrigin(order.store) : config.webUrl;
+      const storefrontBaseUrl = orderStore ? storefrontOrigin(orderStore) : config.webUrl;
 
       const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
       const customerName =
-        `${order.customer?.firstName ?? shipping.firstName ?? ''} ${
-          order.customer?.lastName ?? shipping.lastName ?? ''
+        `${orderCustomer?.firstName ?? shipping.firstName ?? ''} ${
+          orderCustomer?.lastName ?? shipping.lastName ?? ''
         }`.trim() || 'Customer';
-      const customerEmail = order.customer?.email || shipping.email || '';
-      const customerPhone = order.customer?.phone || shipping.phone || undefined;
+      const customerEmail = orderCustomer?.email || shipping.email || '';
+      const customerPhone = orderCustomer?.phone || shipping.phone || undefined;
 
       const result = await PaymentService.createPayment(
         {
@@ -2235,7 +2325,7 @@ router.post(
           amount: order.total - order.walletAmount,
           currency: order.currency as Currency,
           customer: {
-            id: order.customer?.id ?? `guest-${order.id}`,
+            id: orderCustomer?.id ?? `guest-${order.id}`,
             name: customerName,
             email: customerEmail,
             phone: customerPhone,
@@ -2322,6 +2412,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      const db = await storeDb(storeId);
       const user = req.user;
 
       // Resolve caller role — a store viewer (super_admin / store_admin /
@@ -2339,7 +2430,7 @@ router.get(
       }
 
       // Fetch the order to get customerId + synthetic event dates
-      const order = await prisma.order.findFirst({
+      const order = await db.order.findFirst({
         where: { id: orderId, storeId },
         select: {
           id: true,
@@ -2370,12 +2461,11 @@ router.get(
       const rows: TimelineRow[] = [];
 
       // 1. Audit log entries for this order
-      const audits = await prisma.auditLog.findMany({
-        where: { storeId, resourceType: 'order', resourceId: orderId },
-        include: { user: { select: { firstName: true, lastName: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
+      const audits = await listAuditWithActors(
+        storeId,
+        { resourceType: 'order', resourceId: orderId },
+        200
+      );
 
       const auditKinds = new Set<string>();
       for (const a of audits) {

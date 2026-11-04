@@ -145,7 +145,7 @@ function metaOf(v: unknown): Record<string, unknown> {
 export class InstapayService {
   /** The store's enabled InstaPay config, or null. (No global fallback: the handle is per merchant.) */
   static async getConfig(storeId: string) {
-    return prisma.paymentConfig.findFirst({
+    return (await storeDb(storeId)).paymentConfig.findFirst({
       where: { storeId, provider: 'instapay', isEnabled: true },
     });
   }

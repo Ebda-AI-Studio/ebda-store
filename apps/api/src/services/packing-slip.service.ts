@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import {
   BARCODE_DISPLAY_PX,
   groupOrderLinesForDisplay,
@@ -80,8 +80,23 @@ const CSS = (size: PackingSlipSize) => `
 
 type SlipOrder = Awaited<ReturnType<typeof loadSlipOrders>>[number];
 
-function loadSlipOrders(storeId: string, ids: string[]) {
-  return prisma.order.findMany({
+const SLIP_STORE_SELECT = {
+  name: true,
+  nameAr: true,
+  logo: true,
+  logoAr: true,
+  timezone: true,
+  settings: true,
+} as const;
+
+/**
+ * The orders a packing slip prints, read through the store's backend (NEON-ZERO-1, Ruling NZ-A-3). `Store` is a platform row a
+ * Durable Object cannot join, so it is attached after the order read with the select the Postgres join had.
+ */
+async function loadSlipOrders(storeId: string, ids: string[]) {
+  const orders = await (
+    await storeDb(storeId)
+  ).order.findMany({
     where: { storeId, id: { in: ids }, deletedAt: null },
     orderBy: { createdAt: 'asc' },
     select: {
@@ -91,16 +106,6 @@ function loadSlipOrders(storeId: string, ids: string[]) {
       createdAt: true,
       customerNotes: true,
       shippingAddress: true,
-      store: {
-        select: {
-          name: true,
-          nameAr: true,
-          logo: true,
-          logoAr: true,
-          timezone: true,
-          settings: true,
-        },
-      },
       items: {
         select: {
           id: true,
@@ -118,6 +123,12 @@ function loadSlipOrders(storeId: string, ids: string[]) {
       },
     },
   });
+  if (orders.length === 0) return [];
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({ where: { id: storeId }, select: SLIP_STORE_SELECT });
+  // an order whose store row is gone cannot be printed (the join returned no row for it either)
+  return store ? orders.map(o => ({ ...o, store })) : [];
 }
 
 function lineRow(item: SlipOrder['items'][number], ar: boolean, sub: boolean): string {

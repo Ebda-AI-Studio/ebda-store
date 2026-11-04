@@ -59,6 +59,7 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
+import { storeDb } from '../lib/repo-factory';
 import { runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
@@ -148,7 +149,7 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
     // BE:S-22: no resolvable store is a 404, never the platform default (and never "first store").
     if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-    const data = await withStore(storeId, () => loadCheckoutPaymentConfig(storeId));
+    const data = await runInStoreCtx(storeId, () => loadCheckoutPaymentConfig(storeId));
 
     res.json({ success: true, data });
   } catch (error) {
@@ -198,7 +199,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     displayNameAr: string | null;
   } | null = null;
   const codRecord = storeId
-    ? await prisma.paymentConfig.findFirst({
+    ? await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: { storeId, provider: 'cod' as const, isEnabled: true },
       })
     : null;
@@ -244,7 +247,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
   // Ruling SHARIA-GOLD-1: a cart with gold hides COD + installments unless the merchant allowed them. The
   // storefront only hides the options; the API refuses them (assertGoldPaymentAllowed) whatever it shows.
   const goldStore = storeId
-    ? await prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    ? await (
+        await storeDb(storeId)
+      ).store.findUnique({ where: { id: storeId }, select: { settings: true } })
     : null;
   const goldPrepaidOnly = !goldAllowsDeferredPayment(goldStore?.settings);
 
