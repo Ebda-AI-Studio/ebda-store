@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
+import { ArrowEnd } from '../../../../../components/ArrowStart';
 import { deriveCoreBrandTokens } from '@ebda/shared';
 import { BrandPreview } from './BrandPreview';
 import { ImageUpload } from '../../../../../components/ImageUpload';
@@ -168,19 +170,20 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={generatePalette}
             disabled={!canGenerate}
-            className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-medium text-primary-ink hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11"
           >
-            ✨ {tColors('generateButton')}
-          </button>
+            {tColors('generateButton')}
+          </Button>
           <Link
             href={`/stores/${storeId}/builder`}
             className="text-xs font-medium text-primary underline-offset-2 hover:underline"
           >
-            {tColors('editorLink')} →
+            {tColors('editorLink')} <ArrowEnd />
           </Link>
         </div>
 
@@ -201,7 +204,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
                 key={opt}
                 type="button"
                 onClick={() => setSeed('logoSize', opt)}
-                className={`min-w-[44px] rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                className={`min-h-11 min-w-[44px] rounded-md px-3 py-1.5 text-xs font-medium transition ${
                   active
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted/60'
@@ -214,203 +217,166 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </div>
       </div>
 
-      {/* ── Blog ─────────────────────────────────────────────────────────── */}
-      <label
-        data-theme-toggle="blog"
-        className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card p-4"
+      {/* ── Blog & web push: the switches live with the thing they switch (UX:B-1) ───────────────── */}
+      <div
+        data-theme-toggle="elsewhere"
+        className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 text-sm"
       >
-        <span className="min-w-0 flex-1">
-          <span
-            data-setting-id="branding.blog"
-            className="block text-sm font-semibold text-foreground"
+        <p className="font-semibold text-foreground">{t('elsewhere.title')}</p>
+        <ul className="space-y-1 text-muted-foreground">
+          <li>
+            {t('elsewhere.blog')}{' '}
+            <Link
+              href={`/stores/${storeId}/blog`}
+              className="font-medium text-primary-ink underline underline-offset-2"
+            >
+              {t('elsewhere.blogLink')}
+            </Link>
+          </li>
+          <li>
+            {t('elsewhere.webPush')}{' '}
+            <Link
+              href={`/stores/${storeId}/notifications`}
+              className="font-medium text-primary-ink underline underline-offset-2"
+            >
+              {t('elsewhere.webPushLink')}
+            </Link>
+          </li>
+        </ul>
+      </div>
+
+      {/* Seldom-changed looks. The editor owns the per-section versions of these. */}
+      <details data-theme-toggle="advanced" className="rounded-lg border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+          {t('advanced.title')}
+        </summary>
+        <p className="mt-1 text-xs text-muted-foreground">{t('advanced.hint')}</p>
+        <div className="mt-4 space-y-4">
+          {/* ── Social icon brand colors ────────────────────────────────────── */}
+          <div
+            data-theme-toggle="social-icon-colors"
+            className="space-y-3 rounded-lg border border-border bg-card p-4"
           >
-            {t('blog.title')}
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{t('blog.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={branding.blogEnabled === true}
-          onChange={e => onChange({ ...branding, blogEnabled: e.target.checked })}
-          className="h-5 w-5 cursor-pointer accent-primary"
-        />
-      </label>
+            <div>
+              <p className="text-sm font-semibold text-foreground">{t('socialIconColors.title')}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('socialIconColors.hint')}</p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={branding.theme.footerSocialOriginalColor === true}
+                onChange={e =>
+                  onChange({
+                    ...branding,
+                    theme: { ...branding.theme, footerSocialOriginalColor: e.target.checked },
+                  })
+                }
+                className="h-4 w-4 cursor-pointer accent-primary"
+              />
+              <span className="text-xs text-foreground">{t('socialIconColors.footerLabel')}</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={branding.theme.floatingWidgetOriginalColor === true}
+                onChange={e =>
+                  onChange({
+                    ...branding,
+                    theme: { ...branding.theme, floatingWidgetOriginalColor: e.target.checked },
+                  })
+                }
+                className="h-4 w-4 cursor-pointer accent-primary"
+              />
+              <span className="text-xs text-foreground">{t('socialIconColors.widgetLabel')}</span>
+            </label>
+          </div>
 
-      {/* ── Social icon brand colors ────────────────────────────────────── */}
-      <div
-        data-theme-toggle="social-icon-colors"
-        className="space-y-3 rounded-lg border border-border bg-card p-4"
-      >
-        <div>
-          <p className="text-sm font-semibold text-foreground">{t('socialIconColors.title')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('socialIconColors.hint')}</p>
-        </div>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.footerSocialOriginalColor === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, footerSocialOriginalColor: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('socialIconColors.footerLabel')}</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.floatingWidgetOriginalColor === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, floatingWidgetOriginalColor: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('socialIconColors.widgetLabel')}</span>
-        </label>
-      </div>
-
-      {/* ── Storefront web push ───────────────────────────────────────────── */}
-      <div
-        data-theme-toggle="web-push"
-        className="space-y-3 rounded-lg border border-border bg-card p-4"
-      >
-        <div>
-          <p data-setting-id="branding.web-push" className="text-sm font-semibold text-foreground">
-            {t('webPush.title')}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('webPush.hint')}</p>
-        </div>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.storefrontWebPushEnabled === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, storefrontWebPushEnabled: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('webPush.enableLabel')}</span>
-        </label>
-      </div>
-
-      {/* ── Card-frame dedup (2026-07-12) ────────────────────────────────── */}
-      <div
-        data-theme-toggle="card-frame-dedup"
-        className="space-y-3 rounded-lg border border-border bg-card p-4"
-      >
-        <div>
-          <p className="text-sm font-semibold text-foreground">{t('cardFrameDedup.title')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('cardFrameDedup.hint')}</p>
-        </div>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.frameChromeDedup === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, frameChromeDedup: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('cardFrameDedup.enableLabel')}</span>
-        </label>
-      </div>
-
-      {/* ── Uppercase styling ─────────────────────────────────────────────── */}
-      <div
-        data-theme-toggle="uppercase"
-        className="space-y-3 rounded-lg border border-border bg-card p-4"
-      >
-        <div>
-          <p className="text-sm font-semibold text-foreground">{t('uppercaseStyle.title')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('uppercaseStyle.hint')}</p>
-        </div>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.uppercaseStyle === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, uppercaseStyle: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('uppercaseStyle.enableLabel')}</span>
-        </label>
-      </div>
-
-      {/* ── Footer logo ───────────────────────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-        <div>
-          <p
-            data-setting-id="branding.footer-logo"
-            className="text-sm font-semibold text-foreground"
+          {/* ── Card-frame dedup (2026-07-12) ────────────────────────────────── */}
+          <div
+            data-theme-toggle="card-frame-dedup"
+            className="space-y-3 rounded-lg border border-border bg-card p-4"
           >
-            {t('footerLogo.title')}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('footerLogo.hint')}</p>
+            <div>
+              <p className="text-sm font-semibold text-foreground">{t('cardFrameDedup.title')}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('cardFrameDedup.hint')}</p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={branding.theme.frameChromeDedup === true}
+                onChange={e =>
+                  onChange({
+                    ...branding,
+                    theme: { ...branding.theme, frameChromeDedup: e.target.checked },
+                  })
+                }
+                className="h-4 w-4 cursor-pointer accent-primary"
+              />
+              <span className="text-xs text-foreground">{t('cardFrameDedup.enableLabel')}</span>
+            </label>
+          </div>
+
+          {/* ── Footer logo ───────────────────────────────────────────────────── */}
+          <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div>
+              <p
+                data-setting-id="branding.footer-logo"
+                className="text-sm font-semibold text-foreground"
+              >
+                {t('footerLogo.title')}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('footerLogo.hint')}</p>
+            </div>
+            <ImageUpload
+              value={branding.theme.footerLogo}
+              onUpload={url =>
+                onChange({
+                  ...branding,
+                  theme: { ...branding.theme, footerLogo: url },
+                })
+              }
+              onRemove={() =>
+                onChange({
+                  ...branding,
+                  theme: { ...branding.theme, footerLogo: undefined },
+                })
+              }
+              folder="logos"
+              storeId={storeId}
+              accept="image/*"
+              label={t('footerLogoLabel')}
+            />
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={branding.theme.footerLogoInvert === true}
+                onChange={e =>
+                  onChange({
+                    ...branding,
+                    theme: { ...branding.theme, footerLogoInvert: e.target.checked },
+                  })
+                }
+                className="h-4 w-4 cursor-pointer accent-primary"
+              />
+              <span className="text-xs text-foreground">{t('footerLogo.invertLabel')}</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={branding.theme.hideFooterLogoMobile === true}
+                onChange={e =>
+                  onChange({
+                    ...branding,
+                    theme: { ...branding.theme, hideFooterLogoMobile: e.target.checked },
+                  })
+                }
+                className="h-4 w-4 cursor-pointer accent-primary"
+              />
+              <span className="text-xs text-foreground">{t('footerLogo.hideMobileLabel')}</span>
+            </label>
+          </div>
         </div>
-        <ImageUpload
-          value={branding.theme.footerLogo}
-          onUpload={url =>
-            onChange({
-              ...branding,
-              theme: { ...branding.theme, footerLogo: url },
-            })
-          }
-          onRemove={() =>
-            onChange({
-              ...branding,
-              theme: { ...branding.theme, footerLogo: undefined },
-            })
-          }
-          folder="logos"
-          storeId={storeId}
-          accept="image/*"
-          label={t('footerLogoLabel')}
-        />
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.footerLogoInvert === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, footerLogoInvert: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('footerLogo.invertLabel')}</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.hideFooterLogoMobile === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, hideFooterLogoMobile: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('footerLogo.hideMobileLabel')}</span>
-        </label>
-      </div>
+      </details>
     </div>
   );
 }

@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
-import { apiGet, apiDelete } from '../../../../lib/api';
+import { apiGet, apiDelete, apiPut } from '../../../../lib/api';
+import { RowActions } from '../../../../components/RowActions';
+import { useConfirm } from '../../../../hooks/useConfirm';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
 
@@ -30,9 +32,8 @@ interface StoreInfo {
 /**
  * Bucket E1 (2026-05-17) — admin blog list page.
  *
- * Lists all posts (drafts + published) newest first. Header shows the
- * store's `blogEnabled` state — if disabled, surfaces a callout linking
- * to the Branding tab where the toggle lives.
+ * Lists all posts (drafts + published) newest first. The store's `blogEnabled` switch lives HERE (moved from the
+ * branding theme tab): while it is off, a card explains it and turns it on in one click.
  *
  * Wraps in <AdminLayout> per canonical admin pattern (matches Categories /
  * Customers / Products etc) — gives the same TopBar + sidebar + auto back
@@ -49,6 +50,9 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   // Debounced search term — client-side filter over post title (EN or AR).
   const [search, setSearch] = useState('');
   const t = useT('blog.page');
+  const confirm = useConfirm();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [togglingBlog, setTogglingBlog] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,16 +94,36 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
     return { publishedCount: p, draftCount: d };
   }, [posts]);
 
-  async function handleDelete(postId: string) {
-    if (!confirm(t('postDeleteConfirm'))) return;
-    setDeletingId(postId);
-    const { error } = await apiDelete(`/api/v1/stores/${storeId}/blog/${postId}`);
+  async function handleDelete(post: BlogPost) {
+    const ok = await confirm({
+      object: t('postDeleteObject', { title: post.title }),
+      consequence: t('postDeleteConsequence'),
+      confirmLabel: t('postDeleteLabel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setDeletingId(post.id);
+    const { error } = await apiDelete(`/api/v1/stores/${storeId}/blog/${post.id}`);
     setDeletingId(null);
     if (!error) {
-      setPosts(prev => prev.filter(p => p.id !== postId));
+      setPosts(prev => prev.filter(p => p.id !== post.id));
+      toastSuccess(t('postDeleted'), '');
     } else {
-      alert(error.message || t('postDeleteFailed'));
+      toastError(t('postDeleteFailedTitle'), error.message || t('postDeleteFailed'));
     }
+  }
+
+  // The blog switch (formerly on the branding page). Sends only `blogEnabled`.
+  async function enableBlog() {
+    setTogglingBlog(true);
+    const { error } = await apiPut(`/api/v1/stores/${storeId}`, { blogEnabled: true });
+    setTogglingBlog(false);
+    if (error) {
+      toastError(t('enableFailedTitle'), error.message || t('enableFailed'));
+      return;
+    }
+    setStore(prev => ({ ...(prev ?? {}), blogEnabled: true }));
+    toastSuccess(t('enabledToast'), '');
   }
 
   return (
@@ -107,33 +131,30 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <div className="flex gap-2">
-          <Link href={`/stores/${storeId}`}>
-            <Button type="button" variant="outline">
-              {t('backToStore')}
-            </Button>
-          </Link>
-          <Link
-            href={`/stores/${storeId}/blog/new`}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            {t('newPost')}
-          </Link>
-        </div>
+        <Link
+          href={`/stores/${storeId}/blog/new`}
+          className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          {t('newPost')}
+        </Link>
       }
       storeId={storeId}
     >
       <div className="space-y-6">
         {store && store.blogEnabled === false && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
-            <p className="font-semibold text-amber-900">{t('disabledTitle')}</p>
-            <p className="mt-1 text-amber-800">
-              {t('disabledBody')}{' '}
-              <Link href={`/stores/${storeId}/branding`} className="font-semibold underline">
-                {t('disabledLink')}
-              </Link>{' '}
-              {t('disabledSuffix')}
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
+            <div className="min-w-0">
+              <p className="font-semibold text-warning-ink">{t('disabledTitle')}</p>
+              <p className="mt-1 text-muted-foreground">{t('disabledBody')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={enableBlog}
+              disabled={togglingBlog}
+              className="min-h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            >
+              {t('enableBlog')}
+            </button>
           </div>
         )}
 
@@ -149,12 +170,12 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
 
         {!isLoading && posts.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 font-medium text-success-ink">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
               {t('publishedCount', { count: publishedCount })}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 font-medium text-warning-ink">
+              <span className="h-1.5 w-1.5 rounded-full bg-warning" />
               {draftCount === 1
                 ? t('draftCount', { count: draftCount })
                 : t('draftsCount', { count: draftCount })}
@@ -250,8 +271,8 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                           <span
                             className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
                               post.isPublished
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
+                                ? 'bg-success/10 text-success-ink'
+                                : 'bg-warning/10 text-warning-ink'
                             }`}
                           >
                             {post.isPublished ? t('postPublished') : t('postDraft')}
@@ -279,18 +300,21 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                     <div className="flex items-center gap-2 sm:shrink-0">
                       <Link
                         href={`/stores/${storeId}/blog/${post.id}`}
-                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted sm:flex-none"
+                        className="inline-flex flex-1 items-center justify-center min-h-11 rounded-lg border border-input px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted sm:flex-none"
                       >
                         {t('postEdit')}
                       </Link>
-                      <button
-                        type="button"
-                        disabled={deletingId === post.id}
-                        onClick={() => handleDelete(post.id)}
-                        className="inline-flex items-center justify-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive-ink hover:bg-destructive/10 disabled:opacity-60"
-                      >
-                        {deletingId === post.id ? t('postDeleting') : t('postDelete')}
-                      </button>
+                      <RowActions
+                        menuLabel={t('postMenu')}
+                        items={[
+                          {
+                            label: deletingId === post.id ? t('postDeleting') : t('postDelete'),
+                            onSelect: () => void handleDelete(post),
+                            destructive: true,
+                            disabled: deletingId === post.id,
+                          },
+                        ]}
+                      />
                     </div>
                   </li>
                 );

@@ -1,0 +1,97 @@
+{
+  "shippingHub": {
+    "title": "الشحن والتوصيل",
+    "subtitle": "حدد بتشحن بكام، ومع مين، وإمتى بيوصل الطلب",
+    "tabs": {
+      "label": "أقسام الشحن والتوصيل",
+      "rates": "الأسعار",
+      "carriers": "شركات الشحن",
+      "delivery": "وقت التوصيل",
+      "cod": "تحصيل الدفع عند الاستلام"
+    },
+    "savedTitle": "اتحفظ الشحن",
+    "savedBody": "سياسة الإرجاع اتحدّثت.",
+    "saveLabel": "احفظ الشحن"
+  },
+  "shipping": {
+    "areaRates": {
+      "moreMenu": "خيارات تانية للأسعار",
+      "firstRunTitle": "سعر واحد لكل مصر؟",
+      "firstRunHint": "اكتب سعر الشحن مرة واحدة وهنطبّقه على كل المحافظات. تقدر تغيّر سعر محافظة معينة بعدين.",
+      "firstRunFee": "سعر الشحن",
+      "firstRunFeePlaceholder": "مثلًا 50",
+      "firstRunFreeOver": "الشحن ببلاش لو الطلب فوق (اختياري)",
+      "firstRunFreeOverPlaceholder": "مثلًا 1000",
+      "firstRunSave": "احفظ السعر ده لكل مصر",
+      "perGovernorateTitle": "أسعار مختلفة لكل محافظة",
+      "perGovernorateHint": "افتح المحافظة وحدد سعر كل منطقة فيها.",
+      "applyAllGlobal": "طبّق سعر واحد على كل المحافظات"
+    }
+  },
+  "checkoutDelivery": {
+    "page": {
+      "errorTitle": "مقدرناش نحفظ",
+      "save": "احفظ وقت التوصيل",
+      "successMessage": "اتحفظ وقت التوصيل",
+      "failedMessage": "مقدرناش نحفظ إعدادات التوصيل. جرّب تاني.",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
+      "noteSectionHint": "بتظهر للعميل وهو بيدفع، فوق زرار الدفع.",
+      "minOrderSectionHint": "العميل مش هيقدر يكمّل الطلب لو إجمالي المنتجات أقل من المبلغ ده. سيبه فاضي أو اكتب 0 لو مش عايز حد أدنى.",
+      "minOrderPlaceholder": "مثلًا 500",
+      "addWindow": "ضيف ميعاد",
+      "noWindowsYet": "لسه مفيش مواعيد توصيل. ضيف أول ميعاد."
+    }
+  },
+  "branding": {
+    "page": {
+      "subtitle": "الاسم واللوجو والألوان وبيانات التواصل لـ {name}"
+    },
+    "actions": {
+      "save": "احفظ الهوية"
+    },
+    "messages": {
+      "saveFailedPrefix": "مقدرناش نحفظ الهوية",
+      "saveSuccessTitle": "اتحفظت الهوية",
+      "saveSuccessBody": "كل التغييرات اتحفظت مرة واحدة."
+    },
+    "theme": {
+      "elsewhere": {
+        "title": "إعدادات تانية بتلاقيها في مكانها",
+        "blog": "تشغيل المدونة بيتم من صفحة المدونة.",
+        "blogLink": "افتح المدونة",
+        "webPush": "إشعارات المتصفح للعملاء بتتشغل من صفحة الإشعارات.",
+        "webPushLink": "افتح الإشعارات"
+      },
+      "advanced": {
+        "title": "متقدم: شكل الأيقونات والفوتر",
+        "hint": "إعدادات بتتغير نادرًا. باقي تفاصيل الشكل بتلاقيها في المحرر."
+      },
+      "logoSize": {
+        "title": "حجم اللوجو",
+        "hint": "اختار حجم اللوجو في أعلى المتجر.",
+        "auto": "تلقائي",
+        "sm": "صغير",
+        "md": "وسط",
+        "lg": "كبير"
+      }
+    }
+  },
+  "blog": {
+    "page": {
+      "disabledTitle": "المدونة مقفولة دلوقتي",
+      "disabledBody": "المقالات اللي بتكتبها مش هتظهر للعملاء غير لما تشغّل المدونة.",
+      "enableBlog": "شغّل المدونة",
+      "enabledToast": "المدونة اشتغلت",
+      "enableFailedTitle": "مقدرناش نشغّل المدونة",
+      "enableFailed": "جرّب تاني بعد شوية.",
+      "postDeleteObject": "المقال «{title}»",
+      "postDeleteConsequence": "المقال هيتمسح نهائيًا ومش هتقدر ترجّعه.",
+      "postDeleteLabel": "امسح المقال",
+      "postDeleted": "اتمسح المقال",
+      "postDeleteFailedTitle": "مقدرناش نمسح المقال",
+      "postDeleteFailed": "جرّب تاني بعد شوية.",
+      "postMenu": "خيارات المقال",
+      "newPost": "اكتب مقال جديد"
+    }
+  }
+}

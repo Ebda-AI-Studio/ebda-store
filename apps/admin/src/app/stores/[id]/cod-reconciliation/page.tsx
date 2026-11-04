@@ -9,6 +9,7 @@ import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
@@ -95,6 +96,7 @@ export default function CodReconciliationPage() {
   const params = useParams();
   const storeId = params.id as string;
   const t = useT('codReconciliation');
+  const tHub = useT('shippingHub');
   const tStatus = useT('shipping.carriers.shipments');
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
@@ -176,7 +178,8 @@ export default function CodReconciliationPage() {
   );
 
   return (
-    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+    <AdminLayout title={tHub('title')} subtitle={t('subtitle')}>
+      <ShippingTabs />
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

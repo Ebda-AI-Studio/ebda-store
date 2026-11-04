@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../lib/api';
 
@@ -17,14 +17,29 @@ import { apiGet, apiPut } from '../../../../../lib/api';
  *
  * A merchant typing a number here is making a public commitment that Google and
  * buying agents will treat as binding, so we never pre-fill a default.
+ *
+ * It has no Save of its own (rule 5): the shipping page's one sticky Save bar calls `save()` through the ref, and
+ * `onDirtyChange` tells the bar when this card differs from what is stored.
  */
-export function ReturnPolicyCard({ storeId }: { storeId: string }) {
+export interface ReturnPolicyHandle {
+  save: () => Promise<boolean>;
+  reset: () => void;
+}
+
+interface Props {
+  storeId: string;
+  onDirtyChange?: (dirty: boolean) => void;
+}
+
+export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function ReturnPolicyCard(
+  { storeId, onDirtyChange },
+  ref
+) {
   const t = useT('shipping.returnPolicy');
   const [days, setDays] = useState('');
   const [feesPaidBy, setFeesPaidBy] = useState('customer');
+  const [stored, setStored] = useState<{ days: string; feesPaidBy: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,12 +51,14 @@ export function ReturnPolicyCard({ storeId }: { storeId: string }) {
       if (cancelled) return;
       const store = data?.store;
       // `?? ''` not `|| ''` — 0 is a real value here, not "empty".
-      setDays(
+      const loadedDays =
         store?.returnWindowDays === null || store?.returnWindowDays === undefined
           ? ''
-          : String(store.returnWindowDays)
-      );
-      setFeesPaidBy(store?.returnFeesPaidBy ?? 'customer');
+          : String(store.returnWindowDays);
+      const loadedFees = store?.returnFeesPaidBy ?? 'customer';
+      setDays(loadedDays);
+      setFeesPaidBy(loadedFees);
+      setStored({ days: loadedDays, feesPaidBy: loadedFees });
       setLoading(false);
     })();
     return () => {
@@ -49,16 +66,18 @@ export function ReturnPolicyCard({ storeId }: { storeId: string }) {
     };
   }, [storeId]);
 
-  const save = async () => {
-    setSaving(true);
+  const dirty = stored !== null && (days !== stored.days || feesPaidBy !== stored.feesPaidBy);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  const save = async (): Promise<boolean> => {
     setError(null);
-    setSaved(false);
     const trimmed = days.trim();
     const parsed = trimmed === '' ? null : Number(trimmed);
     if (parsed !== null && (!Number.isInteger(parsed) || parsed < 0)) {
       setError(t('invalid'));
-      setSaving(false);
-      return;
+      return false;
     }
     const { error: err } = await apiPut(`/api/v1/stores/${storeId}`, {
       returnWindowDays: parsed,
@@ -66,10 +85,23 @@ export function ReturnPolicyCard({ storeId }: { storeId: string }) {
       // is meaningless and would linger as stale state.
       returnFeesPaidBy: parsed === null ? null : feesPaidBy,
     });
-    if (err) setError(err.message);
-    else setSaved(true);
-    setSaving(false);
+    if (err) {
+      setError(err.message);
+      return false;
+    }
+    setStored({ days, feesPaidBy });
+    return true;
   };
+
+  useImperativeHandle(ref, () => ({
+    save,
+    reset: () => {
+      if (!stored) return;
+      setDays(stored.days);
+      setFeesPaidBy(stored.feesPaidBy);
+      setError(null);
+    },
+  }));
 
   if (loading) return null;
 
@@ -119,18 +151,11 @@ export function ReturnPolicyCard({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-        >
-          {saving ? t('saving') : t('save')}
-        </button>
-        {saved && <span className="text-xs text-success-ink">{t('saved')}</span>}
-        {error && <span className="text-xs text-destructive-ink">{error}</span>}
-      </div>
+      {error && (
+        <p role="alert" className="mt-3 text-xs text-destructive-ink">
+          {error}
+        </p>
+      )}
     </div>
   );
-}
+});

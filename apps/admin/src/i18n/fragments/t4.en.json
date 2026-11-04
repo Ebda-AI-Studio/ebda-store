@@ -1,0 +1,97 @@
+{
+  "shippingHub": {
+    "title": "Shipping and delivery",
+    "subtitle": "Set what you charge for shipping, who delivers, and when orders arrive",
+    "tabs": {
+      "label": "Shipping and delivery sections",
+      "rates": "Rates",
+      "carriers": "Carriers",
+      "delivery": "Delivery times",
+      "cod": "Cash-on-delivery collection"
+    },
+    "savedTitle": "Shipping saved",
+    "savedBody": "The return policy was updated.",
+    "saveLabel": "Save shipping"
+  },
+  "shipping": {
+    "areaRates": {
+      "moreMenu": "More rate options",
+      "firstRunTitle": "One price for all of Egypt?",
+      "firstRunHint": "Enter the shipping fee once and it applies to every governorate. You can change a single governorate later.",
+      "firstRunFee": "Shipping fee",
+      "firstRunFeePlaceholder": "e.g. 50",
+      "firstRunFreeOver": "Free shipping when the order is over (optional)",
+      "firstRunFreeOverPlaceholder": "e.g. 1000",
+      "firstRunSave": "Save this price for all of Egypt",
+      "perGovernorateTitle": "Different prices per governorate",
+      "perGovernorateHint": "Open a governorate and set the price of each area in it.",
+      "applyAllGlobal": "Apply one price to all governorates"
+    }
+  },
+  "checkoutDelivery": {
+    "page": {
+      "errorTitle": "Could not save",
+      "save": "Save delivery times",
+      "successMessage": "Delivery times saved",
+      "failedMessage": "Could not save the delivery settings. Try again.",
+      "connectionError": "Cannot reach the server right now. Try again.",
+      "noteSectionHint": "Shown to the customer at checkout, above the pay button.",
+      "minOrderSectionHint": "The customer cannot check out if the items total is below this amount. Leave empty or enter 0 for no minimum.",
+      "minOrderPlaceholder": "e.g. 500",
+      "addWindow": "Add a time slot",
+      "noWindowsYet": "No delivery time slots yet. Add the first one."
+    }
+  },
+  "branding": {
+    "page": {
+      "subtitle": "Name, logo, colors and contact details for {name}"
+    },
+    "actions": {
+      "save": "Save branding"
+    },
+    "messages": {
+      "saveFailedPrefix": "Could not save the branding",
+      "saveSuccessTitle": "Branding saved",
+      "saveSuccessBody": "All the changes were saved together."
+    },
+    "theme": {
+      "elsewhere": {
+        "title": "Other settings live where they belong",
+        "blog": "Turning the blog on is done from the blog page.",
+        "blogLink": "Open the blog",
+        "webPush": "Browser notifications for customers are turned on from the notifications page.",
+        "webPushLink": "Open notifications"
+      },
+      "advanced": {
+        "title": "Advanced: icon and footer looks",
+        "hint": "Rarely changed. The rest of the look details are in the editor."
+      },
+      "logoSize": {
+        "title": "Logo size",
+        "hint": "Pick the size of the logo at the top of the store.",
+        "auto": "Automatic",
+        "sm": "Small",
+        "md": "Medium",
+        "lg": "Large"
+      }
+    }
+  },
+  "blog": {
+    "page": {
+      "disabledTitle": "The blog is off right now",
+      "disabledBody": "Posts you write will not show to customers until you turn the blog on.",
+      "enableBlog": "Turn on the blog",
+      "enabledToast": "The blog is on",
+      "enableFailedTitle": "Could not turn on the blog",
+      "enableFailed": "Try again in a moment.",
+      "postDeleteObject": "The post \"{title}\"",
+      "postDeleteConsequence": "The post will be deleted for good and cannot be brought back.",
+      "postDeleteLabel": "Delete the post",
+      "postDeleted": "Post deleted",
+      "postDeleteFailedTitle": "Could not delete the post",
+      "postDeleteFailed": "Try again in a moment.",
+      "postMenu": "Post options",
+      "newPost": "Write a new post"
+    }
+  }
+}

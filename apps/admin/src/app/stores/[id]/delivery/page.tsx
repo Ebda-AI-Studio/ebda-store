@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import { useToast } from '@ebda/ui';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
+import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { apiGet, apiPut } from '../../../../lib/api';
 import {
   buildCheckoutDeliverySettings,
@@ -30,20 +32,21 @@ function genId() {
 }
 
 /**
- * Per-store checkout delivery block editor. Platform-level — every store can
- * opt in via this page, never hardcoded to a store slug. Edits
- * `Store.settings.checkoutDelivery` (no dedicated DB column) and saves via
- * the generic store update endpoint. That endpoint shallow-merges top-level
- * `settings` keys server-side (StoreService.update), but this page still
- * reads + spreads the full settings object client-side before saving as
- * defense-in-depth, matching the "send the merged object" pattern.
+ * Per-store checkout delivery block editor ("وقت التوصيل" tab of the shipping page). Platform-level — every store
+ * can opt in via this page, never hardcoded to a store slug. Edits `Store.settings.checkoutDelivery` (no dedicated
+ * DB column) and saves via the generic store update endpoint, sending ONLY this page's keys (BE:F-2): the server
+ * shallow-merges top-level `settings` keys against the live row, so another page's save is never reverted by a stale
+ * copy of the whole blob held here.
  */
 export default function CheckoutDeliveryPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('checkoutDelivery.page');
+  const tHub = useT('shippingHub');
 
-  const [existingSettings, setExistingSettings] = useState<Record<string, unknown>>({});
+  // The packing-slip note is the one stored key a child component edits itself (it has its own save).
+  const [packingSlipNote, setPackingSlipNote] = useState<string | undefined>(undefined);
+  const [baseline, setBaseline] = useState<string | null>(null);
   const [config, setConfig] = useState<CheckoutDeliverySettings>(DEFAULT_CONFIG);
   // Per-store, opt-in minimum order value. Held as the raw EGP string the
   // merchant types (e.g. "5.000") — converted to integer piastres only on save.
@@ -63,7 +66,7 @@ export default function CheckoutDeliveryPage() {
   const [offDaysInvalid, setOffDaysInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const fetchSettings = useCallback(async () => {
     if (!storeId) return;
@@ -73,7 +76,7 @@ export default function CheckoutDeliveryPage() {
         store?: { settings?: Record<string, unknown> };
       }>(`/api/v1/stores/${storeId}`);
       const settings = data?.store?.settings ?? {};
-      setExistingSettings(settings);
+      setPackingSlipNote(settings.packingSlipNote as string | undefined);
       const existing = settings.checkoutDelivery as CheckoutDeliverySettings | undefined;
       setConfig({
         note: { ...DEFAULT_CONFIG.note, ...(existing?.note ?? {}) },
@@ -97,6 +100,7 @@ export default function CheckoutDeliveryPage() {
       setDeliveryOffDays(offDaysFromSettings(settings.deliveryOffDays));
       setOffDaysSaved(hasSavedOffDays(settings.deliveryOffDays));
       setOffDaysInvalid(hasInvalidOffDays(settings.deliveryOffDays));
+      setBaseline(null); // re-armed by the effect below once the loaded values are in state
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -108,23 +112,47 @@ export default function CheckoutDeliveryPage() {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Everything the merchant can edit here, as one string: the sticky Save bar shows while it differs from the
+  // last loaded/saved copy.
+  const snapshot = useMemo(
+    () =>
+      JSON.stringify([
+        config,
+        minimumOrderMajor,
+        orderInvoiceEmail,
+        deliveryDaysMin,
+        deliveryDaysMax,
+        deliveryOffDays,
+      ]),
+    [
+      config,
+      minimumOrderMajor,
+      orderInvoiceEmail,
+      deliveryDaysMin,
+      deliveryDaysMax,
+      deliveryOffDays,
+    ]
+  );
+  useEffect(() => {
+    if (!isLoading && baseline === null) setBaseline(snapshot);
+  }, [isLoading, baseline, snapshot]);
+  const dirty = baseline !== null && snapshot !== baseline;
+
   const handleSave = useCallback(async () => {
     const days = parseDeliveryDaysInput(deliveryDaysMin, deliveryDaysMax);
     if (!days.ok) {
-      setMessage({ type: 'error', text: t('deliveryDaysInvalid') });
+      toastError(t('errorTitle'), t('deliveryDaysInvalid'));
       return;
     }
     const off = offDaysForSave(deliveryOffDays, offDaysSaved, offDaysInvalid);
     if (!off.ok) {
-      setMessage({ type: 'error', text: t('deliveryOffDaysAllOff') });
+      toastError(t('errorTitle'), t('deliveryOffDaysAllOff'));
       return;
     }
     setIsSaving(true);
-    setMessage(null);
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}`, {
         settings: buildCheckoutDeliverySettings({
-          existingSettings,
           config,
           minimumOrderMajor,
           orderInvoiceEmail,
@@ -137,18 +165,19 @@ export default function CheckoutDeliveryPage() {
           setOffDaysSaved(off.value !== null);
           setOffDaysInvalid(false);
         }
-        setMessage({ type: 'success', text: t('successMessage') });
+        setBaseline(snapshot);
+        toastSuccess(t('successMessage'), '');
       } else {
-        setMessage({ type: 'error', text: error.message || t('failedMessage') });
+        toastError(t('errorTitle'), error.message || t('failedMessage'));
       }
     } catch {
-      setMessage({ type: 'error', text: t('connectionError') });
+      toastError(t('errorTitle'), t('connectionError'));
     } finally {
       setIsSaving(false);
     }
   }, [
     storeId,
-    existingSettings,
+    snapshot,
     config,
     minimumOrderMajor,
     orderInvoiceEmail,
@@ -158,6 +187,8 @@ export default function CheckoutDeliveryPage() {
     offDaysSaved,
     offDaysInvalid,
     t,
+    toastSuccess,
+    toastError,
   ]);
 
   const patchNote = (next: Partial<CheckoutDeliverySettings['note']>) =>
@@ -191,7 +222,8 @@ export default function CheckoutDeliveryPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title={t('title')} subtitle={t('loading')}>
+      <AdminLayout title={tHub('title')}>
+        <ShippingTabs />
         <div className="animate-pulse space-y-4">
           <div className="h-40 rounded-xl bg-muted" />
         </div>
@@ -200,28 +232,9 @@ export default function CheckoutDeliveryPage() {
   }
 
   return (
-    <AdminLayout
-      title={t('title')}
-      subtitle={t('subtitle')}
-      actions={
-        <div className="flex gap-2">
-          <Link href={`/stores/${storeId}/settings`}>
-            <Button type="button" variant="outline">
-              {t('backToSettings')}
-            </Button>
-          </Link>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || deliveryOffDays.length >= 7}
-            className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {isSaving ? t('saving') : t('save')}
-          </button>
-        </div>
-      }
-    >
-      <div className="space-y-4 pb-8">
+    <AdminLayout title={tHub('title')} subtitle={t('subtitle')}>
+      <ShippingTabs />
+      <div className="space-y-4 pb-24">
         {/* Delivery info note */}
         <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
@@ -544,23 +557,18 @@ export default function CheckoutDeliveryPage() {
         {!isLoading && (
           <PackingSlipNoteField
             storeId={storeId}
-            value={existingSettings.packingSlipNote as string | undefined}
-            onSaved={note => setExistingSettings(s => ({ ...s, packingSlipNote: note }))}
+            value={packingSlipNote}
+            onSaved={note => setPackingSlipNote(note)}
           />
         )}
-
-        {message && (
-          <div
-            className={`rounded-xl p-4 text-sm ${
-              message.type === 'success'
-                ? 'bg-success/10 border border-success/20 text-success-ink'
-                : 'bg-destructive/10 border border-destructive/20 text-destructive-ink'
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
       </div>
+      <StickySaveBar
+        dirty={dirty || isSaving}
+        onSave={handleSave}
+        onReset={() => void fetchSettings()}
+        saving={isSaving}
+        saveLabel={t('save')}
+      />
     </AdminLayout>
   );
 }
