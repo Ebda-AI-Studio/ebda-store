@@ -72,7 +72,7 @@ export function checkGoldPayment(input: {
 
 /** Shown when a merchant enables an installment provider: the provider's own terms and fees apply to the customer. */
 export const BNPL_DISCLOSURE = {
-  en: 'Installments are financed by the provider (valU, Kashier, Aman, Masary), not by Ebda. The provider own terms, fees and any late charges apply to your customer. Check them before you turn this on.',
+  en: 'Installments are financed by the provider (valU, Kashier, Aman, Masary), not by Ebda Store. The provider’s own terms, fees and any late charges apply to your customer. Check them before you turn this on.',
   ar: 'التقسيط بيتموله مزوّد الخدمة (فاليو، كاشير، أمان، مصاري) مش ابدأ. شروط المزوّد ورسومه وأي غرامات تأخير بتتطبق على عميلك. راجعها قبل ما تفعّل الخدمة دي.',
 } as const;
 

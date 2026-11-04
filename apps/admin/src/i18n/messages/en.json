@@ -4958,7 +4958,7 @@
         "expiryInvalid": "Enter a whole number of hours between 1 and 720.",
         "save": "Save options"
       },
-      "bnplDisclosure": "Installments are financed by the provider (valU, Kashier, Aman, Masary), not by Ebda. The provider own terms, fees and any late charges apply to your customer. Check them before you turn this on.",
+      "bnplDisclosure": "Installments are financed by the provider (valU, Kashier, Aman, Masary), not by Ebda Store. The provider’s own terms, fees and any late charges apply to your customer. Check them before you turn this on.",
       "methods": {
         "card": "Card",
         "wallet": "Mobile wallet",

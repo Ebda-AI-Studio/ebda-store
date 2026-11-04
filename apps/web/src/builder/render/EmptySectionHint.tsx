@@ -85,7 +85,7 @@ export function EmptySectionHint({ kind }: { kind: EmptySectionKind }) {
           type="button"
           data-builder-action="open-admin"
           data-builder-target={FILL_TARGET[kind]}
-          className="mt-3 inline-flex min-h-11 items-center rounded-[var(--radius)] border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
+          className="mt-3 inline-flex min-h-11 items-center rounded-[var(--radius)] border border-input px-4 text-sm font-medium text-foreground hover:bg-muted"
         >
           {t(FILL_LABEL[FILL_TARGET[kind]!], translations[FILL_LABEL[FILL_TARGET[kind]!]])}
         </button>
