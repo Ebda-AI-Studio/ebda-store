@@ -110,7 +110,7 @@ function assertEditable(status: TaxProfileStatusValue): void {
       'TAX_PROFILE_LOCKED',
       status === 'pending'
         ? 'Your VAT registration is under review and cannot be changed now. / طلب التسجيل الضريبي قيد المراجعة ولا يمكن تعديله الآن.'
-        : 'A verified VAT registration can only be changed by Ebda AI Studio support. / لا يمكن تعديل التسجيل الضريبي الموثّق إلا عن طريق دعم ابدأ استوديو للذكاء الاصطناعي.'
+        : 'A verified VAT registration can only be changed by Ebda AI Studio support. / لا يمكن تعديل التسجيل الضريبي الموثّق إلا عن طريق دعم ابدأ ستوديو للذكاء الاصطناعي.'
     );
   }
 }

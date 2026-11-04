@@ -1,70 +1,74 @@
 {
   "home": {
-    "hash": "fed7d7ba86a70523",
-    "date": "2026-11-02"
+    "hash": "060f4474f78c766c",
+    "date": "2026-11-03"
+  },
+  "store": {
+    "hash": "8b52809ccfa5ab37",
+    "date": "2026-11-03"
   },
   "features": {
-    "hash": "1665bcd8e643001a",
-    "date": "2026-11-02"
+    "hash": "e903f7c5e1eb3c9a",
+    "date": "2026-11-03"
   },
   "whatsapp": {
-    "hash": "87df010a8737a9ef",
-    "date": "2026-11-02"
+    "hash": "1fedf85a3b534f5e",
+    "date": "2026-11-03"
   },
   "compare/zid": {
-    "hash": "ddb332c6d974bdbc",
-    "date": "2026-11-02"
+    "hash": "f56b69f4bd04b418",
+    "date": "2026-11-03"
   },
   "compare/shopify": {
-    "hash": "3569ce714b8f5dd3",
-    "date": "2026-11-02"
+    "hash": "56bd3fd4b974ce1a",
+    "date": "2026-11-03"
   },
   "compare/wuilt": {
-    "hash": "9d47934702b3f346",
-    "date": "2026-11-02"
+    "hash": "7ae2872d43f67a95",
+    "date": "2026-11-03"
   },
   "compare/youcan": {
-    "hash": "db8d756131473b44",
-    "date": "2026-11-02"
+    "hash": "cfeb4c31eb663158",
+    "date": "2026-11-03"
   },
   "compare/easyorders": {
-    "hash": "989ba45ef1c89925",
-    "date": "2026-11-02"
+    "hash": "937e283586d5968e",
+    "date": "2026-11-03"
   },
   "compare/expandcart": {
-    "hash": "927667c263cbe6b0",
-    "date": "2026-11-02"
+    "hash": "a466b8bdd048048a",
+    "date": "2026-11-03"
   },
   "for/fashion": {
-    "hash": "eb1f590fdb02b239",
-    "date": "2026-11-02"
+    "hash": "b9c42c07ecc50377",
+    "date": "2026-11-03"
   },
   "for/electronics": {
-    "hash": "31ed44fe1c857886",
-    "date": "2026-11-02"
+    "hash": "33db6e4f6c0a730b",
+    "date": "2026-11-03"
   },
   "for/beauty": {
-    "hash": "40d31462daf3fd97",
-    "date": "2026-11-02"
+    "hash": "a66f6853ea675ef7",
+    "date": "2026-11-03"
   },
   "for/food": {
-    "hash": "3b5b1cbaecda8544",
-    "date": "2026-11-02"
+    "hash": "e6b8addbf62cd226",
+    "date": "2026-11-03"
   },
   "for/jewellery": {
-    "hash": "907f3a049492a59d",
-    "date": "2026-11-02"
+    "hash": "e31acca36d9ffb5a",
+    "date": "2026-11-03"
   },
   "about": {
-    "hash": "374f23565ec2820a",
-    "date": "2026-11-02"
+    "hash": "cc06df9e3b5fe2ab",
+    "date": "2026-11-03"
   },
   "contact": {
-    "hash": "27fe3e5b24a25e9d",
-    "date": "2026-11-02"
+    "hash": "6455b5b1fa170083",
+    "date": "2026-11-03"
   },
   "credits": {
-    "hash": "05092e8e807b05bd",
-    "date": "2026-11-02"
+    "hash": "fb3c696114f9eab0",
+    "date": "2026-11-03"
   }
 }

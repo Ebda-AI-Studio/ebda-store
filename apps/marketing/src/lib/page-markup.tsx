@@ -7,6 +7,7 @@ import { ContactPage } from '../components/ContactPage';
 import { CreditsPage } from '../components/CreditsPage';
 import { FeaturesPage } from '../components/FeaturesPage';
 import { Home } from '../components/Home';
+import { StudioHomePage } from '../components/StudioHome';
 import { WhatsAppPage } from '../components/WhatsAppPage';
 import {
   COMPARE_PAGES,
@@ -27,6 +28,7 @@ import { VerticalPage } from '../components/VerticalPage';
  */
 export const DATED_PAGES: readonly PageSlug[] = [
   '',
+  'store',
   'features',
   'whatsapp',
   ...COMPARE_PAGES,
@@ -37,7 +39,8 @@ export const DATED_PAGES: readonly PageSlug[] = [
 ];
 
 const render = (page: PageSlug, locale: Locale): ReactElement => {
-  if (page === '') return <Home locale={locale} />;
+  if (page === '') return <StudioHomePage locale={locale} />;
+  if (page === 'store') return <Home locale={locale} />;
   if (page === 'features') return <FeaturesPage locale={locale} />;
   if (page === 'whatsapp') return <WhatsAppPage locale={locale} />;
   if (page === 'about') return <AboutPage locale={locale} />;

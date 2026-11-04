@@ -235,3 +235,18 @@ export function pageDensityStyle(
   if (density === 'spacious') return { paddingTop: '3.5rem', paddingBottom: '3.5rem' };
   return undefined;
 }
+
+/**
+ * Hero headline size (audit 2026-11-03 #3, Ruling PREMIUM-3): design.md makes the hero headline
+ * the one scale exception, 36px on a phone to 72px on desktop. A merchant typography zone used to
+ * be able to pull it down to 14px (`responsiveFontSize` floors at 70% of the pick, min 14px).
+ * Here the zone size can only RAISE the ceiling (a 96px pick keeps 96px on desktop); it can never
+ * take the headline under the 36px floor. One fluid clamp, 36px at 390px wide, 72px from 1100px.
+ */
+export const HERO_HEADLINE_SIZE = 'clamp(2.25rem, 1.2rem + 4.4vw, 4.5rem)';
+export function heroHeadlineFontSize(zoneSize: string | undefined): string {
+  const px = zoneSize?.match(/^([\d.]+)px$/);
+  const ceiling = px ? parseFloat(px[1]) : 0;
+  if (ceiling > 72) return `clamp(2.25rem, 1.2rem + 4.4vw, ${ceiling / 16}rem)`;
+  return HERO_HEADLINE_SIZE;
+}

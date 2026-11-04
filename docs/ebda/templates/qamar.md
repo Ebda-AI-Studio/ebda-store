@@ -75,3 +75,7 @@ The Qamar demo boutique (`scripts/qamar-demo/catalogue.mjs`: 18 products, 160 va
 ## Header chrome override (Ruling EP-4, Task 10)
 
 `templates/qamar/Header.tsx` draws the logo placement the merchant chose in the visual editor's Theme pane (`theme.headerLogoPlacement`), else the look's `chrome.header.logoPlacement` (Atelier and Lookbook start, Vitrine centre), through `resolveHeaderChrome`. A store with no override draws exactly what its look says. Switching look with `design: 'reset'` clears the override; `keep` leaves it. Detail: `docs/architecture/store-theme-flags.md`.
+
+## Storefront audit 2026-11-03 (PREMIUM-30, PREMIUM-37)
+
+The lockup's display name keeps clip room for its marks (Lookbook's wordmark was cut at the top) and the Latin line is never truncated. The look-bundle strip peeking the next panel is intentional.

@@ -1,3 +1,4 @@
+import { VARIANT_WIDTHS, variantKey, canHaveVariants, isVariantKey } from '@ebda/shared';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { loadS3, loadS3Presigner } from '../lib/lazy-modules';
 import { randomUUID } from 'node:crypto';
@@ -231,6 +232,38 @@ export class StorageService {
       new (await loadS3()).DeleteObjectCommand({
         Bucket: config.storageBucket,
         Key: key,
+      })
+    );
+    // PREMIUM-2: the resized WebP siblings die with their original (deletes of absent keys are no-ops).
+    if (canHaveVariants(key)) {
+      await Promise.all(
+        VARIANT_WIDTHS.map(async w => {
+          try {
+            await client.send(
+              new (await loadS3()).DeleteObjectCommand({
+                Bucket: config.storageBucket,
+                Key: variantKey(key, w),
+              })
+            );
+          } catch {
+            // best effort: a surviving variant is only unreferenced bytes, swept by prefix on store delete
+          }
+        })
+      );
+    }
+  }
+
+  /** Write one resized variant (key made by `variantKey`, content always WebP). */
+  static async putVariant(key: string, body: Uint8Array): Promise<void> {
+    if (!isVariantKey(key)) throw new AppError(400, 'INVALID_VARIANT_KEY', 'Not a variant key');
+    const client = await this.getClient();
+    await client.send(
+      new (await loadS3()).PutObjectCommand({
+        Bucket: config.storageBucket,
+        Key: key,
+        Body: body,
+        ContentType: 'image/webp',
+        CacheControl: 'public, max-age=31536000, immutable',
       })
     );
   }

@@ -68,16 +68,23 @@ describe('filter panel is a quiet surface on every skin (Ruling B1-31)', () => {
   it('the panel, sheet and trigger paint the page surface + hairline, never a primary slab', () => {
     expect(src).not.toMatch(/bg-\[hsl\(var\(--primary\)\)\]/);
     expect(src).not.toMatch(/--primary-foreground\)/);
-    // VT-05 (W2a): the frame is an interactive boundary, so it reads --input (B1-43)
-    expect(src).toMatch(/lg:border lg:border-input lg:bg-\[hsl\(var\(--filter-bg\)\)\]/);
+    // PREMIUM-20 supersedes B1-43 for the FRAME: the panel is a container, not a control, so a hairline
+    // (12% of the panel's own ink) replaces the full --input border (audit 2026-11-03 #9). The
+    // controls inside (chips, thumbs, selects) keep their own boundaries.
+    expect(src).toMatch(
+      /lg:border lg:border-\[hsl\(var\(--filter-fg\)\/0\.12\)\] lg:bg-\[hsl\(var\(--filter-bg\)\)\]/
+    );
+    expect(src).not.toMatch(/lg:border-input/);
     expect(css).toMatch(
       /\[data-zone='filters'\] \{\s*--filter-bg: var\(--bg-page\);\s*--filter-fg: var\(--foreground\);/
     );
   });
   it('the accent (primary) marks only the active state', () => {
+    // One chip skin for facet values and categories (PREMIUM-20): the literal lives once, in CHIP_ON.
     expect(
-      src.match(/'filter-active bg-primary text-primary-foreground font-semibold'/g)
-    ).toHaveLength(3);
+      src.match(/'filter-active border-primary bg-primary text-primary-foreground font-semibold'/g)
+    ).toHaveLength(1);
+    expect(src.match(/className=\{chip\(/g)!.length).toBeGreaterThanOrEqual(3);
   });
   it('on a merchant-coloured panel the active chip keeps an ink ring (N3)', () => {
     expect(src).toMatch(/data-filter-custom=\{sidebarVars \? '' : undefined\}/);
@@ -111,16 +118,16 @@ describe('mobile filter row shows the item count and a sort (IA-11)', () => {
   });
 });
 
-describe('price sliders are 44px targets (a11y P2-10)', () => {
-  it('both range inputs carry a 44px box', async () => {
+describe('price range is one accessible two-thumb slider with 44px thumbs (a11y P2-10, audit #9)', () => {
+  it('the sidebar uses PriceRangeSlider, no native range inputs, and each thumb has a 44px hit area', async () => {
     const { readFileSync } = await import('node:fs');
-    const src = readFileSync(
-      new URL('../../apps/web/src/app/products/ProductsFilterSidebar.tsx', import.meta.url),
-      'utf8'
-    );
-    const ranges = [...src.matchAll(/<input\s+type="range"[\s\S]*?\/>/g)].map(m => m[0]);
-    expect(ranges).toHaveLength(2);
-    for (const r of ranges) expect(r).toMatch(/className="[^"]*\bh-11\b/);
+    const read = (f: string) =>
+      readFileSync(new URL(`../../apps/web/src/app/products/${f}`, import.meta.url), 'utf8');
+    expect(read('ProductsFilterSidebar.tsx')).toContain('<PriceRangeSlider');
+    expect(read('ProductsFilterSidebar.tsx')).not.toMatch(/type="range"/);
+    // 24px thumb + before:-inset-2.5 (10px each side) = 44px
+    expect(read('PriceRangeSlider.tsx')).toContain('h-6 w-6');
+    expect(read('PriceRangeSlider.tsx')).toContain('before:-inset-2.5');
   });
 });
 

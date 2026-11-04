@@ -324,7 +324,7 @@ export function Home({ locale }: { locale: Locale }) {
         {c.skip}
       </a>
       <JsonLd data={jsonLd(locale)} />
-      <Header locale={locale} />
+      <Header locale={locale} page="store" />
       <main id="main">
         <section className="hero" aria-labelledby="hero-h">
           <div className="wrap hero-inner">
@@ -362,7 +362,7 @@ export function Home({ locale }: { locale: Locale }) {
           <Fragment key={id}>{renderers[id]()}</Fragment>
         ))}
       </main>
-      <Footer locale={locale} />
+      <Footer locale={locale} page="store" />
     </>
   );
 }

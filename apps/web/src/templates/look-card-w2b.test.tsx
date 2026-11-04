@@ -303,7 +303,8 @@ describe('StorefrontProductCard material (L-12, LB-02, M-03, K-01)', () => {
     selectLook('qamar.lookbook');
     const h = heart(card('plain')).className;
     expect(h).not.toContain('text-foreground');
-    expect(h).toContain('bg-white/95');
+    expect(h).toContain('bg-white');
+    expect(h).not.toContain('bg-white/');
     expect(h).toContain('rgb(20_20_20');
   });
   it('Atelier: a bare glyph (no disc, no blur), no hover lift, the accent chip on the radius', () => {
@@ -314,7 +315,8 @@ describe('StorefrontProductCard material (L-12, LB-02, M-03, K-01)', () => {
     // look's own (square) radius: no disc, no blur, no shadow.
     expect(h).not.toContain('rounded-full');
     expect(h).toContain('rounded-[var(--radius)]');
-    expect(h).toContain('bg-white/85');
+    expect(h).toContain('bg-white');
+    expect(h).not.toContain('bg-white/'); // opaque plate: no grey square over a photo (audit #9)
     expect(h).not.toContain('backdrop-blur');
     expect(h).not.toMatch(/shadow-/);
     expect(c.querySelector('article')!.className).not.toContain('md:hover:scale');
