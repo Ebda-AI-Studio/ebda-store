@@ -1820,20 +1820,6 @@ export async function storeUpdateMany(
   return res;
 }
 
-/**
- * For a raw-SQL write to `stores` (jsonb_set on `settings`): re-read the named columns from the authoritative row and copy
- * them, so a partial JSON write reaches the DO as the whole resulting value.
- */
-export async function syncStoreFields(storeId: string, fields: string[]): Promise<void> {
-  if ((await storeRepo(storeId)).backend !== 'do') return;
-  const select = Object.fromEntries(fields.map(f => [f, true]));
-  const row = (await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select })
-  )) as Record<string, unknown> | null;
-  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
-  await copyStoreSettings(storeId, row);
-}
-
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */
 export function repoScope(req: Request, _res: Response, next: NextFunction): void {
   scopes.run({ req, repos: new Map() }, next);

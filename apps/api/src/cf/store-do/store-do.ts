@@ -33,6 +33,7 @@ import {
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
+  bootstrapStoreRows,
   readStoreRecord,
   encodeRpc,
   decodeRpc,
@@ -317,6 +318,35 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
       const err = e as { code?: string };
       return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  /**
+   * First-time bootstrap of a store created on this DO (N-18, Ruling NZ-D11): `store_profile` + `store_config` + the inactive
+   * default VAT rate. Idempotent (a retry converges). The API wrote the D1 directory row first.
+   */
+  async bootstrapStore(
+    storeId: string,
+    inputJson: string
+  ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
+    try {
+      this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const input = decodeRpc<{
+        identity: { name: string; slug: string; ownerId: string };
+        fields: Record<string, unknown>;
+        vat?: { id: string; name: string; nameAr: string; rate: number };
+        cod?: { id: string; name: string; nameAr: string; currency: string };
+      }>(inputJson);
+      return {
+        ok: true,
+        data: bootstrapStoreRows(doSqlRunner(this.ctx.storage), meta, storeId, input),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'BOOTSTRAP_REFUSED', status: 409 };
     }
   }
 

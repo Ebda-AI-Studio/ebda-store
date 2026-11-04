@@ -32,7 +32,8 @@ import { bustStoreCaches, StoreService } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
-import { assertOwnerMayCreateStore } from './plan-limit.service';
+import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
+import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
 import {
@@ -193,8 +194,10 @@ export class OnboardingService {
       throw new AppError(403, 'FORBIDDEN', 'Only merchant accounts can create a store');
     }
 
-    const owned = await withUser(owner.userId, tx =>
-      tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+    const owned = await countOwnerStores(owner.userId, () =>
+      withUser(owner.userId, tx =>
+        tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+      )
     );
     if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
@@ -245,10 +248,10 @@ export class OnboardingService {
       // Plan gate (locked pricing): a SECOND store needs a plan that allows it
       // (Business = 3). Also stops a Basic/Growth owner farming fresh Growth trials.
       if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId);
-      const ownedNow = await withUser(owner.userId, tx =>
-        tx.store.count({
-          where: { ownerId: owner.userId, deletedAt: null },
-        })
+      const ownedNow = await countOwnerStores(owner.userId, () =>
+        withUser(owner.userId, tx =>
+          tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+        )
       );
       try {
         const result = await ProvisioningService.provisionStore({
@@ -259,6 +262,14 @@ export class OnboardingService {
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          maxOwnedStores:
+            owner.isSuperAdmin || !storeCreateOnDo()
+              ? null
+              : Math.min(
+                  MAX_SELF_SERVE_STORES_PER_OWNER,
+                  (await ownerStoreAllowance(owner.userId)).allowance ??
+                    MAX_SELF_SERVE_STORES_PER_OWNER
+                ),
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',

@@ -55,6 +55,8 @@ const apiVars = {
   TRUST_PROXY_HOPS: '1',
   // The dev-only /__dev/stats and /__dev/probe routes (src/cf/dev-stats.ts); never set in wrangler.jsonc.
   DEV_STATS: '1',
+  // N-18: a store created on D1 + its DO (lib/store-create-do.ts); the pg-unreachable test creates one with Postgres dead.
+  STORE_CREATE_ON_DO: '1',
   // StoreDO spike (lib/store-backend.ts): one flagged id + the operator seed secret.
   STORE_DO_ENABLED_IDS: 'spike-store-1',
   STORE_DO_SEED_TOKEN: 'workers-test-seed-token',

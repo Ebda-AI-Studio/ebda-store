@@ -49,6 +49,7 @@ import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlem
 import { socketService } from './socket.service';
 import { EmailService } from './email.service';
 import { config } from '../config';
+import { ownerStores } from '../lib/store-create-do';
 import logger from '../lib/logger';
 
 type Tx = Prisma.TransactionClient;
@@ -138,30 +139,48 @@ function limitError(
  * subscription resolves to the hidden free plan (1 store), so a lapsed Business
  * owner cannot keep adding stores.
  */
-export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+export async function ownerStoreAllowance(ownerId: string): Promise<{
+  /** null = unlimited. */
+  allowance: number | null;
+  count: number;
+  entitlements: Entitlements | null;
+}> {
   // The OLDEST live store is the billing parent: its plan sets the allowance
   // (Ruling EBDA-FUNNEL-13; same rule as account.service ownerStoreAllowance).
   // An additional store's own subscription never grants more stores, so a
   // lapsed parent cannot be worked around through a child.
+  // N-18: with STORE_CREATE_ON_DO on, the union of Postgres and the D1 directory (a store created on its DO exists only in D1);
+  // with it off, Postgres only, exactly as before.
   const stores = sortOwnerStores(
-    await withUser(ownerId, tx =>
-      tx.store.findMany({
-        where: { ownerId, deletedAt: null },
-        select: { id: true, createdAt: true },
-      })
+    await ownerStores(ownerId, () =>
+      withUser(ownerId, tx =>
+        tx.store.findMany({
+          where: { ownerId, deletedAt: null },
+          select: { id: true, createdAt: true },
+        })
+      )
     )
   );
-  if (stores.length === 0) return;
+  if (stores.length === 0) return { allowance: 1, count: 0, entitlements: null };
   const e = await getEntitlements(stores[0].id);
   const max = e?.limits.maxStores;
-  if (max === null) return;
-  const allowance = typeof max === 'number' && max >= 1 ? max : 1;
-  if (stores.length + 1 > allowance) {
+  if (max === null) return { allowance: null, count: stores.length, entitlements: e };
+  return {
+    allowance: typeof max === 'number' && max >= 1 ? max : 1,
+    count: stores.length,
+    entitlements: e,
+  };
+}
+
+export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+  const { allowance, count, entitlements: e } = await ownerStoreAllowance(ownerId);
+  if (allowance === null || count === 0) return;
+  if (count + 1 > allowance) {
     throw limitError(
       (e ?? { planCode: 'unknown' }) as Entitlements,
       'maxStores',
       allowance,
-      stores.length,
+      count,
       1
     );
   }

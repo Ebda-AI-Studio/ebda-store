@@ -80,7 +80,7 @@ Collections: there is no `Collection` model; the storefront's collection surface
 
 ### Settings copy: every Store write is routed (PR D1c, Ruling CF-WRITES-3)
 
-The cutover gate of CF-WRITES-2 is closed. The 39 direct `store.update` / `updateMany` calls and 4 raw `UPDATE stores ... jsonb_set` writes now go through `storeUpdate` / `storeUpdateMany` / `syncStoreFields` (`lib/repo-factory.ts`) or `updateStoreThrough` (`StoreService`). `tests/unit/store-settings-routed.test.ts` walks `apps/api/src` with the TypeScript AST and fails on a new direct write; the only allow-listed file is `lib/repo-factory.ts` (it holds the helpers' own call). A relation write (`credentials`) is directory-only in the copy.
+The cutover gate of CF-WRITES-2 is closed. The 39 direct `store.update` / `updateMany` calls and 4 raw `UPDATE stores ... jsonb_set` writes now go through `storeUpdate` / `storeUpdateMany` (`lib/repo-factory.ts`) or `updateStoreThrough` (`StoreService`). `tests/unit/store-settings-routed.test.ts` walks `apps/api/src` with the TypeScript AST and fails on a new direct write; the only allow-listed file is `lib/repo-factory.ts` (it holds the helpers' own call). A relation write (`credentials`) is directory-only in the copy.
 
 ```ts
 await storeUpdate(tx, { where: { id: storeId }, data: { pwaEnabled } }); // authoritative write on YOUR client, then the DO copy
@@ -88,7 +88,9 @@ await storeUpdateMany(tx, {
   where: { id: storeId, pendingDomain },
   data: { domainStatus: 'failed' },
 }); // copies only if a row matched
-await syncStoreFields(storeId, ['settings']); // after a raw jsonb_set: re-read, copy the whole value
+// a raw jsonb_set on a Postgres store (N-19, `syncStoreFields` is gone): `UPDATE ... RETURNING settings`, then
+await copyStoreSettings(storeId, { settings: returned }); // the whole resulting value, never a re-read
+// a D1 + DO store never runs raw SQL: read-merge at write time, then storeUpdate with the whole `settings` value
 ```
 
 ## Stock and inventory on the DO (PR D2a, Ruling CF-STOCK-1)
