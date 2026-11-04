@@ -67,29 +67,8 @@ const apiVars = {
 // worker, which reaches it through the `API` service binding and shares its Durable Objects / KV by
 // binding them with `scriptName: 'api'`. The bundle is never sent through Vite (an 11 MB module cannot
 // travel over the pool's websocket, and 143k lines of Express / Prisma CJS should not be re-transformed).
-const ACCOUNTS_STUB = `
-import { WorkerEntrypoint } from 'cloudflare:workers';
-const state = id => ({
-  id,
-  email: id + '@exit-test.invalid',
-  emailVerified: true,
-  mfaEnabled: false,
-  mfaEnrolledAt: null,
-  status: 'active',
-  role: /^cust[-_]/.test(id) ? 'customer' : 'store_admin',
-  firstName: 'Test',
-  lastName: 'Account',
-  phone: null,
-  language: 'ar',
-});
-export class Accounts extends WorkerEntrypoint {
-  async getAccountState(id) { return state(id); }
-  async getAccountsBrief(ids) {
-    return ids.map(id => { const s = state(id); return { id, email: s.email, firstName: s.firstName, lastName: s.lastName, status: s.status, role: s.role, lastLoginAt: null, createdAt: new Date(0).toISOString() }; });
-  }
-}
-export default { fetch() { return new Response('accounts stub'); } };
-`;
+// The route sweep (workers-test/route-sweep.test.ts) runs with a stand-in identity service behind `ACCOUNTS`; no other test does.
+const WITH_ACCOUNTS = process.argv.some(a => a.includes('route-sweep'));
 
 export default defineConfig(async () => {
   // D1 `ebda-platform` (task 2.4): the REAL cf-schema platform migrations, applied by the test, shared by both workers.
@@ -106,8 +85,9 @@ export default defineConfig(async () => {
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
-            SWEEP_ONLY: process.env.SWEEP_ONLY ?? '',
+            // route-sweep.test.ts: the host env does not reach workerd's process.env, so the switches travel as bindings
             SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
+            SWEEP_FILTER: process.env.SWEEP_FILTER ?? '',
             ...apiVars,
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
@@ -131,13 +111,22 @@ export default defineConfig(async () => {
             EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
           },
           workers: [
-            {
-              name: 'accounts',
-              modules: true,
-              compatibilityDate: '2026-08-01',
-              compatibilityFlags: ['nodejs_compat'],
-              script: ACCOUNTS_STUB,
-            },
+            ...(WITH_ACCOUNTS
+              ? [
+                  {
+                    name: 'accounts',
+                    modulesRoot: here('./workers-test/fakes'),
+                    modules: [
+                      {
+                        type: 'ESModule' as const,
+                        path: here('./workers-test/fakes/accounts.mjs'),
+                      },
+                    ],
+                    compatibilityDate: '2026-08-01',
+                    compatibilityFlags: ['nodejs_compat'],
+                  },
+                ]
+              : []),
             {
               name: 'api',
               modulesRoot: here('./dist-cf'),
@@ -152,6 +141,7 @@ export default defineConfig(async () => {
               bindings: apiVars,
               kvNamespaces: { KV_CACHE: 'kv-cache' },
               d1Databases: { PLATFORM_DB: 'platform-db' },
+              ...(WITH_ACCOUNTS ? { serviceBindings: { ACCOUNTS: 'accounts' } } : {}),
               durableObjects: {
                 AUTH_STATE: { className: 'AuthState', useSQLite: true },
                 STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
@@ -165,10 +155,6 @@ export default defineConfig(async () => {
               hyperdrives: {
                 HYPERDRIVE: LOCAL_DB,
               },
-              // The shared identity service (wrangler.jsonc: ACCOUNTS -> ebda-accounts#Accounts), stubbed: every id is a
-              // verified, active merchant account unless it starts with `cust-`/`cust_` (a shopper). Enough for the merchant
-              // onboarding reads (verified flag, name, phone); the real service has its own tests (apps/accounts).
-              serviceBindings: { ACCOUNTS: { name: 'accounts', entrypoint: 'Accounts' } },
               queueProducers: {
                 EMAIL_QUEUE: { queueName: 'ebda-email' },
                 SMS_QUEUE: { queueName: 'ebda-sms' },

@@ -1,4 +1,5 @@
-import { prisma, withUser } from '@ebda/database';
+import { prisma } from '@ebda/database';
+import { withPlatformUser } from '../lib/platform-scope';
 import {
   DEFAULT_PLATFORM_VAT,
   PLATFORM_VAT_SETTING_KEY,
@@ -52,7 +53,7 @@ export async function updatePlatformVat(
   actor: { userId: string; ip?: string; userAgent?: string }
 ): Promise<PlatformVat> {
   const next = parseInput(platformVatSchema, input);
-  return withUser(actor.userId, async () => {
+  return withPlatformUser(actor.userId, async () => {
     const before = await getPlatformVat();
     await prisma.systemSetting.upsert({
       where: { key: PLATFORM_VAT_SETTING_KEY },

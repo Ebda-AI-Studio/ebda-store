@@ -353,6 +353,35 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
     });
   });
 
+  it('NEON-ZERO: with Postgres unreachable the tick never throws and reconciles D1 against the StoreDO only', async () => {
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    const alerts: string[] = [];
+    const down = async () => {
+      throw new Error('connect ECONNREFUSED');
+    };
+    // the DO says suspended: D1 (active) is less restrictive, so it is closed; the DO slug mismatch is alert-only
+    const r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ slug: 'alpha', status: 'suspended' }),
+      alert: t => void alerts.push(t),
+    });
+    expect(r.postgresSkipped).toBe(true);
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(d1Status()).toBe('suspended');
+    expect(alerts).toHaveLength(1);
+    // an unreadable DO is reported, never thrown
+    const r2 = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => {
+        throw new Error('DO unavailable');
+      },
+      alert: () => undefined,
+    });
+    expect(r2.alertOnly.map(c => c.id)).toEqual([A]);
+  });
+
   it('PG says suspended or deleted for a do store: the RESTRICTIVE direction is applied (status / deleted_at only) and alerted (NZ-D14)', async () => {
     sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
     const alerts: string[] = [];

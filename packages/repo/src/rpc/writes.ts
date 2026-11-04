@@ -106,12 +106,14 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'BundleItem',
   // per-store admin CRUD (NEON-ZERO-1 N-11 group B, Ruling NZ-N11-1): merchant-edited config/marketing rows, never a stock column
   'CustomerGroup',
+  // the platform tax-verification decision (NEON-ZERO group C, Ruling NZ-C-7)
+  'StoreTaxProfile',
+  // shopper address book, per store (Ruling NZ-SF-5)
   'Address',
   'CustomerAddress',
   'Coupon',
   'Promotion',
   'TaxRate',
-  'StoreTaxProfile',
   'StoreTaxDocument',
   'WholesaleApplication',
   'ProductModel',
