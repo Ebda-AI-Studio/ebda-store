@@ -9,27 +9,48 @@ import { userContext } from '../middleware/tenant-context';
 
 const router = Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALIDATED_STORE = Symbol('ebda.addressStore');
+
 /**
- * Ruling NZ-SF-5: a shopper's addresses live in the customer's StoreDO (per store, like the per-store account). The store is
- * the `X-Store-ID` header (the web client sends it on every request) or, failing that, the store the customer token is bound to;
- * `authenticate` has already refused a header store that differs from the token's (customer-store-binding). A customer with
- * neither is a 400 `STORE_REQUIRED`. A merchant/admin token with no store keeps the Postgres address book it always had.
+ * Ruling NZ-SF-5: a shopper's address book lives in the customer's StoreDO (per store, like the per-store account). The store is
+ * decided ONCE, here, from the verified token and nothing else:
+ *  - a customer always uses `req.user.storeId` (the store the token was issued for). An `X-Store-ID` header is never trusted:
+ *    absent is fine, present must be ONE well-formed id equal to the token's store, otherwise 403 (an array, a duplicate that
+ *    Node joins with a comma, or any other shape is a 400). A customer token with no store is a 400 `STORE_REQUIRED`.
+ *  - every other role ignores `X-Store-ID` entirely and keeps the Postgres address book it always had.
+ * The one validated id is what `userContext` and `storeWriter` both receive.
  */
-function addressStoreId(req: Request): string | undefined {
-  const header = req.headers['x-store-id'];
-  const fromHeader = typeof header === 'string' && header ? header : undefined;
-  const claim = (req.user as { storeId?: string } | undefined)?.storeId;
-  return fromHeader ?? (req.user?.role === 'customer' ? claim : undefined);
+function resolveAddressStore(req: Request, _res: Response, next: NextFunction): void {
+  try {
+    let store: string | undefined;
+    if (req.user?.role === 'customer') {
+      const claim = (req.user as { storeId?: string }).storeId;
+      if (typeof claim !== 'string' || !UUID_RE.test(claim))
+        throw new AppError(400, 'STORE_REQUIRED', 'Store is required for the address book');
+      const header = req.headers['x-store-id'];
+      if (header !== undefined) {
+        if (typeof header !== 'string' || !UUID_RE.test(header))
+          throw new AppError(400, 'INVALID_STORE', 'X-Store-ID must be a single store id');
+        if (header.toLowerCase() !== claim.toLowerCase())
+          throw new AppError(403, 'STORE_MISMATCH', 'This account belongs to another store');
+      }
+      store = claim.toLowerCase();
+    }
+    (req as unknown as Record<symbol, string | undefined>)[VALIDATED_STORE] = store;
+    next();
+  } catch (e) {
+    next(e);
+  }
 }
 
-/** The address client of the request's store: its DO for a DO store, `prisma` for a Postgres store or a store-less admin token. */
+const addressStoreId = (req: Request): string | undefined =>
+  (req as unknown as Record<symbol, string | undefined>)[VALIDATED_STORE];
+
+/** The address client of the validated store: its DO for a DO store, `prisma` for a Postgres store or a non-customer token. */
 async function addressDb(req: Request) {
   const storeId = addressStoreId(req);
-  if (!storeId) {
-    if (req.user?.role === 'customer')
-      throw new AppError(400, 'STORE_REQUIRED', 'Store is required for the address book');
-    return prisma;
-  }
+  if (!storeId) return prisma;
   return (await storeWriter(storeId)) as unknown as typeof prisma;
 }
 
@@ -59,6 +80,7 @@ async function addressDb(req: Request) {
 // will 404 instead of 403 — the DB backstop doing its job (don't reveal
 // existence of another user's row). Expected; do not try to preserve 403.
 router.use(authenticate);
+router.use(resolveAddressStore);
 router.use(
   userContext(
     req => req.user!.userId,
