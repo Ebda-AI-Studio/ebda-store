@@ -8,6 +8,7 @@ import {
   storeDirectory,
   withoutHiddenStores,
 } from '@ebda/database';
+import { platformD1ReferencedKeys } from '../../r2-platform-d1-references';
 import { collectDoStoreReferencedKeys } from '../../r2-do-references';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -225,7 +226,11 @@ export const r2OrphanSweep: JobDef = inngest.createFunction(
     const doReferenced = await step.run('collect-do-referenced-keys', () =>
       collectDoReferencedKeys()
     );
-    const referenced = new Set([...referencedList, ...doReferenced]);
+    // + the platform tables that moved to D1 (their Postgres rows are stale)
+    const d1Referenced = await step.run('collect-d1-referenced-keys', async () =>
+      Array.from(await platformD1ReferencedKeys(urlToR2Key))
+    );
+    const referenced = new Set([...referencedList, ...doReferenced, ...d1Referenced]);
     logger.info({ count: referenced.size }, 'r2-orphan-sweep: collected referenced keys from DB');
 
     // ── Step 3: compute orphans ───────────────────────────────────────────

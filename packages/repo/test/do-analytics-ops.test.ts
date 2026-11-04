@@ -169,7 +169,15 @@ describe('the Postgres copy', () => {
     search_query_daily: { rows: 2, sums: { searches: 6, zero_results: 2, last_result_count: 4 } },
     product_daily_views: { rows: 2, sums: { count: 8 } },
     qr_scan_daily: { rows: 2, sums: { count: 10 } },
-    notification_logs: { rows: 2, sums: { created_at: 2 * D0 } },
+    notification_logs: {
+      rows: 2,
+      sums: {
+        'min:created_at': D0,
+        'max:created_at': D0,
+        'min:updated_at': D0,
+        'max:updated_at': D0,
+      },
+    },
     gsc_daily_metrics: { rows: 2, sums: { impressions: 20, clicks: 4 } },
   };
   const load = (op: ReturnType<typeof rig>['op']) =>
@@ -198,6 +206,33 @@ describe('the Postgres copy', () => {
     expect(op('analyticsImportStatus', {}).done).toBe(false);
     expect(op('analyticsImportFinish', { expect: expectAll })).toMatchObject({ done: true });
     expect(op('analyticsImportStatus', {}).done).toBe(true);
+  });
+
+  it('reset wipes copied rows and the ledger so the copy can restart; a wrong confirm is refused', () => {
+    const { raw, op } = rig();
+    load(op);
+    op('analyticsImportFinish', { expect: expectAll });
+    expect(() => op('analyticsImportReset', { confirm: 'other' })).toThrow();
+    expect(op('analyticsImportReset', { confirm: 's1' })).toMatchObject({ reset: true });
+    expect(all(raw, 'SELECT COUNT(*) AS n FROM qr_scan_daily')[0].n).toBe(0);
+    expect(op('analyticsImportStatus', {})).toMatchObject({ done: false, batches: 0 });
+    load(op); // the same batch ids apply again
+    expect(op('analyticsImportFinish', { expect: expectAll })).toMatchObject({ done: true });
+  });
+
+  it('a batch whose first row id is new applies even after rows shifted (key-range ids, not positions)', () => {
+    const { raw, op } = rig();
+    op('analyticsImport', {
+      batchId: 's1:qr_scan_daily:r0',
+      table: 'qr_scan_daily',
+      rows: [row('qr_scan_daily', 0)],
+    });
+    op('analyticsImport', {
+      batchId: 's1:qr_scan_daily:r5',
+      table: 'qr_scan_daily',
+      rows: [row('qr_scan_daily', 5)],
+    });
+    expect(all(raw, 'SELECT COUNT(*) AS n FROM qr_scan_daily')[0].n).toBe(2);
   });
 
   it('refuses every batch after the marker, and a DO that already holds native rows', () => {

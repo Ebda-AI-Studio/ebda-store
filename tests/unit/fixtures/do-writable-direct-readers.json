@@ -9,11 +9,18 @@
     }
   },
   "baseline": {
-    "apps/api/src/routes/admin.routes.ts": {
-      "kind": "platform",
-      "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
+    "apps/api/src/lib/audit-read.ts": {
+      "kind": "pg-branch",
+      "reason": "readAuditByResource: a DO store returns early from storeDb; the prisma read is the Postgres store's audit trail (actor joined)",
       "models": {
-        "product": 3
+        "auditLog": 1
+      }
+    },
+    "apps/api/src/lib/definer.ts": {
+      "kind": "pg-branch",
+      "reason": "platform audit viewer: a DO store is read through storeRepo(...).db; the withStore read is a Postgres store's own rows",
+      "models": {
+        "auditLog": 2
       }
     },
     "apps/api/src/routes/notification.routes.ts": {
@@ -54,7 +61,8 @@
       "models": {
         "product": 1,
         "productVariant": 1,
-        "category": 1
+        "category": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/purchase-order.service.ts": {
@@ -63,6 +71,14 @@
       "models": {
         "productVariant": 4,
         "product": 1
+      }
+    },
+    "apps/api/src/services/accounting/reorder-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "the reorder scan: a store on its Durable Object takes the storeMoney() reorderUpsert section (Ruling NZ-A-1); the remaining tx read is the Postgres upsert branch inside its tenant transaction.",
+      "models": {
+        "reorderSuggestion": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/stock-adjustment.service.ts": {
@@ -83,9 +99,11 @@
     },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
-      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route.",
       "models": {
-        "campaignRecipient": 1
+        "campaignRecipient": 1,
+        "address": 1,
+        "wholesaleApplication": 1
       }
     },
     "apps/api/src/services/barcode-scan.service.ts": {
@@ -111,6 +129,14 @@
         "productOption": 1,
         "productVariant": 1,
         "product": 1
+      }
+    },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {
@@ -196,14 +222,6 @@
       "models": {
         "product": 2,
         "productVariant": 2
-      }
-    },
-    "apps/api/src/services/bundle.service.ts": {
-      "kind": "platform",
-      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
-      "models": {
-        "bundle": 3,
-        "bundleItem": 1
       }
     }
   }

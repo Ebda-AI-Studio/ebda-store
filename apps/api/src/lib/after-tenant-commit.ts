@@ -69,7 +69,12 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { onClosedTenantTxAccess, runInStoreScope, runInTenantContext } from '@ebda/database';
+import {
+  onClosedTenantTxAccess,
+  runInStoreScope,
+  runInTenantContext,
+  runInUserScope,
+} from '@ebda/database';
 import logger from './logger';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 import { sendAlert } from '../services/alerts.service';
@@ -412,6 +417,9 @@ async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext):
     // the same user. It still takes one slot, so a burst of DO-store requests cannot start unbounded deferred work at once.
     if (ctx.noPgTx && ctx.storeId) {
       await runInStoreScope(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    } else if (ctx.noPgTx && ctx.userId) {
+      // A platform (user-only) request, Ruling NZ-C-1: same lazy per-query scope, no store.
+      await runInUserScope(ctx.userId, () => task.run().then(() => undefined));
     } else {
       await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
     }

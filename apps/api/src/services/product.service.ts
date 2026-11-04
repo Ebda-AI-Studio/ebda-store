@@ -798,6 +798,7 @@ export class ProductService {
     // QA-PRICE-ZERO-1: an ACTIVE product is orderable, so it cannot be free (a draft may be a 0 placeholder).
     assertActiveProductPrice({ status: data.status ?? 'draft', price: data.price });
 
+    const openingStockOnDo = data.inventory ? await storeStock(storeId) : null;
     const product = await w.product.create({
       data: {
         storeId,
@@ -820,8 +821,9 @@ export class ProductService {
         discountValue: data.discountValue ?? null,
         sku: data.sku,
         ...(typedBarcode ? { barcode: typedBarcode } : {}),
-        // 0 is the column default; a non-zero opening stock is a stock write (refused on a DO store until D2)
-        ...(data.inventory ? { inventory: data.inventory } : {}),
+        // 0 is the column default. A non-zero opening stock is a stock write: on Postgres it rides the insert, on a DO
+        // store it goes through the stock client right after the insert (the generic writer refuses stock columns).
+        ...(data.inventory && !openingStockOnDo ? { inventory: data.inventory } : {}),
         ...(data.lowStockThreshold !== undefined
           ? { lowStockThreshold: data.lowStockThreshold }
           : {}),
@@ -858,6 +860,22 @@ export class ProductService {
         categories: { include: { category: true } },
       },
     });
+
+    if (openingStockOnDo && data.inventory) {
+      try {
+        // Same effect as the Postgres insert: the column is set, no history row.
+        await openingStockOnDo.bulkSetInventory({
+          productIds: [product.id],
+          mode: 'set',
+          value: data.inventory,
+        });
+        (product as { inventory?: number }).inventory = data.inventory;
+      } catch (err) {
+        // Compensate: a product that was asked to have stock must not exist with 0 (the merchant would sell nothing).
+        await w.product.delete({ where: { id: product.id, storeId } }).catch(() => undefined);
+        throw err;
+      }
+    }
 
     // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
     // A product that later gets variants carries its codes on the variants.
@@ -1244,7 +1262,9 @@ export class ProductService {
         );
     }
     const productAt = ops.length;
-    ops.push(w.product.update(a.updateArgs));
+    // The generic writer refuses stock columns: a new on-hand quantity goes through the stock client after the batch.
+    const { inventory: newInventory, ...doData } = a.updateArgs.data as { inventory?: number };
+    ops.push(w.product.update({ ...a.updateArgs, data: doData }));
     const mergeAt =
       Object.keys(a.setSources).length > 0 || a.removedSources.length > 0 ? ops.length : -1;
     if (mergeAt >= 0)
@@ -1261,6 +1281,13 @@ export class ProductService {
     // SlugRedirect is a D1 platform model: it stays on the platform path until the platform client lands (PR A).
     if (a.slugChanged)
       await recordSlugRedirect(prisma, a.storeId, SlugEntityType.PRODUCT, a.oldSlug, a.finalSlug);
+    if (newInventory !== undefined) {
+      const stock = await storeStock(a.storeId);
+      if (stock) {
+        await stock.bulkSetInventory({ productIds: [productId], mode: 'set', value: newInventory });
+        (updated as { inventory?: number }).inventory = Math.max(0, Math.round(newInventory));
+      }
+    }
     return updated;
   }
 
@@ -1294,6 +1321,12 @@ export class ProductService {
   static async updateInventory(storeId: string, productId: string, quantity: number) {
     await this.getById(storeId, productId);
 
+    const doStock = await storeStock(storeId);
+    if (doStock) {
+      await doStock.bulkSetInventory({ productIds: [productId], mode: 'set', value: quantity });
+      await this.invalidateStoreProductCache(storeId);
+      return this.getById(storeId, productId);
+    }
     const updated = await prisma.product.update({
       where: { id: productId, storeId },
       data: { inventory: quantity },

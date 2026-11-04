@@ -4348,7 +4348,9 @@ export class OrderService {
     if (data.couponCode) {
       // Active coupons of THIS store only — an override bypasses the rules,
       // never the merchant's own on/off switch.
-      appliedCoupon = await prisma.coupon.findFirst({
+      appliedCoupon = await (
+        await storeDb(storeId)
+      ).coupon.findFirst({
         where: {
           storeId,
           code: { equals: data.couponCode, mode: 'insensitive' },

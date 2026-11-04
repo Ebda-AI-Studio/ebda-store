@@ -55,3 +55,16 @@ export async function inDoStoreScope<T>(storeId: string, fn: () => Promise<T>): 
   if ((await storeRepo(storeId)).backend === 'do') return runInStoreScope(storeId, fn);
   return fn();
 }
+
+/**
+ * `runInTenantContext(storeId, fn)` for a handler that WRITES (NEON-ZERO-1 N-11): a Postgres store opens its tenant transaction
+ * exactly as before; a store on its Durable Object gets the bare store scope (no Postgres transaction, so a dead Postgres cannot
+ * fail the request before the handler runs). Unlike `readInStoreContext` this never reuses or splits a transaction on Postgres.
+ */
+export async function runInStoreTenantContext<T>(
+  storeId: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  if ((await storeRepo(storeId)).backend === 'do') return runInStoreScope(storeId, fn);
+  return runInTenantContext(storeId, fn);
+}

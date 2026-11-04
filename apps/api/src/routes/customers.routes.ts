@@ -11,6 +11,7 @@ import {
   summarizeExportFilters,
 } from '../lib/exports/xlsx';
 import { prisma, type RfmSegment } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requirePermission } from '../middleware/rbac';
@@ -127,7 +128,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, slug: true },
       });

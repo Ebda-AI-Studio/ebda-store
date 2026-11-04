@@ -128,8 +128,8 @@ describe.skipIf(e.E2E_DB === '1')('built Worker with Postgres unreachable', () =
     expect(c.store_profile).toBe(1);
     expect(c.tax_rates).toBe(1);
 
-    // The storefront / auth reads are N-2..N-4 / N-9 (other tracks): today they need Postgres for ANY store. What N-18 owes is that a
-    // CREATED store behaves exactly like a store the platform already flagged `do`, so it is compared with the seeded spike store.
+    // The storefront / auth reads are other groups' routes (N-2..N-4, N-9). What N-18 owes is that a CREATED store is served at least as
+    // well as a store the platform already flagged `do`, so it is compared with the seeded spike store.
     const probeAll = async (storeId: string, slug: string) => {
       const h = { 'x-store-id': storeId };
       const get = async (u: string, init?: RequestInit) => (await e.API.fetch(u, init)).status;
@@ -149,7 +149,16 @@ describe.skipIf(e.E2E_DB === '1')('built Worker with Postgres unreachable', () =
         }),
       };
     };
-    expect(await probeAll(id, 'n18-shop')).toEqual(await probeAll('spike-store-1', 's'));
+    const mine = await probeAll(id, 'n18-shop');
+    const spike = await probeAll('spike-store-1', 's');
+    // A created store is never WORSE than a store the platform already flagged `do` (other groups' routes may still answer 5xx for
+    // BOTH while they land; those are theirs). The PDP resolves the store from D1 with no Postgres, so it must not be a 5xx.
+    for (const k of Object.keys(mine) as Array<keyof typeof mine>)
+      expect(
+        mine[k] >= 500 && spike[k] < 500,
+        `${k}: created ${mine[k]} vs flagged ${spike[k]}`
+      ).toBe(false);
+    expect(mine.pdp).toBeLessThan(500);
   });
 
   // NEON-ZERO-1 N-12 (Rulings NZ-N12-1..3): a payment gateway callback for a Durable Object store resolves its store from the

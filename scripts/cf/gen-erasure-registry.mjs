@@ -20,7 +20,7 @@ const CANDIDATES = {
   email: ['email', 'guest_email', 'customer_email'],
   phone: ['phone', 'customer_phone'],
   userId: ['user_id'],
-  buyerKey: ['buyer_key'],
+  buyerKey: ['buyer_key', 'recipient_phone_hash'],
   customerId: ['customer_id'],
 };
 /** A table that reaches the subject only through its parent order (no customer column of its own). */

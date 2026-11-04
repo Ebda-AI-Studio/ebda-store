@@ -32,6 +32,7 @@
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
+import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import {
@@ -123,6 +124,10 @@ export type WritableModel =
   | 'customerRfmSnapshot'
   | 'answerEngineCheck'
   | 'shipment'
+  | 'shippingZone'
+  | 'shippingAreaRate'
+  | 'reorderSuggestion'
+  | 'supplier'
   | 'catalogImportJob'
   | 'catalogImportFile'
   | 'catalogImportItem'
@@ -136,7 +141,21 @@ export type WritableModel =
   | 'wishlist'
   | 'wishlistItem'
   | 'bundle'
-  | 'bundleItem';
+  | 'bundleItem'
+  | 'auditLog'
+  | 'customerGroup'
+  | 'address'
+  | 'customerAddress'
+  | 'coupon'
+  | 'promotion'
+  | 'taxRate'
+  | 'storeTaxProfile'
+  | 'storeTaxDocument'
+  | 'wholesaleApplication'
+  | 'productModel'
+  | 'productModelBinding'
+  | 'storeWhatsAppLink'
+  | 'goldRateSettings';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -742,6 +761,10 @@ export interface MoneyClient {
   }): Promise<{ recorded: true }>;
   /** The payment-abandonment stamp: once, only while the order is unpaid and unstamped. */
   abandonStamp(a: { orderId: string }): Promise<{ stamped: boolean }>;
+  /** COD mark-paid (single and bulk) in ONE section; skips paid / cancelled / refunded / non-COD orders (Ruling NZ-A-2). */
+  codMarkPaid(a: { orderIds: string[] }): Promise<{
+    updated: Array<{ orderId: string; paymentId: string; fromStatus: string; orderNumber: string }>;
+  }>;
   /** Stamp an order once for a job (`reviewRequestSentAt`): false when an earlier run already did (Ruling CF-JOBS-4). */
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
@@ -776,6 +799,65 @@ export interface MoneyClient {
     pruneBeforeMs?: number;
   }): Promise<{ counted: true }>;
   viewRecord(a: { dayMs: number; productId: string }): Promise<{ counted: true }>;
+  /** Merchant analytics reads on the DO (analytics-reads.ts); the Postgres twins are raw SQL in analytics.service.ts. */
+  analyticsPeriod(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    revenue: number;
+    orders: number;
+    customers: number;
+    profit: number | null;
+    costedLines: number;
+    missingLines: number;
+    missingRevenue: number;
+  }>;
+  analyticsSales(a: {
+    startMs: number;
+    endMs: number;
+    offsetMinutes: number;
+    granularity: 'day' | 'week' | 'month';
+  }): Promise<Array<{ key: string; revenue: number; orders: number }>>;
+  analyticsItems(
+    a:
+      | { by: 'product'; startMs: number; endMs: number; nonRevenue: string[]; limit?: number }
+      | { by: 'priceSource'; startMs: number; endMs: number; nonRevenue: string[] }
+  ): Promise<
+    Array<{
+      productId?: string;
+      priceSource?: string | null;
+      priceGroupApplied?: boolean | null;
+      quantity: number;
+      total: number;
+    }>
+  >;
+  analyticsOrdersBy(a: {
+    by: 'status' | 'paymentStatus';
+    startMs: number;
+    endMs: number;
+    nonRevenue?: string[];
+  }): Promise<Array<{ key: string; count: number; total: number }>>;
+  analyticsCustomers(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    newCustomers: number;
+    returningCustomers: number;
+    top: Array<{ customerId: string | null; total: number; count: number }>;
+  }>;
+  analyticsStock(a: Record<string, never>): Promise<{
+    stockValue: number;
+    backorderCount: number;
+    backorderValue: number;
+  }>;
+  analyticsCashflow(a: {
+    fromMs: number;
+    toMs: number;
+  }): Promise<Array<{ dayMs: number; net: number }>>;
+  analyticsLowStock(a: { threshold: number }): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      sku: string | null;
+      inventory: number;
+      imageUrl: string | null;
+    }>
+  >;
   analyticsImportStatus(a: Record<string, never>): Promise<{
     done: boolean;
     batches: number;
@@ -786,6 +868,9 @@ export interface MoneyClient {
     table: string;
     rows: Array<Record<string, unknown>>;
   }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportReset(a: {
+    confirm: string;
+  }): Promise<{ reset: true; deleted: Record<string, number> }>;
   analyticsImportFinish(a: {
     expect: Record<string, { rows: number; sums: Record<string, number> }>;
   }): Promise<{ done: true; tables: Record<string, number> }>;
@@ -1282,6 +1367,7 @@ export function makeMoneyClient(
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
     paymentEventRecord: a => call('paymentEventRecord', a),
     abandonStamp: a => call('abandonStamp', a),
+    codMarkPaid: a => call('codMarkPaid', a),
     trialBalance: () => call('trialBalance', {}),
     orderStamp: a => call('orderStamp', a),
     orderAnonymize: a => call('orderAnonymize', a),
@@ -1295,6 +1381,15 @@ export function makeMoneyClient(
     analyticsImportStatus: a => call('analyticsImportStatus', a),
     analyticsImport: a => call('analyticsImport', a),
     analyticsImportFinish: a => call('analyticsImportFinish', a),
+    analyticsPeriod: a => call('analyticsPeriod', a),
+    analyticsSales: a => call('analyticsSales', a),
+    analyticsItems: a => call('analyticsItems', a),
+    analyticsOrdersBy: a => call('analyticsOrdersBy', a),
+    analyticsCustomers: a => call('analyticsCustomers', a),
+    analyticsLowStock: a => call('analyticsLowStock', a),
+    analyticsStock: a => call('analyticsStock', a),
+    analyticsCashflow: a => call('analyticsCashflow', a),
+    analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),
@@ -1668,6 +1763,18 @@ async function d1StoreWrite(
  */
 export async function syncStoreEntitlement(storeId: string): Promise<void> {
   const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
+  if (await platformFamilyOnD1('access')) {
+    // D1 is the source: copy ITS current row to the Durable Object (nothing is read from Postgres, nothing is written to D1).
+    const d1Row = (await (
+      await requirePlatformDb()
+    ).store.findUnique({
+      where: { id: storeId },
+      select,
+    })) as Record<string, unknown> | null;
+    if (!d1Row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+    await copyStoreSettings(storeId, d1Row);
+    return;
+  }
   const row = (await withStore(storeId, tx =>
     tx.store.findUnique({ where: { id: storeId }, select })
   )) as Record<string, unknown> | null;
@@ -1729,6 +1836,8 @@ async function mirrorEntitlementToPg(
     ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
   );
   if (Object.keys(patch).length === 0) return;
+  // The access family is on D1: D1 `stores` IS the record of the entitlement fields, there is no Postgres copy to keep in step.
+  if (await platformFamilyOnD1('access')) return;
   await withStore(storeId, async tx => {
     await (tx as unknown as StoreUpdateManyClient).store.updateMany({
       where: { id: storeId },

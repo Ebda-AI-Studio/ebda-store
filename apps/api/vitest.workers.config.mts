@@ -67,6 +67,9 @@ const apiVars = {
 // worker, which reaches it through the `API` service binding and shares its Durable Objects / KV by
 // binding them with `scriptName: 'api'`. The bundle is never sent through Vite (an 11 MB module cannot
 // travel over the pool's websocket, and 143k lines of Express / Prisma CJS should not be re-transformed).
+// The route sweep (workers-test/route-sweep.test.ts) runs with a stand-in identity service behind `ACCOUNTS`; no other test does.
+const WITH_ACCOUNTS = process.argv.some(a => a.includes('route-sweep'));
+
 export default defineConfig(async () => {
   // D1 `ebda-platform` (task 2.4): the REAL cf-schema platform migrations, applied by the test, shared by both workers.
   const platformMigrations = await readD1Migrations(
@@ -82,6 +85,9 @@ export default defineConfig(async () => {
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
+            // route-sweep.test.ts: the host env does not reach workerd's process.env, so the switches travel as bindings
+            SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
+            SWEEP_FILTER: process.env.SWEEP_FILTER ?? '',
             ...apiVars,
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
@@ -105,6 +111,37 @@ export default defineConfig(async () => {
             EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
           },
           workers: [
+            ...(WITH_ACCOUNTS
+              ? [
+                  {
+                    name: 'accounts',
+                    modulesRoot: here('./workers-test/fakes'),
+                    modules: [
+                      {
+                        type: 'ESModule' as const,
+                        path: here('./workers-test/fakes/accounts.mjs'),
+                      },
+                    ],
+                    compatibilityDate: '2026-08-01',
+                    compatibilityFlags: ['nodejs_compat'],
+                  },
+                ]
+              : []),
+            {
+              name: 'accounts-stub',
+              modules: true,
+              compatibilityDate: '2026-08-01',
+              script: `
+                import { WorkerEntrypoint } from 'cloudflare:workers';
+                export default class extends WorkerEntrypoint {
+                  async getAccountState(id) {
+                    return { id, email: id + '@exit-test.invalid', emailVerified: true, mfaEnabled: id.startsWith('super-'),
+                      mfaEnrolledAt: null, status: 'active', role: id.startsWith('super-') ? 'super_admin' : 'store_admin',
+                      firstName: 'T', lastName: 'T', phone: null, language: 'en' };
+                  }
+                  async fetch() { return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } }); }
+                }`,
+            },
             {
               name: 'api',
               modulesRoot: here('./dist-cf'),
@@ -119,6 +156,7 @@ export default defineConfig(async () => {
               bindings: apiVars,
               kvNamespaces: { KV_CACHE: 'kv-cache' },
               d1Databases: { PLATFORM_DB: 'platform-db' },
+              ...(WITH_ACCOUNTS ? { serviceBindings: { ACCOUNTS: 'accounts' } } : {}),
               durableObjects: {
                 AUTH_STATE: { className: 'AuthState', useSQLite: true },
                 STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
@@ -132,6 +170,9 @@ export default defineConfig(async () => {
               hyperdrives: {
                 HYPERDRIVE: LOCAL_DB,
               },
+              // The identity service (Service Binding ACCOUNTS): the route sweep needs the account facts (MFA enrolled, active)
+              // that the real one answers from D1 `ebda-identity`. A user named `super-*` is an enrolled platform admin.
+              serviceBindings: { ACCOUNTS: 'accounts-stub' },
               queueProducers: {
                 EMAIL_QUEUE: { queueName: 'ebda-email' },
                 SMS_QUEUE: { queueName: 'ebda-sms' },

@@ -133,7 +133,7 @@ interface Fx {
 }
 let n = 0;
 async function fixtures(
-  opts: { points?: number; totalEarned?: number; member?: boolean } = {}
+  opts: { points?: number; totalEarned?: number; member?: boolean; preImport?: boolean } = {}
 ): Promise<Fx> {
   const k = `${sfx}${++n}`;
   const user = await prisma.user.create({
@@ -182,6 +182,13 @@ async function fixtures(
     });
     insertSqlite(sqlite, 'LoyaltyPoints', [row] as never);
   }
+  // Both backends share ONE Postgres in this harness, so the PG run's ledger rows would be read by the DO run's lazy import as
+  // "Postgres-only history" (in production a DO store's Postgres ledger is frozen at the switch). Customers that are not under
+  // test for the import are flagged imported on the DO side so each backend starts from the same baseline.
+  if (opts.preImport !== false)
+    sqlite
+      .prepare('INSERT OR REPLACE INTO do_flags (name, value) VALUES (?, 1)')
+      .run(`loyalty_import:${user.id}`);
   return {
     cust: user.id,
     o1: o1.id,
@@ -232,6 +239,10 @@ beforeAll(async () => {
       `INSERT OR REPLACE INTO store_config (store_id, loyalty_enabled, loyalty_settings) VALUES (?, 1, ?)`
     )
     .run(STORE, JSON.stringify(SETTINGS));
+  // store-wide reads (members, stats): the test customers are flagged one by one in `fixtures`, so the store import is done
+  sqlite
+    .prepare("INSERT OR REPLACE INTO do_flags (name, value) VALUES ('loyalty_import_store', 1)")
+    .run();
 });
 beforeEach(() => {
   // the vitest config resets mocks between tests: install the platform `loyalty` feature as ON for each one
@@ -372,8 +383,8 @@ describe('loyalty admin reads + manual awards (L-1, Ruling FP-2)', () => {
       }),
     }));
     void big;
-    expect(t.out.ok.award.newBalance).toBe(350);
-    expect(t.out.ok.deduct.newBalance).toBe(330);
+    expect(t.out.ok.award.newBalance).toBe(370);
+    expect(t.out.ok.deduct.newBalance).toBe(350);
     expect(t.out.ok.members.members).toHaveLength(2);
     expect(t.out.ok.stats.totalMembers).toBe(2);
   });
@@ -410,7 +421,7 @@ describe('loyalty admin reads + manual awards (L-1, Ruling FP-2)', () => {
   });
 
   it('FP-2: a member whose history exists only on Postgres keeps balance and bonuses after the store moves to the DO', async () => {
-    const fx = await fixtures({ member: true }); // sqlite starts EMPTY for this customer: the pre-switch state
+    const fx = await fixtures({ member: true, preImport: false }); // sqlite starts EMPTY for this customer: the pre-switch state
     await prisma.loyaltyPoints.create({
       data: { storeId: STORE, customerId: fx.cust, points: 175, totalEarned: 175, tier: 'bronze' },
     });

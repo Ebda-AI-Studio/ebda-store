@@ -82,6 +82,16 @@ vi.mock('../../apps/api/src/services/email.service', () => ({
     },
   },
 }));
+vi.mock('../../apps/api/src/lib/jobs/store-db', async importOriginal => {
+  const real = await importOriginal<Record<string, unknown>>();
+  return {
+    ...real,
+    withStoreDb: async (_id: string, fn: (db: unknown) => unknown) =>
+      fn({
+        store: { findUnique: async () => ({ name: 'Dahab', owner: { email: 'o@example.com' } }) },
+      }),
+  };
+});
 vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<Record<string, unknown>>();
   return {

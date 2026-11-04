@@ -11,6 +11,7 @@ import {
   type MoneyClient,
 } from '../lib/repo-factory';
 import { assertStoreCustomer } from '../lib/store-customer';
+import { withStoreRead } from '../lib/store-read';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -202,13 +203,16 @@ export class LoyaltyService {
   static async ensureDoHistory(
     storeId: string,
     customerId: string,
-    money?: MoneyClient | null
+    money?: MoneyClient | null,
+    // `trusted`: the id comes from an order row the DO itself validates against this store (the earn fan-out), not from a
+    // URL, body or token, so the membership lookup is skipped; every other caller leaves it false.
+    opts: { trusted?: boolean } = {}
   ): Promise<void> {
     const key = `${storeId}:${customerId}`;
     if (importedSeen.has(key)) return;
     const m = money ?? (await storeMoney(storeId));
     if (!m) return;
-    await assertStoreCustomer(storeId, customerId);
+    if (!opts.trusted) await assertStoreCustomer(storeId, customerId);
     if ((await m.loyaltyImportState({ customerId })).done) {
       importedSeen.add(key);
       return;
@@ -301,7 +305,7 @@ export class LoyaltyService {
    * Get store loyalty settings
    */
   static async getSettings(storeId: string): Promise<LoyaltySettingsResponse> {
-    const store = await withStore(storeId, tx =>
+    const store = await withStoreRead(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
         select: {
@@ -578,7 +582,7 @@ export class LoyaltyService {
     // transaction below. The DO reads the order total from its own order row (orderTotalFils is what Postgres is given).
     const money = await storeMoney(storeId);
     if (money) {
-      await LoyaltyService.ensureDoHistory(storeId, customerId, money);
+      await LoyaltyService.ensureDoHistory(storeId, customerId, money, { trusted: true });
       const featureEnabled = await featureService.isFeatureEnabled(storeId, 'loyalty');
       const r = await money.loyaltyEarn({ customerId, orderId, featureEnabled });
       return { pointsEarned: r.pointsEarned, newBalance: r.newBalance };

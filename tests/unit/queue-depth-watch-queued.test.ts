@@ -24,6 +24,8 @@ vi.mock('@api/lib/inngest/client', () => ({
 vi.mock('@api/lib/jobs/store-db', () => ({
   // the watcher reads queued first, then running
   sweepStoresDb: async () => (state.call++ % 2 === 0 ? state.queued : state.running),
+  withStoreDb: async (_id: string, fn: (db: unknown) => unknown) =>
+    fn({ store: { findUnique: async () => ({ name: 'QA Store', slug: 'qa' }) } }),
   withStoreRw: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({ bulkAiJob: { updateMany: mockUpdateMany, update: mockUpdateMany } }),
 }));

@@ -1,4 +1,6 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import { requirePlatformDb } from '../lib/platform-db';
+import { d1StoreBriefs, platformDb as platformDirectoryDb } from '../lib/platform-directory';
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { customerAuthRoute } from '../lib/customer-auth';
@@ -12,6 +14,8 @@ import {
   eraseIdentityUser,
   getAccountState,
   inviteIdentity,
+  getAccountsBrief,
+  revokeIdentityUser,
   setAccountRole,
   setAccountStatus,
 } from '../lib/identity-client';
@@ -80,14 +84,29 @@ import {
   assignSubscriptionSchema,
   isReservedSlug,
 } from '@ebda/shared';
-import { userContext } from '../middleware/tenant-context';
+import { platformUserContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
+import { revokeUserMerchantKeysD1 } from '../services/platform/platform-d1';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 import { referralSignupCounts } from '../services/lifecycle-emails.service';
 import { storeUpdate } from '../lib/repo-factory';
 import { toSafeStoreResponse } from '../lib/store-response';
+import {
+  HUB_FANOUT_CAP,
+  hubAccountIds,
+  hubFanout,
+  hubFanoutStoreIds,
+  hubOnD1,
+  hubOwnedStores,
+  hubOwners,
+  hubStorePage,
+  hubStoresById,
+  hubUsers,
+} from '../lib/platform-hub';
+import { storeDb } from '../lib/repo-factory';
+import { customerRows } from '../lib/customer-directory';
 
 const router = Router();
 
@@ -113,7 +132,7 @@ router.use(requireMfaEnrolled);
 // the user directory and the role checks all resolve under it. Exports stream
 // for longer than the 30s request-transaction budget, so they stay outside it
 // and scope themselves (they fan out per store).
-const adminUserContext = userContext(req => req.user?.userId);
+const adminUserContext = platformUserContext(req => req.user?.userId);
 router.use((req: Request, res: Response, next: NextFunction) =>
   req.path.startsWith('/export') ? next() : adminUserContext(req, res, next)
 );
@@ -153,6 +172,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export const SUPER_ADMIN_FANOUT_CAP = 500;
 export async function boundedFanoutStoreIds(ids?: string[]): Promise<string[]> {
+  // NEON-ZERO (Ruling NZ-C-4): the hub lists stores from D1 (already capped, newest first).
+  if (!ids && (await hubOnD1())) return (await hubFanoutStoreIds()).ids;
   const all = ids ?? (await storeDirectory()).map(s => s.id);
   if (all.length <= SUPER_ADMIN_FANOUT_CAP) return all;
   logger.warn(
@@ -160,6 +181,63 @@ export async function boundedFanoutStoreIds(ids?: string[]): Promise<string[]> {
     '[admin] cross-store fan-out truncated to the cap'
   );
   return all.slice(0, SUPER_ADMIN_FANOUT_CAP);
+}
+
+async function findProductStoreOnHub(productId: string): Promise<string | null> {
+  const { ids } = await hubFanoutStoreIds();
+  const hits = await hubFanout(
+    ids,
+    async sid =>
+      (await (
+        await storeDb(sid)
+      ).product.findUnique({ where: { id: productId }, select: { id: true } }))
+        ? sid
+        : null,
+    () => undefined
+  );
+  return hits.find(h => h.value)?.value ?? null;
+}
+
+/** On the hub the `store` relation is not a join (DO read clients cannot reach D1): attach {id,name,slug} from the directory. */
+async function attachStoreRel<T extends { storeId: string }>(rows: T[], on: boolean): Promise<T[]> {
+  if (!on || rows.length === 0) return rows;
+  const byId = new Map(
+    (await hubStoresById(rows.map(r => r.storeId))).map(s => [
+      s.id,
+      { id: s.id, name: s.name, slug: s.slug },
+    ])
+  );
+  return rows.map(r => ({ ...r, store: byId.get(r.storeId) ?? null }));
+}
+
+/** DO-store orders carry `customerId` only (the customer lives in the store's customer directory): attach {id,email,names}. */
+async function attachCustomerRel<T extends { storeId: string; customerId?: string | null }>(
+  rows: T[],
+  on: boolean
+): Promise<
+  Array<
+    T & { customer?: { id?: string; email: string; firstName: string; lastName: string } | null }
+  >
+> {
+  if (!on || rows.length === 0) return rows;
+  const byStore = new Map<string, Set<string>>();
+  for (const r of rows)
+    if (r.customerId)
+      byStore.set(r.storeId, (byStore.get(r.storeId) ?? new Set()).add(r.customerId));
+  const found = new Map<
+    string,
+    { id: string; email: string; firstName: string; lastName: string }
+  >();
+  await hubFanout(
+    [...byStore.keys()],
+    async sid => {
+      const list = await customerRows(sid, [...byStore.get(sid)!]);
+      for (const c of list ?? [])
+        found.set(c.id, { id: c.id, email: c.email, firstName: c.firstName, lastName: c.lastName });
+    },
+    () => undefined
+  );
+  return rows.map(r => ({ ...r, customer: (r.customerId && found.get(r.customerId)) || null }));
 }
 
 function storeIdsFromFilter(storeId: unknown): string[] | undefined {
@@ -336,16 +414,22 @@ router.get(
       // the row inside that store's own scope. Ownership is checked below.
       const hit = await lookupStore({ id }, ['active', 'inactive', 'suspended']);
       const store = hit
-        ? await withStore(hit.id, tx =>
-            tx.store.findUnique({
-              where: { id: hit.id },
-              include: {
-                owner: {
-                  select: { id: true, email: true, firstName: true, lastName: true },
+        ? (await hubOnD1())
+          ? await (async () => {
+              const rec = await (await storeDb(hit.id)).store.findUnique({ where: { id: hit.id } });
+              const owner = rec ? (await hubOwners([rec.ownerId])).get(rec.ownerId) : undefined;
+              return rec ? { ...rec, owner: owner ?? null } : null;
+            })()
+          : await withStore(hit.id, tx =>
+              tx.store.findUnique({
+                where: { id: hit.id },
+                include: {
+                  owner: {
+                    select: { id: true, email: true, firstName: true, lastName: true },
+                  },
                 },
-              },
-            })
-          )
+              })
+            )
         : null;
 
       if (!store) {
@@ -826,12 +910,17 @@ router.put(
       const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
 
       // Pre-read so a slug change can bust the OLD slug's cache key too.
-      const before = await prisma.store.findUnique({
-        where: { id },
-        select: { slug: true },
-      });
+      // NEON-ZERO (Ruling NZ-C-4): the store row is read and written through its own backend (DO / D1 directory), the
+      // owner comes from the identity service; no Postgres `stores` read.
+      const onHub = await hubOnD1();
+      const before = onHub
+        ? await (await storeDb(id)).store.findUnique({ where: { id }, select: { slug: true } })
+        : await prisma.store.findUnique({
+            where: { id },
+            select: { slug: true },
+          });
 
-      const store = await storeUpdate(prisma, {
+      const updated = await storeUpdate(prisma, {
         where: { id },
         data: {
           ...(name !== undefined && { name }),
@@ -839,12 +928,19 @@ router.put(
           ...(plan !== undefined && { plan }),
           ...(status !== undefined && { status }),
         },
-        include: {
-          owner: {
-            select: { id: true, email: true, firstName: true, lastName: true },
-          },
-        },
+        ...(onHub
+          ? {}
+          : {
+              include: {
+                owner: {
+                  select: { id: true, email: true, firstName: true, lastName: true },
+                },
+              },
+            }),
       });
+      const store = onHub
+        ? { ...updated, owner: (await hubOwners([updated.ownerId])).get(updated.ownerId) ?? null }
+        : updated;
 
       // Account status / slug / name are NEVER-stale on the storefront
       // (adversarial audit P1-7): bust the public resolve/slug/id caches +
@@ -912,6 +1008,33 @@ router.get(
     try {
       const { page: pageStr, limit: limitStr, role, search } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
+
+      // NEON-ZERO (Ruling NZ-C-4): there is no users table to page. The directory is every store owner and staff member (D1)
+      // read through the identity service, newest stores first, capped; a search / role filter runs over that capped set
+      // and says so (`truncated`). Customers are never here (they live in their store's DO, see GET /admin/customers).
+      if (await hubOnD1()) {
+        const { ids, truncated } = await hubAccountIds([req.user!.userId]);
+        const filtered = Boolean((role && role !== 'all') || search);
+        const window = filtered ? ids : ids.slice(skip, skip + limit);
+        const briefs = await getAccountsBrief(window);
+        const needle = typeof search === 'string' ? search.toLowerCase() : '';
+        const kept = briefs.filter(
+          b =>
+            (!role || role === 'all' || b.role === role) &&
+            (!needle || `${b.email} ${b.firstName} ${b.lastName}`.toLowerCase().includes(needle))
+        );
+        const pageRows = filtered ? kept.slice(skip, skip + limit) : kept;
+        const total = filtered ? kept.length : ids.length;
+        res.json({
+          success: true,
+          data: {
+            users: await hubUsers(pageRows),
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+            ...(truncated ? { truncated: true, cap: HUB_FANOUT_CAP } : {}),
+          },
+        });
+        return;
+      }
 
       // Platform users have storeId = null. Customers are store-scoped and
       // must be managed via GET /admin/customers, not this endpoint.
@@ -998,12 +1121,17 @@ router.post(
       const data = schema.parse(req.body);
       const email = data.email.toLowerCase();
 
-      const existing = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.findFirst({
-          where: { email, storeId: null },
-          select: { id: true },
-        })
-      );
+      // NEON-ZERO (Ruling NZ-C-4): the identity service is the only account store; `inviteIdentity` below answers "already
+      // exists" itself, and there is no Postgres profile row to create.
+      const onHub = await hubOnD1();
+      const existing = onHub
+        ? null
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.findFirst({
+              where: { email, storeId: null },
+              select: { id: true },
+            })
+          );
       if (existing) {
         res.status(409).json({
           success: false,
@@ -1030,32 +1158,44 @@ router.post(
         });
         return;
       }
-      const user = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.create({
-          data: {
+      const user = onHub
+        ? {
             id: invited.id,
             email,
             firstName: data.firstName,
             lastName: data.lastName,
-            passwordHash: '!pending',
-            role: UserRole.store_admin,
-            status: 'active',
-            emailVerified: false,
-            language: 'en',
-          },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            status: true,
-            createdAt: true,
-            lastLoginAt: true,
-            stores: { select: { id: true, name: true } },
-          },
-        })
-      );
+            role: 'store_admin' as const,
+            status: 'active' as const,
+            createdAt: new Date(),
+            lastLoginAt: null,
+            stores: [] as Array<{ id: string; name: string }>,
+          }
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.create({
+              data: {
+                id: invited.id,
+                email,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                passwordHash: '!pending',
+                role: UserRole.store_admin,
+                status: 'active',
+                emailVerified: false,
+                language: 'en',
+              },
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                status: true,
+                createdAt: true,
+                lastLoginAt: true,
+                stores: { select: { id: true, name: true } },
+              },
+            })
+          );
 
       await auditLog({
         action: 'user.created',
@@ -1085,24 +1225,26 @@ router.get(
     try {
       const { id } = req.params;
 
-      const user = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.findUnique({
-          where: { id },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            status: true,
-            createdAt: true,
-            lastLoginAt: true,
-            stores: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        })
-      );
+      const user = (await hubOnD1())
+        ? ((await hubUsers(await getAccountsBrief([id])))[0] ?? null)
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.findUnique({
+              where: { id },
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                status: true,
+                createdAt: true,
+                lastLoginAt: true,
+                stores: {
+                  select: { id: true, name: true, slug: true },
+                },
+              },
+            })
+          );
 
       if (!user) {
         res.status(404).json({
@@ -1149,9 +1291,21 @@ router.put(
       });
       const data = schema.parse(req.body);
 
-      const existing = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.findUnique({ where: { id } })
-      );
+      // NEON-ZERO (Ruling NZ-C-4): with the platform families on D1 the account is the identity service's record
+      // (customers are never reachable by id alone: they live in their store's DO and are edited from that store).
+      const onHub = await hubOnD1();
+      const existing: {
+        id: string;
+        email: string;
+        role: string;
+        status: string;
+        storeId: string | null;
+      } | null = onHub
+        ? ((b: { id: string; email: string; role: string; status: string } | undefined) =>
+            b ? { ...b, storeId: null } : null)((await getAccountsBrief([id]))[0])
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.findUnique({ where: { id } })
+          );
       if (!existing && data.storeId) {
         const doRoute = await customerAuthRoute(data.storeId, { write: true });
         const profile =
@@ -1250,6 +1404,20 @@ router.put(
       // change a profile row the identity service ignores); status and role go to the identity service first.
       const identityManaged = existing.storeId === null && existing.role !== 'customer';
       if (
+        onHub &&
+        (data.firstName !== undefined || data.lastName !== undefined || data.phone !== undefined)
+      ) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'MANAGED_BY_IDENTITY',
+            message:
+              'Name and phone of this account are managed by the sign-in service; only status and role can be changed here.',
+          },
+        });
+        return;
+      }
+      if (
         identityManaged &&
         (data.password ||
           data.role === 'customer' ||
@@ -1284,7 +1452,7 @@ router.put(
       }
 
       // Email collision: if changing email, ensure no other user has it.
-      if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
+      if (!onHub && data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
         const newEmail = data.email.toLowerCase();
         const collide = await asPlatformOperator(req.user!.userId, () =>
           prisma.user.findFirst({
@@ -1314,25 +1482,29 @@ router.put(
         updateData.passwordHash = await bcrypt.hash(data.password, 12);
       }
 
-      const user = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.update({
-          where: { id },
-          data: updateData,
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            status: true,
-            createdAt: true,
-            lastLoginAt: true,
-            stores: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        })
-      );
+      const user = onHub
+        ? ((await hubUsers(await getAccountsBrief([id])))[0] as NonNullable<
+            Awaited<ReturnType<typeof hubUsers>>[number]
+          >)
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.update({
+              where: { id },
+              data: updateData,
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                status: true,
+                createdAt: true,
+                lastLoginAt: true,
+                stores: {
+                  select: { id: true, name: true, slug: true },
+                },
+              },
+            })
+          );
 
       // Don't include `password` in the audit metadata — only that it
       // changed. Same treatment as auth.service.changePassword.
@@ -1375,7 +1547,10 @@ router.put(
         fromTo.status.to !== 'active';
       const roleChanged = fromTo.role !== undefined;
       if (statusLeftActive || roleChanged) {
-        await AuthService.revokeAllSessions(id);
+        if (onHub) {
+          await revokeIdentityUser(id, 'admin-update');
+          await revokeUserMerchantKeysD1(id, new Date());
+        } else await AuthService.revokeAllSessions(id);
       }
 
       await auditLog({
@@ -1420,6 +1595,55 @@ router.delete(
             message: 'You cannot delete your own account',
           },
         });
+        return;
+      }
+
+      // NEON-ZERO (Ruling NZ-C-4): the account is the identity service's; erasing it ends every session and passkey there, the
+      // membership rows go from D1, and owned stores still block exactly as before. Deleting a super_admin is refused here (the
+      // directory cannot count super_admins without a users table, and platform administrators are operator-only, Ruling ID-12).
+      if (await hubOnD1()) {
+        const acct = (await getAccountsBrief([id]))[0];
+        if (!acct) {
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'User not found' },
+          });
+          return;
+        }
+        if (acct.role === 'super_admin') {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'OPERATOR_ONLY',
+              message:
+                'Platform administrators are removed by the platform operator, not through this endpoint.',
+            },
+          });
+          return;
+        }
+        const owned = (await hubOwnedStores([id])).get(id) ?? [];
+        if (owned.length > 0) {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'USER_OWNS_STORES',
+              message: `User still owns ${owned.length} store(s) (${owned.map(s => s.name).join(', ')}). Reassign or delete those first.`,
+            },
+          });
+          return;
+        }
+        await eraseIdentityUser(id);
+        await eraseUserAccess(id, acct.email);
+        await auditLog({
+          action: 'user.deleted',
+          userId: req.user!.userId,
+          resourceType: 'user',
+          resourceId: id,
+          details: { email: acct.email, role: acct.role },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        res.json({ success: true, data: { message: 'User deleted' } });
         return;
       }
 
@@ -1576,6 +1800,8 @@ router.get(
   requireRole(['super_admin', 'store_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       // Store admins see only stats for the stores they own. Super admins
       // get the platform-wide aggregate.
       const ownerScope = ownerScopeForReq(req);
@@ -1589,20 +1815,26 @@ router.get(
       // transaction per store) and merged here. A store admin's dashboard spans
       // only the stores they own.
       const dashboardStoreIds = await boundedFanoutStoreIds(await ownedStoreIds(ownerScope));
+      // NEON-ZERO (Ruling NZ-C-4): store / account counts and the recent-stores card come from D1 + identity.
+      const onHub = await hubOnD1();
       const [storeCount, userCount, orderTotals, recentStores, recentOrdersPage] =
         await Promise.all([
-          prisma.store.count({ where: storeFilter }),
+          onHub
+            ? hubStorePage({ ownerId: ownerScope, skip: 0, take: 1 }).then(r => r.total)
+            : prisma.store.count({ where: storeFilter }),
           // User count is platform-wide and only meaningful for super admins.
           // Store admins don't have access to the cross-tenant user table —
           // return 0 so the dashboard widget renders without leaking data.
           ownerScope
             ? Promise.resolve(0)
-            : asPlatformOperator(req.user!.userId, () => prisma.user.count()),
+            : onHub
+              ? hubAccountIds([req.user!.userId]).then(r => r.ids.length)
+              : asPlatformOperator(req.user!.userId, () => prisma.user.count()),
           acrossStores(
             async storeId => {
               const [count, revenue] = await Promise.all([
-                prisma.order.count({ where: { storeId } }),
-                prisma.order.aggregate({
+                (await storeDb(storeId)).order.count({ where: { storeId } }),
+                (await storeDb(storeId)).order.aggregate({
                   where: { storeId, paymentStatus: 'paid' },
                   _sum: { total: true },
                 }),
@@ -1611,14 +1843,22 @@ router.get(
             },
             { storeIds: dashboardStoreIds }
           ),
-          prisma.store.findMany({
-            where: storeFilter,
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              owner: { select: { email: true } },
-            },
-          }),
+          onHub
+            ? hubStorePage({ ownerId: ownerScope, skip: 0, take: 5 }).then(async r => {
+                const owners = await hubOwners(r.rows.map(s => s.ownerId));
+                return r.rows.map(s => ({
+                  ...s,
+                  owner: { email: owners.get(s.ownerId)?.email ?? '' },
+                }));
+              })
+            : prisma.store.findMany({
+                where: storeFilter,
+                take: 5,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                  owner: { select: { email: true } },
+                },
+              }),
           pageAcrossStores({
             storeIds: dashboardStoreIds,
             skip: 0,
@@ -1626,13 +1866,17 @@ router.get(
 
             orderKey: (row: { createdAt: Date }) => row.createdAt,
             fetch: async window => ({
-              rows: await prisma.order.findMany({
+              rows: await (
+                await storeDb(currentStoreId())
+              ).order.findMany({
                 where: { storeId: currentStoreId() },
                 take: window,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                  customer: { select: { email: true, firstName: true, lastName: true } },
-                  store: { select: { name: true } },
+                  ...(HUB_ON
+                    ? { customerId: true }
+                    : { customer: { select: { email: true, firstName: true, lastName: true } } }),
+                  ...(HUB_ON ? {} : { store: { select: { name: true } } }),
                 },
               }),
               total: 0,
@@ -1640,14 +1884,18 @@ router.get(
           }),
         ]);
       // Super-admin only: signups that came through the store badge / referral email (UTM first touch).
-      const referrals = ownerScope
-        ? null
-        : await asPlatformOperator(req.user!.userId, () => referralSignupCounts());
+      const referrals =
+        ownerScope || onHub
+          ? null
+          : await asPlatformOperator(req.user!.userId, () => referralSignupCounts());
       const orderCount = orderTotals.reduce((n, r) => n + r.value.count, 0);
       const revenueResult = {
         _sum: { total: orderTotals.reduce((n, r) => n + r.value.revenue, 0) },
       };
-      const recentOrders = recentOrdersPage.rows;
+      const recentOrders = await attachCustomerRel(
+        await attachStoreRel(recentOrdersPage.rows, HUB_ON),
+        HUB_ON
+      );
 
       res.json({
         success: true,
@@ -1678,6 +1926,8 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       const { page: pageStr, limit: limitStr, storeId, status, search } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
@@ -1687,7 +1937,7 @@ router.get(
       // products is RLS-protected; this is a cross-store super-admin list, so it
       // is read store by store and merged (see lib/cross-store.ts). The `storeId`
       // query filter narrows which stores are visited.
-      const { rows: products, total } = await pageAcrossStores({
+      const { rows: productRows, total } = await pageAcrossStores({
         storeIds: storeIdsFromFilter(storeId),
         skip,
         take: limit,
@@ -1708,16 +1958,16 @@ router.get(
             };
           }
           const [rows, count] = await Promise.all([
-            prisma.product.findMany({
+            (await storeDb(sid)).product.findMany({
               where: scoped,
               take: window,
               orderBy: { createdAt: 'desc' },
               include: {
-                store: { select: { id: true, name: true } },
+                ...(HUB_ON ? {} : { store: { select: { id: true, name: true } } }),
                 images: { take: 1 },
               },
             }),
-            prisma.product.count({ where: scoped }),
+            (await storeDb(sid)).product.count({ where: scoped }),
           ]);
           return { rows, total: count };
         },
@@ -1726,7 +1976,7 @@ router.get(
       res.json({
         success: true,
         data: {
-          products,
+          products: await attachStoreRel(productRows, HUB_ON),
           pagination: {
             page,
             limit,
@@ -1750,36 +2000,42 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       const { id } = req.params;
 
       // products is RLS-protected and the id alone does not say which store owns
       // it: a definer (`ebda_entity_store_id`, exact primary-key match, store id
       // only) finds the store, and the read runs in that store's scope.
-      const productStoreId = await getEntityStoreId('product', id);
+      // NEON-ZERO (Ruling NZ-C-4): D1 has no product index, so on the hub the owning store is found by a bounded fan-out of
+      // primary-key reads over the capped store list (a rare, human-driven lookup).
+      const productStoreId = (await hubOnD1())
+        ? await findProductStoreOnHub(id)
+        : await getEntityStoreId('product', id);
       const product = productStoreId
-        ? await withStore(productStoreId, tx =>
-            tx.product.findUnique({
-              where: { id, storeId: productStoreId },
-              include: {
-                store: { select: { id: true, name: true, slug: true } },
-                images: { orderBy: { position: 'asc' } },
-                categories: {
-                  include: { category: { select: { id: true, name: true } } },
-                },
-                variants: {
-                  include: {
-                    options: {
-                      include: {
-                        value: {
-                          include: { option: true },
-                        },
+        ? await (
+            await storeDb(productStoreId)
+          ).product.findUnique({
+            where: { id, storeId: productStoreId },
+            include: {
+              ...(HUB_ON ? {} : { store: { select: { id: true, name: true, slug: true } } }),
+              images: { orderBy: { position: 'asc' } },
+              categories: {
+                include: { category: { select: { id: true, name: true } } },
+              },
+              variants: {
+                include: {
+                  options: {
+                    include: {
+                      value: {
+                        include: { option: true },
                       },
                     },
                   },
                 },
               },
-            })
-          )
+            },
+          })
         : null;
 
       if (!product) {
@@ -1792,7 +2048,7 @@ router.get(
 
       // Transform categories to flat array
       const transformedProduct = {
-        ...product,
+        ...(HUB_ON ? (await attachStoreRel([product], true))[0] : product),
         categories: product.categories.map(pc => pc.category),
       };
 
@@ -1815,6 +2071,8 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       const { page: pageStr, limit: limitStr, storeId, status, paymentStatus } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
@@ -1824,7 +2082,7 @@ router.get(
 
       // orders is RLS-protected; this is a cross-store super-admin list, read
       // store by store and merged (see lib/cross-store.ts).
-      const { rows: orders, total } = await pageAcrossStores({
+      const { rows: orderRows, total } = await pageAcrossStores({
         storeIds: storeIdsFromFilter(storeId),
         skip,
         take: limit,
@@ -1833,17 +2091,23 @@ router.get(
         fetch: async window => {
           const scoped: Prisma.OrderWhereInput = { ...where, storeId: currentStoreId() };
           const [rows, count] = await Promise.all([
-            prisma.order.findMany({
+            (await storeDb(currentStoreId())).order.findMany({
               where: scoped,
               take: window,
               orderBy: { createdAt: 'desc' },
               include: {
-                store: { select: { id: true, name: true } },
-                customer: { select: { id: true, email: true, firstName: true, lastName: true } },
+                ...(HUB_ON ? {} : { store: { select: { id: true, name: true } } }),
+                ...(HUB_ON
+                  ? { customerId: true }
+                  : {
+                      customer: {
+                        select: { id: true, email: true, firstName: true, lastName: true },
+                      },
+                    }),
                 items: { take: 3 },
               },
             }),
-            prisma.order.count({ where: scoped }),
+            (await storeDb(currentStoreId())).order.count({ where: scoped }),
           ]);
           return { rows, total: count };
         },
@@ -1852,7 +2116,7 @@ router.get(
       res.json({
         success: true,
         data: {
-          orders,
+          orders: await attachCustomerRel(await attachStoreRel(orderRows, HUB_ON), HUB_ON),
           pagination: {
             page,
             limit,
@@ -1876,6 +2140,8 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       const { page: pageStr, limit: limitStr, storeId, search } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
@@ -1890,7 +2156,7 @@ router.get(
 
       // customers is RLS-protected; this is a cross-store super-admin list, read
       // store by store and merged (see lib/cross-store.ts).
-      const { rows: customers, total } = await pageAcrossStores({
+      const { rows: customerRows, total } = await pageAcrossStores({
         storeIds: storeIdsFromFilter(storeId),
         skip,
         take: limit,
@@ -1899,7 +2165,7 @@ router.get(
         fetch: async window => {
           const scoped: Prisma.CustomerWhereInput = { ...where, storeId: currentStoreId() };
           const [rows, count] = await Promise.all([
-            prisma.customer.findMany({
+            (await storeDb(currentStoreId())).customer.findMany({
               where: scoped,
               take: window,
               orderBy: { createdAt: 'desc' },
@@ -1912,10 +2178,11 @@ router.get(
                 totalOrders: true,
                 totalSpent: true,
                 createdAt: true,
-                store: { select: { id: true, name: true } },
+                storeId: true,
+                ...(HUB_ON ? {} : { store: { select: { id: true, name: true } } }),
               },
             }),
-            prisma.customer.count({ where: scoped }),
+            (await storeDb(currentStoreId())).customer.count({ where: scoped }),
           ]);
           return { rows, total: count };
         },
@@ -1924,7 +2191,7 @@ router.get(
       res.json({
         success: true,
         data: {
-          customers,
+          customers: await attachStoreRel(customerRows, HUB_ON),
           pagination: {
             page,
             limit,
@@ -1948,7 +2215,7 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { page: pageStr, limit: limitStr, action, userId, resourceType } = req.query;
+      const { page: pageStr, limit: limitStr, action, userId, resourceType, storeId } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
       // audit_logs is store-scoped under RLS and also holds platform events with
@@ -1960,6 +2227,7 @@ router.get(
         action: typeof action === 'string' && action ? action : undefined,
         userId: typeof userId === 'string' && userId ? userId : undefined,
         resourceType: typeof resourceType === 'string' && resourceType ? resourceType : undefined,
+        storeId: typeof storeId === 'string' && storeId ? storeId : undefined,
         limit,
         offset: skip,
       });
@@ -2083,10 +2351,12 @@ router.get(
         // Fetch store metadata for all referenced storeIds
         const storeIds = [...new Set(storeStats.map(r => r.store_id))];
 
-        const stores = await prisma.store.findMany({
-          where: { id: { in: storeIds } },
-          select: { id: true, slug: true, name: true, plan: true },
-        });
+        const stores = (await hubOnD1())
+          ? await hubStoresById(storeIds)
+          : await prisma.store.findMany({
+              where: { id: { in: storeIds } },
+              select: { id: true, slug: true, name: true, plan: true },
+            });
         const storeMap = new Map(stores.map(s => [s.id, s]));
 
         // Aggregate per-store
@@ -2235,6 +2505,42 @@ export async function loadUsageHistoryRows(
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
+  // `store_usage_snapshots` is on D1 once the `ai-usage` family moved (Ruling NZ-INTEG-1): one global read, no per-store Postgres
+  // transaction. The routed delegate has no `include`, so the store's slug / name / plan come from the D1 directory.
+  if (await platformFamilyOnD1('ai-usage')) {
+    const d1db = await requirePlatformDb(); // D1 has no RLS: the platform client directly, no store scope to open
+    const periods: Array<{ periodStart: Date }> = await d1db.storeUsageSnapshot.groupBy({
+      by: ['periodStart'],
+      orderBy: { periodStart: 'desc' },
+      take: months,
+    });
+    if (periods.length === 0) return [];
+    const snaps: Awaited<ReturnType<typeof loadUsageHistoryRows>> =
+      await d1db.storeUsageSnapshot.findMany({
+        where: { periodStart: { in: periods.map(p => p.periodStart) } },
+        orderBy: [{ periodStart: 'desc' }],
+      });
+    const d1 = platformDirectoryDb();
+    const briefs = new Map(
+      (d1
+        ? await d1StoreBriefs(
+            d1,
+            snaps.map(r => r.storeId)
+          )
+        : []
+      ).map(b => [b.id, b])
+    );
+    return snaps.map(r => ({
+      ...r,
+      store: briefs.has(r.storeId)
+        ? {
+            slug: briefs.get(r.storeId)!.slug,
+            name: briefs.get(r.storeId)!.name,
+            plan: briefs.get(r.storeId)!.plan,
+          }
+        : null,
+    }));
+  }
   const perStore = await acrossStores(
     storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
     { storeIds: await boundedFanoutStoreIds() }
@@ -2373,6 +2679,8 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       // BE:S-21: every filter is validated; an unknown status / unparseable date used to reach Prisma (or `new Date(...)`) and 500.
       const { storeId, status, paymentStatus, from, to } = exportOrdersQuery.parse(req.query);
 
@@ -2404,42 +2712,45 @@ router.get(
       // long one would blow the 30s budget).
       const exportStoreIds =
         storeIdsFromFilter(storeId) ??
-        (await prisma.store.findMany({ select: { id: true }, orderBy: { id: 'asc' } })).map(
-          st => st.id
-        );
+        ((await hubOnD1())
+          ? (await hubFanoutStoreIds()).ids
+          : (await prisma.store.findMany({ select: { id: true }, orderBy: { id: 'asc' } })).map(
+              st => st.id
+            ));
       for (const exportStoreId of exportStoreIds) {
         let cursor: string | undefined;
         while (true) {
-          const rows = await withStore(exportStoreId, tx =>
-            tx.order.findMany({
-              where: { ...where, storeId: exportStoreId },
-              orderBy: { id: 'asc' }, // stable cursor anchor
-              take: EXPORT_CHUNK_SIZE,
-              // Prisma cursor: skip the cursor row itself (skip: 1) on every
-              // page after the first. The `id` field is a UUID primary key so
-              // it uniquely identifies the last-seen row.
-              ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-              select: {
-                id: true,
-                orderNumber: true,
-                storeId: true,
-                status: true,
-                paymentStatus: true,
-                total: true,
-                shippingAddress: true,
-                createdAt: true,
-                store: { select: { name: true } },
-                customer: {
-                  select: { email: true, firstName: true, lastName: true },
-                },
-              },
-            })
-          );
+          const rows = await (
+            await storeDb(exportStoreId)
+          ).order.findMany({
+            where: { ...where, storeId: exportStoreId },
+            orderBy: { id: 'asc' }, // stable cursor anchor
+            take: EXPORT_CHUNK_SIZE,
+            // Prisma cursor: skip the cursor row itself (skip: 1) on every
+            // page after the first. The `id` field is a UUID primary key so
+            // it uniquely identifies the last-seen row.
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            select: {
+              id: true,
+              orderNumber: true,
+              storeId: true,
+              status: true,
+              paymentStatus: true,
+              total: true,
+              shippingAddress: true,
+              createdAt: true,
+              ...(HUB_ON ? {} : { store: { select: { name: true } } }),
+              ...(HUB_ON
+                ? { customerId: true }
+                : { customer: { select: { email: true, firstName: true, lastName: true } } }),
+            },
+          });
 
           if (rows.length === 0) break;
+          const rowsWithStore = await attachCustomerRel(await attachStoreRel(rows, HUB_ON), HUB_ON);
 
           // Build and flush this chunk to the TCP buffer
-          const chunk = rows
+          const chunk = rowsWithStore
             .map(o => {
               const addr = o.shippingAddress as Record<string, string> | null;
               return [
@@ -2505,6 +2816,8 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // a DO store's read client cannot join `store` (it lives in D1): the hub attaches the name afterwards
+      const HUB_ON = await hubOnD1();
       const { storeId, status, paymentStatus, from, to } = req.query;
 
       const where: Prisma.OrderWhereInput = {};
@@ -2520,8 +2833,8 @@ router.get(
       // cut to the same 50 000-row ceiling as before.
       const orders = (
         await acrossStoresFlat(
-          sid =>
-            prisma.order.findMany({
+          async sid =>
+            (await storeDb(sid)).order.findMany({
               where: { ...where, storeId: sid },
               orderBy: { createdAt: 'asc' },
               take: 50000,
@@ -2534,35 +2847,37 @@ router.get(
                 total: true,
                 shippingAddress: true,
                 createdAt: true,
-                store: { select: { name: true } },
-                customer: {
-                  select: { email: true, firstName: true, lastName: true },
-                },
+                ...(HUB_ON ? {} : { store: { select: { name: true } } }),
+                ...(HUB_ON
+                  ? { customerId: true }
+                  : { customer: { select: { email: true, firstName: true, lastName: true } } }),
               },
             }),
-          { storeIds: storeIdsFromFilter(storeId) }
+          { storeIds: storeIdsFromFilter(storeId) ?? (await boundedFanoutStoreIds()) }
         )
       )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
         .slice(0, 50000);
 
-      const rows = orders.map(o => {
-        const addr = o.shippingAddress as Record<string, string> | null;
-        return {
-          orderNumber: o.orderNumber ?? '',
-          storeId: o.storeId,
-          storeName: o.store?.name ?? '',
-          status: o.status,
-          paymentStatus: o.paymentStatus,
-          total: fromMinor(o.total),
-          customerEmail: o.customer?.email ?? '',
-          customerName: o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : '',
-          shippingCountry: addr?.country ?? '',
-          shippingCity: addr?.city ?? '',
-          shippingArea: addr?.area ?? '',
-          createdAt: o.createdAt.toISOString(),
-        };
-      });
+      const rows = (await attachCustomerRel(await attachStoreRel(orders, HUB_ON), HUB_ON)).map(
+        o => {
+          const addr = o.shippingAddress as Record<string, string> | null;
+          return {
+            orderNumber: o.orderNumber ?? '',
+            storeId: o.storeId,
+            storeName: o.store?.name ?? '',
+            status: o.status,
+            paymentStatus: o.paymentStatus,
+            total: fromMinor(o.total),
+            customerEmail: o.customer?.email ?? '',
+            customerName: o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : '',
+            shippingCountry: addr?.country ?? '',
+            shippingCity: addr?.city ?? '',
+            shippingArea: addr?.area ?? '',
+            createdAt: o.createdAt.toISOString(),
+          };
+        }
+      );
 
       await auditLog({
         action: 'admin.export.orders',

@@ -3,8 +3,9 @@ import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { runInTenantContext } from '@ebda/database';
+
 import { listOpenBackorders, cancelBackorder } from '../services/accounting/backorder.service';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get(
   requireFeature('inventory.backorder'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         listOpenBackorders(req.params.storeId)
       );
       res.json({ data });
@@ -52,7 +53,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         cancelBackorder(req.params.storeId, req.params.id, body.data.reason, req.user?.userId)
       );
       res.json({ data });

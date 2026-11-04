@@ -17,7 +17,9 @@ import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
-import ROUTES from './route-table.json';
+import ALL_ROUTES from './route-table.json';
+
+const ROUTES: string[] = ALL_ROUTES as string[];
 
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };
@@ -26,7 +28,14 @@ const e = env as unknown as {
     prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } };
   };
   TEST_PLATFORM_MIGRATIONS: unknown[];
+  /** Test-worker bindings (vitest.workers.config.mts): the host's env does not reach workerd's `process.env`. */
+  SWEEP_STRICT?: string;
+  SWEEP_FILTER?: string;
 };
+
+/** `SWEEP_FILTER=<regex>` runs only the routes whose `METHOD /path` matches (the strict assertion then covers that subset). */
+const FILTER = e.SWEEP_FILTER ? new RegExp(e.SWEEP_FILTER) : undefined;
+const inSubset = (line: string) => !e.SWEEP_FILTER || new RegExp(e.SWEEP_FILTER).test(line);
 
 const BASE = 'https://api.ebda.app/api/v1';
 const ZERO = '00000000-0000-4000-8000-000000000001';
@@ -37,6 +46,9 @@ const MARKER_KEYS = [
   'platform_cutover.inbox',
   'platform_cutover.ai-usage',
   'platform_cutover.analytics',
+  'platform_cutover.payments',
+  'platform_cutover.ops',
+  'platform_cutover.audit',
   'customer_auth_cutover.__all',
 ];
 
@@ -67,6 +79,8 @@ async function hit(
   headers: Record<string, string>,
   body?: unknown
 ): Promise<Response | undefined> {
+  // SWEEP_FILTER=<regex over "METHOD /route">: measure a subset (a group owner re-checks only its routes).
+  if (!inSubset(`${method} ${route}`)) return undefined;
   const t0 = Date.now();
   const r: Result = { group, method, route, url, status: 0, ms: 0 };
   let res: Response | undefined;
@@ -177,7 +191,9 @@ describe.skipIf(e.E2E_DB === '1')(
         .replace(/\/$/, '/');
 
     it('every GET route (public anonymous, merchant as store_admin, /admin as super_admin)', async () => {
-      const gets = (ROUTES as string[]).filter(r => r.startsWith('GET ')).map(r => r.slice(4));
+      const gets = (ROUTES as string[])
+        .filter(r => r.startsWith('GET ') && inSubset(r))
+        .map(r => r.slice(4));
       await pool(gets, 8, async route => {
         const isPublic = route.startsWith('/public') || route.startsWith('/stores/public');
         const isAdminNs = route.startsWith('/admin') || route.startsWith('/internal');
@@ -192,12 +208,12 @@ describe.skipIf(e.E2E_DB === '1')(
           headers
         );
       });
-      expect(results.length).toBeGreaterThan(300);
+      if (!e.SWEEP_FILTER) expect(results.length).toBeGreaterThan(300);
     }, 600_000);
 
     it('GET as a logged-in storefront customer (customer-scoped reads)', async () => {
       const mine = (ROUTES as string[])
-        .filter(r => r.startsWith('GET '))
+        .filter(r => r.startsWith('GET ') && inSubset(r))
         .map(r => r.slice(4))
         .filter(r =>
           /^\/(auth\/me|addresses|me\/|public\/orders|public\/customers|public\/wishlist|public\/cart|public\/loyalty|public\/wallet)/.test(
@@ -214,7 +230,9 @@ describe.skipIf(e.E2E_DB === '1')(
     }, 300_000);
 
     it('every mutating route with an empty JSON body (validation must answer before any Postgres read)', async () => {
-      const writes = (ROUTES as string[]).filter(r => !r.startsWith('GET ')).map(r => r.split(' '));
+      const writes = (ROUTES as string[])
+        .filter(r => !r.startsWith('GET ') && inSubset(r))
+        .map(r => r.split(' '));
       await pool(writes, 8, async ([method, route]) => {
         const isPublic =
           route!.startsWith('/public') ||
@@ -228,164 +246,209 @@ describe.skipIf(e.E2E_DB === '1')(
       });
     }, 600_000);
 
-    it('payment / billing / shipping / alert webhooks (unsigned: must be a 4xx or a retryable 503 from D1, never a Postgres 500)', async () => {
-      const hooks: Array<[string, string]> = [
-        ['POST', '/webhooks/payment/paymob'],
-        ['POST', '/webhooks/payment/tap'],
-        ['POST', '/webhooks/payment/myfatoorah'],
-        ['POST', '/webhooks/payment/fawry'],
-        ['POST', '/webhooks/payment/stripe'],
-        ['POST', `/webhooks/payment/paymob/s/${storeId}`],
-        ['POST', `/webhooks/payment/tap/s/${storeId}`],
-        ['POST', '/webhooks/payment'],
-        ['GET', '/webhooks/payment/callback?merchant_order_id=x'],
-        ['GET', '/webhooks/payment/error'],
-        ['POST', `/webhooks/shipping/bosta/${storeId}/sweep`],
-        ['POST', '/webhooks/billing/tap'],
-        ['POST', '/webhooks/billing/stripe'],
-        ['POST', '/webhooks/billing/paymob'],
-        ['POST', '/alerts/webhooks/sentry'],
-      ];
-      for (const [m, p] of hooks)
-        await hit(
-          'WEBHOOK',
-          m,
-          p,
-          BASE + p,
-          {},
-          m === 'POST'
-            ? { type: 'TRANSACTION', obj: { id: 1, order: { id: 'sweep-ref' } } }
-            : undefined
+    it.skipIf(!!FILTER)(
+      'payment / billing / shipping / alert webhooks (unsigned: must be a 4xx or a retryable 503 from D1, never a Postgres 500)',
+      async () => {
+        const hooks: Array<[string, string]> = [
+          ['POST', '/webhooks/payment/paymob'],
+          ['POST', '/webhooks/payment/tap'],
+          ['POST', '/webhooks/payment/myfatoorah'],
+          ['POST', '/webhooks/payment/fawry'],
+          ['POST', '/webhooks/payment/stripe'],
+          ['POST', `/webhooks/payment/paymob/s/${storeId}`],
+          ['POST', `/webhooks/payment/tap/s/${storeId}`],
+          ['POST', '/webhooks/payment'],
+          ['GET', '/webhooks/payment/callback?merchant_order_id=x'],
+          ['GET', '/webhooks/payment/error'],
+          ['POST', `/webhooks/shipping/bosta/${storeId}/sweep`],
+          ['POST', '/webhooks/billing/tap'],
+          ['POST', '/webhooks/billing/stripe'],
+          ['POST', '/webhooks/billing/paymob'],
+          ['POST', '/alerts/webhooks/sentry'],
+        ];
+        for (const [m, p] of hooks)
+          await hit(
+            'WEBHOOK',
+            m,
+            p,
+            BASE + p,
+            {},
+            m === 'POST'
+              ? { type: 'TRANSACTION', obj: { id: 1, order: { id: 'sweep-ref' } } }
+              : undefined
+          );
+      },
+      120_000
+    );
+
+    it.skipIf(!!FILTER)(
+      'storefront flow: home, category, search, PDP, cart, checkout quote, order create (up to payment)',
+      async () => {
+        const h = { 'x-store-id': storeId, 'x-session-id': 'sess-flow', 'accept-language': 'ar' };
+        const adm = { authorization: `Bearer ${sa}`, 'x-store-id': storeId };
+        await hit('FLOW', 'GET', '/public/stores/:slug', `${BASE}/public/stores/sweep-shop`, h);
+        const cat = await hit(
+          'FLOW',
+          'POST',
+          '/stores/:storeId/categories',
+          `${BASE}/stores/${storeId}/categories`,
+          adm,
+          { name: 'Sweep Cat' }
         );
-    }, 120_000);
-
-    it('storefront flow: home, category, search, PDP, cart, checkout quote, order create (up to payment)', async () => {
-      const h = { 'x-store-id': storeId, 'x-session-id': 'sess-flow', 'accept-language': 'ar' };
-      const adm = { authorization: `Bearer ${sa}`, 'x-store-id': storeId };
-      await hit('FLOW', 'GET', '/public/stores/:slug', `${BASE}/public/stores/sweep-shop`, h);
-      const cat = await hit(
-        'FLOW',
-        'POST',
-        '/stores/:storeId/categories',
-        `${BASE}/stores/${storeId}/categories`,
-        adm,
-        { name: 'Sweep Cat' }
-      );
-      const prod = await hit(
-        'FLOW',
-        'POST',
-        '/stores/:storeId/products',
-        `${BASE}/stores/${storeId}/products`,
-        adm,
-        {
-          name: 'Sweep Product',
-          price: 5000,
-          inventory: 10,
-          status: 'active',
-        }
-      );
-      let productId = ZERO;
-      try {
-        const j = (await prod?.clone().json()) as {
-          data?: { id?: string; product?: { id?: string } };
-        };
-        productId = j.data?.id ?? j.data?.product?.id ?? ZERO;
-      } catch {
-        /* creation failed: the following steps still run against a missing product and are recorded */
-      }
-      void cat;
-      await hit('FLOW', 'GET', '/public/categories', `${BASE}/public/categories`, h);
-      await hit('FLOW', 'GET', '/public/products', `${BASE}/public/products`, h);
-      await hit(
-        'FLOW',
-        'GET',
-        '/public/products?search=sweep',
-        `${BASE}/public/products?search=sweep`,
-        h
-      );
-      await hit('FLOW', 'GET', '/public/products/:id', `${BASE}/public/products/${productId}`, h);
-      // a storefront customer: register (the DO customer-auth path, marker set) -> bearer for cart / quote / order
-      const reg = await hit('FLOW', 'POST', '/auth/register', `${BASE}/auth/register`, h, {
-        email: 'sweep-customer@exit-test.invalid',
-        password: 'Sweep-Passw0rd!x',
-        firstName: 'Sweep',
-        lastName: 'Customer',
-        storeId,
-      });
-      let bearer = '';
-      try {
-        const j = (await reg?.clone().json()) as {
-          data?: { accessToken?: string; tokens?: { accessToken?: string } };
-        };
-        bearer = j.data?.accessToken ?? j.data?.tokens?.accessToken ?? '';
-      } catch {
-        /* register failed: the steps below run anonymously and are recorded */
-      }
-      const ch = bearer ? { ...h, authorization: `Bearer ${bearer}` } : h;
-      await hit('FLOW', 'GET', '/public/cart', `${BASE}/public/cart`, ch);
-      await hit('FLOW', 'POST', '/public/cart/items', `${BASE}/public/cart/items`, ch, {
-        productId,
-        quantity: 1,
-      });
-      await hit('FLOW', 'GET', '/public/cart (after add)', `${BASE}/public/cart`, ch);
-      const order = {
-        shippingAddress: {
-          firstName: 'Sweep',
-          lastName: 'Buyer',
-          address1: '1 Test St',
-          city: 'Cairo',
-          phone: '+201000000000',
-          country: 'EG',
-        },
-        paymentMethod: 'cod',
-      };
-      await hit('FLOW', 'POST', '/public/orders/quote', `${BASE}/public/orders/quote`, ch, order);
-      await hit('FLOW', 'POST', '/public/orders', `${BASE}/public/orders`, ch, order);
-      await hit('FLOW', 'POST', '/auth/login', `${BASE}/auth/login`, h, {
-        email: 'sweep-customer@exit-test.invalid',
-        password: 'Sweep-Passw0rd!x',
-      });
-      await hit('FLOW', 'POST', '/auth/forgot-password', `${BASE}/auth/forgot-password`, h, {
-        email: 'sweep-customer@exit-test.invalid',
-      });
-      await hit(
-        'FLOW',
-        'POST',
-        '/auth/merchant/signup',
-        `${BASE}/auth/merchant/signup`,
-        {},
-        { email: 'm@exit-test.invalid', password: 'Sweep-Passw0rd!x', storeName: 'x' }
-      );
-    }, 180_000);
-
-    it('cron and job groups for a DO store (scheduled events; outcomes are in the Worker log lines "[cron] job failed")', async () => {
-      const api = e.API as unknown as {
-        scheduled?(o: { cron: string; scheduledTime?: Date }): Promise<{ outcome: string }>;
-      };
-      const crons = ['0 * * * *', '*/15 * * * *', '*/30 * * * *', '0 */12 * * *', '0 3 * * *'];
-      for (const cron of crons) {
-        const t0 = Date.now();
-        let outcome = 'ran (job outcomes: Worker log lines "[cron] job done|failed")';
+        const prod = await hit(
+          'FLOW',
+          'POST',
+          '/stores/:storeId/products',
+          `${BASE}/stores/${storeId}/products`,
+          adm,
+          {
+            name: 'Sweep Product',
+            price: 5000,
+            inventory: 10,
+            status: 'active',
+          }
+        );
+        let productId = ZERO;
         try {
-          outcome =
-            (await api.scheduled?.({ cron, scheduledTime: new Date() }))?.outcome ?? outcome;
-        } catch (err) {
-          outcome = `threw: ${String(err).slice(0, 160)}`;
+          const j = (await prod?.clone().json()) as {
+            data?: { id?: string; product?: { id?: string } };
+          };
+          productId = j.data?.id ?? j.data?.product?.id ?? ZERO;
+        } catch {
+          /* creation failed: the following steps still run against a missing product and are recorded */
         }
-        const r: Result = {
-          group: 'CRON',
-          method: 'SCHEDULED',
-          route: cron,
-          url: cron,
-          status: outcome.startsWith('threw') ? -1 : 200,
-          ms: Date.now() - t0,
-          message: outcome,
+        if (productId === ZERO) {
+          // Product create is its own fix (group B). The cart / quote / order steps below must not be skipped meanwhile:
+          // seed one product through the operator seed route so they run against a real, priced, in-stock row.
+          const seeded = crypto.randomUUID();
+          const now = Date.now();
+          const r = await e.API.fetch(
+            `https://api.ebda.app/api/v1/internal/store-do/${storeId}/seed`,
+            {
+              method: 'POST',
+              headers: {
+                authorization: 'Bearer workers-test-seed-token',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                products: [
+                  {
+                    id: seeded,
+                    storeId,
+                    name: 'Seeded Sweep Product',
+                    slug: 'seeded-sweep',
+                    price: 5000,
+                    inventory: 10,
+                    status: 'active',
+                    hasVariants: false,
+                    createdAt: now,
+                    updatedAt: now,
+                  },
+                ],
+              }),
+            }
+          );
+          if (r.status === 200) productId = seeded;
+        }
+        void cat;
+        await hit('FLOW', 'GET', '/public/categories', `${BASE}/public/categories`, h);
+        await hit('FLOW', 'GET', '/public/products', `${BASE}/public/products`, h);
+        await hit(
+          'FLOW',
+          'GET',
+          '/public/products?search=sweep',
+          `${BASE}/public/products?search=sweep`,
+          h
+        );
+        await hit('FLOW', 'GET', '/public/products/:id', `${BASE}/public/products/${productId}`, h);
+        // a storefront customer: register (the DO customer-auth path, marker set) -> bearer for cart / quote / order
+        const reg = await hit('FLOW', 'POST', '/auth/register', `${BASE}/auth/register`, h, {
+          email: 'sweep-customer@exit-test.invalid',
+          password: 'Sweep-Passw0rd!x',
+          firstName: 'Sweep',
+          lastName: 'Customer',
+          storeId,
+        });
+        let bearer = '';
+        try {
+          const j = (await reg?.clone().json()) as {
+            data?: { accessToken?: string; tokens?: { accessToken?: string } };
+          };
+          bearer = j.data?.accessToken ?? j.data?.tokens?.accessToken ?? '';
+        } catch {
+          /* register failed: the steps below run anonymously and are recorded */
+        }
+        const ch = bearer ? { ...h, authorization: `Bearer ${bearer}` } : h;
+        await hit('FLOW', 'GET', '/public/cart', `${BASE}/public/cart`, ch);
+        await hit('FLOW', 'POST', '/public/cart/items', `${BASE}/public/cart/items`, ch, {
+          productId,
+          quantity: 1,
+        });
+        await hit('FLOW', 'GET', '/public/cart (after add)', `${BASE}/public/cart`, ch);
+        const order = {
+          shippingAddress: {
+            firstName: 'Sweep',
+            lastName: 'Buyer',
+            address1: '1 Test St',
+            city: 'Cairo',
+            phone: '+201000000000',
+            country: 'EG',
+          },
+          paymentMethod: 'cod',
         };
-        results.push(r);
-        // eslint-disable-next-line no-console
-        console.log('SWEEP_RESULT ' + JSON.stringify(r));
-      }
-    }, 300_000);
+        await hit('FLOW', 'POST', '/public/orders/quote', `${BASE}/public/orders/quote`, ch, order);
+        await hit('FLOW', 'POST', '/public/orders', `${BASE}/public/orders`, ch, order);
+        await hit('FLOW', 'POST', '/auth/login', `${BASE}/auth/login`, h, {
+          email: 'sweep-customer@exit-test.invalid',
+          password: 'Sweep-Passw0rd!x',
+        });
+        await hit('FLOW', 'POST', '/auth/forgot-password', `${BASE}/auth/forgot-password`, h, {
+          email: 'sweep-customer@exit-test.invalid',
+        });
+        await hit(
+          'FLOW',
+          'POST',
+          '/auth/merchant/signup',
+          `${BASE}/auth/merchant/signup`,
+          {},
+          { email: 'm@exit-test.invalid', password: 'Sweep-Passw0rd!x', storeName: 'x' }
+        );
+      },
+      180_000
+    );
+
+    it.skipIf(!!FILTER)(
+      'cron and job groups for a DO store (scheduled events; outcomes are in the Worker log lines "[cron] job failed")',
+      async () => {
+        const api = e.API as unknown as {
+          scheduled?(o: { cron: string; scheduledTime?: Date }): Promise<{ outcome: string }>;
+        };
+        const crons = ['0 * * * *', '*/15 * * * *', '*/30 * * * *', '0 */12 * * *', '0 3 * * *'];
+        for (const cron of crons) {
+          const t0 = Date.now();
+          let outcome = 'ran (job outcomes: Worker log lines "[cron] job done|failed")';
+          try {
+            outcome =
+              (await api.scheduled?.({ cron, scheduledTime: new Date() }))?.outcome ?? outcome;
+          } catch (err) {
+            outcome = `threw: ${String(err).slice(0, 160)}`;
+          }
+          const r: Result = {
+            group: 'CRON',
+            method: 'SCHEDULED',
+            route: cron,
+            url: cron,
+            status: outcome.startsWith('threw') ? -1 : 200,
+            ms: Date.now() - t0,
+            message: outcome,
+          };
+          results.push(r);
+          // eslint-disable-next-line no-console
+          console.log('SWEEP_RESULT ' + JSON.stringify(r));
+        }
+      },
+      300_000
+    );
 
     it('summary', () => {
       const bad = results.filter(failing);
@@ -396,8 +459,12 @@ describe.skipIf(e.E2E_DB === '1')(
       console.log(
         `SWEEP_SUMMARY total=${results.length} ok2xx=${results.filter(r => r.status >= 200 && r.status < 300).length} expected4xx=${results.filter(r => EXPECTED_4XX.has(r.status)).length} failing=${bad.length} odd=${odd.length}`
       );
-      if (process.env.SWEEP_STRICT === '1')
-        expect(bad.map(r => `${r.method} ${r.route} ${r.status}`)).toEqual([]);
+      if (e.SWEEP_STRICT === '1') {
+        const lines = bad.map(r => `${r.method} ${r.route} ${r.status}`);
+        // eslint-disable-next-line no-console
+        if (lines.length) console.log('SWEEP_FAILING\n' + lines.join('\n'));
+        expect(lines, 'routes answering 5xx or hanging').toEqual([]);
+      }
     });
   }
 );

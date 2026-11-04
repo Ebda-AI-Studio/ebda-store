@@ -9,6 +9,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../apps/api/src/services/alerts.service', () => ({
   sendAlert: vi.fn(async () => undefined),
 }));
+const pg = vi.hoisted(() => ({ rows: [] as Array<{ id: string }> }));
+vi.mock('@ebda/database', async importOriginal => {
+  const real = await importOriginal<typeof import('@ebda/database')>();
+  // the one Postgres read of the freeze path (ebda_webhook_inbox_by_key) is answered by the test
+  const prisma = new Proxy(real.prisma, {
+    get: (t, p) => (p === '$queryRaw' ? async () => pg.rows : Reflect.get(t, p)),
+  });
+  return { ...real, prisma };
+});
 
 import { prisma } from '@ebda/database';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
@@ -17,7 +26,7 @@ import {
   freezeKey,
   resetCutoverCache,
 } from '../../apps/api/src/services/platform/cutover';
-import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
+import { registerPlatformRouter, vatGuard } from '../../apps/api/src/services/platform/router';
 import {
   inboxGetD1,
   inboxListD1,
@@ -81,6 +90,7 @@ const freeze = (db: DatabaseSync, family: 'platform' | 'inbox') =>
     .run(freezeKey(family), JSON.stringify({ expiresAt: Date.now() + 60_000 }));
 
 beforeEach(() => {
+  pg.rows = [];
   resetCutoverCache();
   clearCfBindings();
   registerPlatformRouter();
@@ -294,5 +304,138 @@ describe('inbox family', () => {
     await expect(
       webhookInbox.update('some-postgres-row', { status: 'processing' })
     ).rejects.toMatchObject({ statusCode: 503 });
+  });
+});
+
+describe('freeze-window inbox callbacks are deduped against Postgres', () => {
+  it('an event Postgres already holds returns ITS id and creates no D1 row; an unknown one is recorded in D1', async () => {
+    const db = world(null);
+    freeze(db, 'inbox');
+    pg.rows = [{ id: 'pg-row-1' }];
+    const known = await webhookInbox.record({
+      provider: 'paymob',
+      idempotencyKey: 'known',
+      storeId: A,
+      payload: {},
+      rawBody: 'r',
+      signature: 's',
+    });
+    expect(known).toBe('pg-row-1');
+    expect(db.prepare('SELECT COUNT(*) n FROM webhook_events').get()).toEqual({ n: 0 });
+    pg.rows = [];
+    const fresh = await webhookInbox.record({
+      provider: 'paymob',
+      idempotencyKey: 'new',
+      storeId: A,
+      payload: {},
+      rawBody: 'r',
+      signature: 's',
+    });
+    expect(
+      db.prepare('SELECT idempotency_key k FROM webhook_events WHERE id = ?').get(fresh)
+    ).toEqual({ k: 'new' });
+  });
+
+  it('put-back merge: PROCESSED wins on a key the copy already holds, and never the other way round', async () => {
+    const { ASIDE } = await import('../../scripts/cf/cutover-platform-family.mjs');
+    const db = world('inbox');
+    const lit = (v: unknown) =>
+      v === null
+        ? 'NULL'
+        : typeof v === 'number'
+          ? String(v)
+          : `'${String(v).replace(/'/g, "''")}'`;
+    const row = (over: Record<string, unknown>) => ({
+      id: crypto.randomUUID(),
+      provider: 'p',
+      idempotency_key: 'k',
+      store_id: null,
+      payload: '{}',
+      raw_body: 'r',
+      signature: 's',
+      status: 'received',
+      attempts: 0,
+      last_error: null,
+      result_order_id: null,
+      result_status: null,
+      received_at: 9,
+      processed_at: null,
+      created_at: 9,
+      updated_at: 9,
+      ...over,
+    });
+    const restore = (r: Record<string, unknown>) => db.exec(ASIDE.webhook_events.restore(r, lit));
+    restore(row({ id: 'pg-copy' })); // what the copy wrote: received
+    restore(
+      row({
+        id: 'd1-born',
+        status: 'processed',
+        attempts: 1,
+        result_order_id: 'o1',
+        result_status: 'paid',
+        processed_at: 10,
+      })
+    );
+    expect(db.prepare('SELECT COUNT(*) n FROM webhook_events').get()).toEqual({ n: 1 });
+    expect(db.prepare('SELECT id, status, result_order_id r FROM webhook_events').get()).toEqual({
+      id: 'pg-copy',
+      status: 'processed',
+      r: 'o1',
+    });
+    restore(row({ id: 'again', status: 'received' })); // a received duplicate must not reset it
+    expect(db.prepare('SELECT status FROM webhook_events').get()).toEqual({ status: 'processed' });
+    restore(row({ id: 'fresh', idempotency_key: 'other' })); // unknown key: inserted as is
+    expect(db.prepare('SELECT COUNT(*) n FROM webhook_events').get()).toEqual({ n: 2 });
+  });
+
+  it('the payment consumer THROWS on an inbox miss instead of returning', () => {
+    const src = fs.readFileSync(
+      new URL(
+        '../../apps/api/src/lib/inngest/functions/payment-webhook-process.ts',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    const step = src.slice(
+      src.indexOf("step.run('load-inbox'"),
+      src.indexOf('shouldProcessInboxRow(row.status)')
+    );
+    expect(step).toMatch(/throw new Error\(/);
+    expect(step).not.toMatch(/nothing to process/);
+  });
+});
+
+describe('platform VAT setting guard (Ruling TAX-8) on D1', () => {
+  it('only a super_admin may write ebda.vat; other keys do not consult the guard', async () => {
+    const db = world('platform');
+    const spy = vi.spyOn(vatGuard, 'isSuperAdmin');
+    spy.mockResolvedValue(false);
+    await expect(
+      prisma.systemSetting.upsert({
+        where: { key: 'ebda.vat' },
+        create: { key: 'ebda.vat', value: { enabled: true } },
+        update: { value: { enabled: true } },
+      })
+    ).rejects.toMatchObject({ statusCode: 403, code: 'PLATFORM_VAT_FORBIDDEN' });
+    expect(
+      db.prepare(`SELECT COUNT(*) n FROM system_settings WHERE key = 'ebda.vat'`).get()
+    ).toEqual({ n: 0 });
+    spy.mockClear();
+    await prisma.systemSetting.create({ data: { key: 'some.other', value: {} } });
+    expect(spy).not.toHaveBeenCalled();
+    // a bulk write with no literal key filter could hit ebda.vat: guarded
+    await expect(
+      prisma.systemSetting.deleteMany({ where: { category: 'billing' } })
+    ).rejects.toMatchObject({ statusCode: 403 });
+    spy.mockResolvedValue(true);
+    await prisma.systemSetting.upsert({
+      where: { key: 'ebda.vat' },
+      create: { key: 'ebda.vat', value: { enabled: true } },
+      update: { value: { enabled: false } },
+    });
+    expect(
+      db.prepare(`SELECT COUNT(*) n FROM system_settings WHERE key = 'ebda.vat'`).get()
+    ).toEqual({ n: 1 });
+    spy.mockRestore();
   });
 });

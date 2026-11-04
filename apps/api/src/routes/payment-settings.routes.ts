@@ -801,7 +801,10 @@ const credentialUpdateSchema = z.object({
 
 /** Loads the store and repeats the inline ownership check the other store routes make. */
 async function loadOwnedStore(req: Request, storeId: string) {
-  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { id: true, ownerId: true },
+  });
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   const user = getAuthUser(req);
   if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
