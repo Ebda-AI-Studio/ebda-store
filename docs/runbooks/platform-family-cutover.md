@@ -79,7 +79,7 @@ Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
 - **Strays.** D1 rows that Postgres does not have are deleted inside the freeze (reported per table).
 - **Fail closed.** After the flip, the drift check and the settle wait, the copied Postgres rows are DELETED (by primary key, one transaction) so every
   Postgres policy/definer that still reads `store_staff` denies. Needs a write URL: `--pg-write-url` (or `CUTOVER_PG_WRITE_URL`), plus
-  `--allow-prod-write` for a Neon host; a dry run and `--commit` without it refuse before freezing anything. The Neon dump (`com.forceai.neon-backup`)
+  `--allow-prod-write` for a Neon host; a dry run and `--commit` without it refuse before freezing anything. The Neon dump
   must be fresh. Skipped on drift (those rows are the only copy of a write D1 lacks); exit code 3 if the emptying itself failed.
 - **After the flip** the gate (`requireStoreAccess`, `checkStoreAccess`), staff routes, invite accept, `storesForUser`, `ownedStoreIds`, merchant-MCP
   membership, the staff seat count, `GET /admin/stores` (staff) and the payment timeline read D1 only. Verify (VERIFIED / NOT VERIFIED): owner 200

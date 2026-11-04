@@ -41,5 +41,6 @@ merges. The owning PR authors apply the same resolution when their PR is rebased
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api/src/routes/payment.routes.ts`                    | #410 (adds a second `import { checkStoreAccess }` that main/another PR already has) | remove the duplicate import.                                                                                                    |
 | `packages/repo/src/do/customer-auth.ts` (`exportCustomer`) | #414                                                                                | `passkeyList` returns `Res<PasskeyRow[]>`: read `.data` only when `.ok` (`tsc -p packages/repo` fails on the PR branch itself). |
+| `docs/runbooks/platform-family-cutover.md` line 82         | #407 / #410                                                                         | `no-force-branding` scanner: drop the inherited launchd label `com.forceai.neon-backup` from the sentence.                      |
 
 `npm run build -w packages/shared`, `-w packages/database`, then `tsc --noEmit` for shared, database, cf-schema, repo and apps/api: clean.
