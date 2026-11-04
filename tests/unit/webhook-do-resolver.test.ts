@@ -16,6 +16,8 @@ function d1(rows: Array<[string, string, string]>, doStores: string[]) {
       all: async () => ({ results: doStores.map(id => ({ id })) }),
       bind: (...args: string[]) => ({
         first: async () => {
+          if (/SELECT 1 AS one FROM stores/.test(sql))
+            return args[0] === 'do' && doStores.length > 0 ? { one: 1 } : null;
           if (/storage_backend FROM stores/.test(sql))
             return doStores.includes(args[0]) ? { storage_backend: 'do' } : null;
           const r = rows.find(x => x[0] === args[0] && x[1] === args[1]);

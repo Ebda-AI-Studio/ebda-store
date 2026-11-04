@@ -71,28 +71,22 @@ export async function d1InboxRecord(
     signature: string;
   }
 ): Promise<string> {
-  const run = (storeId: string | null) =>
+  // A failed insert (including a `store_id` the directory does not hold) is a 503: the provider's delivery is NOT acknowledged,
+  // so the gateway retries. Recording it store-less would let the consumer mark it processed with no store and lose the payment.
+  await guarded(() =>
     db
       .prepare(INSERT)
       .bind(
         input.id,
         input.provider,
         input.idempotencyKey,
-        storeId,
+        input.storeId,
         input.payloadJson,
         input.rawBody,
         input.signature
       )
-      .run();
-  try {
-    await run(input.storeId);
-  } catch (err) {
-    // `store_id` is a foreign key to `stores`: a reference to a store the directory does not hold is recorded store-less
-    // (the consumer resolves the store itself) rather than losing the provider's only delivery.
-    if (input.storeId && /FOREIGN KEY/i.test(String((err as Error)?.message))) {
-      await guarded(() => run(null));
-    } else throw unavailable();
-  }
+      .run()
+  );
   const row = await guarded(() =>
     db
       .prepare('SELECT id FROM webhook_events WHERE idempotency_key = ?1')

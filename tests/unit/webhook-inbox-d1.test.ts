@@ -5,17 +5,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  prisma: new Proxy(
-    {},
-    {
-      get: (_t, p) => {
-        throw new Error(`Postgres touched: prisma.${String(p)}`);
-      },
-    }
-  ),
+  pgOn: false,
+  pgRows: [] as unknown[][],
+  calls: 0,
+  prisma: {
+    $queryRaw: async () => {
+      h.calls++;
+      if (!h.pgOn) throw new Error('Postgres touched: prisma.$queryRaw');
+      return h.pgRows.shift() ?? [];
+    },
+  } as never,
 }));
 vi.mock('@ebda/database', async () =>
-  (await import('./helpers/database-mock')).databaseMock({ prisma: h.prisma })
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: h.prisma,
+    extra: { withSystemJob: async (_n: string, fn: () => unknown) => fn() },
+  })
 );
 
 import { setCfBindings } from '../../apps/api/src/cf/bindings';
@@ -31,7 +36,7 @@ const A = '11111111-1111-4111-8111-111111111111';
 
 type Row = Record<string, unknown>;
 /** A tiny D1 double: the inbox table as an array, the entity index and the store flag as maps. */
-function d1() {
+function d1(opts: { pgStore?: boolean } = {}) {
   const inbox: Row[] = [];
   const index = new Map<string, string>([
     ['order:o1', A],
@@ -41,8 +46,14 @@ function d1() {
   const stmt = (sql: string) => ({
     bind: (...a: unknown[]) => ({
       first: async () => {
+        if (/SELECT 1 AS one FROM stores/.test(sql))
+          return a[0] === 'pg' && opts.pgStore ? { one: 1 } : a[0] === 'do' ? { one: 1 } : null;
         if (/storage_backend FROM stores/.test(sql))
-          return a[0] === A ? { storage_backend: 'do' } : null;
+          return a[0] === A
+            ? { storage_backend: 'do' }
+            : a[0] === 'P1'
+              ? { storage_backend: 'pg' }
+              : null;
         if (/FROM entity_index/.test(sql)) {
           const s = index.get(`${a[0]}:${a[1]}`);
           return s ? { store_id: s } : null;
@@ -157,5 +168,56 @@ describe('store resolvers on D1 (PG poisoned)', () => {
     expect(await getPaymentStoreId('p1')).toBe(A);
     expect(await storefrontForStoreId(A)).toEqual({ slug: 'shop', domain: null });
     expect(await storefrontForStoreId('other')).toBeNull();
+  });
+});
+
+describe('transition: Postgres stores and rows (Ruling NZ-N12-2, NZ-N12-5)', () => {
+  it('an unknown order id with no pg store in the directory is null and never touches Postgres', async () => {
+    h.calls = 0;
+    setCfBindings({ PLATFORM_DB: d1().binding } as never);
+    expect(await getOrderStoreId('guess-me')).toBeNull();
+    expect(h.calls).toBe(0);
+  });
+
+  it('with a pg store present, a Postgres answer is accepted only for a store the directory says is pg', async () => {
+    h.pgOn = true;
+    setCfBindings({ PLATFORM_DB: d1({ pgStore: true }).binding } as never);
+    h.pgRows = [[{ id: 'P1' }]];
+    expect(await getOrderStoreId('legacy')).toBe('P1');
+    h.pgRows = [[{ id: A }]]; // stale Postgres row of a store that is now `do`
+    expect(await getOrderStoreId('legacy2')).toBeNull();
+    // webhook reference: same rule, and a Postgres failure is "unresolved", not a 500
+    h.pgRows = [[{ id: 'P1' }]];
+    expect(await resolveStoreFromWebhookRef({ transactionId: 'X', provider: 'paymob' })).toBe('P1');
+    h.pgOn = false;
+    expect(await resolveStoreFromWebhookRef({ transactionId: 'Y', provider: 'paymob' })).toBeNull();
+    h.pgOn = false;
+  });
+
+  it('a Postgres inbox row is still read while a pg store exists; a D1 row wins', async () => {
+    h.pgOn = true;
+    const { binding } = d1({ pgStore: true });
+    setCfBindings({ PLATFORM_DB: binding } as never);
+    h.pgRows = [
+      [
+        {
+          id: 'old',
+          provider: 'paymob',
+          idempotency_key: 'k',
+          store_id: 'P1',
+          payload: {},
+          raw_body: '',
+          signature: '',
+          status: 'received',
+          attempts: 0,
+          last_error: null,
+          result_order_id: null,
+          result_status: null,
+          received_at: new Date(0),
+        },
+      ],
+    ];
+    expect(await webhookInbox.get('old')).toMatchObject({ id: 'old', storeId: 'P1' });
+    h.pgOn = false;
   });
 });

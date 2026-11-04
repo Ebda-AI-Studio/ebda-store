@@ -78,9 +78,11 @@ export const paymentWebhookProcess: JobDef = inngest.createFunction(
     if (!row) {
       logger.error(
         { webhookEventId, idempotencyKey },
-        '[payment-webhook-process] inbox row not found — nothing to process'
+        '[payment-webhook-process] inbox row not found — retrying'
       );
-      return;
+      // The route already answered the gateway 2xx for this row: returning here would drop a paid order's webhook. THROW so the
+      // job retries (a row recorded moments ago, a D1 blip) and the failure watch sees it if it never appears.
+      throw new Error(`payment-webhook-process: inbox row ${webhookEventId} not found`);
     }
 
     // Idempotency layer 1 — already fully processed, this is a retry / duplicate
