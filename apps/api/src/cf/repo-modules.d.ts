@@ -231,6 +231,17 @@ declare module '@ebda-src/repo' {
     storeId: string,
     fields: Record<string, unknown>
   ): { profile: string[]; config: string[]; directoryOnly: string[] };
+  export function bootstrapStoreRows(
+    sql: SqlRunner,
+    meta: Meta,
+    storeId: string,
+    input: {
+      identity: { name: string; slug: string; ownerId: string };
+      fields: Record<string, unknown>;
+      vat?: { id: string; name: string; nameAr: string; rate: number };
+      cod?: { id: string; name: string; nameAr: string; currency: string };
+    }
+  ): { profile: string[]; config: string[]; directoryOnly: string[] };
   export type StockAnswer =
     | { ok: true; json: string }
     | { ok: false; code: string; status: number; message: string };

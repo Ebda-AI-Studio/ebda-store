@@ -314,6 +314,9 @@
     // "1" = background jobs follow each store's D1 backend flag (stores.storage_backend): DO stores get alarms, their unported jobs are
     // refused with an alert, sweeps skip them (src/lib/jobs/do-guard.ts). Flipped together with the flag at the cutover; "" = every store on Postgres.
     "JOBS_ON_DO": "",
+    // "1" = a NEW store is created on D1 + its StoreDO with no Postgres row (lib/store-create-do.ts, Ruling NZ-D22). Keep "" until the
+    // store-access gate and the billing readers (N-6, N-10) can serve a store with no Postgres row; "" = the unchanged Postgres create.
+    "STORE_CREATE_ON_DO": "",
     // "1" = cutover write freeze (docs/runbooks/cutover-cf.md 5.1): HTTP writes answer 503 AND crons, queue consumers, Workflows and
     // DO alarms stand still (parked, never dropped; src/lib/jobs/freeze.ts). Anything else = off.
     "WRITES_FROZEN": "",

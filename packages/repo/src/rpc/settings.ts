@@ -75,6 +75,63 @@ export function applyStoreSettings(
 }
 
 /**
+ * First-time bootstrap of a store created on its Durable Object (NEON-ZERO-1 N-18, Ruling NZ-D11): the `store_profile` row (its NOT
+ * NULL identity columns), then every other field through `applyStoreSettings` (`store_config` is an upsert), then the default VAT
+ * rate. IDEMPOTENT end to end (INSERT OR IGNORE; a second call re-applies the same fields and adds no second rate), so a retry
+ * after a partial failure converges. `vat.rate` is the stored shape of `tax_rates.rate` (hundredths of a percent: 14% is 1400).
+ */
+export function bootstrapStoreRows(
+  sql: SqlRunner,
+  meta: Meta,
+  storeId: string,
+  input: {
+    identity: { name: string; slug: string; ownerId: string };
+    fields: Record<string, unknown>;
+    vat?: { id: string; name: string; nameAr: string; rate: number };
+    /** Cash on delivery, enabled (provisioning's default payment method). */
+    cod?: { id: string; name: string; nameAr: string; currency: string };
+  }
+): { profile: string[]; config: string[]; directoryOnly: string[] } {
+  const { identity } = input;
+  sql.run(
+    'INSERT OR IGNORE INTO "store_profile" ("store_id", "name", "slug", "owner_id") VALUES (?, ?, ?, ?)',
+    [storeId, identity.name, identity.slug, identity.ownerId]
+  );
+  const out = applyStoreSettings(sql, meta, storeId, input.fields);
+  if (input.vat) {
+    sql.run(
+      `INSERT INTO "tax_rates" ("id", "store_id", "name", "name_ar", "rate", "is_active")
+       SELECT ?, ?, ?, ?, ?, 0 WHERE NOT EXISTS (SELECT 1 FROM "tax_rates" WHERE "store_id" = ? AND "name" = ?)`,
+      [
+        input.vat.id,
+        storeId,
+        input.vat.name,
+        input.vat.nameAr,
+        input.vat.rate,
+        storeId,
+        input.vat.name,
+      ]
+    );
+  }
+  if (input.cod) {
+    sql.run(
+      `INSERT INTO "payment_configs" ("id", "store_id", "provider", "is_enabled", "display_name", "display_name_ar", "test_mode", "supported_methods", "supported_currencies", "fixed_fee", "percentage_fee")
+       SELECT ?, ?, 'cod', 1, ?, ?, 0, '["cod"]', ?, 0, 0
+       WHERE NOT EXISTS (SELECT 1 FROM "payment_configs" WHERE "store_id" = ? AND "provider" = 'cod')`,
+      [
+        input.cod.id,
+        storeId,
+        input.cod.name,
+        input.cod.nameAr,
+        JSON.stringify([input.cod.currency]),
+        storeId,
+      ]
+    );
+  }
+  return out;
+}
+
+/**
  * The StoreDO's read of the Store record (NEON-ZERO-1): `store_profile` (mirror + profile columns) joined with
  * `store_config` (config columns), as Prisma `Store` field values. ONE statement-pair, no D1 and no Postgres. `fields`
  * limits the result to those Prisma field names (default: every scalar the two tables carry). A name with no column in

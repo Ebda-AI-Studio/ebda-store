@@ -164,4 +164,52 @@ describe('StoreDO.mutate procedures and the settings copy (PR D1b)', () => {
       code: 'STORE_MISMATCH',
     });
   });
+  it('bootstrapStore (N-18) creates profile + config + inactive VAT + COD, is idempotent, and the record reads back', async () => {
+    const stub = stubFor('boot-1');
+    const { encodeRpc, decodeRpc: dec } = await import('@ebda-src/repo');
+    const input = encodeRpc({
+      identity: { name: 'Boot', slug: 'boot', ownerId: 'owner-1' },
+      fields: {
+        name: 'Boot',
+        slug: 'boot',
+        ownerId: 'owner-1',
+        status: 'inactive',
+        plan: 'professional',
+        settings: { currency: 'EGP' },
+        theme: { frameChromeDedup: true },
+        layoutSettings: {},
+        domainStatus: 'active',
+      },
+      vat: { id: 'vat-1', name: 'VAT', nameAr: 'ضريبة', rate: 1400 },
+      cod: { id: 'cod-1', name: 'Cash on Delivery', nameAr: 'الدفع', currency: 'EGP' },
+    });
+    expect(await stub.bootstrapStore('boot-1', input)).toMatchObject({
+      ok: true,
+      data: { directoryOnly: ['domainStatus'] },
+    });
+    // a retry converges: still one VAT row and one COD row
+    expect(await stub.bootstrapStore('boot-1', input)).toMatchObject({ ok: true });
+    const rows = await runInDurableObject(stub, async d => ({
+      vat: d.ctx.storage.sql
+        .exec("SELECT rate, is_active FROM tax_rates WHERE store_id = 'boot-1'")
+        .toArray(),
+      cod: d.ctx.storage.sql
+        .exec("SELECT is_enabled, provider FROM payment_configs WHERE store_id = 'boot-1'")
+        .toArray(),
+    }));
+    expect(rows.vat).toEqual([{ rate: 1400, is_active: 0 }]);
+    expect(rows.cod).toEqual([{ is_enabled: 1, provider: 'cod' }]);
+    const rec = await stub.storeRecord('boot-1', ['name', 'plan', 'status', 'settings']);
+    expect(rec).toMatchObject({ ok: true });
+    expect(dec((rec as { data: { json: string } }).data.json)).toMatchObject({
+      name: 'Boot',
+      plan: 'professional',
+      status: 'inactive',
+      settings: { currency: 'EGP' },
+    });
+    expect(await stub.bootstrapStore('someone-else', input)).toMatchObject({
+      ok: false,
+      code: 'STORE_MISMATCH',
+    });
+  });
 });

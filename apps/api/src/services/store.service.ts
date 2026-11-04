@@ -18,7 +18,6 @@ import {
   closeDoIfNoMoney,
   reopenDoAfterFailedDelete,
   storeWritesToDo,
-  syncStoreFields,
 } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
@@ -30,6 +29,12 @@ import {
   unlinkUserAuditLogs,
 } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
+import {
+  finishDoStoreCreate,
+  insertDoStore,
+  listOwnerStoresD1,
+  storeCreateOnDo,
+} from '../lib/store-create-do';
 import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
 import { config as appConfig } from '../config';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
@@ -314,21 +319,24 @@ async function mergeSettingsAtomic(
       WHERE id = ${storeId}
       RETURNING settings`
   );
-  await syncStoreFields(storeId, ['settings']);
-  return (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
+  const settings = (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
+  // N-19: the DO copy (a Node / dev store whose DO is not yet the writer) gets the WHOLE resulting value from RETURNING, never a re-read.
+  await copyStoreSettings(storeId, { settings });
+  return settings;
 }
 
 /** Atomic replace of ONE top-level `settings` key (Postgres path). */
 async function setSettingsKeyAtomic(storeId: string, key: string, value: unknown): Promise<void> {
-  await withStore(
+  const rows = await withStore(
     storeId,
-    tx => tx.$executeRaw`
+    tx => tx.$queryRaw<Array<{ settings: unknown }>>`
       UPDATE stores
       SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), ARRAY[${key}]::text[], ${JSON.stringify(value)}::jsonb),
           updated_at = now()
-      WHERE id = ${storeId}`
+      WHERE id = ${storeId}
+      RETURNING settings`
   );
-  await syncStoreFields(storeId, ['settings']);
+  await copyStoreSettings(storeId, { settings: rows?.[0]?.settings ?? {} });
 }
 
 export class StoreService {
@@ -514,12 +522,16 @@ export class StoreService {
     // go-live-gate.ts), an additional one (only reachable on a multi-store plan)
     // rides the owner's Business plan — the same shapes as self-serve onboarding.
     // The platform operator keeps the old behaviour (active, default plan).
+    // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
+    const onDo = storeCreateOnDo();
     const merchantCreate = !opts.platformOperator
       ? {
           firstStore:
-            (await withUser(ownerId, tx =>
-              tx.store.count({ where: { ownerId, deletedAt: null } })
-            )) === 0,
+            (onDo
+              ? ((await listOwnerStoresD1(ownerId)) ?? []).length
+              : await withUser(ownerId, tx =>
+                  tx.store.count({ where: { ownerId, deletedAt: null } })
+                )) === 0,
         }
       : null;
 
@@ -566,6 +578,43 @@ export class StoreService {
       await assertPlanAllows(STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
     }
 
+    const newSettings = ((data.settings && typeof data.settings === 'object'
+      ? stripServerOwnedSettings(data.settings as Record<string, unknown>)
+      : null) || {
+      currency: REGION.currency,
+      locale: 'ar-EG',
+      defaultLanguage: REGION.defaultLocale,
+    }) as Prisma.InputJsonValue;
+    const newTheme = { frameChromeDedup: true, oosRibbonColor: '#6b7280' };
+
+    if (onDo) {
+      const plan = merchantCreate
+        ? merchantCreate.firstStore
+          ? ('professional' as const)
+          : ('enterprise' as const)
+        : NEW_STORE_LEGACY_PLAN;
+      const id = await insertDoStore({
+        name: data.name,
+        slug,
+        domain: data.domain ?? null,
+        ownerId,
+        status: merchantCreate ? 'inactive' : 'active',
+        plan,
+        settings: newSettings as Record<string, unknown>,
+        theme: newTheme,
+        layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
+        vatRateHundredths: REGION.defaultVatBps,
+      });
+      const created = await finishDoStoreCreate(id, {
+        slug,
+        domain: data.domain ?? null,
+        plan,
+        trial: merchantCreate?.firstStore ? {} : undefined,
+      });
+      // The owner row is identity (Postgres until the identity track moves it): not read on this path.
+      return { ...created, owner: { id: ownerId } } as typeof created & { owner: { id: string } };
+    }
+
     // `stores` is under RLS (R-EBDA-005): the row is inserted AS its owner (the policy's
     // WITH CHECK and the tenant guard both key a new store on the acting owner).
     const store = await withUser(ownerId, () =>
@@ -590,13 +639,7 @@ export class StoreService {
                   : ('enterprise' as const),
               }
             : {}),
-          settings: ((data.settings && typeof data.settings === 'object'
-            ? stripServerOwnedSettings(data.settings as Record<string, unknown>)
-            : null) || {
-            currency: REGION.currency,
-            locale: 'ar-EG',
-            defaultLanguage: REGION.defaultLocale,
-          }) as Prisma.InputJsonValue,
+          settings: newSettings,
           // 2026-07-12 design structural batch: new stores get the card-frame dedup
           // ON by default (Ahmad-approved for NEW
           // stores only — every existing store keeps these flags undefined/false
@@ -607,10 +650,7 @@ export class StoreService {
           // terracotta). Existing stores keep it undefined and render unchanged.
           // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8); nor is
           // `personaChromeV2`: only the deleted Force skins read it (Ruling SKIN-DEL-5).
-          theme: {
-            frameChromeDedup: true,
-            oosRibbonColor: '#6b7280',
-          },
+          theme: newTheme,
         },
       })
     );
@@ -818,20 +858,46 @@ export class StoreService {
    * and for writing the STORE_DELETED audit log AFTER this returns successfully.
    */
   static async delete(storeId: string, actorUserId?: string) {
-    const store = await this.getById(storeId);
     // Decided BEFORE the Postgres delete (Ruling NZ-D14): the post-commit teardown must know whether the store lived on its DO.
     const wasOnDo = await storeWritesToDo(storeId);
+    // N-18 (Ruling NZ-D14): a store created on D1 + its DO has NO Postgres row, so the Postgres phase (getById, the raw SQL deletes)
+    // has nothing to act on and is skipped; only the DO close, the owner-family check (D1), and finishStoreDeletion apply.
+    const pgRow = wasOnDo
+      ? await withStore(storeId, tx =>
+          tx.store.findUnique({ where: { id: storeId }, select: { id: true } })
+        )
+      : true;
+    const doNative = wasOnDo && !pgRow;
+    const store = doNative
+      ? await (async () => {
+          const r = (await (
+            await storeDb(storeId)
+          ).store.findUnique({
+            where: { id: storeId },
+            select: { id: true, name: true, slug: true, domain: true, ownerId: true },
+          })) as {
+            id: string;
+            name: string;
+            slug: string;
+            domain: string | null;
+            ownerId: string;
+          } | null;
+          if (!r) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+          return r;
+        })()
+      : await this.getById(storeId);
     // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
     // owner still has other live stores would strand the paid period and re-parent the
     // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
     if (store.ownerId) {
       const family = sortOwnerStores(
-        await withUser(store.ownerId, tx =>
-          tx.store.findMany({
-            where: { ownerId: store.ownerId!, deletedAt: null },
-            select: { id: true, createdAt: true },
-          })
-        )
+        (doNative ? await listOwnerStoresD1(store.ownerId) : undefined) ??
+          (await withUser(store.ownerId, tx =>
+            tx.store.findMany({
+              where: { ownerId: store.ownerId!, deletedAt: null },
+              select: { id: true, createdAt: true },
+            })
+          ))
       );
       if (family.length > 1 && family[0].id === storeId) {
         throw new AppError(
@@ -852,150 +918,154 @@ export class StoreService {
     let erasedOwnerId: string | null = null;
 
     try {
-      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-        // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
-        // statements because the Prisma-typed approach kept hitting
-        // P2003 (journal_entries_store_id_fkey) even with explicit
-        // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
-        //   1. unambiguous about which table + column the delete targets
-        //      (no Prisma client cache / schema drift)
-        //   2. easier to debug — each step logs storeId + affected row
-        //      count via $executeRaw's number return value
-        //   3. order-explicit — Postgres processes statements sequentially
-        //      so any FK cascade chain is committed before the next step
-        //
-        // Order matters. Each step listed below corresponds to a Store FK
-        // that's either Restrict OR a child whose own FK to Product is
-        // NoAction. Cascade-from-Store relations clean themselves up via
-        // store.delete() at the end. Schema audit done 2026-05-21:
-        //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
-        //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
-        //   JournalEntry(Restrict), BackorderLine.product(NoAction),
-        //   AuditLog.store(NoAction nullable).
-        // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
-        // to zero rows. The accounting tables (journal_entries, expenses,
-        // stock_adjustments, accounts, sequences) have row-level-security
-        // policies that match only the transaction's store, and this
-        // transaction had none set, so DELETE matched 0 rows even though rows
-        // existed. The FK violation at store.delete then fired because the
-        // journal_entries rows were never actually touched.
-        //
-        // The transaction is scoped to THIS store with a transaction-local
-        // set_config (no bypass flag exists any more). It dies on commit/rollback,
-        // and this is a super-admin-only code path (the route gates on role).
-        // The acting super_admin is set too: unlinking the owner's audit rows below
-        // happens AFTER the store row is gone, so the definer's "user of the caller's
-        // store" test cannot match; the caller's own role (ebda_is_super_admin) is
-        // what authorises it.
-        // `scopeTransaction` also makes this the ambient tenant transaction, so the
-        // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
-        return scopeTransaction(
-          tx,
-          { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
-          async () => {
-            logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
+      if (!doNative)
+        await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+          // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
+          // statements because the Prisma-typed approach kept hitting
+          // P2003 (journal_entries_store_id_fkey) even with explicit
+          // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
+          //   1. unambiguous about which table + column the delete targets
+          //      (no Prisma client cache / schema drift)
+          //   2. easier to debug — each step logs storeId + affected row
+          //      count via $executeRaw's number return value
+          //   3. order-explicit — Postgres processes statements sequentially
+          //      so any FK cascade chain is committed before the next step
+          //
+          // Order matters. Each step listed below corresponds to a Store FK
+          // that's either Restrict OR a child whose own FK to Product is
+          // NoAction. Cascade-from-Store relations clean themselves up via
+          // store.delete() at the end. Schema audit done 2026-05-21:
+          //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
+          //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
+          //   JournalEntry(Restrict), BackorderLine.product(NoAction),
+          //   AuditLog.store(NoAction nullable).
+          // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
+          // to zero rows. The accounting tables (journal_entries, expenses,
+          // stock_adjustments, accounts, sequences) have row-level-security
+          // policies that match only the transaction's store, and this
+          // transaction had none set, so DELETE matched 0 rows even though rows
+          // existed. The FK violation at store.delete then fired because the
+          // journal_entries rows were never actually touched.
+          //
+          // The transaction is scoped to THIS store with a transaction-local
+          // set_config (no bypass flag exists any more). It dies on commit/rollback,
+          // and this is a super-admin-only code path (the route gates on role).
+          // The acting super_admin is set too: unlinking the owner's audit rows below
+          // happens AFTER the store row is gone, so the definer's "user of the caller's
+          // store" test cannot match; the caller's own role (ebda_is_super_admin) is
+          // what authorises it.
+          // `scopeTransaction` also makes this the ambient tenant transaction, so the
+          // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
+          return scopeTransaction(
+            tx,
+            { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
+            async () => {
+              logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 
-            // Ruling MONEYB-4: refuse while money is in flight, then copy every
-            // fiscal record the deletes below would cascade away (legacy orders
-            // without an issued document, Ebda's billing_events VAT ledger) into
-            // the immutable 6-year archive. Issued invoices / receipts / credit
-            // notes live there already (no FK to stores) and survive as they are.
-            await assertNoMoneyInFlight(tx, storeId);
-            await archiveFiscalRecords(tx, storeId);
+              // Ruling MONEYB-4: refuse while money is in flight, then copy every
+              // fiscal record the deletes below would cascade away (legacy orders
+              // without an issued document, Ebda's billing_events VAT ledger) into
+              // the immutable 6-year archive. Issued invoices / receipts / credit
+              // notes live there already (no FK to stores) and survive as they are.
+              await assertNoMoneyInFlight(tx, storeId);
+              await archiveFiscalRecords(tx, storeId);
 
-            const reviewCount =
-              await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
+              const reviewCount =
+                await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
 
-            const returnCount =
-              await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
+              const returnCount =
+                await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
 
-            const orderCount =
-              await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
+              const orderCount =
+                await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
 
-            const expenseCount =
-              await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
+              const expenseCount =
+                await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
 
-            const stockAdjCount =
-              await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
+              const stockAdjCount =
+                await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
 
-            const poCount =
-              await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
+              const poCount =
+                await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
 
-            const journalCount =
-              await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
+              const journalCount =
+                await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
 
-            const backorderCount =
-              await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
+              const backorderCount =
+                await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
-            // Detach historical audit logs by nulling their storeId (preserves trail).
-            // A definer: nulling store_id leaves the store scope, which the policy's
-            // WITH CHECK would reject.
-            const auditCount = await detachStoreAuditLogs(storeId, tx);
-            logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
+              // Detach historical audit logs by nulling their storeId (preserves trail).
+              // A definer: nulling store_id leaves the store scope, which the policy's
+              // WITH CHECK would reject.
+              const auditCount = await detachStoreAuditLogs(storeId, tx);
+              logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
-            // Verification: count any rows that would still block the store delete.
-            // If any of these come back > 0, we know exactly which table.
-            const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
+              // Verification: count any rows that would still block the store delete.
+              // If any of these come back > 0, we know exactly which table.
+              const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
           SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM public.orders WHERE store_id = ${storeId}
           UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM public.journal_entries WHERE store_id = ${storeId}
           UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM public.expenses WHERE store_id = ${storeId}
           UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM public.stock_adjustments WHERE store_id = ${storeId}
           UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM public.purchase_orders WHERE store_id = ${storeId}
         `;
-            const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
-            if (stillBlocking.length > 0) {
-              logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
-            }
-
-            // Final delete — cascades products, categories, customers, pages,
-            // carts, coupons, accounts, suppliers, backorders, etc.
-            await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
-            logger.info({ storeId }, '[STORE_DELETE] store deleted');
-
-            // If the owner was a store_admin and this was their only store,
-            // delete the user too. Otherwise they remain in the system as a
-            // login-able account with no stores to manage — confusing UI and
-            // dead weight on the users list. Super-admins are never deleted
-            // here (they own the platform, not specific stores). Cleaned up
-            // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
-            // The owner's row is outside this store's scope (users.store_id NULL): only the
-            // platform operator may read and delete it ('platform-operator' hatch, checked by
-            // `ebda_is_super_admin()` in this same transaction).
-            if (!actorUserId) return;
-            await asPlatformOperator(actorUserId, async () => {
-              const owner = await tx.user.findUnique({
-                where: { id: store.ownerId },
-                select: { id: true, role: true, _count: { select: { stores: true } } },
-              });
-              if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
-                await unlinkUserAuditLogs(owner.id, tx);
-                // User-keyed rows: deleted through the guarded definer (the acting user is
-                // the super_admin, not the owner).
-                await deleteUserTokens(owner.id);
-                // Only an ACTIVE owner is flipped (and restored on rollback): a suspended owner stays suspended either way.
-                const managed = await isIdentityManagedUser(owner.id);
-                if (managed) {
-                  const acc = await getAccountState(owner.id);
-                  if (acc?.status === 'active') {
-                    await setAccountStatus(owner.id, 'inactive', 'store-deleted');
-                    deactivatedOwnerId = owner.id;
-                  }
-                }
-                await tx.user.delete({ where: { id: owner.id } });
-                if (managed) erasedOwnerId = owner.id;
+              const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
+              if (stillBlocking.length > 0) {
+                logger.error(
+                  { storeId, stillBlocking },
+                  '[STORE_DELETE] BLOCKING rows still exist'
+                );
               }
-            });
-          }
-        );
-      });
+
+              // Final delete — cascades products, categories, customers, pages,
+              // carts, coupons, accounts, suppliers, backorders, etc.
+              await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
+              logger.info({ storeId }, '[STORE_DELETE] store deleted');
+
+              // If the owner was a store_admin and this was their only store,
+              // delete the user too. Otherwise they remain in the system as a
+              // login-able account with no stores to manage — confusing UI and
+              // dead weight on the users list. Super-admins are never deleted
+              // here (they own the platform, not specific stores). Cleaned up
+              // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
+              // The owner's row is outside this store's scope (users.store_id NULL): only the
+              // platform operator may read and delete it ('platform-operator' hatch, checked by
+              // `ebda_is_super_admin()` in this same transaction).
+              if (!actorUserId) return;
+              await asPlatformOperator(actorUserId, async () => {
+                const owner = await tx.user.findUnique({
+                  where: { id: store.ownerId },
+                  select: { id: true, role: true, _count: { select: { stores: true } } },
+                });
+                if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
+                  await unlinkUserAuditLogs(owner.id, tx);
+                  // User-keyed rows: deleted through the guarded definer (the acting user is
+                  // the super_admin, not the owner).
+                  await deleteUserTokens(owner.id);
+                  // Only an ACTIVE owner is flipped (and restored on rollback): a suspended owner stays suspended either way.
+                  const managed = await isIdentityManagedUser(owner.id);
+                  if (managed) {
+                    const acc = await getAccountState(owner.id);
+                    if (acc?.status === 'active') {
+                      await setAccountStatus(owner.id, 'inactive', 'store-deleted');
+                      deactivatedOwnerId = owner.id;
+                    }
+                  }
+                  await tx.user.delete({ where: { id: owner.id } });
+                  if (managed) erasedOwnerId = owner.id;
+                }
+              });
+            }
+          );
+        });
     } catch (err) {
       // Compensating rollback (Ruling NZ-D17): the Postgres delete failed, so the DO this call closed is reopened (only its own flag).
       if (doClose?.token) {
@@ -1522,36 +1592,16 @@ export class StoreService {
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
   /**
-   * QR-1: replace `settings.qr` only. One atomic jsonb_set so a concurrent write of another
+   * QR-1: replace `settings.qr` only (setSettingsKey: one atomic jsonb_set on Postgres, a write-time read-merge on a DO store) so a concurrent write of another
    * settings key (floating widget, announcement, ...) is never overwritten by a stale read-merge-write.
    */
   static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
-    const store = await this.getById(storeId);
-    await withStore(
-      storeId,
-      tx => tx.$executeRaw`
-        UPDATE stores
-        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{qr}', ${JSON.stringify(qr)}::jsonb),
-            updated_at = now()
-        WHERE id = ${storeId}`
-    );
-    await syncStoreFields(storeId, ['settings']);
-    await StoreService.invalidateCache(store);
+    await this.setSettingsKey(storeId, 'qr', qr);
   }
 
   /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
   static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
-    const store = await this.getById(storeId);
-    await withStore(
-      storeId,
-      tx => tx.$executeRaw`
-        UPDATE stores
-        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{labels}', ${JSON.stringify(labels)}::jsonb),
-            updated_at = now()
-        WHERE id = ${storeId}`
-    );
-    await syncStoreFields(storeId, ['settings']);
-    await StoreService.invalidateCache(store);
+    await this.setSettingsKey(storeId, 'labels', labels);
   }
 
   /**

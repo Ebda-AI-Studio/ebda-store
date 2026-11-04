@@ -49,6 +49,7 @@ import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlem
 import { socketService } from './socket.service';
 import { EmailService } from './email.service';
 import { config } from '../config';
+import { listOwnerStoresD1 } from '../lib/store-create-do';
 import logger from '../lib/logger';
 
 type Tx = Prisma.TransactionClient;
@@ -143,13 +144,17 @@ export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> 
   // (Ruling EBDA-FUNNEL-13; same rule as account.service ownerStoreAllowance).
   // An additional store's own subscription never grants more stores, so a
   // lapsed parent cannot be worked around through a child.
+  // N-18: where the platform D1 is bound (every deployed Worker) the owner's stores are read from the D1 directory, which holds
+  // every store (Postgres stores are mirrored there, a store created on its DO exists only there); Postgres only where D1 is not
+  // bound (Node, tests, local dev).
   const stores = sortOwnerStores(
-    await withUser(ownerId, tx =>
-      tx.store.findMany({
-        where: { ownerId, deletedAt: null },
-        select: { id: true, createdAt: true },
-      })
-    )
+    (await listOwnerStoresD1(ownerId)) ??
+      (await withUser(ownerId, tx =>
+        tx.store.findMany({
+          where: { ownerId, deletedAt: null },
+          select: { id: true, createdAt: true },
+        })
+      ))
   );
   if (stores.length === 0) return;
   const e = await getEntitlements(stores[0].id);

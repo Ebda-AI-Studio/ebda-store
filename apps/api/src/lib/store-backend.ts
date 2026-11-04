@@ -135,6 +135,11 @@ interface StoreDoStub {
     sessionId: string
   ): Promise<DoResult<{ orderId: string; orderNumber: string; total: number }>>;
   seed(rows: unknown): Promise<DoResult<{ products: number; variants: number }>>;
+  /** N-18: first-time bootstrap of a store created on its DO (store_profile + store_config + default rows). Idempotent. */
+  bootstrapStore(
+    storeId: string,
+    inputJson: string
+  ): Promise<DoResult<{ profile: string[]; config: string[]; directoryOnly: string[] }>>;
   rowCounts(): Promise<Record<string, number>>;
   ensureBackupAlarm(): Promise<number>;
   backupNow(storeId: string): Promise<unknown>;

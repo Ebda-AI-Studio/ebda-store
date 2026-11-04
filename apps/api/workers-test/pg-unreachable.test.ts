@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
+import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 
 // Ruling ROLE-GUARD-LAZY-1: with Postgres unreachable (Neon quota, 2026-10-31) the built Worker still serves
 // everything D1 / a Durable Object answers. Run with EBDA_WORKERS_TEST_DB_URL pointing at a dead port.
@@ -64,5 +65,79 @@ describe.skipIf(e.E2E_DB === '1')('built Worker with Postgres unreachable', () =
     expect(seed.status).toBe(200);
     const counts = await e.API.fetch(`${base}/counts`, { headers });
     expect(counts.status).toBe(200);
+  });
+  it('N-18: a store is CREATED on D1 + its DO with Postgres dead, then served', async () => {
+    await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
+    // plans are platform data (imported in production); the subscription row's FK needs them
+    for (const p of DEFAULT_PLAN_SEEDS)
+      await e.PLATFORM_DB.prepare(
+        'INSERT OR IGNORE INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+      )
+        .bind(`plan-${p.code}`, p.code, p.nameEn, p.nameAr, p.featureTier, JSON.stringify(p.limits))
+        .run();
+    const created = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
+      method: 'POST',
+      body: JSON.stringify({
+        ownerId: 'owner-n18',
+        name: 'N18 Shop',
+        slug: 'n18-shop',
+        operator: true,
+      }),
+    });
+    expect(created.status).toBe(200);
+    const { id } = (await created.json()) as { id: string };
+
+    // D1 directory row + subscription, written with no Postgres
+    const row = await (
+      e.PLATFORM_DB as unknown as {
+        prepare(s: string): { bind(...v: unknown[]): { first<T>(): Promise<T | null> } };
+      }
+    )
+      .prepare(
+        'SELECT s.storage_backend AS b, s.status AS st, sub.status AS sub FROM stores s JOIN store_subscriptions sub ON sub.store_id = s.id WHERE s.id = ?1'
+      )
+      .bind(id)
+      .first<{ b: string; st: string; sub: string }>();
+    expect(row).toEqual({ b: 'do', st: 'active', sub: 'active' });
+
+    const headers = {
+      authorization: 'Bearer workers-test-seed-token',
+      'content-type': 'application/json',
+    };
+    // the DO is bootstrapped: the new store answers a counts probe (profile and the inactive VAT rate exist)
+    const counts = await e.API.fetch(`https://api.ebda.app/api/v1/internal/store-do/${id}/counts`, {
+      headers,
+    });
+    expect(counts.status).toBe(200);
+    const body = (await counts.json()) as { data?: Record<string, number> } & Record<
+      string,
+      number
+    >;
+    const c = body.data ?? body;
+    expect(c.store_profile).toBe(1);
+    expect(c.tax_rates).toBe(1);
+
+    // The storefront / auth reads are N-2..N-4 / N-9 (other tracks): today they need Postgres for ANY store. What N-18 owes is that a
+    // CREATED store behaves exactly like a store the platform already flagged `do`, so it is compared with the seeded spike store.
+    const probeAll = async (storeId: string, slug: string) => {
+      const h = { 'x-store-id': storeId };
+      const get = async (u: string, init?: RequestInit) => (await e.API.fetch(u, init)).status;
+      return {
+        home: await get(`https://api.ebda.app/api/v1/public/stores/${slug}`),
+        products: await get('https://api.ebda.app/api/v1/public/products', { headers: h }),
+        pdp: await get('https://api.ebda.app/api/v1/public/products/no-such-product', {
+          headers: h,
+        }),
+        cart: await get('https://api.ebda.app/api/v1/public/cart/items', {
+          method: 'POST',
+          headers: { ...h, 'content-type': 'application/json', 'x-session-id': 'sess-1' },
+          body: JSON.stringify({
+            productId: '33333333-3333-4333-8333-333333333333',
+            quantity: 1,
+          }),
+        }),
+      };
+    };
+    expect(await probeAll(id, 'n18-shop')).toEqual(await probeAll('spike-store-1', 's'));
   });
 });
