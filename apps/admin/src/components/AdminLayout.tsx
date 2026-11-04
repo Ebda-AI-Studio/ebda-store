@@ -33,6 +33,7 @@ import { TopBar } from './admin-layout/TopBar';
 import { DocumentTitle } from './DocumentTitle';
 import { FocusTopBar } from './admin-layout/FocusTopBar';
 import { MobileBottomNav } from './mobile/MobileBottomNav';
+import { ConfirmHost } from '../hooks/useConfirm';
 import { useFocusMode } from '../contexts/FocusModeContext';
 
 interface AdminLayoutProps {
@@ -137,6 +138,7 @@ export function AdminLayout({
     floatingWidget: t('hubTabs.floatingWidget'),
     sizeCharts: t('hubTabs.sizeCharts'),
     goldRates: t('hubTabs.goldRates'),
+    categories: t('hubTabs.categories'),
     // Sales tabs
     orders: t('hubTabs.orders'),
     invoices: t('hubTabs.invoices'),
@@ -455,6 +457,7 @@ export function AdminLayout({
         <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-6 lg:p-6">
           {children}
         </main>
+        <ConfirmHost />
       </div>
     );
   }
@@ -463,6 +466,8 @@ export function AdminLayout({
     <div className="flex min-h-screen bg-background">
       {/* Global ⌘K command palette — renders null until opened; searches every admin page. */}
       <CommandPalette items={paletteItems} />
+      {/* The one confirmation dialog behind useConfirm(). */}
+      <ConfirmHost />
       {/* ?setting=<id> deep link: scroll to the control and highlight it. */}
       <Suspense fallback={null}>
         <SettingHighlight />

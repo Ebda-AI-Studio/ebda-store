@@ -1,0 +1,26 @@
+{
+  "components": {
+    "rowActions": {
+      "more": "More options"
+    },
+    "stickySaveBar": {
+      "regionLabel": "Save changes",
+      "dirtyMessage": "You have changes that are not saved yet",
+      "reset": "Undo changes",
+      "save": "Save"
+    },
+    "formFooter": {
+      "cancel": "Cancel"
+    },
+    "confirm": {
+      "cancel": "Cancel"
+    },
+    "adminLayout": {
+      "navMarketing": "Marketing and offers",
+      "hubTabs": {
+        "categories": "Categories",
+        "bundles": "Product bundles"
+      }
+    }
+  }
+}

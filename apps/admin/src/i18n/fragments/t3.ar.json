@@ -1,0 +1,26 @@
+{
+  "components": {
+    "rowActions": {
+      "more": "خيارات تانية"
+    },
+    "stickySaveBar": {
+      "regionLabel": "حفظ التغييرات",
+      "dirtyMessage": "فيه تغييرات لسه ما اتحفظتش",
+      "reset": "تراجع",
+      "save": "احفظ"
+    },
+    "formFooter": {
+      "cancel": "إلغاء"
+    },
+    "confirm": {
+      "cancel": "إلغاء"
+    },
+    "adminLayout": {
+      "navMarketing": "التسويق والعروض",
+      "hubTabs": {
+        "categories": "الأقسام",
+        "bundles": "مجموعات المنتجات"
+      }
+    }
+  }
+}

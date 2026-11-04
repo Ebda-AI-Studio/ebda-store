@@ -22,12 +22,35 @@
  * keys (`t(\`role.${r}\`)`) are dynamic and skipped.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ADMIN_SRC = join(__dirname, '../../apps/admin/src');
-const en = JSON.parse(readFileSync(join(ADMIN_SRC, 'i18n/messages/en.json'), 'utf8'));
-const ar = JSON.parse(readFileSync(join(ADMIN_SRC, 'i18n/messages/ar.json'), 'utf8'));
+// Keys a track has written to i18n/fragments/<track>.<locale>.json resolve too: the integrator merges them into
+// the message files at the end (scripts/merge-i18n-fragments.mjs), so a track's PR must not fail before that.
+function loadMessages(locale: 'en' | 'ar'): unknown {
+  const base = JSON.parse(readFileSync(join(ADMIN_SRC, `i18n/messages/${locale}.json`), 'utf8'));
+  const dir = join(ADMIN_SRC, 'i18n/fragments');
+  if (!existsSync(dir)) return base;
+  const overlay = (dst: Record<string, unknown>, src: Record<string, unknown>) => {
+    for (const [k, v] of Object.entries(src)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const cur = dst[k];
+        dst[k] = overlay(
+          cur && typeof cur === 'object' ? (cur as Record<string, unknown>) : {},
+          v as Record<string, unknown>
+        );
+      } else dst[k] = v;
+    }
+    return dst;
+  };
+  for (const f of readdirSync(dir).filter(n => n.endsWith(`.${locale}.json`))) {
+    overlay(base, JSON.parse(readFileSync(join(dir, f), 'utf8')));
+  }
+  return base;
+}
+const en = loadMessages('en');
+const ar = loadMessages('ar');
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {
