@@ -16,6 +16,7 @@
  * period to extend (free or comped plan) or a charge for its current period is in flight, the grant
  * stays `pending` and is applied by the next call, which runs on every subscription payment.
  */
+import { hubOnD1, hubStoresById } from '../../lib/platform-hub';
 import crypto from 'crypto';
 import {
   prisma,
@@ -666,7 +667,10 @@ export async function listGrants(limit = 200) {
     Boolean
   );
   const idSet = new Set(ids);
-  const stores = (await storeDirectory()).filter(x => idSet.has(x.id));
+  // NEON-ZERO (Ruling NZ-C-4): names from D1 once the platform families moved.
+  const stores = (await hubOnD1())
+    ? await hubStoresById([...idSet])
+    : (await storeDirectory()).filter(x => idSet.has(x.id));
   const name = new Map(stores.map(s => [s.id, s]));
   const [total, founding, referral] = await Promise.all([
     prisma.billingGrant.aggregate({ _sum: { valueMinor: true } }),

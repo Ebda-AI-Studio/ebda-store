@@ -22,7 +22,7 @@ const DIRS = ['lib', 'services', 'mcp', 'middleware', 'utils'].map(d =>
   path.join(ROOT, 'apps/api/src', d)
 );
 const SCOPES =
-  /^(withStore|runInStoreScope|runInTenantContext|acrossStores|acrossStoresFlat|withUser|asPlatformOperator|scopeTransaction|readInStoreContext|withTenantContext|pageAcrossStores|sweepAcrossStores)$/;
+  /^(withStore|runInStoreScope|runInTenantContext|acrossStores|acrossStoresFlat|withUser|asPlatformOperator|asOperator|scopeTransaction|readInStoreContext|withTenantContext|pageAcrossStores|sweepAcrossStores)$/;
 
 /** `file::function` that run only under a caller's scope, with the reason. */
 const ALLOWED: Record<string, string> = {

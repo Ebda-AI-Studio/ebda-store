@@ -128,7 +128,7 @@ function isScopedOp(v: unknown): v is ScopedOp {
 }
 
 function scopedOp(
-  storeId: string,
+  storeId: string | undefined,
   exec: () => Promise<unknown>,
   userId?: string
 ): ScopedOp & Promise<unknown> {
@@ -728,6 +728,16 @@ export function runInStoreScope<T>(
   return storeScope.run({ storeId, userId }, () => settleInScope(fn));
 }
 
+/**
+ * NEON-ZERO (Ruling NZ-C-1): a USER scope with no store and no long-lived transaction. Like `runInStoreScope`, a `prisma` call
+ * inside runs in its own short tenant transaction carrying `app.current_user_id`, so a request that never touches Postgres
+ * (the super-admin hub once its platform families are on D1) never opens a connection, and a handler that still does keeps
+ * the user-keyed RLS it had under the request transaction.
+ */
+export function runInUserScope<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return storeScope.run({ userId }, () => settleInScope(fn));
+}
+
 // ---------------------------------------------------------------------------
 // Cross-store and contextless access under STRICT RLS (R-EBDA-001)
 // ---------------------------------------------------------------------------
@@ -768,11 +778,41 @@ export function runInStoreScope<T>(
  * `fn` receives the `prisma` proxy typed as a transaction client, so existing
  * `tx.model.findMany(...)` code moves over without change.
  */
-export function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+export async function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>): Promise<T> {
   const run = () => fn(prisma as unknown as TenantTx);
   if (currentTenantGucs()?.storeId === storeId) return run();
   if (!tenantStorage.getStore() && storeScope.getStore()?.storeId === storeId) return run();
+  // NEON-ZERO (Ruling NZ-C-3): a store served by its Durable Object has no Postgres rows to scope to, so a caller outside any
+  // request transaction (the super-admin hub, a job step) gets the lazy per-query store scope instead of a BEGIN that cannot connect.
+  if (
+    !tenantStorage.getStore() &&
+    storeScopeResolver &&
+    (await storeScopeResolver(storeId)) === 'no-pg'
+  )
+    return runInStoreScope(storeId, run);
   return runInTenantContext(storeId, run);
+}
+
+/**
+ * Registered once by the API at boot: says whether a store must NOT open a Postgres transaction ('no-pg': its data is in its
+ * Durable Object / D1). Unregistered (Node scripts, unit tests) = every store keeps the Postgres transaction.
+ */
+/** Registered by the API: the store ids a hub (user-scope) cross-store view covers, or undefined to use the directory definer. */
+let hubStoreLister: (() => Promise<string[] | undefined>) | undefined;
+export function setHubStoreLister(fn: (() => Promise<string[] | undefined>) | undefined): void {
+  hubStoreLister = fn;
+}
+
+export type StoreScopeResolver = (storeId: string) => Promise<'pg' | 'no-pg'>;
+let storeScopeResolver: StoreScopeResolver | undefined;
+export function setStoreScopeResolver(r: StoreScopeResolver | undefined): void {
+  storeScopeResolver = r;
+}
+/** The per-store scope runner `acrossStores` uses (same decision as `withStore`). */
+async function runInStoreTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  if (storeScopeResolver && (await storeScopeResolver(storeId)) === 'no-pg')
+    return runInStoreScope(storeId, fn);
+  return runInTenantContext(storeId, fn);
 }
 
 /**
@@ -921,9 +961,20 @@ export async function acrossStores<T>(
   fn: (storeId: string) => Promise<T>,
   opts: AcrossStoresOptions = {}
 ): Promise<Array<{ storeId: string; value: T }>> {
+  // NEON-ZERO (Ruling NZ-C-4): inside the platform user scope (`runInUserScope`, the super-admin hub) with no filter, the store
+  // list is the registered lister's (D1, capped), not the Postgres directory definer.
+  const listed =
+    !opts.storeIds &&
+    !opts.filter &&
+    !tenantStorage.getStore() &&
+    storeScope.getStore()?.storeId === undefined
+      ? await hubStoreLister?.()
+      : undefined;
   const storeIds = opts.storeIds
     ? dropHiddenStores(opts.storeIds, id => id, 'acrossStores')
-    : (await storeDirectory(opts.filter)).map(s => s.id);
+    : listed
+      ? dropHiddenStores(listed, id => id, 'acrossStores')
+      : (await storeDirectory(opts.filter)).map(s => s.id);
 
   const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
   let next = 0;
@@ -934,7 +985,7 @@ export async function acrossStores<T>(
       if (i >= storeIds.length) return;
       const storeId = storeIds[i];
       try {
-        out[i] = { storeId, value: await runInTenantContext(storeId, () => fn(storeId)) };
+        out[i] = { storeId, value: await runInStoreTx(storeId, () => fn(storeId)) };
       } catch (err) {
         if (opts.onStoreError) opts.onStoreError(storeId, err);
         else failure = { err };

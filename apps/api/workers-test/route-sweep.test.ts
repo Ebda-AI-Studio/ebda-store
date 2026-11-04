@@ -43,6 +43,9 @@ const MARKER_KEYS = [
   'platform_cutover.inbox',
   'platform_cutover.ai-usage',
   'platform_cutover.analytics',
+  'platform_cutover.payments',
+  'platform_cutover.ops',
+  'platform_cutover.audit',
   'customer_auth_cutover.__all',
 ];
 
@@ -73,6 +76,8 @@ async function hit(
   headers: Record<string, string>,
   body?: unknown
 ): Promise<Response | undefined> {
+  // SWEEP_FILTER=<regex over "METHOD /route">: measure a subset (a group owner re-checks only its routes).
+  if (!inSubset(`${method} ${route}`)) return undefined;
   const t0 = Date.now();
   const r: Result = { group, method, route, url, status: 0, ms: 0 };
   let res: Response | undefined;

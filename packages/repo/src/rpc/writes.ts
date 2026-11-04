@@ -104,6 +104,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'WishlistItem',
   'Bundle',
   'BundleItem',
+  // the platform tax-verification decision (NEON-ZERO group C, Ruling NZ-C-7)
+  'StoreTaxProfile',
   // shopper address book, per store (Ruling NZ-SF-5)
   'Address',
 ]);

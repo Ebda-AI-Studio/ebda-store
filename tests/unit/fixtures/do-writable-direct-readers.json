@@ -23,13 +23,6 @@
         "auditLog": 2
       }
     },
-    "apps/api/src/routes/admin.routes.ts": {
-      "kind": "platform",
-      "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
-      "models": {
-        "product": 3
-      }
-    },
     "apps/api/src/routes/notification.routes.ts": {
       "kind": "pg-branch",
       "guardFile": "apps/api/src/lib/analytics-backend.ts",
@@ -203,6 +196,13 @@
       "reason": "NZ-AN-1: SMS idempotency lookup. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
       "models": {
         "notificationLog": 1
+      }
+    },
+    "apps/api/src/services/tax-profile.service.ts": {
+      "kind": "platform",
+      "reason": "merchant tax-profile paths (get-or-create, submit, update) still read the profile through the store-scope prisma; the super-admin queue and decision already use storeDb / storeWriter (group C). The merchant paths belong to N-11 and are Postgres-store only until then.",
+      "models": {
+        "storeTaxProfile": 3
       }
     },
     "apps/api/src/services/variant.service.ts": {
