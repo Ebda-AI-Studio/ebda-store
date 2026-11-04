@@ -1872,7 +1872,7 @@ router.get(
                 orderBy: { createdAt: 'desc' },
                 include: {
                   ...(HUB_ON
-                    ? { customerId: true }
+                    ? {}
                     : { customer: { select: { email: true, firstName: true, lastName: true } } }),
                   ...(HUB_ON ? {} : { store: { select: { name: true } } }),
                 },
@@ -2096,7 +2096,7 @@ router.get(
               include: {
                 ...(HUB_ON ? {} : { store: { select: { id: true, name: true } } }),
                 ...(HUB_ON
-                  ? { customerId: true }
+                  ? {}
                   : {
                       customer: {
                         select: { id: true, email: true, firstName: true, lastName: true },
@@ -2815,7 +2815,12 @@ router.get(
                   : { customer: { select: { email: true, firstName: true, lastName: true } } }),
               },
             }),
-          { storeIds: storeIdsFromFilter(storeId) ?? (await boundedFanoutStoreIds()) }
+          {
+            // the cap is the hub's (D1 list); off the hub no filter still means every store, as before
+            storeIds:
+              storeIdsFromFilter(storeId) ??
+              ((await hubOnD1()) ? await boundedFanoutStoreIds() : undefined),
+          }
         )
       )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
