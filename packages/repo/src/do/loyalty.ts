@@ -632,9 +632,19 @@ function ensurePointsRow(db: SyncSql, storeId: string, customerId: string, now: 
   )[0];
 }
 
+/**
+ * THE one gate for every loyalty write that is not an order step (award, init, review bonus, history import, import flag):
+ * a store has loyalty on the DO exactly when its `store_config` row EXISTS. `loyalty_enabled` (the merchant's switch) is
+ * deliberately not part of it: importing history is data, not enablement, and every write op uses this same predicate, so
+ * the import and the ops that write after it cannot drift (a write is never possible before the import is).
+ */
+export function loyaltyStoreConfig(db: SyncSql, storeId: string) {
+  return loadLoyaltyConfig(db, storeId);
+}
+
 /** Config for an admin/storefront operation: refuses (LOYALTY_DISABLED) when the platform flag is off or the DO has no config row. */
 function requireConfig(db: SyncSql, storeId: string, featureEnabled: boolean) {
-  const cfg = loadLoyaltyConfig(db, storeId);
+  const cfg = loyaltyStoreConfig(db, storeId);
   if (!cfg || featureEnabled !== true)
     throw new MoneyError('LOYALTY_DISABLED', 'Loyalty program is not enabled', 400);
   return cfg;
@@ -1025,10 +1035,10 @@ export function importLedgerRows(
     throw new MoneyError('BAD_ARGS', 'rows must be an array of at most 500', 400);
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
-    const cfg = loadLoyaltyConfig(db, a.storeId);
-    // An import never creates or enables anything by itself: a store with no config row, or with loyalty switched off, is
-    // left untouched (and NOT marked imported, so the first touch after it is switched on does the import).
-    if (!cfg || !cfg.enabled) return { inserted: 0, skipped: 0, newBalance: 0, disabled: true };
+    const cfg = loyaltyStoreConfig(db, a.storeId);
+    // An import never creates anything for a store without loyalty config (no `store_config` row): left untouched and NOT
+    // marked, so the first touch after it is configured does the import. With a config row it always runs, enabled or not.
+    if (!cfg) return { inserted: 0, skipped: 0, newBalance: 0, disabled: true };
     const settings = cfg.settings;
     let rowEnsured = false;
     let inserted = 0;

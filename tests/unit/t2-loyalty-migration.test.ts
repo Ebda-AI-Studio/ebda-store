@@ -125,7 +125,7 @@ describe('LoyaltyService.ensureDoHistory (FP-2: no DO answer without the custome
     expect(money.loyaltyImport).not.toHaveBeenCalled();
   });
 
-  it('a store whose loyalty is off (import answers disabled) is not cached as imported', async () => {
+  it('a store with no loyalty config row (import answers disabled) is not cached as imported', async () => {
     (money.loyaltyImport as any).mockResolvedValue({
       inserted: 0,
       skipped: 0,

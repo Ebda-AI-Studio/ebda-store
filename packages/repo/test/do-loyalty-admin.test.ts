@@ -370,24 +370,50 @@ describe('loyalty on the DO: manual award, members, stats, history', () => {
     expect(r.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
   });
 
-  it('a store with loyalty off or no config row: import and mark create and flag nothing', () => {
-    const off = rig(0);
+  it('no config row: import and mark create and flag nothing', () => {
+    const none = rig();
+    none.raw.exec('DELETE FROM store_config');
     const rows = [{ id: 'p1', type: 'earn_manual', points: 5, createdAt: 1 }];
-    expect(off.op('loyaltyImport', { customerId: 'c1', rows, markDone: true })).toMatchObject({
+    expect(none.op('loyaltyImport', { customerId: 'c1', rows, markDone: true })).toMatchObject({
       inserted: 0,
       disabled: true,
     });
-    expect(off.op('loyaltyMarkImported', { customerId: 'c1' })).toEqual({ done: false });
-    expect(off.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
-    expect(off.q('SELECT count(*) AS n FROM loyalty_transactions')[0].n).toBe(0);
-    expect(off.op('loyaltyImportState', { customerId: 'c1' })).toEqual({ done: false });
-    const none = rig();
-    none.raw.exec('DELETE FROM store_config');
-    expect(none.op('loyaltyImport', { customerId: 'c1', rows, markDone: true })).toMatchObject({
-      disabled: true,
-    });
+    expect(none.op('loyaltyMarkImported', { customerId: 'c1' })).toEqual({ done: false });
+    expect(none.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
+    expect(none.q('SELECT count(*) AS n FROM loyalty_transactions')[0].n).toBe(0);
     expect(
       none.q('SELECT count(*) AS n FROM do_flags WHERE name LIKE ?', 'loyalty_import%')[0].n
     ).toBe(0);
+  });
+
+  it('config row with loyalty switched OFF: history is imported and marked (data, not enablement); an award after it lands on it; re-enable has no duplicate signup', () => {
+    const off = rig(0);
+    const hist = [
+      { id: 'pg-s', type: 'earn_signup', points: 100, createdAt: 1000 },
+      { id: 'pg-m', type: 'earn_manual', points: 40, description: 'gift', createdAt: 2000 },
+    ];
+    expect(off.op('loyaltyImport', { customerId: 'c1', rows: hist, markDone: true })).toMatchObject(
+      {
+        inserted: 2,
+        newBalance: 140,
+      }
+    );
+    expect(off.op('loyaltyImportState', { customerId: 'c1' })).toEqual({ done: true });
+    // an owner award while disabled writes after the import, never before it
+    expect(
+      off.op('loyaltyAward', { customerId: 'c1', points: 10, type: 'earn_manual', ...feature })
+    ).toEqual({
+      newBalance: 150,
+    });
+    // the merchant switches loyalty back on
+    off.raw.exec('UPDATE store_config SET loyalty_enabled = 1');
+    expect(off.op('loyaltyCustomerPoints', { customerId: 'c1', ...feature }).row.points).toBe(150);
+    expect(off.code('loyaltyInit', { customerId: 'c1', giveSignupBonus: true, ...feature })).toBe(
+      'ALREADY_EXISTS/400'
+    );
+    expect(off.op('loyaltyImport', { customerId: 'c1', rows: hist })).toMatchObject({
+      inserted: 0,
+      newBalance: 150,
+    });
   });
 });

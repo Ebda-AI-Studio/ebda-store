@@ -11,7 +11,7 @@ import {
   markImported,
   initializeCustomerPoints,
   listMembers,
-  loadLoyaltyConfig,
+  loyaltyStoreConfig,
   listStoreTransactions,
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
@@ -441,10 +441,9 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     }),
   loyaltyImportState: (db, _storeId, a) =>
     importState(db, { customerId: typeof a.customerId === 'string' ? a.customerId : undefined }),
-  // never records anything for a store without loyalty config (nothing was imported, nothing may be created)
+  // never records anything for a store without a loyalty config row (nothing was imported, nothing may be created)
   loyaltyMarkImported: (db, storeId, a) => {
-    const cfg = loadLoyaltyConfig(db, storeId);
-    if (!cfg || !cfg.enabled) return { done: false };
+    if (!loyaltyStoreConfig(db, storeId)) return { done: false };
     return markImported(db, {
       customerId: typeof a.customerId === 'string' ? a.customerId : undefined,
     });
