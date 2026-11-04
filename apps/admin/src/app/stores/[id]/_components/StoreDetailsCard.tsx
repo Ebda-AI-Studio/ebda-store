@@ -18,6 +18,8 @@ interface StoreDetailsCardProps {
   onCancel: () => void;
   /** Opens the edit form on the status field: an inactive store gets a visible way to go live (audit D-1). */
   onActivate?: () => void;
+  /** Start editing; the page header no longer carries "edit store" (its primary is the editor). */
+  onEdit?: () => void;
 }
 
 export function StoreDetailsCard({
@@ -31,6 +33,7 @@ export function StoreDetailsCard({
   onSave,
   onCancel,
   onActivate,
+  onEdit,
 }: StoreDetailsCardProps) {
   const t = useT('stores.dashboard.details');
   const statusLabel = {
@@ -46,6 +49,11 @@ export function StoreDetailsCard({
     <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b p-4">
         <h2 className="font-semibold text-foreground">{t('title')}</h2>
+        {!isEditing && onEdit && (
+          <Button variant="outline" size="sm" onClick={onEdit}>
+            {t('edit')}
+          </Button>
+        )}
         {isEditing && (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onCancel}>

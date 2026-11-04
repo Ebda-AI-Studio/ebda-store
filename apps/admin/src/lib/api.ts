@@ -20,6 +20,7 @@
  * session IDs and store IDs in headers.
  */
 
+import { resolveErrorMessage } from './error-messages';
 import { hasSessionHintCookie, sessionHintCookieClears } from '@ebda/shared';
 import {
   PLAN_GATE_FALLBACK,
@@ -682,7 +683,12 @@ export async function apiRequest<T = unknown>(
           data: null,
           error: {
             code: 'PARSE_ERROR',
-            message: `Server returned non-JSON response with status ${response.status}`,
+            message: resolveErrorMessage({
+              code: 'PARSE_ERROR',
+              status: response.status,
+              serverMessage: `Server returned non-JSON response with status ${response.status}`,
+              locale: adminUiLocale(),
+            }),
             status: response.status,
           },
         };
@@ -743,6 +749,17 @@ export async function apiRequest<T = unknown>(
           });
         }
       }
+      // ERROR_AR / ERROR_EN by code (UX:C-1): English server text never reaches the Arabic UI.
+      // Plan-gate / permission fallbacks above are already localized, so they are left alone.
+      if (message === (errMessage || `Request failed with status ${response.status}`)) {
+        message = resolveErrorMessage({
+          code: errCode,
+          status: response.status,
+          serverMessage: message,
+          locale: adminUiLocale(),
+          hasBilingualDetails: hasBilingualText(errObj?.details),
+        });
+      }
       return {
         data: null,
         error: {
@@ -760,7 +777,12 @@ export async function apiRequest<T = unknown>(
       data: null,
       error: {
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Network request failed',
+        message: resolveErrorMessage({
+          code: 'NETWORK_ERROR',
+          status: 0,
+          serverMessage: error instanceof Error ? error.message : 'Network request failed',
+          locale: adminUiLocale(),
+        }),
         status: 0,
       },
     };
@@ -890,11 +912,17 @@ export async function apiGetPage<T = unknown>(
         meta: null,
         error: {
           code: body?.error?.code || 'SERVER_ERROR',
-          message: localizedApiMessage(
-            body?.error?.code,
-            body?.error?.message || `Request failed with status ${response.status}`,
-            body?.error?.details
-          ),
+          message: resolveErrorMessage({
+            code: body?.error?.code,
+            status: response.status,
+            serverMessage: localizedApiMessage(
+              body?.error?.code,
+              body?.error?.message || `Request failed with status ${response.status}`,
+              body?.error?.details
+            ),
+            locale: adminUiLocale(),
+            hasBilingualDetails: hasBilingualText(body?.error?.details),
+          }),
           status: response.status,
           details: body?.error?.details,
         },
@@ -911,7 +939,12 @@ export async function apiGetPage<T = unknown>(
       meta: null,
       error: {
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Network request failed',
+        message: resolveErrorMessage({
+          code: 'NETWORK_ERROR',
+          status: 0,
+          serverMessage: error instanceof Error ? error.message : 'Network request failed',
+          locale: adminUiLocale(),
+        }),
         status: 0,
       },
     };
@@ -982,6 +1015,12 @@ export function localizedApiMessage(
   return typeof text === 'string' && text ? text : message;
 }
 
+/** True when the API sent the text in the admin's language itself (`details.messageAr` / `messageEn`). */
+function hasBilingualText(details: Record<string, unknown> | undefined): boolean {
+  const text = adminUiLocale() === 'ar' ? details?.messageAr : details?.messageEn;
+  return typeof text === 'string' && text.length > 0;
+}
+
 export interface UpsellEventDetail {
   code: string;
   message: string;
@@ -1007,65 +1046,4 @@ function dispatchUpsell(
       },
     })
   );
-}
-
-/**
- * Get user-friendly error message based on status code
- */
-export function getErrorMessage(error: ApiError): { title: string; message: string } {
-  switch (error.status) {
-    case 400:
-      return {
-        title: 'Invalid request',
-        message: error.message || 'The request was invalid. Please check your input.',
-      };
-    case 401:
-      return {
-        title: 'Session expired',
-        message: 'Please log in again to continue.',
-      };
-    case 403:
-      return {
-        title: 'Access denied',
-        message: error.message || 'You do not have permission to perform this action.',
-      };
-    case 404:
-      return {
-        title: 'Not found',
-        message: error.message || 'The requested resource was not found.',
-      };
-    case 409:
-      return {
-        title: 'Conflict',
-        message: error.message || 'This action conflicts with existing data.',
-      };
-    case 422:
-      return {
-        title: 'Validation error',
-        message: error.message || 'Please check your input and try again.',
-      };
-    case 429:
-      return {
-        title: 'Too many requests',
-        message: 'Please wait a moment before trying again.',
-      };
-    case 500:
-    case 502:
-    case 503:
-    case 504:
-      return {
-        title: 'Server error',
-        message: 'Something went wrong on our end. Please try again later.',
-      };
-    case 0:
-      return {
-        title: 'Connection error',
-        message: 'Unable to connect to the server. Please check your internet connection.',
-      };
-    default:
-      return {
-        title: 'Error',
-        message: error.message || 'An unexpected error occurred.',
-      };
-  }
 }

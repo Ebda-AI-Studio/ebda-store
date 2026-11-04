@@ -314,7 +314,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             rows.map((item, idx) => (
               <li key={item.key} data-idx={idx}>
                 {item.section && (
-                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {t(item.section)}
                   </p>
                 )}
@@ -365,7 +365,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             </li>
           )}
         </ul>
-        <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
+        <div className="flex items-center justify-between border-t border-border px-4 py-2 text-xs text-muted-foreground">
           <span>{t('countResults', { count: rows.length })}</span>
           <span className="hidden sm:inline">{t('navHint')}</span>
         </div>

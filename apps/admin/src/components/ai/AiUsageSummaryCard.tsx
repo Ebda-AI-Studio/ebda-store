@@ -69,7 +69,7 @@ function SpendFigure({
         {micros == null ? '—' : formatSpend(micros)}
       </p>
       {unpriced > 0 && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-500">
+        <p className="text-xs text-warning-ink">
           {t('spendUnpriced', { count: unpriced.toLocaleString(undefined, withNumerals()) })}
         </p>
       )}
@@ -317,7 +317,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
                   height={40}
                   ariaLabel={t('sparklineAriaLabel')}
                 />
-                <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                <div className="mt-1 flex justify-between text-xs text-muted-foreground">
                   <span>{summary.last30Days[0]?.day ?? ''}</span>
                   <span>{summary.last30Days[summary.last30Days.length - 1]?.day ?? ''}</span>
                 </div>
@@ -415,7 +415,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
             <span>{t('last30Days')}</span>
           </div>
           <Sparkline data={summary.last30Days} height={60} ariaLabel={t('sparklineAriaLabel')} />
-          <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+          <div className="mt-1 flex justify-between text-xs text-muted-foreground">
             <span>{summary.last30Days[0]?.day ?? ''}</span>
             <span>{summary.last30Days[summary.last30Days.length - 1]?.day ?? ''}</span>
           </div>

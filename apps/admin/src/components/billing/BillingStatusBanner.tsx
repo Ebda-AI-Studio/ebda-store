@@ -43,9 +43,7 @@ export function BillingStatusBanner({ storeId }: { storeId: string }) {
     <div
       role={urgent ? 'alert' : 'status'}
       className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 text-sm lg:ms-72 ${
-        urgent
-          ? 'bg-destructive/10 text-destructive-ink'
-          : 'bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200'
+        urgent ? 'bg-destructive/10 text-destructive-ink' : 'bg-warning/10 text-warning-ink'
       }`}
     >
       <span>{title}</span>

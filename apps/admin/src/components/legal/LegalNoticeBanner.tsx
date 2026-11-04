@@ -69,7 +69,7 @@ export function LegalNoticeBanner({ storeId }: { storeId: string }) {
     <div
       role="status"
       aria-labelledby="legal-notice-title"
-      className="flex flex-col gap-2 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200 lg:ms-72"
+      className="flex flex-col gap-2 border-b border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink lg:ms-72"
     >
       <p id="legal-notice-title" className="font-medium">
         {t('title')}
@@ -97,7 +97,7 @@ export function LegalNoticeBanner({ storeId }: { storeId: string }) {
           type="button"
           onClick={acknowledge}
           disabled={saving}
-          className="min-h-9 rounded-md bg-amber-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-amber-200 dark:text-amber-950"
+          className="min-h-9 rounded-md bg-warning-ink px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
         >
           {saving ? t('saving') : t('gotIt')}
         </button>

@@ -26,7 +26,7 @@ type OrderStatus =
 export type StatusStyle = { bg: string; text: string; dot: string } | { className: string };
 
 const DEFAULT_STATUS_STYLES: Record<string, StatusStyle> = {
-  pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  pending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
   // InstaPay: the money has not been confirmed to have arrived (SP6a).
   awaiting_payment_confirmation: {
     bg: 'bg-violet-50',
@@ -40,7 +40,7 @@ const DEFAULT_STATUS_STYLES: Record<string, StatusStyle> = {
   cancelled: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
   refunded: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
   paid: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  unpaid: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  unpaid: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
 };
 
 interface OrderStatusBadgeProps {
