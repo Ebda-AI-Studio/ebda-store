@@ -70,6 +70,11 @@ const PARITY: Record<string, Verdict> = {
     pg: 'n/a (DO-only): the saved scope of the erasure',
     do: 'written first, read on a replay',
   },
+  notification_logs: {
+    how: 'handled',
+    pg: 'n/a (DO-only table): rows keyed by the hashed phone',
+    do: 'delete by the shopper buyer keys',
+  },
   commerce_outcomes: {
     how: 'handled',
     pg: 'n/a (DO-only table): buyer key to NULL',

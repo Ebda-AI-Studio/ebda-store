@@ -211,6 +211,11 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
         [storeId, JSON.stringify(buyerKeys)]
       );
       flag(0);
+      // the delivery log keys a message by the HASHED phone: the same buyer keys, deleted (registry action `delete`, N-13)
+      db.run(
+        'DELETE FROM notification_logs WHERE store_id = ? AND recipient_phone_hash IN (SELECT value FROM json_each(?))',
+        [storeId, JSON.stringify(buyerKeys)]
+      );
     }
 
     // 4. orders keep money history, lose identity
