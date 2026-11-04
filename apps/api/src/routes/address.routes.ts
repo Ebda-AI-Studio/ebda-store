@@ -1,11 +1,37 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
+import { AppError } from '../middleware/error-handler';
 import { egyptAddressSchema } from '@ebda/shared';
 import { authenticate } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+/**
+ * Ruling NZ-SF-5: a shopper's addresses live in the customer's StoreDO (per store, like the per-store account). The store is
+ * the `X-Store-ID` header (the web client sends it on every request) or, failing that, the store the customer token is bound to;
+ * `authenticate` has already refused a header store that differs from the token's (customer-store-binding). A customer with
+ * neither is a 400 `STORE_REQUIRED`. A merchant/admin token with no store keeps the Postgres address book it always had.
+ */
+function addressStoreId(req: Request): string | undefined {
+  const header = req.headers['x-store-id'];
+  const fromHeader = typeof header === 'string' && header ? header : undefined;
+  const claim = (req.user as { storeId?: string } | undefined)?.storeId;
+  return fromHeader ?? (req.user?.role === 'customer' ? claim : undefined);
+}
+
+/** The address client of the request's store: its DO for a DO store, `prisma` for a Postgres store or a store-less admin token. */
+async function addressDb(req: Request) {
+  const storeId = addressStoreId(req);
+  if (!storeId) {
+    if (req.user?.role === 'customer')
+      throw new AppError(400, 'STORE_REQUIRED', 'Store is required for the address book');
+    return prisma;
+  }
+  return (await storeWriter(storeId)) as unknown as typeof prisma;
+}
 
 // RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — this router
 // is mounted BARE at `/addresses` (routes/index.ts), with no `:storeId`/`:id`
@@ -33,7 +59,12 @@ const router = Router();
 // will 404 instead of 403 — the DB backstop doing its job (don't reveal
 // existence of another user's row). Expected; do not try to preserve 403.
 router.use(authenticate);
-router.use(userContext(req => req.user!.userId));
+router.use(
+  userContext(
+    req => req.user!.userId,
+    req => addressStoreId(req)
+  )
+);
 
 // Validation schema for creating/updating an address.
 //
@@ -58,7 +89,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
 
-    const addresses = await prisma.address.findMany({
+    const addresses = await (
+      await addressDb(req)
+    ).address.findMany({
       where: { userId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
@@ -94,17 +127,21 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // If this address is being set as default, unset all other defaults first
     if (data.isDefault) {
-      await prisma.address.updateMany({
+      await (
+        await addressDb(req)
+      ).address.updateMany({
         where: { userId, isDefault: true },
         data: { isDefault: false },
       });
     }
 
     // If this is the user's first address, make it default automatically
-    const existingCount = await prisma.address.count({ where: { userId } });
+    const existingCount = await (await addressDb(req)).address.count({ where: { userId } });
     const isDefault = data.isDefault ?? existingCount === 0;
 
-    const address = await prisma.address.create({
+    const address = await (
+      await addressDb(req)
+    ).address.create({
       data: {
         userId,
         firstName: data.firstName,
@@ -146,7 +183,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     // Verify ownership
-    const existing = await prisma.address.findUnique({ where: { id, userId } });
+    const existing = await (await addressDb(req)).address.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({
         success: false,
@@ -181,13 +218,17 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     // If setting this address as default, unset others
     if (data.isDefault) {
-      await prisma.address.updateMany({
+      await (
+        await addressDb(req)
+      ).address.updateMany({
         where: { userId, isDefault: true, id: { not: id } },
         data: { isDefault: false },
       });
     }
 
-    const address = await prisma.address.update({
+    const address = await (
+      await addressDb(req)
+    ).address.update({
       where: { id, userId },
       data: {
         ...(data.firstName !== undefined && { firstName: data.firstName }),
@@ -227,7 +268,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { id } = req.params;
 
     // Verify ownership
-    const existing = await prisma.address.findUnique({ where: { id, userId } });
+    const existing = await (await addressDb(req)).address.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({
         success: false,
@@ -244,16 +285,20 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    await prisma.address.delete({ where: { id, userId } });
+    await (await addressDb(req)).address.delete({ where: { id, userId } });
 
     // If the deleted address was default, promote the most recently created address
     if (existing.isDefault) {
-      const next = await prisma.address.findFirst({
+      const next = await (
+        await addressDb(req)
+      ).address.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
       });
       if (next) {
-        await prisma.address.update({ where: { id: next.id, userId }, data: { isDefault: true } });
+        await (
+          await addressDb(req)
+        ).address.update({ where: { id: next.id, userId }, data: { isDefault: true } });
       }
     }
 
