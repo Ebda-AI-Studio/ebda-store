@@ -20,6 +20,7 @@ import request from 'supertest';
 import { withRlsBypass } from '@ebda/database';
 
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'campaign-it-admin', role: 'super_admin' };
     next();

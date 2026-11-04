@@ -62,6 +62,8 @@ import { healthPayload } from './lib/health-payload';
 import { storageBackendCounts } from './lib/store-backend';
 import { cfBindings } from './cf/bindings';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
+import { serverTiming } from './lib/request-timing';
+import { localizeRateLimited } from './lib/localized-error';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 import { repoScope } from './lib/repo-factory';
 assertBillingConfigAtBoot();
@@ -159,6 +161,10 @@ app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
+// Server-Timing: auth / identity / db-wait / handler (BE:E-1) next to request-tx.
+app.use(serverTiming);
+// RATE_LIMITED bodies from every limiter carry details.messageAr/messageEn (BE:E-3).
+app.use(localizeRateLimited);
 // Per-request repo scope (lib/repo-factory.ts, Ruling CF-REPO-1): lets a service ask for its store's backend by store id.
 app.use(repoScope);
 

@@ -65,7 +65,9 @@ describe('tenantContext — one transaction per request (#1602)', () => {
   });
 
   it('a request that falls through the bare /stores/:storeId mount opens ONE transaction', async () => {
-    const res = await request(app()).get(`/stores/${STORE}/coupons`);
+    const res = await request(app())
+      .get(`/stores/${STORE}/coupons`)
+      .set('Authorization', 'Bearer t');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ from: 'coupons' });
     expect(runInTenantContextMock).toHaveBeenCalledTimes(1);
@@ -73,15 +75,17 @@ describe('tenantContext — one transaction per request (#1602)', () => {
   });
 
   it('a route the first mount does answer still opens exactly one', async () => {
-    const res = await request(app()).get(`/stores/${STORE}/customers`);
+    const res = await request(app())
+      .get(`/stores/${STORE}/customers`)
+      .set('Authorization', 'Bearer t');
     expect(res.body).toEqual({ from: 'customers' });
     expect(runInTenantContextMock).toHaveBeenCalledTimes(1);
   });
 
   it('separate requests do not share a transaction', async () => {
     const a = app();
-    await request(a).get(`/stores/${STORE}/coupons`);
-    await request(a).get(`/stores/${STORE}/coupons`);
+    await request(a).get(`/stores/${STORE}/coupons`).set('Authorization', 'Bearer t');
+    await request(a).get(`/stores/${STORE}/coupons`).set('Authorization', 'Bearer t');
     expect(runInTenantContextMock).toHaveBeenCalledTimes(2);
   });
 });

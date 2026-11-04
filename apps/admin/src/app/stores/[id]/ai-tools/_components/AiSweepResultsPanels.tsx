@@ -272,7 +272,7 @@ function TranslatePanel({ data, storeId }: { data: TranslateResult; storeId: str
   return (
     <div className="space-y-4">
       {/* Fill-rate cards side-by-side */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FillRateCard
           label={t('fillRateLabels.productsAr')}
           filled={data.products.filled}
@@ -342,7 +342,7 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
   return (
     <div className="space-y-4">
       {/* 3 fill-rate cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FillRateCard
           label={t('fillRateLabels.store')}
           filled={data.storeMetaFilled ? 1 : 0}
@@ -559,7 +559,7 @@ function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string 
   return (
     <div className="space-y-4">
       {/* Fill-rate cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FillRateCard
           label={t('fillRateLabels.store')}
           filled={data.storeAeoFilled ? 1 : 0}
@@ -734,7 +734,7 @@ function TagsPanel({ data, storeId }: { data: TagsResult; storeId: string }) {
   const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FillRateCard
           label={t('fillRateLabels.productsTagged')}
           filled={data.products.filled}
@@ -743,7 +743,7 @@ function TagsPanel({ data, storeId }: { data: TagsResult; storeId: string }) {
         />
         <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-center">
           <div className="text-2xl font-bold text-foreground">{data.totalTags}</div>
-          <div className="mt-1 text-[11px] font-medium text-foreground">{t('totalTags')}</div>
+          <div className="mt-1 text-xs font-medium text-foreground">{t('totalTags')}</div>
         </div>
       </div>
 
@@ -811,7 +811,7 @@ function FillRateCard({
 }) {
   const percentage = pct(rate);
   const color =
-    rate >= 0.8 ? 'text-emerald-600' : rate >= 0.4 ? 'text-amber-600' : 'text-destructive-ink';
+    rate >= 0.8 ? 'text-emerald-600' : rate >= 0.4 ? 'text-warning-ink' : 'text-destructive-ink';
 
   return (
     <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-center">
@@ -819,7 +819,7 @@ function FillRateCard({
       <div className="mt-0.5 text-xs text-muted-foreground">
         {filled}/{total}
       </div>
-      <div className="mt-1 text-[11px] font-medium text-foreground">{label}</div>
+      <div className="mt-1 text-xs font-medium text-foreground">{label}</div>
       {/* Thin fill-rate bar */}
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
         <div className="h-full bg-primary transition-all" style={{ width: `${percentage}%` }} />

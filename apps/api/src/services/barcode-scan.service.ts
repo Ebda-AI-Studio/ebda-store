@@ -494,7 +494,8 @@ export async function submitCountLine(
   let systemQty = 0;
   if (line.variantId) {
     const v = await prisma.productVariant.findFirst({
-      where: { id: line.variantId, productId: line.productId },
+      // BE:S-7: the product must be THIS store's, else a foreign variant's stock is read
+      where: { id: line.variantId, productId: line.productId, product: { storeId } },
       select: { inventory: true },
     });
     systemQty = v?.inventory ?? 0;

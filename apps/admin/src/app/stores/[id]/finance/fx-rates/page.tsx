@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { FeatureUpgradeGate } from '@/components/FeatureUpgradeGate';
 import { apiGet, apiPost } from '@/lib/api';
 import { ALLOWED_CURRENCIES, withNumerals } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
@@ -162,14 +163,7 @@ export default function FxRatesPage() {
 
   // Feature not active
   if (featureEnabled === false) {
-    return (
-      <AdminLayout title={t('title')} subtitle={t('multiCurrencyAccounting')}>
-        <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          <p className="font-semibold mb-1">{t('featureInactive')}</p>
-          <p>{t('featureInactiveDesc')}</p>
-        </div>
-      </AdminLayout>
-    );
+    return <FeatureUpgradeGate featureKey="accounting.multi_currency" storeId={storeId} />;
   }
 
   return (

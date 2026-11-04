@@ -174,62 +174,6 @@ export function ActionFooter({
             }
           />
         )}
-        {/* Refresh payment — diagnostic. Re-check provider status when
-            webhook didn't fire (provider portal misconfigured /
-            signature mismatch / network blip). Same fanout as the
-            real webhook so notifications catch up. */}
-        {showMarkPaid && (
-          <RefreshPaymentButton
-            storeId={storeId}
-            orderId={order.id}
-            disabled={isUpdating}
-            onRefreshed={onPaymentRefreshed}
-          />
-        )}
-        {/* Refund via provider — actually moves money back to the
-            customer's card. Distinct from the "Refunded" status menu
-            entry, which is only DB bookkeeping for already-refunded
-            COD / bank-transfer cases. */}
-        {showInstapayRefund && instapayRemaining > 0 && (
-          <InstapayRefundButton
-            storeId={storeId}
-            orderId={order.id}
-            orderNumber={order.orderNumber}
-            remainingMinor={instapayRemaining}
-            disabled={isUpdating}
-            onRecorded={onPaymentRefreshed}
-          />
-        )}
-        {showRefundViaProvider && canRefund && (
-          <RefundButton
-            storeId={storeId}
-            orderId={order.id}
-            orderNumber={order.orderNumber}
-            // What the PROVIDER refunds (#2069): the refundable remainder of the
-            // payment row the route picks — after a partial refund that is less
-            // than the order value. Older payloads without the figures fall back
-            // to the order value less any customer-wallet spend (D1).
-            total={refundViaProviderRemaining(order) ?? order.total - (order.walletAmount ?? 0)}
-            currency={order.currency}
-            disabled={isUpdating}
-            onRefunded={onPaymentRefreshed}
-          />
-        )}
-        {/* Refresh refund status — diagnostic. Re-check provider status
-            for an already-submitted refund. A gateway may queue refunds
-            for 1-3 days; this button confirms when the finance team
-            has actually executed the refund (so the customer's card
-            reflects the credit). Same safety-net pattern as Refresh
-            Payment — autonomous webhook handles the common case, this
-            covers missed webhooks. */}
-        {showRefreshRefundStatus && (
-          <RefreshRefundStatusButton
-            storeId={storeId}
-            orderId={order.id}
-            disabled={isUpdating}
-            onRefreshed={onPaymentRefreshed}
-          />
-        )}
         {showManualMarkPaid && (
           <button
             type="button"
@@ -254,45 +198,25 @@ export function ActionFooter({
             <span className="min-w-0">{t('markPaid')}</span>
           </button>
         )}
-        {canCancel && !isFinal && (
-          <button
-            type="button"
-            onClick={() => onStatusChange('cancelled')}
-            disabled={isUpdating}
-            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center rounded-xl border-2 border-destructive bg-card px-3 py-2.5 text-center text-sm font-semibold leading-tight text-destructive-ink hover:bg-destructive/5 disabled:opacity-60 transition-colors cursor-pointer"
-          >
-            <span className="min-w-0">{t('cancel')}</span>
-          </button>
-        )}
-
-        <div className="relative" ref={menuRef}>
+        <div className="relative ms-auto" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOpen(o => !o)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={t('more')}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors cursor-pointer"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="19" cy="12" r="1.6" />
             </svg>
           </button>
           {menuOpen && (
             <div
               role="menu"
-              className="absolute end-0 bottom-full mb-2 w-56 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+              className="absolute end-0 bottom-full mb-2 w-64 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-lg"
             >
               <button
                 type="button"
@@ -301,24 +225,88 @@ export function ActionFooter({
                   setMenuOpen(false);
                   onPrintInvoice();
                 }}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm text-foreground hover:bg-muted cursor-pointer"
+                className="flex min-h-11 w-full items-center px-4 text-start text-sm text-foreground hover:bg-muted cursor-pointer"
               >
-                <svg
-                  className="h-4 w-4 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                  />
-                </svg>
                 {t('printInvoice')}
               </button>
+              {/* Money + diagnostic actions: reachable in one tap, never beside the primary (rule 7). */}
+              <div className="flex flex-col gap-2 p-2">
+                {/* Refresh payment — diagnostic. Re-check provider status when
+                    webhook didn't fire (provider portal misconfigured /
+                    signature mismatch / network blip). Same fanout as the
+                    real webhook so notifications catch up. */}
+                {showMarkPaid && (
+                  <RefreshPaymentButton
+                    storeId={storeId}
+                    orderId={order.id}
+                    disabled={isUpdating}
+                    onRefreshed={onPaymentRefreshed}
+                  />
+                )}
+                {/* Refund via provider — actually moves money back to the
+                    customer's card. Distinct from the "Refunded" status menu
+                    entry, which is only DB bookkeeping for already-refunded
+                    COD / bank-transfer cases. */}
+                {showInstapayRefund && instapayRemaining > 0 && (
+                  <InstapayRefundButton
+                    storeId={storeId}
+                    orderId={order.id}
+                    orderNumber={order.orderNumber}
+                    remainingMinor={instapayRemaining}
+                    disabled={isUpdating}
+                    onRecorded={onPaymentRefreshed}
+                  />
+                )}
+                {showRefundViaProvider && canRefund && (
+                  <RefundButton
+                    storeId={storeId}
+                    orderId={order.id}
+                    orderNumber={order.orderNumber}
+                    // What the PROVIDER refunds (#2069): the refundable remainder of the
+                    // payment row the route picks — after a partial refund that is less
+                    // than the order value. Older payloads without the figures fall back
+                    // to the order value less any customer-wallet spend (D1).
+                    total={
+                      refundViaProviderRemaining(order) ?? order.total - (order.walletAmount ?? 0)
+                    }
+                    currency={order.currency}
+                    disabled={isUpdating}
+                    onRefunded={onPaymentRefreshed}
+                  />
+                )}
+                {/* Refresh refund status — diagnostic. Re-check provider status
+                    for an already-submitted refund. A gateway may queue refunds
+                    for 1-3 days; this button confirms when the finance team
+                    has actually executed the refund (so the customer's card
+                    reflects the credit). Same safety-net pattern as Refresh
+                    Payment — autonomous webhook handles the common case, this
+                    covers missed webhooks. */}
+                {showRefreshRefundStatus && (
+                  <RefreshRefundStatusButton
+                    storeId={storeId}
+                    orderId={order.id}
+                    disabled={isUpdating}
+                    onRefreshed={onPaymentRefreshed}
+                  />
+                )}
+              </div>
+              {canCancel && !isFinal && (
+                <>
+                  <div role="separator" className="my-1 h-px bg-border" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onStatusChange('cancelled');
+                    }}
+                    disabled={isUpdating}
+                    className="flex min-h-11 w-full items-center px-4 text-start text-sm font-medium text-destructive-ink hover:bg-destructive/5 disabled:opacity-60 cursor-pointer"
+                  >
+                    {t('cancel')}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

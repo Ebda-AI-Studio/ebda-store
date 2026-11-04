@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 const SRC = join(__dirname, '..', '..', 'apps', 'api', 'src');
 const walk = (dir: string): string[] =>
@@ -22,6 +22,17 @@ const walk = (dir: string): string[] =>
 const files = walk(SRC);
 const read = (p: string) => readFileSync(p, 'utf8');
 const rel = (p: string) => relative(SRC, p);
+/** Classify on the path RELATIVE to the source root: a checkout/worktree directory named `...routes` must not match. */
+export const isRouteFile = (src: string, file: string) =>
+  relative(src, file).startsWith(`routes${sep}`);
+
+describe('route-file classifier', () => {
+  it('ignores a repo root whose own name contains "routes"', () => {
+    const root = join(sep, 'w', 'ebda-store__fix-nz-customer-auth-routes', 'apps', 'api', 'src');
+    expect(isRouteFile(root, join(root, 'services', 'a.service.ts'))).toBe(false);
+    expect(isRouteFile(root, join(root, 'routes', 'a.routes.ts'))).toBe(true);
+  });
+});
 
 describe('layer 1: HTTP routers', () => {
   it('ai.routes.ts: requireAiEnabled is mounted before every route but the two /settings ones', () => {
@@ -39,9 +50,7 @@ describe('layer 1: HTTP routers', () => {
   it('every other route file that reaches a model names requireAiEnabled on that route', () => {
     const AI_CALL = /AIService\.|draftOwnerResponse\(|summarizeProductReviews\(/g;
     const offenders: string[] = [];
-    for (const f of files.filter(
-      f => f.includes(`${join('routes', '')}`) && !f.endsWith('ai.routes.ts')
-    )) {
+    for (const f of files.filter(f => isRouteFile(SRC, f) && !f.endsWith('ai.routes.ts'))) {
       const src = read(f);
       const calls = (src.match(AI_CALL) ?? []).length;
       if (calls === 0) continue;

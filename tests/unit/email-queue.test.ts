@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { emailQueue, EmailQueueService, QueuedEmail } from '@api/services/email-queue.service';
 import { redis } from '@api/services/redis.service';
 import { EmailService } from '@api/services/email.service';
+import logger from '@api/lib/logger';
 
 // Mock dependencies
 vi.mock('@api/services/redis.service', () => ({
@@ -74,7 +75,7 @@ describe('Email Queue Service', () => {
 
     it('should send email immediately when Redis unavailable (with storeId)', async () => {
       vi.mocked(redis.isAvailable).mockReturnValue(false);
-      vi.mocked(EmailService.sendRaw).mockResolvedValue(undefined);
+      vi.mocked(EmailService.sendRaw).mockResolvedValue({ id: 'm' });
 
       const emailOptions = {
         to: 'test@example.com',
@@ -89,7 +90,7 @@ describe('Email Queue Service', () => {
 
     it('should send platform email immediately when Redis unavailable (no storeId)', async () => {
       vi.mocked(redis.isAvailable).mockReturnValue(false);
-      vi.mocked(EmailService.sendPlatformRaw).mockResolvedValue(undefined);
+      vi.mocked(EmailService.sendPlatformRaw).mockResolvedValue({ id: 'm' });
 
       const emailOptions = {
         to: 'test@example.com',
@@ -558,6 +559,23 @@ describe('Email queue — terminal failure is loud (issue 2142)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('an email whose every recipient was dropped as undeliverable is not logged or counted as sent', async () => {
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => logger);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+    vi.mocked(EmailService.sendPlatformRaw).mockResolvedValue({ id: 'skipped-undeliverable' });
+    await emailQueue.deliver({
+      id: 'email_skip',
+      storeId: null,
+      options: { to: 'x@placeholder.invalid', subject: 's', html: '<p/>' },
+      attempts: 0,
+      maxAttempts: 3,
+      createdAt: new Date().toISOString(),
+    });
+    const infoMsgs = info.mock.calls.map(c => c[1]);
+    expect(infoMsgs).not.toContain('[EMAIL QUEUE] Sent email');
+    expect(warn.mock.calls.map(c => c[1]).join()).toContain('not sent');
   });
 
   it('with Redis unavailable, a failed inline send REJECTS enqueue (no silent success)', async () => {

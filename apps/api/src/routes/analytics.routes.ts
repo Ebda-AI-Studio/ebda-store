@@ -2,7 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { featureService } from '../services/feature.service';
 import { storeDb } from '../lib/repo-factory';
 import { activeVariants, lineAllowsBackorder } from '../lib/effective-inventory';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireFeature } from '../middleware/feature-gate';
 import { requirePermission } from '../middleware/rbac';
 import { AnalyticsService, currentMonthStart } from '../services/analytics.service';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -428,8 +430,12 @@ router.get(
 router.get(
   '/performance',
   authenticate,
+  requireMfaEnrolled,
+  // BE:S-4: GL profit, cash flow and cost-based stock value are finance data: owner + `accounting.basic`, like /finance/*.
+  authorize('store_admin', 'super_admin'),
   requirePermission('analytics:read'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -465,8 +471,12 @@ router.get(
 router.get(
   '/cashflow',
   authenticate,
+  requireMfaEnrolled,
+  // BE:S-4: GL profit, cash flow and cost-based stock value are finance data: owner + `accounting.basic`, like /finance/*.
+  authorize('store_admin', 'super_admin'),
   requirePermission('analytics:read'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -504,8 +514,12 @@ router.get(
 router.get(
   '/stock-snapshot',
   authenticate,
+  requireMfaEnrolled,
+  // BE:S-4: GL profit, cash flow and cost-based stock value are finance data: owner + `accounting.basic`, like /finance/*.
+  authorize('store_admin', 'super_admin'),
   requirePermission('analytics:read'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
+const confirmMock = vi.hoisted(() => vi.fn());
+vi.mock('../../hooks/useConfirm', () => ({ useConfirm: () => confirmMock }));
 vi.mock('../../lib/api', () => ({ apiGet, apiPut }));
 vi.mock('../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -49,7 +51,7 @@ describe('platform settings — Ebda VAT', () => {
       data: { vat: { ...off, enabled: true, trn: '123456789', legalName: 'Ebda AI Studio' } },
       error: null,
     });
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     render(<PlatformSettingsPage />);
     await screen.findByText('vat.title');
     fireEvent.change(screen.getByLabelText('vat.trn'), { target: { value: '123-456-789' } });
@@ -67,7 +69,7 @@ describe('platform settings — Ebda VAT', () => {
         legalName: 'Ebda AI Studio',
       })
     );
-    expect(confirm).toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalled();
   });
 
   it('does not save when the confirm dialog is declined', async () => {
@@ -75,7 +77,7 @@ describe('platform settings — Ebda VAT', () => {
       data: { vat: { ...off, trn: '123456789', legalName: 'W11' } },
       error: null,
     });
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    confirmMock.mockResolvedValue(false);
     render(<PlatformSettingsPage />);
     await screen.findByText('vat.title');
     fireEvent.click(screen.getByRole('switch'));

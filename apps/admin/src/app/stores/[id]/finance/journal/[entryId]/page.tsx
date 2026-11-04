@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { PageState } from '@/components/PageState';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
@@ -53,9 +54,9 @@ export default function JournalDetailPage() {
   const storeId = params?.id as string;
   const entryId = params?.entryId as string;
   const t = useT('finance.journal');
-  const tc = useT('common');
 
   const [entry, setEntry] = useState<JournalEntry | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,31 +68,20 @@ export default function JournalDetailPage() {
         } else if (data) {
           setEntry(data);
         } else {
-          setError('Entry not found');
+          setError(t('entryNotFound'));
         }
       })
-      .catch(() => setError('Failed to load journal entry'));
-  }, [storeId, entryId]);
+      .catch(() => setError(t('loadEntryFailed')));
+  }, [storeId, entryId, retryKey]);
 
   const backHref = `/stores/${storeId}/finance/journal`;
 
-  if (error) {
+  if (error || !entry) {
     return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 space-y-3">
-          <Link href={backHref} className="text-sm text-primary underline underline-offset-2">
-            ← {t('title')}
-          </Link>
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      </AdminLayout>
-    );
-  }
-
-  if (!entry) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+      <AdminLayout title={t('title')} parent={{ label: t('title'), href: backHref }}>
+        <PageState loading={!error} error={error} onRetry={() => setRetryKey(k => k + 1)}>
+          {null}
+        </PageState>
       </AdminLayout>
     );
   }
@@ -101,15 +91,11 @@ export default function JournalDetailPage() {
 
   return (
     <AdminLayout
+      parent={{ label: t('title'), href: backHref }}
       title={entry.entryNumber}
       subtitle={`${new Date(entry.postedAt).toLocaleString(undefined, withNumerals())} · ${entry.source.replace(/_/g, ' ')}`}
     >
       <div className="max-w-3xl space-y-5">
-        {/* Back link */}
-        <Link href={backHref} className="text-sm text-primary underline underline-offset-2">
-          ← {t('title')}
-        </Link>
-
         {/* Entry header card */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-2">
           {entry.memo && <p className="text-sm text-foreground">{entry.memo}</p>}
@@ -121,7 +107,7 @@ export default function JournalDetailPage() {
 
           {/* Reversal notices */}
           {entry.status === 'reversed' && entry.reversedBy && (
-            <p className="text-sm text-amber-700 dark:text-amber-400">
+            <p className="text-sm text-warning-ink">
               {t('reversed')}{' '}
               <Link
                 href={`/stores/${storeId}/finance/journal/${entry.reversedBy.id}`}
@@ -132,7 +118,7 @@ export default function JournalDetailPage() {
             </p>
           )}
           {entry.reverses && (
-            <p className="text-sm text-amber-700 dark:text-amber-400">
+            <p className="text-sm text-warning-ink">
               {t('reverses')}{' '}
               <Link
                 href={`/stores/${storeId}/finance/journal/${entry.reverses.id}`}

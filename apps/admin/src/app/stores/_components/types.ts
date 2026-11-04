@@ -51,7 +51,7 @@ export const planConfig = {
   free: { bg: 'bg-muted', text: 'text-foreground', icon: '🆓' },
   starter: { bg: 'bg-info/5', text: 'text-info-ink', icon: '🚀' },
   professional: { bg: 'bg-violet-50', text: 'text-violet-700', icon: '💼' },
-  enterprise: { bg: 'bg-amber-50', text: 'text-amber-700', icon: '👑' },
+  enterprise: { bg: 'bg-warning/10', text: 'text-warning-ink', icon: '👑' },
 };
 
 export { formatDate } from '@/lib/format';

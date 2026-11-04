@@ -75,3 +75,17 @@ For large reconciliations, Enterprise stores can upload a CSV with SKU or Barcod
 A variant you **disable** is no longer stock anywhere — not on the storefront, not in the inventory counts, and **not in your stock value**, even if it still holds units. The finance dashboard, the analytics inventory card, the inventory page and the dead-stock list all leave it out. Disabling a variant does **not** write anything to your accounts, so the stock value on the finance dashboard can be lower than the Inventory line of your balance sheet by the cost of those units. Enable the variant again and its units count again.
 
 التنويعة التي **تعطّلها** لا تُحسب مخزونًا في أي مكان — لا في المتجر، ولا في أعداد المخزون، **ولا في قيمة المخزون**، حتى لو كانت ما زالت تحمل وحدات. لوحة المالية وبطاقة المخزون في التحليلات وصفحة المخزون وقائمة المخزون الراكد كلها تستبعدها. تعطيل التنويعة **لا** يسجّل أي قيد في حساباتك، لذلك قد تكون قيمة المخزون في لوحة المالية أقل من بند المخزون في الميزانية بمقدار تكلفة تلك الوحدات. أعد تفعيل التنويعة لتُحتسب وحداتها من جديد.
+
+---
+
+## Stock adjustments and counts — تعديلات المخزون والجرد (2026-11-04)
+
+**Stock adjustments** (Stock → Stock adjustments, formerly "Adjustments / تسويات"). The page has one main button, **New stock adjustment**, in the header. On the new-adjustment page the manual form is the default tab (CSV import is the second tab). **Save as draft** keeps it for review; **Approve adjustment** changes your stock and posts the matching entry to your accounts, and cannot be undone, so a confirmation names how many products it touches first.
+
+**Stock counts** (Stock → Scan → Count). **Close the count** asks first and says how many items were counted. **Approve differences** asks first and says how many items differ and the net units; it then adjusts stock for every item that differs and posts it to your accounts, and cannot be undone.
+
+**Warehouses, suppliers and purchase orders.** Row actions are an "…" menu with _Deactivate_ / _Cancel_ last and in red. A failed save or deactivate now shows an error instead of a success message. The purchase order page has **Receive goods** in the header and **Cancel purchase order** in the "…" menu.
+
+**Backorder for all products** moved from a header button to the "…" menu on the Inventory page and asks first.
+
+**تعديلات المخزون** (المخزون ← تعديلات المخزون): الصفحة فيها زرار رئيسي واحد في الأعلى «تعديل مخزون جديد». في صفحة التعديل الجديد النموذج اليدوي هو الأول، واستيراد CSV تبويب تاني. **احفظ كمسودة** بيخلّيه للمراجعة، و**اعتمد التعديل** بيغيّر المخزون فعلاً وبيتسجّل في حساباتك ومش بيترجع، فبنسألك الأول وبنقولك عدد المنتجات. **الجرد**: «اقفل الجرد» و«اعتمد الفروقات» بيسألوك الأول، والتاني بيقولك كام صنف فيه فرق وصافي الوحدات.

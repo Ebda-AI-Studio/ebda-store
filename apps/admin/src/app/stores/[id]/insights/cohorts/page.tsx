@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
+import { PageState } from '@/components/PageState';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
@@ -32,7 +33,7 @@ interface CohortData {
 function retentionColor(rate: number): string {
   if (rate >= 0.7) return 'bg-green-200 text-green-900';
   if (rate >= 0.5) return 'bg-green-100 text-green-800';
-  if (rate >= 0.3) return 'bg-amber-100 text-amber-800';
+  if (rate >= 0.3) return 'bg-warning/10 text-warning-ink';
   if (rate >= 0.1) return 'bg-red-100 text-red-700';
   return 'bg-red-50 text-red-500';
 }
@@ -47,6 +48,7 @@ export default function InsightsCohortsPage() {
 
   const [data, setData] = useState<CohortData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -55,23 +57,22 @@ export default function InsightsCohortsPage() {
         if (apiError) setError(apiError.message);
         else if (d) setData(d);
       })
-      .catch(() => setError('Failed to load cohort data'));
-  }, [storeId]);
+      .catch(() => setError(t('loadFailed')));
+  }, [storeId, reloadKey]);
 
-  if (error) {
+  if (error || !data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!data) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
+        <PageState
+          loading={!error}
+          error={error}
+          onRetry={() => {
+            setError(null);
+            setReloadKey(k => k + 1);
+          }}
+        >
+          {null}
+        </PageState>
       </AdminLayout>
     );
   }

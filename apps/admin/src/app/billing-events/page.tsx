@@ -26,6 +26,7 @@ import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { apiGet, apiPost } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { ClaimsPanel } from './_components/ClaimsPanel';
 import { ManualPaymentForm, type ManualPaymentPrefill } from './_components/ManualPaymentForm';
@@ -81,6 +82,7 @@ function LedgerPanel({
   onRecordRefund: (target: ManualRefundTarget) => void;
 }) {
   const t = useT('billingEvents');
+  const askConfirm = useConfirm();
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,15 +114,13 @@ function LedgerPanel({
   }, [fetchRows, refreshKey, refreshSignal]);
 
   async function refund(row: LedgerRow) {
-    if (
-      !window.confirm(
-        t('confirmRefund', {
-          amount: formatMoney(row.amountMinor, locale, { fixedDecimals: true }),
-        })
-      )
-    ) {
-      return;
-    }
+    const amount = formatMoney(row.amountMinor, locale, { fixedDecimals: true });
+    const ok = await askConfirm({
+      object: t('refundObject', { amount }),
+      consequence: t('confirmRefund', { amount }),
+      confirmLabel: t('refundAction'),
+    });
+    if (!ok) return;
     setBusy(row.id);
     setMessage(null);
     const res = await apiPost(`/api/v1/admin/billing/events/${row.id}/refund`, {});

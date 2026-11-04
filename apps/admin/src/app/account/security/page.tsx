@@ -237,9 +237,9 @@ export default function SecurityPage() {
           !status.mfaEnabled &&
           passkeyCount === 0 &&
           step === 'idle' && (
-            <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <div className="flex items-start gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-4">
               <svg
-                className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                className="mt-0.5 h-5 w-5 shrink-0 text-warning-ink"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -253,9 +253,7 @@ export default function SecurityPage() {
                 />
               </svg>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                  {t('mfaBanner')}
-                </p>
+                <p className="text-sm font-medium text-warning-ink">{t('mfaBanner')}</p>
                 <Button
                   type="button"
                   className="mt-3"
