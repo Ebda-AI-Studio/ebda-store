@@ -82,6 +82,9 @@ export default defineConfig(async () => {
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
+            // route-sweep.test.ts: the host env does not reach workerd's process.env, so the switches travel as bindings
+            SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
+            SWEEP_FILTER: process.env.SWEEP_FILTER ?? '',
             ...apiVars,
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
