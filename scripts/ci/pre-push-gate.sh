@@ -45,4 +45,19 @@ if [ "$MODE" = "affected" ]; then
   fi
 fi
 
+# SCANNER-1 (Ruling PREPUSH-3): the repo-scanning unit tests ALWAYS run, whatever the diff. `vitest related` only follows
+# imports, so it misses a gate that walks the whole tree (a banned string in apps/admin, a route-table walk, a git grep):
+# those used to go green here and red in CI. The list is derived by content (scripts/ci/pre-push-plan.mjs SCANNER_RULE), not
+# kept by hand. Same environment guard as the related step (built shared packages).
+SCANNERS=$(field scanners)
+if [ -n "$SCANNERS" ]; then
+  if [ -d packages/database/dist ] && [ -d packages/shared/dist ]; then
+    echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run)"
+    # shellcheck disable=SC2086
+    npx vitest run --passWithNoTests --maxWorkers=50% $SCANNERS
+  else
+    echo "! scanner tests skipped (packages not built); CI runs them"
+  fi
+fi
+
 echo "OK light pre-push gate passed (lint/typecheck/full suite run in CI)"

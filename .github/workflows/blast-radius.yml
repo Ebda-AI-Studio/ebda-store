@@ -74,7 +74,7 @@ jobs:
             exit 0
           fi
           python3 - <<'PY'
-          import json, os, urllib.error, urllib.request
+          import json, os, urllib.request
 
           api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
           repo = os.environ["GITHUB_REPOSITORY"]
@@ -120,7 +120,10 @@ jobs:
               else:
                   call("POST", f"/repos/{repo}/issues/{pr}/comments", {"body": body})
               print("blast-radius: PR comment upserted")
-          except (urllib.error.URLError, KeyError, ValueError) as e:
-              # e.g. 403 on a fork PR (read-only token): the step summary still has the report.
-              print(f"::warning::blast-radius: PR comment NOT posted ({e}); report is in the step summary")
+          except Exception as e:  # noqa: BLE001 - informational job: no delivery problem may fail it (Ruling CI-BLAST-COMMENT-1)
+              # A 403 on a fork PR (read-only token) is an HTTPError; a network blip is NOT always a URLError: a timeout while
+              # reading the body raises TimeoutError, a dropped connection ConnectionResetError / http.client.RemoteDisconnected
+              # (all OSError / HTTPException, none wrapped by urllib). The first one in CI killed the job on a transient blip.
+              # The step summary still has the report either way.
+              print(f"::warning::blast-radius: PR comment NOT posted ({type(e).__name__}: {e}); report is in the step summary")
           PY

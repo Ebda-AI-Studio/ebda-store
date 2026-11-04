@@ -36,7 +36,11 @@ vi.mock('@api/lib/definer', () => ({
   resolvePaymentEventsStore: vi.fn(),
   resolveStoreFromWebhookRef: (...a: unknown[]) => h.resolve(...a),
 }));
+vi.mock('@api/middleware/require-mfa', () => ({
+  requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
+}));
 vi.mock('@api/middleware/auth', () => ({
+  authorize: () => (_q: any, _s: any, n: any) => n(),
   rejectImpersonated: (_req: any, _res: any, next: any) => next(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'u1', role: 'super_admin' };

@@ -4,6 +4,7 @@ import { qrSettingsSchema } from '@ebda/shared/qr/schema';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { tenantContext } from '../middleware/tenant-context';
+import { requireFeature } from '../middleware/feature-gate';
 import { StoreService } from '../services/store.service';
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
@@ -23,6 +24,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.barcode'), // BE:F-8: same gate as the /codes page
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -53,6 +55,7 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.barcode'), // BE:F-8: same gate as the /codes page
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -71,6 +74,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.barcode'), // BE:F-8: same gate as the /codes page
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

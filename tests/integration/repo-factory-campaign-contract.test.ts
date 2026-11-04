@@ -38,6 +38,7 @@ const { captured, sendMarketingEmail, send } = vi.hoisted(() => {
   };
 });
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'user-1', role: 'store_admin' };
     next();

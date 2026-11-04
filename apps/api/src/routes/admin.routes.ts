@@ -61,6 +61,7 @@ import {
   asPlatformOperator,
   currentTenantGucs,
   currentStoreId,
+  storeDirectory,
   Prisma,
   UserRole,
   ProductStatus,
@@ -138,6 +139,24 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * none given = every store; a malformed id matches no store (as before, an
  * empty page rather than an error).
  */
+/**
+ * BE:E-4: the super-admin pages fan out one short tenant transaction per store. That is O(stores) per request and was
+ * unbounded; past a few hundred stores a page would sit behind hundreds of sequential-ish transactions. Every fan-out below
+ * now takes its store list through this guard: at most SUPER_ADMIN_FANOUT_CAP stores per request, with a warning when the
+ * list is cut. RESIDUAL (Ruling FP-7): beyond the cap the totals cover the first CAP stores by id; a cursor/rollup table is the
+ * real fix and is a platform decision. Cost if wrong: a platform with more stores than the cap sees partial super-admin totals.
+ */
+export const SUPER_ADMIN_FANOUT_CAP = 500;
+export async function boundedFanoutStoreIds(ids?: string[]): Promise<string[]> {
+  const all = ids ?? (await storeDirectory()).map(s => s.id);
+  if (all.length <= SUPER_ADMIN_FANOUT_CAP) return all;
+  logger.warn(
+    { stores: all.length, cap: SUPER_ADMIN_FANOUT_CAP },
+    '[admin] cross-store fan-out truncated to the cap'
+  );
+  return all.slice(0, SUPER_ADMIN_FANOUT_CAP);
+}
+
 function storeIdsFromFilter(storeId: unknown): string[] | undefined {
   if (!storeId) return undefined;
   return UUID_RE.test(String(storeId)) ? [String(storeId)] : [];
@@ -349,6 +368,8 @@ router.get(
   }
 );
 
+const adminStoreStatusBody = z.object({ status: z.enum(['active', 'inactive', 'suspended']) });
+
 /**
  * PATCH /admin/stores/:id/status
  * Update store status
@@ -359,15 +380,16 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { status } = req.body;
-
-      if (!['active', 'inactive', 'suspended'].includes(status)) {
+      // BE:S-15: shape-checked, so a non-object body is the same 400.
+      const parsedStatus = adminStoreStatusBody.safeParse(req.body);
+      if (!parsedStatus.success) {
         res.status(400).json({
           success: false,
           error: { code: 'INVALID_STATUS', message: 'Invalid status' },
         });
         return;
       }
+      const { status } = parsedStatus.data;
 
       const store = await ProvisioningService.updateStoreStatus(id, status);
 
@@ -1424,7 +1446,7 @@ router.get(
       // aggregate is assembled store by store (`acrossStores`: one short tenant
       // transaction per store) and merged here. A store admin's dashboard spans
       // only the stores they own.
-      const dashboardStoreIds = await ownedStoreIds(ownerScope);
+      const dashboardStoreIds = await boundedFanoutStoreIds(await ownedStoreIds(ownerScope));
       const [storeCount, userCount, orderTotals, recentStores, recentOrdersPage] =
         await Promise.all([
           prisma.store.count({ where: storeFilter }),
@@ -1860,31 +1882,32 @@ router.get(
       // aiUsage has RLS: aggregate store by store (`acrossStores`, one short tenant
       // transaction each) and merge the per-store partials.
       const result = await (async () => {
-        const perStore = await acrossStores(async storeId => {
-          const [today, month, cached] = await Promise.all([
-            prisma.aiUsage.count({
-              where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
-            }),
-            prisma.aiUsage.count({
-              where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
-            }),
-            prisma.aiUsage.count({
-              where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: true },
-            }),
-          ]);
-          // Per-store aggregations: today count, month count, last call, feature breakdown
-          const stats = await prisma.$queryRaw<
-            Array<{
-              store_id: string;
-              today_count: bigint;
-              month_count: bigint;
-              last_call_at: Date | null;
-              feature: string;
-              feature_count: bigint;
-              month_cost_micros: bigint | null;
-              month_unpriced: bigint;
-            }>
-          >`
+        const perStore = await acrossStores(
+          async storeId => {
+            const [today, month, cached] = await Promise.all([
+              prisma.aiUsage.count({
+                where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+              }),
+              prisma.aiUsage.count({
+                where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
+              }),
+              prisma.aiUsage.count({
+                where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: true },
+              }),
+            ]);
+            // Per-store aggregations: today count, month count, last call, feature breakdown
+            const stats = await prisma.$queryRaw<
+              Array<{
+                store_id: string;
+                today_count: bigint;
+                month_count: bigint;
+                last_call_at: Date | null;
+                feature: string;
+                feature_count: bigint;
+                month_cost_micros: bigint | null;
+                month_unpriced: bigint;
+              }>
+            >`
           SELECT
             store_id,
             COUNT(*) FILTER (WHERE created_at >= ${startOfDay} AND cached_hit = false) AS today_count,
@@ -1906,8 +1929,10 @@ router.get(
           FROM ai_usage
           GROUP BY store_id, feature
         `;
-          return { today, month, cached, stats };
-        });
+            return { today, month, cached, stats };
+          },
+          { storeIds: await boundedFanoutStoreIds() }
+        );
         const platformToday = perStore.reduce((n, p) => n + p.value.today, 0);
         const platformMonth = perStore.reduce((n, p) => n + p.value.month, 0);
         const platformCached = perStore.reduce((n, p) => n + p.value.cached, 0);
@@ -2071,8 +2096,9 @@ export async function loadUsageHistoryRows(
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
-  const perStore = await acrossStores(storeId =>
-    loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId)
+  const perStore = await acrossStores(
+    storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
+    { storeIds: await boundedFanoutStoreIds() }
   );
   const rows = perStore.flatMap(p => p.value);
   const keep = new Set(
@@ -2195,20 +2221,29 @@ const EXPORT_CHUNK_SIZE = 250;
  *   from?          – ISO date string (createdAt >=)
  *   to?            – ISO date string (createdAt <=)
  */
+const exportOrdersQuery = z.object({
+  storeId: z.string().uuid().optional(),
+  status: z.nativeEnum(OrderStatus).optional(),
+  paymentStatus: z.nativeEnum(OrderPaymentStatus).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
 router.get(
   '/export/orders',
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { storeId, status, paymentStatus, from, to } = req.query;
+      // BE:S-21: every filter is validated; an unknown status / unparseable date used to reach Prisma (or `new Date(...)`) and 500.
+      const { storeId, status, paymentStatus, from, to } = exportOrdersQuery.parse(req.query);
 
       const where: Prisma.OrderWhereInput = {};
-      if (status) where.status = status as OrderStatus;
-      if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
+      if (status) where.status = status;
+      if (paymentStatus) where.paymentStatus = paymentStatus;
       if (from || to) {
         where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from as string);
-        if (to) where.createdAt.lte = new Date(to as string);
+        if (from) where.createdAt.gte = from;
+        if (to) where.createdAt.lte = to;
       }
 
       const filename = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -2649,13 +2684,18 @@ router.get(
   }
 );
 
+const webhookReplayParams = z.object({ id: z.string().uuid() });
+const webhookReplayBody = z.object({ force: z.boolean().optional() });
+
 router.post(
   '/webhook-events/:id/replay',
   requireRole(['super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
-      const force = req.body?.force === true || req.query.force === 'true';
+      // BE:S-32: a non-uuid id / non-boolean force is a 400, not a database error.
+      const { id } = webhookReplayParams.parse(req.params);
+      const force =
+        webhookReplayBody.parse(req.body ?? {}).force === true || req.query.force === 'true';
       const row = await webhookInbox.get(id);
       if (!row) {
         res.status(404).json({

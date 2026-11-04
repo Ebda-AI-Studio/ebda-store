@@ -57,6 +57,9 @@ describe('a duck-typed ZodError whose issues carry no path (review M-1)', () => 
     const res = await request(app).get('/x');
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(res.body.error.details).toEqual({ '': ['Required'], 'size.0': ['Too small'] });
+    // the field map stays; the bilingual sentence rides next to it for the admin's localizer (BE:E-2)
+    expect(res.body.error.details).toMatchObject({ '': ['Required'], 'size.0': ['Too small'] });
+    expect(res.body.error.details.messageAr).toEqual(expect.any(String));
+    expect(res.body.error.details.messageEn).toEqual(expect.any(String));
   });
 });
