@@ -25,7 +25,7 @@ export interface DoQuery {
 
 export type DoQueryResult =
   | { ok: true; json: string }
-  | { ok: false; code: string; message: string; json?: string };
+  | { ok: false; code: string; message: string; status?: number; json?: string };
 
 const isOp = (op: unknown): op is ReadOp => (READ_OPS as readonly string[]).includes(op as string);
 const delegateOf = (model: string) => model[0].toLowerCase() + model.slice(1);

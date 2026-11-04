@@ -8,11 +8,12 @@ import {
   statusInkVars,
 } from '@ebda/shared';
 import type { StoreTheme } from '@ebda/shared';
+import { sectionInkVars } from './section-ink';
 
 /**
- * Per-section style — paints the merchant's explicit bg override only.
- * No runtime contrast auto-fix; ColorField in admin owns pick-time
- * feedback. Render merchant intent verbatim.
+ * Per-section style — paints the merchant's explicit bg override, and (Ruling PREMIUM-1) re-scopes
+ * the ink tokens to the paint when the page ink would not read on it (`section-ink.ts`). The
+ * background itself is always the merchant's colour, verbatim.
  *
  * One exception, set only by a look's mix: `token:inverse` (W2a, LB-01) paints the band in the
  * page ink and swaps the ink variables inside it (text = the page colour, fields = the page
@@ -26,7 +27,8 @@ export function sectionBgStyle(
   if (bgColor === INVERSE_SURFACE) return inverseBandStyle(theme);
   const resolvedBg = resolveColor(bgColor, theme);
   if (!resolvedBg) return undefined;
-  return { backgroundColor: resolvedBg };
+  // Section tone contract: re-scope the ink tokens when the page ink does not read on this paint.
+  return { backgroundColor: resolvedBg, ...sectionInkVars(resolvedBg, theme) };
 }
 
 function inverseBandStyle(theme: StoreTheme): CSSProperties | undefined {

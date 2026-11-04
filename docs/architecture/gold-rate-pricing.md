@@ -46,6 +46,10 @@ Price is NEVER-stale. After every write path (manual, feed, confirming a pending
 
 Free, keyless, commercial-use sources behind a neutral adapter: gold-api.com XAU/USD x open.er-api USD/EGP, fawazahmed0 as fallback, every 6 hours (`5 */6 * * *`). Two sources more than 2 percent apart store the rate `pending`. A jump over the store's gate (default 5 percent) is `pending` for a feed rate and a 409 `GOLD_RATE_CONFIRM_REQUIRED` for a manual one (confirm with `confirm: true`). The staleness watch (`7 * * * *`) warns the owner 4 hours before the limit and again when it passes. Both crons read a SECURITY DEFINER function first so an empty tick costs one Inngest execution (`EMPTY_PATH_STEPS`, INNGEST-BUDGET-1). The provider is named in exactly one file, the admin `RateAttribution` (licence attribution); `tests/unit/gold-provider-name-gate.test.ts` fails anywhere else.
 
+## Price-zero guard (QA-PRICE-ZERO-1)
+
+An ACTIVE fixed-price product or variant must have a price above zero (`apps/api/src/lib/sellable-price.ts`: product create/update, bulk, CSV import, variants). Gold-rate rows are exempt: the repricer is their only price writer, a gold row with no rate stays `draft`, and the guard never runs inside `withRepriceFlag`, so the trigger and repricer are untouched.
+
 ## Failure codes
 
 | Code                                                                 | Where           | Meaning                                                                                     |

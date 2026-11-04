@@ -1,7 +1,23 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { api, getProfileWithMountRetries, isTransientSessionAnswer, type User } from '../lib/api';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react';
+import { usePathname } from 'next/navigation';
+import {
+  api,
+  getProfileWithMountRetries,
+  hasSessionHint,
+  isTransientSessionAnswer,
+  type User,
+} from '../lib/api';
+import { isSessionIntentPath } from '../lib/session-intent';
 import { useStore } from './StoreContext';
 import { runPasskeyAuthentication } from '../lib/passkeys';
 
@@ -69,9 +85,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(() => checkUser(false), [checkUser]);
 
+  // Console hygiene (audit 2026-11-03 #15): ask the API who this is only when it can matter.
+  // A browser that holds a session hint checks on every first mount, as before. One with NO hint is
+  // a guest everywhere except the account/order routes (`isSessionIntentPath`), so a visit to the
+  // home page, a listing, a PDP or the blog makes no `/auth/me` call and logs no 401. It still
+  // checks, once, the first time it reaches an intent route (the Safari-ITP cohort whose
+  // localStorage was evicted while the refresh cookie survived is healed there, #2164).
+  const pathname = usePathname();
+  const intent = isSessionIntentPath(pathname);
+  const checked = useRef(false);
   useEffect(() => {
+    if (checked.current) return;
+    if (!intent && !hasSessionHint()) {
+      setIsLoading(false);
+      return;
+    }
+    checked.current = true;
     checkUser(true);
-  }, [checkUser]);
+  }, [checkUser, intent]);
 
   const login = useCallback(
     async (email: string, password: string) => {

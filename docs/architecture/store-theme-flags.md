@@ -241,3 +241,11 @@ The layout keys `sizing`, `bottomBar`, `locationsPage`, `productCardDefaults` (h
 ## Look switch (Task 9)
 
 `PUT /stores/:id/look` (apply) and `POST /stores/:id/look/preview` (what apply would do, no write) share `composeLookDocument` in `page-builder.service.ts`. The editor's Look pane drives both; the revision token ties an apply to the preview it came from (409 `DRAFT_MOVED`). No native `confirm` remains in the visual editor (`tests/unit/builder-no-native-dialogs.test.ts`).
+
+## Premium defaults (2026-11-03, Rulings PREMIUM-1..5)
+
+- **Section tone contract**: a section painted with a colour that the theme ink does not read on (< 4.5:1 body or muted, any gradient stop) re-scopes `--foreground`, `--muted-foreground`, `--card*`, `--border`, `--input`, `--primary*`, `--accent*` to an ink derived from the band (`templates/shared/section-ink.ts`, via `sectionBgStyle`). Merchant colours are never changed, only the ink on them. Test: `section-ink.test.tsx`.
+- **Hero headline**: fluid 36px (390) to 72px (>= 1100); a typography zone size only raises the ceiling. `heroHeadlineFontSize`.
+- **Product grids** choose the desktop column count the count fills (`fitDesktopColumns`); carousels are 4-up at lg with a 12px minimum gap.
+- **Missing image**: `MissingImage` (store tokens) on every card path, category tile, list row, search row, bundle line and PDP.
+- **Images**: `sizes` from `lib/image-sizes.ts`; WebP variants written at upload; `NEXT_PUBLIC_IMAGE_VARIANTS=1` turns the srcset on (`docs/ENVIRONMENT.md`).

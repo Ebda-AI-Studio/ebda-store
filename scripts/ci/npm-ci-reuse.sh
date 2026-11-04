@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # npm-ci-reuse.sh — Ruling CI-NODE-MODULES-1.
 # Hosted (EBDA_RUNS_ON empty): exactly `npm ci`. Self-hosted: restore node_modules from a runner-local store.
-#   key   = sha256(package-lock.json + node major + arch)
+#   key   = sha256(package-lock.json + node major + arch + lane); lane = main | pr (main never reuses a tree a PR job has touched,
+#           because a hardlinked restore lets any in-place write poison every later job that restores the same tree)
 #   store = ${EBDA_NM_STORE:-$RUNNER_TOOL_CACHE/../ebda-node-modules}/<key>/  (pristine trees, saved BEFORE any generate step)
 # Restore = hardlink copy (cp -al), except the dirs install/generate steps WRITE into (prisma engines+client, caches),
 # which are real copies so no job can mutate the store or a sibling job's tree. A failed restore or `npm ls` falls back to `npm ci`.
@@ -11,7 +12,8 @@ if [ -z "${EBDA_RUNS_ON:-}" ]; then exec npm ci; fi
 KEEP="${EBDA_NM_KEEP:-2}"   # 2, not 3: ~2.4 GB/key; the Umbra VM has 37 GB free and the floor is 30 GB
 STORE="${EBDA_NM_STORE:-${RUNNER_TOOL_CACHE:-$HOME/_tool}/../ebda-node-modules}"
 MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-KEY="$( { cat package-lock.json; echo "node$MAJOR"; uname -m; } | sha256sum | cut -c1-24)"
+if [ "${GITHUB_EVENT_NAME:-}" = push ] && [ "${GITHUB_REF:-}" = refs/heads/main ]; then LANE=main; else LANE=pr; fi
+KEY="$( { cat package-lock.json; echo "node$MAJOR"; uname -m; echo "lane-$LANE"; } | sha256sum | cut -c1-24)"
 DIR="$STORE/$KEY"
 # Dirs written to after install (prisma postinstall/generate, tool caches): copied, never hardlinked.
 MUTABLE=(.prisma @prisma/client @prisma/engines prisma .cache .vite .vite-temp)
@@ -60,7 +62,11 @@ save() {
     mkdir -p "$TMP/tree/$(dirname "$nm")" && cp -a "$nm" "$TMP/tree/$nm" || return 1
   done
   nm_dirs > "$TMP/.dirs" && touch "$TMP/.complete" || return 1
-  if [ -d "$DIR" ]; then rm -rf "$TMP"; else mv "$TMP" "$DIR"; fi
+  # race-free and portable (BSD mv has no -T): `mkdir` is the atomic claim of $DIR (the loser drops its copy and never nests a
+  # tree inside the winner's); .complete moves LAST, so a reader never sees a half-filled key as usable
+  mkdir "$DIR" 2>/dev/null || { rm -rf "$TMP"; return 0; }
+  mv "$TMP/tree" "$DIR/tree" && mv "$TMP/.dirs" "$DIR/.dirs" && mv "$TMP/.complete" "$DIR/.complete" && rm -rf "$TMP" \
+    || { rm -rf "$DIR"; return 1; }
 }
 save || { echo "store save failed (non-fatal)"; rm -rf "$TMP"; }
 # Keep the newest $KEEP keys; drop stale tmp dirs.

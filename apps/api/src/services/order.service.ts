@@ -99,9 +99,7 @@ import { SmsConsentService } from './sms-consent.service';
 import {
   assertStockHoldCapNotExceeded,
   HOLD_CAPPED_PAYMENT_METHODS,
-  openUnpaidGatewayHoldCap,
-  openUnpaidHoldCap,
-  openUnpaidHoldIpCap,
+  resolveStoreHoldCaps,
 } from '../lib/stock-hold-cap';
 import {
   storeDb,
@@ -1745,12 +1743,20 @@ export class OrderService {
           // sent — gateway/unknown labels against the looser cap. Only
           // `manualHoldAdmitted` (the tight-cap methods) unlocks COD/InstaPay later.
           if (!paidInFullByWallet) {
-            await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
-              phone: data.shippingAddress.phone,
-              email:
-                typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
-              ip: requestContext?.checkoutIp ?? null,
-            });
+            await assertStockHoldCapNotExceeded(
+              tx,
+              storeId,
+              data.paymentMethod,
+              {
+                phone: data.shippingAddress.phone,
+                email:
+                  typeof data.shippingAddress.email === 'string'
+                    ? data.shippingAddress.email
+                    : null,
+                ip: requestContext?.checkoutIp ?? null,
+              },
+              resolveStoreHoldCaps(storeForMinOrder?.settings)
+            );
           }
           // The public checkout (`POST /public/orders`) and the MCP `place_order`
           // tool reach this with NO tenant context, and `backorder_lines` (written
@@ -2539,10 +2545,11 @@ export class OrderService {
     // (read from the DO's own products) and written as the first line of the order notes, exactly like the Postgres path.
     // A quote never refuses on it.
     let orderNotes: string | undefined = data.notes;
+    // ONE primary-key read of the store row, shared by the delivery note and the per-store hold caps (QA-HOLDS-1).
+    const storeRow = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
+    );
     if (!isQuote) {
-      const storeRow = await withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
-      );
       const leads = await (
         await storeDb(storeId)
       ).product.findMany({
@@ -2586,11 +2593,8 @@ export class OrderService {
       shippingAddress: data.shippingAddress,
       billingAddress: data.billingAddress,
       checkoutIp: c.requestContext?.checkoutIp ?? undefined,
-      holdCaps: {
-        manual: openUnpaidHoldCap(),
-        gateway: openUnpaidGatewayHoldCap(),
-        ip: openUnpaidHoldIpCap(),
-      },
+      // QA-HOLDS-1: env defaults, overridable per store (Store.settings.stockHoldCaps, bounded)
+      holdCaps: resolveStoreHoldCaps(storeRow?.settings),
       wholesaleEntitled: wholesale,
       loyaltyFeatureEnabled: loyaltyOn,
       backorderEnabled: backorderOn,

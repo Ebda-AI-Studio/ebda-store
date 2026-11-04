@@ -18,8 +18,8 @@ import { api } from '../../lib/api';
 import {
   buildQuoteRequest,
   quoteKey,
+  expectedTotalToSend,
   freshQuote,
-  expectedTotalFor,
   priceChangedCopy,
   type HeldQuote,
 } from '../../lib/checkout-quote';
@@ -1663,9 +1663,9 @@ export default function CheckoutClient() {
           pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
           // The total the buyer is looking at, as computed by the SERVER's quote for exactly these inputs and this cart. If the
           // server prices the order differently (approval revoked, tier edited, plan changed) it answers 409 PRICE_CHANGED and
-          // nothing is charged. Undefined when no fresh quote exists (the quote request failed), in which case the server
-          // simply charges its own price as before.
-          expectedTotal: expectedTotalFor(heldQuote, currentQuoteKey),
+          // nothing is charged. With no fresh quote (the request failed or is in flight) the total on screen is sent instead,
+          // so the order is never charged more than the buyer saw (Ruling QA-COUPON-1).
+          expectedTotal: expectedTotalToSend(heldQuote, currentQuoteKey, total),
           // Only sent when the customer ticked "Use wallet balance" on a store
           // where the API reports wallet checkout as available.
           useWallet: walletApplied > 0 ? true : undefined,

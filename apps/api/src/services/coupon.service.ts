@@ -1,3 +1,4 @@
+import { assertCouponValue } from '../lib/sellable-price';
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
@@ -153,10 +154,18 @@ export class CouponService {
       throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
     }
 
+    // QA-COUPON-1: a legacy percentage/fixed coupon saved with value 0 would be "accepted" and then charge full price.
+    // Every public path (validate, quote, order) reads through here, so all of them refuse it the same way.
+    if (coupon.type !== 'free_shipping' && typeof coupon.value === 'number' && coupon.value <= 0) {
+      throw new AppError(400, 'COUPON_VALUE_REQUIRED', 'Coupon has no discount value');
+    }
+
     return coupon;
   }
 
   static async create(storeId: string, data: CreateCouponData) {
+    // QA-PRICE-ZERO-1: a coupon that discounts nothing (or everything) is refused at the door.
+    assertCouponValue(data.type, data.value);
     // Check for duplicate code
     const existingCoupon = await prisma.coupon.findFirst({
       where: {
@@ -198,7 +207,11 @@ export class CouponService {
   }
 
   static async update(storeId: string, couponId: string, data: UpdateCouponData) {
-    await this.getById(storeId, couponId);
+    const current = await this.getById(storeId, couponId);
+    // QA-PRICE-ZERO-1: judge the type/value pair the row will HAVE after this update.
+    if (data.type !== undefined || data.value !== undefined) {
+      assertCouponValue(data.type ?? current.type, data.value ?? current.value);
+    }
 
     // Check for duplicate code if changing code
     if (data.code) {
@@ -280,22 +293,14 @@ export class CouponService {
     },
     orderTotal: number
   ): number {
-    let discount = 0;
-
-    if (coupon.type === 'percentage') {
-      discount = Math.round((orderTotal * coupon.value) / 100);
-      if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-        discount = coupon.maxDiscount;
-      }
-    } else if (coupon.type === 'fixed') {
-      discount = coupon.value;
-      if (discount > orderTotal) {
-        discount = orderTotal;
-      }
-    }
-    // free_shipping is handled separately
-
-    return discount;
+    // ONE formula for validate, quote and order: promotion-targeting's computeDiscount (the order and the DO twin use it
+    // too). This used to be a second copy with a different max-discount rule (QA-COUPON-1).
+    return computeDiscount(
+      coupon.type as 'percentage' | 'fixed' | 'free_shipping',
+      coupon.value,
+      coupon.maxDiscount,
+      orderTotal
+    );
   }
 
   /**

@@ -78,7 +78,8 @@ export function productSizeClass(size: CardSize | undefined): string {
 export function gridGapClass(gap: CardGap | undefined): string {
   switch (gap) {
     case 'tight':
-      return 'gap-2 sm:gap-3';
+      // PREMIUM-4: never tighter than 12px (audit 2026-11-03 #4: cards read as butted together).
+      return 'gap-3';
     case 'loose':
       return 'gap-4 sm:gap-6';
     case 'xloose':

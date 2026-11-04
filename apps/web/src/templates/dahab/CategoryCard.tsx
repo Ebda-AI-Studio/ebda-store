@@ -7,6 +7,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { countText, PIECES } from '../../lib/plural';
 import { cx } from './ui';
+import { MissingImage } from '../shared/MissingImage';
+import { CATEGORY_TILE_SIZES } from '../../lib/image-sizes';
 
 /**
  * `'arch'` is accepted so a saved page document keeps validating and rendering (Ruling B5-3), but
@@ -27,7 +29,7 @@ export function DahabTile({
   label,
   meta,
   shape = 'rectangle',
-  sizes = '(min-width: 1024px) 22vw, 45vw',
+  sizes = CATEGORY_TILE_SIZES,
 }: {
   href: string;
   image?: string;
@@ -59,7 +61,7 @@ export function DahabTile({
             className="object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:group-hover/tile:scale-[1.05]"
           />
         ) : (
-          <div aria-hidden="true" className="absolute inset-0 bg-muted" />
+          <MissingImage label={label} />
         )}
         <span
           aria-hidden="true"

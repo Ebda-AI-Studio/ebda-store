@@ -34,7 +34,13 @@ describe('VariantService.updateVariant — disabling a stocked variant is tracea
   });
 
   it('writes a zero-quantity history marker when a variant holding stock is disabled', async () => {
-    h.findFirst.mockResolvedValue({ id: 'v1', isActive: true, inventory: 100, imageUrl: null });
+    h.findFirst.mockResolvedValue({
+      id: 'v1',
+      isActive: true,
+      inventory: 100,
+      imageUrl: null,
+      product: { status: 'draft', price: 0, pricingMode: 'fixed' },
+    });
     await VariantService.updateVariant('s1', 'p1', 'v1', { isActive: false });
     expect(h.historyCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -51,7 +57,13 @@ describe('VariantService.updateVariant — disabling a stocked variant is tracea
   });
 
   it('records re-enabling too', async () => {
-    h.findFirst.mockResolvedValue({ id: 'v1', isActive: false, inventory: 7, imageUrl: null });
+    h.findFirst.mockResolvedValue({
+      id: 'v1',
+      isActive: false,
+      inventory: 7,
+      imageUrl: null,
+      product: { status: 'draft', price: 0, pricingMode: 'fixed' },
+    });
     await VariantService.updateVariant('s1', 'p1', 'v1', { isActive: true });
     expect(h.historyCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ reason: expect.stringMatching(/re-enabled.*7 unit/) }),
@@ -59,9 +71,21 @@ describe('VariantService.updateVariant — disabling a stocked variant is tracea
   });
 
   it('writes nothing when no stock is held, or the flag did not change', async () => {
-    h.findFirst.mockResolvedValue({ id: 'v1', isActive: true, inventory: 0, imageUrl: null });
+    h.findFirst.mockResolvedValue({
+      id: 'v1',
+      isActive: true,
+      inventory: 0,
+      imageUrl: null,
+      product: { status: 'draft', price: 0, pricingMode: 'fixed' },
+    });
     await VariantService.updateVariant('s1', 'p1', 'v1', { isActive: false });
-    h.findFirst.mockResolvedValue({ id: 'v1', isActive: true, inventory: 5, imageUrl: null });
+    h.findFirst.mockResolvedValue({
+      id: 'v1',
+      isActive: true,
+      inventory: 5,
+      imageUrl: null,
+      product: { status: 'draft', price: 0, pricingMode: 'fixed' },
+    });
     await VariantService.updateVariant('s1', 'p1', 'v1', { isActive: true, price: 100 });
     expect(h.historyCreate).not.toHaveBeenCalled();
   });

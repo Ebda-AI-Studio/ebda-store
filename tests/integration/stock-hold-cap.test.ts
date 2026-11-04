@@ -145,7 +145,8 @@ describe.skipIf(!hasDb)('stock-hold abuse fix (open unpaid order cap)', () => {
     ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
   });
 
-  it('allows eight distinct contacts on one CGNAT IP, then rejects the ninth', async () => {
+  it('allows eight distinct contacts on one CGNAT IP, then rejects the ninth (ceiling set to 8; the default is 40 per 24 h, QA-HOLDS-1)', async () => {
+    process.env.OPEN_UNPAID_HOLD_IP_CAP = '8';
     const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
     const { store, productId } = await setUp(suffix);
     const ip = '203.0.113.8';

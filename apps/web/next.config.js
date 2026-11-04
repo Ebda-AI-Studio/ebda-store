@@ -6,11 +6,15 @@ const { withSentryConfig } = require('@sentry/nextjs/config');
 // Cloudflare build; CF_PAGES is auto-set by Cloudflare Pages. Default (Vercel/
 // local) is false, so the Vercel deploy is unaffected by the dual-target tweaks
 // below.
+const IMAGE_VARIANTS = process.env.NEXT_PUBLIC_IMAGE_VARIANTS === '1';
 const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Dev only: hosts (comma separated) allowed to load /_next dev assets, e.g. when a demo store host is
+  // mapped to localhost for visual checks. Empty in every real build.
+  allowedDevOrigins: (process.env.DEV_ORIGINS || '').split(',').filter(Boolean),
   // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
   poweredByHeader: false,
 
@@ -35,7 +39,20 @@ const nextConfig = {
     // Workers-incompatible). Storefront images come from R2 already backend-
     // resized, so there's no quality loss. On Vercel this stays false → Vercel's
     // image optimization is unchanged (zero regression).
-    unoptimized: IS_CLOUDFLARE,
+    //
+    // PREMIUM-2 (audit 2026-11-03 #2): with NEXT_PUBLIC_IMAGE_VARIANTS=1 the Cloudflare build stays off
+    // sharp and picks among the WebP widths the API wrote at upload time (src/lib/image-loader.ts, no
+    // request-time transformation), and `next/image` emits a real srcset from each `sizes`. Off by default
+    // until the backfill has covered existing images.
+    unoptimized: IS_CLOUDFLARE && !IMAGE_VARIANTS,
+    ...(IS_CLOUDFLARE && IMAGE_VARIANTS
+      ? {
+          loader: 'custom',
+          loaderFile: './src/lib/image-loader.ts',
+          deviceSizes: [480, 960, 1600],
+          imageSizes: [160, 320],
+        }
+      : {}),
     remotePatterns: [
       // Only allow localhost image sources in non-production environments
       ...(process.env.NODE_ENV !== 'production'
@@ -54,6 +71,12 @@ const nextConfig = {
             },
           ]
         : []),
+      {
+        protocol: 'https',
+        hostname: 'media.ebda.app',
+        port: '',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'cdn.ebda.app',

@@ -21,7 +21,7 @@ function hydrate(minOrderFils: number, maxDiscountFils: number): CouponFormData 
     description: '',
     descriptionAr: '',
     type: 'percentage',
-    value: 10,
+    value: '10',
     minOrderAmount: minOrderFils ? String(fromMinor(minOrderFils)) : '',
     maxDiscount: maxDiscountFils ? String(fromMinor(maxDiscountFils)) : '',
     usageLimit: '',

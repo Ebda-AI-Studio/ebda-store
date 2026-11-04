@@ -50,6 +50,8 @@ export default function CouponsPage() {
     setFilterActive,
     fetchCoupons,
     saveCoupon,
+    saveError,
+    clearSaveError,
     deleteCoupon,
     toggleActive,
   } = useCoupons(storeId);
@@ -79,7 +81,7 @@ export default function CouponsPage() {
       type: coupon.type,
       // `fixed` coupons are stored in piastres → show as EGP (÷1000) in the form.
       // `percentage` coupons store the raw percent, shown as-is.
-      value: coupon.type === 'fixed' ? fromMinor(coupon.value) : coupon.value,
+      value: String(coupon.type === 'fixed' ? fromMinor(coupon.value) : coupon.value),
       minOrderAmount: coupon.minOrderAmount ? String(fromMinor(coupon.minOrderAmount)) : '',
       maxDiscount: coupon.maxDiscount ? String(fromMinor(coupon.maxDiscount)) : '',
       usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : '',
@@ -164,6 +166,8 @@ export default function CouponsPage() {
               formData={formData}
               onChange={setFormData}
               onSubmit={handleSubmit}
+              saveError={saveError}
+              onDismissError={clearSaveError}
               onClose={closeModal}
               storeId={storeId}
               customerGroups={customerGroups}
