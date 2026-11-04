@@ -136,6 +136,11 @@ describe('family table list', () => {
     };
     const { FAMILY_MODELS } = await import('../../apps/api/src/services/platform/cutover');
     for (const family of Object.keys(FAMILY_MODELS) as Array<keyof typeof FAMILY_MODELS>) {
+      // a family with no routed model (analytics, Ruling NZ-AN-1) has its own copy script and no table list here
+      if (!(family in FAMILIES)) {
+        expect(FAMILY_MODELS[family], family).toEqual([]);
+        continue;
+      }
       const tables = FAMILY_MODELS[family].map(m => {
         const model = meta.models[m[0].toUpperCase() + m.slice(1)];
         expect(model?.db, m).toBe('d1');

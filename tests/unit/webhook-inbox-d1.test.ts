@@ -121,7 +121,9 @@ function d1(opts: { pgStore?: boolean } = {}) {
 afterEach(() => setCfBindings(undefined as never));
 
 describe('webhook inbox on D1 (PG poisoned)', () => {
-  it('record -> get -> update -> stuck, and a redelivery of a processed row is not overwritten', async () => {
+  // INTEGRATION (docs/cf/neon-zero-integration.md row 8): the inbox is the `inbox` family of platform/cutover.ts (#415); its
+  // coverage is tests/unit/platform-n10b-d1.test.ts. This test drove the superseded unmarked D1 inbox of #409.
+  it.skip('record -> get -> update -> stuck, and a redelivery of a processed row is not overwritten', async () => {
     const { binding, inbox } = d1();
     setCfBindings({ PLATFORM_DB: binding } as never);
     const id = await webhookInbox.record({

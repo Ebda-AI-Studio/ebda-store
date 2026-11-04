@@ -96,8 +96,11 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/fn-map.json](cf/fn-map.json) - fn map
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
+- [cf/neon-zero-integration.md](cf/neon-zero-integration.md) - NEON-ZERO integration branch: every merge conflict between the twelve PRs and its resolution
+- [cf/neon-zero-remaining.md](cf/neon-zero-remaining.md) - NEON-ZERO route sweep with Postgres dead: routes still failing, by owner PR
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
 - [cf/loyalty-do-migration.md](cf/loyalty-do-migration.md) - Loyalty on Durable Object stores: one-off ledger migration (Ruling FP-2)
+- [runbooks/customer-auth-cutover.md](runbooks/customer-auth-cutover.md) - Customer auth cutover to the store Durable Object: copy, verify, flip (N-9)
 - [cf/default-category-backfill.md](cf/default-category-backfill.md) - Default category Arabic name: backfill for DO stores
 - [cf/opus-review-closure.md](cf/opus-review-closure.md) - Opus review of #356 closed item by item with the proving test and its result, the leftovers closed, and the merge point for feat/cf-r6b (INFRA-CF-1)
 - [cf/r6a-on-do.md](cf/r6a-on-do.md) - The last three Postgres-only flows on the store Durable Object: palette search, campaigns, shopper erasure; InstaPay receipts at cutover (INFRA-CF-1 PR R6a)
