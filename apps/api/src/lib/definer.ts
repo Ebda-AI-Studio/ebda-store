@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { prisma, withSystemJob, type Prisma } from '@ebda/database';
+import { prisma, withStore, withSystemJob, type Prisma } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
+import { AppError } from '../middleware/error-handler';
 import {
   d1LookupStore,
   d1PublicStorePage,
@@ -10,6 +11,15 @@ import {
   platformDb,
 } from './platform-directory';
 import { backendFor, doStoreIdList } from './store-backend';
+import {
+  d1InboxGet,
+  d1InboxList,
+  d1InboxRecord,
+  d1InboxStuck,
+  d1InboxUpdate,
+  inboxD1,
+  type InboxRowRaw,
+} from './webhook-inbox-d1';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
@@ -174,6 +184,9 @@ export async function resolveStoreFromWebhookRef(ref: {
   preferStoreId?: string | null;
 }): Promise<string | null> {
   if (!ref.transactionId && !ref.invoiceId) return null;
+  // Ruling NZ-N12-1: with D1 bound (every deployed Worker) the entity index is the ONLY source; the Postgres definers below
+  // are the Node / test / local-dev path. An unknown reference resolves to nothing, never to a Postgres lookup.
+  if (platformDb()) return resolveDoStoreFromWebhookRef(ref);
   let found: string | null;
   if (ref.provider || ref.preferStoreId) {
     const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
@@ -231,8 +244,23 @@ export async function findOrderByIdempotencyKey(
     : null;
 }
 
-/** An order id -> its store id. */
+/**
+ * The Durable Object store that owns an order / payment id, via the D1 entity index (Ruling CF-PAY-1; NZ-N12-2), or null.
+ * Only a store the flag lists as `do` is returned (an index row of a store that went back to Postgres is stale; the definer
+ * owns it). Null when D1 is unbound (Node / tests / local dev) or the id is not indexed.
+ */
+async function doStoreFromIndex(kind: 'order' | 'payment', id: string): Promise<string | null> {
+  const d1 = platformDb();
+  if (!d1) return null;
+  const { resolveStoreId: fromIndex } = await import('@ebda-src/repo');
+  const storeId = await fromIndex(d1 as never, kind, id);
+  return storeId && (await backendFor(storeId)) === 'do' ? storeId : null;
+}
+
+/** An order id -> its store id (a Durable Object store from the D1 index first, no Postgres touched; else the definer). */
 export async function getOrderStoreId(orderId: string): Promise<string | null> {
+  const onDo = await doStoreFromIndex('order', orderId);
+  if (onDo) return onDo;
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_order_store_id(${orderId}) AS id`;
   return rows[0]?.id ?? null;
@@ -240,6 +268,8 @@ export async function getOrderStoreId(orderId: string): Promise<string | null> {
 
 /** A payment id -> its store id (exact primary key). The caller then reads and authorises inside that store. */
 export async function getPaymentStoreId(paymentId: string): Promise<string | null> {
+  const onDo = await doStoreFromIndex('payment', paymentId);
+  if (onDo) return onDo;
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_payment_store_id(${paymentId}) AS id`;
   return rows[0]?.id ?? null;
@@ -294,6 +324,18 @@ type InboxDbRow = {
   received_at: Date;
 };
 
+const fromD1 = (r: InboxRowRaw): InboxDbRow => ({
+  ...r,
+  payload: (() => {
+    try {
+      return JSON.parse(r.payload);
+    } catch {
+      return r.payload;
+    }
+  })(),
+  received_at: new Date(Number(r.received_at)),
+});
+
 const toInboxRow = (r: InboxDbRow): WebhookInboxRow => ({
   id: r.id,
   provider: r.provider,
@@ -343,6 +385,17 @@ export const webhookInbox = {
     rawBody: string;
     signature: string;
   }): Promise<string> {
+    const d1 = inboxD1();
+    if (d1)
+      return d1InboxRecord(d1, {
+        id: randomUUID(),
+        provider: input.provider,
+        idempotencyKey: input.idempotencyKey,
+        storeId: input.storeId ?? null,
+        payloadJson: JSON.stringify(input.payload),
+        rawBody: input.rawBody,
+        signature: input.signature,
+      });
     const rows = await prisma.$queryRaw<Array<{ id: string }>>`
       SELECT public.ebda_webhook_inbox_record(
         ${randomUUID()}, ${input.provider}, ${input.idempotencyKey}, ${input.storeId ?? null},
@@ -352,6 +405,11 @@ export const webhookInbox = {
   },
 
   async get(id: string): Promise<WebhookInboxRow | null> {
+    const d1 = inboxD1();
+    if (d1) {
+      const r = await d1InboxGet(d1, id);
+      return r ? toInboxRow(fromD1(r)) : null;
+    }
     const rows = await asWebhookInbox(
       () => prisma.$queryRaw<InboxDbRow[]>`SELECT * FROM public.ebda_webhook_inbox_get(${id})`
     );
@@ -359,6 +417,8 @@ export const webhookInbox = {
   },
 
   async update(id: string, patch: WebhookInboxPatch): Promise<boolean> {
+    const d1 = inboxD1();
+    if (d1) return d1InboxUpdate(d1, id, patch);
     const rows = await asWebhookInbox(
       () => prisma.$queryRaw<Array<{ ok: boolean }>>`
       SELECT public.ebda_webhook_inbox_update(
@@ -373,6 +433,18 @@ export const webhookInbox = {
 
   /** Rows never consumed or wedged past `cutoff`, oldest first. */
   async stuck(cutoff: Date, limit: number) {
+    const d1 = inboxD1();
+    if (d1) {
+      return (await d1InboxStuck(d1, cutoff.getTime(), limit)).map(r => ({
+        id: r.id,
+        provider: r.provider,
+        idempotencyKey: r.idempotency_key,
+        storeId: r.store_id,
+        status: r.status,
+        attempts: r.attempts,
+        receivedAt: new Date(Number(r.received_at)),
+      }));
+    }
     const rows = await asWebhookInbox(
       () =>
         prisma.$queryRaw<
@@ -406,6 +478,26 @@ export const webhookInbox = {
     limit: number;
     offset: number;
   }) {
+    const d1 = inboxD1();
+    if (d1) {
+      // The route is `requireRole(['super_admin'])`; the Postgres definer's own actor check + audit row are not repeated here.
+      const { rows, total } = await d1InboxList(d1, input);
+      return {
+        total,
+        events: rows.map(r => ({
+          id: r.id,
+          provider: r.provider,
+          storeId: r.store_id,
+          status: r.status,
+          attempts: r.attempts,
+          lastError: r.last_error,
+          resultOrderId: r.result_order_id,
+          resultStatus: r.result_status,
+          idempotencyKey: r.idempotency_key,
+          receivedAt: new Date(Number(r.received_at)),
+        })),
+      };
+    }
     const rows = await prisma.$queryRaw<
       Array<{
         id: string;
@@ -448,6 +540,36 @@ export async function getStorefrontForPaymentRef(
   const rows = await prisma.$queryRaw<Array<{ slug: string; domain: string | null }>>`
     SELECT slug, domain FROM public.ebda_storefront_for_payment_ref(${ref})`;
   return rows[0] ?? null;
+}
+
+/**
+ * The storefront (slug + ACTIVE custom domain) of a store, for a payment-redirect callback. D1 directory when bound (no
+ * Postgres), else the Store row. Null for an unknown store.
+ */
+export async function storefrontForStoreId(
+  storeId: string
+): Promise<{ slug: string; domain: string | null } | null> {
+  const d1 = platformDb();
+  if (d1) {
+    let row: { slug: string; domain: string | null; domain_status: string | null } | null;
+    try {
+      row = await d1
+        .prepare(
+          'SELECT slug, domain, domain_status FROM stores WHERE id = ?1 AND deleted_at IS NULL'
+        )
+        .bind(storeId)
+        .first();
+    } catch {
+      throw new AppError(503, 'PLATFORM_DIRECTORY_UNAVAILABLE', 'Store directory is unavailable');
+    }
+    return row
+      ? { slug: row.slug, domain: row.domain_status === 'active' ? row.domain : null }
+      : null;
+  }
+  const store = await withStore(storeId, () =>
+    prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
+  );
+  return store ?? null;
 }
 
 /** A carrier tracking number -> the store that owns the shipment. */

@@ -65,4 +65,37 @@ describe.skipIf(e.E2E_DB === '1')('built Worker with Postgres unreachable', () =
     const counts = await e.API.fetch(`${base}/counts`, { headers });
     expect(counts.status).toBe(200);
   });
+
+  // NEON-ZERO-1 N-12 (Rulings NZ-N12-1..3): a payment gateway callback for a Durable Object store resolves its store from the
+  // D1 entity index and records/reads the inbox in D1; with Postgres dead nothing 5xx-es from a Postgres lookup.
+  describe('payment webhooks for a Durable Object store', () => {
+    const WH_STORE = '3c1f7a52-9d44-4e0b-8f6a-2b7d5c9e1a10';
+    const hook = (txn: string) =>
+      e.API.fetch('https://api.ebda.app/api/v1/webhooks/payment/paymob?hmac=deadbeef', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'TRANSACTION', obj: { id: 777, order: { id: txn } } }),
+      });
+
+    it('an unknown reference is a 503 retry (never a Postgres 500); a known one reaches the DO config read', async () => {
+      await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
+      await e.PLATFORM_DB.prepare(
+        'INSERT OR REPLACE INTO stores (id, name, slug, owner_id, storage_backend) VALUES (?1, ?2, ?3, ?4, ?5)'
+      )
+        .bind(WH_STORE, 'wh', 'wh', 'owner-1', 'do')
+        .run();
+      const unknown = await hook('no-such-ref');
+      expect(unknown.status).toBe(503);
+      await e.PLATFORM_DB.prepare(
+        "INSERT OR REPLACE INTO entity_index (kind, id, store_id) VALUES ('webhook', 'paymob:T-WH-1', ?1)"
+      )
+        .bind(WH_STORE)
+        .run();
+      // Resolved from the index to the DO store, whose DO holds no provider config here: the refusal is the DO-side
+      // "provider not configured", i.e. the request got past the resolver and the config read WITHOUT Postgres.
+      const known = await hook('T-WH-1');
+      const body = (await known.json()) as { error?: { code?: string } };
+      expect(body.error?.code).toBe('PAYMENT_PROVIDER_NOT_CONFIGURED');
+    });
+  });
 });

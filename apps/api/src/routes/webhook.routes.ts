@@ -2,11 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@ebda/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { runInTenantContext, withStore } from '@ebda/database';
 import {
   findOrderByIdempotencyKey,
   getOrderStoreId,
   getStorefrontForPaymentRef,
+  storefrontForStoreId,
   resolveStoreFromWebhookRef,
   webhookInbox,
 } from '../lib/definer';
@@ -282,6 +283,9 @@ async function checkIdempotency(
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
+  // A store on its Durable Object dedupes inside the DO (`payment_event_log`, same section as the effects, Ruling CF-PAY-1);
+  // there is no Postgres order row to look up (NZ-N12-3: nothing of a DO store's webhook may touch Postgres).
+  if (await storeMoney(storeId)) return { alreadyProcessed: false };
   // The store is not known yet, so this exact-key lookup is a definer
   // (`ebda_webhook_order_by_idempotency`), not a store-scoped read.
   const order = await findOrderByIdempotencyKey(idempotencyKey);
@@ -994,9 +998,7 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   async function getStorefrontUrl(storeId: string | null): Promise<string> {
     try {
       if (!storeId) return config.webUrl;
-      const store = await withStore(storeId, () =>
-        prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
-      );
+      const store = await storefrontForStoreId(storeId);
       if (store) return storefrontOrigin(store);
       return config.webUrl;
     } catch {
