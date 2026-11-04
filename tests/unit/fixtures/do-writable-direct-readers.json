@@ -24,6 +24,20 @@
         "notificationLog": 4
       }
     },
+    "apps/api/src/routes/order.routes.ts": {
+      "kind": "platform",
+      "reason": "N-10d (#419) audit family: order timeline audit trail reads `auditLog` for a store through Postgres; DO-store audit rows live in the StoreDO, so this read must go through the audit reader before Postgres is removed (listed in neon-zero-remaining.md, unowned).",
+      "models": {
+        "auditLog": 1
+      }
+    },
+    "apps/api/src/routes/return.routes.ts": {
+      "kind": "platform",
+      "reason": "N-10d (#419) audit family: return timeline audit trail reads `auditLog` for a store through Postgres; DO-store audit rows live in the StoreDO, so this read must go through the audit reader before Postgres is removed (listed in neon-zero-remaining.md, unowned).",
+      "models": {
+        "auditLog": 1
+      }
+    },
     "apps/api/src/services/abandoned-cart.service.ts": {
       "kind": "pg-branch",
       "reason": "processReminders / getStats / candidate load: each Postgres read sits in the `backend !== 'do'` / `onDo` else-branch next to the DO read (CF-R4-5).",
@@ -113,6 +127,14 @@
         "product": 1
       }
     },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
+      }
+    },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {
       "kind": "pg-branch",
       "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
@@ -196,14 +218,6 @@
       "models": {
         "product": 2,
         "productVariant": 2
-      }
-    },
-    "apps/api/src/services/bundle.service.ts": {
-      "kind": "platform",
-      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
-      "models": {
-        "bundle": 3,
-        "bundleItem": 1
       }
     }
   }
