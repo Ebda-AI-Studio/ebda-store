@@ -9,7 +9,7 @@
  * Contract (Ruling NZ-10D-1): a DO / D1 audit write NEVER throws into the caller and NEVER blocks it for long (3 s cap),
  * and a row is never lost silently: a failed or timed-out write is put on the jobs queue as `audit-write-retry` carrying
  * the WHOLE row (its id is fixed, every sink is idempotent on id, so a late original plus a retry is one row). If even the
- * enqueue fails the full row goes to the error log and a P1 pages. The dead-letter handler parks the row in R2 and pages.
+ * enqueue fails the row is parked in R2 and a P1 pages (rows are never logged: they carry IP, user agent and details). The dead-letter handler parks the row in R2 and pages.
  * The Postgres leg keeps its old behaviour (throws; the caller's savepoint decides).
  * `details.impersonatedBy` (BE:S-2) travels inside `details` untouched on every leg.
  */
@@ -129,7 +129,7 @@ export async function deliverAuditRow(row: AuditRow, targets: Target[]): Promise
   }
 }
 
-/** Put a row that could not be written on the jobs queue; if that fails too, log it whole and page. Never throws. */
+/** Put a row that could not be written on the jobs queue; if that fails too, park it in R2 and page (the row itself is never logged). Never throws. */
 export async function queueAuditRetry(row: AuditRow, err: unknown): Promise<void> {
   const message = err instanceof Error ? err.message : String(err);
   logger.warn(
@@ -143,15 +143,24 @@ export async function queueAuditRetry(row: AuditRow, err: unknown): Promise<void
       contentType: 'json',
     });
   } catch (e) {
-    // LAST RESORT: the full row is in the log drain (retained) and a human is paged. Never silent.
-    logger.error({ row, err: e }, '[audit] ROW AT RISK: write failed and could not be queued');
+    // LAST RESORT: the row carries IP, user agent and free-form details, so it is NEVER logged. Park it in R2; if that
+    // fails too, page with the ids only (the row is lost, and the page says so).
+    const parked = await putDeadLetter(row);
+    logger.error(
+      { err: e, auditId: row.id, action: row.action, storeId: row.storeId ?? null, parked },
+      '[audit] write failed and could not be queued'
+    );
     await sendAlert({
       level: 'p1',
       scope: 'platform',
       source: 'audit.write_at_risk',
       title: 'Audit row could not be written or queued',
-      body: `action ${row.action} store ${row.storeId ?? '-'} id ${row.id}: ${message}. The full row is in the error log (search the id).`,
-      context: { auditId: row.id, action: row.action, storeId: row.storeId ?? null },
+      body: `action ${row.action} store ${row.storeId ?? '-'} id ${row.id}: ${message}. ${
+        parked
+          ? `Parked at R2 audit-dead-letter/${row.id}.json: re-apply it.`
+          : 'NOT parked: the row is LOST.'
+      }`,
+      context: { auditId: row.id, action: row.action, storeId: row.storeId ?? null, parked },
     }).catch(() => undefined);
   }
 }
@@ -202,19 +211,26 @@ interface R2PutLike {
   put(key: string, value: string): Promise<unknown>;
 }
 
-/** Dead letter: park the row in R2 (private bucket) and page. The row is also in the error log. Never throws. */
-export async function parkDeadAuditRow(row: AuditRow): Promise<void> {
-  let parked = false;
+/** Park the row in the private bucket. Returns whether it is there. Never throws, never logs the row. */
+async function putDeadLetter(row: AuditRow): Promise<boolean> {
   try {
     const r2 = cfBindings()?.STORE_BACKUPS as R2PutLike | undefined;
-    if (r2?.put) {
-      await r2.put(`audit-dead-letter/${row.id}.json`, JSON.stringify(row));
-      parked = true;
-    }
+    if (!r2?.put) return false;
+    await r2.put(`audit-dead-letter/${row.id}.json`, JSON.stringify(row));
+    return true;
   } catch (e) {
     logger.error({ err: e, auditId: row.id }, '[audit] dead-letter park failed');
+    return false;
   }
-  logger.error({ row, parked }, '[audit] retry exhausted');
+}
+
+/** Dead letter: park the row in R2 (private bucket) and page. Ids only in the log and the page. Never throws. */
+export async function parkDeadAuditRow(row: AuditRow): Promise<void> {
+  const parked = await putDeadLetter(row);
+  logger.error(
+    { auditId: row.id, action: row.action, storeId: row.storeId ?? null, parked },
+    '[audit] retry exhausted'
+  );
   await sendAlert({
     level: 'p1',
     scope: 'platform',
@@ -223,7 +239,7 @@ export async function parkDeadAuditRow(row: AuditRow): Promise<void> {
     body: `action ${row.action} store ${row.storeId ?? '-'} id ${row.id}. ${
       parked
         ? `Parked at R2 audit-dead-letter/${row.id}.json: re-apply it.`
-        : 'NOT parked: the full row is in the error log.'
+        : 'NOT parked: the row is LOST.'
     }`,
     context: { auditId: row.id, action: row.action, storeId: row.storeId ?? null, parked },
   }).catch(() => undefined);

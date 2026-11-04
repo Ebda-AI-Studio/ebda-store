@@ -702,13 +702,15 @@ async function flushCount(
   try {
     // One short store-scoped statement (strict RLS: an unscoped UPDATE matches no row).
     const repo = await storeRepo(store.id);
-    const update = () =>
-      repo.writer.auditLog.update({
-        where: { id: rowId, storeId: store.id },
-        data: { details: JSON.parse(JSON.stringify({ ...baseDetails, count })) },
-      });
-    if (repo.backend === 'do') await update();
-    else await runInStoreScope(store.id, update);
+    const details = JSON.parse(JSON.stringify({ ...baseDetails, count }));
+    if (repo.backend === 'do') {
+      // the DO audit trail has no generic update: one named procedure, scoped to this row and store
+      await repo.writer.$proc('auditSetDetails', { id: rowId, storeId: store.id, details });
+    } else {
+      await runInStoreScope(store.id, () =>
+        repo.writer.auditLog.update({ where: { id: rowId, storeId: store.id }, data: { details } })
+      );
+    }
     return true;
   } catch (err) {
     logger.warn(

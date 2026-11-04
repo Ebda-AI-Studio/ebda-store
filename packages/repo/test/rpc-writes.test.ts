@@ -319,3 +319,61 @@ describe('procedures (PR D1b)', () => {
     expect(r.count('products')).toBe(1);
   });
 });
+
+describe('audit trail is append-only on the DO write path (N-10d security review)', () => {
+  const audit = (id: string, extra: Record<string, unknown> = {}) => ({
+    model: 'AuditLog',
+    op: 'create' as const,
+    args: {
+      data: {
+        id,
+        action: 'a',
+        resourceType: 't',
+        storeId: STORE,
+        userId: 'u1',
+        details: {},
+        ...extra,
+      },
+    },
+  });
+
+  it('create works; update / updateMany / upsert / delete / deleteMany are refused and change nothing', async () => {
+    const r = rig();
+    expect((await r.run({ ops: [audit('r1')] })).ok).toBe(true);
+    for (const op of ['update', 'updateMany', 'upsert', 'delete', 'deleteMany'] as const) {
+      const out = await r.run({
+        ops: [{ model: 'AuditLog', op, args: { where: { id: 'r1' }, data: { action: 'x' } } }],
+      });
+      expect(out, op).toMatchObject({ ok: false, code: 'AUDIT_APPEND_ONLY' });
+    }
+    expect(r.count('audit_logs')).toBe(1);
+  });
+
+  it('the named procedures do the three narrow edits and refuse a young purge', async () => {
+    const r = rig();
+    await r.run({ ops: [audit('r1'), audit('r2', { userId: 'u2' })] });
+    const proc = (op: string, args: Record<string, unknown>) =>
+      r.run({ ops: [{ model: '$proc', op, args } as never] });
+    expect(
+      await proc('auditSetDetails', { id: 'r1', storeId: STORE, details: { count: 5 } })
+    ).toMatchObject({ ok: true });
+    expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r1'`).get()).toEqual({
+      details: '{"count":5}',
+    });
+    // another store's id changes nothing
+    await proc('auditSetDetails', { id: 'r2', storeId: 'other', details: { count: 9 } });
+    expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r2'`).get()).toEqual({
+      details: '{}',
+    });
+    await proc('auditUnlinkUser', { userId: 'u2' });
+    expect(r.db.prepare(`SELECT user_id FROM audit_logs WHERE id='r2'`).get()).toEqual({
+      user_id: null,
+    });
+    expect(await proc('auditPurge', { before: Date.now(), upToId: 'zzz' })).toMatchObject({
+      ok: false,
+    });
+    expect(r.count('audit_logs')).toBe(2);
+    await proc('auditPurge', { before: Date.now() - 40 * 86_400_000, upToId: 'zzz' });
+    expect(r.count('audit_logs')).toBe(2); // nothing is that old
+  });
+});

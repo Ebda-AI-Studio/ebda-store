@@ -632,6 +632,18 @@ async function listAuditD1(input: {
   const { d1All } = await import('../services/platform/billing-d1.js');
   const limit = Math.min(Math.max(input.limit, 0), 200);
   const offset = Math.max(input.offset, 0);
+  // The view is audited on EVERY path (D1 list and a DO store's own rows), before anything is read.
+  await insertAuditLog({
+    action: 'audit.platform_viewed',
+    userId: input.actorUserId,
+    resourceType: 'audit_log',
+    details: {
+      action: input.action ?? null,
+      userId: input.userId ?? null,
+      resourceType: input.resourceType ?? null,
+      storeId: input.storeId ?? null,
+    },
+  });
   if (input.storeId) {
     // one store on its Durable Object: its own rows (the D1 mirror only holds impersonated actions)
     const repo = await (await import('./repo-factory.js')).storeRepo(input.storeId);
@@ -692,12 +704,6 @@ async function listAuditD1(input: {
     limit,
     offset
   );
-  await insertAuditLog({
-    action: 'audit.platform_viewed',
-    userId: input.actorUserId,
-    resourceType: 'audit_log',
-    details: { action: input.action ?? null, storeId: input.storeId ?? null },
-  });
   return {
     total: rows[0] ? Number(rows[0].total) : 0,
     rows: rows.map(r => {
@@ -822,6 +828,40 @@ export async function detachStoreAuditLogs(
   return Number(rows[0]?.n ?? 0) + d1;
 }
 
+/**
+ * Erasure reaches the audit rows that live in every store's Durable Object too: `user_id` is nulled in each (bounded
+ * parallelism). A store that cannot be reached FAILS the erasure (thrown after every store was tried; the call is idempotent,
+ * so the caller simply retries) - an erasure that skipped a store would be reported as complete.
+ */
+async function unlinkUserAuditLogsInDoStores(userId: string): Promise<number> {
+  if (!(cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB) return 0;
+  const [{ doStoreIdList }, { storeWriter }] = await Promise.all([
+    import('./store-backend.js'),
+    import('./repo-factory.js'),
+  ]);
+  const ids = await doStoreIdList();
+  let total = 0;
+  const failed: string[] = [];
+  const BATCH = 5;
+  for (let i = 0; i < ids.length; i += BATCH) {
+    await Promise.all(
+      ids.slice(i, i + BATCH).map(async id => {
+        try {
+          const n = await (await storeWriter(id)).$proc('auditUnlinkUser', { userId });
+          total += Number(n) || 0;
+        } catch {
+          failed.push(id);
+        }
+      })
+    );
+  }
+  if (failed.length)
+    throw new Error(
+      `audit unlink: ${failed.length} store DO(s) not reached (${failed.slice(0, 5).join(', ')}); retry the erasure`
+    );
+  return total;
+}
+
 /** One UPDATE on D1 `platform_audit_log` when the platform D1 is bound (0 otherwise: local / unit tests). */
 async function detachD1(sql: string, id: string): Promise<number> {
   if (!(cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB) return 0;
@@ -840,7 +880,7 @@ export async function unlinkUserAuditLogs(
     `UPDATE platform_audit_log SET actor_id = NULL WHERE actor_id = ?1`,
     userId
   );
-  return Number(rows[0]?.n ?? 0) + d1;
+  return Number(rows[0]?.n ?? 0) + d1 + (await unlinkUserAuditLogsInDoStores(userId));
 }
 
 /** The consent row an SMS opt-out token names (the store is on the row, not the token). */

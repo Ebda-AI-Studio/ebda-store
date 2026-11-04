@@ -14,10 +14,21 @@ const repo = vi.hoisted(() => ({
   created: [] as Array<{ storeId: string; data: Record<string, unknown> }>,
   failNext: 0,
   dupNext: false,
+  unreachable: new Set<string>(),
+  procs: [] as Array<{ id: string; name: string; args: Record<string, unknown> }>,
 }));
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeWritesToDo: async (id: string) => repo.doStores.has(id),
+  storeRepo: async () => ({
+    backend: 'do',
+    db: { auditLog: { findMany: async () => [], count: async () => 0 } },
+  }),
   storeWriter: async (id: string) => ({
+    $proc: async (name: string, args: Record<string, unknown>) => {
+      if (repo.unreachable.has(id)) throw new Error('do down');
+      repo.procs.push({ id, name, args });
+      return 2;
+    },
     auditLog: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         if (repo.failNext > 0) {
@@ -72,6 +83,7 @@ function world(markers: Family[], extra: Record<string, unknown> = {}) {
       : { results: [], meta: { changes: Number(db.prepare(sql).run(...(v as never[])).changes) } };
   const d1 = {
     prepare: (sql: string) => ({
+      all: async () => (await Promise.resolve(), stmt(sql, [])),
       bind: (...v: unknown[]) => ({
         all: async () => (await Promise.resolve(), stmt(sql, v)),
         run: async () => (await Promise.resolve(), stmt(sql, v)),
@@ -106,6 +118,8 @@ beforeEach(() => {
   repo.created.length = 0;
   repo.failNext = 0;
   repo.dupNext = false;
+  repo.unreachable.clear();
+  repo.procs.length = 0;
 });
 
 const claim = (storeId: string, ref: string) => ({
@@ -415,5 +429,44 @@ describe('R2 references over D1', () => {
     expect(
       (await platformD1ReferencedKeys(toKey, 'stores/a/proof.png')).has('stores/a/proof.png')
     ).toBe(true);
+  });
+});
+
+describe('security review fixes', () => {
+  it('a super-admin viewing a DO store audit trail is itself audited, with the store in details', async () => {
+    const db = world(['audit']);
+    repo.doStores.add(A);
+    const { platformAuditLogs } = await import('../../apps/api/src/lib/definer');
+    await platformAuditLogs.list({ actorUserId: 'root', storeId: A, limit: 10, offset: 0 });
+    const row = db
+      .prepare(
+        `SELECT actor_id, meta FROM platform_audit_log WHERE action = 'audit.platform_viewed'`
+      )
+      .get() as { actor_id: string; meta: string };
+    expect(row.actor_id).toBe('root');
+    expect(JSON.parse(row.meta).details.storeId).toBe(A);
+  });
+
+  it('user erasure also unlinks the user in every DO store, and fails loudly when one is unreachable', async () => {
+    const db = world(['audit']);
+    db.prepare(`UPDATE stores SET storage_backend = 'do'`).run();
+    const { unlinkUserAuditLogs } = await import('../../apps/api/src/lib/definer');
+    const fake = { $queryRaw: async () => [{ n: 1 }] } as never;
+    const total = await unlinkUserAuditLogs('u9', fake);
+    expect(repo.procs.map(p => p.name)).toEqual(['auditUnlinkUser', 'auditUnlinkUser']);
+    expect(total).toBe(1 + 0 + 4);
+    repo.unreachable.add(B);
+    await expect(unlinkUserAuditLogs('u9', fake)).rejects.toThrow(/not reached/);
+  });
+
+  it('a row that cannot be written or queued is never logged whole', async () => {
+    const logger = (await import('../../apps/api/src/lib/logger')).default;
+    const spy = vi.spyOn(logger, 'error');
+    world([]);
+    repo.doStores.add(A);
+    repo.failNext = 1;
+    await appendAudit(entry({ storeId: A, ip: '203.0.113.7', userAgent: 'SECRET-UA' }), pg);
+    expect(JSON.stringify(spy.mock.calls)).not.toMatch(/203\.0\.113\.7|SECRET-UA/);
+    spy.mockRestore();
   });
 });
