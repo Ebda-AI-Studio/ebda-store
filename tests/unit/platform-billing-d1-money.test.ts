@@ -49,7 +49,10 @@ import {
   commitManualPaymentD1,
   planTierDriftD1,
 } from '../../apps/api/src/services/platform/billing-d1';
+import { setBillingProviderForTests } from '../../apps/api/src/services/billing';
 import {
+  handleBillingWebhook,
+  processDeferredBillingWebhooks,
   applyWebhookEvent,
   expireStaleCheckouts,
   settleInTx,
@@ -460,7 +463,7 @@ describe('freeze lifecycle', () => {
     db.prepare('DELETE FROM system_settings').run();
     putFreeze(db, Date.now() + 60_000);
     await expect(platformFamilyOnD1ForWrite('billing')).rejects.toMatchObject({
-      details: { retryable: true, messageAr: expect.stringContaining('أعد المحاولة') },
+      details: { retryable: true, messageAr: expect.stringContaining('جرّب تاني') },
     });
   });
 });
@@ -532,5 +535,114 @@ describe('stuck leases and tier reconciliation', () => {
       data: { plan: 'professional' },
     });
     expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
+  });
+});
+
+describe('webhooks during the freeze are deferred, not 503d, and applied exactly once', () => {
+  const event = {
+    eventId: 'wh-frozen',
+    kind: 'charge.succeeded',
+    merchantOrderId: EV,
+    providerRef: 'ref-9',
+    amountMinor: null,
+    currency: 'EGP',
+    failureReason: undefined,
+    card: undefined,
+    occurredAt: new Date(),
+    raw: {},
+  };
+  const provider = {
+    name: 'stub',
+    isConfigured: () => true,
+    verifyWebhook: vi.fn(() => ({ ...event })),
+  };
+  const freezeNow = (db: DatabaseSync) =>
+    db
+      .prepare(`INSERT INTO system_settings (id, key, value) VALUES ('fz', ?, ?)`)
+      .run(freezeKey('billing'), JSON.stringify({ expiresAt: Date.now() + 60_000 }));
+  const unfreeze = (db: DatabaseSync) =>
+    db.prepare('DELETE FROM system_settings WHERE key = ?').run(freezeKey('billing'));
+
+  function frozenWorld() {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'free', 'active')`
+    ).run(STORE);
+    ledger(db);
+    setBillingProviderForTests(provider as never);
+    freezeNow(db);
+    return db;
+  }
+
+  it('authenticated -> stored deferred -> 200; duplicates collapse; nothing applied while frozen', async () => {
+    const db = frozenWorld();
+    const first = await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    expect(first).toEqual({ duplicate: false, outcome: 'deferred', detail: 'family_frozen' });
+    await handleBillingWebhook('stub', Buffer.from('{}'), {}); // the provider delivers it twice
+    expect(db.prepare(`SELECT outcome FROM billing_webhook_events`).all()).toEqual([
+      { outcome: 'deferred' },
+    ]);
+    expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+      status: 'pending',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(0); // still frozen
+    expect(storeUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('a bad signature is NOT stored (authenticate first)', async () => {
+    const db = frozenWorld();
+    provider.verifyWebhook.mockImplementationOnce(() => {
+      throw new Error('INVALID_SIGNATURE');
+    });
+    await expect(handleBillingWebhook('stub', Buffer.from('{}'), {})).rejects.toThrow(
+      'INVALID_SIGNATURE'
+    );
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_webhook_events').get()).toEqual({ n: 0 });
+  });
+
+  it('after the freeze the queue is processed exactly once; a live redelivery afterwards is a replay', async () => {
+    const db = frozenWorld();
+    await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    unfreeze(db);
+    expect(await processDeferredBillingWebhooks()).toBe(1);
+    expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+      status: 'succeeded',
+    });
+    expect(db.prepare('SELECT plan_code p FROM store_subscriptions').get()).toEqual({ p: 'basic' });
+    expect(db.prepare('SELECT outcome FROM billing_webhook_events').get()).toEqual({
+      outcome: 'processed',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(0);
+    expect(await handleBillingWebhook('stub', Buffer.from('{}'), {})).toMatchObject({
+      duplicate: true,
+      detail: 'replay',
+    });
+    expect(storeUpdateMock).toHaveBeenCalledTimes(1); // ONE effect
+  });
+
+  it('a live delivery that beats the processor takes the deferred row over; the processor then finds nothing', async () => {
+    const db = frozenWorld();
+    await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    unfreeze(db);
+    expect(await handleBillingWebhook('stub', Buffer.from('{}'), {})).toMatchObject({
+      outcome: 'processed',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(0);
+    expect(storeUpdateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed apply puts the row BACK in the queue (the payment is never forgotten) and the next run applies it', async () => {
+    const db = frozenWorld();
+    await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    unfreeze(db);
+    storeUpdateMock.mockRejectedValueOnce(new Error('postgres down'));
+    expect(await processDeferredBillingWebhooks()).toBe(0);
+    expect(db.prepare('SELECT outcome FROM billing_webhook_events').get()).toEqual({
+      outcome: 'deferred',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(1);
+    expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+      status: 'succeeded',
+    });
   });
 });

@@ -427,3 +427,38 @@ export async function planTierDriftD1(
     limit
   );
 }
+
+/**
+ * A verified billing webhook that arrived while the family is frozen: stored durably (raw SQL, so the router's write
+ * freeze does not apply) in the dedupe table as `outcome = 'deferred'`, idempotent on (provider, event_id). The payload
+ * is the provider-verified normalised event plus the raw body for audit. Returns false when the event was already known.
+ */
+export async function deferBillingWebhookD1(a: {
+  provider: string;
+  eventId: string;
+  eventType: string;
+  payload: unknown;
+}): Promise<boolean> {
+  const changes = await run(
+    `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at)
+     VALUES (?1, ?2, ?3, ?4, 'deferred', ?5, ?6)
+     ON CONFLICT (provider, event_id) DO NOTHING`,
+    crypto.randomUUID(),
+    a.provider,
+    a.eventId,
+    a.eventType,
+    JSON.stringify(a.payload),
+    Date.now()
+  );
+  return changes === 1;
+}
+
+export async function listDeferredBillingWebhooksD1(
+  limit: number
+): Promise<Array<{ provider: string; eventId: string; detail: string }>> {
+  return all<{ provider: string; eventId: string; detail: string }>(
+    `SELECT provider, event_id AS eventId, detail FROM billing_webhook_events
+      WHERE outcome = 'deferred' ORDER BY received_at ASC LIMIT ?1`,
+    limit
+  );
+}

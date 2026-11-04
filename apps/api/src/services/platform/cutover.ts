@@ -111,6 +111,13 @@ async function readKeys(
   }
 }
 
+/** Is the family frozen right now? Always a fresh read (no cache); false without a platform D1 binding. */
+export async function isFamilyFrozen(family: PlatformFamily): Promise<boolean> {
+  const d1 = binding();
+  if (!d1) return false;
+  return (await readKeys(d1, family)).frozen;
+}
+
 /** Sync view for guards: has this isolate already seen the marker? */
 export const isFamilyCachedOnD1 = (family: PlatformFamily): boolean => on.has(family);
 
@@ -119,7 +126,7 @@ const frozenError = (family: PlatformFamily) =>
     retryable: true,
     family,
     retryAfterSeconds: 30,
-    messageAr: 'جارٍ نقل بيانات الاشتراكات الآن، أعد المحاولة بعد دقيقة.',
+    messageAr: 'بنحدّث بيانات الاشتراكات دلوقتي، جرّب تاني بعد دقيقة.',
   });
 
 /**

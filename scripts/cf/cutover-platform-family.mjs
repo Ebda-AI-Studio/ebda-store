@@ -243,6 +243,19 @@ async function main() {
     await sleep(Number(args['drain-ms']));
     const { client, fam } = await open();
     famNames = fam.map(b => b.name);
+    // 2b. billing: webhooks deferred during the freeze live in the dedupe table and could collide with a Postgres row of
+    // the same (provider, event_id) on copy. Set them aside, copy, then put back those Postgres does not already know
+    // (one it knows was already applied: dropping it IS the dedupe).
+    let deferred = [];
+    if (tables.includes('billing_webhook_events')) {
+      deferred = await d1Query(
+        d,
+        `SELECT id, provider, event_id, event_type, outcome, detail, received_at FROM billing_webhook_events WHERE outcome = 'deferred'`
+      );
+      if (deferred.length)
+        await d1Statements(d, [`DELETE FROM billing_webhook_events WHERE outcome = 'deferred';`]);
+      console.log(`  ${deferred.length} deferred webhook(s) set aside`);
+    }
     // 3. copy (idempotent upserts, FK order)
     let stmts = [];
     let bytes = 0;
@@ -265,6 +278,16 @@ async function main() {
       console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
     }
 
+    if (deferred.length) {
+      await d1Statements(
+        d,
+        deferred.map(
+          r =>
+            `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at) VALUES (${[r.id, r.provider, r.event_id, r.event_type, r.outcome, r.detail, r.received_at].map(lit).join(', ')}) ON CONFLICT (provider, event_id) DO NOTHING;`
+        )
+      );
+      console.log(`  ${deferred.length} deferred webhook(s) put back (already-known ones dropped)`);
+    }
     // 4. verify: count + digest on both sides, foreign keys
     const results = await d1QueryMany(d, [
       ...fam.map(
@@ -348,9 +371,11 @@ async function main() {
 
 /** D1 rows to compare: the cutover bookkeeping rows live in system_settings and are not part of the copied data. */
 function verifyWhere(table) {
-  return table === 'system_settings'
-    ? ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`
-    : '';
+  if (table === 'system_settings')
+    return ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`;
+  // webhooks that arrived during the freeze are stored here as `deferred` (D1 only); they are not part of the copy
+  if (table === 'billing_webhook_events') return ` WHERE outcome <> 'deferred'`;
+  return '';
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

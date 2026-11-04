@@ -38,7 +38,14 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { sendAlert } from '../alerts.service';
-import { acrossBilling, onD1, planTierDriftD1 } from '../platform/billing-d1';
+import {
+  acrossBilling,
+  deferBillingWebhookD1,
+  listDeferredBillingWebhooksD1,
+  onD1,
+  planTierDriftD1,
+} from '../platform/billing-d1';
+import { isFamilyFrozen } from '../platform/cutover';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -459,6 +466,7 @@ async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): P
 
 /** Webhook dedupe claim (see applyWebhookEvent): `outcome` while in flight, and how old it must be to be taken over. */
 const WEBHOOK_PROCESSING = 'processing';
+const WEBHOOK_DEFERRED = 'deferred';
 const WEBHOOK_CLAIM_STALE_MS = 120_000;
 
 /** D1 settle lease marker (stored in `failure_reason` while a success is being applied) and how long it holds. */
@@ -1362,6 +1370,9 @@ export async function runBillingCycle(
     );
     // M-023: settle / hand on charges whose outcome never arrived, BEFORE the due list is read (a given-up
     // renewal enters dunning and may be due again today).
+    await processDeferredBillingWebhooks().catch(err =>
+      logger.error({ err }, '[billing] deferred webhook processing failed')
+    );
     await reconcilePlanTiers().catch(err =>
       logger.error({ err }, '[billing] plan tier reconciliation failed')
     );
@@ -1531,7 +1542,7 @@ export async function resumeSubscription(args: { storeId: string }): Promise<voi
 
 export interface WebhookResult {
   duplicate: boolean;
-  outcome: 'processed' | 'ignored';
+  outcome: 'processed' | 'ignored' | 'deferred';
   detail?: string;
 }
 
@@ -1650,6 +1661,7 @@ export async function applyWebhookEvent(
   // Postgres a failure rolls the claim back with everything else; D1 commits the claim at once, so a failure deletes it
   // and a crash leaves a `processing` row that the provider's retry may take over once it is stale. Without this a
   // throw after the claim turned the provider's retry into a "replay" and the paid checkout never got its plan.
+  let tookDeferred = false;
   const apply = async (tx: Tx): Promise<WebhookResult> => {
     const ins = await tx.billingWebhookEvent.createMany({
       data: [
@@ -1663,15 +1675,24 @@ export async function applyWebhookEvent(
       skipDuplicates: true,
     });
     if (ins.count === 0) {
-      const takeover = await tx.billingWebhookEvent.updateMany({
-        where: {
-          provider: providerName,
-          eventId: event.eventId,
-          outcome: WEBHOOK_PROCESSING,
-          receivedAt: { lt: new Date(now.getTime() - WEBHOOK_CLAIM_STALE_MS) },
-        },
-        data: { receivedAt: now },
+      // A delivery that arrived during the cutover freeze was stored `deferred` (handleBillingWebhook); whoever flips it
+      // to `processing` first (this delivery or the deferred-queue processor) applies it, exactly once.
+      const fromDeferred = await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_DEFERRED },
+        data: { outcome: WEBHOOK_PROCESSING, receivedAt: now },
       });
+      tookDeferred = fromDeferred.count === 1;
+      const takeover = tookDeferred
+        ? { count: 1 }
+        : await tx.billingWebhookEvent.updateMany({
+            where: {
+              provider: providerName,
+              eventId: event.eventId,
+              outcome: WEBHOOK_PROCESSING,
+              receivedAt: { lt: new Date(now.getTime() - WEBHOOK_CLAIM_STALE_MS) },
+            },
+            data: { receivedAt: now },
+          });
       if (takeover.count === 0) {
         const held = await tx.billingWebhookEvent.findFirst({
           where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_PROCESSING },
@@ -1696,16 +1717,29 @@ export async function applyWebhookEvent(
       return out;
     } catch (err) {
       if (await onD1()) {
-        await tx.billingWebhookEvent
-          .deleteMany({
-            where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_PROCESSING },
-          })
-          .catch(undo =>
-            logger.error(
-              { err: undo, eventId: event.eventId },
-              '[billing] could not release a webhook claim'
-            )
-          );
+        // a claim taken over from the deferred queue goes BACK to the queue (the payment must not be forgotten)
+        const release = tookDeferred
+          ? tx.billingWebhookEvent.updateMany({
+              where: {
+                provider: providerName,
+                eventId: event.eventId,
+                outcome: WEBHOOK_PROCESSING,
+              },
+              data: { outcome: WEBHOOK_DEFERRED },
+            })
+          : tx.billingWebhookEvent.deleteMany({
+              where: {
+                provider: providerName,
+                eventId: event.eventId,
+                outcome: WEBHOOK_PROCESSING,
+              },
+            });
+        await release.catch(undo =>
+          logger.error(
+            { err: undo, eventId: event.eventId },
+            '[billing] could not release a webhook claim'
+          )
+        );
       }
       throw err;
     }
@@ -1752,7 +1786,63 @@ export async function handleBillingWebhook(
   headers: Record<string, string | string[] | undefined>
 ): Promise<WebhookResult> {
   const provider = billingWebhookProvider(providerName);
-  let event = provider.verifyWebhook(rawBody, headers);
+  const event = provider.verifyWebhook(rawBody, headers); // signature / HMAC FIRST: nothing unauthenticated is stored
+  // Cutover freeze: the family's writes are refused, but a payment notification must not be lost (Paymob documents no
+  // retry for failed deliveries; Kashier's is unverified). Store the authenticated event durably, answer 200, and let the
+  // deferred queue apply it once the freeze is lifted (confirm-before-apply runs THEN).
+  if (await isFamilyFrozen('billing')) {
+    await deferBillingWebhookD1({
+      provider: provider.name,
+      eventId: event.eventId,
+      eventType: event.kind,
+      payload: { event, rawBody: Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody },
+    });
+    return { duplicate: false, outcome: 'deferred', detail: 'family_frozen' };
+  }
+  void drainDeferredSoon();
+  return confirmAndApplyWebhook(provider, event);
+}
+
+let lastDeferredDrain = 0;
+/** Opportunistic: the first webhook after the freeze drains the queue (at most every 30 s per isolate). */
+function drainDeferredSoon(): Promise<void> {
+  if (Date.now() - lastDeferredDrain < 30_000) return Promise.resolve();
+  lastDeferredDrain = Date.now();
+  return processDeferredBillingWebhooks()
+    .then(() => undefined)
+    .catch(err => logger.error({ err }, '[billing] deferred webhook drain failed'));
+}
+
+/**
+ * Apply the webhooks stored during a cutover freeze (cron every 15 min, the daily cycle, and the first webhook after the
+ * freeze). Each is confirmed at the gateway like a live delivery, then applied through the same claim, so a delivery
+ * that also arrives live is applied once. A row that cannot be applied stays deferred.
+ */
+export async function processDeferredBillingWebhooks(limit = 50): Promise<number> {
+  if (!(await onD1()) || (await isFamilyFrozen('billing'))) return 0;
+  let applied = 0;
+  for (const row of await listDeferredBillingWebhooksD1(limit)) {
+    try {
+      const { event } = JSON.parse(row.detail) as { event: BillingWebhookEvent };
+      event.occurredAt = new Date(event.occurredAt);
+      const provider = billingWebhookProvider(row.provider);
+      await confirmAndApplyWebhook(provider, event);
+      applied++;
+    } catch (err) {
+      logger.error(
+        { err, provider: row.provider, eventId: row.eventId },
+        '[billing] deferred webhook not applied yet'
+      );
+    }
+  }
+  return applied;
+}
+
+async function confirmAndApplyWebhook(
+  provider: ReturnType<typeof billingWebhookProvider>,
+  verified: BillingWebhookEvent
+): Promise<WebhookResult> {
+  let event = verified;
   // PROVIDERS-17 confirm-before-apply: only the gateway's own record of the transaction is
   // applied. Failure throws (500, the gateway redelivers, the dedupe row is never written).
   if (provider.confirmWebhookEvent && event.kind !== 'ignored') {
