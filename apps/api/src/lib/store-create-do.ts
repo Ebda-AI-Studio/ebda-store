@@ -9,6 +9,9 @@
  * Not atomic across D1 and the DO: a failure in 2 deletes the D1 row again (compensation); steps 3-4 are idempotent and a retry of
  * the whole create is a new store id, so a failure there leaves a store that is retried by the caller deleting it (the error says so).
  *
+ * wa-plan: new-store-not-linked (the raw INSERT INTO store_subscriptions below is the initial row of a store created a moment ago;
+ * it has no WhatsApp link to notify and the wa-plan-sync cron reconciles linked stores).
+ *
  * Enabled by `STORE_CREATE_ON_DO=1` AND both bindings (PLATFORM_DB, STORE_DO). Off (the default) = the unchanged Postgres create.
  * Ruling NZ-D11a: default OFF until N-6 (store-access) and N-10 (billing readers) can serve a store with no Postgres row.
  */
