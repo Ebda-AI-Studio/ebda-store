@@ -5,7 +5,9 @@ const queued = (id: string, subject: string) => ({
   id,
   storeId: null,
   // Platform sender with no provider configured in the test environment: every send attempt throws.
-  options: { to: 'someone@exit-test.invalid', subject, html: '<p>h</p>' },
+  // The address must be deliverable-looking: a reserved `.invalid` TLD is dropped before send (Ruling WA-LEGACY-1) and the
+  // message would be acked as handled, never retried or parked.
+  options: { to: 'someone@exit-test.example.com', subject, html: '<p>h</p>' },
   attempts: 0,
   maxAttempts: 3,
   createdAt: new Date().toISOString(),
