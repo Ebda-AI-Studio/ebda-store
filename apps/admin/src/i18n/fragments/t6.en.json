@@ -37,7 +37,8 @@
       "newButton": "New purchase order",
       "new": {
         "supplierRequired": "Select a supplier first.",
-        "linesRequired": "Add at least one line with a product, quantity and unit cost."
+        "linesRequired": "Add at least one line with a product, quantity and unit cost.",
+        "loadFailed": "Could not load suppliers and products. Try again."
       }
     },
     "adjustments": {

@@ -17,5 +17,7 @@ Quality
 Rulings
 
 - Ruling T6-1 - The use-confirm handle is named `askConfirm`, not `confirm`. `admin-action-placement.test.ts` matches `confirm(` anywhere and would flag `await confirm({...})`. Cost if wrong: none; the name is local.
-- Ruling T6-2 - Count close/reconcile confirmations show line count, differing-line count and net units, not a money value. The count-session payload carries no per-line cost; adding one is an API change owned by T1/T2. Cost if wrong: the merchant approves a count without seeing its money impact.
+- Ruling T6-4 - Count close/reconcile confirmations show line count (close) and differing-line count plus net units (reconcile); no per-line cost exists in the count-session payload. Cost if wrong: the merchant approves a count without seeing its money impact.
+- Ruling T6-5 - Card mode below md is done for bank statements, journal, billing charges and the trial balance. The cohort retention matrix and the P&L / balance sheet / tax statements stay as pinned-column scroll grids (rows are compared across columns; card-stacking loses that; the cohort LTV table is already cards). Cost if wrong: those reports need sideways scrolling on a phone.
+- Ruling T6-6 - The finance hub gets a divider before the accountant tabs (accounts, journal, reports, bank rec) via `groupStart`. Cost if wrong: one extra divider in the tab strip.
 - Ruling T6-3 - Cashflow 403 FORBIDDEN (not only FEATURE_DISABLED) is a locked card on /analytics, because BE:S-4 makes it owner-only. Cost if wrong: a real permission bug on that call would show as a lock instead of an error banner.

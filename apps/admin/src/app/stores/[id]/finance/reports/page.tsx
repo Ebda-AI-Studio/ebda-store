@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
+import { DataTable } from '@/components/mobile/DataTable';
 import { apiGet, apiFetch } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -248,63 +249,55 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {rows && !loading && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="text-start px-3 py-2 w-20 font-medium text-muted-foreground">
-                    {tb('accountCode')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {tb('accountName')}
-                  </th>
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('debit')} {tc('egpParen')}
-                  </th>
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('credit')} {tc('egpParen')}
-                  </th>
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('balance')} {tc('egpParen')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr key={i} className="border-t border-border/40">
-                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.code}</td>
-                    <td className="px-3 py-2">
-                      {r.nameEn}
-                      {r.nameAr && (
-                        <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-                          — {r.nameAr}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-end font-mono">{major(r.debit)}</td>
-                    <td className="px-3 py-2 text-end font-mono">{major(r.credit)}</td>
-                    <td className="px-3 py-2 text-end font-mono">{major(r.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-muted/20 border-t border-border">
-                <tr>
-                  <td className="px-3 py-2 font-semibold" colSpan={2}>
-                    {tb('totals')}
-                  </td>
-                  <td className="px-3 py-2 text-end font-mono font-semibold">
-                    {major(totals.debit)}
-                  </td>
-                  <td className="px-3 py-2 text-end font-mono font-semibold">
-                    {major(totals.credit)}
-                  </td>
-                  <td className="px-3 py-2 text-end text-xs">
-                    {balanced && <span className="text-green-700">{tb('balanced')}</span>}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+        <div className="space-y-3">
+          <DataTable<(typeof rows)[number]>
+            ariaLabel={tb('accountName')}
+            columns={[
+              {
+                header: tb('accountCode'),
+                cell: r => (
+                  <span className="font-mono text-xs text-muted-foreground">{r.code}</span>
+                ),
+              },
+              {
+                header: tb('accountName'),
+                primaryOnMobile: true,
+                cell: r => (
+                  <span>
+                    {r.nameEn}
+                    {r.nameAr && (
+                      <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
+                        — {r.nameAr}
+                      </span>
+                    )}
+                  </span>
+                ),
+              },
+              {
+                header: `${tb('debit')} ${tc('egpParen')}`,
+                alignEnd: true,
+                cell: r => <span className="font-mono">{major(r.debit)}</span>,
+              },
+              {
+                header: `${tb('credit')} ${tc('egpParen')}`,
+                alignEnd: true,
+                cell: r => <span className="font-mono">{major(r.credit)}</span>,
+              },
+              {
+                header: `${tb('balance')} ${tc('egpParen')}`,
+                alignEnd: true,
+                cell: r => <span className="font-mono">{major(r.balance)}</span>,
+              },
+            ]}
+            rows={rows}
+            rowKey={r => r.code}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-3 py-2 text-sm font-semibold">
+            <span>{tb('totals')}</span>
+            <span className="font-mono">
+              {major(totals.debit)} / {major(totals.credit)}
+            </span>
+            {balanced && <span className="text-xs text-success-ink">{tb('balanced')}</span>}
           </div>
         </div>
       )}
