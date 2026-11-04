@@ -92,11 +92,6 @@ export default function StoreTagsPage() {
             storeId={storeId}
             pairs={rows.map(r => tagTranslatePair(r, patch))}
           />
-          <Link href={`/stores/${storeId}/categories`}>
-            <Button type="button" variant="outline">
-              {t('manage')}
-            </Button>
-          </Link>
         </div>
       }
     >
@@ -106,7 +101,15 @@ export default function StoreTagsPage() {
         </p>
       )}
       {!loading && rows.length === 0 && !error && (
-        <p className="text-sm text-muted-foreground">{t('empty')}</p>
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-sm text-muted-foreground">{t('empty')}</p>
+          <Link
+            href={`/stores/${storeId}/products`}
+            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            {t('emptyAction')}
+          </Link>
+        </div>
       )}
       {rows.length > 0 && (
         <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">

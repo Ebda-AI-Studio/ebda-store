@@ -17,6 +17,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { Button, Modal, useToast } from '@ebda/ui';
+import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet } from '../../../../../../../lib/api';
 import type { ProductSummary } from './ProductSearch';
 import { useT } from '@/i18n/useT';
@@ -73,6 +74,7 @@ export function AiSuggestionsPanel({
   /** Controls the "Promote N recommendations?" confirmation modal. */
   const [showPromoteAllModal, setShowPromoteAllModal] = useState(false);
   const { success: toastSuccess } = useToast();
+  const askConfirm = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,9 +169,13 @@ export function AiSuggestionsPanel({
     executePromoteAll();
   };
 
-  const demoteAll = () => {
+  const demoteAll = async () => {
     if (aiIdsAlreadyAdded.length === 0) return;
-    const ok = window.confirm(t('demoteConfirm', { count: aiIdsAlreadyAdded.length }));
+    const ok = await askConfirm({
+      object: t('demoteDialog.object', { count: aiIdsAlreadyAdded.length }),
+      consequence: t('demoteDialog.consequence'),
+      confirmLabel: t('demoteDialog.confirmLabel'),
+    });
     if (!ok) return;
     onDemoteAll(aiIdsAlreadyAdded);
     toastSuccess(t('demotedToast', { count: aiIdsAlreadyAdded.length }));

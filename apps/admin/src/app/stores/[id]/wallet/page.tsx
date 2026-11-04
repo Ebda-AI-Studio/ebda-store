@@ -148,7 +148,15 @@ export default function WalletPage() {
 
           <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             {rows.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground">{t('empty')}</p>
+              <div className="flex flex-col items-start gap-3 p-6">
+                <p className="text-sm text-muted-foreground">{t('empty')}</p>
+                <Link
+                  href={`/stores/${storeId}/customers`}
+                  className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
+                >
+                  {t('emptyAction')}
+                </Link>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import {
   DndContext,
@@ -20,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useT } from '@/i18n/useT';
+import { RowActions } from '@/components/RowActions';
 
 interface Category {
   id: string;
@@ -144,6 +144,11 @@ function SortableCategoryRow({
           <div>
             <p className="font-medium text-foreground">{displayName}</p>
             {altName && <p className="text-sm text-muted-foreground">{altName}</p>}
+            {!cat.nameAr?.trim() && (
+              <span className="mt-1 inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
+                {t('missingArabicName')}
+              </span>
+            )}
             {cat.description && (
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{cat.description}</p>
             )}
@@ -174,35 +179,38 @@ function SortableCategoryRow({
       </td>
       <td className="px-6 py-4 text-end">
         <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => onEdit(cat)}
-            className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-          >
-            {t('edit')}
-          </button>
-          {(cat._count?.products ?? 0) > 1 && (
-            <Link
-              href={`/stores/${storeId}/categories/${cat.id}/order`}
-              className="px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
-              title={tOrder('title')}
-            >
-              {tOrder('title')}
-            </Link>
-          )}
-          <button
-            type="button"
-            onClick={() =>
-              onDelete({
-                id: cat.id,
-                name: isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || cat.name,
-              })
+          <RowActions
+            menuLabel={t('rowMenu', { name: displayName })}
+            primary={
+              <button
+                type="button"
+                onClick={() => onEdit(cat)}
+                className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                {t('edit')}
+              </button>
             }
-            disabled={deletingId === cat.id}
-            className="px-3 py-1.5 text-xs font-medium text-destructive-ink border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
-          >
-            {deletingId === cat.id ? t('deleting') : t('delete')}
-          </button>
+            items={[
+              ...((cat._count?.products ?? 0) > 1
+                ? [
+                    {
+                      label: tOrder('title'),
+                      href: `/stores/${storeId}/categories/${cat.id}/order`,
+                    },
+                  ]
+                : []),
+              {
+                label: deletingId === cat.id ? t('deleting') : t('delete'),
+                destructive: true,
+                disabled: deletingId === cat.id,
+                onSelect: () =>
+                  onDelete({
+                    id: cat.id,
+                    name: isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || cat.name,
+                  }),
+              },
+            ]}
+          />
         </div>
       </td>
     </tr>
