@@ -37,6 +37,7 @@ import {
   type SubscriptionStatus,
 } from '@ebda/shared';
 import logger from '../lib/logger';
+import { readStorePlan } from '../lib/store-plan';
 
 type Tx = Prisma.TransactionClient;
 
@@ -97,9 +98,7 @@ export async function getEntitlements(
   // until N-10 moves every billing reader and writer together).
   const run = async (db: Tx): Promise<Entitlements | null> => {
     const store =
-      known !== undefined
-        ? { plan: known.legacyPlan }
-        : await db.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+      known !== undefined ? { plan: known.legacyPlan } : await readStorePlan(db, storeId);
     let fromD1: Awaited<ReturnType<typeof platformDb>>;
     if (!store) {
       fromD1 = await platformDb();

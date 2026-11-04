@@ -266,9 +266,13 @@ export function ordersOpenFor(
  * `withStore`, so it runs under the caller's tenant guard + RLS like any other store read.
  */
 export async function assertOrderAllowed(storeId: string): Promise<void> {
-  const row = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
-  );
+  // A Durable Object store's record is its DO (NEON-ZERO-1 N-4); a Postgres store keeps the withStore read.
+  const demoQuery = { where: { id: storeId }, select: { isDemo: true } } as const;
+  const repo = await storeRepo(storeId);
+  const row =
+    repo.backend === 'do'
+      ? await repo.db.store.findUnique(demoQuery)
+      : await withStore(storeId, tx => tx.store.findUnique(demoQuery));
   if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (row.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {

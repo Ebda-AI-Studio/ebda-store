@@ -2631,7 +2631,7 @@ export class AuthService {
       storeDb(storeId).then(db =>
         db.abandonedCart.findMany({ where: { customerId: userId, storeId } })
       ),
-      prisma.wishlist.findMany({ where: { userId, storeId } }),
+      storeDb(storeId).then(db => db.wishlist.findMany({ where: { userId, storeId } })),
       storeDb(storeId).then(db => db.review.findMany({ where: { customerId: userId, storeId } })),
       prisma.return.findMany({ where: { customerId: userId, storeId } }),
       prisma.loyaltyPoints.findMany({ where: { customerId: userId, storeId } }),

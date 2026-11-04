@@ -132,7 +132,11 @@ export type WritableModel =
   | 'productDailyView'
   | 'qrScanDaily'
   | 'notificationLog'
-  | 'gscDailyMetric';
+  | 'gscDailyMetric'
+  | 'wishlist'
+  | 'wishlistItem'
+  | 'bundle'
+  | 'bundleItem';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<

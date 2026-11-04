@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma, SlugEntityType } from '@ebda/database';
-import { storeWriter } from '../lib/repo-factory';
+import { storeWriter, storeDb } from '../lib/repo-factory';
 import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
 import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
@@ -87,7 +87,9 @@ router.get(
       // shows an empty uploader and the next save kicks the column
       // into existence on Railway's Dockerfile-driven migrate-deploy.
       try {
-        const store = await prisma.store.findUnique({
+        const store = await (
+          await storeDb(storeId)
+        ).store.findUnique({
           where: { id: storeId },
           select: { bestSellersImage: true },
         });
@@ -119,7 +121,9 @@ router.put(
       });
       const data = schema.parse(req.body);
 
-      const existing = await prisma.store.findUnique({
+      const existing = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { bestSellersImage: true },
       });

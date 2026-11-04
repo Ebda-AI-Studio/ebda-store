@@ -25,7 +25,7 @@ import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { bustStoreCaches } from '../services/store.service';
 import { publishLegacyLayout } from '../services/page-builder.service';
 import logger from '../lib/logger';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeUpdate, storeDb } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -48,7 +48,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { layoutSettings: true, template: true, look: true },
       });
@@ -96,7 +98,9 @@ router.put(
       }
       const patch = layoutSchema.parse(req.body);
 
-      const current = await prisma.store.findUnique({
+      const current = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { layoutSettings: true, template: true, look: true, slug: true, domain: true },
       });

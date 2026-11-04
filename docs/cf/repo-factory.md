@@ -178,3 +178,13 @@ Until D2 lands, flipping a store to `do` would serve its moved reads and writes 
 Eleven models join `DO_WRITABLE_MODELS` / `WritableModel` for the non-money background jobs (Ruling CF-JOBS-4): `BulkAiJob`, `BulkImportJob`, `StoreFaq`, `StoreHowto`, `AiRecommendation`, `FrequentlyBoughtTogether`, `ProfitAnomaly`, `CustomerCohortSnapshot`, `FunnelSnapshot`, `CustomerRfmSnapshot`, `AnswerEngineCheck`. Their routes and services read through `storeDb` and write through `storeWriter` (the bulk job endpoints in `routes/ai.routes.ts` / `routes/bulk.routes.ts`, the FAQ / how-to admin in `routes/store.routes.ts`, the recommendation reads, the insights and answer-engine dashboards). One more in-DO procedure, `guardedAiWrite` (the guarded AI product write: fresh re-read, per-field compare-and-set, `human` stamps kept), and two money-client ops, `accountTotals` and `ciOrderStamp`. `tests/unit/do-writable-direct-readers.test.ts` keeps every direct reader of these models off Postgres.
 
 Five more models join `DO_WRITABLE_MODELS` / `WritableModel` (Ruling INTEG-1): `CatalogImportJob`, `CatalogImportFile`, `CatalogImportItem` (catalogue import) and `CiHintLog`, `CiStoreGate` (Customer Intelligence hints). Their services and jobs read through `storeDb` and write through `storeWriter`; the variants of an imported draft product use the DO op `importBatch`. `tests/unit/integ-1-on-do.test.ts` proves each flow on the DO path with a double-fire case.
+
+## Request scope of a Durable Object store (NEON-ZERO-1, Ruling NZ-SF-1)
+
+`tenantContext` (admin `/stores/:storeId/*` and the storefront GET lane of `publicStoreContext`) and `readInStoreContext` read the
+store's backend through `storeRepo` (the per-request memo) before opening anything. A `do` store runs the request in
+`runInStoreScope`: no Postgres client is leased and no BEGIN is issued, the tenant guard still sees the store, and a model that is
+not ported yet runs as a per-query short transaction (loud when Postgres is down). A `pg` store keeps its one request transaction.
+`inDoStoreScope(storeId, fn)` gives a handler that resolved its own store the same scope for its several reads and is a plain call
+for a Postgres store. With the platform D1 bound, `backendFor` answers 404 `STORE_NOT_FOUND` for an id the directory does not hold
+(Ruling NZ-SF-2) and `resolveStoreId` (host -> store) reads that directory. Proof: `apps/api/workers-test/pg-unreachable.test.ts`.

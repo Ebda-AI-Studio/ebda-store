@@ -55,6 +55,9 @@ export async function resolveStoreId(match: {
   domain?: string | null;
 }): Promise<string | null> {
   if (!match.slug && !match.domain) return null;
+  // NEON-ZERO-1 (N-1 follow-up): a deployed Worker resolves a host from the D1 directory only (no Postgres fallback).
+  const d1 = platformDb();
+  if (d1) return (await d1LookupStore(d1, match, ['active']))?.id ?? null;
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_resolve_store_id(${match.slug ?? null}, ${match.domain ?? null}) AS id`;
   return rows[0]?.id ?? null;
@@ -261,7 +264,13 @@ export async function resolveDoStoreFromWebhookRef(ref: {
   for (const r of [ref.transactionId, ref.invoiceId]) {
     if (!r) continue;
     const id = await resolveStoreId(d1, 'webhook', `${ref.provider}:${r}`);
-    if (!id || (await backendFor(id)) !== 'do') continue;
+    if (!id) continue;
+    // An index row naming a store the directory does not know is not routable (backendFor: 404), never an error.
+    const backend = await backendFor(id).catch(e => {
+      if ((e as { statusCode?: number }).statusCode === 404) return null;
+      throw e;
+    });
+    if (backend !== 'do') continue;
     // a URL that names store A never accepts store B's reference: same answer as an unknown one
     if (ref.preferStoreId && id !== ref.preferStoreId) return null;
     return id;

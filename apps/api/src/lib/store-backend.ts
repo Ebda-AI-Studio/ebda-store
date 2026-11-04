@@ -6,8 +6,9 @@
  * `x-ebda-backend: do` is ignored (and stripped at the Worker edge), because letting a visitor move a store's money,
  * stock and writes onto the Durable Object while its real backend is Postgres is split-brain money state.
  *
- *   - D1 bound: the column decides. A store without a directory row is not flagged ('pg'); an unreadable or malformed
- *     flag is a 503 (fail closed - a flagged store is never defaulted to pg on a read error).
+ *   - D1 bound: the column decides. A store without a directory row does not exist: 404 STORE_NOT_FOUND (NEON-ZERO-1 N-14,
+ *     the directory holds every store, so "unknown" is never "Postgres"); an unreadable or malformed flag is a 503
+ *     (fail closed - a flagged store is never defaulted to pg on a read error).
  *   - D1 unbound (Node, unit tests, local dev): the `STORE_DO_ENABLED_IDS` env list decides - but only outside
  *     production. In production an unbound D1 with a listed store is a 503, never a silent fallback.
  *
@@ -86,7 +87,7 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
   } catch {
     throw unavailable();
   }
-  if (!row) return 'pg';
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (row.storage_backend === 'do' || row.storage_backend === 'pg') return row.storage_backend;
   throw unavailable();
 }
