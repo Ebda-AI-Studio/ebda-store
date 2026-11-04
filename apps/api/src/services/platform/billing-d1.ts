@@ -381,3 +381,12 @@ export async function applyGrantsBatchD1(a: GrantBatchD1): Promise<number> {
     );
   return applied;
 }
+
+/** The store that already holds this idempotency key in the ledger (any store), or null. */
+export async function idempotencyKeyStoreD1(key: string): Promise<string | null> {
+  const rows = await all<{ store_id: string }>(
+    'SELECT store_id FROM billing_events WHERE idempotency_key = ?1 LIMIT 1',
+    key
+  );
+  return rows[0]?.store_id ?? null;
+}

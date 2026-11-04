@@ -47,9 +47,9 @@ import { instapayHandle, instapayQrUrl } from './manual-config';
 import { sendAlert } from '../alerts.service';
 import {
   commitManualPaymentD1,
+  idempotencyKeyStoreD1,
   lockSubscription,
   onD1,
-  type ManualPaymentD1,
 } from '../platform/billing-d1';
 import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
 import { goLiveVerdict } from './go-live-verdict';
@@ -917,12 +917,66 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await assertPayableStore(input.storeId);
 
-  let d1Pending: ManualPaymentD1 | null = null;
+  // The Postgres half of a manual payment: the tier on `stores`, the merchant's claim and the receipt behind it. Every
+  // statement is idempotent on the event id, so a retry (and the heal below) repeats it safely.
+  const pgHalf = async (tx: Tx, eventId: string): Promise<string[]> => {
+    await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: plan.featureTier } });
+    // Confirm the merchant's claim: the named one, or the pending one with this reference.
+    await tx.manualPaymentClaim.updateMany({
+      where: {
+        storeId: input.storeId,
+        status: 'pending',
+        ...(input.claimId
+          ? { id: input.claimId }
+          : {
+              method: input.method,
+              payerReference: {
+                in: [reference, normalizeInstapayReference(reference) ?? reference],
+              },
+            }),
+      },
+      data: {
+        status: 'confirmed',
+        reviewedBy: input.actorId,
+        reviewedAt: now,
+        billingEventId: eventId,
+      },
+    });
+    // ...and the receipt behind it: approved by the super-admin (the human approval).
+    const confirmed = await tx.manualPaymentClaim.findMany({
+      where: { storeId: input.storeId, billingEventId: eventId },
+      select: { id: true },
+    });
+    let approvedReceiptIds: string[] = [];
+    if (confirmed.length) {
+      approvedReceiptIds = await InstapayReceiptService.approveSubmitted(
+        tx,
+        input.storeId,
+        { claimIds: confirmed.map(c => c.id) },
+        input.actorId,
+        now
+      );
+    }
+    return approvedReceiptIds;
+  };
+
   const result = await withStore(input.storeId, async (tx: Tx) => {
     const existing = await tx.billingEvent.findUnique({
       where: { idempotencyKey: key, storeId: input.storeId },
     });
-    if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    if (existing) {
+      // D1: the ledger row is committed BEFORE the Postgres half, so a replay may be the retry of a request whose
+      // Postgres half failed. Repeat it (idempotent) while the subscription is still on this payment's plan, never
+      // after the store moved on (a stale replay must not drag stores.plan back).
+      if (await onD1()) {
+        const current = await tx.storeSubscription.findUnique({
+          where: { storeId: input.storeId },
+        });
+        if (current?.planCode === plan.code && current.status === 'active')
+          await pgHalf(tx, existing.id);
+      }
+      return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    }
     // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
     // period computed below is never from a read a grant is about to change.
     await lockSubscription(tx, input.storeId);
@@ -930,8 +984,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
       : manualPeriodFor(sub, input.interval, now);
-    // D1: the event id is derived from the idempotency key, so a retry after a partial run reuses it (the Postgres half
-    // below is idempotent on it) and the D1 commit point comes LAST, after the Postgres transaction (Ruling NZ-10-2).
+    // D1: the event id is derived from the idempotency key, so a retry after a partial run reuses it; the D1 write is the
+    // FIRST change (fail closed), the idempotent Postgres half follows (Ruling NZ-10-2).
     const d1 = await onD1();
     const eventId = d1
       ? deterministicUuid(`manual-payment:${input.storeId}:${key}`)
@@ -969,7 +1023,16 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       billingMethod,
     };
     if (d1) {
-      d1Pending = {
+      // FAIL CLOSED: the D1 write comes FIRST, before any Postgres change. A reference another store already holds, a
+      // lost compare-and-set or any D1 error is refused here, with stores.plan, the claim and the receipt untouched.
+      const holder = await idempotencyKeyStoreD1(key);
+      if (holder && holder !== input.storeId)
+        throw new AppError(
+          409,
+          'REFERENCE_USED_ELSEWHERE',
+          'This reference was recorded for another store'
+        );
+      const outcome = await commitManualPaymentD1({
         eventId,
         idempotencyKey: key,
         storeId: input.storeId,
@@ -987,7 +1050,26 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
         billingMethod,
         expectedSubUpdatedAt: sub?.updatedAt ?? null,
         now,
-      };
+      });
+      if (outcome === 'conflict') {
+        const racer = await idempotencyKeyStoreD1(key);
+        if (racer && racer !== input.storeId)
+          throw new AppError(
+            409,
+            'REFERENCE_USED_ELSEWHERE',
+            'This reference was recorded for another store'
+          );
+        throw new AppError(
+          409,
+          'SUBSCRIPTION_CHANGED',
+          'The subscription changed while this payment was being recorded; retry',
+          { retryable: true }
+        );
+      }
+      if (outcome === 'duplicate') {
+        await pgHalf(tx, eventId);
+        return { duplicate: true, billingEventId: eventId } as ManualPaymentResult;
+      }
     } else {
       const { count } = await tx.billingEvent.createMany({
         data: [
@@ -1033,42 +1115,18 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
         await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
       }
     }
-    await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: plan.featureTier } });
-    // Confirm the merchant's claim: the named one, or the pending one with this reference.
-    await tx.manualPaymentClaim.updateMany({
-      where: {
-        storeId: input.storeId,
-        status: 'pending',
-        ...(input.claimId
-          ? { id: input.claimId }
-          : {
-              method: input.method,
-              payerReference: {
-                in: [reference, normalizeInstapayReference(reference) ?? reference],
-              },
-            }),
-      },
-      data: {
-        status: 'confirmed',
-        reviewedBy: input.actorId,
-        reviewedAt: now,
-        billingEventId: eventId,
-      },
-    });
-    // ...and the receipt behind it: approved by the super-admin (the human approval).
-    const confirmed = await tx.manualPaymentClaim.findMany({
-      where: { storeId: input.storeId, billingEventId: eventId },
-      select: { id: true },
-    });
-    let approvedReceiptIds: string[] = [];
-    if (confirmed.length) {
-      approvedReceiptIds = await InstapayReceiptService.approveSubmitted(
-        tx,
-        input.storeId,
-        { claimIds: confirmed.map(c => c.id) },
-        input.actorId,
-        now
-      );
+    let approvedReceiptIds: string[];
+    try {
+      approvedReceiptIds = await pgHalf(tx, eventId);
+    } catch (err) {
+      // D1 already holds the ledger row + subscription: the retry (same key) repeats this half.
+      if (d1)
+        void sendAlert({
+          level: 'p1',
+          title: 'Billing: manual payment recorded in D1 but the Postgres half failed',
+          body: `store ${input.storeId}, key ${key}, event ${eventId}. Retry the same request (idempotent).`,
+        }).catch(() => undefined);
+      throw err;
     }
     return {
       duplicate: false,
@@ -1078,32 +1136,6 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       approvedReceiptIds,
     };
   });
-
-  const pending = d1Pending as ManualPaymentD1 | null;
-  if (pending) {
-    // The D1 commit point (ledger row + subscription, one atomic batch). The Postgres half above has committed and is
-    // idempotent on the derived event id, so a failure here is a plain retry; it still pages because the merchant's
-    // claim already reads "confirmed" while the plan has not moved.
-    let outcome: 'applied' | 'duplicate' | 'conflict';
-    try {
-      outcome = await commitManualPaymentD1(pending);
-    } catch (err) {
-      void sendAlert({
-        level: 'p1',
-        title: 'Billing: manual payment confirmed but the D1 commit failed',
-        body: `store ${input.storeId}, key ${key}, event ${pending.eventId}. Retry the same request (idempotent).`,
-      }).catch(() => undefined);
-      throw err;
-    }
-    if (outcome === 'conflict')
-      throw new AppError(
-        409,
-        'SUBSCRIPTION_CHANGED',
-        'The subscription changed while this payment was being recorded; retry',
-        { retryable: true }
-      );
-    if (outcome === 'duplicate') return { duplicate: true, billingEventId: pending.eventId };
-  }
 
   if (!result.duplicate) {
     // the approved receipts' screenshots are deleted now that the approval has committed (M-003; a miss is retried weekly)
