@@ -312,7 +312,11 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
     kind: 'no-pii',
   },
   notification_logs: {
-    kind: 'store-owned',
+    kind: 'customer-pii',
+    match: {
+      buyerKey: 'recipient_phone_hash',
+    },
+    action: 'delete',
   },
   onesignal_subscriptions: {
     kind: 'customer-pii',
@@ -610,7 +614,6 @@ export const GENERATED_MERCHANT_PII_PLAN: Array<{ table: string; columns: string
   { table: 'gold_rates', columns: ['created_by', 'decided_by'] },
   { table: 'inventory_history', columns: ['created_by'] },
   { table: 'journal_entries', columns: ['posted_by'] },
-  { table: 'notification_logs', columns: ['recipient_phone_hash', 'recipient_email_hash'] },
   { table: 'order_events', columns: ['actor_id'] },
   { table: 'payment_configs', columns: ['created_by', 'updated_by'] },
   { table: 'payment_events', columns: ['triggered_by_user_id'] },

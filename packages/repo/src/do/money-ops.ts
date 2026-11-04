@@ -102,6 +102,7 @@ import {
 } from './analytics-reads';
 import {
   analyticsImportFinishOp,
+  analyticsImportResetOp,
   analyticsImportOp,
   analyticsImportStatusOp,
   qrScanRecordOp,
@@ -277,7 +278,8 @@ export type MoneyOpName =
   | 'analyticsCustomers'
   | 'analyticsLowStock'
   | 'analyticsStock'
-  | 'analyticsCashflow';
+  | 'analyticsCashflow'
+  | 'analyticsImportReset';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -396,6 +398,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsLowStock',
   'analyticsStock',
   'analyticsCashflow',
+  'analyticsImportReset',
 ];
 
 const TABLE = '_money_ops';
@@ -807,6 +810,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsLowStock: (db, storeId, a) => analyticsLowStockOp(db, storeId, a),
   analyticsStock: (db, storeId) => analyticsStockOp(db, storeId),
   analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),
+  analyticsImportReset: (db, storeId, a) => analyticsImportResetOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),

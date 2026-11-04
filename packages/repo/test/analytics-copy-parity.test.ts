@@ -2,13 +2,16 @@
 // copied column must exist in the generated StoreDO schema.
 import { describe, expect, it } from 'vitest';
 import { ANALYTICS_TABLES } from '../src/do/analytics-ops';
-import { TABLES, SUMS } from '../../../scripts/cf/copy-analytics-to-do.mjs';
+import { TABLES, SUMS, EXTREMES } from '../../../scripts/cf/copy-analytics-to-do.mjs';
 import { openSqlite } from './diff-harness';
 
 describe('copy-analytics-to-do.mjs and analytics-ops.ts', () => {
   it('copy the same tables and verify the same SUM columns', () => {
     expect([...TABLES].sort()).toEqual(Object.keys(ANALYTICS_TABLES).sort());
-    for (const t of TABLES) expect(SUMS[t], t).toEqual(ANALYTICS_TABLES[t].sums);
+    for (const t of TABLES) {
+      expect(SUMS[t], t).toEqual(ANALYTICS_TABLES[t].sums);
+      expect(EXTREMES[t] ?? [], t).toEqual(ANALYTICS_TABLES[t].extremes ?? []);
+    }
   });
 
   it('every copied column is a column of the real StoreDO table, and no column is left out', () => {

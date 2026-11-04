@@ -15,6 +15,7 @@ import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { loyaltyAutomationService } from '../services/loyalty-automation.service';
 import { AuthService } from '../services/auth.service';
 import { processDeferredBillingWebhooks } from '../services/billing/subscription-billing.service';
+import { reconcilePayments } from '../services/billing/payments-reconcile.service';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
@@ -45,6 +46,8 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'abandoned-cart', run: () => abandonedCartService.process() },
     // Billing webhooks stored during a cutover freeze (NEON-ZERO N-10): apply them once the freeze is lifted.
     { name: 'billing-deferred-webhooks', run: () => processDeferredBillingWebhooks() },
+    // InstaPay receipts / manual-payment claims left half-done by a dead Worker (N-10d): complete or roll back, P1 if undecidable.
+    { name: 'payments-reconcile', run: () => reconcilePayments() },
   ],
   // Carrier tracking poll (was every 30 min).
   '*/30 * * * *': [

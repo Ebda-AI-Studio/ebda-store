@@ -136,7 +136,9 @@ export type WritableModel =
   | 'wishlist'
   | 'wishlistItem'
   | 'bundle'
-  | 'bundleItem';
+  | 'bundleItem'
+  | 'auditLog'
+  | 'address';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -845,6 +847,9 @@ export interface MoneyClient {
     table: string;
     rows: Array<Record<string, unknown>>;
   }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportReset(a: {
+    confirm: string;
+  }): Promise<{ reset: true; deleted: Record<string, number> }>;
   analyticsImportFinish(a: {
     expect: Record<string, { rows: number; sums: Record<string, number> }>;
   }): Promise<{ done: true; tables: Record<string, number> }>;
@@ -1362,6 +1367,7 @@ export function makeMoneyClient(
     analyticsLowStock: a => call('analyticsLowStock', a),
     analyticsStock: a => call('analyticsStock', a),
     analyticsCashflow: a => call('analyticsCashflow', a),
+    analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),

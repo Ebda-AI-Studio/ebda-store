@@ -14,6 +14,7 @@ import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-
 import { isWorkers } from '../lib/runtime';
 import { cfBindings } from '../cf/bindings';
 import { analyticsRead, analyticsWrite } from '../lib/analytics-backend';
+import { recipientPhoneKey } from '../lib/notification-recipient';
 
 type SmsLogUpsert = Parameters<typeof prisma.notificationLog.upsert>[0];
 /** The SMS delivery log row, keyed by its idempotency key; in the store's DO once its analytics moved (Ruling NZ-AN-1). */
@@ -132,7 +133,7 @@ class SmsQueueService {
   /** Dead-letter queue consumer: the permanent-failure half of `sendSms`, for a Queues-exhausted message. */
   async parkDeadLetter(sms: QueuedSms, why = 'max attempts reached'): Promise<void> {
     logger.error({ smsId: sms.id, why }, '[SMS QUEUE] SMS failed permanently');
-    const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
+    const recipientPhoneHash = await recipientPhoneKey(sms.recipientPhone);
     await smsLogUpsert(sms.storeId, {
       where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
       create: {
@@ -239,7 +240,7 @@ class SmsQueueService {
     sms.attempts++;
     sms.lastAttempt = new Date().toISOString();
 
-    const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
+    const recipientPhoneHash = await recipientPhoneKey(sms.recipientPhone);
     // Set once the provider has accepted the message (issue 2382). Anything
     // that throws after that point must NOT retry or dead-letter: the
     // idempotency row below is what the retry would look for, and it is the
