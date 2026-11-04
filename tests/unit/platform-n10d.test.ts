@@ -470,3 +470,268 @@ describe('security review fixes', () => {
     spy.mockRestore();
   });
 });
+
+describe('audit re-import into DO stores (copy script)', () => {
+  it('sends every Postgres row of each DO store, verifies present = sent per store, refuses on a short count', async () => {
+    const { reimportDoStoreAudit, auditRowToDoImport } =
+      (await import('../../scripts/cf/cutover-platform-family.mjs')) as {
+        reimportDoStoreAudit: (
+          ...a: unknown[]
+        ) => Promise<Array<{ storeId: string; pg: number; inserted: number }>>;
+        auditRowToDoImport: (r: Record<string, unknown>) => Record<string, unknown>;
+      };
+    const rows = (n: number, store: string) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `${store}-${String(i).padStart(4, '0')}`,
+        user_id: null,
+        action: 'a',
+        store_id: store,
+        resource_type: 't',
+        resource_id: null,
+        details: { k: i },
+        ip_address: null,
+        user_agent: null,
+        created_ms: '1790000000000',
+      }));
+    const all = [...rows(3, 's1'), ...rows(501, 's2')];
+    const client = {
+      query: async (_sql: string, [store, after, limit]: [string, string, number]) => ({
+        rows: all.filter(r => r.store_id === store && r.id > after).slice(0, limit),
+      }),
+    };
+    const seen: Array<{ url: string; n: number }> = [];
+    const mk = (short?: string) => async (url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { rows: unknown[] };
+      seen.push({ url, n: body.rows.length });
+      const present = url.includes(short ?? '#') ? body.rows.length - 1 : body.rows.length;
+      return { ok: true, status: 200, json: async () => ({ ok: true, inserted: 1, present }) };
+    };
+    const args = { doUrl: 'https://do', secret: 'x'.repeat(30) };
+    const out = await reimportDoStoreAudit(client, args, ['s1', 's2'], mk() as never);
+    expect(out.map(o => [o.storeId, o.pg])).toEqual([
+      ['s1', 3],
+      ['s2', 501],
+    ]);
+    expect(seen.filter(s => s.url.includes('/s2/')).map(s => s.n)).toEqual([500, 1]);
+    expect(seen[0].url).toBe('https://do/cutover/stores/s1/__auditimport');
+    await expect(reimportDoStoreAudit(client, args, ['s1'], mk('s1') as never)).rejects.toThrow(
+      /holds 2 of 3/
+    );
+    expect(auditRowToDoImport(all[0]).details).toBe('{"k":0}');
+  });
+});
+
+describe('payments reconcile (receipts without claim, claims against the ledger)', () => {
+  const old = new Date(Date.now() - 60 * 60_000);
+  const receipt = (over: Record<string, unknown> = {}) => ({
+    storeId: A,
+    kind: 'subscription',
+    storageKey: 'k',
+    mimeType: 'image/png',
+    sizeBytes: 10,
+    sha256: 'h',
+    status: 'submitted',
+    submittedAt: old,
+    referenceKey: '11112222',
+    ...over,
+  });
+  async function run() {
+    const { reconcilePayments } =
+      await import('../../apps/api/src/services/billing/payments-reconcile.service');
+    return reconcilePayments();
+  }
+
+  it('links a receipt to the pending claim that already holds its reference', async () => {
+    const db = world(['billing', 'payments']);
+    const c = await prisma.manualPaymentClaim.create({
+      data: { ...claim(A, '11112222'), updatedAt: old },
+    });
+    const r = await prisma.instapayReceipt.create({ data: receipt() as never });
+    expect(await run()).toMatchObject({ linked: 1, rolledBack: 0, undecided: [] });
+    expect(db.prepare('SELECT claim_id FROM instapay_receipts WHERE id = ?').get(r.id)).toEqual({
+      claim_id: c.id,
+    });
+  });
+
+  it('rolls back a receipt with no claim to draft; a second run changes nothing', async () => {
+    const db = world(['billing', 'payments']);
+    const r = await prisma.instapayReceipt.create({ data: receipt() as never });
+    expect(await run()).toMatchObject({ rolledBack: 1 });
+    expect(
+      db
+        .prepare('SELECT status, reference_key, submitted_at FROM instapay_receipts WHERE id = ?')
+        .get(r.id)
+    ).toEqual({ status: 'draft', reference_key: null, submitted_at: null });
+    expect(await run()).toMatchObject({ linked: 0, rolledBack: 0, confirmed: 0 });
+  });
+
+  it('leaves a young receipt alone', async () => {
+    const db = world(['billing', 'payments']);
+    await prisma.instapayReceipt.create({ data: receipt({ submittedAt: new Date() }) as never });
+    expect(await run()).toMatchObject({ rolledBack: 0 });
+    expect(db.prepare(`SELECT status FROM instapay_receipts`).get()).toEqual({
+      status: 'submitted',
+    });
+  });
+
+  it('confirms a pending claim whose payment is already in the ledger and approves its receipt', async () => {
+    const db = world(['billing', 'payments']);
+    const { manualPaymentKey } =
+      await import('../../apps/api/src/services/billing/account.service');
+    const c = await prisma.manualPaymentClaim.create({
+      data: { ...claim(A, '33334444'), updatedAt: old },
+    });
+    await prisma.instapayReceipt.create({
+      data: receipt({ claimId: c.id, referenceKey: '33334444' }) as never,
+    });
+    await prisma.billingEvent.create({
+      data: {
+        storeId: A,
+        type: 'manual_payment',
+        planCode: 'growth',
+        billingInterval: 'monthly',
+        amountMinor: 49900,
+        currency: 'EGP',
+        provider: 'manual',
+        providerRef: '33334444',
+        idempotencyKey: manualPaymentKey('instapay', '33334444'),
+        status: 'succeeded',
+      } as never,
+    });
+    expect(await run()).toMatchObject({ confirmed: 1, undecided: [] });
+    expect(
+      db.prepare('SELECT status, billing_event_id FROM manual_payment_claims').get()
+    ).toMatchObject({
+      status: 'confirmed',
+    });
+    expect(db.prepare('SELECT status FROM instapay_receipts').get()).toEqual({
+      status: 'approved',
+    });
+  });
+
+  it('pages P1 for a confirmed claim with no ledger event and touches nothing', async () => {
+    const db = world(['billing', 'payments']);
+    await prisma.manualPaymentClaim.create({
+      data: { ...claim(A, '55556666'), status: 'confirmed', updatedAt: old },
+    });
+    const out = await run();
+    expect(out.undecided[0]).toMatch(/confirmed without a matching ledger event/);
+    expect(alerts.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'payments.reconcile.undecided' })
+    );
+    expect(db.prepare('SELECT status FROM manual_payment_claims').get()).toEqual({
+      status: 'confirmed',
+    });
+  });
+});
+
+describe('N-27 merchant erasure of payer PII in the platform payments tables', () => {
+  const seed = async () => {
+    const db = world(['billing', 'payments']);
+    const c = await prisma.manualPaymentClaim.create({
+      data: { ...claim(A, '77778888'), reviewedBy: 'admin1' },
+    });
+    await prisma.manualPaymentClaim.create({
+      data: { ...claim(A, '99990000'), reviewedBy: 'admin1' },
+    });
+    await prisma.manualPaymentClaim.create({ data: claim(B, 'keep-b') });
+    await prisma.instapayReceipt.create({
+      data: {
+        storeId: A,
+        kind: 'subscription',
+        storageKey: 'k',
+        mimeType: 'image/png',
+        sizeBytes: 10,
+        sha256: 'h',
+        status: 'approved',
+        claimId: c.id,
+        amountMinor: 49900,
+        reference: '77778888',
+        referenceKey: '77778888',
+        payerName: 'Ali',
+        payerAddress: 'ali@instapay',
+        payerMobile: '01000000000',
+        payerBank: 'CIB',
+        receiverName: 'Ebda',
+        reviewedBy: 'admin1',
+        extractionStatus: 'done',
+        extracted: { name: 'Ali' },
+      } as never,
+    });
+    return db;
+  };
+  const surfaceFor = async () => {
+    const { paymentsSurface } = await import('../../apps/api/src/cf/erasure/surfaces');
+    const { paymentsErasurePort } =
+      await import('../../apps/api/src/services/billing/payments-erasure');
+    return paymentsSurface(paymentsErasurePort, async () => [A]);
+  };
+  const subject = { kind: 'merchant', requestId: 'req1', storeId: A, ownerUserId: 'o' } as never;
+
+  it('anonymises payer values, keeps amounts and references, verifies remaining = 0, and is idempotent', async () => {
+    const db = await seed();
+    const surface = await surfaceFor();
+    const out = await surface.eraseSubject(subject);
+    expect(out).toMatchObject({ surface: 'platform-payments', remaining: 0 });
+    expect(out.erased).toBeGreaterThan(0);
+    expect(db.prepare('SELECT * FROM instapay_receipts').get()).toMatchObject({
+      payer_name: null,
+      payer_address: null,
+      payer_mobile: null,
+      payer_bank: null,
+      receiver_name: null,
+      reviewed_by: null,
+      extracted: null,
+      amount_minor: 49900,
+      reference_key: '77778888',
+    });
+    const claims = db
+      .prepare(
+        `SELECT payer_reference, reviewed_by, amount_minor, store_id FROM manual_payment_claims ORDER BY store_id, payer_reference`
+      )
+      .all() as Array<Record<string, unknown>>;
+    expect(
+      claims
+        .filter(c => c.store_id === A)
+        .every(
+          c =>
+            String(c.payer_reference).startsWith('erased:req1:') &&
+            c.reviewed_by === null &&
+            c.amount_minor === 49900
+        )
+    ).toBe(true);
+    expect(claims.find(c => c.store_id === B)?.payer_reference).toBe('keep-b'); // another store untouched
+    const again = await surface.eraseSubject(subject);
+    expect(again).toMatchObject({ erased: 0, remaining: 0 });
+  });
+
+  it('does not run when the store-do money gate refuses (job order), so nothing is anonymised', async () => {
+    const db = await seed();
+    const { runErasure } = await import('../../apps/api/src/cf/erasure/job');
+    const paid = await surfaceFor();
+    const gate = {
+      name: 'store-do',
+      exportSubject: async () => ({ surface: 'store-do', ndjson: '', records: 0 }),
+      eraseSubject: async () => ({
+        surface: 'store-do',
+        erased: 0,
+        remaining: 2,
+        note: 'refused: money in flight',
+      }),
+    };
+    const store = new Map<string, string>();
+    const env = {
+      PDPL_CF_ERASURE_ENABLED: 'true',
+      STORE_BACKUPS: {
+        get: async (k: string) => (store.has(k) ? { text: async () => store.get(k)! } : null),
+        put: async (k: string, v: string) => void store.set(k, v),
+      },
+    };
+    const entry = await runErasure(env as never, [paid, gate as never], subject);
+    expect(entry.status).toBe('failed');
+    expect(entry.surfaces.map(s => s.surface)).toEqual(['store-do']);
+    expect(db.prepare('SELECT payer_name FROM instapay_receipts').get()).toEqual({
+      payer_name: 'Ali',
+    });
+  });
+});

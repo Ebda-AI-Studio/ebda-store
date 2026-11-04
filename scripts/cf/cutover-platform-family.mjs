@@ -477,7 +477,7 @@ async function main() {
 // upsert; rows born in D1 during the freeze have other ids) -> verify the rows older than T (the freeze instant: D1 holds only
 // copied rows there) -> flip the marker -> settle -> lift -> drift check on a NEW connection (a Postgres row that appeared
 // after the snapshot = a write that bypassed the sink). Rows of stores on their Durable Object that Postgres still holds are
-// REPORTED, not copied (their home is the DO; re-import with migrate-store-to-do.mjs, idempotent upsert).
+// RE-IMPORTED into their StoreDO before the flip (`reimportDoStoreAudit`, idempotent by id, verified per store).
 const AUDIT_COLS = [
   'id',
   'actor_id',
@@ -531,6 +531,65 @@ async function auditDigest(client, size, olderThanMs) {
   return { ...(await dg.finish()), all };
 }
 
+/** Postgres audit row -> the `__auditimport` row shape (snake_case, details as JSON text, created_at epoch ms). */
+export const auditRowToDoImport = r => ({
+  id: r.id,
+  action: r.action,
+  user_id: r.user_id,
+  store_id: r.store_id,
+  resource_type: r.resource_type,
+  resource_id: r.resource_id,
+  details: JSON.stringify(r.details ?? {}),
+  ip_address: r.ip_address,
+  user_agent: r.user_agent,
+  created_at: Number(r.created_ms),
+});
+
+const DO_AUDIT_SQL = `SELECT id, user_id, action, store_id, resource_type, resource_id, details, ip_address, user_agent,
+    (extract(epoch FROM created_at) * 1000)::bigint AS created_ms
+  FROM audit_logs WHERE store_id = $1 AND id > $2 ORDER BY id LIMIT $3`;
+
+/**
+ * Re-import the Postgres audit rows of every DO store into its StoreDO (POST /cutover/stores/<id>/__auditimport: the one
+ * write a SEALED store accepts, INSERT OR IGNORE by id, so rows the DO already holds are no-ops and a re-run is safe).
+ * Every Postgres row of the store is sent, which covers "created at or after the store's migration" and also any older
+ * row the migration copy missed; verified per store: the DO must hold every sent id (present = sent). Throws on the
+ * first store that does not verify, BEFORE the marker is flipped.
+ */
+export async function reimportDoStoreAudit(client, args, doStores, fetchImpl = fetch) {
+  const out = [];
+  for (const storeId of doStores) {
+    let after = '';
+    let pg = 0;
+    let present = 0;
+    let inserted = 0;
+    for (;;) {
+      const rows = (await client.query(DO_AUDIT_SQL, [storeId, after, 500])).rows;
+      if (rows.length === 0) break;
+      const res = await fetchImpl(`${args.doUrl}/cutover/stores/${storeId}/__auditimport`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${args.secret}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ rows: rows.map(auditRowToDoImport) }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok)
+        throw new Error(`audit re-import ${storeId}: HTTP ${res.status} ${j.error ?? ''}`);
+      pg += rows.length;
+      present += j.present;
+      inserted += j.inserted;
+      after = rows[rows.length - 1].id;
+      if (rows.length < 500) break;
+    }
+    if (present !== pg)
+      throw new Error(`audit re-import ${storeId}: DO holds ${present} of ${pg} Postgres rows`);
+    out.push({ storeId, pg, inserted });
+    console.log(
+      `  audit re-import ${storeId}: ${pg} row(s) in Postgres, ${inserted} added, all present`
+    );
+  }
+  return out;
+}
+
 async function auditCutover(args) {
   if (!args.d1) throw new Error('pass --d1 <database name>');
   const d = {
@@ -567,6 +626,10 @@ async function auditCutover(args) {
   }
   if (args.commit && have)
     throw new Error(`marker ${key} already exists: D1 is the source of truth; refusing to re-copy`);
+  if (!args.doUrl || !args.secret || args.secret.length < 24)
+    throw new Error(
+      '--commit needs --do-url (or CUTOVER_DO_URL) and CUTOVER_IMPORT_SECRET for the per-store audit re-import'
+    );
   const size = args.pageSize || 1000;
   const t0 = performance.now();
   const doStores = (await d1Query(d, `SELECT id FROM stores WHERE storage_backend = 'do'`)).map(
@@ -589,7 +652,7 @@ async function auditCutover(args) {
       : 0;
     console.log(`audit: Postgres store-less rows ${pg}   D1 platform_audit_log ${n[0].n}`);
     console.log(
-      `audit: rows of ${doStores.length} DO store(s) still in Postgres: ${stranded} (NOT copied; re-import with migrate-store-to-do.mjs)`
+      `audit: rows of ${doStores.length} DO store(s) in Postgres: ${stranded} (re-imported into their StoreDO by --commit)`
     );
   };
   {
