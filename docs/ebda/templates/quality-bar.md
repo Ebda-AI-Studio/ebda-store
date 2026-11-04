@@ -166,6 +166,16 @@ Source: `.superpowers/sdd/2026-10-15-phase-b1-qamar/taste/independent-audit.md` 
 
 Also gated in W4, beyond (a)–(g): landmarks (one banner, named navs, `landmarks-gate.test.ts`), opaque focus rings (`focus-ring-gate.test.ts`), sentence-case English on the purchase path (`sentence-case-gate.test.ts`), per-card action names (`card-action-names.test.tsx`), the minus sign on every stepper (`stepper-minus-glyph.test.ts`), swatch rings at 3:1 on every look (`muted-ink-composited-contrast.test.ts`) and one mobile menu (`tab-bar-menu-dedupe.test.ts`).
 
+## 11. Chrome, PDP, listing and consent (audit 2026-11-03, Rulings PREMIUM-20..27)
+
+- **One bottom layer.** A short page ends its footer above the tab bar (`--chrome-reserve`, ShopChrome min-height); the cookie strip sits on whichever bar is the bottom layer. Gate: `tests/unit/fixed-bottom-single-layer.test.ts`.
+- **PDP.** The sticky buy bar appears only when the inline CTA is not reachable and never for a sold-out product (the inline disabled button is the one state). One WhatsApp row (`useHasWaMeProductButton`). Saving shown in words from the selected variant's OWN compare-at; trust line 15px ink; the description is its own section.
+- **Filters.** `PriceRangeSlider` (two WAI-ARIA sliders), chips for facet values and categories, hairline panel frame. New filter controls reuse them.
+- **Guests make no `/auth/me` call** off account/order routes unless the browser holds a session hint (`lib/session-intent.ts`, `hasSessionHint`).
+- **Consent.** Accept and Reject are the same control; compact strip on phones.
+- **No client-fetched first paint** for SEO lists: the blog index is a server component (`BlogIndexBody`).
+- **CLS.** A placeholder must reserve the real height (header with an uploaded logo), late content fills reserved space (404, search), fixed strips mount after fonts.
+
 ## How to run the taste gate
 
 Run it at the end of every template or look task, after the tests pass and before the commit. The B0 taste bar's gate still applies; this adds the order and the bar.

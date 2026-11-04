@@ -177,7 +177,7 @@ declare module '@ebda-src/repo' {
   }
   export type DoQueryResult =
     | { ok: true; json: string }
-    | { ok: false; code: string; message: string; json?: string };
+    | { ok: false; code: string; message: string; status?: number; json?: string };
   export function runReads(
     lite: Record<string, unknown>,
     queries: readonly DoQuery[]

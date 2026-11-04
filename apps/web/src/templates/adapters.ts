@@ -1,3 +1,4 @@
+import { storefrontText } from '@ebda/shared';
 import type { Product, Category } from '@/lib/api';
 import type { RecommendedProduct } from '../hooks/useProductRecommendations';
 import type { TemplateProduct, TemplateCategory } from './types';
@@ -48,11 +49,11 @@ export function needsOptions(p: { variants?: ReadonlyArray<unknown> | null }): b
 export function toTemplateProduct(p: Product): TemplateProduct {
   return {
     id: p.id,
-    name: p.name,
+    name: storefrontText(p.name, false),
     // Preserve nameAr so RTL templates render Arabic product names instead
     // of falling through to the English `name`. The API consistently returns
     // `nameAr` for tenants that have entered it (e.g. Wady Aljuz).
-    nameAr: p.nameAr,
+    nameAr: arText(p.nameAr),
     slug: p.slug,
     price: p.price,
     compareAtPrice: p.compareAtPrice ?? undefined,
@@ -96,8 +97,8 @@ export function toTemplateProduct(p: Product): TemplateProduct {
 export function recommendedToTemplateProduct(p: RecommendedProduct): TemplateProduct {
   return {
     id: p.id,
-    name: p.name,
-    nameAr: p.nameAr,
+    name: storefrontText(p.name, false),
+    nameAr: arText(p.nameAr),
     slug: p.slug,
     price: p.price,
     compareAtPrice: p.compareAtPrice ?? undefined,
@@ -141,8 +142,8 @@ export interface WishlistCardProduct {
 export function wishlistToTemplateProduct(itemId: string, p: WishlistCardProduct): TemplateProduct {
   return {
     id: p.id,
-    name: p.name,
-    nameAr: p.nameAr,
+    name: storefrontText(p.name, false),
+    nameAr: arText(p.nameAr),
     slug: p.slug,
     price: p.price,
     compareAtPrice: p.compareAtPrice,
@@ -168,10 +169,15 @@ export function wishlistToTemplateProduct(itemId: string, p: WishlistCardProduct
 export function toTemplateCategory(c: Category): TemplateCategory {
   return {
     id: c.id,
-    name: c.name,
-    nameAr: c.nameAr,
+    name: storefrontText(c.name, false),
+    nameAr: arText(c.nameAr),
     slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
     image: c.image,
     productCount: c.productCount,
   };
+}
+
+/** Arabic copy: Western digits + bidi-isolated numbers (PREMIUM-12). Absent stays absent. */
+function arText<T extends string | null | undefined>(v: T): T {
+  return (v ? storefrontText(v, true) : v) as T;
 }

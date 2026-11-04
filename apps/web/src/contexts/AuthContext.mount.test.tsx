@@ -24,6 +24,17 @@ vi.mock('../lib/api', async importOriginal => {
 
 vi.mock('./StoreContext', () => ({ useStore: () => ({ store: { id: 'store-1' } }) }));
 
+let pathname: string | null = '/ar';
+// The shared jsdom setup has no localStorage: a Map-backed one, so the session hint is real state.
+const store = new Map<string, string>();
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => store.get(k) ?? null,
+  setItem: (k: string, v: string) => void store.set(k, v),
+  removeItem: (k: string) => void store.delete(k),
+  clear: () => store.clear(),
+});
+vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
+
 import { AuthProvider, useAuth } from './AuthContext';
 
 const CUSTOMER = { success: true, data: { user: { id: 'u1', role: 'customer' } } };
@@ -36,10 +47,16 @@ function Probe() {
 
 beforeEach(() => {
   latest = null;
+  pathname = '/ar';
+  // A returning customer's browser: the session hint is present, so the mount check runs everywhere.
+  localStorage.setItem('hadSession', '1');
   mocks.getProfile.mockReset();
   mocks.getProfileWithMountRetries.mockReset();
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 describe('AuthProvider mount check', () => {
   it('runs the mount ladder and keeps isLoading true until it settles', async () => {
@@ -101,5 +118,74 @@ describe('AuthProvider mount check', () => {
     });
 
     expect(latest!.user).toBeNull();
+  });
+});
+
+describe('AuthProvider asks only when it can matter (audit 2026-11-03 #15)', () => {
+  const mount = () =>
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+
+  it('a guest browser (no session hint) on the home page makes NO /auth/me call and is not loading', async () => {
+    localStorage.clear();
+    pathname = '/ar';
+    mount();
+    await act(async () => {});
+    expect(mocks.getProfileWithMountRetries).not.toHaveBeenCalled();
+    expect(latest!.isLoading).toBe(false);
+    expect(latest!.user).toBeNull();
+  });
+
+  it.each(['/ar/products', '/ar/products/cart-cover', '/en/blog', '/s/shop/ar/blog/my-post'])(
+    'a guest on %s stays silent',
+    async p => {
+      localStorage.clear();
+      pathname = p;
+      mount();
+      await act(async () => {});
+      expect(mocks.getProfileWithMountRetries).not.toHaveBeenCalled();
+    }
+  );
+
+  it('the first time a guest reaches an account/order route it checks once (Safari-ITP cohort)', async () => {
+    localStorage.clear();
+    mocks.getProfileWithMountRetries.mockResolvedValue({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'x' },
+    });
+    pathname = '/ar';
+    const view = mount();
+    await act(async () => {});
+    expect(mocks.getProfileWithMountRetries).not.toHaveBeenCalled();
+
+    pathname = '/ar/cart';
+    view.rerender(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+    await act(async () => {});
+    expect(mocks.getProfileWithMountRetries).toHaveBeenCalledTimes(1);
+
+    pathname = '/ar/checkout';
+    view.rerender(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+    await act(async () => {});
+    expect(mocks.getProfileWithMountRetries).toHaveBeenCalledTimes(1);
+  });
+
+  it('a browser WITH a hint checks on a content page too, as before', async () => {
+    mocks.getProfileWithMountRetries.mockResolvedValue(CUSTOMER);
+    pathname = '/ar/products';
+    mount();
+    await act(async () => {});
+    expect(mocks.getProfileWithMountRetries).toHaveBeenCalledTimes(1);
+    expect(latest!.user?.id).toBe('u1');
   });
 });

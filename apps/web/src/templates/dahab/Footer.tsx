@@ -24,6 +24,7 @@ import {
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
 import { DAHAB_CONTAINER, cx } from './ui';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 const LINK =
   'inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-foreground/70 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
@@ -74,9 +75,11 @@ export default function DahabFooter({
       <div className={cx(DAHAB_CONTAINER, 'grid gap-10 py-14 sm:py-16 md:grid-cols-12 lg:py-20')}>
         <div className="md:col-span-4">
           {logo ? (
-            <img
+            <ResponsiveImg
               src={logo}
               alt={name}
+              sizes="240px"
+              maxWidth={480}
               className="h-14 w-auto object-contain"
               style={
                 !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'

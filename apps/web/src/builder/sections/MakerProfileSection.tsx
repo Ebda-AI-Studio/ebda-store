@@ -18,6 +18,7 @@ import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { EmptySectionHint } from '../render/EmptySectionHint';
 import { displayedImageKey, imageMarker } from '../render/image-key';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export interface MakerProfileSettings extends SectionPaddingMaxWidthVisibility {
   variant?: 'strip' | 'lead';
@@ -82,11 +83,13 @@ export function MakerProfileSection({
         <div className={spacing.innerContainerClass}>
           <div className="flex items-center gap-4 rounded-[var(--radius)] bg-card p-4 text-start">
             {image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <ResponsiveImg
                 src={image}
                 alt="" /* the name sits beside the photo: an alt equal to it reads twice */
-                loading="lazy"
+                sizes="64px"
+                maxWidth={320}
+                width={64}
+                height={64}
                 className="h-16 w-16 shrink-0 rounded-full object-cover"
                 {...imageMarker(editorMode, imageKey)}
               />
@@ -124,10 +127,11 @@ export function MakerProfileSection({
       <div className={spacing.innerContainerClass}>
         <div className="grid items-center gap-6 md:grid-cols-2 md:gap-10">
           {image && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <ResponsiveImg
               src={image}
               alt={alt}
+              sizes="(max-width: 768px) 100vw, 600px"
+              maxWidth={1600}
               loading="eager"
               className="aspect-[4/3] w-full rounded-[var(--radius)] object-cover"
               {...imageMarker(editorMode, imageKey)}

@@ -278,6 +278,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-28-store-on-cloudflare.md](plans/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
 - [plans/2026-11-02-neon-zero.md](plans/2026-11-02-neon-zero.md) - NEON-ZERO-1: the Ebda API with zero Postgres, Neon or Hyperdrive (inventory, scale rules, design note)
 - [plans/2026-11-03-contact-form.md](plans/2026-11-03-contact-form.md) - CONTACT-FORM-1: studio service-enquiry form on the contact page
+- [plans/2026-11-03-storefront-premium-defaults.md](plans/2026-11-03-storefront-premium-defaults.md) - Storefront premium defaults (audit 2026-11-03)
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something
 - [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan

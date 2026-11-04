@@ -1,3 +1,4 @@
+import { generateImageVariants } from '../services/image-variants.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
@@ -273,6 +274,9 @@ router.post(
             storeId: resolved.storeId,
           }
         );
+
+        // PREMIUM-2: resized WebP variants, once, at upload. Never fails the upload.
+        await generateImageVariants(uploaded.key, resizedBuffer);
 
         await auditLog({
           action: 'file.uploaded',

@@ -20,6 +20,7 @@ import { resolveBannerLink } from '../shared/hero-banner-link-utils';
 import { HeroVideo } from '../../components/commerce/HeroVideo';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DAHAB_BTN_PRIMARY, DAHAB_CONTAINER, cx, pick } from './ui';
+import { imageSrcSet } from '../../lib/image-loader';
 
 function Slide({
   slide,
@@ -46,10 +47,16 @@ function Slide({
   const posterPicture = (
     <picture>
       {imageMobile && imageMobile !== image && (
-        <source media="(max-width: 1023px)" srcSet={imageMobile} />
+        <source
+          media="(max-width: 1023px)"
+          srcSet={imageSrcSet(imageMobile, 1280) ?? imageMobile}
+          sizes="100vw"
+        />
       )}
       <img
         src={image}
+        srcSet={imageSrcSet(image, 1920)}
+        sizes="100vw"
         alt={slide.alt || headline || ''}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
@@ -66,8 +73,8 @@ function Slide({
 
   const body = (
     <>
-      {/* The photograph: the top 56% of the frame below lg, the whole frame from lg. */}
-      <div className="absolute inset-x-0 top-0 h-[56%] overflow-hidden lg:inset-0 lg:h-auto">
+      {/* The photograph: a block of its own height below lg, the whole frame from lg. */}
+      <div className="relative h-[min(52svh,440px)] overflow-hidden md:h-[min(46vh,480px)] lg:absolute lg:inset-0 lg:h-auto">
         {slide.video ? (
           // The poster picture is the base layer and the LCP element; the video
           // only overlays it after hydration (muted, looping, reduced-motion safe).
@@ -93,12 +100,14 @@ function Slide({
         <div
           className={cx(
             DAHAB_CONTAINER,
-            'absolute inset-x-0 bottom-0 flex h-[44%] items-start pb-12 pt-5 lg:inset-0 lg:h-full lg:items-center lg:pb-0 lg:pt-0'
+            // PREMIUM-31: below lg the copy is in the flow under the photo, so the frame is exactly as tall as
+            // its content (a fixed 44% left ~140 px of dead white under the button); `pb-12` keeps the slide dots clear
+            'relative flex min-h-[11rem] items-start pb-12 pt-5 lg:absolute lg:inset-0 lg:h-full lg:min-h-0 lg:items-center lg:pb-0 lg:pt-0'
           )}
         >
           <div className="max-w-[34rem]">
             {headline && (
-              <h1 className="font-display text-balance text-[clamp(1.9rem,1.3rem+2.8vw,4.4rem)] leading-[1.1] text-foreground rtl:leading-[1.4]">
+              <h1 className="font-display text-balance text-[clamp(2.25rem,1.2rem+4.4vw,4.5rem)] leading-[1.1] text-foreground rtl:leading-[1.4]">
                 {headline}
               </h1>
             )}
@@ -121,18 +130,19 @@ function Slide({
   return wholeLink ? (
     <Link
       href={wholeLink}
-      className="absolute inset-0 block"
+      className="relative block lg:absolute lg:inset-0"
       aria-label={headline || slide.alt || ''}
     >
       {body}
     </Link>
   ) : (
-    <div className="absolute inset-0">{body}</div>
+    <div className="relative lg:absolute lg:inset-0">{body}</div>
   );
 }
 
+// Below lg the frame takes its height from its content (photo block + copy); from lg it is a fixed full-bleed stage.
 const FRAME =
-  'relative isolate w-full overflow-hidden bg-background h-[min(88svh,720px)] min-h-[500px] md:h-[min(72vh,820px)] lg:h-[min(84vh,760px)] lg:min-h-[520px]';
+  'relative isolate w-full overflow-hidden bg-background lg:h-[min(84vh,760px)] lg:min-h-[520px]';
 
 export function DahabHeroBanner(props: HeroBannerProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -186,7 +196,7 @@ export function DahabHeroSlider({
 
   return (
     <section
-      className={FRAME}
+      className={cx(FRAME, 'grid lg:block')}
       aria-roledescription="carousel"
       aria-label={t('Featured', 'مختارات')}
       onMouseEnter={() => setPaused(true)}
@@ -203,7 +213,8 @@ export function DahabHeroSlider({
           aria-hidden={i !== index}
           inert={i !== index ? true : undefined}
           className={cx(
-            'absolute inset-0 transition-opacity duration-[1200ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+            // one grid cell below lg (the frame is as tall as the tallest slide), stacked absolutely from lg
+            'col-start-1 row-start-1 transition-opacity duration-[1200ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none lg:absolute lg:inset-0',
             i === index ? 'opacity-100' : 'opacity-0'
           )}
         >

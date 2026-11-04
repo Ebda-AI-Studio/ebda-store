@@ -5,7 +5,7 @@ import Link from '../../components/StoreLink';
 import { sanitizeUrl, type HeroSlide } from '@ebda/shared';
 import { HeroBannerLink } from './HeroBannerLink';
 import { translations } from '../../contexts/LanguageContext';
-import { zoneStyle, type ResolvedZone } from './section-typography';
+import { zoneStyle, heroHeadlineFontSize, type ResolvedZone } from './section-typography';
 
 /**
  * The surface the collage headline + CTA sit on: the page colour, fully opaque (C28). The text
@@ -95,8 +95,11 @@ export function HeroCollage({
               {headline && (
                 <h1
                   data-zone="heroHeadline"
-                  className="font-display text-balance text-4xl leading-[1.3] text-foreground md:text-5xl lg:text-6xl"
-                  style={zoneStyle(headingZone)}
+                  className="font-display text-balance leading-[1.3] text-foreground"
+                  style={{
+                    ...zoneStyle(headingZone),
+                    fontSize: heroHeadlineFontSize(headingZone?.fontSize),
+                  }}
                 >
                   {headline}
                 </h1>

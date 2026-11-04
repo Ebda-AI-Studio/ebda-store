@@ -58,3 +58,7 @@ A product can be priced from today's gold rate. It is a platform feature (every 
 ## Deferred (with reasons: Ruling B5-9)
 
 Appointment booking, buy-now-pay-later, a certificate row (a fact by convention), "only 1 left", build-a-stack; per-customer-group gold price lists, silver and platinum rates, buy-back and trade-in.
+
+## Storefront audit 2026-11-03 (PREMIUM-31, PREMIUM-32)
+
+Below `lg` the hero is as tall as its content (photo block plus the copy in the flow; slider slides share one grid cell), so no dead white sits under the button. The showroom seeds gold pieces with a 10 EGP rounding step (`roundingStep: 1000`). Card actions are solid `bg-background` buttons and every target is 44px (measured, 390).
