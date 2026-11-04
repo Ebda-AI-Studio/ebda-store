@@ -276,14 +276,7 @@ beforeAll(async () => {
   ownerId = owner.id;
   STORE = (
     await prisma.store.create({
-      // The gold parity cases pay by COD, so the store opts in to deferred payment for gold (Ruling SHARIA-GOLD-1).
-      data: {
-        name: 'D2b2',
-        slug: `d2b2-${sfx}`,
-        ownerId: owner.id,
-        status: 'active',
-        settings: { goldAllowDeferredPayment: true },
-      },
+      data: { name: 'D2b2', slug: `d2b2-${sfx}`, ownerId: owner.id, status: 'active' },
     })
   ).id;
   // the DO's copy of the store's settings: the sale document reads its seller (name, address, phone, email) from it
@@ -338,6 +331,15 @@ const moveRate = async () => {
   await applyRate();
 };
 async function goldWorld(mirror: boolean): Promise<World> {
+  // The gold cases pay by COD, so the store opts in to deferred payment for gold (Ruling SHARIA-GOLD-1), on BOTH backends:
+  // Postgres reads stores.settings, the DO checkout reads store_config.settings.
+  await prisma.$executeRaw`update stores set settings = coalesce(settings, '{}'::jsonb) || '{"goldAllowDeferredPayment": true}'::jsonb where id = ${STORE}`;
+  if (mirror)
+    sqlite.exec(
+      // accounting_enabled = 0 so a NEW row reads exactly like the missing one (the DO ledger treats no row as accounting off)
+      `INSERT INTO store_config (store_id, settings, accounting_enabled) VALUES ('${STORE}', '{"goldAllowDeferredPayment":true}', 0)
+       ON CONFLICT(store_id) DO UPDATE SET settings = json_set(settings, '$.goldAllowDeferredPayment', json('true'))`
+    );
   const id = await createProduct(ownerPg, STORE, {
     mode: 'gold_rate',
     karat: 21,
