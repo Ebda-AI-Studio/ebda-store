@@ -6,6 +6,14 @@
  * token is exchanged for the Store API's own HttpOnly cookie with `POST /auth/session`, so every existing request keeps
  * working unchanged. No password or refresh token is ever stored in JS.
  */
+import { resolveErrorMessage } from './error-messages';
+
+/** English service text never reaches an Arabic sign-in screen: map by code / status (UX:S-5). */
+function accountsMessage(status: number, code: string, serverMessage: string): string {
+  const rtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  return resolveErrorMessage({ code, status, serverMessage, locale: rtl ? 'ar' : 'en' });
+}
+
 export const accountsUrl = (): string =>
   (process.env.NEXT_PUBLIC_ACCOUNTS_URL || 'https://accounts.ebda.app').replace(/\/$/, '');
 
@@ -45,7 +53,11 @@ export async function accountsFetch<T>(
     throw new AccountsError(
       res.status,
       body.error?.code ?? 'REQUEST_FAILED',
-      body.error?.message ?? 'Request failed'
+      accountsMessage(
+        res.status,
+        body.error?.code ?? 'REQUEST_FAILED',
+        body.error?.message ?? 'Request failed'
+      )
     );
   return body.data as T;
 }
@@ -91,13 +103,18 @@ export async function establishApiSession<U = unknown>(accessToken: string): Pro
       headers: { Authorization: `Bearer ${accessToken}` },
     }
   );
-  if (res.status === 429) throw new AccountsError(429, 'THROTTLED', 'Rate limited');
+  if (res.status === 429)
+    throw new AccountsError(429, 'THROTTLED', accountsMessage(429, 'RATE_LIMITED', 'Rate limited'));
   const body = (await res.json().catch(() => ({}))) as Envelope<{ user: U }>;
   if (!res.ok || !body.data)
     throw new AccountsError(
       res.status,
       body.error?.code ?? 'SESSION_FAILED',
-      body.error?.message ?? 'Session failed'
+      accountsMessage(
+        res.status,
+        body.error?.code ?? 'SESSION_FAILED',
+        body.error?.message ?? 'Session failed'
+      )
     );
   return body.data.user;
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { SparkleIcon } from './SparkleIcon';
 import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '../lib/api';
 import { useT } from '@/i18n/useT';
@@ -104,7 +105,7 @@ export function AICategorySuggestions({
   if (loading) {
     return (
       <p className="mt-2 text-xs text-muted-foreground">
-        <span aria-hidden>✨</span> {t('loading')}
+        <SparkleIcon /> {t('loading')}
       </p>
     );
   }
@@ -116,7 +117,7 @@ export function AICategorySuggestions({
   return (
     <div className="mt-2">
       <p className="mb-1.5 text-xs text-muted-foreground">
-        <span aria-hidden>✨</span> {t('suggests')}
+        <SparkleIcon /> {t('suggests')}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {suggestions.map(s => (
@@ -129,7 +130,7 @@ export function AICategorySuggestions({
           >
             <span>{s.name}</span>
             {s.confidence === 'high' && (
-              <span className="text-[10px] uppercase tracking-wide opacity-60">
+              <span className="text-xs uppercase tracking-wide opacity-60">
                 {t('confidenceHigh')}
               </span>
             )}
