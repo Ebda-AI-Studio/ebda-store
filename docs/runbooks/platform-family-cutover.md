@@ -51,3 +51,21 @@ to D1 after the flip are not in Postgres. After real traffic the answer is forwa
 - Scripts or consoles that read or write `store_subscriptions` / `billing_*` / `plans` in Postgres after the flip read stale data. Use D1.
 - No row-level security on these tables after the flip (Ruling NZ-10-4): every query keeps its `storeId` filter.
 - The Neon dump keeps a frozen copy of these tables; D1 export + Time Travel (backup sweep) is the live backup.
+
+## Family `access` (store membership: `store_staff`, `staff_invites`)
+
+Same script, `--family access`. Differences (Rulings NZ-A1, NZ-A2):
+
+- **Freeze.** `--commit` writes `system_settings.platform_freeze.access` first: every Postgres WRITE of `storeStaff` / `staffInvite` (add/remove
+  staff, invite, accept, revoke) answers 503 `PLATFORM_FAMILY_FROZEN` until the script lifts it; reads and the access gate keep working from
+  Postgres. The script waits `--freeze-wait-ms` (default 20000, longer than the 5 s freeze cache and the 10 s cutover cache), only then opens
+  its snapshot, copies, verifies, flips, waits again, re-digests on a NEW connection and lifts the freeze. `--unfreeze` removes a left-over one.
+- **Directory check.** Before anything is written the script compares D1 `stores` with Postgres for every PG-backed store (owner, status,
+  billing suspension, deleted) and refuses on a difference or a missing store: the gate decides on those D1 columns after the flip. Fix with the
+  directory reconcile (`reconcileStoreDirectory`) and re-run. DO stores are skipped (their Postgres row is sealed).
+- **After the flip** the gate (`requireStoreAccess`, `checkStoreAccess`), staff routes, invite accept, `storesForUser` (token `stores[]`),
+  `ownedStoreIds`, merchant-MCP membership and the staff seat count read D1 only. Verify (VERIFIED / NOT VERIFIED): owner 200 and another
+  owner 403 on `/stores/:id/products`; add a staff member, then that user's GET is 200; remove them, the very next GET is 403; accept a fresh
+  invitation; `SELECT count(*) FROM store_staff` in D1 equals the dry-run PG count. NOT verifiable until the request transaction is lazy: an
+  admin GET with Postgres stopped (see the plan, N-6 evidence).
+- Rollback: only before traffic (`--delete-marker`).
