@@ -56,7 +56,7 @@ interface Props {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-border bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
+  'w-full rounded-lg border border-input bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
 const btnPrimary =
   'rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50';
 const btnOutline =
@@ -674,9 +674,9 @@ function HealthChip({ config }: { config: GatewayConfig }) {
     state === 'down'
       ? 'bg-destructive/10 text-destructive-ink'
       : state === 'degraded'
-        ? 'bg-amber-100 text-amber-800'
+        ? 'bg-warning/10 text-warning-ink'
         : state === 'healthy'
-          ? 'bg-emerald-100 text-emerald-800'
+          ? 'bg-success/10 text-success-ink'
           : 'bg-muted text-muted-foreground';
   return (
     <span
