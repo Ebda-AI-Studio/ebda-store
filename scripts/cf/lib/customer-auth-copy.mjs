@@ -71,6 +71,7 @@ export const TABLES = {
     sql: `SELECT t.id, t.token, t.user_id, t.expires_at, t.created_at, t.replaced_by_id, t.revoked_at, t.revoked_reason
             FROM refresh_tokens t JOIN users u ON u.id = t.user_id
            WHERE u.store_id = $1 AND u.role = 'customer' AND t.token NOT LIKE 'reset:%'
+             AND NOT (u.mfa_enabled AND u.mfa_secret IS NOT NULL)
              AND ((t.revoked_at IS NULL AND t.expires_at > now()) OR t.revoked_at > now() - interval '30 days')
            ORDER BY t.id`,
     map: r => [
@@ -120,6 +121,22 @@ export const TABLES = {
 };
 // Email-verification and password-reset links are NOT copied: they were mailed without a store id and cannot be redeemed
 // against a StoreDO. A link mailed before the flip stops working; the customer requests a new one (24 h / 1 h links).
+
+/**
+ * The part of a table's rows that cannot change merely because the clock moved. The refresh query selects "live now, or revoked
+ * within 30 days": a token that expires, or a revocation that ages out, DURING the run would otherwise read as drift on the
+ * re-check. Both the before-rows and the after-rows are reduced to what is still inside the window at `cutoff` (epoch ms).
+ */
+export function stableRows(table, rows, cutoff) {
+  if (table !== '_cauth_refresh') return rows;
+  const EXPIRES = 3;
+  const REVOKED = 6;
+  return rows.filter(r => {
+    const live = r[REVOKED] === null && r[EXPIRES] > cutoff;
+    const recentlyRevoked = r[REVOKED] !== null && r[REVOKED] > cutoff - REFRESH_REVOKED_KEEP_MS;
+    return live || recentlyRevoked;
+  });
+}
 
 export async function digestRows(cols, rows) {
   const d = new TableDigest();

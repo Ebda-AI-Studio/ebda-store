@@ -29,6 +29,14 @@ node scripts/cf/cutover-customer-auth.mjs $F --commit --global   # also writes c
 
 `--commit` refuses a store whose marker exists or whose DO says live. It flips only if EVERY table of the store is equal on both sides. Exit 2 = Postgres changed after the copy (drift): the freeze is lifted, the DO is NOT marked live (imports stay open); re-run is refused by the marker, so investigate and re-apply the rows by hand through `importRows`. The freeze is the same mechanism as #407 (expiry + P1 if left behind, SIGINT/SIGTERM lift). Verification and reset links mailed before the flip stop working (Ruling NZ-N9-4).
 
+## Before the first copy (Opus review of 7d03ec0cd)
+
+- Set the Worker secret `CUSTOMER_AUTH_BACKUP_KEY` (32 random bytes, base64) BEFORE the flip: from then on a store with customer accounts fails its nightly backup without it, and the key is what restores them. Store it in the password manager.
+- `--scrub-pg-url` (env `CUSTOMER_SCRUB_PG_URL`) is required with `--commit` unless `--keep-pg-copy`: after the verified flip the Postgres copy of the customers' refresh tokens, verification tokens, passkeys and credential columns is cleared, inside the freeze. A failed scrub leaves the flip standing: re-run with `--scrub-only --store <id>`.
+- `--global` is refused while any `storage_backend = 'do'` store lacks its marker.
+- After the cutover UNSET `CUTOVER_IMPORT_SECRET` (the import is also refused 423 per store once the marker exists).
+- MFA accounts cannot sign in on the DO (Ruling NZ-N9-1); their refresh rows are not copied. Tell the store owners, who can clear it.
+
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 
 - `--status`: marker PRESENT, DO counts equal the dry-run PG counts.

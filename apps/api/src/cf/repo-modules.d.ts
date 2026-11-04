@@ -124,19 +124,10 @@ declare module '@ebda-src/repo' {
   export function ensurePaymentSchema(db: SyncSql): void;
   export function purgeErasureLedger(db: SyncSql, now?: number): number;
   /** Storefront customer auth on the StoreDO (N-9; rpc/customer-auth.ts). */
-  export interface PasswordVerifier {
-    compare(plain: string, hash: string): Promise<boolean>;
-    dummyHash: string;
-  }
   export type AuthAnswer =
     | { ok: true; json: string }
     | { ok: false; code: string; status: number; message: string };
-  export function answerAuthOp(
-    db: SyncSql,
-    v: PasswordVerifier,
-    op: string,
-    argsJson: string
-  ): Promise<AuthAnswer>;
+  export function answerAuthOp(db: SyncSql, op: string, argsJson: string): Promise<AuthAnswer>;
   export const AUTH_OP_NAMES: readonly string[];
   export function ensureCustomerAuthSchema(db: SyncSql): void;
   export function purgeCustomerAuth(db: SyncSql, now?: number): number;

@@ -856,12 +856,9 @@ router.delete(
       // N-9: a customer served by the StoreDO is deactivated there (soft-delete + immediate revocation in one section).
       const delRoute = await customerAuthRoute(req.user!.storeId, { write: true });
       if (delRoute.kind === 'do') {
-        const r = await delRoute.client.call<{ tokenVersion: number; phone: string | null }>(
-          'softDelete',
-          { userId }
-        );
-        await redis.setUserTokenVersion(userId, r.tokenVersion).catch(() => undefined);
-        await revokeForAccount(delRoute.client.storeId, userId, r.phone);
+        // one DO section + a cache push that must land (a swallowed Redis failure left the access token alive: review 8a)
+        const { phone } = await AuthService.softDeleteCustomer(userId, delRoute.client.storeId);
+        await revokeForAccount(delRoute.client.storeId, userId, phone);
         await auditLog({
           action: 'user.account.deleted',
           userId,

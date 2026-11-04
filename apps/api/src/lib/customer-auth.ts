@@ -143,7 +143,7 @@ export async function assertNoCustomerAuthFreeze(): Promise<void> {
 /**
  * For store-create (#408): a store created ON a Durable Object has no Postgres customers to copy, so it starts with the marker
  * on. Call it in the SAME step that writes the D1 `stores` row with `storage_backend = 'do'`:
- *   `await markCustomerAuthOnDo(env.PLATFORM_DB, store.id)`
+ *   `await markCustomerAuthOnDo(platformDb, store.id)`
  * Idempotent (`ON CONFLICT DO NOTHING`). Without it the new store's first customers register in Postgres.
  */
 export async function markCustomerAuthOnDo(
