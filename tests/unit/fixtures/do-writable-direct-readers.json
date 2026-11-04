@@ -97,9 +97,11 @@
     },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
-      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route.",
       "models": {
-        "campaignRecipient": 1
+        "campaignRecipient": 1,
+        "address": 1,
+        "wholesaleApplication": 1
       }
     },
     "apps/api/src/services/barcode-scan.service.ts": {
@@ -218,6 +220,13 @@
       "models": {
         "product": 2,
         "productVariant": 2
+      }
+    },
+    "apps/api/src/services/tax-profile.service.ts": {
+      "kind": "platform",
+      "reason": "super_admin review of a store's tax profile runs under withUser against the Postgres tax_profile_review_guard trigger; a DO writer would skip that guard, so the review stays a platform path and is not a merchant data path.",
+      "models": {
+        "storeTaxProfile": 1
       }
     }
   }

@@ -117,7 +117,6 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'ProductModel',
   'ProductModelBinding',
   'StoreWhatsAppLink',
-  'StoreWhatsAppConsent',
   'GoldRateSettings',
 ]);
 
