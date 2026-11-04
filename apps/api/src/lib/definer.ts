@@ -443,7 +443,15 @@ export const webhookInbox = {
   }): Promise<string> {
     // A provider callback is the one thing that must never be refused (nobody may retry it). During the cutover freeze it
     // is recorded straight into D1: the copy script sets such rows aside and merges them (cutover-platform-family.mjs).
-    if ((await onBillingD1('inbox')) || (await isFamilyFrozen('inbox')))
+    const onD1Inbox = await onBillingD1('inbox');
+    if (!onD1Inbox && (await isFamilyFrozen('inbox'))) {
+      // Postgres is being copied: an event it already holds is NOT recorded a second time (read-only lookup); the
+      // existing row (and its processing state) stays the single record.
+      const known = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM public.ebda_webhook_inbox_by_key(${input.idempotencyKey})`;
+      if (known[0]) return known[0].id;
+    }
+    if (onD1Inbox || (await isFamilyFrozen('inbox')))
       return inboxRecordD1({
         id: randomUUID(),
         provider: input.provider,
@@ -905,20 +913,37 @@ export const platformAuditLogs = {
  * rows leave the database). The global AI caps and the paid answer-engine budget
  * are cross-store questions on a hot path.
  */
+export const AI_COUNT_TTL_MS = 30_000;
+const aiCountCache = new Map<string, { n: number; until: number }>();
+/** Test seam. */
+export const resetAiCountCache = (): void => aiCountCache.clear();
+
 export async function countAiUsage(opts: {
   since: Date;
   cachedHit: boolean;
   feature?: string;
 }): Promise<number> {
-  // Ruling NZ-AN-1: after the `ai-usage` cutover the table is one platform table on D1 (a single indexed count, no RLS to bypass)
+  // Ruling NZ-AN-1: after the `ai-usage` cutover the table is one platform table on D1 (a single indexed count, no RLS to bypass).
+  // STALENESS CLASS: BOUNDED-stale. The platform-wide daily / monthly AI caps are cost guards, not entitlements or prices: this
+  // count runs on every AI call, so an isolate answers it from memory for AI_COUNT_TTL_MS (30 s). Residual window: a cap can be
+  // overshot by the calls made during that window, per isolate; the per-STORE cap (ai-quota.ts, uncached) is unaffected.
+  // Nothing invalidates it on purpose: the TTL is the whole mechanism, and an expired entry is a fresh D1 read.
   if (await platformFamilyOnD1('ai-usage')) {
-    return (await requirePlatformDb()).aiUsage.count({
+    const key = `${opts.since.getTime()}|${opts.cachedHit}|${opts.feature ?? ''}`;
+    const hit = aiCountCache.get(key);
+    if (hit && hit.until > Date.now()) return hit.n;
+    const n = await (
+      await requirePlatformDb()
+    ).aiUsage.count({
       where: {
         createdAt: { gte: opts.since },
         cachedHit: opts.cachedHit,
         ...(opts.feature ? { feature: opts.feature } : {}),
       },
     });
+    if (aiCountCache.size > 64) aiCountCache.clear();
+    aiCountCache.set(key, { n, until: Date.now() + AI_COUNT_TTL_MS });
+    return n;
   }
   const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
     SELECT public.ebda_ai_usage_count(${opts.since}::timestamp, ${opts.cachedHit}, ${opts.feature ?? null}) AS n`;

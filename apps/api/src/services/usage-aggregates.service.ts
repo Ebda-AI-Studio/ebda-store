@@ -6,6 +6,9 @@
  */
 import { prisma } from '@ebda/database';
 
+/** Row ceiling of the last-30-days chart read (see aiUsageLast30Days). */
+const LAST_30_ROW_CAP = 20_000;
+
 export interface AiUsageTotals {
   calls: number;
   billableCalls: number;
@@ -66,6 +69,9 @@ export async function aiUsageLast30Days(
     where: { storeId, createdAt: { gte: since } },
     select: { createdAt: true },
     orderBy: { createdAt: 'asc' },
+    // Bounded read: a store's own daily AI cap (AI_STORE_DAILY_REQUEST_CAP, default 100) x 30 days is the real ceiling; this
+    // hard stop keeps a misconfigured cap from turning the summary into an unbounded scan. Past it the chart is a floor.
+    take: LAST_30_ROW_CAP,
   });
   const byDay = new Map<string, number>();
   for (const r of rows) {

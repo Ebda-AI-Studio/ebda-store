@@ -91,6 +91,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'CatalogImportItem',
   'CiHintLog',
   'CiStoreGate',
+  // the per-store audit trail (NEON-ZERO N-10d): appended by services/audit-sink.ts, which only ever `create`s
+  'AuditLog',
   // per-store analytics (Ruling NZ-AN-1): the gsc ingest upserts and the notification log write through the generic path; the counters use the analytics ops
   'SearchQueryDaily',
   'ProductDailyView',
@@ -102,10 +104,10 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'WishlistItem',
   'Bundle',
   'BundleItem',
-  // the super-admin VAT-registration decision (approve / reject / revoke) on the store's tax profile (NEON-ZERO, Ruling NZ-C-7)
+  // the platform tax-verification decision (NEON-ZERO group C, Ruling NZ-C-7)
   'StoreTaxProfile',
-  // the per-store audit trail (NEON-ZERO N-10d): appended by services/audit-sink.ts, which only ever `create`s
-  'AuditLog',
+  // shopper address book, per store (Ruling NZ-SF-5)
+  'Address',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

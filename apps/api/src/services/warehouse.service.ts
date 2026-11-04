@@ -539,7 +539,7 @@ export class WarehouseService {
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
     const variantId = input.variantId ?? null;
-    await WarehouseService.assertNotVariantProductLevel(input.productId, variantId);
+    await WarehouseService.assertNotVariantProductLevel(storeId, input.productId, variantId);
 
     await retryOnWriteConflict(
       () =>
@@ -603,7 +603,7 @@ export class WarehouseService {
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
     const variantId = input.variantId ?? null;
-    await WarehouseService.assertNotVariantProductLevel(input.productId, variantId);
+    await WarehouseService.assertNotVariantProductLevel(storeId, input.productId, variantId);
 
     const newQty = await retryOnWriteConflict(
       () =>
@@ -671,13 +671,16 @@ export class WarehouseService {
    * loud, as InventoryService.adjustInventory does.
    */
   private static async assertNotVariantProductLevel(
+    storeId: string,
     productId: string,
     variantId: string | null
   ): Promise<void> {
     if (variantId) {
       // BE:S-25: the caller verified the product belongs to the store; the variant must belong to THAT product.
+      // Same pooled client as the surrounding writes (this path runs only after the DO early-return, i.e. on Postgres). A second
+      // client lease per call (`storeDb`) exhausted the pool under 20 concurrent adjustments (tests/integration/warehouse/stock-race).
       const own = await prisma.productVariant.findFirst({
-        where: { id: variantId, productId },
+        where: { id: variantId, productId, product: { storeId } },
         select: { id: true },
       });
       if (!own) throw new AppError(404, 'VARIANT_NOT_FOUND', 'Variant not found');

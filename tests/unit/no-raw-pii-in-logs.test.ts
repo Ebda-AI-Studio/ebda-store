@@ -75,6 +75,10 @@ const REVIEWED_SPREADS: Record<string, string> = {
     'billingProviderUnsetWarning() → a fixed config warning string; no contact data',
   'apps/api/src/lib/database-role-guard.ts|detail':
     'refuse() detail → { err: message } | { rowCount } | { currentUser: DB role name, rol* flags }',
+  'apps/api/src/lib/inngest/functions/audit-log-archive.ts|cf':
+    'archive-cloudflare-audit step result → { skipped?: boolean; d1: number; stores: number; storeRows: number }, counts only',
+  'apps/api/src/services/billing/payments-reconcile.service.ts|report':
+    'ReconcileReport → { linked, rolledBack, confirmed: number; undecided: array replaced by its length } (counts only, no payer fields)',
   'apps/api/src/lib/inngest/functions/accounting-post-refund-journal.ts|partialResult':
     'postPartialReturnJournal → { posted: number; skipped?: string }',
   'apps/api/src/lib/inngest/functions/ai-autofill-sweep.ts|res':

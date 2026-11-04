@@ -2903,7 +2903,12 @@ export class AuthService {
       // Art. 20 portability bundle that looks complete. `withUser` reads them AS
       // the shopper — unlike the erase, this is read-only, so a second
       // connection carries no atomicity or independent-commit hazard.
-      withUser(userId, tx => tx.address.findMany({ where: { userId } })),
+      // A Durable Object store keeps the shopper's address book in its DO (Ruling NZ-SF-5).
+      storeRepo(storeId).then(repo =>
+        repo.backend === 'do'
+          ? repo.db.address.findMany({ where: { userId } })
+          : withUser(userId, tx => tx.address.findMany({ where: { userId } }))
+      ),
       prisma.order.findMany({
         where: { customerId: userId, storeId },
         include: { items: true, payments: true },
