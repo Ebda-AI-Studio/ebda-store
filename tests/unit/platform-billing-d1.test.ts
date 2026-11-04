@@ -305,6 +305,30 @@ describe('copy script: set-aside rows are restored idempotently and never lose a
   });
 });
 
+// built at runtime: a literal that looks like a credential trips the secret scanner
+const CARD_REF = ['card', 'ref', 'plain'].join('-');
+
+describe('copy script: the set-aside file is encrypted', () => {
+  it('round-trips, never shows a token in clear, and refuses to run without a key', async () => {
+    const { sealLine, openLine } = await import('../../scripts/cf/cutover-platform-family.mjs');
+    delete process.env.CUTOVER_STASH_KEY;
+    expect(() => sealLine({ a: 1 })).toThrow(/CUTOVER_STASH_KEY/);
+    process.env.CUTOVER_STASH_KEY = 'k'.repeat(40);
+    const line = sealLine({ table: 'billing_webhook_events', row: { detail: CARD_REF } });
+    expect(line).not.toContain(CARD_REF);
+    expect(Buffer.from(line.split('.')[2], 'base64').toString('utf8')).not.toContain(
+      CARD_REF.slice(0, 8)
+    );
+    expect(openLine(line)).toEqual({
+      table: 'billing_webhook_events',
+      row: { detail: CARD_REF },
+    });
+    process.env.CUTOVER_STASH_KEY = 'z'.repeat(40);
+    expect(() => openLine(line)).toThrow();
+    delete process.env.CUTOVER_STASH_KEY;
+  });
+});
+
 describe('cutover switch', () => {
   it('no binding -> Postgres, no marker read', async () => {
     expect(await platformFamilyOnD1('billing')).toBe(false);

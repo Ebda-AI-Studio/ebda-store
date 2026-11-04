@@ -61,6 +61,30 @@ export const ASIDE = {
   },
 };
 
+/**
+ * The set-aside file holds D1 rows that can carry provider payloads and card references, so every line is AES-256-GCM
+ * encrypted with a key from CUTOVER_STASH_KEY (>= 32 chars; the run refuses to set rows aside without it), the file is mode
+ * 0600, and it is DELETED once the rows are back in D1.
+ */
+function stashKey() {
+  const k = process.env.CUTOVER_STASH_KEY;
+  if (!k || k.length < 32)
+    throw new Error('set CUTOVER_STASH_KEY (>= 32 chars) before rows are set aside');
+  return crypto.createHash('sha256').update(k).digest();
+}
+export const sealLine = obj => {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', stashKey(), iv);
+  const enc = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
+  return [iv, c.getAuthTag(), enc].map(b => b.toString('base64')).join('.');
+};
+export const openLine = line => {
+  const [iv, tag, enc] = line.split('.').map(x => Buffer.from(x, 'base64'));
+  const d = crypto.createDecipheriv('aes-256-gcm', stashKey(), iv);
+  d.setAuthTag(tag);
+  return JSON.parse(Buffer.concat([d.update(enc), d.final()]).toString('utf8'));
+};
+
 const markerKey = family => `platform_cutover.${family}`;
 const freezeKey = family => `platform_freeze.${family}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -121,7 +145,7 @@ async function main() {
       .readFileSync(args['restore-stash'], 'utf8')
       .split('\n')
       .filter(Boolean)
-      .map(l => JSON.parse(l));
+      .map(l => openLine(l));
     const sql = lines.map(({ table, row }) => ASIDE[table].restore(row, lit));
     if (sql.length) await d1Statements(d, sql);
     console.log(
@@ -282,6 +306,7 @@ async function main() {
     const sql = aside.flatMap(({ table, rows }) => rows.map(r => ASIDE[table].restore(r, lit)));
     if (sql.length) await d1Statements(d, sql);
     putBackDone = true;
+    fs.rmSync(stashFile, { force: true }); // the rows are durable in D1 again: no copy stays on disk
     if (sql.length)
       console.log(`  ${sql.length} set-aside row(s) put back (already-known ones dropped)`);
   };
@@ -301,11 +326,8 @@ async function main() {
       );
       if (rows.length) {
         fs.mkdirSync(path.dirname(stashFile), { recursive: true });
-        const fd = fs.openSync(stashFile, 'a');
-        fs.writeSync(
-          fd,
-          rows.map(r => JSON.stringify({ table: bt.name, row: r })).join('\n') + '\n'
-        );
+        const fd = fs.openSync(stashFile, 'a', 0o600);
+        fs.writeSync(fd, rows.map(r => sealLine({ table: bt.name, row: r })).join('\n') + '\n');
         fs.fsyncSync(fd);
         fs.closeSync(fd);
         for (let i = 0; i < rows.length; i += 400)

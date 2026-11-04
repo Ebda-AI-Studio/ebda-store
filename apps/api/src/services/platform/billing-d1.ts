@@ -437,7 +437,8 @@ export async function deferBillingWebhookD1(a: {
   provider: string;
   eventId: string;
   eventType: string;
-  payload: unknown;
+  /** already ENCRYPTED text (never plaintext: it can hold a card token) */
+  payload: string;
 }): Promise<boolean> {
   const changes = await run(
     `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at)
@@ -447,7 +448,7 @@ export async function deferBillingWebhookD1(a: {
     a.provider,
     a.eventId,
     a.eventType,
-    JSON.stringify(a.payload),
+    a.payload,
     Date.now()
   );
   return changes === 1;
