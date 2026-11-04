@@ -1,7 +1,7 @@
 /**
  * The cutover admin surface on the API Worker (Rulings CUTOVER-2/3/4, docs/runbooks/cutover-cf.md):
  *
- *   /cutover/stores/<storeId>/{__import,__verify,__seal,__status,__unseal,__rebase,__diff,__analytics}
+ *   /cutover/stores/<storeId>/{__import,__auditimport,__verify,__seal,__status,__unseal,__rebase,__diff,__analytics}
  *
  * The bearer check against CUTOVER_IMPORT_SECRET happens HERE, before the StoreDO sees the request, with
  * the constant-time compare that lives next to the handler (packages/cf-migrate, shared with the rehearsal
@@ -18,6 +18,7 @@ export const CUTOVER_PREFIX = '/cutover/';
 const ACTIONS = {
   __import: 'POST',
   __verify: 'POST',
+  __auditimport: 'POST',
   __seal: 'POST',
   __unseal: 'POST',
   __rebase: 'POST',

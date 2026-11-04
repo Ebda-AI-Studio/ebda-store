@@ -58,7 +58,7 @@ import { instapayHandle } from '../billing/manual-config';
 export type ReceiptKind = 'subscription' | 'order';
 
 /** What a scrub clears: everything a person typed or the AI read about a person. Money and evidence columns are untouched. */
-const SCRUBBED_PERSONAL_FIELDS = (now: Date) => ({
+export const SCRUBBED_PERSONAL_FIELDS = (now: Date) => ({
   payerName: null,
   payerAddress: null,
   payerMobile: null,

@@ -344,6 +344,12 @@ describe('cutover switch', () => {
         'merchantApiKey',
         'slugRedirect',
         'webhookEvent',
+        // N-10d
+        'instapayReceipt',
+        'manualPaymentClaim',
+        'answerEngineProviderConfig',
+        'storeUsageSnapshot',
+        'ciInsight',
       ].sort()
     );
     setModelRouter(undefined);

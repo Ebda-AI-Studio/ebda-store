@@ -30,6 +30,12 @@ import {
 import { cfBindings } from '../../cf/bindings';
 import { sendAlert } from '../../services/alerts.service';
 import {
+  applyAuditRetry,
+  isAuditWriteRetry,
+  parkDeadAuditRow,
+  type AuditWriteRetryMessage,
+} from '../../services/audit-sink';
+import {
   applyStoreUpdateRetry,
   isStoreUpdateRetry,
   type StoreUpdateRetryMessage,
@@ -78,6 +84,10 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   }
   if (isStoreUpdateRetry(msg.body)) {
     await handleStoreUpdateRetry(msg, msg.body);
+    return;
+  }
+  if (isAuditWriteRetry(msg.body)) {
+    await handleAuditRetry(msg, msg.body);
     return;
   }
   if (!isJobQueueMessage(msg.body)) {
@@ -242,9 +252,22 @@ async function handleStoreUpdateRetry(
   else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
 }
 
+/** An audit row that could not be written inline (services/audit-sink.ts): retried with backoff, parked + paged at the DLQ. */
+async function handleAuditRetry(msg: QueueMessageLike, m: AuditWriteRetryMessage): Promise<void> {
+  const { replayAuditRowPg } = await import('../definer.js');
+  const out = await applyAuditRetry(m, { pgInsert: replayAuditRowPg });
+  if (out === 'done') msg.ack();
+  else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+}
+
 async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
   if (writesFrozen()) {
     msg.retry({ delaySeconds: 3600 });
+    return;
+  }
+  if (isAuditWriteRetry(msg.body)) {
+    await parkDeadAuditRow(msg.body.row);
+    msg.ack();
     return;
   }
   if (isStoreUpdateRetry(msg.body)) {
