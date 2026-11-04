@@ -113,11 +113,12 @@ function jasmine() {
     [R - 0.0095, 0.054],
     [0, 0.054],
   ];
+  // OPAQUE on purpose (Ruling MKT-3D-FIX-1): a transmissive liquid is invisible behind the transmissive glass in three.js
+  // (the transmission pass excludes other transmissive objects), so the colour swatches would not change what the shopper sees.
+  // tests/unit/marketing-model3d.test.ts asserts the generated glb keeps the serum materials free of KHR_materials_transmission.
   const serum = P('serum', {
     color: COLOURWAYS_J[0].serum,
     roughness: 0.12,
-    transmission: 0.55,
-    thickness: 0.02,
     ior: 1.38,
   });
   g.add(mk(lathe(liquid), serum, 'serum'));

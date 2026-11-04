@@ -11,7 +11,8 @@ export class StoreError extends Error {
       | 'CART_NOT_FOUND'
       | 'CART_EMPTY'
       | 'OUT_OF_STOCK'
-      | 'VARIANT_REQUIRED',
+      | 'VARIANT_REQUIRED'
+      | 'STORE_CLOSED',
     public readonly status: number
   ) {
     super(code);

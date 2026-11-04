@@ -28,6 +28,12 @@ import {
   type LegacyCronMessage,
 } from './start';
 import { cfBindings } from '../../cf/bindings';
+import { sendAlert } from '../../services/alerts.service';
+import {
+  applyStoreUpdateRetry,
+  isStoreUpdateRetry,
+  type StoreUpdateRetryMessage,
+} from '../store-update-retry';
 
 const GATE_MAX_WAITS = 120;
 
@@ -68,6 +74,10 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   }
   if (isLegacyCronMessage(msg.body)) {
     await runLegacyCron(msg, msg.body);
+    return;
+  }
+  if (isStoreUpdateRetry(msg.body)) {
+    await handleStoreUpdateRetry(msg, msg.body);
     return;
   }
   if (!isJobQueueMessage(msg.body)) {
@@ -215,9 +225,38 @@ async function parkForGate(msg: QueueMessageLike, body: JobQueueMessage, gate: G
 }
 
 /** Retries exhausted at the platform level (a crash loop): same failure path, once. */
+/**
+ * A post-commit D1 / DO Store write that failed once (lib/store-update-retry.ts): re-sync the CURRENT committed state with backoff (Ruling NZ-D20); otherwise the delivery is retried until the queue dead-letters it (alerted there).
+ */
+async function handleStoreUpdateRetry(
+  msg: QueueMessageLike,
+  m: StoreUpdateRetryMessage
+): Promise<void> {
+  const out = await applyStoreUpdateRetry(m, {
+    sync: async storeId => {
+      const { syncStoreEntitlement } = await import('../repo-factory.js');
+      await syncStoreEntitlement(storeId);
+    },
+  });
+  if (out === 'done') msg.ack();
+  else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+}
+
 async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
   if (writesFrozen()) {
     msg.retry({ delaySeconds: 3600 });
+    return;
+  }
+  if (isStoreUpdateRetry(msg.body)) {
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'store.update.retry_exhausted',
+      title: 'Store update retry exhausted: D1/DO still behind Postgres',
+      body: `store ${msg.body.storeId}: re-sync its plan / billing / status to D1 and the StoreDO by hand.`,
+      context: { storeId: msg.body.storeId },
+    }).catch(() => undefined);
+    msg.ack();
     return;
   }
   if (isJobQueueMessage(msg.body)) {

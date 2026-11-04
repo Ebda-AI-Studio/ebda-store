@@ -177,9 +177,9 @@ describe('document numbers and retention', () => {
     expect(fiscalNumber('credit_note', 7)).toBe('CRN-000007');
     expect(fiscalNumber('refund_receipt', 1234567)).toBe('RFR-1234567');
   });
-  it('kept 6 years from issue', () => {
+  it('kept 7 years from issue (Ruling RETENTION-1)', () => {
     expect(retainUntil(new Date('2026-10-08T10:00:00Z')).toISOString()).toBe(
-      '2032-10-08T10:00:00.000Z'
+      '2033-10-08T10:00:00.000Z'
     );
   });
 });

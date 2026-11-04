@@ -187,7 +187,8 @@ export function Product3D({ copy, locale }: { copy: Model3dCopy; locale: Locale 
     '--bg': def.skin.bg,
     '--ink': def.skin.ink,
     '--mut': def.skin.mut,
-    '--ac': def.skin.ac,
+    // Ebda's own demos carry no orange (Ruling METAL-1): the serum look's amber accent becomes Ebda gold in this demo only.
+    '--ac': active === 'jasmine' ? '#B08D57' : def.skin.ac,
     '--fd': `'${def.skin.fd}'`,
     '--fb': `'${def.skin.fb}'`,
   } as CSSProperties;

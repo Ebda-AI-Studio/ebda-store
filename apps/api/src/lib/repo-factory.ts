@@ -34,12 +34,20 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
-import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/database';
+import {
+  afterTenantTxCommit,
+  afterTxCommit,
+  prisma,
+  withStore,
+  type AppPrismaClient,
+  type Prisma,
+} from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
 import { d1StorePatch } from './store-columns';
+import { reportAndRetryStoreUpdate, reportStoreUpdateFailure } from './store-update-retry';
 import { getAccountState } from './identity-client';
 
 type WriteOp =
@@ -1436,16 +1444,9 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
-  const d1 = d1StorePatch(data);
-  if (Object.keys(d1).length > 0) {
-    const platform = await requirePlatformDb();
-    await platform.store.update({ where: { id: storeId }, data: d1, select: { id: true } });
-  } else {
-    // no D1 column in the patch: still prove the store exists in the directory (fail closed, never a blind DO write)
-    const platform = await requirePlatformDb();
-    const found = await platform.store.findUnique({ where: { id: storeId }, select: { id: true } });
-    if (!found) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  }
+  // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await copyStoreSettings(storeId, data);
   const stub = storeDo(storeId) as unknown as QueryStub;
   const { decodeRpc } = await import('@ebda-src/repo');
@@ -1470,14 +1471,175 @@ export async function storeUpdateOnDo(
   return row;
 }
 
+/**
+ * Defer a DO store's update to the commit of the surrounding transaction (Ruling NZ-D18). Returns the PROJECTED row (the current
+ * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
+ */
+/**
+ * THE one writer of D1 `stores` (Ruling NZ-D20): every Store directory / entitlement write to D1 goes through here (an immediate DO
+ * update, a compare-and-set, a post-commit sync, a retry). Returns the number of rows written (for an empty patch: matched).
+ */
+async function d1StoreWrite(
+  where: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Promise<number> {
+  const platform = await requirePlatformDb();
+  if (Object.keys(patch).length === 0) return (await platform.store.count({ where })) as number;
+  return ((await platform.store.updateMany({ where, data: patch })) as { count: number }).count;
+}
+
+/**
+ * Re-sync a DO store's ENTITLEMENT state from its committed authoritative row (Ruling NZ-D20). Plan, billing suspension, status and
+ * deletion are decided in Postgres (the write that the transaction committed); this reads the CURRENT row there and copies the
+ * full current state to D1 and the DO. It replays no patch and carries no version: idempotent and latest-state-wins, so a late or
+ * duplicated retry, or two concurrent ones, converge on whatever Postgres holds NOW (a deleted or suspended store copies its
+ * restrictive state). Throws when the row cannot be read or either copy fails (the caller retries).
+ */
+export async function syncStoreEntitlement(storeId: string): Promise<void> {
+  const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
+  const row = (await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select })
+  )) as Record<string, unknown> | null;
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(row))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found in the directory');
+  await copyStoreSettings(storeId, row);
+}
+
+/**
+ * The post-commit D1 / DO write of a deferred update. Postgres has already committed it. Entitlement fields are re-synced from the
+ * committed row (`syncStoreEntitlement`); a failure is logged, alerted and put on the jobs queue as `{storeId}` only
+ * (lib/store-update-retry.ts), the handler re-syncs the CURRENT state. Other fields of the same patch are absolute profile / config
+ * values written once through the same D1 writer; a failure there is alerted (P1) with no retry (residual, NZ-D20).
+ */
+async function applyPostCommit(storeId: string, patch: Record<string, unknown>): Promise<void> {
+  const rest = Object.fromEntries(
+    Object.entries(patch).filter(([k]) => !(ENTITLEMENT_FIELDS as readonly string[]).includes(k))
+  );
+  if (touchesEntitlement(patch)) {
+    try {
+      await syncStoreEntitlement(storeId);
+    } catch (err) {
+      await reportAndRetryStoreUpdate(storeId, err);
+    }
+  }
+  if (Object.keys(rest).length > 0) {
+    try {
+      await d1StoreWrite({ id: storeId }, d1StorePatch(rest));
+      await copyStoreSettings(storeId, rest);
+    } catch (err) {
+      await reportStoreUpdateFailure(storeId, Object.keys(rest), err);
+    }
+  }
+}
+
+/** Fields whose rollback must not leave a D1 / DO change behind: plan (entitlements), billing suspension, lifecycle status. */
+const ENTITLEMENT_FIELDS: readonly string[] = [
+  'plan',
+  'billingSuspendedReason',
+  'billingSuspendedAt',
+  'status',
+  'deletedAt',
+];
+const touchesEntitlement = (data: Record<string, unknown>): boolean =>
+  ENTITLEMENT_FIELDS.some(f => data[f] !== undefined);
+
+/** The row an update WILL produce (current record with the patch laid over it), read without writing. */
+async function projectStoreUpdate(
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<Record<string, unknown>> {
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const selected = args.select
+    ? Object.keys(args.select as object).filter(k => (args.select as any)[k])
+    : undefined;
+  const current = await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+    where: { id: storeId },
+    ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
+  });
+  if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  const projected: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(args.data))
+    if (v !== undefined && (!selected || selected.includes(k))) projected[k] = v;
+  return projected;
+}
+
+export async function storeUpdateAfterCommit(
+  tx: object,
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<any> {
+  // The hook is bound to THIS transaction object (Ruling NZ-D19), not to the ambient tenant scope: a separate money transaction can
+  // roll back while the outer tenant transaction commits. A transaction with no hook registry cannot take it: refused (fail closed).
+  const pending: { write?: () => Promise<void> } = {};
+  if (!afterTxCommit(tx, () => pending.write?.()))
+    throw new AppError(
+      501,
+      'STORE_TX_WRITE_UNSUPPORTED',
+      'A Store update inside this database transaction has no post-commit hook for a Durable Object store'
+    );
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const delegate = doStoreDelegate(storeId, stub, decodeRpc as never);
+  const data = Object.fromEntries(Object.entries(args.data).filter(([, v]) => v !== undefined));
+  const selected = args.select
+    ? Object.keys(args.select as object).filter(k => (args.select as any)[k])
+    : undefined;
+  const current = await delegate.findUnique({
+    where: { id: storeId },
+    ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
+  });
+  if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  // Postgres owns the entitlement fields: the committed intent lives in THIS transaction, so it commits or rolls back with it and a
+  // retry can re-read it (NZ-D20). Never a bare patch held only in memory.
+  await (tx as StoreUpdateClient).store.update({
+    where: { id: storeId },
+    data,
+    select: { id: true },
+  });
+  pending.write = () => applyPostCommit(storeId, data);
+  const projected: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(data))
+    if (!selected || selected.includes(k)) projected[k] = v;
+  return projected;
+}
+
 export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
   db: StoreUpdateClient,
   args: Prisma.SelectSubset<A, Prisma.StoreUpdateArgs>
 ): Promise<Prisma.StoreGetPayload<A>> {
   const a = args as Prisma.StoreUpdateArgs;
   const id = a.where.id as string;
-  if (await storeWritesToDo(id))
+  if (await storeWritesToDo(id)) {
+    // Ruling NZ-D18: a D1 / DO write is NOT in the caller's Postgres transaction. Called with a TRANSACTION client (a billing / money
+    // tx), applying it now would leave a plan or entitlement change that a later rollback never undoes (a free upgrade). So it is
+    // applied after the tx COMMITS (dropped on rollback), and the caller gets the projected row; with no post-commit hook available
+    // (a job's own transaction) it is refused, so that caller gets a proper port.
+    if ((db as unknown) !== (prisma as unknown))
+      return (await storeUpdateAfterCommit(
+        db as object,
+        id,
+        a as never
+      )) as Prisma.StoreGetPayload<A>;
+    // The base `prisma` proxy writes into the AMBIENT tenant transaction (`withStore` hands callers `prisma` itself, not a registered
+    // tx object). An ENTITLEMENT / lifecycle change (plan, billing suspension, status) made there must not outlive that transaction's
+    // rollback (a free upgrade, a re-activation): it applies after the AMBIENT transaction commits, when one with a hook registry
+    // exists. Every other field, and a write with no ambient transaction, is applied now (like every other DO write in a request).
+    if (touchesEntitlement(a.data as Record<string, unknown>)) {
+      let write: (() => Promise<void>) | undefined;
+      if (afterTenantTxCommit(() => write?.())) {
+        const projected = await projectStoreUpdate(id, a as never);
+        const patch = Object.fromEntries(
+          Object.entries(a.data as object).filter(([, v]) => v !== undefined)
+        );
+        await db.store.update({ where: { id }, data: patch, select: { id: true } });
+        write = () => applyPostCommit(id, patch);
+        return projected as Prisma.StoreGetPayload<A>;
+      }
+    }
     return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
+  }
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
   await copyStoreSettings(id, a.data as Record<string, unknown>);
   return row;
@@ -1488,6 +1650,14 @@ export async function storeUpdateMany(
   args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
 ): Promise<Prisma.BatchPayload> {
   if (await storeWritesToDo(args.where.id)) {
+    // Ruling NZ-D18: a compare-and-set returns its count NOW, so it cannot be deferred past a transaction's commit: refused for a
+    // transaction client (the caller ports it), allowed for the base client.
+    if ((db as unknown) !== (prisma as unknown))
+      throw new AppError(
+        501,
+        'STORE_TX_WRITE_UNSUPPORTED',
+        'Store.updateMany inside a database transaction is not served for a Durable Object store'
+      );
     // Compare-and-set stays ONE atomic D1 statement: the filter may name only D1 columns (id + directory / mirror fields); a
     // filter on a DO-only column is refused. The DO copy follows only when the row matched.
     const filter = args.where as Record<string, unknown>;
@@ -1503,15 +1673,9 @@ export async function storeUpdateMany(
     const data = Object.fromEntries(
       Object.entries(args.data as object).filter(([, v]) => v !== undefined)
     );
-    const platform = await requirePlatformDb();
-    const patch = d1StorePatch(data);
-    const res =
-      Object.keys(patch).length > 0
-        ? ((await platform.store.updateMany({
-            where: args.where,
-            data: patch,
-          })) as Prisma.BatchPayload)
-        : { count: (await platform.store.count({ where: args.where })) as number };
+    const res = {
+      count: await d1StoreWrite(args.where as Record<string, unknown>, d1StorePatch(data)),
+    } as Prisma.BatchPayload;
     if (res.count > 0) await copyStoreSettings(args.where.id, data);
     return res;
   }
@@ -1551,4 +1715,45 @@ export function withRepo<T>(repo: StoreRepo, fn: () => T, req: RequestLike = NO_
  */
 export function runInJobRepoScope<T>(fn: () => T): T {
   return scopes.run({ req: NO_REQUEST, repos: new Map() }, fn);
+}
+
+/**
+ * ATOMIC money gate + close of a DO store's deletion (Ruling NZ-D17): ONE DO call checks money in flight and sets the closed flag, so
+ * nothing can slip in between. Refused -> 409 STORE_HAS_MONEY_IN_FLIGHT with the counts (nothing was changed). `token` is
+ * a closure token when THIS call closed the store (null when it was already closed): only that token can reopen it.
+ */
+export async function closeDoIfNoMoney(storeId: string): Promise<{ token: string | null }> {
+  const stub = storeDo(storeId) as unknown as {
+    closeIfNoMoneyInFlight(id: string): Promise<
+      | {
+          ok: true;
+          data:
+            | { closed: true; token: string | null }
+            | { refused: true; counts: Record<string, number> };
+        }
+      | { ok: false; code: string; status: number }
+    >;
+  };
+  const r = await stub.closeIfNoMoneyInFlight(storeId);
+  if (!r.ok) throw new AppError(r.status, r.code, `store close refused: ${r.code}`);
+  if ('refused' in r.data)
+    throw new AppError(
+      409,
+      'STORE_HAS_MONEY_IN_FLIGHT',
+      'This store still has money in flight (paid orders not delivered, transfers awaiting confirmation, open returns, cash on delivery not settled, payments in dispute, unsettled payouts or wallet balances). Settle them before deleting the store.',
+      { ...r.data.counts }
+    );
+  return { token: r.data.token };
+}
+
+/** Compensating rollback (Ruling NZ-D17): reopen a DO that THIS delete closed, when the delete then failed. Clears only its own flag. */
+export async function reopenDoAfterFailedDelete(storeId: string, token: string): Promise<void> {
+  const stub = storeDo(storeId) as unknown as {
+    reopenAfterFailedDelete(
+      id: string,
+      token: string
+    ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
+  };
+  const r = await stub.reopenAfterFailedDelete(storeId, token);
+  if (!r.ok) throw new AppError(r.status, r.code, `store reopen refused: ${r.code}`);
 }

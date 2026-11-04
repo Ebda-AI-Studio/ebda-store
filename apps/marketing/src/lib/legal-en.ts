@@ -28,7 +28,9 @@ export const LEGAL_EN: LegalPages = {
         p: [
           '"Ebda Store" («ابدأ ستور»), available at ebda.app, is an online store builder for merchants in Egypt (the "Service"). The Service is a technology platform owned and operated by ' +
             OP +
-            ' ("we", "us"). Ebda AI Studio is our company brand.',
+            ' ("we", "us"). The operating legal entity is ' +
+            BRAND.company.legalNameEn +
+            '. Ebda AI Studio is our company brand.',
         ],
       },
       {

@@ -119,3 +119,31 @@ export async function syncStoreDirectoryFromPg(storeId: string): Promise<void> {
     throw unavailable(e);
   }
 }
+
+/**
+ * Take a deleted store out of the D1 directory (Ruling NZ-D14 / NZ-D15). Lookups read D1, so a deleted store whose row survives
+ * stays resolvable.
+ *   - `soft: true` (a DO store): the row is MARKED deleted (status inactive + deleted_at), never removed. Its data is retained and
+ *     its slug stays reserved; lookups exclude it at once.
+ *   - `soft: false` (a Postgres store, already hard-deleted there): the row is removed; D1 FKs cascade the platform rows.
+ * No-op when unbound.
+ */
+export async function retireStoreDirectoryRow(
+  storeId: string,
+  opts: { soft: boolean }
+): Promise<void> {
+  const db = d1();
+  if (!db) return;
+  try {
+    if (opts.soft)
+      await db
+        .prepare(
+          'UPDATE "stores" SET "status" = \'inactive\', "deleted_at" = COALESCE("deleted_at", ?) WHERE "id" = ?'
+        )
+        .bind(Date.now(), storeId)
+        .run();
+    else await db.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(storeId).run();
+  } catch (e) {
+    throw unavailable(e);
+  }
+}

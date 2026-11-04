@@ -5,7 +5,7 @@ Assess launch readiness, remove exposed Ebda naming, improve UI and fix wiring/e
 
 ## Ebda naming — 2026-10-10
 
-- Goal: product Ebda Store (ابدأ ستور), company Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي), approved across folders/repo/app branding.
+- Goal: product Ebda Store (ابدأ ستور), company Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي), approved across folders/repo/app branding.
 - Done: private repo renamed to Whisky-11/ebda-store; product root `Ebda-AI-Studio/internal-projects/ebda-store`; local business papers `Ebda-AI-Studio/business/ebda-ai-studio`. All 23 worktree registrations/statuses preserved. Foundation PR227 merged and resolver installed; canonical name and legacy alias resolve correctly (18 tests).
 - Validation: 113 affected branding and sibling tests pass; final CI-parity run 10,009 tests across 752 files passed. Monorepo typecheck, lint, formatting and affected app builds pass. All-email scope reviewed: 328 targeted tests plus full-unit coverage; localized platform names/attribution, company team copy, merchant branding preserved. CI browser dependency failure repaired in both unit jobs (missing libatk). AR/EN marketing checked at 390/820/1280px and merchant login at 390px with no overflow.
 - Blast-radius: current app/config/workflow/scripts, installed scripts and launchd jobs swept; stale audit fallback paths and two current audit-document links fixed. Two dated historical records keep old repo URLs; approved naming plan retains its baseline and move instructions. Domains/resources unchanged.

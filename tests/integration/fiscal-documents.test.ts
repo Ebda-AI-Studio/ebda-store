@@ -151,7 +151,7 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
   });
 
   afterAll(async () => {
-    // Issued documents are immutable and retained 6 years by design; the test
+    // Issued documents are immutable and retained 7 years by design; the test
     // database is disposable, so they are left in place.
   });
 
@@ -495,9 +495,9 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
     expect(legacyPayload).not.toContain('Mona');
     expect(legacyPayload).not.toContain('+20');
     expect(legacyPayload).not.toContain('mona@example.test');
-    // Retained for 6 years.
+    // Retained for 7 years (Ruling RETENTION-1).
     expect(byType('order_record')[0].retainUntil.getUTCFullYear()).toBe(
-      legacy.createdAt.getUTCFullYear() + 6
+      legacy.createdAt.getUTCFullYear() + 7
     );
   });
 });

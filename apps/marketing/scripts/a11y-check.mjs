@@ -7,6 +7,8 @@ import { runA11y } from '@ebda/site-kit/gates/a11y';
 
 const pages = [
   '/',
+  '/store/',
+  '/en/store/',
   '/no-such-page/',
   '/en/no-such-page/',
   '/en/',

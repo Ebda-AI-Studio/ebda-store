@@ -13,6 +13,7 @@ import { setTenantGucs as setTenantGucsImpl } from './tenant-gucs';
 import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
 import { dropHiddenStores } from './job-store-guard';
+import { afterTxCommit, registerTxHooks, runCommitHooks } from './tx-hooks';
 
 export {
   withHiddenStores,
@@ -524,6 +525,7 @@ export { prisma as db };
 // Money-safe transaction wrapper (Neon pgbouncer P2028 guard). Use for every
 // interactive $transaction call site. See ./with-money-tx.ts.
 export { withMoneyTx } from './with-money-tx';
+export { afterTxCommit, setCommitHookErrorReporter } from './tx-hooks';
 
 // Set RLS settings on a caller-opened transaction. See ./tenant-gucs.ts.
 export { setTenantGucs, type TenantGucs } from './tenant-gucs';
@@ -576,9 +578,6 @@ export { setTenantGucs, type TenantGucs } from './tenant-gucs';
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** After-COMMIT callbacks of transactions opened by `runInTenantContext` (see `afterTenantTxCommit`). */
-const afterCommitHooks = new WeakMap<object, Array<() => unknown>>();
-
 /**
  * Run `fn` after the ambient tenant transaction COMMITS — for side effects that must not see (or
  * announce) uncommitted rows, e.g. an Inngest event, when there is no request deferral scope
@@ -590,10 +589,7 @@ const afterCommitHooks = new WeakMap<object, Array<() => unknown>>();
  */
 export function afterTenantTxCommit(fn: () => unknown): boolean {
   const tx = tenantStorage.getStore() as object | undefined;
-  const hooks = tx ? afterCommitHooks.get(tx) : undefined;
-  if (!hooks) return false;
-  hooks.push(fn);
-  return true;
+  return tx ? afterTxCommit(tx, fn) : false;
 }
 
 export async function runInTenantContext<T>(
@@ -607,7 +603,7 @@ export async function runInTenantContext<T>(
   const hooks: Array<() => unknown> = [];
   const result = await basePrisma().$transaction(
     async tx => {
-      afterCommitHooks.set(tx as object, hooks);
+      registerTxHooks(tx as object, hooks);
       await applyGucs(tx, { storeId, userId });
       txGucs.set(tx as object, { storeId, userId });
       try {
@@ -639,13 +635,8 @@ export async function runInTenantContext<T>(
     { maxWait: 10000, timeout: 30000 }
   );
   // COMMITTED (a rollback threw above and the hooks are dropped with it).
-  for (const hook of hooks.splice(0)) {
-    try {
-      await tenantStorage.exit(() => hook());
-    } catch {
-      // The transaction is committed; a failing callback reports its own error.
-    }
-  }
+  await runCommitHooks(hooks.map(h => () => tenantStorage.exit(() => h())));
+  hooks.length = 0;
   return result;
 }
 

@@ -21,6 +21,8 @@ import {
 } from '../../apps/marketing/src/lib/capabilities';
 import {
   ALL_ROW_IDS,
+  COMPARE_AS_OF,
+  COMPARE_AS_OF_AR,
   CHECKED_ON,
   CHECKED_ON_AR,
   COMPARE,
@@ -110,7 +112,8 @@ describe('/compare is balanced', () => {
         }
         for (const r of [...compareRows().gap, ...compareRows().strength])
           expect(html).toContain(r.label[locale]);
-        expect(html).toContain(locale === 'en' ? 'October 2026' : 'أكتوبر 2026');
+        // the as-of date comes from the same source the page renders (lib/compare.ts), never a hardcoded month
+        expect(html).toContain(locale === 'en' ? COMPARE_AS_OF : COMPARE_AS_OF_AR);
         expect(html).not.toMatch(BAD);
         // JSON-LD on a compare page carries no FAQPage
         expect(html).not.toContain('FAQPage');
@@ -198,7 +201,7 @@ describe('llms.txt and llms-full.txt', () => {
         expect(llms).toContain(`https://ebda.app${pagePath(locale, `compare/${s}` as never)}/`);
     }
     expect(llms).toContain('https://ebda.app/llms-full.txt');
-    expect(llms).toMatch(/^# Ebda Store/);
+    expect(llms).toMatch(/^# Ebda AI Studio/);
     expect(llms).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
     expect(llms).toMatch(/## Not there yet/);
     expect(llms).not.toMatch(BAD);
