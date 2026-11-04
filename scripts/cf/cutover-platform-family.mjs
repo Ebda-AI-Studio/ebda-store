@@ -42,6 +42,9 @@ export const FAMILIES = {
     'billing_webhook_events',
     'store_lifecycle_emails',
   ],
+  // Ruling NZ-AN-1: platform-wide AI usage (the quota counts across stores). The per-store analytics tables use
+  // scripts/cf/copy-analytics-to-do.mjs instead (same marker/freeze keys, family `analytics`).
+  'ai-usage': ['ai_usage'],
 };
 
 const markerKey = family => `platform_cutover.${family}`;

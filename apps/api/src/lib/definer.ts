@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { platformFamilyOnD1 } from '../services/platform/cutover';
+import { requirePlatformDb } from './platform-db';
 import {
   entityStoreIdD1,
   onD1 as onBillingD1,
@@ -580,6 +582,16 @@ export async function countAiUsage(opts: {
   cachedHit: boolean;
   feature?: string;
 }): Promise<number> {
+  // Ruling NZ-AN-1: after the `ai-usage` cutover the table is one platform table on D1 (a single indexed count, no RLS to bypass)
+  if (await platformFamilyOnD1('ai-usage')) {
+    return (await requirePlatformDb()).aiUsage.count({
+      where: {
+        createdAt: { gte: opts.since },
+        cachedHit: opts.cachedHit,
+        ...(opts.feature ? { feature: opts.feature } : {}),
+      },
+    });
+  }
   const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
     SELECT public.ebda_ai_usage_count(${opts.since}::timestamp, ${opts.cachedHit}, ${opts.feature ?? null}) AS n`;
   return Number(rows[0]?.n ?? 0);

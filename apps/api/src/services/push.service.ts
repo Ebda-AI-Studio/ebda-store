@@ -6,6 +6,7 @@
  * (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT).
  */
 
+import { analyticsWrite } from '../lib/analytics-backend';
 import webpush from 'web-push';
 import { currentStoreId, prisma, withStore, runInTenantContext } from '@ebda/database';
 import logger from '../lib/logger';
@@ -161,21 +162,17 @@ class PushService {
 
     // notification_logs is under FORCE-RLS too — bypass so the write succeeds
     // from non-tenant-context fan-out.
-    await withStore(storeId, tx =>
-      tx.notificationLog.create({
-        data: {
-          storeId,
-          channel: 'push',
-          event: 'push_send',
-          status,
-          metadata: {
-            title,
-            tokenCount: subscriptions.length,
-            successCount,
-            failureCount,
-          },
-        },
-      })
+    const pushLog = {
+      storeId,
+      channel: 'push',
+      event: 'push_send',
+      status,
+      metadata: { title, tokenCount: subscriptions.length, successCount, failureCount },
+    };
+    await analyticsWrite(
+      storeId,
+      w => w.notificationLog.create({ data: pushLog }),
+      () => withStore(storeId, tx => tx.notificationLog.create({ data: pushLog }))
     ).catch(err => logger.error({ err }, '[PushService] Failed to write NotificationLog'));
 
     logger.info(
@@ -340,16 +337,17 @@ class PushService {
     }
 
     const status = successCount > 0 ? 'sent' : 'failed';
-    await runInTenantContext(storeId, () =>
-      prisma.notificationLog.create({
-        data: {
-          storeId,
-          channel: 'push',
-          event: 'orders_app_new_order',
-          status,
-          metadata: { title, tokenCount: subscriptions.length, successCount, failureCount },
-        },
-      })
+    const ordersLog = {
+      storeId,
+      channel: 'push',
+      event: 'orders_app_new_order',
+      status,
+      metadata: { title, tokenCount: subscriptions.length, successCount, failureCount },
+    };
+    await analyticsWrite(
+      storeId,
+      w => w.notificationLog.create({ data: ordersLog }),
+      () => runInTenantContext(storeId, () => prisma.notificationLog.create({ data: ordersLog }))
     ).catch(err =>
       logger.error({ err }, '[PushService] Failed to write orders-app NotificationLog')
     );

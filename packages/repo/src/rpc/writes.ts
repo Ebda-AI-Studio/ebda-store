@@ -91,6 +91,12 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'CatalogImportItem',
   'CiHintLog',
   'CiStoreGate',
+  // per-store analytics (Ruling NZ-AN-1): the gsc ingest upserts and the notification log write through the generic path; the counters use the analytics ops
+  'SearchQueryDaily',
+  'ProductDailyView',
+  'QrScanDaily',
+  'NotificationLog',
+  'GscDailyMetric',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

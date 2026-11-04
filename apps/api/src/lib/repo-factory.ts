@@ -127,7 +127,12 @@ export type WritableModel =
   | 'catalogImportFile'
   | 'catalogImportItem'
   | 'ciHintLog'
-  | 'ciStoreGate';
+  | 'ciStoreGate'
+  | 'searchQueryDaily'
+  | 'productDailyView'
+  | 'qrScanDaily'
+  | 'notificationLog'
+  | 'gscDailyMetric';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -638,6 +643,49 @@ export interface MoneyClient {
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** Per-store analytics counters and reads on the DO (Ruling NZ-AN-1). */
+  searchLogRecord(a: {
+    dayMs: number;
+    term: string;
+    count: number;
+    zero: number;
+    cap: number;
+  }): Promise<{ counted: boolean }>;
+  searchLogPurge(a: { cutoffMs: number }): Promise<{ deleted: number }>;
+  searchInsights(a: {
+    sinceMs: number;
+    minShown: number;
+    zeroOnly: boolean;
+    limit?: number;
+  }): Promise<{
+    totals: { searches: number; zero: number };
+    terms: Array<{
+      term: string;
+      searches: number;
+      zero_results: number;
+      last_result_count: number;
+    }>;
+  }>;
+  qrScanRecord(a: {
+    dayMs: number;
+    kind: string;
+    ref: string;
+    pruneBeforeMs?: number;
+  }): Promise<{ counted: true }>;
+  viewRecord(a: { dayMs: number; productId: string }): Promise<{ counted: true }>;
+  analyticsImportStatus(a: Record<string, never>): Promise<{
+    done: boolean;
+    batches: number;
+    tables: Record<string, { rows: number; sums: Record<string, number> }>;
+  }>;
+  analyticsImport(a: {
+    batchId: string;
+    table: string;
+    rows: Array<Record<string, unknown>>;
+  }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportFinish(a: {
+    expect: Record<string, { rows: number; sums: Record<string, number> }>;
+  }): Promise<{ done: true; tables: Record<string, number> }>;
   /** True while any indexable product still needs a vector. */
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
   /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
@@ -1125,6 +1173,14 @@ export function makeMoneyClient(
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    searchLogRecord: a => call('searchLogRecord', a),
+    searchLogPurge: a => call('searchLogPurge', a),
+    searchInsights: a => call('searchInsights', a),
+    qrScanRecord: a => call('qrScanRecord', a),
+    viewRecord: a => call('viewRecord', a),
+    analyticsImportStatus: a => call('analyticsImportStatus', a),
+    analyticsImport: a => call('analyticsImport', a),
+    analyticsImportFinish: a => call('analyticsImportFinish', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),

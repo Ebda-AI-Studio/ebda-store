@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { analyticsRead } from '../lib/analytics-backend';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { FeatureKey } from '@ebda/shared';
@@ -350,26 +351,34 @@ router.get(
         ...(status ? { status } : {}),
       };
 
-      const [total, logs] = await Promise.all([
-        prisma.notificationLog.count({ where }),
-        prisma.notificationLog.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-          select: {
-            id: true,
-            channel: true,
-            event: true,
-            status: true,
-            providerMessageId: true,
-            error: true,
-            metadata: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        }),
-      ]);
+      const listArgs = {
+        where,
+        orderBy: { createdAt: 'desc' as const },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          channel: true,
+          event: true,
+          status: true,
+          providerMessageId: true,
+          error: true,
+          metadata: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      };
+      // Ruling NZ-AN-1: a Durable Object store's log lives in its DO once its analytics moved
+      const [total, logs] = await analyticsRead(
+        storeId,
+        async r =>
+          Promise.all([r.notificationLog.count({ where }), r.notificationLog.findMany(listArgs)]),
+        async () =>
+          Promise.all([
+            prisma.notificationLog.count({ where }),
+            prisma.notificationLog.findMany(listArgs),
+          ])
+      );
 
       res.json({
         success: true,
@@ -401,11 +410,24 @@ router.get(
       const { storeId } = req.params;
 
       // Group by channel + status for a breakdown
-      const groups = await prisma.notificationLog.groupBy({
-        by: ['channel', 'status'],
+      const statArgs = {
+        by: ['channel', 'status'] as ('channel' | 'status')[],
         where: { storeId },
-        _count: { id: true },
-      });
+        _count: { id: true as const },
+      };
+      const [groups, total] = await analyticsRead(
+        storeId,
+        async r =>
+          Promise.all([
+            r.notificationLog.groupBy(statArgs),
+            r.notificationLog.count({ where: { storeId } }),
+          ]),
+        async () =>
+          Promise.all([
+            prisma.notificationLog.groupBy(statArgs),
+            prisma.notificationLog.count({ where: { storeId } }),
+          ])
+      );
 
       // Build a nested map: { channel: { status: count } }
       const stats: Record<string, Record<string, number>> = {};
@@ -413,8 +435,6 @@ router.get(
         if (!stats[row.channel]) stats[row.channel] = {};
         stats[row.channel][row.status] = row._count.id;
       }
-
-      const total = await prisma.notificationLog.count({ where: { storeId } });
 
       res.json({ success: true, data: { stats, total } });
     } catch (error) {

@@ -1332,6 +1332,26 @@ export const goldRatesCurrent = sqliteTable(
   t => [primaryKey({ columns: [t.storeId, t.karat] })]
 );
 
+export const gscDailyMetrics = sqliteTable('gsc_daily_metrics', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  impressions: integer('impressions').notNull().default(0),
+  clicks: integer('clicks').notNull().default(0),
+  ctr: real('ctr').notNull().default(0),
+  position: real('avg_position').notNull().default(0),
+  topQueries: text('top_queries', { mode: 'json' }).$type<unknown>().notNull().default([]),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const inventoryHistory = sqliteTable('inventory_history', {
   id: text('id')
     .primaryKey()
@@ -1515,6 +1535,29 @@ export const notificationEventConfigs = sqliteTable('notification_event_configs'
   whatsapp: integer('whatsapp', { mode: 'boolean' }).notNull().default(true),
   sms: integer('sms', { mode: 'boolean' }).notNull().default(true),
   push: integer('push', { mode: 'boolean' }).notNull().default(true),
+});
+
+export const notificationLogs = sqliteTable('notification_logs', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  channel: text('channel').notNull(),
+  event: text('event').notNull(),
+  recipientPhoneHash: text('recipient_phone_hash'),
+  recipientEmailHash: text('recipient_email_hash'),
+  status: text('status').notNull().default('queued'),
+  providerMessageId: text('provider_message_id'),
+  idempotencyKey: text('idempotency_key'),
+  error: text('error'),
+  metadata: text('metadata', { mode: 'json' }).$type<unknown>().notNull().default({}),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
 export const onesignalSubscriptions = sqliteTable('onesignal_subscriptions', {
@@ -1821,6 +1864,17 @@ export const productCategories = sqliteTable(
   },
   t => [primaryKey({ columns: [t.productId, t.categoryId] })]
 );
+
+export const productDailyViews = sqliteTable('product_daily_views', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  productId: text('product_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  count: integer('count').notNull().default(0),
+});
 
 export const productFaqs = sqliteTable('product_faqs', {
   id: text('id')
@@ -2210,6 +2264,18 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const qrScanDaily = sqliteTable('qr_scan_daily', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  kind: text('kind').notNull(),
+  ref: text('ref').notNull().default(''),
+  count: integer('count').notNull().default(0),
+});
+
 export const reorderRules = sqliteTable('reorder_rules', {
   id: text('id')
     .primaryKey()
@@ -2362,6 +2428,20 @@ export const reviews = sqliteTable('reviews', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const searchQueryDaily = sqliteTable('search_query_daily', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  term: text('term').notNull(),
+  searches: integer('searches').notNull().default(0),
+  zeroResults: integer('zero_results').notNull().default(0),
+  lastResultCount: integer('last_result_count').notNull().default(0),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const sequences = sqliteTable(

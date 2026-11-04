@@ -18,7 +18,7 @@
  */
 import { GeminiFailoverClient } from '../lib/ai/gemini-keys';
 import { z } from 'zod/v3';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { redis } from './redis.service';
@@ -290,6 +290,8 @@ export async function recordUsage(
     await withSavepoint(() =>
       prisma.aiUsage.create({
         data: {
+          // client-side id (Ruling NZ-AN-1): the row is append-only and a retried insert of the same id is one row
+          id: randomUUID(),
           storeId,
           feature,
           inputTokens,

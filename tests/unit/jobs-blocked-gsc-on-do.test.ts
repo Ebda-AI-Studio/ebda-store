@@ -1,7 +1,7 @@
 /**
- * Ruling CF-JOBS-4B: the two GSC ingest jobs for a store that lives on its Durable Object. They open NO store table (the Store row
- * is platform, the daily metric is the analytics target): the repo factory THROWS if either asks for a store's DO, the guard lets
- * both run, and a double fire upserts the same (store, date) row once.
+ * Ruling CF-JOBS-4B + NZ-AN-1: the two GSC ingest jobs for a store that lives on its Durable Object. The Store row is read through the
+ * store's backend and the daily metric is written to the store's DO (analytics moved): Postgres THROWS if either job reaches it,
+ * the guard lets both run, and a double fire upserts the same (store, date) row once.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,15 +10,27 @@ const h = vi.hoisted(() => ({
   metrics: new Map<string, Record<string, unknown>>(),
   directory: [] as Array<Record<string, unknown>>,
 }));
-vi.mock('@api/lib/repo-factory', () => {
-  const boom = () => {
-    throw new Error('DO touched');
-  };
-  return { storeRepo: boom, storeDb: boom, storeWriter: boom, storeMoney: boom };
-});
-vi.mock('@ebda/database', async () =>
-  (await import('./helpers/database-mock')).databaseMock({
-    prisma: {
+const doStore = {
+  store: { findUnique: async () => ({ domain: 'dahab.example', plan: 'growth' }) },
+};
+vi.mock('@api/lib/repo-factory', () => ({
+  storeRepo: async () => ({ backend: 'do', db: doStore }),
+  storeDb: async () => doStore,
+  storeWriter: async () => {
+    throw new Error('writer not expected here');
+  },
+  storeMoney: async () => {
+    throw new Error('DO money touched');
+  },
+}));
+// analytics moved to the DO (marker present): the metric is written through the DO writer, never prisma
+vi.mock('@api/lib/analytics-backend', () => ({
+  analyticsWrite: async (
+    _id: string,
+    onDo: (w: unknown) => Promise<unknown>,
+    _pg: () => Promise<unknown>
+  ) =>
+    onDo({
       gscDailyMetric: {
         upsert: async (a: {
           where: { storeId_date: { storeId: string; date: Date } };
@@ -31,11 +43,26 @@ vi.mock('@ebda/database', async () =>
           return a.create;
         },
       },
-    },
+    }),
+}));
+vi.mock('@ebda/database', async () =>
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: new Proxy(
+      {},
+      {
+        get: (_t, p) => {
+          throw new Error(`Postgres touched: prisma.${String(p)}`);
+        },
+      }
+    ),
     extra: {
-      runInTenantContext: async (_id: string, fn: () => unknown) => fn(),
-      withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
-        fn({ store: { findUnique: async () => ({ domain: 'dahab.example', plan: 'growth' }) } }),
+      runInTenantContext: async () => {
+        throw new Error('Postgres tenant transaction opened for a DO store');
+      },
+      withStore: async () => {
+        throw new Error('Postgres withStore touched for a DO store');
+      },
+      withoutHiddenStores: (fn: () => unknown) => fn(),
       storeDirectory: async (pred: (s: Record<string, unknown>) => boolean) =>
         h.directory.filter(pred),
     },

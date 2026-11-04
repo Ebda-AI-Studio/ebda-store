@@ -33,7 +33,7 @@ describe('model-split.json', () => {
       count('analytics'),
       count('drop'),
       count('identity'),
-    ]).toEqual([27, 122, 7, 1, 4]);
+    ]).toEqual([28, 127, 1, 1, 4]);
   });
 
   it('keeps identity out of the platform database (Ruling ID-1: owned by the ebda-identity track)', () => {

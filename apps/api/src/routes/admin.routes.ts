@@ -1,4 +1,6 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import { aiUsageFeatureStats } from '../services/ai-usage.service';
+import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -1882,57 +1884,54 @@ router.get(
       // aiUsage has RLS: aggregate store by store (`acrossStores`, one short tenant
       // transaction each) and merge the per-store partials.
       const result = await (async () => {
-        const perStore = await acrossStores(
-          async storeId => {
-            const [today, month, cached] = await Promise.all([
-              prisma.aiUsage.count({
-                where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
-              }),
-              prisma.aiUsage.count({
-                where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
-              }),
-              prisma.aiUsage.count({
-                where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: true },
-              }),
-            ]);
-            // Per-store aggregations: today count, month count, last call, feature breakdown
-            const stats = await prisma.$queryRaw<
-              Array<{
-                store_id: string;
-                today_count: bigint;
-                month_count: bigint;
-                last_call_at: Date | null;
-                feature: string;
-                feature_count: bigint;
-                month_cost_micros: bigint | null;
-                month_unpriced: bigint;
-              }>
-            >`
-          SELECT
-            store_id,
-            COUNT(*) FILTER (WHERE created_at >= ${startOfDay} AND cached_hit = false) AS today_count,
-            COUNT(*) FILTER (WHERE created_at >= ${startOfMonth} AND cached_hit = false) AS month_count,
-            MAX(created_at) AS last_call_at,
-            feature,
-            COUNT(*) AS feature_count,
-            -- Spend this month. SUM ignores NULLs, so unpriced rows do not
-            -- silently contribute 0 - they are counted separately below and
-            -- surfaced in the UI, because "no rate configured" and "free" are
-            -- different facts and folding them together makes an unpriced
-            -- deployment look free. See apps/api/src/lib/ai-pricing.ts.
-            SUM(cost_micros) FILTER (WHERE created_at >= ${startOfMonth}) AS month_cost_micros,
-            COUNT(*) FILTER (
-              WHERE created_at >= ${startOfMonth}
-                AND cached_hit = false
-                AND cost_micros IS NULL
-            ) AS month_unpriced
-          FROM ai_usage
-          GROUP BY store_id, feature
-        `;
-            return { today, month, cached, stats };
-          },
-          { storeIds: await boundedFanoutStoreIds() }
-        );
+        const perStoreFn = async (storeId: string) => {
+          const [today, month, cached] = await Promise.all([
+            prisma.aiUsage.count({
+              where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+            }),
+            prisma.aiUsage.count({
+              where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
+            }),
+            prisma.aiUsage.count({
+              where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: true },
+            }),
+          ]);
+          // Per-store aggregations: today count, month count, last call, feature breakdown. No raw SQL (Ruling NZ-AN-1): the
+          // model router serves D1 or Postgres. SUM ignores NULLs, so unpriced rows do not silently contribute 0 - they are
+          // counted separately and surfaced in the UI ("no rate configured" and "free" are different facts; ai-pricing.ts).
+          const features = await aiUsageFeatureStats(storeId, startOfDay, startOfMonth);
+          const stats = features.map(f => ({
+            store_id: storeId,
+            today_count: f.todayCount,
+            month_count: f.monthCount,
+            last_call_at: f.lastCallAt,
+            feature: f.feature,
+            feature_count: f.featureCount,
+            month_cost_micros: f.monthCostMicros,
+            month_unpriced: f.monthUnpriced,
+          }));
+          return { today, month, cached, stats };
+        };
+        const storeIdsForAi = await boundedFanoutStoreIds();
+        // `ai_usage` on D1 has no RLS: one plain pass, no Postgres transaction per store. Before the cutover it is store by store
+        // (`acrossStores`, one short tenant transaction each) because the Postgres table is strict-RLS.
+        const perStore = (await platformFamilyOnD1('ai-usage'))
+          ? await (async () => {
+              // bounded concurrency: 500 stores x 8 statements at once would queue behind D1's single writer thread
+              const out: Array<{ storeId: string; value: Awaited<ReturnType<typeof perStoreFn>> }> =
+                [];
+              let next = 0;
+              await Promise.all(
+                Array.from({ length: 6 }, async () => {
+                  while (next < storeIdsForAi.length) {
+                    const storeId = storeIdsForAi[next++];
+                    out.push({ storeId, value: await perStoreFn(storeId) });
+                  }
+                })
+              );
+              return out;
+            })()
+          : await acrossStores(perStoreFn, { storeIds: storeIdsForAi });
         const platformToday = perStore.reduce((n, p) => n + p.value.today, 0);
         const platformMonth = perStore.reduce((n, p) => n + p.value.month, 0);
         const platformCached = perStore.reduce((n, p) => n + p.value.cached, 0);

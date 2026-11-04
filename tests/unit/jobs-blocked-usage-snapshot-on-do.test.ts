@@ -1,7 +1,7 @@
 /**
  * Ruling CF-JOBS-4B: store-usage-snapshot for a store on its Durable Object. The catalogue and commerce counts come from the DO op
- * `usageCounts`, the analytics numbers and the snapshot row from the platform side; the store-scoped Postgres query THROWS if
- * reached. Double fire: the snapshot is upserted by (store, period), so one row.
+ * `usageCounts` (incl. the DO's own product views, Ruling NZ-AN-1), the AI numbers from the D1 `ai_usage` table and the snapshot
+ * row from the platform side; the store-scoped Postgres query THROWS if reached. Double fire: the snapshot is upserted by (store, period), so one row.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,18 +24,9 @@ vi.mock('@ebda/database', async () =>
     extra: {
       withStore: async (_id: string, fn: (tx: unknown) => Promise<unknown>) =>
         fn({
-          store: { findUnique: async () => ({ deletedAt: h.deleted ? new Date() : null }) },
-          $queryRaw: async () => [
-            {
-              product_views: 40n,
-              ai_calls: 3n,
-              ai_billable_calls: 2n,
-              ai_tokens_in: 100n,
-              ai_tokens_out: 50n,
-              ai_cost_micros: 900n,
-              ai_unpriced_calls: 0n,
-            },
-          ],
+          $queryRaw: async () => {
+            throw new Error('Postgres touched: $queryRaw');
+          },
           storeUsageSnapshot: {
             upsert: async (a: { where: any; create: Record<string, any> }) => {
               h.snapshots.set(
@@ -49,7 +40,10 @@ vi.mock('@ebda/database', async () =>
   })
 );
 vi.mock('@api/lib/repo-factory', () => ({
-  storeRepo: async () => ({ backend: 'do' }),
+  storeRepo: async () => ({
+    backend: 'do',
+    db: { store: { findUnique: async () => ({ deletedAt: h.deleted ? new Date() : null }) } },
+  }),
   storeMoney: async () => ({
     usageCounts: async (a: { startMs: number; endMs: number }) => {
       h.usageArgs.push(a);
@@ -64,8 +58,21 @@ vi.mock('@api/lib/repo-factory', () => ({
         customers: 5,
         sessionsProxy: 90,
         cartsWithItems: 11,
+        productViews: 40,
       };
     },
+  }),
+}));
+vi.mock('@api/lib/analytics-backend', () => ({ analyticsOnDo: async () => true }));
+vi.mock('@api/services/platform/cutover', () => ({ platformFamilyOnD1: async () => true }));
+vi.mock('@api/services/ai-usage.service', () => ({
+  aiUsageTotals: async () => ({
+    calls: 3,
+    billableCalls: 2,
+    tokensIn: 100,
+    tokensOut: 50,
+    costMicros: 900,
+    unpricedCalls: 0,
   }),
 }));
 vi.mock('@api/lib/inngest/client', () => ({
