@@ -8,6 +8,7 @@ import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { withSavepoint } from '../lib/savepoint';
+import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { config } from '../config';
 import { generateProductSearchTerms } from '../lib/ai/product-search-terms-generator';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
@@ -1070,10 +1071,17 @@ async function enqueueRecommendationsSweepNow(storeId: string, productId: string
     });
     if (!jobId) return;
 
-    await inngest.send({
-      name: 'bulk-ai/recommendations-requested',
-      data: { jobId, storeId, force: false },
-    });
+    try {
+      await inngest.send({
+        name: 'bulk-ai/recommendations-requested',
+        data: { jobId, storeId, force: false },
+      });
+    } catch (sendErr) {
+      // Queue-then-send fails fast (Ruling JOBS-ORPHAN-1): nothing will start this row, so fail it
+      // rather than leave an orphan `queued` one, then fall into the non-fatal catch below.
+      await markJobFailedOnEnqueueError(storeId, jobId, sendErr);
+      throw sendErr;
+    }
 
     logger.info(
       { storeId, productId, jobId },
