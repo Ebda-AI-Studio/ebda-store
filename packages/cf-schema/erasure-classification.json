@@ -1532,11 +1532,11 @@
   },
   "store-do:notification_logs": {
     "db": "store-do",
-    "class": "merchant-pii",
+    "class": "customer-pii",
     "action": "delete",
     "piiColumns": ["recipient_phone_hash", "recipient_email_hash"],
-    "subjectKeys": [],
-    "note": "NZ-AN-1: unsalted SHA-256 of the recipient; goes with the store. A shopper-subject match by hash is a residual (DO SQLite has no sha256)"
+    "subjectKeys": ["buyerKey"],
+    "note": "NZ-AN-1: recipient_phone_hash is the suite buyer key (HMAC of the E.164 phone), so a shopper erasure deletes the rows by it; recipient_email_hash is never written"
   },
   "d1:ai_usage": {
     "db": "d1",

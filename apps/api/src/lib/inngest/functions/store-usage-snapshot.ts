@@ -342,18 +342,26 @@ async function withAiUsageFromD1<
   },
 >(rows: T[], start: Date, end: Date): Promise<T[]> {
   if (!(await platformFamilyOnD1('ai-usage'))) return rows;
-  const out: T[] = [];
-  for (const r of rows) {
-    const ai = await aiUsageTotals(r.store_id, start, end);
-    out.push({
-      ...r,
-      ai_calls: BigInt(ai.calls),
-      ai_billable_calls: BigInt(ai.billableCalls),
-      ai_tokens_in: BigInt(ai.tokensIn),
-      ai_tokens_out: BigInt(ai.tokensOut),
-      ai_cost_micros: BigInt(ai.costMicros),
-      ai_unpriced_calls: BigInt(ai.unpricedCalls),
-    });
-  }
+  // bounded parallelism (8 stores at a time, 4 statements each): serial was 4 sequential D1 round trips per store
+  const out: T[] = new Array(rows.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, rows.length) }, async () => {
+      while (next < rows.length) {
+        const i = next++;
+        const r = rows[i];
+        const ai = await aiUsageTotals(r.store_id, start, end);
+        out[i] = {
+          ...r,
+          ai_calls: BigInt(ai.calls),
+          ai_billable_calls: BigInt(ai.billableCalls),
+          ai_tokens_in: BigInt(ai.tokensIn),
+          ai_tokens_out: BigInt(ai.tokensOut),
+          ai_cost_micros: BigInt(ai.costMicros),
+          ai_unpriced_calls: BigInt(ai.unpricedCalls),
+        };
+      }
+    })
+  );
   return out;
 }

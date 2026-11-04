@@ -234,6 +234,7 @@ async function main() {
       console.error(`${sig}: lifting the freeze before exit`);
       lift().finally(() => process.exit(130));
     });
+  const freezeStartedAt = Date.now();
   await setFreeze();
   frozenNow = true;
   console.log(
@@ -351,10 +352,54 @@ async function main() {
   if (frozenNow) throw new Error('the freeze is still up (see above); run --unfreeze');
   console.log('freeze lifted.');
 
+  // 5b. ai-usage (Ruling NZ-AN-1): while the family is frozen `recordUsage` writes the usage row of an AI call that already ran to
+  // POSTGRES (never dropped). Copy those rows into D1 now (idempotent by id), then verify every one is there; the digest drift
+  // check below would otherwise report them as lost writes.
+  let skipDrift = new Set();
+  if (args.family === 'ai-usage') {
+    const c = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+    try {
+      const since = new Date(freezeStartedAt - 60_000);
+      const rows = (
+        await c.query(
+          `SELECT id, store_id, feature, input_tokens, output_tokens, cached_hit, model, cost_micros, subject_type, subject_id, created_at
+             FROM ai_usage WHERE created_at >= $1 ORDER BY id`,
+          [since]
+        )
+      ).rows;
+      const stmts = rows.map(
+        r =>
+          `INSERT INTO ai_usage (id, store_id, feature, input_tokens, output_tokens, cached_hit, model, cost_micros, subject_type, subject_id, created_at) VALUES (${[r.id, r.store_id, r.feature, r.input_tokens, r.output_tokens, r.cached_hit ? 1 : 0, r.model, r.cost_micros, r.subject_type, r.subject_id, new Date(r.created_at).getTime()].map(lit).join(', ')}) ON CONFLICT (id) DO NOTHING;`
+      );
+      for (let i = 0; i < stmts.length; i += 200) await d1Statements(d, stmts.slice(i, i + 200));
+      let missing = 0;
+      for (let i = 0; i < rows.length; i += 200) {
+        const ids = rows.slice(i, i + 200).map(r => lit(r.id));
+        const have = (
+          await d1Query(d, `SELECT count(*) AS n FROM ai_usage WHERE id IN (${ids.join(',')})`)
+        )[0].n;
+        missing += ids.length - Number(have);
+      }
+      console.log(
+        `  ai-usage delta: ${rows.length} Postgres row(s) since the freeze, ${missing} missing in D1 after the copy`
+      );
+      if (missing) {
+        console.log(
+          'DELTA INCOMPLETE: copy the missing Postgres ai_usage rows (created_at since the freeze) into D1 by hand.'
+        );
+        process.exit(2);
+      }
+      skipDrift = new Set(['ai_usage']);
+    } finally {
+      await c.query('ROLLBACK').catch(() => {});
+      await c.end();
+    }
+  }
+
   // 6. drift: a NEW connection = a snapshot taken after the flip. Any difference is a write that reached Postgres.
   const after = await open();
   const drift = [];
-  for (const bt of after.fam) {
+  for (const bt of after.fam.filter(b => !skipDrift.has(b.name))) {
     const now = await sourceDigest(after.client, bt, plan.platform, 'all');
     if (now.count !== before[bt.name].count || now.digest !== before[bt.name].digest)
       drift.push(bt.name);

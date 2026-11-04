@@ -230,14 +230,21 @@ export async function purgeSearchLogAcrossStores(
     );
   let failedStores = 0;
   let purged = 0;
-  for (const storeId of storeIds) {
-    try {
-      purged += await runInStoreCtx(storeId, () => purgeSearchLog(storeId, opts.now));
-    } catch (err) {
-      failedStores += 1;
-      logger.error({ storeId, code: errCode(err) }, '[SEARCH-LOG] purge failed for store');
-    }
-  }
+  // bounded parallelism (8 stores at a time): serial over every store made the daily run O(stores) round trips
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, storeIds.length) }, async () => {
+      while (next < storeIds.length) {
+        const storeId = storeIds[next++];
+        try {
+          purged += await runInStoreCtx(storeId, () => purgeSearchLog(storeId, opts.now));
+        } catch (err) {
+          failedStores += 1;
+          logger.error({ storeId, code: errCode(err) }, '[SEARCH-LOG] purge failed for store');
+        }
+      }
+    })
+  );
   return { purged, failedStores };
 }
 

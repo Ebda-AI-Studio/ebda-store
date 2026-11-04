@@ -161,7 +161,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     } catch {
       return reply({ ok: false, code: 'BAD_JSON' }, 400);
     }
-    const ALLOWED = ['analyticsImportStatus', 'analyticsImport', 'analyticsImportFinish'];
+    const ALLOWED = [
+      'analyticsImportStatus',
+      'analyticsImport',
+      'analyticsImportFinish',
+      'analyticsImportReset',
+    ];
     if (typeof body.op !== 'string' || !ALLOWED.includes(body.op))
       return reply({ ok: false, code: 'OP_NOT_ALLOWED' }, 400);
     try {
