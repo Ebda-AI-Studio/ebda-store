@@ -2,6 +2,8 @@ import type { Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { FISCAL_RETENTION_YEARS } from './fiscal-document.service';
+import { onD1 } from './platform/billing-d1';
+import crypto from 'crypto';
 
 /**
  * What a store deletion must check and keep (ruling MONEYB-4).
@@ -145,7 +147,11 @@ export async function archiveFiscalRecords(
         WHERE d.store_id = o.store_id AND d.order_id = o.id
           AND d.doc_type IN ('tax_invoice', 'receipt', 'order_record'))`;
   // Ebda's own subscription billing ledger (its VAT on the store's plan).
-  const billingEvents = await tx.$executeRaw`
+  // NEON-ZERO-1 (N-10): billing_events live in D1 after the cutover, so the INSERT ... SELECT across them cannot be one
+  // Postgres statement: read the ledger through the routed model and insert the archive rows.
+  const billingEvents = (await onD1())
+    ? await archiveBillingEventsFromD1(tx, storeId, years)
+    : await tx.$executeRaw`
     INSERT INTO public.fiscal_documents
       (id, store_id, order_id, doc_type, status, issued_at, currency,
        net_amount, vat_amount, total_amount, vat_rate_bps, seller_trn, payload, retain_until)
@@ -176,4 +182,57 @@ export async function archiveFiscalRecords(
     WHERE b.store_id = ${storeId}`;
   logger.info({ storeId, orders, billingEvents }, '[STORE_DELETE] fiscal records archived');
   return { orders, billingEvents };
+}
+
+async function archiveBillingEventsFromD1(
+  tx: Prisma.TransactionClient,
+  storeId: string,
+  years: number
+): Promise<number> {
+  const [store, events] = await Promise.all([
+    tx.store.findUnique({ where: { id: storeId }, select: { name: true } }),
+    tx.billingEvent.findMany({ where: { storeId } }),
+  ]);
+  if (events.length === 0) return 0;
+  const archivedAt = new Date().toISOString();
+  const { count } = await tx.fiscalDocument.createMany({
+    data: events.map(b => {
+      const vat = (b.vat ?? null) as { rateBps?: number | string; trn?: string } | null;
+      const rate = vat?.rateBps === undefined || vat.rateBps === '' ? null : Number(vat.rateBps);
+      const retainUntil = new Date(b.createdAt);
+      retainUntil.setUTCFullYear(retainUntil.getUTCFullYear() + years);
+      return {
+        id: crypto.randomUUID(),
+        storeId: b.storeId,
+        orderId: null,
+        docType: 'billing_record' as const,
+        status: 'issued',
+        issuedAt: b.createdAt,
+        currency: b.currency,
+        netAmount: Math.max(0, b.amountMinor - b.vatMinor),
+        vatAmount: Math.max(0, b.vatMinor),
+        totalAmount: Math.max(0, b.amountMinor),
+        vatRateBps: Number.isInteger(rate) ? rate : null,
+        sellerTrn: vat?.trn ?? null,
+        retainUntil,
+        payload: {
+          version: 1,
+          archivedAt,
+          reason: 'store_deleted',
+          billingEventId: b.id,
+          type: b.type,
+          status: b.status,
+          planCode: b.planCode,
+          billingInterval: b.billingInterval,
+          forPeriodEnd: b.forPeriodEnd,
+          provider: b.provider,
+          providerRef: b.providerRef,
+          relatedEventId: b.relatedEventId,
+          vat: b.vat,
+          seller: { name: store?.name ?? null },
+        },
+      };
+    }),
+  });
+  return count;
 }

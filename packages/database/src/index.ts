@@ -394,6 +394,59 @@ export function currentTenantGucs(): TenantGucs | undefined {
 }
 
 /**
+ * NEON-ZERO-1: models whose rows moved to Cloudflare D1. The API registers a router once at boot; every
+ * `prisma.<model>.<method>(...)` / `tx.<model>.<method>(...)` (the `withStore` transaction IS this proxy) then asks
+ * `route` first. `route` answers from D1 once the table family's cutover marker exists and otherwise calls `postgres()`,
+ * so nothing changes until the controller has run the copy (no dual-read: one marker, one source). Routed models are
+ * never usable inside an array `$transaction([...])` (the call is async); there are none today.
+ */
+export interface ModelRouter {
+  models: ReadonlySet<string>;
+  route(
+    model: string,
+    method: string,
+    args: unknown[],
+    postgres: () => Promise<unknown>
+  ): Promise<unknown>;
+}
+let modelRouter: ModelRouter | undefined;
+export function setModelRouter(router: ModelRouter | undefined): void {
+  modelRouter = router;
+}
+const ROUTED_METHODS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'create',
+  'createMany',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany',
+  'count',
+  'aggregate',
+  'groupBy',
+]);
+function routedDelegate(model: string, postgres: () => unknown, router: ModelRouter): object {
+  return new Proxy(
+    {},
+    {
+      get(_t, method) {
+        if (typeof method !== 'string' || !ROUTED_METHODS.has(method))
+          return (postgres() as Record<string | symbol, unknown>)[method];
+        return (...args: unknown[]) =>
+          router.route(model, method, args, async () =>
+            (postgres() as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](...args)
+          );
+      },
+    }
+  );
+}
+
+/**
  * Proxy-wrapped Prisma client.
  *
  * Which client it talks to is decided PER ACCESS (`basePrisma()`): the
@@ -411,6 +464,33 @@ export function currentTenantGucs(): TenantGucs | undefined {
  */
 export const prisma = new Proxy({} as AppPrismaClient, {
   get(_target, prop) {
+    // NEON-ZERO-1: a model the API has moved to D1 resolves per CALL (the cutover switch is read then), and only
+    // the Postgres branch of that call touches `basePrisma()` - a D1-served call never needs a Postgres client.
+    if (modelRouter && typeof prop === 'string' && modelRouter.models.has(prop))
+      return routedDelegate(prop, () => proxiedGet(prop), modelRouter);
+    return proxiedGet(prop);
+  },
+  // The target is an empty shell, so the remaining traps forward to the live
+  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
+  // then behave as they did when the target was the client itself.
+  has: (_t, prop) => prop in basePrisma(),
+  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
+  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
+  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
+  ownKeys: () => Reflect.ownKeys(basePrisma()),
+  getOwnPropertyDescriptor: (_t, prop) => {
+    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
+    if (d) d.configurable = true;
+    return d;
+  },
+  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
+  // PrismaClient the types would still advertise `passwordHash` while the
+  // runtime omits it — code reading it would compile and silently get
+  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
+}) as AppPrismaClient;
+
+function proxiedGet(prop: string | symbol): unknown {
+  {
     const target = basePrisma();
     const receiver = target;
     const tx = tenantStorage.getStore();
@@ -459,25 +539,8 @@ export const prisma = new Proxy({} as AppPrismaClient, {
     return typeof value === 'function' && typeof prop === 'string' && prop[0] === '$'
       ? value.bind(target)
       : value;
-  },
-  // The target is an empty shell, so the remaining traps forward to the live
-  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
-  // then behave as they did when the target was the client itself.
-  has: (_t, prop) => prop in basePrisma(),
-  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
-  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
-  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
-  ownKeys: () => Reflect.ownKeys(basePrisma()),
-  getOwnPropertyDescriptor: (_t, prop) => {
-    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
-    if (d) d.configurable = true;
-    return d;
-  },
-  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
-  // PrismaClient the types would still advertise `passwordHash` while the
-  // runtime omits it — code reading it would compile and silently get
-  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
-}) as AppPrismaClient;
+  }
+}
 
 // Re-export everything from Prisma client (types, enums, Prisma namespace)
 export * from '@prisma/client';

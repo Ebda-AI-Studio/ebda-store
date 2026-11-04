@@ -31,13 +31,14 @@
  *    the store into the dunning window with a pay-now notice instead.
  */
 import crypto from 'crypto';
-import { prisma, withStore, acrossStores, currentStoreId, type Prisma } from '@ebda/database';
+import { prisma, withStore, currentStoreId, type Prisma } from '@ebda/database';
 import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { sendAlert } from '../alerts.service';
+import { acrossBilling, onD1 } from '../platform/billing-d1';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -449,6 +450,10 @@ async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): P
   });
 }
 
+/** D1 settle lease marker (stored in `failure_reason` while a success is being applied) and how long it holds. */
+const SETTLE_LEASE = 'settling';
+const SETTLE_LEASE_MS = 120_000;
+
 /**
  * Settle one charge row inside the caller's transaction. Guarded transitions:
  *  - succeeded: only from pending|failed (a late success after a failure still
@@ -474,14 +479,57 @@ export async function settleInTx(
     o = { ...o, status: 'failed', failureReason: 'card_setup_without_token' };
   }
   if (o.status === 'succeeded') {
+    const settled = {
+      status: 'succeeded' as const,
+      failureReason: null,
+      ...(o.providerRef ? { providerRef: o.providerRef } : {}),
+      ...(raw !== undefined ? { raw } : {}),
+    };
+    if (await onD1()) {
+      // D1 has no transaction and `succeeded` is final (billing_events_succeeded_final), so the order is: take a lease
+      // on the row, apply the subscription, THEN flip the status. A failure releases the lease and nothing is settled;
+      // a crash leaves the lease, which expires after SETTLE_LEASE_MS. (Ruling NZ-10-2.)
+      const leased = await tx.billingEvent.updateMany({
+        where: {
+          id: eventId,
+          storeId: row.storeId,
+          status: { in: ['pending', 'failed'] },
+          OR: [
+            { failureReason: null },
+            { failureReason: { not: SETTLE_LEASE } },
+            { updatedAt: { lt: new Date(now.getTime() - SETTLE_LEASE_MS) } },
+          ],
+        },
+        data: { failureReason: SETTLE_LEASE },
+      });
+      if (leased.count === 0) return { transitioned: false };
+      try {
+        await applySuccess(tx, row, o, now, effects);
+      } catch (err) {
+        await tx.billingEvent
+          .updateMany({
+            where: { id: eventId, storeId: row.storeId, failureReason: SETTLE_LEASE },
+            data: { failureReason: row.failureReason },
+          })
+          .catch(undo =>
+            logger.error({ err: undo, eventId }, '[billing] could not release a settle lease')
+          );
+        throw err;
+      }
+      const flipped = await tx.billingEvent.updateMany({
+        where: {
+          id: eventId,
+          storeId: row.storeId,
+          status: { in: ['pending', 'failed'] },
+          failureReason: SETTLE_LEASE,
+        },
+        data: settled,
+      });
+      return { transitioned: flipped.count === 1 };
+    }
     const upd = await tx.billingEvent.updateMany({
       where: { id: eventId, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
-      data: {
-        status: 'succeeded',
-        failureReason: null,
-        ...(o.providerRef ? { providerRef: o.providerRef } : {}),
-        ...(raw !== undefined ? { raw } : {}),
-      },
+      data: settled,
     });
     if (upd.count === 0) return { transitioned: false };
     await applySuccess(tx, row, o, now, effects);
@@ -497,7 +545,21 @@ export async function settleInTx(
     },
   });
   if (upd.count === 0) return { transitioned: false };
-  await applyFailure(tx, row, effects);
+  try {
+    await applyFailure(tx, row, effects);
+  } catch (err) {
+    if (await onD1()) {
+      await tx.billingEvent
+        .updateMany({
+          where: { id: eventId, storeId: row.storeId, status: 'failed' },
+          data: { status: 'pending' },
+        })
+        .catch(undo =>
+          logger.error({ err: undo, eventId }, '[billing] could not reopen a half-settled failure')
+        );
+    }
+    throw err;
+  }
   return { transitioned: true };
 }
 
@@ -1035,11 +1097,11 @@ export async function findDueSubscriptionIds(
 ): Promise<string[]> {
   // Per store, each in its own scope (store_subscriptions is strict-RLS): no
   // bypass, and a store whose scope fails does not hide the rest.
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           ...(only?.subscriptionIds ? { id: { in: only.subscriptionIds } } : {}),
           planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
           OR: [
@@ -1088,11 +1150,11 @@ export async function sweepStuckCharges(
   provider?: BillingProvider
 ): Promise<{ polled: number; settled: number; notFound: number; stillStuck: number }> {
   const cutoff = new Date(now.getTime() - STUCK_CHARGE_AFTER_MS);
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.billingEvent.findMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           type: { in: ['renewal', 'upgrade'] },
           status: 'pending',
           createdAt: { lt: cutoff },
@@ -1177,11 +1239,11 @@ export async function sweepStuckCharges(
 
 export async function expireStaleCheckouts(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_CHECKOUT_MS);
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.billingEvent.updateMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           type: { in: ['checkout', 'card_setup'] },
           status: 'pending',
           createdAt: { lt: cutoff },
@@ -2012,10 +2074,13 @@ export async function listSubscriptionsForAdmin(
     select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
   });
   const vat = await resolvePlatformVat();
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
-        where: args.status ? { storeId, status: args.status as never } : { storeId },
+        where: {
+          ...(storeId ? { storeId } : {}),
+          ...(args.status ? { status: args.status as never } : {}),
+        },
         include: {
           store: {
             select: {

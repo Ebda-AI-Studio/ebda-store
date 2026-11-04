@@ -28,6 +28,13 @@ import {
 import { resolveStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
 import { addInterval, priceFor } from './period';
+import {
+  claimRestoreD1,
+  insertCappedGrant,
+  lockSubscription,
+  onD1,
+  revokeGrantsD1,
+} from '../platform/billing-d1';
 
 export const FOUNDING_SLOTS = 20;
 export const REFERRER_MAX_GRANTS = 3;
@@ -191,13 +198,43 @@ async function insertGrant(
     valueMinor: number;
     /** the qualifying payment this grant is backed by */
     source: { eventId: string; storeId: string };
+    /** D1 only: the cap enforced inside the INSERT itself (Postgres serialises with an advisory lock instead). */
+    cap?: { kind: string; beneficiaryId?: string; max: number };
   }
 ): Promise<boolean> {
-  const rows = await tx.$executeRaw`
-    INSERT INTO billing_grants (id, kind, beneficiary_id, counterpart_id, months, value_minor, status, idempotency_key, source_event_id, source_store_id)
-    VALUES (${crypto.randomUUID()}, ${g.kind}, ${g.beneficiaryId}, ${g.counterpartId ?? null}, 1, ${g.valueMinor}, 'pending', ${g.key}, ${g.source.eventId}, ${g.source.storeId})
-    ON CONFLICT (idempotency_key) DO NOTHING`;
-  return rows === 1;
+  if (g.cap && (await onD1()))
+    return insertCappedGrant(
+      {
+        id: crypto.randomUUID(),
+        kind: g.kind,
+        beneficiaryId: g.beneficiaryId,
+        counterpartId: g.counterpartId ?? null,
+        valueMinor: g.valueMinor,
+        key: g.key,
+        sourceEventId: g.source.eventId,
+        sourceStoreId: g.source.storeId,
+      },
+      g.cap
+    );
+  // Same statement on Postgres and D1: createMany + skipDuplicates is INSERT ... ON CONFLICT DO NOTHING.
+  const { count } = await tx.billingGrant.createMany({
+    data: [
+      {
+        id: crypto.randomUUID(),
+        kind: g.kind,
+        beneficiaryId: g.beneficiaryId,
+        counterpartId: g.counterpartId ?? null,
+        months: 1,
+        valueMinor: g.valueMinor,
+        status: 'pending',
+        idempotencyKey: g.key,
+        sourceEventId: g.source.eventId,
+        sourceStoreId: g.source.storeId,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return count === 1;
 }
 
 /**
@@ -219,11 +256,16 @@ export async function createGrantsForPayment(
     where: { kind: 'founding', beneficiaryId: paidStoreId },
   });
   if (already === 0) {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey('billing_grants:founding')}))`;
+    // D1: the cap is inside the INSERT (insertGrant `cap`), so no lock and no separate count.
+    const d1 = await onD1();
+    if (!d1)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey('billing_grants:founding')}))`;
     // a revoked grant gives its slot back
-    const taken = await tx.billingGrant.count({
-      where: { kind: 'founding', status: { not: 'revoked' } },
-    });
+    const taken = d1
+      ? 0
+      : await tx.billingGrant.count({
+          where: { kind: 'founding', status: { not: 'revoked' } },
+        });
     if (taken < FOUNDING_SLOTS) {
       const valueMinor = await monthValueMinor(tx, paidStoreId);
       if (
@@ -233,6 +275,7 @@ export async function createGrantsForPayment(
           key: `founding:${paidStoreId}`,
           valueMinor,
           source,
+          cap: { kind: 'founding', max: FOUNDING_SLOTS },
         })
       )
         created.push('founding');
@@ -255,14 +298,18 @@ export async function createGrantsForPayment(
       where: { kind: 'referral_referrer', idempotencyKey: `referral:${paidStoreId}:referrer` },
     });
     if (rewarded === 0) {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey(`billing_grants:referrer:${link.referrerStoreId}`)}))`;
-      const used = await tx.billingGrant.count({
-        where: {
-          kind: 'referral_referrer',
-          beneficiaryId: link.referrerStoreId,
-          status: { not: 'revoked' },
-        },
-      });
+      const d1 = await onD1();
+      if (!d1)
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey(`billing_grants:referrer:${link.referrerStoreId}`)}))`;
+      const used = d1
+        ? 0
+        : await tx.billingGrant.count({
+            where: {
+              kind: 'referral_referrer',
+              beneficiaryId: link.referrerStoreId,
+              status: { not: 'revoked' },
+            },
+          });
       if (used < REFERRER_MAX_GRANTS) {
         const ok = await insertGrant(tx, {
           kind: 'referral_referrer',
@@ -271,6 +318,11 @@ export async function createGrantsForPayment(
           key: `referral:${paidStoreId}:referrer`,
           valueMinor: await monthValueMinor(tx, link.referrerStoreId),
           source,
+          cap: {
+            kind: 'referral_referrer',
+            beneficiaryId: link.referrerStoreId,
+            max: REFERRER_MAX_GRANTS,
+          },
         });
         if (ok) {
           created.push('referral_referrer');
@@ -293,9 +345,7 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
     select: { id: true },
   });
   if (pending.length === 0) return 0;
-  const locked = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id FROM store_subscriptions WHERE store_id = ${storeId} FOR UPDATE`;
-  if (locked.length === 0) return 0;
+  if (!(await lockSubscription(tx, storeId))) return 0;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
   // the same "paid through" the billing cycle reads: the trial end while trialing, else the period end
   const base =
@@ -319,13 +369,31 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
     applied += 1;
   }
   if (applied > 0) {
-    await tx.storeSubscription.update({
-      where: { storeId },
-      data: {
-        currentPeriodEnd: end,
-        ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}),
-      },
-    });
+    const data = {
+      currentPeriodEnd: end,
+      ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}),
+    };
+    if (await onD1()) {
+      // No row lock on D1: compare-and-set on the period this call read. A concurrent renewal / grant that moved it
+      // makes the CAS miss; the grants are already `applied` (one-way), so say so loudly instead of dropping them.
+      const moved = await tx.storeSubscription.updateMany({
+        where: {
+          storeId,
+          ...(sub.status === 'trialing'
+            ? { trialEndsAt: sub.trialEndsAt }
+            : { currentPeriodEnd: sub.currentPeriodEnd }),
+          status: sub.status,
+        },
+        data,
+      });
+      if (moved.count !== 1)
+        logger.error(
+          { storeId, applied },
+          '[billing] free-month grants applied but the subscription moved underneath: reconcile currentPeriodEnd by hand'
+        );
+    } else {
+      await tx.storeSubscription.update({ where: { storeId }, data });
+    }
   }
   return applied;
 }
@@ -355,10 +423,11 @@ export async function revokeGrantsForEvent(
         status: { in: ['pending', 'applied'] },
       },
     });
-    if (own > 0)
-      await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${ownStoreId} FOR UPDATE`;
+    if (own > 0) await lockSubscription(tx, ownStoreId);
   }
-  const rows = await tx.$queryRaw<Array<{ id: string; beneficiary_id: string }>>`
+  const rows = (await onD1())
+    ? await revokeGrantsD1(eventId, reason, now)
+    : await tx.$queryRaw<Array<{ id: string; beneficiary_id: string }>>`
     UPDATE billing_grants SET status = 'revoked', revoked_at = ${now}, revoke_reason = ${reason}
     WHERE source_event_id = ${eventId} AND status IN ('pending', 'applied')
     RETURNING id, beneficiary_id`;
@@ -374,12 +443,18 @@ export async function revokeGrantsForEvent(
  * and any later PAID period (an upgrade, a renewal), is not touched.
  */
 async function restoreOne(tx: Tx, grantId: string, storeId: string, now: Date): Promise<void> {
-  await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${storeId} FOR UPDATE`;
-  const claimed = await tx.$queryRaw<
-    Array<{ period_end_before: Date; period_end_after: Date }>
-  >`UPDATE billing_grants SET restored_at = ${now}
+  await lockSubscription(tx, storeId);
+  let claimed: Array<{ period_end_before: Date; period_end_after: Date }>;
+  if (await onD1()) {
+    const c = await claimRestoreD1(grantId, now);
+    claimed = c ? [{ period_end_before: c.before, period_end_after: c.after }] : [];
+  } else {
+    claimed = await tx.$queryRaw<
+      Array<{ period_end_before: Date; period_end_after: Date }>
+    >`UPDATE billing_grants SET restored_at = ${now}
     WHERE id = ${grantId} AND status = 'revoked' AND restored_at IS NULL AND period_end_after IS NOT NULL
     RETURNING period_end_before, period_end_after`;
+  }
   if (claimed.length === 0) return;
   const span = claimed[0].period_end_after.getTime() - claimed[0].period_end_before.getTime();
   const left =
@@ -556,10 +631,11 @@ export async function recordReferral(referredStoreId: string, refSlug: string): 
     withStore(id, tx => tx.store.findUnique({ where: { id }, select: { ownerId: true } }));
   const [referrer, referred] = await Promise.all([ownerOf(referrerId), ownerOf(referredStoreId)]);
   if (!referrer || !referred || referred.ownerId === referrer.ownerId) return false; // same owner = self-referral
-  const rows = await prisma.$executeRaw`
-    INSERT INTO billing_referrals (referred_store_id, referrer_store_id)
-    VALUES (${referredStoreId}, ${referrerId}) ON CONFLICT (referred_store_id) DO NOTHING`;
-  return rows === 1;
+  const { count } = await prisma.billingReferral.createMany({
+    data: [{ referredStoreId, referrerStoreId: referrerId }],
+    skipDuplicates: true,
+  });
+  return count === 1;
 }
 
 /** Super-admin view: every grant, newest first, with store names and the founding/referral totals. */

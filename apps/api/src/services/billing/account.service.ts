@@ -44,6 +44,8 @@ import { getEntityStoreId, lookupStore } from '../../lib/definer';
 import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
+import { sendAlert } from '../alerts.service';
+import { lockSubscription, onD1 } from '../platform/billing-d1';
 import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
 import { goLiveVerdict } from './go-live-verdict';
 import {
@@ -917,7 +919,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
     // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
     // period computed below is never from a read a grant is about to change.
-    await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${input.storeId} FOR UPDATE`;
+    await lockSubscription(tx, input.storeId);
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
@@ -992,10 +994,23 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       nextRetryAt: null,
       billingMethod,
     };
-    if (sub) {
-      await tx.storeSubscription.update({ where: { storeId: input.storeId }, data });
-    } else {
-      await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
+    try {
+      if (sub) {
+        await tx.storeSubscription.update({ where: { storeId: input.storeId }, data });
+      } else {
+        await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
+      }
+    } catch (err) {
+      // D1 has no transaction that would roll the ledger row back with this failure (Ruling NZ-10-2): the payment is
+      // recorded, the period is not. A retry returns `duplicate`, so name the exact repair and page.
+      if (await onD1()) {
+        void sendAlert({
+          level: 'p1',
+          title: 'Billing: manual payment recorded but the subscription was not updated',
+          body: `billing_events ${eventId} (store ${input.storeId}). Re-apply with the operator period override (periodStart ${periodStart.toISOString()}, periodEnd ${periodEnd.toISOString()}).`,
+        }).catch(() => undefined);
+      }
+      throw err;
     }
     await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: plan.featureTier } });
     // Confirm the merchant's claim: the named one, or the pending one with this reference.

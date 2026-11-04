@@ -1,4 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import {
+  entityStoreIdD1,
+  onD1 as onBillingD1,
+  planSubscriberCountsD1,
+  refundStoreIdD1,
+  storeIdsOnPlanD1,
+} from '../services/platform/billing-d1';
 import { prisma, withSystemJob, type Prisma } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
 import {
@@ -499,6 +506,9 @@ export async function getEntityStoreId(
     | 'store_subscription',
   id: string
 ): Promise<string | null> {
+  // NEON-ZERO-1 (N-10): the billing family answers from D1 once its cutover marker exists.
+  if ((kind === 'billing_event' || kind === 'store_subscription') && (await onBillingD1()))
+    return entityStoreIdD1(kind, id);
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_entity_store_id(${kind}, ${id}) AS id`;
   return rows[0]?.id ?? null;
@@ -697,6 +707,7 @@ export const auditRetention = {
 
 /** Stores per plan code, across every store. Super_admin only (the function checks). */
 export async function planSubscriberCounts(): Promise<Map<string, number>> {
+  if (await onBillingD1()) return planSubscriberCountsD1();
   const rows = await prisma.$queryRaw<
     Array<{ plan_code: string; n: bigint }>
   >`SELECT plan_code, n FROM public.ebda_plan_subscriber_counts()`;
@@ -705,6 +716,7 @@ export async function planSubscriberCounts(): Promise<Map<string, number>> {
 
 /** The ids of every store subscribed to `planCode`. Super_admin only (the function checks). */
 export async function storeIdsOnPlan(planCode: string): Promise<string[]> {
+  if (await onBillingD1()) return storeIdsOnPlanD1(planCode);
   const rows = await prisma.$queryRaw<
     Array<{ store_id: string }>
   >`SELECT store_id FROM public.ebda_plan_store_ids(${planCode})`;
@@ -716,6 +728,7 @@ export async function getBillingRefundStoreId(
   provider: string,
   providerRef: string
 ): Promise<string | null> {
+  if (await onBillingD1()) return refundStoreIdD1(provider, providerRef);
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_billing_refund_store_id(${provider}, ${providerRef}) AS id`;
   return rows[0]?.id ?? null;
