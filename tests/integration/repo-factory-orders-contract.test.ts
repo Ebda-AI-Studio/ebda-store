@@ -276,7 +276,14 @@ beforeAll(async () => {
   ownerId = owner.id;
   STORE = (
     await prisma.store.create({
-      data: { name: 'D2b2', slug: `d2b2-${sfx}`, ownerId: owner.id, status: 'active' },
+      // The gold parity cases pay by COD, so the store opts in to deferred payment for gold (Ruling SHARIA-GOLD-1).
+      data: {
+        name: 'D2b2',
+        slug: `d2b2-${sfx}`,
+        ownerId: owner.id,
+        status: 'active',
+        settings: { goldAllowDeferredPayment: true },
+      },
     })
   ).id;
   // the DO's copy of the store's settings: the sale document reads its seller (name, address, phone, email) from it
