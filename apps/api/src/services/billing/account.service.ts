@@ -62,7 +62,7 @@ import {
   type LedgerVat,
 } from './charge-amount';
 import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
-import { scheduleClaimRelease, withClaimReleases } from '../../lib/instapay-ref-claim';
+import { releaseInstapayReference, withClaimReleases } from '../../lib/instapay-ref-claim';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -590,6 +590,28 @@ export async function suggestManualPeriod(
 // ───────────────────────────── claims ─────────────────────────────────────
 
 /**
+ * Put a receipt this call just submitted back to draft and free its cross-store transfer reference. The reference is
+ * released DIRECTLY, not queued: every caller throws right after, and a queued release is dropped on a throw
+ * (`withClaimReleases`), which left the D1 reference bound to a draft receipt (the re-upload then failed with
+ * DUPLICATE_REFERENCE). The release is idempotent and only frees a claim bound to THIS receipt.
+ */
+export async function undoSubmittedReceipt(
+  tx: Pick<Tx, 'instapayReceipt'>,
+  receipt: { id: string; referenceKey: string | null },
+  storeId: string
+): Promise<void> {
+  await tx.instapayReceipt.updateMany({
+    where: { id: receipt.id, storeId },
+    data: { status: 'draft', referenceKey: null, submittedAt: null },
+  });
+  if (receipt.referenceKey) {
+    await releaseInstapayReference(receipt.referenceKey, storeId, receipt.id).catch(
+      () => undefined
+    );
+  }
+}
+
+/**
  * Merchant: submit the InstaPay receipt for the subscription (the screenshot was
  * uploaded first, the AI pre-filled it, the merchant corrected it). Creates the claim
  * the super-admin reviews. NEVER activates anything (only the super-admin's recorded
@@ -638,16 +660,7 @@ async function submitSubscriptionReceiptInner(args: {
       now,
     });
     // The receipt is a draft again: its D1 reference claim (Ruling INSTAPAY-DO-1) is freed once this transaction commits.
-    const undoReceiptSubmit = async () => {
-      await tx.instapayReceipt.updateMany({
-        where: { id: receipt.id, storeId: args.storeId },
-        data: { status: 'draft', referenceKey: null, submittedAt: null },
-      });
-      if (receipt.referenceKey)
-        scheduleClaimRelease([
-          { referenceKey: receipt.referenceKey, storeId: args.storeId, receiptId: receipt.id },
-        ]);
-    };
+    const undoReceiptSubmit = () => undoSubmittedReceipt(tx, receipt, args.storeId);
     let claim;
     try {
       claim = await withSavepoint(() =>

@@ -9,26 +9,26 @@
     }
   },
   "baseline": {
+    "apps/api/src/lib/audit-read.ts": {
+      "kind": "pg-branch",
+      "reason": "readAuditByResource: a DO store returns early from storeDb; the prisma read is the Postgres store's audit trail (actor joined)",
+      "models": {
+        "auditLog": 1
+      }
+    },
+    "apps/api/src/lib/definer.ts": {
+      "kind": "pg-branch",
+      "reason": "platform audit viewer: a DO store is read through storeRepo(...).db; the withStore read is a Postgres store's own rows",
+      "models": {
+        "auditLog": 2
+      }
+    },
     "apps/api/src/routes/notification.routes.ts": {
       "kind": "pg-branch",
       "guardFile": "apps/api/src/lib/analytics-backend.ts",
       "reason": "NZ-AN-1: notification log list/count/stats. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
       "models": {
         "notificationLog": 4
-      }
-    },
-    "apps/api/src/routes/order.routes.ts": {
-      "kind": "platform",
-      "reason": "N-10d (#419) audit family: order timeline audit trail reads `auditLog` for a store through Postgres; DO-store audit rows live in the StoreDO, so this read must go through the audit reader before Postgres is removed (listed in neon-zero-remaining.md, unowned).",
-      "models": {
-        "auditLog": 1
-      }
-    },
-    "apps/api/src/routes/return.routes.ts": {
-      "kind": "platform",
-      "reason": "N-10d (#419) audit family: return timeline audit trail reads `auditLog` for a store through Postgres; DO-store audit rows live in the StoreDO, so this read must go through the audit reader before Postgres is removed (listed in neon-zero-remaining.md, unowned).",
-      "models": {
-        "auditLog": 1
       }
     },
     "apps/api/src/services/abandoned-cart.service.ts": {
