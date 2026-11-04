@@ -10,6 +10,8 @@ import {
   ambientScope as ambientScopeImpl,
 } from './tenant-scope';
 import { setTenantGucs as setTenantGucsImpl } from './tenant-gucs';
+import { getModelRouter, routeTx, routedDelegate } from './tx-route';
+export { setModelRouter, type ModelRouter, routeTx } from './tx-route';
 import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
 import { dropHiddenStores } from './job-store-guard';
@@ -48,6 +50,8 @@ export {
   GLOBAL_MODELS,
   setDbHopObserver,
   setModelWriteObserver,
+  notifyModelWrite,
+  setRoutedModelGuard,
   type ModelWriteEvent,
 } from './tenant-guard';
 export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
@@ -166,7 +170,7 @@ function transactionWithGucs(gucs: TenantGucs) {
       const fn = arg as (tx: TenantTx) => Promise<unknown>;
       return base(async (tx: TenantTx) => {
         await applyGucs(tx, gucs);
-        return fn(tx);
+        return fn(routeTx(tx));
       }, opts);
     }
     if (Array.isArray(arg)) {
@@ -415,6 +419,34 @@ export function currentTenantGucs(): TenantGucs | undefined {
  */
 export const prisma = new Proxy({} as AppPrismaClient, {
   get(_target, prop) {
+    // NEON-ZERO-1: a model the API has moved to D1 resolves per CALL (the cutover switch is read then), and only
+    // the Postgres branch of that call touches `basePrisma()` - a D1-served call never needs a Postgres client.
+    const modelRouter = getModelRouter();
+    if (modelRouter && typeof prop === 'string' && modelRouter.models.has(prop))
+      return routedDelegate(prop, () => proxiedGet(prop), modelRouter);
+    return proxiedGet(prop);
+  },
+  // The target is an empty shell, so the remaining traps forward to the live
+  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
+  // then behave as they did when the target was the client itself.
+  has: (_t, prop) => prop in basePrisma(),
+  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
+  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
+  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
+  ownKeys: () => Reflect.ownKeys(basePrisma()),
+  getOwnPropertyDescriptor: (_t, prop) => {
+    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
+    if (d) d.configurable = true;
+    return d;
+  },
+  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
+  // PrismaClient the types would still advertise `passwordHash` while the
+  // runtime omits it — code reading it would compile and silently get
+  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
+}) as AppPrismaClient;
+
+function proxiedGet(prop: string | symbol): unknown {
+  {
     const target = basePrisma();
     const receiver = target;
     const tx = tenantStorage.getStore();
@@ -466,28 +498,19 @@ export const prisma = new Proxy({} as AppPrismaClient, {
     // `$connect` / `$disconnect` / `$on` / `$extends` / `$use` are called as
     // `prisma.$x()`, i.e. with the proxy as `this`; they must act on the
     // client resolved NOW, not on whatever the proxy resolves to later.
+    if (prop === '$transaction' && typeof value === 'function' && getModelRouter()) {
+      // a raw client handed to a callback must route the D1 models too (tx-route.ts)
+      const bound = value.bind(target) as (...a: unknown[]) => unknown;
+      return (arg: unknown, opts?: unknown) =>
+        typeof arg === 'function'
+          ? bound((tx: object) => (arg as (t: object) => unknown)(routeTx(tx)), opts)
+          : bound(arg, opts);
+    }
     return typeof value === 'function' && typeof prop === 'string' && prop[0] === '$'
       ? value.bind(target)
       : value;
-  },
-  // The target is an empty shell, so the remaining traps forward to the live
-  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
-  // then behave as they did when the target was the client itself.
-  has: (_t, prop) => prop in basePrisma(),
-  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
-  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
-  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
-  ownKeys: () => Reflect.ownKeys(basePrisma()),
-  getOwnPropertyDescriptor: (_t, prop) => {
-    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
-    if (d) d.configurable = true;
-    return d;
-  },
-  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
-  // PrismaClient the types would still advertise `passwordHash` while the
-  // runtime omits it — code reading it would compile and silently get
-  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
-}) as AppPrismaClient;
+  }
+}
 
 // Re-export everything from Prisma client (types, enums, Prisma namespace)
 export * from '@prisma/client';
@@ -668,7 +691,7 @@ export async function withTenantContext<T>(
       await applyGucs(tx, { storeId });
       // Ambient for the code-level tenant guard (and the proxy), like runInTenantContext.
       txGucs.set(tx as object, { storeId });
-      return tenantStorage.run(tx, () => settleInScope(() => fn(tx)));
+      return tenantStorage.run(tx, () => settleInScope(() => fn(routeTx(tx))));
     },
     { maxWait: 10000, timeout: 30000 }
   );
@@ -842,7 +865,7 @@ export async function scopeTransaction<Tx extends object, T>(
 ): Promise<T> {
   await setTenantGucsImpl(tx as unknown as Parameters<typeof setTenantGucsImpl>[0], gucs);
   txGucs.set(tx, { ...gucs });
-  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(tx)));
+  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(routeTx(tx))));
 }
 
 /**
@@ -1029,7 +1052,7 @@ export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<
   // Hatch 'owner-role-tx' (R-EBDA-003): the role was just proven to bypass RLS, so the
   // code-level tenant guard stands aside for this transaction only.
   return guardHatch.run('owner-role-tx', () =>
-    client.$transaction(tx => fn(tx), { maxWait: 10000, timeout: 30000 })
+    client.$transaction(tx => fn(routeTx(tx)), { maxWait: 10000, timeout: 30000 })
   );
 }
 

@@ -14,6 +14,7 @@ import { abandonedCartService } from '../services/abandoned-cart.service';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { loyaltyAutomationService } from '../services/loyalty-automation.service';
 import { AuthService } from '../services/auth.service';
+import { processDeferredBillingWebhooks } from '../services/billing/subscription-billing.service';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
@@ -40,7 +41,11 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
   ],
   // Abandoned-cart reminder emails (was every 15 min).
-  '*/15 * * * *': [{ name: 'abandoned-cart', run: () => abandonedCartService.process() }],
+  '*/15 * * * *': [
+    { name: 'abandoned-cart', run: () => abandonedCartService.process() },
+    // Billing webhooks stored during a cutover freeze (NEON-ZERO N-10): apply them once the freeze is lifted.
+    { name: 'billing-deferred-webhooks', run: () => processDeferredBillingWebhooks() },
+  ],
   // Carrier tracking poll (was every 30 min).
   '*/30 * * * *': [
     { name: 'shipping-tracking', run: () => shippingCarrierService.runTrackingCron() },

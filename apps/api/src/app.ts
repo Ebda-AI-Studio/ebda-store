@@ -35,6 +35,7 @@ import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
 import { prisma, setCommitHookErrorReporter, setDbHopObserver } from '@ebda/database';
 import { lookupStore } from './lib/definer';
+import './services/platform/router';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';

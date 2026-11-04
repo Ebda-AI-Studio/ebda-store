@@ -1188,3 +1188,5 @@ html[lang=ar] .sf-col h2{letter-spacing:0}
 .sf-bottom{border-top:1px solid #2f3435;margin-top:32px;padding-top:16px}
 .sf-bottom p{margin:0;color:#a9b1af}
 `.replace(/\n/g, '');
+
+export * from './billing-vat';

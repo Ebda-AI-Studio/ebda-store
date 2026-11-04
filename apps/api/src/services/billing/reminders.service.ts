@@ -8,7 +8,8 @@
  * run the same day sends nothing. Only the most specific due offset is sent: a
  * job that missed days does not replay the older reminders.
  */
-import { prisma, withStore, acrossStores } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
+import { acrossBilling } from '../platform/billing-d1';
 import { config } from '../../config';
 import { getEntityStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
@@ -56,11 +57,11 @@ export function reminderKindAt(dueAt: Date, now: Date): ReminderKind | null {
 export async function findReminderCandidates(now: Date): Promise<string[]> {
   const horizon = new Date(now.getTime() + 7 * DAY);
   const floor = new Date(now.getTime() - DAY);
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
           cancelAtPeriodEnd: false,
           OR: [

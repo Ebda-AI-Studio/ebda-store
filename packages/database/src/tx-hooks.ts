@@ -7,15 +7,18 @@
  * transaction object it belongs to, runs only when THAT transaction commits, and is dropped when it rolls back. A transaction with
  * no registry (not opened by `runInTenantContext` / `withMoneyTx`) refuses the hook, and the caller decides (fail closed).
  */
+import { unwrapTx } from './tx-route';
+
 const registry = new WeakMap<object, Array<() => unknown>>();
 
 export function registerTxHooks(tx: object, hooks: Array<() => unknown>): void {
+  tx = unwrapTx(tx);
   if (!registry.has(tx)) registry.set(tx, hooks);
 }
 
 /** Register `fn` to run after `tx` COMMITS. Returns false (registering nothing) when `tx` has no hook registry. */
 export function afterTxCommit(tx: object, fn: () => unknown): boolean {
-  const hooks = registry.get(tx);
+  const hooks = registry.get(unwrapTx(tx));
   if (!hooks) return false;
   hooks.push(fn);
   return true;
