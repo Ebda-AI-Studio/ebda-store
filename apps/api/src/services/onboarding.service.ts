@@ -9,6 +9,8 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
+import { cfBindings } from '../cf/bindings';
+import { getAccountState } from '../lib/identity-client';
 import { recordReferral } from './billing/grants.service';
 import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 import { sendOnboardingStepToCi } from '../lib/ci/emit';
@@ -93,12 +95,15 @@ export class OnboardingService {
 
   static async state(userId: string) {
     // As that user: `users` is RLS-scoped to app.current_user_id.
-    const user = await withUser(userId, tx =>
-      tx.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, firstName: true, emailVerified: true, phone: true },
-      })
-    );
+    // With the identity service bound the account lives there (not in Postgres); otherwise as that user: `users` is RLS-scoped.
+    const user = cfBindings()?.ACCOUNTS
+      ? await getAccountState(userId)
+      : await withUser(userId, tx =>
+          tx.user.findUnique({
+            where: { id: userId },
+            select: { id: true, email: true, firstName: true, emailVerified: true, phone: true },
+          })
+        );
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
     const store = await withUser(userId, tx =>
