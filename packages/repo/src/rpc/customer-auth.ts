@@ -49,6 +49,7 @@ export type AuthOpName =
 export const AUTH_OP_NAMES: readonly string[] = [
   ...Object.keys(SYNC_OPS),
   'changePassword',
+  'purge',
   'counts',
   'markLive',
   'isLive',
@@ -66,6 +67,8 @@ async function run(db: SyncSql, op: string, a: Record<string, any>): Promise<R> 
         newHash: String(a.newHash),
         reason: 'password_changed',
       });
+    case 'purge':
+      return { ok: true, data: { deleted: A.purgeCustomerAuth(db) } };
     case 'counts':
       return { ok: true, data: A.counts(db) };
     case 'markLive':

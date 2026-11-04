@@ -36,6 +36,7 @@ import {
 } from '../middleware/security';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
+import { resolvePublicStoreId } from '../utils/store-helpers';
 import { customerAuthRoute } from '../lib/customer-auth';
 import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
@@ -305,7 +306,10 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
 router.post('/login', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = loginSchema.parse(req.body);
-    const result = await AuthService.login(data.email, data.password, req.ip, data.storeId ?? null);
+    // The storefront names its store by header / host as well as in the body; a login with neither is the admin namespace, which
+    // signs in at the identity service (no Postgres lookup to find out).
+    const loginStore = data.storeId ?? (await resolvePublicStoreId(req)) ?? null;
+    const result = await AuthService.login(data.email, data.password, req.ip, loginStore);
 
     // MFA challenge: return the challenge token without issuing a real session.
     // The client must POST /auth/mfa/verify with the challengeToken + TOTP code.
@@ -1131,7 +1135,8 @@ router.post(
       const parsed = emailLookupSchema.safeParse({ email });
       if (parsed.success) {
         // Always return success to prevent email enumeration
-        const scope = typeof storeId === 'string' ? storeId : null;
+        const scope =
+          typeof storeId === 'string' ? storeId : ((await resolvePublicStoreId(req)) ?? null);
         const found = await AuthService.requestPasswordReset(parsed.data.email, scope);
         // Audit only when a link was actually issued: the row is internal (the
         // response below is identical either way), and logging every probe for
@@ -1318,7 +1323,7 @@ router.post(
       const result = parsed.success
         ? await AuthService.resendVerificationEmail(
             parsed.data.email,
-            typeof storeId === 'string' ? storeId : null
+            typeof storeId === 'string' ? storeId : ((await resolvePublicStoreId(req)) ?? null)
           )
         : { ...GENERIC_RESEND_VERIFICATION_RESULT };
 

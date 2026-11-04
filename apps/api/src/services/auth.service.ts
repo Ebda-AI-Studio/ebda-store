@@ -72,7 +72,7 @@ import {
   customerAuthRoute,
   type CustomerAuthClient,
 } from '../lib/customer-auth';
-import { storeDo } from '../lib/store-backend';
+import { doStoreIdList, hasStoresOnBackend, storeDo } from '../lib/store-backend';
 import { scrubOrEnqueue } from '../lib/customer-pg-scrub';
 import { CustomerAuthFlows, type DoCustomer } from './customer-auth-flows';
 import { verifyRefreshJwt } from '../middleware/security';
@@ -833,6 +833,14 @@ export class AuthService {
     // re-casing the address (Ebda SP5 review).
     const route = await customerAuthRoute(storeId, { write: true });
     if (route.kind === 'do') return CustomerAuthFlows.login(route.client, email, password, ip);
+    // No store: the admin namespace (merchants, staff, super admins), whose credentials live in the identity service. The answer
+    // does not depend on the email or the password, so it needs no Postgres lookup and reveals nothing about any account.
+    if (storeId === null && (await hasStoresOnBackend('do')) && !(await hasStoresOnBackend('pg')))
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
 
     const lockoutKey = loginGate.lockoutKey(email, storeId);
     await loginGate.assertNotLocked(lockoutKey);
@@ -1474,10 +1482,30 @@ export class AuthService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    // N-9: a DO store's refresh rows are its DO's (expired and long-revoked ones; the DO alarm does the same nightly). The
+    // Postgres definer is asked ONLY while a `pg` store exists: with every store on D1 / a DO there is nothing in Postgres to
+    // purge, and the cron must not need it.
+    let total = 0;
+    for (const storeId of await doStoreIdList()) {
+      const route = await customerAuthRoute(storeId, { write: true });
+      if (route.kind !== 'do') continue;
+      try {
+        total += (await route.client.call<{ deleted: number }>('purge', {})).deleted;
+      } catch (err) {
+        // a closed store keeps its rows as a retained record (Ruling NZ-D15); anything else fails the job
+        if (!(err instanceof AppError && err.code === 'STORE_CLOSED')) throw err;
+      }
+    }
+    if (!(await hasStoresOnBackend('pg'))) {
+      if (total > 0)
+        logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows (DO stores)');
+      return total;
+    }
+
     // `refresh_tokens` is user-keyed under RLS; the cross-user purge is the
     // `ebda_refresh_tokens_purge` definer, which only the named platform job
     // 'token-retention' may call (`withSystemJob`).
-    const total = await purgeRefreshTokens(now, thirtyDaysAgo);
+    total += await purgeRefreshTokens(now, thirtyDaysAgo);
     if (total > 0) {
       logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows');
     }
