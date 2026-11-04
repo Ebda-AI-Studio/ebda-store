@@ -19,9 +19,9 @@
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { cli, fmtMs } from './lib/cli.mjs';
-import { connectReadOnly } from './lib/pg.mjs';
+import { connectReadOnly, connectWritable } from './lib/pg.mjs';
 import { d1Query, d1Statements, lit } from './lib/d1.mjs';
-import { TABLES, digestRows } from './lib/customer-auth-copy.mjs';
+import { TABLES, digestRows, stableRows } from './lib/customer-auth-copy.mjs';
 
 const markerKey = id => `customer_auth_cutover.${id}`;
 const GLOBAL = 'customer_auth_cutover.__all';
@@ -65,9 +65,15 @@ async function main() {
       // a freeze carries its own expiry: if this script dies the API ignores it after this long and pages (P1)
       'freeze-ttl-ms': { type: 'string', default: '900000' },
       commit: { type: 'boolean', default: false },
+      // after the verified flip the Postgres copy of the customer-auth rows is DELETED / its credential columns cleared (default on)
+      'scrub-pg-url': { type: 'string' },
+      'allow-prod-write': { type: 'boolean', default: false },
+      'keep-pg-copy': { type: 'boolean', default: false },
       global: { type: 'boolean', default: false },
       status: { type: 'boolean', default: false },
       unfreeze: { type: 'boolean', default: false },
+      // re-run ONLY the Postgres scrub of stores whose marker exists (a flip whose scrub failed)
+      'scrub-only': { type: 'boolean', default: false },
     },
     {}
   );
@@ -148,6 +154,77 @@ async function main() {
       throw new Error(`the DO of ${s} is already live`);
   }
 
+  const scrubUrl = args['scrub-pg-url'] ?? process.env.CUTOVER_SCRUB_PG_URL;
+  if (args.commit && !args['keep-pg-copy'] && !scrubUrl)
+    throw new Error(
+      'set --scrub-pg-url (or CUTOVER_SCRUB_PG_URL, a role that may DELETE refresh_tokens / verification_tokens / passkey_credentials and UPDATE users) so the Postgres copy is scrubbed after the flip, or pass --keep-pg-copy to leave it (the copy then holds live credentials until the Neon decommission)'
+    );
+
+  // --global means "every DO store serves customer auth from its DO": refuse unless EVERY storage_backend='do' store already has
+  // its per-store marker (or is in this very run). An uncopied store would flip to an EMPTY DO: its customers locked out and
+  // their emails free to be squatted by new registrations.
+  const unmarkedDoStores = async inRun => {
+    const doStores = (
+      await d1Query(d, `SELECT id FROM stores WHERE storage_backend = 'do' AND deleted_at IS NULL`)
+    ).map(r => r.id);
+    const marked = new Set(
+      (
+        await d1Query(d, `SELECT key FROM system_settings WHERE key LIKE 'customer_auth_cutover.%'`)
+      ).map(r => r.key.slice('customer_auth_cutover.'.length))
+    );
+    return doStores.filter(id => !marked.has(id) && !inRun.includes(id));
+  };
+  if (args.commit && args.global) {
+    const missing = await unmarkedDoStores(stores);
+    if (missing.length)
+      throw new Error(
+        `--global refused: ${missing.length} DO store(s) have no customer-auth marker and are not in this run (${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}). Copy them first (--store each), then --global.`
+      );
+  }
+
+  const scrubPg = async ids_ => {
+    const w = await connectWritable(scrubUrl, { allowProd: args['allow-prod-write'] });
+    try {
+      for (const s of ids_) {
+        const ids = `SELECT id FROM users WHERE store_id = $1 AND role = 'customer'`;
+        const del = {};
+        for (const t of ['refresh_tokens', 'verification_tokens', 'passkey_credentials'])
+          del[t] = (await w.query(`DELETE FROM ${t} WHERE user_id IN (${ids})`, [s])).rowCount;
+        const upd = (
+          await w.query(
+            `UPDATE users SET password_hash = '!', mfa_secret = NULL, mfa_backup_codes = '{}', mfa_enabled = false, token_version = token_version + 1 WHERE store_id = $1 AND role = 'customer'`,
+            [s]
+          )
+        ).rowCount;
+        const left = Number(
+          (await w.query(`SELECT count(*) AS n FROM refresh_tokens WHERE user_id IN (${ids})`, [s]))
+            .rows[0].n
+        );
+        if (left !== 0)
+          throw new Error(
+            `Postgres scrub of ${s} left ${left} refresh tokens (role without access?)`
+          );
+        console.log(
+          `  scrubbed PG copy of ${s}: deleted ${JSON.stringify(del)}, credential columns cleared on ${upd} users`
+        );
+      }
+      await w.query('COMMIT');
+    } catch (e) {
+      await w.query('ROLLBACK').catch(() => {});
+      await w.end();
+      throw e;
+    }
+    await w.end();
+  };
+
+  if (args['scrub-only']) {
+    for (const s of stores)
+      if (!(await markerOf(s)))
+        throw new Error(`${s} has no marker: --scrub-only is for flipped stores`);
+    if (!scrubUrl) throw new Error('set --scrub-pg-url');
+    await scrubPg(stores);
+    return;
+  }
   const t0 = performance.now();
   let client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
   console.log('customer-auth family; PG vs DO per store');
@@ -192,10 +269,13 @@ async function main() {
     await sleep(drain);
     client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
     const before = {};
+    const beforeRows = {};
     for (const s of stores) {
       before[s] = {};
+      beforeRows[s] = {};
       for (const t of Object.keys(TABLES)) {
         const rows = await sourceRows(client, t, s);
+        beforeRows[s][t] = rows;
         before[s][t] = await digestRows(TABLES[t].cols, rows);
         for (let i = 0; i < rows.length; i += PAGE)
           await doCall(args, s, 'importRows', { table: t, rows: rows.slice(i, i + PAGE) });
@@ -246,9 +326,15 @@ async function main() {
     const drift = [];
     for (const s of stores)
       for (const t of Object.keys(TABLES)) {
-        const now = await digestRows(TABLES[t].cols, await sourceRows(client, t, s));
-        if (now.count !== before[s][t].count || now.digest !== before[s][t].digest)
-          drift.push(`${s}:${t}`);
+        // a token that expired (or a revocation that aged out) while the run was going is not drift: both sides are reduced to
+        // what is still inside the time window at the check
+        const cutoff = Date.now();
+        const a = await digestRows(
+          TABLES[t].cols,
+          stableRows(t, await sourceRows(client, t, s), cutoff)
+        );
+        const b = await digestRows(TABLES[t].cols, stableRows(t, beforeRows[s][t], cutoff));
+        if (a.count !== b.count || a.digest !== b.digest) drift.push(`${s}:${t}`);
       }
     await client.query('ROLLBACK');
     await client.end();
@@ -259,8 +345,18 @@ async function main() {
       );
       process.exit(2);
     }
+    // The Postgres copy of the customer-auth rows would otherwise keep live credentials (password hashes, refresh tokens, passkeys)
+    // until the Neon decommission. Inside the freeze, right after the verified flip and a clean drift check. NOT reversible:
+    // after this a rollback of the marker needs the Neon dump.
+    if (!args['keep-pg-copy']) await scrubPg(stores);
     for (const s of stores) await doCall(args, s, 'markLive', {});
     if (args.global) {
+      // re-check at the moment of writing: a store created since the preflight must be marked (store-create) or copied first
+      const missing = await unmarkedDoStores([...flipped]);
+      if (missing.length)
+        throw new Error(
+          `--global refused at write time: unmarked DO store(s) ${missing.join(', ')}. The per-store flips above stand; re-run --global after copying them.`
+        );
       await d1Statements(d, [
         `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(GLOBAL)}, ${lit(JSON.stringify({ at: new Date().toISOString(), stores }))}, 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
       ]);

@@ -34,6 +34,7 @@ import {
   isStoreUpdateRetry,
   type StoreUpdateRetryMessage,
 } from '../store-update-retry';
+import { isPgCopyScrub, scrubPgCustomerCopy } from '../customer-pg-scrub';
 
 const GATE_MAX_WAITS = 120;
 
@@ -78,6 +79,17 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   }
   if (isStoreUpdateRetry(msg.body)) {
     await handleStoreUpdateRetry(msg, msg.body);
+    return;
+  }
+  if (isPgCopyScrub(msg.body)) {
+    // N-9: the erased customer's stale Postgres copy; idempotent, retried with backoff until the queue dead-letters it.
+    try {
+      await scrubPgCustomerCopy(msg.body.userId, msg.body.storeId);
+      msg.ack();
+    } catch (err) {
+      logger.warn({ err, userId: msg.body.userId }, '[jobs] pg-copy-scrub failed, will retry');
+      msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+    }
     return;
   }
   if (!isJobQueueMessage(msg.body)) {
@@ -245,6 +257,18 @@ async function handleStoreUpdateRetry(
 async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
   if (writesFrozen()) {
     msg.retry({ delaySeconds: 3600 });
+    return;
+  }
+  if (isPgCopyScrub(msg.body)) {
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'customer.erase.pg_copy_exhausted',
+      title: 'Erased customer still has a Postgres copy: scrub retries exhausted',
+      body: `user ${msg.body.userId} store ${msg.body.storeId}: scrub the users row, tokens and passkeys by hand.`,
+      context: { userId: msg.body.userId, storeId: msg.body.storeId },
+    }).catch(() => undefined);
+    msg.ack();
     return;
   }
   if (isStoreUpdateRetry(msg.body)) {

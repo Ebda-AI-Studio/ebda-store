@@ -1144,12 +1144,56 @@ router.put(
         role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
         status: z.enum(['active', 'inactive', 'suspended']).optional(),
         password: z.string().min(8).max(255).optional(),
+        // N-9: names the store of a customer that exists only in its StoreDO (no Postgres row to find)
+        storeId: z.string().uuid().optional(),
       });
       const data = schema.parse(req.body);
 
       const existing = await asPlatformOperator(req.user!.userId, () =>
         prisma.user.findUnique({ where: { id } })
       );
+      if (!existing && data.storeId) {
+        const doRoute = await customerAuthRoute(data.storeId, { write: true });
+        const profile =
+          doRoute.kind === 'do'
+            ? await doRoute.client.call<Record<string, unknown> | null>('getProfile', {
+                userId: id,
+              })
+            : null;
+        if (doRoute.kind === 'do' && profile) {
+          const other = Object.keys(data).filter(
+            k => k !== 'status' && k !== 'storeId' && (data as never)[k] !== undefined
+          );
+          if (other.length > 0) {
+            res.status(409).json({
+              success: false,
+              error: {
+                code: 'CUSTOMER_ON_STORE_DO',
+                message:
+                  'This customer is served by its store: only the status can be changed here.',
+              },
+            });
+            return;
+          }
+          if (data.status !== undefined) {
+            await AuthService.setCustomerStatusOnDo(id, data.storeId, data.status);
+            await auditLog({
+              action: 'user.updated',
+              userId: req.user!.userId,
+              resourceType: 'user',
+              resourceId: id,
+              details: { changedFields: 'status', backend: 'store-do', status: data.status },
+              ip: req.ip,
+              userAgent: req.headers['user-agent'],
+            });
+          }
+          res.json({
+            success: true,
+            data: { user: { ...profile, status: data.status ?? profile.status } },
+          });
+          return;
+        }
+      }
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -1164,7 +1208,7 @@ router.put(
         const doRoute = await customerAuthRoute(existing.storeId, { write: true });
         if (doRoute.kind === 'do') {
           const other = Object.keys(data).filter(
-            k => k !== 'status' && (data as never)[k] !== undefined
+            k => k !== 'status' && k !== 'storeId' && (data as never)[k] !== undefined
           );
           if (other.length > 0) {
             res.status(409).json({
@@ -1391,6 +1435,25 @@ router.delete(
           },
         })
       );
+      // N-9: a customer that exists only in its StoreDO (?storeId=<store>) is erased there.
+      const doStore = typeof req.query.storeId === 'string' ? req.query.storeId : null;
+      if (!target && doStore && /^[0-9a-f-]{36}$/i.test(doStore)) {
+        const doRoute = await customerAuthRoute(doStore, { write: true });
+        if (doRoute.kind === 'do') {
+          await AuthService.eraseAccount(id, { actorId: req.user!.userId, storeHint: doStore });
+          await auditLog({
+            action: 'user.deleted',
+            userId: req.user!.userId,
+            resourceType: 'user',
+            resourceId: id,
+            details: { role: 'customer', backend: 'store-do', storeId: doStore },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+          res.json({ success: true, data: { message: 'User deleted' } });
+          return;
+        }
+      }
       if (!target) {
         res.status(404).json({
           success: false,

@@ -17,7 +17,7 @@ import { loginGate } from './login-gate';
 import { sendPasskeyNotice } from './passkey-notices';
 import { redis } from './redis.service';
 import { customerAuthRoute, type CustomerAuthClient } from '../lib/customer-auth';
-import type { DoCustomer } from './customer-auth-flows';
+import { CustomerAuthFlows, mfaUnavailable, type DoCustomer } from './customer-auth-flows';
 
 /** N-9: the store's StoreDO client when this shopper's credentials live there, else null (Postgres). */
 async function doClientFor(storeId: string | null | undefined): Promise<CustomerAuthClient | null> {
@@ -331,13 +331,15 @@ export class PasskeyService {
     if (dc) {
       const p = await dc.call<DoCustomer | null>('getProfile', { userId });
       if (!p || p.status !== 'active' || p.deletedAt) throw failed();
+      // Ruling NZ-N9-1: the PG path demands the TOTP code too; the DO has no TOTP, so an MFA account gets NO step-up (a password
+      // alone must never unlock registering a passkey, which would be a second-factor-free way in).
+      if (p.mfaEnabled) throw mfaUnavailable();
       const key = loginGate.lockoutKey(p.email, dc.storeId);
       await loginGate.assertNotLocked(key);
-      // The compare runs INSIDE the DO. MFA is refused at login for DO customers (Ruling NZ-N9-1), so there is no TOTP leg.
+      // The compare runs in the Worker (Ruling NZ-N9-2). MFA accounts were refused above (NZ-N9-1): there is no TOTP leg.
       const ok =
         typeof input.password === 'string' &&
-        (await dc.call<{ valid: boolean }>('verifyPassword', { userId, password: input.password }))
-          .valid;
+        (await CustomerAuthFlows.verifyPassword(dc, userId, input.password));
       if (!ok) {
         await loginGate.recordFailure(key, ip);
         throw failed();
@@ -425,6 +427,7 @@ export class PasskeyService {
           })
         );
     if (!user || user.status !== 'active' || !accountFitsContext(user, ctx)) throw notAllowed();
+    if (dcBegin && doUser?.mfaEnabled) throw mfaUnavailable();
 
     const existing = dcBegin
       ? doExisting.map(p => ({
@@ -665,6 +668,8 @@ export class PasskeyService {
           })
         );
     if (!user) return fail('account');
+    // Ruling NZ-N9-1: a passkey sign-in "satisfies MFA" only where TOTP is enforced elsewhere; a DO account with TOTP on is refused.
+    if (dcAuth && doHit?.user.mfaEnabled) return fail('mfa');
     const lockoutKey = loginGate.lockoutKey(user.email, user.storeId);
     known.lockoutKey = lockoutKey;
     try {

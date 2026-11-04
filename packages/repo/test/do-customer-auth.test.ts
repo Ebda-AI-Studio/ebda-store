@@ -400,3 +400,30 @@ describe('operator status change (setStatus) and directory reads', () => {
     expect(A.expiredDeleted(db, { before: T0 + 10, limit: 10 })).toMatchObject({ data: [] });
   });
 });
+
+describe('MFA accounts (Ruling NZ-N9-1)', () => {
+  it('an MFA account cannot gain a passkey; login reports mfa', () => {
+    const db = fx();
+    reg(db);
+    db.run(`UPDATE _cauth_users SET mfa_enabled = 1, mfa_secret = 'enc'`, []);
+    expect(
+      A.passkeyAdd(db, {
+        id: 'p1',
+        userId: 'u1',
+        credentialId: 'c1',
+        publicKey: 'k',
+        counter: 0,
+        transports: [],
+        deviceType: 'a',
+        backedUp: false,
+        rpId: 'x',
+        name: 'n',
+      })
+    ).toMatchObject({ ok: false, code: 'MFA_UNAVAILABLE', status: 409 });
+    expect(A.loginSucceeded(db, A.loginRow(db, 'a@x.com')!)).toMatchObject({
+      ok: true,
+      data: { mfa: true },
+    });
+    expect(A.counts(db)._cauth_passkeys).toBe(0);
+  });
+});

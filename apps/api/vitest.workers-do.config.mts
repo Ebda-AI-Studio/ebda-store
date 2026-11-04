@@ -17,6 +17,8 @@ export default defineConfig({
       miniflare: {
         compatibilityDate: '2026-08-01',
         compatibilityFlags: ['nodejs_compat'],
+        // N-9: envelope key for the encrypted customer-credential backup (test value only)
+        bindings: { CUSTOMER_AUTH_BACKUP_KEY: Buffer.alloc(32, 7).toString('base64') },
         durableObjects: { STORE_DO: { className: 'StoreDO', useSQLite: true } },
         r2Buckets: ['STORE_BACKUPS', 'MEDIA_BUCKET', 'CI_BUCKET'],
         d1Databases: ['PLATFORM_DB', 'IDENTITY_DB', 'RESTORE_DB'],

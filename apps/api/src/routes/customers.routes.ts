@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod/v3';
+import { revokeForAccount } from '../lib/wa/consent';
 import { customerAuthRoute } from '../lib/customer-auth';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
@@ -824,6 +826,76 @@ router.post(
         success: true,
         data: { message: 'Customer data erased', ...outcome, crmReviewNeeded },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /stores/:storeId/customers/:customerId/status   { status: 'active' | 'inactive' | 'suspended' }
+ *
+ * The store-scoped way to suspend or reactivate a customer of THIS store (owner/admin with `users:write`, never staff, never
+ * while impersonating). For a customer served by the store's Durable Object (N-9) the status and the revocation of every
+ * session are ONE DO section, so a suspended customer's refresh token and access token die at once; the super-admin
+ * `PUT /admin/users/:id` cannot reach such a customer (it has no Postgres row after the flip).
+ */
+router.put(
+  '/customers/:customerId/status',
+  ...privacyMiddleware,
+  requirePermission('users:write'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerId } = req.params;
+      const body = z
+        .object({ status: z.enum(['active', 'inactive', 'suspended']) })
+        .parse(req.body);
+      await resolveStoreCustomerOrThrow(storeId, customerId);
+      await AuthService.setCustomerStatus(customerId, storeId, body.status);
+      await auditLog({
+        action: 'customer.status.changed_by_merchant',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'user',
+        resourceId: customerId,
+        details: { actorRole: req.user!.role, status: body.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { id: customerId, status: body.status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /stores/:storeId/customers/:customerId
+ *
+ * Deactivate (soft-delete) a customer of this store: sessions end now, the account can no longer sign in, WhatsApp marketing
+ * consent is withdrawn. Irreversible PII removal stays `POST .../erase`. Same guards as the status route.
+ */
+router.delete(
+  '/customers/:customerId',
+  ...privacyMiddleware,
+  requirePermission('users:write'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerId } = req.params;
+      await resolveStoreCustomerOrThrow(storeId, customerId);
+      const { phone } = await AuthService.softDeleteCustomer(customerId, storeId);
+      await revokeForAccount(storeId, customerId, phone);
+      await auditLog({
+        action: 'customer.account.deleted_by_merchant',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'user',
+        resourceId: customerId,
+        details: { actorRole: req.user!.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { message: 'Customer account deactivated' } });
     } catch (error) {
       next(error);
     }

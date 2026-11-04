@@ -47,12 +47,7 @@ export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } fr
 export { answerStockOp, type StockAnswer } from './rpc/stock';
 export { runMoneyOp, ensureMoneyOpsSchema, MONEY_OP_NAMES, type MoneyOpName } from './do/money-ops';
 export { answerMoneyOp, type MoneyAnswer } from './rpc/money';
-export {
-  answerAuthOp,
-  AUTH_OP_NAMES,
-  type AuthAnswer,
-  type PasswordVerifier,
-} from './rpc/customer-auth';
+export { answerAuthOp, AUTH_OP_NAMES, type AuthAnswer } from './rpc/customer-auth';
 export {
   ensureCustomerAuthSchema,
   purgeCustomerAuth,

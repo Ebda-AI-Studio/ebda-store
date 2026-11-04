@@ -66,7 +66,6 @@ import {
 } from '@ebda-src/repo';
 import * as repo from './repo';
 import { StoreError } from './repo';
-import bcrypt from 'bcryptjs';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { exportOrder, storeTables } from './tables';
 import {
@@ -80,6 +79,11 @@ import type { Subject } from '../erasure/types';
 import { eraseMerchantAtomically } from '../erasure/merchant-anonymise';
 import {
   buildBackup,
+  buildCustomerAuthBackup,
+  dumpCustomerAuth,
+  loadCustomerAuth,
+  readCustomerAuthBackup,
+  CUSTOMER_AUTH_FILE,
   dumpTables,
   loadBackup,
   sha256Hex,
@@ -107,11 +111,6 @@ export interface R2Like {
   get(key: string): Promise<{ text(): Promise<string> } | null>;
 }
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** bcrypt of 32 random bytes whose plaintext was discarded: compared when the account is unknown (same constant as auth.service). */
-const AUTH_VERIFIER = {
-  compare: (plain: string, hash: string) => bcrypt.compare(plain, hash),
-  dummyHash: '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha',
-};
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export class StoreDO extends DurableObject<Record<string, unknown>> {
@@ -341,8 +340,8 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
 
   /**
    * Storefront CUSTOMER authentication (NEON-ZERO-1 N-9, Ruling NZ-A3): one named operation = one synchronous section over the
-   * `_cauth_*` tables (packages/repo/src/do/customer-auth.ts). Password verification runs HERE (bcryptjs), so a hash never
-   * crosses the RPC boundary. A refusal is an ANSWER. A closed store refuses everything but reads of state.
+   * `_cauth_*` tables (packages/repo/src/do/customer-auth.ts). The password compare runs in the API Worker (bcrypt cost 12 would starve the single-threaded DO); the DO hands the hash only to that
+   * Worker over this stub. A refusal is an ANSWER. A closed store refuses everything but reads of state.
    */
   async authOp(storeId: string, op: string, argsJson: string): Promise<AuthAnswer> {
     try {
@@ -357,7 +356,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       !/^(userState|getProfile|exportCustomer|exportRowsPage|counts|isLive)$/.test(op)
     )
       return { ok: false, code: 'STORE_CLOSED', status: 410, message: 'store is closed' };
-    return answerAuthOp(this.sync, AUTH_VERIFIER, op, argsJson);
+    return answerAuthOp(this.sync, op, argsJson);
   }
 
   /**
@@ -507,10 +506,19 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     const r2 = this.bucket();
     if (!r2) throw new Error('STORE_BACKUPS binding missing');
     const dump = dumpTables(this.ctx.storage.sql); // sync read: consistent snapshot
+    const authDump = dumpCustomerAuth(this.ctx.storage.sql); // same turn: the same snapshot
     const { manifest, files } = await buildBackup(storeId, dump);
+    // Customer credentials (N-9, Ruling NZ-N9-3): ENCRYPTED, or the backup FAILS (loudly, before a manifest is written).
+    // A plaintext fallback does not exist: a store with customer accounts and no key is a failed night, not a silent skip.
+    const ca = await buildCustomerAuthBackup(
+      authDump,
+      this.env.CUSTOMER_AUTH_BACKUP_KEY as string | undefined
+    );
+    if (ca) manifest.customerAuth = ca.entry;
     const day = manifest.takenAt.slice(0, 10);
     for (const [name, body] of Object.entries(files))
       await r2.put(backupKey(storeId, day, name), body);
+    if (ca) await r2.put(backupKey(storeId, day, CUSTOMER_AUTH_FILE), ca.blob);
     // The manifest goes last: a day folder without one is an incomplete backup and must be ignored.
     await r2.put(backupKey(storeId, day, 'manifest.json'), JSON.stringify(manifest, null, 2));
     // Read-back (rule N11): a backup that is not read back is not a backup.
@@ -581,7 +589,20 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     for (const t of live)
       if (this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM "${t}"`).one().n !== 0)
         throw new Error('restore target must be empty');
-    this.ctx.storage.transactionSync(() => loadBackup(this.ctx.storage.sql, files, tables));
+    let authDump: Awaited<ReturnType<typeof readCustomerAuthBackup>> | undefined;
+    if (manifest.customerAuth) {
+      const cf = await r2.get(backupKey(sourceStoreId, day, manifest.customerAuth.file));
+      if (!cf) throw new Error(`missing ${manifest.customerAuth.file}`);
+      authDump = await readCustomerAuthBackup(
+        await cf.text(),
+        manifest.customerAuth,
+        this.env.CUSTOMER_AUTH_BACKUP_KEY as string | undefined
+      );
+    }
+    this.ctx.storage.transactionSync(() => {
+      loadBackup(this.ctx.storage.sql, files, tables);
+      if (authDump) loadCustomerAuth(this.ctx.storage.sql, authDump);
+    });
     // Re-export the restored DO with the same canonical serialization and compare to the manifest.
     const again = await buildBackup(sourceStoreId, dumpTables(this.ctx.storage.sql));
     const out: Record<string, { rows: number; sha256: string; ok: boolean }> = {};
