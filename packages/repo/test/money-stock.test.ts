@@ -493,6 +493,8 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
         paymentMethod: 'cod',
         checkoutIp: '9.9.9.9',
         shippingAddress: { phone: `0101000000${i}` },
+        // QA-HOLDS-1: the COD IP ceiling default is now 40 per 24 h; this pins the engine's counting at an explicit 8
+        holdCaps: { ip: 8 },
       });
     for (let i = 0; i < 8; i++) placeOrder(db, ipA(i));
     expect(err(() => placeOrder(db, ipA(9))).code).toBe('TOO_MANY_OPEN_ORDERS');

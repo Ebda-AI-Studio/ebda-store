@@ -1,0 +1,9 @@
+# QA-HOLDS-1
+
+> Section: 2026-11-03 - QA store full run, branch `fix/qa-p1-coupon-price-holds`
+
+**Ruling QA-HOLDS-1 - the IP ceiling for COD/InstaPay is 40 holds created in the last 24 hours (was 8, forever), tunable per store.** The hold cap exists so one buyer cannot pin stock with unpaid COD orders: that is the phone/email cap (2, unchanged). The IP signal only has to bound one abuser who rotates phone and email, and Egyptian mobile carriers share one IPv4 across thousands of subscribers, so 8 blocked honest buyers (QA: refused after about 8 COD orders). A COD hold counts only while `pending`; once the merchant confirms it, it stops counting. `Store.settings.stockHoldCaps` `{ manual 1..10, gateway 1..20, ip 5..500, ipWindowHours 1..168 }` overrides the env defaults (`OPEN_UNPAID_HOLD_CAP`, `OPEN_UNPAID_GATEWAY_HOLD_CAP`, `OPEN_UNPAID_HOLD_IP_CAP`, `OPEN_UNPAID_HOLD_IP_WINDOW_HOURS`); values outside the range are ignored so protection cannot be configured away. The refusal now says whether it is the buyer's own orders or the network (Arabic in `details.messageAr`). Same on the Postgres path (`lib/stock-hold-cap.ts`) and the Durable Object (`do/checkout.ts`).
+
+Scale budget (NEON-SCALE-1): zero new queries per order (the store row is the one already read; on the DO path that read now also happens for quotes, one primary-key lookup); the IP count gains a `created_at >=` filter on the existing partial index scan, so it can only touch fewer rows; the same three advisory locks. Evidence: QA run P1-3. Tests: `tests/unit/stock-hold-cap.test.ts`, `packages/repo/test/do-order-ops.test.ts`, `packages/repo/test/money-stock.test.ts`, `tests/integration/qa-coupon-and-holds.test.ts`.
+
+Cost if wrong: an attacker rotating phones from one IP can now pin up to 40 COD holds per store per day (not 8) before the ceiling bites; the merchant lowers `stockHoldCaps.ip` for that store, and the per-phone cap still holds.

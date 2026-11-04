@@ -1,3 +1,4 @@
+import { assertActiveProductPrice } from '../lib/sellable-price';
 import {
   prisma,
   Prisma,
@@ -790,6 +791,9 @@ export class ProductService {
     const typedBarcode = data.barcode?.trim() ? parseBarcodeOrThrow(data.barcode) : undefined;
     if (typedBarcode) await assertBarcodeAvailable(storeId, typedBarcode);
 
+    // QA-PRICE-ZERO-1: an ACTIVE product is orderable, so it cannot be free (a draft may be a 0 placeholder).
+    assertActiveProductPrice({ status: data.status ?? 'draft', price: data.price });
+
     const product = await w.product.create({
       data: {
         storeId,
@@ -902,6 +906,15 @@ export class ProductService {
     await this.assertCategoriesInStore(storeId, data.categories);
     await assertSizeChartInStore(storeId, data.sizeChartId);
     const product = await this.getById(storeId, productId);
+
+    // QA-PRICE-ZERO-1: judge the status/price the row will HAVE after this update. A gold-rate row is exempt (only the
+    // repricer writes its price) and a variant product is judged on its variants.
+    assertActiveProductPrice({
+      status: data.status ?? product.status,
+      price: data.price ?? product.price,
+      pricingMode: (product as { pricingMode?: string | null }).pricingMode,
+      hasVariants: (product as { hasVariants?: boolean | null }).hasVariants,
+    });
 
     // Money guard: a fixed discount must never exceed the price (would store a
     // negative sale price). The route schema catches this when the PATCH sends
@@ -1348,6 +1361,7 @@ export class ProductService {
       select: {
         id: true,
         price: true,
+        status: true,
         inventory: true,
         pricingMode: true,
         _count: { select: { variants: true } },
@@ -1355,6 +1369,25 @@ export class ProductService {
     });
 
     if (existing.length === 0) return { updated: 0, skippedVariantProducts: 0 };
+
+    // QA-PRICE-ZERO-1: refuse the WHOLE batch when any simple product would end up ACTIVE at price 0 (an activation of a
+    // 0-priced draft, or a price write that lands on 0). Gold-rate and variant products are exempt inside the helper.
+    if (fields.status !== undefined || fields.price !== undefined) {
+      for (const p of existing) {
+        const priceWritten =
+          fields.price === undefined
+            ? p.price
+            : fields.price.mode === 'set'
+              ? Math.max(0, Math.round(fields.price.value))
+              : Math.max(0, Math.round(p.price * (1 + fields.price.value / 100)));
+        assertActiveProductPrice({
+          status: fields.status ?? p.status,
+          price: priceWritten,
+          pricingMode: p.pricingMode,
+          hasVariants: p._count.variants > 0,
+        });
+      }
+    }
 
     const allIds = existing.map(p => p.id);
     const isVariantProduct = (p: (typeof existing)[number]) => p._count.variants > 0;

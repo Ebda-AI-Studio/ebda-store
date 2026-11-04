@@ -108,8 +108,9 @@ export function computeDiscount(
   base: number
 ): number {
   if (type === 'percentage') {
-    const d = Math.round((base * value) / 100);
-    return maxDiscount != null && d > maxDiscount ? maxDiscount : d;
+    const d = Math.min(base, Math.round((base * value) / 100)); // never more than the goods (a legacy value above 100)
+    // a cap of 0 (or less) means no cap: parity with apps/api promotion-targeting.ts (QA-COUPON-1)
+    return maxDiscount != null && maxDiscount > 0 && d > maxDiscount ? maxDiscount : d;
   }
   if (type === 'fixed') return value > base ? base : value;
   return 0;

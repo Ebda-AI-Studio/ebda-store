@@ -257,19 +257,20 @@ const ALLOW: Record<string, AllowEntry> = {
   },
   'services/product.service.ts': {
     category: 'catalog-read',
-    reason: 'product CRUD + public payload; Task 4/6 add tiers and strip group prices',
+    reason:
+      'product CRUD + public payload; Task 4/6 add tiers and strip group prices; QA-PRICE-ZERO-1 refuses an ACTIVE row at price 0 (validation of the written list price, never a charged price)',
     reads: {
       '<module>': 3,
       advancedSearch: 9,
-      bulkUpdate: 6,
-      create: 1,
+      bulkUpdate: 13,
+      create: 2,
       getById: 1,
       getFilterOptions: 4,
       getSearchSuggestions: 1,
       getSuggestSuggestions: 2,
       listPublic: 5, // +1: the `sort=on_sale` raw SQL ranks by the retail compare-at drop (ordering only; the card price still goes through b2bPublicFields), B2-28
       reshapePublicProductDetail: 2,
-      update: 4,
+      update: 6,
       b2bPublicFields: 3, // product price + variant.price ?? product.price: hides a stale variant tier (final review minor 2)
     },
   },
@@ -296,12 +297,14 @@ const ALLOW: Record<string, AllowEntry> = {
   },
   'services/bulk.service.ts': {
     category: 'writer',
-    reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',
+    reason:
+      'bulk price edits / import; Task 4 returns tier-above-base warnings; QA-PRICE-ZERO-1 refuses an ACTIVE row at price 0 (validation of the written list price, never a charged price)',
     reads: {
       buildProductFields: 1,
+      bulkUpdateStatus: 2,
       createVariantsForProductTx: 1,
       exportProducts: 2,
-      importProducts: 6,
+      importProducts: 10,
     },
   },
   'routes/bulk.routes.ts': {
@@ -319,10 +322,17 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'import preview',
     reads: { buildImportPreview: 2 },
   },
+  'lib/sellable-price.ts': {
+    category: 'writer',
+    reason:
+      'QA-PRICE-ZERO-1: an ACTIVE product / variant must not be written at price 0 (reads the list price being written)',
+    reads: { isFreeActiveProduct: 2, assertActiveVariantPrice: 1 },
+  },
   'services/variant.service.ts': {
     category: 'writer',
-    reason: 'variant price edits',
-    reads: { createVariant: 2, createVariantRow: 1, getProductVariants: 1 },
+    reason:
+      'variant price edits; QA-PRICE-ZERO-1 refuses an ACTIVE row at price 0 (validation of the written list price, never a charged price)',
+    reads: { createVariant: 4, createVariantRow: 1, getProductVariants: 1, updateVariant: 5 },
   },
   'routes/product.routes.ts': {
     category: 'writer',

@@ -74,12 +74,68 @@ export function openUnpaidGatewayHoldCap(): number {
   return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_OPEN_UNPAID_GATEWAY_HOLD_CAP;
 }
 
-/** `OPEN_UNPAID_HOLD_IP_CAP` env var, default `openUnpaidHoldCap() * 4`. */
+/**
+ * QA-HOLDS-1 (2026-11-03). The IP ceiling was identity cap x 4 = 8 forever: a QA run of ~8 COD orders from one egress IP
+ * was refused with TOO_MANY_OPEN_HOLDS, and a real office or an Egyptian mobile carrier (CGNAT shares ONE IPv4 across
+ * thousands of subscribers) would hit the same wall. The identity cap (per phone/email) is what bounds one buyer pinning
+ * stock; the IP signal only has to bound ONE ABUSER who rotates phone/email, so it is now
+ *   - much higher: `DEFAULT_MANUAL_IP_CAP` = 40 for COD/InstaPay, and
+ *   - rate-shaped: only holds created inside the last `openUnpaidHoldIpWindowHours()` (default 24 h) count, so a merchant
+ *     who has not yet confirmed yesterday's COD orders never blocks today's honest buyers on the same NAT. (A COD hold
+ *     counts only while it is `pending`; the moment the merchant confirms it, it stops counting at all.)
+ * Per store both caps can be tuned in `Store.settings.stockHoldCaps` (`resolveStoreHoldCaps`), bounded so a merchant
+ * cannot switch the protection off.
+ */
+const DEFAULT_MANUAL_IP_CAP = 40;
+const DEFAULT_IP_WINDOW_HOURS = 24;
+const MAX_IP_WINDOW_HOURS = 24 * 7;
+
+/** `OPEN_UNPAID_HOLD_IP_CAP` env var, default 40 (COD/InstaPay). */
 export function openUnpaidHoldIpCap(): number {
   const raw = Number(process.env.OPEN_UNPAID_HOLD_IP_CAP);
-  return Number.isInteger(raw) && raw > 0
+  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_MANUAL_IP_CAP;
+}
+
+/** `OPEN_UNPAID_HOLD_IP_WINDOW_HOURS` env var, default 24: how far back an unpaid hold still counts toward the IP cap. */
+export function openUnpaidHoldIpWindowHours(): number {
+  const raw = Number(process.env.OPEN_UNPAID_HOLD_IP_WINDOW_HOURS);
+  return Number.isInteger(raw) && raw > 0 && raw <= MAX_IP_WINDOW_HOURS
     ? raw
-    : openUnpaidHoldCap() * DEFAULT_OPEN_UNPAID_HOLD_IP_MULTIPLIER;
+    : DEFAULT_IP_WINDOW_HOURS;
+}
+
+export interface ResolvedHoldCaps {
+  /** per phone/email, COD + InstaPay */
+  manual: number;
+  /** per phone/email, any other payment label */
+  gateway: number;
+  /** per checkout IP, COD + InstaPay (gateway labels use identity cap x 4) */
+  ip: number;
+  /** hours an unpaid hold keeps counting toward the IP cap */
+  ipWindowHours: number;
+}
+
+const intIn = (v: unknown, min: number, max: number): number | null =>
+  typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : null;
+
+/**
+ * The effective caps for one store: `Store.settings.stockHoldCaps` (`{ manual?, gateway?, ip?, ipWindowHours? }`) over the
+ * env/default values. Every value is range-checked; anything outside its range is ignored (the safe default stands), so
+ * the protection cannot be configured away: identity 1..10, gateway 1..20, ip 5..500, window 1..168 hours.
+ * Reads the store row the checkout already loads, so it costs no query.
+ */
+export function resolveStoreHoldCaps(settings: unknown): ResolvedHoldCaps {
+  const raw =
+    settings && typeof settings === 'object'
+      ? ((settings as Record<string, unknown>).stockHoldCaps as Record<string, unknown> | undefined)
+      : undefined;
+  const o = raw && typeof raw === 'object' ? raw : {};
+  return {
+    manual: intIn(o.manual, 1, 10) ?? openUnpaidHoldCap(),
+    gateway: intIn(o.gateway, 1, 20) ?? openUnpaidGatewayHoldCap(),
+    ip: intIn(o.ip, 5, 500) ?? openUnpaidHoldIpCap(),
+    ipWindowHours: intIn(o.ipWindowHours, 1, MAX_IP_WINDOW_HOURS) ?? openUnpaidHoldIpWindowHours(),
+  };
 }
 
 /**
@@ -131,7 +187,8 @@ export async function assertStockHoldCapNotExceeded(
   tx: HoldCapTx,
   storeId: string,
   paymentMethod: string,
-  identity: HoldCapIdentity
+  identity: HoldCapIdentity,
+  caps: ResolvedHoldCaps = resolveStoreHoldCaps(null)
 ): Promise<void> {
   // Every method is counted (ruling S4-1); the manual methods get the tight cap,
   // everything else the looser gateway cap. Full-wallet orders never get here.
@@ -171,6 +228,7 @@ export async function assertStockHoldCapNotExceeded(
          AND "status" IN ('pending', 'awaiting_payment_confirmation')
          AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL
          AND ${ip}::text IS NOT NULL AND "checkout_ip" = ${ip}
+         AND "created_at" >= (now() AT TIME ZONE 'UTC') - make_interval(hours => ${caps.ipWindowHours}::int)
       ) AS ip_count
   `;
   const { phone_or_email_count, ip_count } = rows[0] ?? {
@@ -178,15 +236,27 @@ export async function assertStockHoldCapNotExceeded(
     ip_count: 0n,
   };
 
-  const identityCap = manual ? openUnpaidHoldCap() : openUnpaidGatewayHoldCap();
-  const ipCap = manual
-    ? openUnpaidHoldIpCap()
-    : identityCap * DEFAULT_OPEN_UNPAID_HOLD_IP_MULTIPLIER;
-  if (Number(phone_or_email_count) >= identityCap || Number(ip_count) >= ipCap) {
+  const identityCap = manual ? caps.manual : caps.gateway;
+  const ipCap = manual ? caps.ip : identityCap * DEFAULT_OPEN_UNPAID_HOLD_IP_MULTIPLIER;
+  const identityHit = Number(phone_or_email_count) >= identityCap;
+  if (identityHit || Number(ip_count) >= ipCap) {
+    // Two different refusals: this BUYER has open orders (finish or cancel one), or this NETWORK has placed many in the
+    // last day (an office / carrier NAT). Both stay 429 TOO_MANY_OPEN_HOLDS; the Arabic text in details says which.
     throw new AppError(
       429,
       'TOO_MANY_OPEN_HOLDS',
-      'You have too many orders awaiting payment. Please complete or cancel an existing order before placing a new one.'
+      identityHit
+        ? 'You have too many orders awaiting payment. Please complete or cancel an existing order before placing a new one.'
+        : 'Too many orders were placed from your network recently. Please try again later, or contact the store to confirm your order.',
+      identityHit
+        ? {
+            messageAr:
+              'عندك طلبات كتير لسه مستنية. كمّل طلب منهم أو الغي واحد قبل ما تعمل طلب جديد.',
+          }
+        : {
+            messageAr:
+              'اتعمل طلبات كتير من نفس الشبكة في آخر فترة. جرّب كمان شوية، أو كلّم المتجر عشان يأكد طلبك.',
+          }
     );
   }
 }
