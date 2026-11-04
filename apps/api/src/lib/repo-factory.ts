@@ -80,6 +80,7 @@ export type StoreReads = {
 export type WritableModel =
   | 'paymentConfig'
   | 'storeTaxProfile'
+  | 'taxRate'
   | 'storeTaxDocument'
   | 'product'
   | 'productVariant'

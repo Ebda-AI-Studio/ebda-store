@@ -32,6 +32,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'PaymentConfig',
   // the store's VAT registration profile and its evidence rows (Ruling NEON-ZERO-2; status transitions stay in TaxProfileService)
   'StoreTaxProfile',
+  // the VAT rates the order tax sums (ruling TAX-1); the admin CRUD writes the table checkout reads (Ruling NEON-ZERO-2)
+  'TaxRate',
   'StoreTaxDocument',
   'Product',
   'ProductVariant',

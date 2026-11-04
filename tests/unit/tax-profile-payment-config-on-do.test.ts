@@ -47,6 +47,7 @@ import {
 } from '@ebda-src/repo';
 import { storeDb, storeWriter, withRepo } from '@api/lib/repo-factory';
 import { TaxProfileService } from '@api/services/tax-profile.service';
+import { TaxService } from '@api/services/tax.service';
 import { loadCodFeeConfig } from '@api/services/payment-providers/cod.provider';
 import { InstapayService } from '@api/services/payment-providers/instapay.service';
 import { META, openSqlite } from '../../packages/repo/test/diff-harness';
@@ -380,6 +381,33 @@ describe('tax profile review guard on the DO (the Postgres trigger, reproduced)'
         }),
       ]);
       expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    });
+  });
+});
+
+describe('tax rates on the DO', () => {
+  it('admin CRUD writes the DO table the order tax reads; rates are listed by creation order', async () => {
+    sqlite.exec('DELETE FROM tax_rates');
+    await on(async () => {
+      const a = await TaxService.createRate(STORE, {
+        name: 'VAT',
+        rate: 14,
+        isActive: true,
+      } as never);
+      const b = await TaxService.createRate(STORE, {
+        name: 'Levy',
+        rate: 1,
+        isActive: false,
+      } as never);
+      expect((await TaxService.listRates(STORE)).map(r => r.name)).toEqual(['VAT']);
+      expect(await TaxService.listRates(STORE, true)).toHaveLength(2);
+      expect((await TaxService.toggleRate(STORE, b.id)).isActive).toBe(true);
+      await TaxService.updateRate(STORE, a.id, { rate: 15 } as never);
+      expect(rows('SELECT rate FROM tax_rates ORDER BY rate').map(r => Number(r.rate))).toEqual([
+        1, 15,
+      ]);
+      await TaxService.deleteRate(STORE, a.id);
+      await expect(TaxService.getRate(STORE, a.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 });

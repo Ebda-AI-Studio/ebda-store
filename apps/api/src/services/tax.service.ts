@@ -5,7 +5,7 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { TAX_NOT_VERIFIED_CODE } from '@ebda/shared';
 import { TaxProfileService } from './tax-profile.service';
-import { storeDb, storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 
 /**
  * Issue 2212: `taxRatePercent` (and taxEnabled/taxIncludedInPrice) ride the
@@ -119,7 +119,9 @@ export class TaxService {
       where.isActive = true;
     }
 
-    const rates = await prisma.taxRate.findMany({
+    const rates = await (
+      await storeDb(storeId)
+    ).taxRate.findMany({
       where,
       // Priority is not a charge input (every active rate is summed, ruling
       // TAX-1), so it does not order the list either.
@@ -136,7 +138,9 @@ export class TaxService {
    * Get a single tax rate
    */
   static async getRate(storeId: string, rateId: string) {
-    const rate = await prisma.taxRate.findFirst({
+    const rate = await (
+      await storeDb(storeId)
+    ).taxRate.findFirst({
       where: { id: rateId, storeId },
     });
 
@@ -154,7 +158,9 @@ export class TaxService {
    * Create a tax rate
    */
   static async createRate(storeId: string, data: CreateTaxRateData) {
-    const rate = await prisma.taxRate.create({
+    const rate = await (
+      await storeWriter(storeId)
+    ).taxRate.create({
       data: {
         storeId,
         name: data.name,
@@ -177,7 +183,9 @@ export class TaxService {
   static async updateRate(storeId: string, rateId: string, data: UpdateTaxRateData) {
     await this.getRate(storeId, rateId);
 
-    const rate = await prisma.taxRate.update({
+    const rate = await (
+      await storeWriter(storeId)
+    ).taxRate.update({
       where: { id: rateId, storeId },
       data: {
         name: data.name,
@@ -199,7 +207,7 @@ export class TaxService {
    */
   static async deleteRate(storeId: string, rateId: string) {
     await this.getRate(storeId, rateId);
-    await prisma.taxRate.delete({ where: { id: rateId, storeId } });
+    await (await storeWriter(storeId)).taxRate.delete({ where: { id: rateId, storeId } });
     bustPublicTaxCaches(storeId);
   }
 
@@ -209,7 +217,9 @@ export class TaxService {
   static async toggleRate(storeId: string, rateId: string) {
     const rate = await this.getRate(storeId, rateId);
 
-    const updated = await prisma.taxRate.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).taxRate.update({
       where: { id: rateId, storeId },
       data: { isActive: !rate.isActive },
     });
