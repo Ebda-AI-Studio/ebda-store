@@ -18,6 +18,7 @@ vi.mock('@api/lib/repo-factory', () => ({
   storeUpdate: vi.fn(),
 }));
 vi.mock('@api/services/feature.service', () => ({ featureService: {} }));
+vi.mock('@api/lib/store-customer', () => ({ assertStoreCustomer: vi.fn() }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -70,5 +71,52 @@ describe('LoyaltyService.migrateLedgerToDo', () => {
     await expect(LoyaltyService.migrateLedgerToDo('s1')).rejects.toMatchObject({
       code: 'NOT_A_DO_STORE',
     });
+  });
+});
+
+describe('LoyaltyService.ensureDoHistory (FP-2: no DO answer without the customer history)', () => {
+  const calls: string[] = [];
+  beforeEach(() => {
+    calls.length = 0;
+    Object.assign(money, {
+      loyaltyImportState: vi.fn(async () => (calls.push('state'), { done: false })),
+      loyaltyImport: vi.fn(
+        async () => (calls.push('import'), { inserted: 1, skipped: 0, newBalance: 0 })
+      ),
+      loyaltyCustomerPoints: vi.fn(async () => (calls.push('read'), null)),
+    });
+    findMany.mockResolvedValue([t('a', 'c1', 10)]);
+  });
+
+  it('imports (and marks done on the last batch) BEFORE the first read, once per isolate', async () => {
+    await LoyaltyService.ensureDoHistory('s-lazy', 'c-lazy', money as never);
+    expect(calls).toEqual(['state', 'import']);
+    expect(money.loyaltyImport).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'c-lazy', markDone: true })
+    );
+    await LoyaltyService.ensureDoHistory('s-lazy', 'c-lazy', money as never);
+    expect(calls).toEqual(['state', 'import']); // second touch: nothing
+  });
+
+  it('a customer already flagged done is not read from Postgres again', async () => {
+    (money.loyaltyImportState as any).mockResolvedValueOnce({ done: true });
+    await LoyaltyService.ensureDoHistory('s-lazy', 'c-done', money as never);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(money.loyaltyImport).not.toHaveBeenCalled();
+  });
+
+  it('a customer with no Postgres rows still gets the done flag', async () => {
+    findMany.mockResolvedValue([]);
+    await LoyaltyService.ensureDoHistory('s-lazy', 'c-empty', money as never);
+    expect(money.loyaltyImport).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'c-empty', rows: [], markDone: true })
+    );
+  });
+
+  it('getCustomerPoints imports first, then reads', async () => {
+    const { featureService } = await import('@api/services/feature.service');
+    (featureService as any).isFeatureEnabled = vi.fn(async () => true);
+    await LoyaltyService.getCustomerPoints('s-read', 'c-read');
+    expect(calls).toEqual(['state', 'import', 'read']);
   });
 });

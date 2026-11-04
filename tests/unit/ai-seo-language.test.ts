@@ -63,6 +63,25 @@ describe('seoLanguagesOk', () => {
     expect(seoLanguagesOk({ ...good, title: '500', descriptionAr: '٥٠٠' })).toBe(true));
 });
 
+describe('seoLanguagesOk with product names (Opus review #4)', () => {
+  const nike = {
+    title: 'Nike Air Max 90',
+    titleAr: 'Nike Air Max 90 حذاء',
+    description: 'Classic running shoe.',
+    descriptionAr: 'حذاء جري كلاسيكي Nike Air Max 90 مريح.',
+  };
+  it('a brand-heavy Arabic title passes (the brand words are not judged)', () => {
+    expect(seoLanguagesOk(nike, ['Nike Air Max 90'])).toBe(true);
+    // even without the names the 25% floor lets it through
+    expect(seoLanguagesOk(nike)).toBe(true);
+  });
+  it('a real swap still fails', () => {
+    expect(seoLanguagesOk({ ...nike, titleAr: 'Nike Air Max 90 shoes' }, ['Nike Air Max 90'])).toBe(
+      false
+    );
+  });
+});
+
 describe('AIService.suggestSeo language check', () => {
   beforeEach(() => generate.mockReset());
 

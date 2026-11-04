@@ -354,9 +354,20 @@ export const seoSuggestionSchema = z.object({
   keywords: z.array(z.string().max(120)).max(50),
 });
 
-/** Share of the letters in `text` that are Arabic script; `null` when it has no letters at all (nothing to judge). */
-function arabicLetterShare(text: string): number | null {
-  const letters = text.match(/\p{L}/gu);
+/**
+ * Share of the letters in `text` that are Arabic script; `null` when it has no letters at all (nothing to judge).
+ * Latin words that are part of the product / store name (brand, model: "Nike Air Max 90") are ignored: they belong in the
+ * Arabic copy as they are written.
+ */
+function arabicLetterShare(
+  text: string,
+  ignoreWords: ReadonlySet<string> = new Set()
+): number | null {
+  const kept = text
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(w => w && !ignoreWords.has(w.toLowerCase()))
+    .join('');
+  const letters = kept.match(/\p{L}/gu);
   if (!letters || letters.length === 0) return null;
   const arabic = letters.filter(c => /[\u0600-\u06FF]/.test(c)).length;
   return arabic / letters.length;
@@ -364,21 +375,26 @@ function arabicLetterShare(text: string): number | null {
 
 /**
  * BE:F-4: `title` / `description` must be English and the `*Ar` pair Arabic. A field with no letters is not judged. The
- * thresholds are loose on purpose (brand names and product codes stay Latin inside Arabic copy and vice versa).
+ * thresholds are loose on purpose (brand names and product codes stay Latin inside Arabic copy and vice versa): English
+ * fields at most 30% Arabic letters, Arabic fields at least 25%, after dropping the words of `names` (product / store).
  */
-export function seoLanguagesOk(s: {
-  title: string;
-  titleAr: string;
-  description: string;
-  descriptionAr: string;
-}): boolean {
+export function seoLanguagesOk(
+  s: { title: string; titleAr: string; description: string; descriptionAr: string },
+  names: readonly string[] = []
+): boolean {
+  const ignore = new Set(
+    names
+      .flatMap(n => n.split(/[^\p{L}\p{N}]+/u))
+      .filter(Boolean)
+      .map(w => w.toLowerCase())
+  );
   for (const en of [s.title, s.description]) {
     const share = arabicLetterShare(en);
     if (share !== null && share > 0.3) return false;
   }
   for (const ar of [s.titleAr, s.descriptionAr]) {
-    const share = arabicLetterShare(ar);
-    if (share !== null && share < 0.5) return false;
+    const share = arabicLetterShare(ar, ignore);
+    if (share !== null && share < 0.25) return false;
   }
   return true;
 }
@@ -592,7 +608,7 @@ export class AIService {
         usage?.candidatesTokenCount ?? 0,
         false
       );
-      if (seoLanguagesOk(candidate)) parsed = candidate;
+      if (seoLanguagesOk(candidate, [input.entityName, input.storeName])) parsed = candidate;
       else
         logger.warn(
           { storeId: input.storeId, kind: input.kind, attempt },

@@ -50,6 +50,7 @@ vi.mock('@api/middleware/auth', () => ({
     req.user = currentUser;
     next();
   },
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
   authorize:
     (..._roles: string[]) =>
     (_req: any, _res: any, next: any) =>

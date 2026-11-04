@@ -458,8 +458,11 @@ export interface MoneyClient {
     }>;
     total: number;
   }>;
+  loyaltyImportState(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyMarkImported(a: { customerId?: string }): Promise<{ done: true }>;
   loyaltyImport(a: {
     customerId: string;
+    markDone?: boolean;
     rows: Array<{
       id: string;
       orderId?: string | null;
@@ -1189,6 +1192,8 @@ export function makeMoneyClient(
     loyaltyStats: a => call('loyaltyStats', a ?? {}),
     loyaltyStoreTransactions: a => call('loyaltyStoreTransactions', a),
     loyaltyImport: a => call('loyaltyImport', a),
+    loyaltyImportState: a => call('loyaltyImportState', a),
+    loyaltyMarkImported: a => call('loyaltyMarkImported', a),
     walletEntry: (a, key) => call('walletEntry', a, key),
     receiptCreate: a => call('receiptCreate', a),
     receiptExtraction: a => call('receiptExtraction', a),

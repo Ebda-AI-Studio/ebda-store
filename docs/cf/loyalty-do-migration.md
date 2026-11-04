@@ -12,7 +12,9 @@ What the migration does, per store and customer, through the money op `loyaltyIm
    rule as `awardBonusPoints`; the engine-tagged `refund-revoke:` / `redeem-recredit:` adjustments move the balance only), then recomputes
    the tier from `total_earned`.
 
-Idempotent by construction (keyed by transaction id): a second run reports `inserted: 0`. Rows the cutover already copied are skipped by id.
+Idempotent by construction: a row is skipped when the DO already holds it by id OR semantically (one signup bonus per customer, one review bonus per description, one earn / redeem row per order and type, one tagged reversal per order and description, else the same customer / type / points / description / time). A second run reports `inserted: 0`.
+
+**The import also runs by itself.** `LoyaltyService.ensureDoHistory` does it for a customer on their first loyalty touch on the DO (and `ensureDoStoreHistory` for the store-wide admin reads), so there is no window in which the DO answers for a customer whose Postgres history it lacks. The explicit runner below is only a belt-and-braces check.
 
 The runner is `LoyaltyService.migrateLedgerToDo(storeId, { dryRun })` (dry run by default; it must run in a Worker context because the DO is only
 reachable through the Worker binding). It reports customers, rows, the Postgres point sum and the DO stats before and after.

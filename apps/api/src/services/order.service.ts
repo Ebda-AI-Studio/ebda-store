@@ -2523,6 +2523,9 @@ export class OrderService {
           missingPersonalisation.map(i => i.productId).join(', '),
         { productIds: missingPersonalisation.map(i => i.productId) }
       );
+    // Ruling FP-2: the customer's Postgres loyalty history is in the DO ledger before the DO order operation redeems from it.
+    if (customerId && (data.pointsToRedeem ?? 0) > 0)
+      await LoyaltyService.ensureDoHistory(storeId, customerId);
     const [loyaltyOn, backorderOn, wholesale, walletOk] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'loyalty'),
       featureService.isFeatureEnabled(storeId, 'inventory.backorder'),

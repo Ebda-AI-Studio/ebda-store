@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { authenticate, authorize, customerUserId } from '../middleware/auth';
+import { authenticate, authorize, customerUserId, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { LoyaltyService } from '../services/loyalty.service';
@@ -299,7 +299,10 @@ router.get(
 router.post(
   '/:storeId/loyalty/members/:customerId/award',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  // Ruling ADMIN-FIX-T2-GATES-1: an award mints spendable points. Only the store owner does it, and never from an impersonated
+  // session (FP-3); the platform super-admin does not mint a store's points.
+  rejectImpersonated,
+  authorize('store_admin'),
   requireStoreAccess,
   requireFeature('loyalty'),
   async (req: Request, res: Response, next: NextFunction) => {

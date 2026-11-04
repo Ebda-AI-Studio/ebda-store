@@ -408,4 +408,51 @@ describe('loyalty admin reads + manual awards (L-1, Ruling FP-2)', () => {
     expect(t.out.ok.review).toEqual({ awarded: true, points: 50 });
     expect(t.out.ok.reviewAgain).toEqual({ awarded: false, points: 0 });
   });
+
+  it('FP-2: a member whose history exists only on Postgres keeps balance and bonuses after the store moves to the DO', async () => {
+    const fx = await fixtures({ member: true }); // sqlite starts EMPTY for this customer: the pre-switch state
+    await prisma.loyaltyPoints.create({
+      data: { storeId: STORE, customerId: fx.cust, points: 175, totalEarned: 175, tier: 'bronze' },
+    });
+    const desc = 'Review bonus for product prod-1 (review rev-1)';
+    for (const [type, points, description] of [
+      ['earn_signup', 100, 'Welcome bonus for joining loyalty program'],
+      ['earn_review', 50, desc],
+      ['earn_manual', 25, 'gift'],
+    ] as const)
+      await prisma.loyaltyTransaction.create({
+        data: { storeId: STORE, customerId: fx.cust, type, points, description },
+      });
+
+    const pg = await onPg(() => LoyaltyService.getCustomerPoints(STORE, fx.cust));
+    const dobj = await onDo(async () => ({
+      points: await LoyaltyService.getCustomerPoints(STORE, fx.cust), // lazy import happens here
+      join: await settle(() => LoyaltyService.initializeCustomerPoints(STORE, fx.cust, true)),
+      review: await LoyaltyService.awardReviewBonus(STORE, fx.cust, 'prod-1', 'rev-1'),
+      migrate: await LoyaltyService.migrateLedgerToDo(STORE, { dryRun: false }),
+      migrateAgain: await LoyaltyService.migrateLedgerToDo(STORE, { dryRun: false }),
+      after: await LoyaltyService.getCustomerPoints(STORE, fx.cust),
+    }));
+    expect(dobj.points?.points).toBe(pg?.points); // 175 on both
+    expect(dobj.points?.points).toBe(175);
+    expect(dobj.join).toMatchObject({ err: { code: 'ALREADY_EXISTS' } });
+    expect(dobj.review).toEqual({ awarded: false, points: 0 });
+    expect(dobj.migrate.inserted).toBe(0); // everything was imported on the first touch
+    expect(dobj.migrateAgain.inserted).toBe(0);
+    expect(dobj.after?.points).toBe(175);
+    expect(
+      sqlite
+        .prepare('SELECT count(*) AS n FROM loyalty_transactions WHERE customer_id = ?')
+        .get(fx.cust)
+    ).toEqual({ n: 3 });
+  });
+
+  it('a deduction larger than the balance is refused the same way on both backends', async () => {
+    const fx = await fixtures({ points: 10, totalEarned: 10, member: true });
+    const t = await parity(fx, () =>
+      LoyaltyService.awardBonusPoints(STORE, fx.cust, -50, 'adjust', 'too much')
+    );
+    expect(t.out.err).toMatchObject({ code: 'INSUFFICIENT_POINTS', status: 409 });
+    expect(t.state.points[0].points).toBe(10);
+  });
 });

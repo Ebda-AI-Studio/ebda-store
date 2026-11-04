@@ -7,6 +7,8 @@ import {
   getLoyaltyStats,
   getTransactionHistory,
   importLedgerRows,
+  importState,
+  markImported,
   initializeCustomerPoints,
   listMembers,
   listStoreTransactions,
@@ -150,6 +152,8 @@ export type MoneyOpName =
   | 'loyaltyStats'
   | 'loyaltyStoreTransactions'
   | 'loyaltyImport'
+  | 'loyaltyImportState'
+  | 'loyaltyMarkImported'
   | 'createOrder'
   | 'confirmPayment'
   | 'cancel'
@@ -250,6 +254,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyStats',
   'loyaltyStoreTransactions',
   'loyaltyImport',
+  'loyaltyImportState',
+  'loyaltyMarkImported',
   'createOrder',
   'confirmPayment',
   'cancel',
@@ -430,7 +436,12 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       storeId,
       customerId: id(a.customerId, 'customerId'),
       rows: Array.isArray(a.rows) ? (a.rows as never) : [],
+      markDone: a.markDone === true,
     }),
+  loyaltyImportState: (db, _storeId, a) =>
+    importState(db, { customerId: typeof a.customerId === 'string' ? a.customerId : undefined }),
+  loyaltyMarkImported: (db, _storeId, a) =>
+    markImported(db, { customerId: typeof a.customerId === 'string' ? a.customerId : undefined }),
   /**
    * OrderService.create (Ruling CF-ORDERS-1): stock reserve, hold cap, coupon limit, loyalty redeem, wallet debit and the
    * order rows are ONE section. The caller never supplies `storeId` (bound by the DO) nor `now` (the DO clock).

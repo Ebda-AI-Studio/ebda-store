@@ -211,4 +211,131 @@ describe('loyalty on the DO: manual award, members, stats, history', () => {
       })
     ).toMatchObject({ inserted: 0, skipped: 1, newBalance: 70 });
   });
+
+  it('FP-2: a PG member with a signup bonus is not granted it again after the switch, in either order', () => {
+    const r = rig();
+    const pgSignup = { id: 'pg-s', type: 'earn_signup', points: 100, createdAt: 1000 };
+    r.op('loyaltyImport', { customerId: 'c1', rows: [pgSignup], markDone: true });
+    expect(r.op('loyaltyImportState', { customerId: 'c1' })).toEqual({ done: true });
+    expect(r.op('loyaltyCustomerPoints', { customerId: 'c1', ...feature }).row.points).toBe(100);
+    expect(r.code('loyaltyInit', { customerId: 'c1', giveSignupBonus: true, ...feature })).toBe(
+      'ALREADY_EXISTS/400'
+    );
+    expect(r.op('loyaltyImport', { customerId: 'c1', rows: [pgSignup] })).toMatchObject({
+      inserted: 0,
+      newBalance: 100,
+    });
+    // the reverse order: the DO granted the bonus first, the PG row (other id, other time) must not add a second one
+    const r2 = rig();
+    r2.op('loyaltyInit', { customerId: 'c1', giveSignupBonus: true, ...feature });
+    expect(
+      r2.op('loyaltyImport', { customerId: 'c1', rows: [{ ...pgSignup, createdAt: 9 }] })
+    ).toMatchObject({ inserted: 0, skipped: 1, newBalance: 100 });
+  });
+
+  it('FP-2: a PG review bonus is not granted again, and an imported one is not duplicated by the DO', () => {
+    const r = rig();
+    const desc = 'Review bonus for product p1 (review r1)';
+    r.op('loyaltyImport', {
+      customerId: 'c1',
+      rows: [{ id: 'pg-r', type: 'earn_review', points: 50, description: desc, createdAt: 1000 }],
+    });
+    expect(
+      r.op('loyaltyReviewBonus', { customerId: 'c1', productId: 'p1', reviewId: 'r1', ...feature })
+    ).toEqual({ awarded: false, points: 0 });
+    const r2 = rig();
+    r2.op('loyaltyReviewBonus', { customerId: 'c1', productId: 'p1', reviewId: 'r1', ...feature });
+    expect(
+      r2.op('loyaltyImport', {
+        customerId: 'c1',
+        rows: [{ id: 'pg-r', type: 'earn_review', points: 50, description: desc, createdAt: 5 }],
+      })
+    ).toMatchObject({ inserted: 0, newBalance: 50 });
+  });
+
+  it('FP-2: a manual award in PG history is imported once; twice changes nothing', () => {
+    const r = rig();
+    const rows = [
+      { id: 'pg-m', type: 'earn_manual', points: 40, description: 'gift', createdAt: 1000 },
+    ];
+    expect(r.op('loyaltyImport', { customerId: 'c1', rows })).toMatchObject({
+      inserted: 1,
+      newBalance: 40,
+    });
+    expect(r.op('loyaltyImport', { customerId: 'c1', rows })).toMatchObject({
+      inserted: 0,
+      newBalance: 40,
+    });
+    expect(r.op('loyaltyCustomerPoints', { customerId: 'c1', ...feature }).row.points).toBe(40);
+  });
+
+  it('one row the DO already holds does not abort the batch (earn_purchase under another id and time)', () => {
+    const r = rig();
+    r.op('loyaltyEarn', { customerId: 'c1', orderId: 'o1', ...feature });
+    const out = r.op('loyaltyImport', {
+      customerId: 'c1',
+      rows: [
+        { id: 'pg-e', orderId: 'o1', type: 'earn_purchase', points: 100, createdAt: 77 },
+        { id: 'pg-x', type: 'earn_manual', points: 15, createdAt: 78 },
+        {
+          id: 'pg-t',
+          orderId: 'o1',
+          type: 'adjust',
+          points: -100,
+          description: 'refund-revoke:abc',
+          createdAt: 79,
+        },
+      ],
+    });
+    expect(out).toMatchObject({
+      inserted: 2,
+      skipped: 1,
+      newBalance: 15,
+    });
+    // the replay of the tagged reversal is skipped by (order, description)
+    expect(
+      r.op('loyaltyImport', {
+        customerId: 'c1',
+        rows: [
+          {
+            id: 'pg-t2',
+            orderId: 'o1',
+            type: 'adjust',
+            points: -100,
+            description: 'refund-revoke:abc',
+            createdAt: 1,
+          },
+        ],
+      })
+    ).toMatchObject({ inserted: 0, skipped: 1 });
+  });
+
+  it('import state and the store flag', () => {
+    const r = rig();
+    expect(r.op('loyaltyImportState', {})).toEqual({ done: false });
+    r.op('loyaltyMarkImported', {});
+    expect(r.op('loyaltyImportState', {})).toEqual({ done: true });
+    expect(r.op('loyaltyImportState', { customerId: 'c9' })).toEqual({ done: false });
+  });
+
+  it('a deduction below zero is refused (409) and changes nothing', () => {
+    const r = rig();
+    r.op('loyaltyAward', { customerId: 'c1', points: 30, type: 'earn_manual', ...feature });
+    expect(
+      r.code('loyaltyAward', { customerId: 'c1', points: -31, type: 'adjust', ...feature })
+    ).toBe('INSUFFICIENT_POINTS/409');
+    expect(r.q('SELECT points FROM loyalty_points')[0].points).toBe(30);
+    expect(r.q('SELECT count(*) AS n FROM loyalty_transactions')[0].n).toBe(1);
+    expect(
+      r.op('loyaltyAward', { customerId: 'c1', points: -30, type: 'adjust', ...feature })
+    ).toEqual({
+      newBalance: 0,
+    });
+    // a first-ever deduction (no row yet) is refused and leaves no empty row behind
+    const r2 = rig();
+    expect(
+      r2.code('loyaltyAward', { customerId: 'c1', points: -1, type: 'adjust', ...feature })
+    ).toBe('INSUFFICIENT_POINTS/409');
+    expect(r2.q('SELECT count(*) AS n FROM loyalty_points')[0].n).toBe(0);
+  });
 });

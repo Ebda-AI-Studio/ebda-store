@@ -4,6 +4,7 @@ import express from 'express';
 import request from 'supertest';
 
 let impersonatedBy: string | undefined;
+let role = 'store_admin';
 vi.mock('@ebda/database', async importOriginal => ({
   ...(await importOriginal<object>()),
   prisma: {
@@ -17,7 +18,7 @@ vi.mock('@api/services/redis.service', () => ({
 vi.mock('@api/middleware/auth', async importOriginal => ({
   ...(await importOriginal<object>()),
   authenticate: (req: any, _res: any, next: any) => {
-    req.user = { userId: 'u1', role: 'store_admin', impersonatedBy };
+    req.user = { userId: 'u1', role, impersonatedBy };
     next();
   },
 }));
@@ -32,6 +33,15 @@ vi.mock('@api/middleware/store-access', async importOriginal => ({
 vi.mock('@api/middleware/feature-gate', () => ({
   requireFeature: () => (_q: any, _s: any, n: any) => n(),
 }));
+vi.mock('@api/middleware/tenant-context', () => ({
+  tenantContext: (_q: any, _s: any, n: any) => n(),
+  storeScopeContext: (_q: any, _s: any, n: any) => n(),
+}));
+const award = vi.fn();
+vi.mock('@api/services/loyalty.service', () => ({
+  LoyaltyService: { awardBonusPoints: (...a: unknown[]) => award(...a) },
+}));
+vi.mock('@api/lib/store-customer', () => ({ assertStoreCustomer: vi.fn() }));
 const complete = vi.fn();
 vi.mock('@api/services/return.service', async importOriginal => ({
   ...(await importOriginal<object>()),
@@ -51,5 +61,41 @@ describe('POST /returns/admin/:id/complete under impersonation', () => {
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('IMPERSONATION_FORBIDDEN');
     expect(complete).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /loyalty/members/:id/award (spendable points)', () => {
+  const post = async () => {
+    const { default: router } = await import('@api/routes/loyalty.routes');
+    const app = express();
+    app.use(express.json());
+    app.use('/stores', router);
+    return request(app)
+      .post('/stores/s1/loyalty/members/c1/award')
+      .send({ points: 10, type: 'earn_manual' });
+  };
+
+  it('403 IMPERSONATION_FORBIDDEN for an impersonated owner', async () => {
+    impersonatedBy = 'platform-admin';
+    role = 'store_admin';
+    const res = await post();
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('IMPERSONATION_FORBIDDEN');
+    expect(award).not.toHaveBeenCalled();
+  });
+
+  it('403 for the platform super-admin', async () => {
+    impersonatedBy = undefined;
+    role = 'super_admin';
+    expect((await post()).status).toBe(403);
+    expect(award).not.toHaveBeenCalled();
+  });
+
+  it('the store owner can award', async () => {
+    impersonatedBy = undefined;
+    role = 'store_admin';
+    award.mockResolvedValue({ newBalance: 10 });
+    expect((await post()).status).toBe(200);
+    expect(award).toHaveBeenCalledTimes(1);
   });
 });

@@ -670,7 +670,7 @@ export function awardBonusPoints(
     const upd = db.all(
       `UPDATE loyalty_points SET points = points + ?1,
          total_earned = total_earned + ?2, total_redeemed = total_redeemed + ?3, tier = ?4, updated_at = ?7
-       WHERE store_id = ?5 AND customer_id = ?6 RETURNING points`,
+       WHERE store_id = ?5 AND customer_id = ?6 AND points + ?1 >= 0 RETURNING points`,
       [
         a.points,
         positive ? a.points : 0,
@@ -681,6 +681,12 @@ export function awardBonusPoints(
         now,
       ]
     );
+    // a deduction can never take the balance below zero: the check and the write are ONE statement
+    if (upd.length !== 1)
+      throw new MoneyError('INSUFFICIENT_POINTS', 'Insufficient points balance', 409, {
+        messageAr: 'رصيد النقاط مش كفاية للخصم ده',
+        messageEn: 'The points balance is too low for this deduction',
+      });
     db.run(
       `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, expires_at, created_at)
        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
@@ -918,6 +924,75 @@ export function getLoyaltyStats(db: SyncSql, a: { storeId: string }) {
 }
 
 /**
+ * Is this Postgres ledger row already in the DO ledger? Semantic, not only by id (a cutover may have regenerated ids and
+ * times, and the DO may have granted the same bonus itself): one signup bonus per customer; one review bonus per
+ * description (it names the product and the review); one earn / redeem row per (order, type); one tagged reversal per
+ * (order, description); anything else by id or by the same customer / type / points / description / time.
+ */
+function importedAlready(
+  db: SyncSql,
+  storeId: string,
+  customerId: string,
+  r: {
+    id: string;
+    orderId?: string | null;
+    type: string;
+    points: number;
+    description?: string | null;
+    createdAt: number;
+  }
+): boolean {
+  const has = (sql: string, params: unknown[]) => db.all(sql, params)[0] !== undefined;
+  if (has('SELECT 1 FROM loyalty_transactions WHERE id = ?', [r.id])) return true;
+  if (r.type === 'earn_signup')
+    return has(
+      `SELECT 1 FROM loyalty_transactions WHERE store_id = ? AND customer_id = ? AND type = 'earn_signup'`,
+      [storeId, customerId]
+    );
+  if (r.type === 'earn_review' && r.description)
+    return has(
+      `SELECT 1 FROM loyalty_transactions WHERE store_id = ? AND customer_id = ? AND type = 'earn_review' AND description = ?`,
+      [storeId, customerId, r.description]
+    );
+  if ((r.type === 'earn_purchase' || r.type === 'redeem_discount') && r.orderId)
+    return has(
+      'SELECT 1 FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = ?',
+      [storeId, r.orderId, r.type]
+    );
+  if (
+    r.type === 'adjust' &&
+    r.orderId &&
+    /^(refund-revoke|redeem-recredit):/.test(r.description ?? '')
+  )
+    return has(
+      `SELECT 1 FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description = ?`,
+      [storeId, r.orderId, r.description]
+    );
+  return has(
+    `SELECT 1 FROM loyalty_transactions WHERE store_id = ? AND customer_id = ? AND type = ? AND points = ?
+       AND created_at = ? AND coalesce(description, '') = coalesce(?, '')`,
+    [storeId, customerId, r.type, r.points, r.createdAt, r.description ?? null]
+  );
+}
+
+/** Has this customer's (or, with no customer, the store's) Postgres history been imported into the DO? */
+export function importState(db: SyncSql, a: { customerId?: string }): { done: boolean } {
+  const name = a.customerId ? `loyalty_import:${a.customerId}` : 'loyalty_import_store';
+  const row = db.all('SELECT value FROM do_flags WHERE name = ?', [name])[0];
+  return { done: row !== undefined && row.value === 1 };
+}
+
+/** Record that a customer's (or the whole store's) Postgres history is in the DO. */
+export function markImported(db: SyncSql, a: { customerId?: string }): { done: true } {
+  const name = a.customerId ? `loyalty_import:${a.customerId}` : 'loyalty_import_store';
+  db.run(
+    'INSERT INTO do_flags (name, value) VALUES (?, 1) ON CONFLICT (name) DO UPDATE SET value = 1',
+    [name]
+  );
+  return { done: true };
+}
+
+/**
  * One-off migration (Ruling FP-2): copy the ledger rows a DO store only has on Postgres (manual awards, signup /
  * review bonuses written before L-1) into the DO. Idempotent and keyed by the Postgres transaction id (or the same ledger
  * fact: customer, type, points and time, in case a cutover regenerated ids): a row the DO already holds is skipped and
@@ -938,6 +1013,8 @@ export function importLedgerRows(
       expiresAt?: number | null;
       createdAt: number;
     }>;
+    /** Record the customer as imported in the same section (the lazy first-touch import sets it on its last batch). */
+    markDone?: boolean;
     now?: number;
   }
 ): { inserted: number; skipped: number; newBalance: number } {
@@ -948,7 +1025,8 @@ export function importLedgerRows(
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
     const cfg = loadLoyaltyConfig(db, a.storeId);
-    if (!cfg) throw new MoneyError('LOYALTY_DISABLED', 'store has no config row', 400);
+    // history is imported even for a store whose loyalty is off (no config row): tiers then use the defaults
+    const settings = cfg?.settings ?? DEFAULT_LOYALTY_SETTINGS;
     ensurePointsRow(db, a.storeId, a.customerId, now);
     let inserted = 0;
     let skipped = 0;
@@ -959,13 +1037,7 @@ export function importLedgerRows(
       requireId(r.id, 'row.id');
       if (!Number.isInteger(r.points) || Math.abs(r.points) > MAX_POINTS)
         throw new MoneyError('BAD_POINTS', 'row.points out of range', 400);
-      // same id, OR the same ledger fact under another id (a cutover that regenerated ids must not double count)
-      const dup = db.all(
-        `SELECT 1 AS x FROM loyalty_transactions WHERE id = ?1
-         OR (store_id = ?2 AND customer_id = ?3 AND type = ?4 AND points = ?5 AND created_at = ?6) LIMIT 1`,
-        [r.id, a.storeId, a.customerId, r.type, r.points, r.createdAt]
-      )[0];
-      if (dup) {
+      if (importedAlready(db, a.storeId, a.customerId, r)) {
         skipped++;
         continue;
       }
@@ -1011,12 +1083,13 @@ export function importLedgerRows(
         dPoints,
         dEarned,
         dRedeemed,
-        calculateTier((lp.total_earned as number) + dEarned, cfg.settings),
+        calculateTier((lp.total_earned as number) + dEarned, settings),
         a.storeId,
         a.customerId,
         now,
       ]
     );
+    if (a.markDone) markImported(db, { customerId: a.customerId });
     return { inserted, skipped, newBalance: upd[0].points as number };
   });
 }
