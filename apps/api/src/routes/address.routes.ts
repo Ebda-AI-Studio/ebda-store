@@ -4,6 +4,8 @@ import { prisma } from '@ebda/database';
 import { egyptAddressSchema } from '@ebda/shared';
 import { authenticate } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { atomicWrites } from '../lib/atomic-writes';
 
 const router = Router();
 
@@ -33,7 +35,26 @@ const router = Router();
 // will 404 instead of 403 — the DB backstop doing its job (don't reveal
 // existence of another user's row). Expected; do not try to preserve 403.
 router.use(authenticate);
-router.use(userContext(req => req.user!.userId));
+router.use(userContext(req => req.user!.userId, addressStoreId));
+
+/**
+ * The store an address request belongs to: the customer token's store, else the `x-store-id` header (the wishlist's
+ * convention). A Durable Object store keeps its address book in its DO; no store (or a Postgres store) is the unchanged prisma.
+ */
+function addressStoreId(req: Request): string | null {
+  const fromToken = req.user?.storeId;
+  if (fromToken) return fromToken;
+  const h = req.headers['x-store-id'];
+  return typeof h === 'string' && h ? h : null;
+}
+async function addressDb(req: Request) {
+  const id = addressStoreId(req);
+  return (id ? await storeDb(id) : prisma) as unknown as typeof prisma;
+}
+async function addressWriter(req: Request) {
+  const id = addressStoreId(req);
+  return (id ? await storeWriter(id) : prisma) as unknown as typeof prisma;
+}
 
 // Validation schema for creating/updating an address.
 //
@@ -58,7 +79,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
 
-    const addresses = await prisma.address.findMany({
+    const addresses = await (
+      await addressDb(req)
+    ).address.findMany({
       where: { userId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
@@ -92,19 +115,14 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const data = parsed.data;
 
-    // If this address is being set as default, unset all other defaults first
-    if (data.isDefault) {
-      await prisma.address.updateMany({
-        where: { userId, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
+    const db = await addressDb(req);
+    const w = await addressWriter(req);
 
     // If this is the user's first address, make it default automatically
-    const existingCount = await prisma.address.count({ where: { userId } });
+    const existingCount = await db.address.count({ where: { userId } });
     const isDefault = data.isDefault ?? existingCount === 0;
 
-    const address = await prisma.address.create({
+    const createAddress = w.address.create({
       data: {
         userId,
         firstName: data.firstName,
@@ -129,6 +147,16 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         isDefault,
       },
     });
+    let address;
+    if (data.isDefault) {
+      // If this address is being set as default, unset all other defaults in the same atomic batch
+      [, address] = await atomicWrites(addressStoreId(req), w, [
+        w.address.updateMany({ where: { userId, isDefault: true }, data: { isDefault: false } }),
+        createAddress,
+      ]);
+    } else {
+      address = await createAddress;
+    }
 
     res.status(201).json({
       success: true,
@@ -146,7 +174,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     // Verify ownership
-    const existing = await prisma.address.findUnique({ where: { id, userId } });
+    const existing = await (await addressDb(req)).address.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({
         success: false,
@@ -180,14 +208,8 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const data = parsed.data;
 
     // If setting this address as default, unset others
-    if (data.isDefault) {
-      await prisma.address.updateMany({
-        where: { userId, isDefault: true, id: { not: id } },
-        data: { isDefault: false },
-      });
-    }
-
-    const address = await prisma.address.update({
+    const w = await addressWriter(req);
+    const updateAddress = w.address.update({
       where: { id, userId },
       data: {
         ...(data.firstName !== undefined && { firstName: data.firstName }),
@@ -210,6 +232,18 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
         ...(data.isDefault !== undefined && { isDefault: data.isDefault }),
       },
     });
+    let address;
+    if (data.isDefault) {
+      [, address] = await atomicWrites(addressStoreId(req), w, [
+        w.address.updateMany({
+          where: { userId, isDefault: true, id: { not: id } },
+          data: { isDefault: false },
+        }),
+        updateAddress,
+      ]);
+    } else {
+      address = await updateAddress;
+    }
 
     res.json({
       success: true,
@@ -227,7 +261,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { id } = req.params;
 
     // Verify ownership
-    const existing = await prisma.address.findUnique({ where: { id, userId } });
+    const existing = await (await addressDb(req)).address.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({
         success: false,
@@ -244,17 +278,23 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    await prisma.address.delete({ where: { id, userId } });
-
-    // If the deleted address was default, promote the most recently created address
-    if (existing.isDefault) {
-      const next = await prisma.address.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (next) {
-        await prisma.address.update({ where: { id: next.id, userId }, data: { isDefault: true } });
-      }
+    const w = await addressWriter(req);
+    // If the deleted address was default, promote the most recently created other address in the same atomic batch
+    const next = existing.isDefault
+      ? await (
+          await addressDb(req)
+        ).address.findFirst({
+          where: { userId, id: { not: id } },
+          orderBy: { createdAt: 'desc' },
+        })
+      : null;
+    if (next) {
+      await atomicWrites(addressStoreId(req), w, [
+        w.address.delete({ where: { id, userId } }),
+        w.address.update({ where: { id: next.id, userId }, data: { isDefault: true } }),
+      ]);
+    } else {
+      await w.address.delete({ where: { id, userId } });
     }
 
     res.json({

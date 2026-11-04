@@ -4,7 +4,7 @@ import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { runInTenantContext, runInStoreScope, withStore } from '@ebda/database';
 import { insertAuditLog } from '../lib/definer';
-import { storeRepo, type StoreWrites } from '../lib/repo-factory';
+import { storeDb, storeRepo, type StoreWrites } from '../lib/repo-factory';
 import type { McpStore } from './resolve-store';
 import { encryption } from '../services/encryption.service';
 import { featureService } from '../services/feature.service';
@@ -219,12 +219,12 @@ export async function resolveAgentAuth(req: Request, store: McpStore): Promise<A
   if (presented) {
     try {
       // `store_credentials` is store-scoped (RLS + tenant guard): read in the store's scope.
-      const row = await withStore(store.id, tx =>
-        tx.storeCredential.findUnique({
-          where: { storeId: store.id },
-          select: { agentApiKey: true },
-        })
-      );
+      const row = await (
+        await storeDb(store.id)
+      ).storeCredential.findUnique({
+        where: { storeId: store.id },
+        select: { agentApiKey: true },
+      });
       if (!row?.agentApiKey) {
         context.credential = 'unconfigured';
       } else {

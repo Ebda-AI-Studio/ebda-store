@@ -4,7 +4,8 @@
  * the next hint): it is read straight from the database on every hint, with no cache layer.
  */
 import { prisma } from '@ebda/database';
-import { storeDb } from '../../repo-factory';
+import { storeDb, storeWritesToDo } from '../../repo-factory';
+import { requirePlatformDb } from '../../platform-db';
 
 export const CI_HINT_FEATURES = ['cod_risk', 'courier', 'fee'] as const;
 export type CiHintFeature = (typeof CI_HINT_FEATURES)[number];
@@ -28,16 +29,31 @@ const parse = (feature: CiHintFeature, value: unknown): GateState => {
   };
 };
 
-export async function gateState(feature: CiHintFeature): Promise<GateState> {
-  const row = await prisma.systemSetting.findUnique({
+/**
+ * Where the platform gate rows are read for a caller: a store served by its Durable Object has no Postgres, so its reads go to
+ * the platform D1 (SystemSetting is `target: d1`); no store, or a Postgres store, keeps the `prisma` proxy (routed per cutover).
+ */
+async function settingsDb(
+  storeId?: string
+): Promise<{ systemSetting: typeof prisma.systemSetting }> {
+  if (storeId && (await storeWritesToDo(storeId))) return (await requirePlatformDb()) as never;
+  return prisma;
+}
+
+export async function gateState(feature: CiHintFeature, storeId?: string): Promise<GateState> {
+  const row = await (
+    await settingsDb(storeId)
+  ).systemSetting.findUnique({
     where: { key: key(feature) },
     select: { value: true },
   });
   return parse(feature, row?.value);
 }
 
-export async function allGates(): Promise<GateState[]> {
-  const rows = await prisma.systemSetting.findMany({
+export async function allGates(storeId?: string): Promise<GateState[]> {
+  const rows = await (
+    await settingsDb(storeId)
+  ).systemSetting.findMany({
     where: { key: { in: CI_HINT_FEATURES.map(key) } },
     select: { key: true, value: true },
   });

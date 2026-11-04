@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma, withStore } from '@ebda/database';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Promotional-SMS consent, per customer per store (issue 206).
@@ -173,7 +174,9 @@ export class SmsConsentService {
     customerKey: string,
     phone?: string | null
   ): Promise<SmsConsentView> {
-    const rows = await prisma.smsMarketingConsent.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).smsMarketingConsent.findMany({
       where: { storeId, OR: consentScope(customerKey, phone) },
       select: { ...VIEW_SELECT, updatedAt: true },
     });
@@ -194,7 +197,9 @@ export class SmsConsentService {
     const phoneKeys = customers
       .map(c => smsConsentPhoneKey(c.phone))
       .filter((k): k is string => k !== null);
-    const rows = await prisma.smsMarketingConsent.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).smsMarketingConsent.findMany({
       where: {
         storeId,
         OR: [

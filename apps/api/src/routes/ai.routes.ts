@@ -134,7 +134,9 @@ router.post(
       const { storeId } = req.params;
       const { section, existingTitle, existingTitleAr } = sectionSchema.parse(req.body);
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -279,7 +281,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
     const { storeId } = req.params;
     const { kind, id } = seoSchema.parse(req.body);
 
-    const store = await prisma.store.findUnique({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { name: true, nameAr: true, description: true, descriptionAr: true },
     });
@@ -402,7 +406,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true },
       });
@@ -488,7 +494,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { logo: true },
       });
@@ -721,7 +729,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true },
       });
@@ -1694,7 +1704,7 @@ router.get('/results/geo', async (req: Request, res: Response, next: NextFunctio
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [store, totalProducts, productsWithCitation] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { llmsTxt: true, aboutJson: true },
       }),
@@ -1921,7 +1931,7 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
       categoriesWithMeta,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaTitle: true, metaDescription: true },
       }),
@@ -2116,7 +2126,7 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
       categoriesWithAeo,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaDescriptionAeo: true },
       }),

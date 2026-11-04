@@ -1,7 +1,7 @@
 import { currentStoreId, prisma, Prisma } from '@ebda/database';
 import { customerRows } from '../lib/customer-directory';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
@@ -210,6 +210,36 @@ interface CustomerStats {
     totalSpent: number;
     orderCount: number;
   }[];
+}
+
+/**
+ * The DO twin of the two `user.count` statements in `getCustomerStats` (the `user.orders` relation is in another database):
+ * the buyers with an order in the period are read flat, then split by whether they also ordered before it.
+ */
+async function doNewAndReturning(
+  odb: Awaited<ReturnType<typeof storeDb>>,
+  storeId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<{ newCustomers: number; returningCustomers: number }> {
+  const inPeriod = await odb.order.groupBy({
+    by: ['customerId'],
+    where: {
+      storeId,
+      customerId: { not: null },
+      createdAt: { gte: startDate, lte: endDate },
+    },
+  });
+  const ids = inPeriod.map(g => g.customerId).filter((id): id is string => id != null);
+  let returning = 0;
+  for (let i = 0; i < ids.length; i += 500) {
+    const before = await odb.order.groupBy({
+      by: ['customerId'],
+      where: { storeId, customerId: { in: ids.slice(i, i + 500) }, createdAt: { lt: startDate } },
+    });
+    returning += before.length;
+  }
+  return { newCustomers: ids.length - returning, returningCustomers: returning };
 }
 
 export class AnalyticsService {
@@ -784,41 +814,50 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
+    const odb = await storeDb(storeId);
+    const onDo = (await storeRepo(storeId)).backend === 'do';
     // New customers: those whose very first order for this store falls inside the period
-    const [newCustomers, returningCustomers, topOrderGroups] = await Promise.all([
-      // Customers with at least one order in the period who had no earlier orders
-      prisma.user.count({
-        where: {
-          storeId,
-          orders: {
-            some: { storeId, createdAt: { gte: startDate, lte: endDate } },
-          },
-          NOT: {
-            orders: {
-              some: { storeId, createdAt: { lt: startDate } },
-            },
-          },
-        },
-      }),
+    const [{ newCustomers, returningCustomers }, topOrderGroups] = await Promise.all([
+      onDo
+        ? doNewAndReturning(odb, storeId, startDate, endDate)
+        : (async () => {
+            const [newCustomers, returningCustomers] = await Promise.all([
+              // Customers with at least one order in the period who had no earlier orders
+              prisma.user.count({
+                where: {
+                  storeId,
+                  orders: {
+                    some: { storeId, createdAt: { gte: startDate, lte: endDate } },
+                  },
+                  NOT: {
+                    orders: {
+                      some: { storeId, createdAt: { lt: startDate } },
+                    },
+                  },
+                },
+              }),
 
-      // Customers with more than one order in this store (returning buyers)
-      prisma.user.count({
-        where: {
-          storeId,
-          orders: {
-            some: { storeId },
-          },
-          AND: [
-            // At least two orders exist: one before or at endDate and one more
-            // We approximate "returning" as having orders both before and after startDate
-            { orders: { some: { storeId, createdAt: { lt: startDate } } } },
-            { orders: { some: { storeId, createdAt: { gte: startDate, lte: endDate } } } },
-          ],
-        },
-      }),
+              // Customers with more than one order in this store (returning buyers)
+              prisma.user.count({
+                where: {
+                  storeId,
+                  orders: {
+                    some: { storeId },
+                  },
+                  AND: [
+                    // At least two orders exist: one before or at endDate and one more
+                    // We approximate "returning" as having orders both before and after startDate
+                    { orders: { some: { storeId, createdAt: { lt: startDate } } } },
+                    { orders: { some: { storeId, createdAt: { gte: startDate, lte: endDate } } } },
+                  ],
+                },
+              }),
+            ]);
+            return { newCustomers, returningCustomers };
+          })(),
 
       // Top customers by total spend — aggregate at DB level, return top 10
-      prisma.order.groupBy({
+      odb.order.groupBy({
         by: ['customerId'],
         where: {
           storeId,

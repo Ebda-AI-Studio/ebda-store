@@ -6,6 +6,7 @@
  * `installWaWriteObservers`), with an 12-hourly reconciliation as the backstop.
  */
 import { withStore, setModelWriteObserver, type ModelWriteEvent } from '@ebda/database';
+import { storeRepo } from '../repo-factory';
 import { getEntitlements } from '../../services/plan-entitlements';
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import logger from '../logger';
@@ -113,8 +114,12 @@ export async function planChangedInput(
   const [ent, store] = await Promise.all([
     getEntitlements(storeId),
     // `Store` is a platform row: the same read for a Postgres store and a store on its Durable Object (Ruling CF-JOBS-4)
-    withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+    storeRepo(storeId).then(repo =>
+      repo.backend === 'do'
+        ? repo.db.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+        : withStore(storeId, tx =>
+            tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+          )
     ),
   ]);
   if (!ent || !store) return null;

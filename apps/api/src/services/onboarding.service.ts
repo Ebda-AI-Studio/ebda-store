@@ -10,7 +10,8 @@
  * COD payment config, subscription).
  */
 import { recordReferral } from './billing/grants.service';
-import { storeDb, storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeUpdate, storeWritesToDo } from '../lib/repo-factory';
+import { requirePlatformDb } from '../lib/platform-db';
 import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
@@ -127,12 +128,19 @@ export class OnboardingService {
         products: await (
           await storeDb(store.id)
         ).product.count({ where: { storeId: store.id, deletedAt: null } }),
-        cod: await prisma.paymentConfig.count({
+        cod: await (
+          await storeDb(store.id)
+        ).paymentConfig.count({
           where: { storeId: store.id, provider: 'cod', isEnabled: true },
         }),
+        // a DO store's subscription row is in the platform D1; a Postgres store keeps its own table
         planCode:
           (
-            await prisma.storeSubscription.findUnique({
+            await (
+              (await storeRepo(store.id)).backend === 'do'
+                ? (await requirePlatformDb()).storeSubscription
+                : prisma.storeSubscription
+            ).findUnique({
               where: { storeId: store.id },
               select: { planCode: true },
             })
@@ -344,11 +352,15 @@ export class OnboardingService {
    * "choose payment methods" item done: the merchant has now chosen.
    */
   static async setPaymentMethods(storeId: string, methods: { cod: boolean }) {
-    const existing = await prisma.paymentConfig.findFirst({
+    const existing = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({
       where: { storeId, provider: 'cod' },
       select: { id: true },
     });
-    const otherEnabled = await prisma.paymentConfig.count({
+    const otherEnabled = await (
+      await storeDb(storeId)
+    ).paymentConfig.count({
       where: { storeId, isEnabled: true, provider: { not: 'cod' } },
     });
     if (!methods.cod && otherEnabled === 0) {
@@ -386,12 +398,12 @@ export class OnboardingService {
 
   /** inactive -> active. Idempotent for an already-live store; a suspended store stays suspended. */
   static async goLive(storeId: string) {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { id: true, slug: true, domain: true, status: true, name: true },
-      })
-    );
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
+      where: { id: storeId },
+      select: { id: true, slug: true, domain: true, status: true, name: true },
+    });
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
     if (store.status === 'suspended') {
       throw new AppError(403, 'STORE_SUSPENDED', 'This store is suspended');
@@ -400,13 +412,16 @@ export class OnboardingService {
       // Billing first (Ruling EBDA-FUNNEL-5): an active trial with a saved card,
       // a pay-at-trial-end trial, a paid plan, or an admin-granted plan.
       await assertStoreMayGoLive(storeId);
-      const methods = await prisma.paymentConfig.count({ where: { storeId, isEnabled: true } });
+      const methods = await (
+        await storeDb(storeId)
+      ).paymentConfig.count({ where: { storeId, isEnabled: true } });
       if (methods === 0) {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');
       }
-      await withStore(storeId, tx =>
-        storeUpdate(tx, { where: { id: storeId }, data: { status: 'active' } })
-      );
+      const statusArgs = { where: { id: storeId }, data: { status: 'active' as const } };
+      // A DO store's status lives in D1/DO: no Postgres transaction is opened for it.
+      if (await storeWritesToDo(storeId)) await storeUpdate(prisma, statusArgs);
+      else await withStore(storeId, tx => storeUpdate(tx, statusArgs));
       await bustStoreCaches(store.id, store.slug, store.domain);
       await sendOnboardingStepToCi(store.id, 'went_live');
     }

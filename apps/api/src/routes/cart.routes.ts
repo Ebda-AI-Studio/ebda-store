@@ -5,6 +5,7 @@ import { customerUserId } from '../middleware/auth';
 import { buyerFromRequest } from '../lib/buyer-identity';
 import { setBuyerPrivate } from '../lib/edge-cache';
 import { requireFeature } from '../middleware/feature-gate';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
 
@@ -50,7 +51,7 @@ const addBundleToCartSchema = z.object({
 const getSessionId = (req: Request): string => {
   const sessionId = req.headers['x-session-id'] as string;
   if (!sessionId) {
-    throw Object.assign(new Error('Session ID required'), { statusCode: 400 });
+    throw new AppError(400, 'MISSING_SESSION', 'Session ID required');
   }
   return sessionId;
 };

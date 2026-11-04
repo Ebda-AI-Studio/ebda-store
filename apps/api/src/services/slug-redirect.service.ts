@@ -1,6 +1,19 @@
 import { DbClient, Prisma, SlugEntityType, prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { BoundedMap } from '../lib/bounded-map';
+import { storeWritesToDo } from '../lib/repo-factory';
+import { requirePlatformDb } from '../lib/platform-db';
+
+/**
+ * Where a store's SlugRedirect rows live: the platform D1 for a store served by its Durable Object (the model is `target: d1`
+ * in model-split.json), the Postgres `prisma` proxy for every other store (unchanged). Never a Postgres fallback for a DO store.
+ */
+async function slugRedirectDb(
+  storeId: string
+): Promise<{ slugRedirect: typeof prisma.slugRedirect }> {
+  if (await storeWritesToDo(storeId)) return (await requirePlatformDb()) as never;
+  return prisma;
+}
 
 /**
  * Record a slug rename so the old URL 301s to the new one.
@@ -53,7 +66,9 @@ export async function resolveSlugRedirect(
 ): Promise<string | null> {
   let current = slug;
   for (let hops = 0; hops < 3; hops++) {
-    const row = await prisma.slugRedirect.findUnique({
+    const row = await (
+      await slugRedirectDb(storeId)
+    ).slugRedirect.findUnique({
       where: { storeId_entityType_fromSlug: { storeId, entityType, fromSlug: current } },
     });
     if (!row) return current === slug ? null : current;
@@ -103,7 +118,8 @@ export async function listSlugRedirects(
   // searching for a slug the merchant already knows. `id` breaks `createdAt`
   // ties so a bulk import's rows (one timestamp) page stably. One row past
   // the page is fetched to know whether another page exists.
-  const fetched = await prisma.slugRedirect.findMany({
+  const sdb = await slugRedirectDb(storeId);
+  const fetched = await sdb.slugRedirect.findMany({
     where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
@@ -111,7 +127,7 @@ export async function listSlugRedirects(
   });
   const rows = fetched.slice(0, limit);
   const nextCursor = fetched.length > limit ? rows[rows.length - 1].id : null;
-  const total = await prisma.slugRedirect.count({ where });
+  const total = await sdb.slugRedirect.count({ where });
   return { rows, total, limit, nextCursor };
 }
 
@@ -122,7 +138,9 @@ export async function listSlugRedirects(
  * re-purposed for something new and the stale redirect would otherwise win.
  */
 export async function deleteSlugRedirect(storeId: string, id: string): Promise<void> {
-  const { count } = await prisma.slugRedirect.deleteMany({ where: { id, storeId } });
+  const { count } = await (
+    await slugRedirectDb(storeId)
+  ).slugRedirect.deleteMany({ where: { id, storeId } });
   if (count === 0) {
     throw new AppError(404, 'NOT_FOUND', 'Slug redirect not found');
   }

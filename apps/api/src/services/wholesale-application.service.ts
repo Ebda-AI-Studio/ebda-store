@@ -7,6 +7,7 @@
  */
 import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
 import { assertWholesaleEntitled, invalidateB2bPricing } from '../lib/b2b-invalidate';
@@ -88,14 +89,18 @@ export const WholesaleApplicationService = {
       );
     }
 
-    const member = await prisma.customer.findFirst({
+    const member = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: { storeId, userId, group: { isWholesale: true } },
       select: { id: true },
     });
     if (member)
       throw new AppError(409, 'ALREADY_APPROVED', 'This account already has wholesale access.');
 
-    const latest = await prisma.wholesaleApplication.findFirst({
+    const latest = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirst({
       where: { storeId, userId },
       orderBy: { createdAt: 'desc' },
       select: { status: true, decidedAt: true },
@@ -123,8 +128,8 @@ export const WholesaleApplicationService = {
     }
 
     try {
-      const created = await withSavepoint(() =>
-        prisma.wholesaleApplication.create({
+      const created = await withSavepoint(async () =>
+        (await storeWriter(storeId)).wholesaleApplication.create({
           data: {
             storeId,
             userId,
@@ -141,7 +146,9 @@ export const WholesaleApplicationService = {
       // Fail-soft (not money): a merchant-notification failure never un-creates the application.
       void (async () => {
         try {
-          const pendingCount = await prisma.wholesaleApplication.count({
+          const pendingCount = await (
+            await storeDb(storeId)
+          ).wholesaleApplication.count({
             where: { storeId, status: 'pending' },
           });
           await notifyMerchantOfApplications(storeId, 'received', {
@@ -171,7 +178,7 @@ export const WholesaleApplicationService = {
   /** The shopper's own latest application (their own decision note is theirs to read). */
   async status(storeId: string, userId: string) {
     const [application, member] = await Promise.all([
-      prisma.wholesaleApplication.findFirst({
+      (await storeDb(storeId)).wholesaleApplication.findFirst({
         where: { storeId, userId },
         orderBy: { createdAt: 'desc' },
         select: {
@@ -183,7 +190,7 @@ export const WholesaleApplicationService = {
           decidedAt: true,
         },
       }),
-      prisma.customer.findFirst({
+      (await storeDb(storeId)).customer.findFirst({
         where: { storeId, userId, group: { isWholesale: true } },
         select: { id: true },
       }),
@@ -195,7 +202,9 @@ export const WholesaleApplicationService = {
     const limit = Math.min(Math.max(opts.limit ?? 25, 1), 100);
     // N-9: for a DO-served store the applicant is read from the store's DO (the Postgres relation is a stale copy).
     const onDo = (await customerRow(storeId, null)) === null;
-    const rows = await prisma.wholesaleApplication.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findMany({
       where: { storeId, ...(opts.status ? { status: opts.status } : {}) },
       select: {
         ...appSelect,
@@ -226,8 +235,10 @@ export const WholesaleApplicationService = {
   /** Pending count and age of the oldest pending application, for the merchant badge and the nudge (review I5). */
   async summary(storeId: string) {
     const [pendingCount, oldest] = await Promise.all([
-      prisma.wholesaleApplication.count({ where: { storeId, status: 'pending' } }),
-      prisma.wholesaleApplication.findFirst({
+      (await storeDb(storeId)).wholesaleApplication.count({
+        where: { storeId, status: 'pending' },
+      }),
+      (await storeDb(storeId)).wholesaleApplication.findFirst({
         where: { storeId, status: 'pending' },
         orderBy: { createdAt: 'asc' },
         select: { createdAt: true },
@@ -251,7 +262,9 @@ export const WholesaleApplicationService = {
    * after the claim, and the claim is released again if the link fails, so a row never says approved without a link.
    */
   async approve(storeId: string, id: string, groupId: string, actorUserId: string) {
-    const app = await prisma.wholesaleApplication.findFirst({
+    const app = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirst({
       where: { id, storeId },
       select: appSelect,
     });
@@ -259,7 +272,9 @@ export const WholesaleApplicationService = {
     if (app.status !== 'pending')
       throw new AppError(409, 'NOT_PENDING', 'This application was already decided.');
     await assertWholesaleEntitled(storeId);
-    const group = await prisma.customerGroup.findFirst({
+    const group = await (
+      await storeDb(storeId)
+    ).customerGroup.findFirst({
       where: { id: groupId, storeId },
       select: { id: true, isWholesale: true, isActive: true },
     });
@@ -267,7 +282,9 @@ export const WholesaleApplicationService = {
     if (!group.isWholesale || !group.isActive) {
       throw new AppError(422, 'GROUP_NOT_WHOLESALE', 'Choose an active wholesale group.');
     }
-    const claim = await prisma.wholesaleApplication.updateMany({
+    const claim = await (
+      await storeWriter(storeId)
+    ).wholesaleApplication.updateMany({
       where: { id, storeId, status: 'pending' },
       data: { status: 'approved', groupId, decidedBy: actorUserId, decidedAt: new Date() },
     });
@@ -277,13 +294,17 @@ export const WholesaleApplicationService = {
       // The link is made from the application's session user id, never from the typed phone / email.
       await CustomerGroupService.linkApprovedBuyer(storeId, app.userId, groupId);
     } catch (err) {
-      await prisma.wholesaleApplication.updateMany({
+      await (
+        await storeWriter(storeId)
+      ).wholesaleApplication.updateMany({
         where: { id, storeId, status: 'approved' },
         data: { status: 'pending', groupId: null, decidedBy: null, decidedAt: null },
       });
       throw err;
     }
-    const updated = await prisma.wholesaleApplication.findFirstOrThrow({
+    const updated = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirstOrThrow({
       where: { id, storeId },
       select: appSelect,
     });
@@ -303,12 +324,16 @@ export const WholesaleApplicationService = {
   },
 
   async reject(storeId: string, id: string, note: string | null, actorUserId: string) {
-    const app = await prisma.wholesaleApplication.findFirst({
+    const app = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirst({
       where: { id, storeId },
       select: appSelect,
     });
     if (!app) throw new AppError(404, 'NOT_FOUND', 'Application not found');
-    const claim = await prisma.wholesaleApplication.updateMany({
+    const claim = await (
+      await storeWriter(storeId)
+    ).wholesaleApplication.updateMany({
       where: { id, storeId, status: 'pending' },
       data: {
         status: 'rejected',
@@ -319,7 +344,9 @@ export const WholesaleApplicationService = {
     });
     if (claim.count === 0)
       throw new AppError(409, 'NOT_PENDING', 'This application was already decided.');
-    const updated = await prisma.wholesaleApplication.findFirstOrThrow({
+    const updated = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirstOrThrow({
       where: { id, storeId },
       select: appSelect,
     });
@@ -344,12 +371,16 @@ export const WholesaleApplicationService = {
    * (a later manual move had already taken them out; the application is still closed).
    */
   async revoke(storeId: string, id: string, note: string | null, actorUserId: string) {
-    const app = await prisma.wholesaleApplication.findFirst({
+    const app = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirst({
       where: { id, storeId },
       select: appSelect,
     });
     if (!app) throw new AppError(404, 'NOT_FOUND', 'Application not found');
-    const claim = await prisma.wholesaleApplication.updateMany({
+    const claim = await (
+      await storeWriter(storeId)
+    ).wholesaleApplication.updateMany({
       where: { id, storeId, status: 'approved' },
       data: {
         status: 'revoked',
@@ -364,7 +395,9 @@ export const WholesaleApplicationService = {
     try {
       result = await CustomerGroupService.unlinkBuyer(storeId, app.userId);
     } catch (err) {
-      await prisma.wholesaleApplication.updateMany({
+      await (
+        await storeWriter(storeId)
+      ).wholesaleApplication.updateMany({
         where: { id, storeId, status: 'revoked' },
         data: {
           status: 'approved',
@@ -375,7 +408,9 @@ export const WholesaleApplicationService = {
       });
       throw err;
     }
-    const updated = await prisma.wholesaleApplication.findFirstOrThrow({
+    const updated = await (
+      await storeDb(storeId)
+    ).wholesaleApplication.findFirstOrThrow({
       where: { id, storeId },
       select: appSelect,
     });

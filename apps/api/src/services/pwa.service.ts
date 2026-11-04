@@ -10,7 +10,7 @@ import { BRAND } from '@ebda/shared';
 import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
 import { redis } from './redis.service';
 import { sendAlert } from './alerts.service';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate, storeWritesToDo } from '../lib/repo-factory';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -319,16 +319,16 @@ export class PWAService {
    * Get store PWA settings
    */
   static async getSettings(storeId: string): Promise<PWASettingsResponse> {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: {
-          name: true,
-          pwaEnabled: true,
-          pwaSettings: true,
-        },
-      })
-    );
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
+      where: { id: storeId },
+      select: {
+        name: true,
+        pwaEnabled: true,
+        pwaSettings: true,
+      },
+    });
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -358,12 +358,12 @@ export class PWAService {
     data: { pwaEnabled?: boolean; settings?: Partial<PWASettings> }
   ): Promise<PWASettingsResponse> {
     // Verify store exists
-    const existing = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { name: true, pwaSettings: true },
-      })
-    );
+    const existing = await (
+      await storeDb(storeId)
+    ).store.findUnique({
+      where: { id: storeId },
+      select: { name: true, pwaSettings: true },
+    });
 
     if (!existing) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -381,19 +381,21 @@ export class PWAService {
       ? { ...currentSettings, ...data.settings }
       : currentSettings;
 
-    const store = await withStore(storeId, tx =>
-      storeUpdate(tx, {
-        where: { id: storeId },
-        data: {
-          pwaEnabled: data.pwaEnabled,
-          pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
-        },
-        select: {
-          pwaEnabled: true,
-          pwaSettings: true,
-        },
-      })
-    );
+    const updateArgs = {
+      where: { id: storeId },
+      data: {
+        pwaEnabled: data.pwaEnabled,
+        pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
+      },
+      select: {
+        pwaEnabled: true,
+        pwaSettings: true,
+      },
+    };
+    // A DO store's settings live in D1/DO: no Postgres transaction is opened for it.
+    const store = (await storeWritesToDo(storeId))
+      ? await storeUpdate(prisma, updateArgs)
+      : await withStore(storeId, tx => storeUpdate(tx, updateArgs));
 
     // Every write here can change what /public/:storeId/manifest.json and
     // the storefront's home-screen icon look like. The manifest route itself
@@ -417,16 +419,14 @@ export class PWAService {
    */
   static async generateManifest(storeId: string): Promise<object | null> {
     const [store, pwaEnabled] = await Promise.all([
-      withStore(storeId, tx =>
-        tx.store.findUnique({
-          where: { id: storeId },
-          select: {
-            name: true,
-            nameAr: true,
-            pwaSettings: true,
-          },
-        })
-      ),
+      (await storeDb(storeId)).store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          nameAr: true,
+          pwaSettings: true,
+        },
+      }),
       featureService.isFeatureEnabled(storeId, 'pwa'),
     ]);
 
@@ -543,14 +543,12 @@ export class PWAService {
     pushEnabled: boolean;
   }> {
     const [store, pwaEnabled] = await Promise.all([
-      withStore(storeId, tx =>
-        tx.store.findUnique({
-          where: { id: storeId },
-          select: {
-            pwaSettings: true,
-          },
-        })
-      ),
+      (await storeDb(storeId)).store.findUnique({
+        where: { id: storeId },
+        select: {
+          pwaSettings: true,
+        },
+      }),
       featureService.isFeatureEnabled(storeId, 'pwa'),
     ]);
 
@@ -581,16 +579,14 @@ export class PWAService {
     title: string;
   } | null> {
     const [store, pwaEnabled] = await Promise.all([
-      withStore(storeId, tx =>
-        tx.store.findUnique({
-          where: { id: storeId },
-          select: {
-            name: true,
-            nameAr: true,
-            pwaSettings: true,
-          },
-        })
-      ),
+      (await storeDb(storeId)).store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          nameAr: true,
+          pwaSettings: true,
+        },
+      }),
       featureService.isFeatureEnabled(storeId, 'pwa'),
     ]);
 
