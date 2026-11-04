@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { changedFiles, check, LABEL } from '../../scripts/ci/deploy-change-label.mjs';
+import {
+  changedFiles,
+  check,
+  deployFilesChanged,
+  LABEL,
+} from '../../scripts/ci/deploy-change-label.mjs';
 
 const dir = mkdtempSync(path.join(tmpdir(), 'dcl-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -75,5 +80,13 @@ describe('deploy-change-label', () => {
     const base = git(cwd, 'rev-parse', 'HEAD');
     commit(cwd, 'scripts/cf-build.sh', 'deploy');
     expect(changedFiles(cwd, base)).toEqual(['scripts/cf-build.sh']);
+  });
+
+  it('treats the deploy planner as a protected deploy file', () => {
+    expect(deployFilesChanged(['scripts/ci/deploy-plan.mjs', 'README.md'])).toEqual([
+      'scripts/ci/deploy-plan.mjs',
+    ]);
+    expect(check(['scripts/ci/deploy-plan.mjs'], []).ok).toBe(false);
+    expect(check(['scripts/ci/deploy-plan.mjs'], [LABEL]).ok).toBe(true);
   });
 });
