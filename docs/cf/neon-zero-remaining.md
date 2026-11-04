@@ -4,46 +4,31 @@ Input for the final PRs N-15 (workers-test sweep with PG dead), N-16 (delete dea
 
 ## N-15 runtime route sweep (Postgres dead, all markers set)
 
-Last run on `integ/neon-zero` a1962bcfb (+ the sweep manifest): **907 requests, 227 2xx, 654 expected 4xx, 26 failing (5xx)** over 26 routes. History on this tree: 269 failing before the group A/B/C and analytics/platform route PRs, 26 now. Of the 26, **11 are test-environment configuration, not Postgres** (identity/ACCOUNTS, OneSignal, storage, alerts token, WA queue bindings absent in the sweep Worker); **15 still reach Postgres** (`connection attempt failed`).
+Last run on `fix/nz-integ-gaps` (on top of `integ/neon-zero` d856da043): **907 requests, 238 2xx, 656 expected 4xx, 11 failing (5xx)**. History: 269 -> 26 -> 11. The sweep now treats a 503 that says an optional third party is not configured (`PUSH_NOT_CONFIGURED` OneSignal, `STORAGE_NOT_CONFIGURED`, `alerts_not_configured`) as the correct answer of a Worker without it; those three are not counted. The identity stub (`ACCOUNTS`) now answers `getAccountsBrief`, `isRevoked`, `setStatus`, `setRole`, `deleteStoreClients`, `eraseUser`, `exportUser`, so the `/admin/users`, `/admin/stores`, `/admin/dashboard` routes are real exercises; the test Worker has the `STORE_BACKUPS` R2 bucket and the `WA_EVENTS_QUEUE` producer.
 
-Reproduce: `cd apps/api && npm run cf:dry-run && EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`. `SWEEP_STRICT=1` prints `SWEEP_FAILING` and fails; `SWEEP_FILTER=<regex over "METHOD /path">` measures a subset. Route list: `workers-test/route-table.json` (kept equal to the real router by `tests/unit/route-table-manifest.test.ts`).
-
-Per owner (failing routes): unowned 14, config 11, #414 1.
+Reproduce: `cd apps/api && npm run cf:dry-run && EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`. `SWEEP_STRICT=1` prints `SWEEP_FAILING` and fails; `SWEEP_FILTER=<regex over "METHOD /path">` measures a subset.
 
 ### SWEEP_FAILING
 
-| Route                                                     | Status | Owner   | Cause                                                                                         |
-| --------------------------------------------------------- | ------ | ------- | --------------------------------------------------------------------------------------------- |
-| `POST /auth/login`                                        | 500    | #414    | customer login of the DO customer reaches Postgres                                            |
-| `GET /admin/dashboard`                                    | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `GET /admin/stores`                                       | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `GET /admin/stores/:storeId/push/broadcasts`              | 503    | config  | OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_RE              |
-| `GET /admin/users`                                        | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `GET /admin/users/:id`                                    | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `DELETE /admin/users/:id`                                 | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `PUT /admin/users/:id`                                    | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `GET /admin/users/:userId/legal-acceptances`              | 503    | config  | no ACCOUNTS (identity) binding in the sweep Worker: not a Postgres dependency                 |
-| `POST /alerts/webhooks/sentry`                            | 503    | config  | Alerts webhook token is not configured.                                                       |
-| `DELETE /stores/:storeId/whatsapp-link/`                  | 500    | config  | WA_EVENTS_QUEUE binding missing                                                               |
-| `GET /uploads/list`                                       | 503    | config  | Storage service is not configured                                                             |
-| `GET /addresses/`                                         | 500    | unowned | account address book (user-keyed `addresses`, Ruling NZ-SF-5 only covers the storefront side) |
-| `DELETE /addresses/:id`                                   | 500    | unowned | account address book (user-keyed `addresses`, Ruling NZ-SF-5 only covers the storefront side) |
-| `PUT /addresses/:id`                                      | 500    | unowned | account address book (user-keyed `addresses`, Ruling NZ-SF-5 only covers the storefront side) |
-| `GET /admin/notifications/onesignal/devices`              | 500    | unowned | OneSignal device registry (`onesignalSubscription`)                                           |
-| `DELETE /admin/notifications/onesignal/devices/:playerId` | 500    | unowned | OneSignal device registry (`onesignalSubscription`)                                           |
-| `GET /auth/passkeys/`                                     | 500    | unowned | passkey list: identity (N-8)                                                                  |
-| `GET /onboarding/state`                                   | 500    | unowned | onboarding store create / go-live (N-18 follow-up)                                            |
-| `POST /onboarding/store`                                  | 500    | unowned | onboarding store create / go-live (N-18 follow-up)                                            |
-| `POST /onboarding/stores/:storeId/go-live`                | 500    | unowned | onboarding store create / go-live (N-18 follow-up)                                            |
-| `GET /payment-settings/store/:storeId`                    | 500    | unowned | payment-settings routes (N-11 payments config)                                                |
-| `DELETE /payment-settings/store/:storeId/:provider`       | 500    | unowned | payment-settings routes (N-11 payments config)                                                |
-| `PUT /payment-settings/store/:storeId/:provider`          | 500    | unowned | payment-settings routes (N-11 payments config)                                                |
-| `POST /payment-settings/store/:storeId/:provider/toggle`  | 500    | unowned | payment-settings routes (N-11 payments config)                                                |
-| `GET /stores/`                                            | 500    | unowned | merchant store list (`GET /stores`)                                                           |
+| Route                                                     | Status | Owner   | Cause                                               |
+| --------------------------------------------------------- | ------ | ------- | --------------------------------------------------- |
+| `GET /auth/passkeys/`                                     | 500    | unowned | passkey list: identity (N-8)                        |
+| `GET /onboarding/state`                                   | 500    | unowned | onboarding (N-18 follow-up)                         |
+| `POST /onboarding/store`                                  | 500    | unowned | onboarding store create                             |
+| `POST /onboarding/stores/:storeId/go-live`                | 500    | unowned | onboarding go-live                                  |
+| `GET /payment-settings/store/:storeId`                    | 500    | unowned | payment-settings (N-11 payments config)             |
+| `PUT /payment-settings/store/:storeId/:provider`          | 500    | unowned | same                                                |
+| `DELETE /payment-settings/store/:storeId/:provider`       | 500    | unowned | same                                                |
+| `POST /payment-settings/store/:storeId/:provider/toggle`  | 500    | unowned | same                                                |
+| `GET /admin/notifications/onesignal/devices`              | 500    | unowned | OneSignal device registry (`onesignalSubscription`) |
+| `DELETE /admin/notifications/onesignal/devices/:playerId` | 500    | unowned | same                                                |
+| `POST /auth/login` (storefront customer, flow step)       | 500    | #414    | customer login of the DO customer reaches Postgres  |
 
-Cron (one tick of each expression against a DO store): `refresh-token-cleanup` (#414: the cleanup still sweeps Postgres RefreshToken) and `backup-sweep` (G8: lists stores from Postgres) log `[cron] job failed`; `abandoned-cart`, `billing-deferred-webhooks`, `payments-reconcile`, `shipping-tracking`, `store-directory-reconcile`, `store-schedule-sync` and `loyalty-daily` are done.
+Cron (one tick of each expression against a DO store): `refresh-token-cleanup` (#414: still sweeps Postgres RefreshToken) fails on Postgres. `backup-sweep` now RUNS (the `STORE_BACKUPS` bucket was the missing binding) and reports `missingYesterday` for every store, because every store in the sweep was created minutes ago and has no manifest from yesterday; that is the job working as designed on a day-zero store, not a Postgres dependency (a store younger than 24 h could be exempt: unowned, tiny). The other seven jobs are done.
 
-Storefront flow (FLOW group): product create with `inventory` 201, customer register 200, cart add 200, cart read 200; `POST /public/orders/quote` and `POST /public/orders` answer **402 `SUBSCRIPTION_REQUIRED`** (the store's subscription is not read as active by the order gate with all markers set: fixture or a real billing-read gap, N-4b; the order is therefore not driven up to payment); `POST /auth/login` of the registered customer is a 500 (Postgres, #414).
+Storefront flow (own store, so the empty-body write sweep cannot cancel its subscription): home 200, category 201, product with `inventory` 201, PDP/list/search 200, register 200, cart add 200, **quote 200, order create 201 (COD, pending/unpaid: up to the payment step)**.
+
+Fixed in this pass (integration gaps): `POST /public/orders/quote` and `/public/orders` answering 402 `SUBSCRIPTION_REQUIRED` was a FIXTURE gap, not a bug: the write sweep hit `POST /stores/:storeId/billing/...` with `{}` on the same store and cancelled its subscription; a fresh DO store (subscription `active` in D1, billing marker on) checks out with Postgres dead (verified step by step). `GET /stores/` now lists from the D1 directory + each store's backend + the identity service. `/addresses` with a non-customer token is 400 `ADDRESS_BOOK_CUSTOMER_ONLY` (Ruling NZ-INTEG-ADDR-1). `order-capi-conversion` no longer throws an uncaught `TypeError` (`findUnique(...).catch` on a DO read client) after every order create.
 
 ## Method and limits (read first)
 

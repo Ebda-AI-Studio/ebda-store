@@ -60,6 +60,8 @@ const apiVars = {
   // StoreDO spike (lib/store-backend.ts): one flagged id + the operator seed secret.
   STORE_DO_ENABLED_IDS: 'spike-store-1',
   STORE_DO_SEED_TOKEN: 'workers-test-seed-token',
+  // The alerts webhook bridge fails closed without a token; a sweep request carries none, so it answers 401, not 503.
+  ALERTS_WEBHOOK_TOKEN: 'workers-test-alerts-token',
 };
 
 // Two workers in one Miniflare: the BUILT API Worker (`npm run cf:dry-run`: wrangler's esbuild bundle with
@@ -139,6 +141,18 @@ export default defineConfig(async () => {
                       mfaEnrolledAt: null, status: 'active', role: id.startsWith('super-') ? 'super_admin' : 'store_admin',
                       firstName: 'T', lastName: 'T', phone: null, language: 'en' };
                   }
+                  async getAccountsBrief(ids) {
+                    return ids.map(id => ({ id, email: id + '@exit-test.invalid', firstName: 'T', lastName: 'T', status: 'active',
+                      role: id.startsWith('super-') ? 'super_admin' : 'store_admin', lastLoginAt: null, createdAt: new Date(0).toISOString() }));
+                  }
+                  async isRevoked() { return false; }
+                  async revokeSession() {}
+                  async revokeUser() {}
+                  async setStatus() {}
+                  async setRole() { return true; }
+                  async deleteStoreClients() { return { clients: 0 }; }
+                  async eraseUser() { return { erased: true, remaining: 0 }; }
+                  async exportUser() { return {}; }
                   async fetch() { return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } }); }
                 }`,
             },
@@ -155,6 +169,8 @@ export default defineConfig(async () => {
               compatibilityFlags: ['nodejs_compat'],
               bindings: apiVars,
               kvNamespaces: { KV_CACHE: 'kv-cache' },
+              // The private bucket of the nightly backup sweep (cf/ops/backup-sweep.ts, G8).
+              r2Buckets: { STORE_BACKUPS: 'store-backups' },
               d1Databases: { PLATFORM_DB: 'platform-db' },
               ...(WITH_ACCOUNTS ? { serviceBindings: { ACCOUNTS: 'accounts' } } : {}),
               durableObjects: {
@@ -177,6 +193,7 @@ export default defineConfig(async () => {
                 EMAIL_QUEUE: { queueName: 'ebda-email' },
                 SMS_QUEUE: { queueName: 'ebda-sms' },
                 JOBS_QUEUE: { queueName: 'ebda-jobs' },
+                WA_EVENTS_QUEUE: { queueName: 'ebda-wa-events' },
               },
               // The consumers of wrangler.jsonc, with the retry delay shortened so a test can watch a
               // message travel main queue -> retry -> dead-letter queue -> the replay list in seconds.

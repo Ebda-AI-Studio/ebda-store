@@ -59,3 +59,29 @@ export async function listDirectoryStores(
     deletedAt: fromMs(r.deleted_at),
   }));
 }
+
+/**
+ * One page of the directory, newest first, optionally one owner's stores (the merchant's own store list). Soft-deleted rows are
+ * excluded. Returns the ids (the caller reads each store's full record from its backend) and the total. A D1 outage is a 503.
+ */
+export async function pageDirectoryStoreIds(opts: {
+  ownerId?: string;
+  skip: number;
+  take: number;
+}): Promise<{ ids: string[]; total: number }> {
+  try {
+    const where = opts.ownerId
+      ? 'WHERE deleted_at IS NULL AND owner_id = ?1'
+      : 'WHERE deleted_at IS NULL';
+    const args = opts.ownerId ? [opts.ownerId] : [];
+    const rows = await d1All<{ id: string }>(
+      `SELECT id FROM stores ${where} ORDER BY created_at DESC, id LIMIT ${Math.trunc(opts.take)} OFFSET ${Math.trunc(opts.skip)}`,
+      ...args
+    );
+    const t = await d1All<{ n: number }>(`SELECT COUNT(*) AS n FROM stores ${where}`, ...args);
+    return { ids: rows.map(r => r.id), total: Number(t[0]?.n ?? 0) };
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    throw new AppError(503, 'PLATFORM_DIRECTORY_UNAVAILABLE', 'Store directory is unavailable');
+  }
+}

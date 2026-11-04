@@ -121,7 +121,14 @@ async function hit(
   return res;
 }
 
-const failing = (r: Result) => r.status < 0 || r.status >= 500;
+/** A 503 that says an optional third-party service is not configured is the correct answer of a Worker without it. */
+const NOT_CONFIGURED = new Set([
+  'PUSH_NOT_CONFIGURED',
+  'STORAGE_NOT_CONFIGURED',
+  'alerts_not_configured',
+]);
+const failing = (r: Result) =>
+  r.status < 0 || (r.status >= 500 && !(r.status === 503 && r.code && NOT_CONFIGURED.has(r.code)));
 
 /** Run `fns` with a bounded number in flight. */
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<unknown>): Promise<void> {
@@ -284,9 +291,29 @@ describe.skipIf(e.E2E_DB === '1')(
     it.skipIf(!!FILTER)(
       'storefront flow: home, category, search, PDP, cart, checkout quote, order create (up to payment)',
       async () => {
+        // Its OWN store: the empty-body write sweep above cancels the sweep store's subscription (billing routes), which would
+        // make the order gate answer 402 SUBSCRIPTION_REQUIRED for a reason that has nothing to do with Postgres.
+        const made = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
+          method: 'POST',
+          body: JSON.stringify({
+            ownerId: 'owner-flow',
+            name: 'Flow Shop',
+            slug: 'flow-shop',
+            operator: true,
+          }),
+        });
+        expect(made.status).toBe(200);
+        const storeId = ((await made.json()) as { id: string }).id;
+        await authState('user:tv:owner-flow', [['set', 'user:tv:owner-flow', '0', {}]]);
+        const sa = await accessToken({
+          userId: 'owner-flow',
+          jti: 'j-flow',
+          role: 'store_admin',
+          storeId,
+        });
         const h = { 'x-store-id': storeId, 'x-session-id': 'sess-flow', 'accept-language': 'ar' };
         const adm = { authorization: `Bearer ${sa}`, 'x-store-id': storeId };
-        await hit('FLOW', 'GET', '/public/stores/:slug', `${BASE}/public/stores/sweep-shop`, h);
+        await hit('FLOW', 'GET', '/public/stores/:slug', `${BASE}/public/stores/flow-shop`, h);
         const cat = await hit(
           'FLOW',
           'POST',
