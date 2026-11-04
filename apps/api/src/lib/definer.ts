@@ -366,7 +366,15 @@ export const webhookInbox = {
   }): Promise<string> {
     // A provider callback is the one thing that must never be refused (nobody may retry it). During the cutover freeze it
     // is recorded straight into D1: the copy script sets such rows aside and merges them (cutover-platform-family.mjs).
-    if ((await onBillingD1('inbox')) || (await isFamilyFrozen('inbox')))
+    const onD1Inbox = await onBillingD1('inbox');
+    if (!onD1Inbox && (await isFamilyFrozen('inbox'))) {
+      // Postgres is being copied: an event it already holds is NOT recorded a second time (read-only lookup); the
+      // existing row (and its processing state) stays the single record.
+      const known = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM public.ebda_webhook_inbox_by_key(${input.idempotencyKey})`;
+      if (known[0]) return known[0].id;
+    }
+    if (onD1Inbox || (await isFamilyFrozen('inbox')))
       return inboxRecordD1({
         id: randomUUID(),
         provider: input.provider,

@@ -8,7 +8,9 @@
  * docs/plans/2026-11-02-neon-zero.md section N-10 (Ruling NZ-10-2) with the replacement (one atomic statement, `$batch`,
  * a compare-and-set, or a compensating write).
  */
+import { AppError } from '../../middleware/error-handler';
 import {
+  prisma,
   notifyModelWrite,
   setModelRouter,
   setRoutedModelGuard,
@@ -33,6 +35,31 @@ const WRITES = new Set([
   'deleteMany',
 ]);
 
+/** The platform VAT setting key (Ruling TAX-6/TAX-8): only an active super_admin may change it. */
+const PLATFORM_VAT_KEY = 'ebda.vat';
+
+/**
+ * Postgres enforces TAX-8 with the trigger `system_settings_platform_vat_guard` (only an active super_admin writes
+ * `ebda.vat`). On D1 there is no trigger, so the router enforces the same rule on the same signal: the acting user the
+ * request already carries (`ebda_is_super_admin()` reads `app.current_user_id`, identity still lives in Postgres).
+ * Replaceable in tests.
+ */
+export const vatGuard = {
+  isSuperAdmin: async (): Promise<boolean> => {
+    const rows = await prisma.$queryRaw<
+      Array<{ ok: boolean }>
+    >`SELECT public.ebda_is_super_admin() AS ok`;
+    return rows[0]?.ok === true;
+  },
+};
+
+/** Does this write name `ebda.vat`, or could it (a bulk write whose key filter is not a literal)? Conservative. */
+function touchesPlatformVat(method: string, arg: unknown): boolean {
+  const a = (arg ?? {}) as { where?: { key?: unknown } };
+  if (JSON.stringify(arg ?? null).includes(PLATFORM_VAT_KEY)) return true;
+  return (method === 'updateMany' || method === 'deleteMany') && typeof a.where?.key !== 'string';
+}
+
 const MODELS: ReadonlySet<string> = new Set(Object.values(FAMILY_MODELS).flat());
 
 export const platformRouter: ModelRouter = {
@@ -44,6 +71,14 @@ export const platformRouter: ModelRouter = {
       ? await platformFamilyOnD1ForWrite(family)
       : await platformFamilyOnD1(family);
     if (!onD1) return postgres();
+    if (model === 'systemSetting' && WRITES.has(method) && touchesPlatformVat(method, args[0])) {
+      if (!(await vatGuard.isSuperAdmin()))
+        throw new AppError(
+          403,
+          'PLATFORM_VAT_FORBIDDEN',
+          'ebda.vat: only a super_admin may change the platform VAT setting'
+        );
+    }
     const client = await requirePlatformDb();
     const result = await (client[model] as Record<string, (...a: unknown[]) => Promise<unknown>>)[
       method

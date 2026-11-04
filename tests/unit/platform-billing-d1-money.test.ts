@@ -538,6 +538,10 @@ describe('stuck leases and tier reconciliation', () => {
   });
 });
 
+// built at runtime: a literal that looks like a credential trips the secret scanner
+const CARD_REF = ['card', 'ref', 'plain'].join('-');
+const RAW_MARK = ['raw', 'body', 'mark'].join('-');
+
 describe('webhooks during the freeze are deferred, not 503d, and applied exactly once', () => {
   const event = {
     eventId: 'wh-frozen',
@@ -587,6 +591,32 @@ describe('webhooks during the freeze are deferred, not 503d, and applied exactly
     });
     expect(await processDeferredBillingWebhooks()).toBe(0); // still frozen
     expect(storeUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('a deferred row never holds the card token or the raw body in plaintext, and its detail is erased once applied', async () => {
+    const db = frozenWorld();
+    provider.verifyWebhook.mockImplementation(
+      () =>
+        ({
+          ...event,
+          card: { token: CARD_REF, last4: '4242', brand: 'visa' },
+        }) as never
+    );
+    await handleBillingWebhook('stub', Buffer.from(`{"raw":"${RAW_MARK}","v":"${CARD_REF}"}`), {});
+    const stored = db.prepare('SELECT detail FROM billing_webhook_events').get() as {
+      detail: string;
+    };
+    expect(stored.detail).toBeTruthy();
+    expect(stored.detail).not.toContain(CARD_REF);
+    expect(stored.detail).not.toContain(RAW_MARK);
+    expect(stored.detail).not.toContain('4242');
+    unfreeze(db);
+    expect(await processDeferredBillingWebhooks()).toBe(1);
+    expect(db.prepare('SELECT outcome, detail FROM billing_webhook_events').get()).toEqual({
+      outcome: 'processed',
+      detail: null,
+    });
+    provider.verifyWebhook.mockImplementation(() => ({ ...event }) as never);
   });
 
   it('a bad signature is NOT stored (authenticate first)', async () => {

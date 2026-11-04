@@ -324,6 +324,11 @@
     "target": "deleted-by-construction",
     "replacement": "dropped with the legacy WBS bridge by migration 20261103000100_drop_legacy_wa_bridge (#223); nothing to port, the DO/D1 schema never has it"
   },
+  "ebda_webhook_inbox_by_key": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.record (unique idempotency_key lookup, services/platform/platform-d1.ts)",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
   "ebda_webhook_inbox_get": {
     "target": "d1",
     "replacement": "platform.webhookInbox.get",

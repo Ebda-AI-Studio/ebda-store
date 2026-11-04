@@ -22,6 +22,8 @@
 //      slipped into Postgres; the script prints the tables and exits 2 so the row can be re-applied by hand.
 // Postgres is opened READ ONLY (lib/pg.mjs refuses a prod URL without --allow-prod-read) and rolled back.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cli, fmtMs } from './lib/cli.mjs';
 import { connectReadOnly } from './lib/pg.mjs';
@@ -59,6 +61,73 @@ export const FAMILIES = {
   inbox: ['webhook_events'],
 };
 
+/**
+ * D1-only rows a table may hold DURING the freeze (written by the API, not part of the Postgres copy). Before the copy they
+ * are set aside (written to a durable NDJSON file FIRST, then deleted by id so a row that arrives meanwhile is never
+ * touched); after the copy they are put back, in a `finally` too, with SQL that is idempotent and never loses state.
+ */
+export const ASIDE = {
+  billing_webhook_events: {
+    cols: ['id', 'provider', 'event_id', 'event_type', 'outcome', 'detail', 'received_at'],
+    where: "outcome = 'deferred'",
+    // a (provider, event_id) Postgres already holds was applied there: dropping the deferred row IS the dedupe
+    restore: (r, lit) =>
+      `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at) VALUES (${[r.id, r.provider, r.event_id, r.event_type, r.outcome, r.detail, r.received_at].map(lit).join(', ')}) ON CONFLICT (provider, event_id) DO NOTHING;`,
+  },
+};
+
+// Inbox rows recorded into D1 during the freeze. `processed` WINS on a key Postgres already holds (a freeze-window
+// redelivery that was processed must not be reset to `received` by the copied row), everything else keeps Postgres' row.
+const INBOX_COLS = [
+  'id',
+  'provider',
+  'idempotency_key',
+  'store_id',
+  'payload',
+  'raw_body',
+  'signature',
+  'status',
+  'attempts',
+  'last_error',
+  'result_order_id',
+  'result_status',
+  'received_at',
+  'processed_at',
+  'created_at',
+  'updated_at',
+];
+ASIDE.webhook_events = {
+  cols: INBOX_COLS,
+  // every row that is not part of the Postgres copy: the freeze started before any of them
+  where: '1 = 1',
+  restore: (r, lit) =>
+    `INSERT INTO webhook_events (${INBOX_COLS.join(', ')}) VALUES (${INBOX_COLS.map(c => lit(r[c])).join(', ')}) ON CONFLICT (idempotency_key) DO UPDATE SET status = excluded.status, attempts = excluded.attempts, last_error = excluded.last_error, result_order_id = excluded.result_order_id, result_status = excluded.result_status, processed_at = excluded.processed_at, updated_at = excluded.updated_at WHERE excluded.status = 'processed' AND webhook_events.status <> 'processed';`,
+};
+
+/**
+ * The set-aside file holds D1 rows that can carry provider payloads and card references, so every line is AES-256-GCM
+ * encrypted with a key from CUTOVER_STASH_KEY (>= 32 chars; the run refuses to set rows aside without it), the file is mode
+ * 0600, and it is DELETED once the rows are back in D1.
+ */
+function stashKey() {
+  const k = process.env.CUTOVER_STASH_KEY;
+  if (!k || k.length < 32)
+    throw new Error('set CUTOVER_STASH_KEY (>= 32 chars) before rows are set aside');
+  return crypto.createHash('sha256').update(k).digest();
+}
+export const sealLine = obj => {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', stashKey(), iv);
+  const enc = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
+  return [iv, c.getAuthTag(), enc].map(b => b.toString('base64')).join('.');
+};
+export const openLine = line => {
+  const [iv, tag, enc] = line.split('.').map(x => Buffer.from(x, 'base64'));
+  const d = crypto.createDecipheriv('aes-256-gcm', stashKey(), iv);
+  d.setAuthTag(tag);
+  return JSON.parse(Buffer.concat([d.update(enc), d.final()]).toString('utf8'));
+};
+
 const markerKey = family => `platform_cutover.${family}`;
 const freezeKey = family => `platform_freeze.${family}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -88,6 +157,9 @@ async function main() {
     'settle-ms': { type: 'string', default: '12000' },
     // a freeze carries its own expiry: if this script dies without lifting it the API ignores it after this long and pages
     'freeze-ttl-ms': { type: 'string', default: '900000' },
+    // where the set-aside rows are written BEFORE they are deleted (kept after the run)
+    'stash-dir': { type: 'string', default: '.cutover-stash' },
+    'restore-stash': { type: 'string' },
   });
   const tables = FAMILIES[args.family];
   if (!tables) throw new Error(`pass --family <${Object.keys(FAMILIES).join('|')}>`);
@@ -111,6 +183,19 @@ async function main() {
   const liftFreeze = () =>
     d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(fkey)};`]);
 
+  if (args['restore-stash']) {
+    const lines = fs
+      .readFileSync(args['restore-stash'], 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(l => openLine(l));
+    const sql = lines.map(({ table, row }) => ASIDE[table].restore(row, lit));
+    if (sql.length) await d1Statements(d, sql);
+    console.log(
+      `restored ${sql.length} set-aside row(s) from ${args['restore-stash']} (idempotent)`
+    );
+    return;
+  }
   if (args.unfreeze) {
     await liftFreeze();
     console.log(`freeze ${fkey} lifted.`);
@@ -246,38 +331,59 @@ async function main() {
       console.error(`${sig}: lifting the freeze before exit`);
       lift().finally(() => process.exit(130));
     });
+  freezeStartMs = Date.now();
   await setFreeze();
   frozenNow = true;
   console.log(
     `FROZEN ${args.family}: writes are refused (503, retryable). Draining ${args['drain-ms']} ms ...`
   );
   let flipped = false;
+  const stashFile = path.join(
+    args['stash-dir'],
+    `${args.family}-${new Date().toISOString().replace(/[:.]/g, '-')}.ndjson`
+  );
+  const aside = [];
+  let putBackDone = false;
+  // idempotent: runs after the copy AND in the finally, so an abort never leaves a callback / webhook only in memory
+  const putBack = async () => {
+    if (putBackDone) return;
+    const sql = aside.flatMap(({ table, rows }) => rows.map(r => ASIDE[table].restore(r, lit)));
+    if (sql.length) await d1Statements(d, sql);
+    putBackDone = true;
+    fs.rmSync(stashFile, { force: true }); // the rows are durable in D1 again: no copy stays on disk
+    if (sql.length)
+      console.log(`  ${sql.length} set-aside row(s) put back (already-known ones dropped)`);
+  };
   const before = {};
   let famNames = [];
   try {
     await sleep(Number(args['drain-ms']));
     const { client, fam } = await open();
     famNames = fam.map(b => b.name);
-    // 2b. billing: webhooks deferred during the freeze live in the dedupe table and could collide with a Postgres row of
-    // the same (provider, event_id) on copy. Set them aside, copy, then put back those Postgres does not already know
-    // (one it knows was already applied: dropping it IS the dedupe).
-    let deferred = [];
-    if (tables.includes('billing_webhook_events')) {
-      deferred = await d1Query(
+    // 2b. set aside the D1-only rows (see ASIDE): durable file first, then delete exactly those ids
+    for (const bt of fam) {
+      const spec = ASIDE[bt.name];
+      if (!spec) continue;
+      const rows = await d1Query(
         d,
-        `SELECT id, provider, event_id, event_type, outcome, detail, received_at FROM billing_webhook_events WHERE outcome = 'deferred'`
+        `SELECT ${spec.cols.join(', ')} FROM ${q(bt.name)} WHERE ${spec.where}`
       );
-      if (deferred.length)
-        await d1Statements(d, [`DELETE FROM billing_webhook_events WHERE outcome = 'deferred';`]);
-      console.log(`  ${deferred.length} deferred webhook(s) set aside`);
-    }
-    // 2c. inbox: callbacks recorded into D1 during the freeze are set aside, the Postgres rows copied, then the set-aside
-    // rows put back unless Postgres already holds that idempotency key (a redelivery of a known event is the dedupe).
-    let inboxStash = [];
-    if (tables.includes('webhook_events')) {
-      inboxStash = await d1Query(d, 'SELECT * FROM webhook_events');
-      if (inboxStash.length) await d1Statements(d, ['DELETE FROM webhook_events;']);
-      console.log(`  ${inboxStash.length} freeze-born inbox row(s) set aside`);
+      if (rows.length) {
+        fs.mkdirSync(path.dirname(stashFile), { recursive: true });
+        const fd = fs.openSync(stashFile, 'a', 0o600);
+        fs.writeSync(fd, rows.map(r => sealLine({ table: bt.name, row: r })).join('\n') + '\n');
+        fs.fsyncSync(fd);
+        fs.closeSync(fd);
+        for (let i = 0; i < rows.length; i += 400)
+          await d1Statements(d, [
+            `DELETE FROM ${q(bt.name)} WHERE id IN (${rows
+              .slice(i, i + 400)
+              .map(r => lit(r.id))
+              .join(', ')});`,
+          ]);
+        aside.push({ table: bt.name, rows });
+      }
+      console.log(`  ${rows.length} ${bt.name} row(s) set aside (${stashFile})`);
     }
     // 3. copy (idempotent upserts, FK order)
     let stmts = [];
@@ -301,34 +407,12 @@ async function main() {
       console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
     }
 
-    if (inboxStash.length) {
-      const cols = Object.keys(inboxStash[0]);
-      await d1Statements(
-        d,
-        inboxStash.map(
-          r =>
-            `INSERT INTO webhook_events (${cols.map(q).join(', ')}) VALUES (${cols.map(c => lit(r[c])).join(', ')}) ON CONFLICT (idempotency_key) DO NOTHING;`
-        )
-      );
-      console.log(
-        `  ${inboxStash.length} freeze-born inbox row(s) put back (already-known ones dropped)`
-      );
-    }
-    if (deferred.length) {
-      await d1Statements(
-        d,
-        deferred.map(
-          r =>
-            `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at) VALUES (${[r.id, r.provider, r.event_id, r.event_type, r.outcome, r.detail, r.received_at].map(lit).join(', ')}) ON CONFLICT (provider, event_id) DO NOTHING;`
-        )
-      );
-      console.log(`  ${deferred.length} deferred webhook(s) put back (already-known ones dropped)`);
-    }
+    await putBack();
     // 4. verify: count + digest on both sides, foreign keys
     const results = await d1QueryMany(d, [
       ...fam.map(
         bt =>
-          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name, inboxStash)} ORDER BY ${bt.pk.map(q).join(', ')}`
+          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name)} ORDER BY ${bt.pk.map(q).join(', ')}`
       ),
       'PRAGMA foreign_key_check',
     ]);
@@ -374,6 +458,11 @@ async function main() {
       `FLIPPED: ${key} written. Waiting ${args['settle-ms']} ms so every isolate sees it ...`
     );
   } finally {
+    await putBack().catch(e =>
+      console.error(
+        `!!! PUT-BACK FAILED (${e.message}); run: --restore-stash ${stashFile} (same --d1 flags)`
+      )
+    );
     if (!flipped) {
       await lift();
       if (!frozenNow) console.log('freeze lifted (nothing was flipped).');
@@ -406,14 +495,14 @@ async function main() {
 }
 
 /** D1 rows to compare: the cutover bookkeeping rows live in system_settings and are not part of the copied data. */
-function verifyWhere(table, inboxStash = []) {
+let freezeStartMs = 0;
+function verifyWhere(table) {
   if (table === 'system_settings')
     return ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`;
   // webhooks that arrived during the freeze are stored here as `deferred` (D1 only); they are not part of the copy
   if (table === 'billing_webhook_events') return ` WHERE outcome <> 'deferred'`;
-  // callbacks recorded during the freeze are D1-only rows, not part of the copied data
-  if (table === 'webhook_events' && inboxStash.length)
-    return ` WHERE id NOT IN (${inboxStash.map(r => lit(r.id)).join(', ')})`;
+  // callbacks recorded into D1 during the freeze are D1-only rows, not part of the copied data
+  if (table === 'webhook_events') return ` WHERE received_at < ${freezeStartMs}`;
   return '';
 }
 
