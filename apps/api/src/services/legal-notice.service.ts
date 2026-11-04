@@ -32,6 +32,8 @@ import {
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { withdrawLegalNoticeSend } from '../lib/definer';
+import { onD1 } from './platform/billing-d1';
+import { legalSendRowD1, sendRowStillExistsD1 } from './platform/platform-d1';
 import { maskEmail, maskIp, scrubEmails } from '../lib/pii-mask';
 import { sendAlert } from './alerts.service';
 import { isP2002 } from '../lib/prisma-errors';
@@ -261,9 +263,14 @@ export async function materializeDeliveries(
   // we get here (we abort, nobody is mailed) or waits for us and then sees our deliveries
   // and refuses to delete.
   return asPlatformOperator(operatorId, async () => {
-    const locked = await prisma.$queryRaw<
-      Array<{ id: string; doc_key: string; version: string; recipient_count: number | null }>
-    >`
+    // D1 has no row lock: read the row, fan out, then re-check it still exists (the withdrawal is one
+    // statement that refuses once a delivery exists, so it either ran first or sees our deliveries).
+    const d1 = await onD1('platform');
+    const locked = d1
+      ? [await legalSendRowD1(sendId)].filter(<T>(r: T | null): r is T => r !== null)
+      : await prisma.$queryRaw<
+          Array<{ id: string; doc_key: string; version: string; recipient_count: number | null }>
+        >`
       SELECT id, doc_key, version, recipient_count FROM public.legal_notice_sends
        WHERE id = ${sendId} FOR UPDATE`;
     const row = locked[0];
@@ -279,6 +286,13 @@ export async function materializeDeliveries(
         });
       }
       recipientCount = userIds.length;
+      if (d1 && !(await sendRowStillExistsD1(sendId))) {
+        // withdrawn between our read and the fan-out: take our deliveries back so nobody is mailed
+        await prisma.legalNoticeDelivery.deleteMany({
+          where: { docKey, version, status: 'queued' },
+        });
+        return { ok: false as const, reason: 'SEND_ROW_MISSING' };
+      }
       await prisma.legalNoticeSend.update({
         where: { id: sendId },
         data: { recipientCount },
@@ -685,7 +699,9 @@ export async function requestNoticeSend(
     let withdrawn = 0;
     let withdrawError: unknown = null;
     try {
-      withdrawn = await asPlatformOperator(operatorId, () => withdrawLegalNoticeSend(row.id));
+      withdrawn = await asPlatformOperator(operatorId, () =>
+        withdrawLegalNoticeSend(row.id, operatorId)
+      );
     } catch (e) {
       withdrawError = e;
     }

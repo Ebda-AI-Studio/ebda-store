@@ -47,6 +47,17 @@ export const billingEvents = sqliteTable('billing_events', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  netMinor: integer('net_minor').notNull().default(0),
+  vatRateBp: integer('vat_rate_bp').notNull().default(0),
+  grossMinor: integer('gross_minor').notNull().default(0),
+  sellerLegalName: text('seller_legal_name'),
+  sellerTaxId: text('seller_tax_id'),
+  buyerTaxId: text('buyer_tax_id'),
+  etaUuid: text('eta_uuid'),
+  etaStatus: text('eta_status', { enum: ['not_submitted', 'submitted', 'accepted', 'rejected'] })
+    .notNull()
+    .default('not_submitted'),
+  etaSubmittedAt: integer('eta_submitted_at', { mode: 'timestamp_ms' }),
 });
 
 export const billingGrants = sqliteTable('billing_grants', {

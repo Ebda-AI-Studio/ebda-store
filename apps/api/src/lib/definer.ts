@@ -8,6 +8,20 @@ import {
 } from '../services/platform/billing-d1';
 import { prisma, withStore, withSystemJob, type Prisma } from '@ebda/database';
 import { onAccessD1, ownedStoreIdsD1 } from '../services/platform/access-d1';
+import {
+  inboxGetD1,
+  inboxListD1,
+  inboxRecordD1,
+  inboxStuckD1,
+  inboxUpdateD1,
+  revokeUserMerchantKeysD1,
+  withdrawLegalSendD1,
+} from '../services/platform/platform-d1';
+import {
+  assertFamilyWritableOnPostgres,
+  assertNotFrozen,
+  isFamilyFrozen,
+} from '../services/platform/cutover';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import {
@@ -19,15 +33,6 @@ import {
   platformDb,
 } from './platform-directory';
 import { backendFor, hasStoresOnBackend } from './store-backend';
-import {
-  d1InboxGet,
-  d1InboxList,
-  d1InboxRecord,
-  d1InboxStuck,
-  d1InboxUpdate,
-  inboxD1,
-  type InboxRowRaw,
-} from './webhook-inbox-d1';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
@@ -375,18 +380,6 @@ type InboxDbRow = {
   received_at: Date;
 };
 
-const fromD1 = (r: InboxRowRaw): InboxDbRow => ({
-  ...r,
-  payload: (() => {
-    try {
-      return JSON.parse(r.payload);
-    } catch {
-      return r.payload;
-    }
-  })(),
-  received_at: new Date(Number(r.received_at)),
-});
-
 const toInboxRow = (r: InboxDbRow): WebhookInboxRow => ({
   id: r.id,
   provider: r.provider,
@@ -436,14 +429,15 @@ export const webhookInbox = {
     rawBody: string;
     signature: string;
   }): Promise<string> {
-    const d1 = inboxD1();
-    if (d1)
-      return d1InboxRecord(d1, {
+    // A provider callback is the one thing that must never be refused (nobody may retry it). During the cutover freeze it
+    // is recorded straight into D1: the copy script sets such rows aside and merges them (cutover-platform-family.mjs).
+    if ((await onBillingD1('inbox')) || (await isFamilyFrozen('inbox')))
+      return inboxRecordD1({
         id: randomUUID(),
         provider: input.provider,
         idempotencyKey: input.idempotencyKey,
         storeId: input.storeId ?? null,
-        payloadJson: JSON.stringify(input.payload),
+        payload: input.payload,
         rawBody: input.rawBody,
         signature: input.signature,
       });
@@ -456,26 +450,30 @@ export const webhookInbox = {
   },
 
   async get(id: string): Promise<WebhookInboxRow | null> {
-    const d1 = inboxD1();
-    if (d1) {
-      const r = await d1InboxGet(d1, id);
-      if (r) return toInboxRow(fromD1(r));
-      // Transition (Ruling NZ-N12-5): a row recorded in Postgres before the deploy is still consumed from Postgres. A miss in
-      // both is a miss; the consumer THROWS on it so the delivery is retried, never dropped.
-      if (!(await hasStoresOnBackend('pg'))) return null;
+    if (await onBillingD1('inbox')) {
+      const r = await inboxGetD1(id);
+      return r ? toInboxRow(r as InboxDbRow) : null;
     }
     const rows = await asWebhookInbox(
       () => prisma.$queryRaw<InboxDbRow[]>`SELECT * FROM public.ebda_webhook_inbox_get(${id})`
     );
-    return rows[0] ? toInboxRow(rows[0]) : null;
+    if (rows[0]) return toInboxRow(rows[0]);
+    // a row recorded during the cutover freeze lives in D1 before the flip (bounded exception to "no dual read")
+    const born = await inboxGetD1(id).catch(() => null);
+    return born ? toInboxRow(born as InboxDbRow) : null;
   },
 
   async update(id: string, patch: WebhookInboxPatch): Promise<boolean> {
-    const d1 = inboxD1();
-    if (d1) {
-      if (await d1InboxUpdate(d1, id, patch)) return true;
-      if (!(await hasStoresOnBackend('pg'))) return false;
-    }
+    if (await onBillingD1('inbox')) return inboxUpdateD1(id, patch);
+    // a freeze-born row is in D1; every other row is in Postgres, whose copy is being taken: no write to it now
+    if (
+      await inboxGetD1(id).then(
+        r => !!r,
+        () => false
+      )
+    )
+      return inboxUpdateD1(id, patch);
+    await assertNotFrozen('inbox');
     const rows = await asWebhookInbox(
       () => prisma.$queryRaw<Array<{ ok: boolean }>>`
       SELECT public.ebda_webhook_inbox_update(
@@ -490,31 +488,16 @@ export const webhookInbox = {
 
   /** Rows never consumed or wedged past `cutoff`, oldest first. */
   async stuck(cutoff: Date, limit: number) {
-    const d1 = inboxD1();
-    if (d1) {
-      const fromD1Rows = (await d1InboxStuck(d1, cutoff.getTime(), limit)).map(r => ({
+    if (await onBillingD1('inbox'))
+      return (await inboxStuckD1(cutoff, limit)).map(r => ({
         id: r.id,
         provider: r.provider,
         idempotencyKey: r.idempotency_key,
         storeId: r.store_id,
         status: r.status,
         attempts: r.attempts,
-        receivedAt: new Date(Number(r.received_at)),
+        receivedAt: r.received_at,
       }));
-      // Transition (NZ-N12-5): rows still in the Postgres inbox are swept too while a `pg` store exists; an unreachable
-      // Postgres must not hide the D1 rows.
-      if (!(await hasStoresOnBackend('pg'))) return fromD1Rows;
-      try {
-        const pgRows = await webhookInbox.stuckPg(cutoff, limit);
-        return [...fromD1Rows, ...pgRows].slice(0, limit);
-      } catch {
-        return fromD1Rows;
-      }
-    }
-    return webhookInbox.stuckPg(cutoff, limit);
-  },
-
-  async stuckPg(cutoff: Date, limit: number) {
     const rows = await asWebhookInbox(
       () =>
         prisma.$queryRaw<
@@ -548,12 +531,21 @@ export const webhookInbox = {
     limit: number;
     offset: number;
   }) {
-    const d1 = inboxD1();
-    if (d1) {
-      // The route is `requireRole(['super_admin'])`; the Postgres definer's own actor check + audit row are not repeated here.
-      const { rows, total } = await d1InboxList(d1, input);
+    if (await onBillingD1('inbox')) {
+      // The Postgres definer leaves an audit row for every cross-store read; keep that property.
+      await insertAuditLog({
+        action: 'platform.cross_store_read',
+        userId: input.actorUserId,
+        resourceType: 'webhook_events',
+        details: {
+          fn: 'inbox_list',
+          status: input.status ?? null,
+          provider: input.provider ?? null,
+        },
+      });
+      const rows = await inboxListD1(input);
       return {
-        total,
+        total: rows[0] ? Number(rows[0].total) : 0,
         events: rows.map(r => ({
           id: r.id,
           provider: r.provider,
@@ -564,7 +556,7 @@ export const webhookInbox = {
           resultOrderId: r.result_order_id,
           resultStatus: r.result_status,
           idempotencyKey: r.idempotency_key,
-          receivedAt: new Date(Number(r.received_at)),
+          receivedAt: r.received_at,
         })),
       };
     }
@@ -659,12 +651,15 @@ export async function getShipmentStoreIdByTracking(trackingNumber: string): Prom
  * user does not exist (the `update` it replaces threw P2025).
  */
 export async function revokeUserSessionsRow(userId: string): Promise<{ tokenVersion: number }> {
+  await assertNotFrozen('platform'); // the definer also revokes the merchant keys in Postgres: not during the copy
   const rows = await prisma.$queryRaw<Array<{ tv: number | null }>>`
     SELECT public.ebda_user_revoke_sessions(${userId}) AS tv`;
   const tv = rows[0]?.tv;
   if (tv === null || tv === undefined) {
     throw Object.assign(new Error(`User ${userId} not found`), { code: 'P2025' });
   }
+  // The definer revoked the keys in Postgres; after the cutover the live keys are in D1.
+  if (await onBillingD1('platform')) await revokeUserMerchantKeysD1(userId, new Date());
   return { tokenVersion: tv };
 }
 
@@ -1257,7 +1252,15 @@ export async function fiscalArchive(storeId: string): Promise<FiscalArchiveRow[]
  * super admin (asPlatformOperator). Returns rows deleted: 1 = withdrawn, 0 = refused (the
  * send may already have started).
  */
-export async function withdrawLegalNoticeSend(sendId: string): Promise<number> {
+export async function withdrawLegalNoticeSend(
+  sendId: string,
+  operatorId?: string
+): Promise<number> {
+  if (await onBillingD1('platform')) {
+    if (!operatorId) throw new Error('withdrawLegalNoticeSend: operatorId is required on D1');
+    return withdrawLegalSendD1(sendId, operatorId, new Date());
+  }
+  await assertFamilyWritableOnPostgres('platform');
   const rows = await prisma.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_withdraw_legal_notice_send(${sendId}) AS n`;
   return Number(rows[0]?.n ?? 0);

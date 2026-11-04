@@ -4,6 +4,16 @@ NEON-ZERO-1 item N-10. Run by the CONTROLLER (this repo never holds production c
 (N-10, Rulings NZ-10-1..4). First family: `billing` = `plans`, `store_subscriptions`, `billing_events`, `billing_grants`,
 `billing_referrals`, `billing_reminders`, `billing_webhook_events`, `store_lifecycle_emails`.
 
+## Families and the order to run them
+
+| family     | tables                                                                                                                                                                                                               | notes                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `billing`  | plans, store_subscriptions, billing_events, billing_grants, billing_referrals, billing_reminders, billing_webhook_events, store_lifecycle_emails                                                                     | N-10a; webhooks deferred during the freeze                             |
+| `platform` | system_settings, store_features, legal_acceptances, legal_notice_sends, legal_notice_deliveries, provider_verifications, provider_verification_events, provider_activation_requests, merchant_api_keys, SlugRedirect | N-10b; run AFTER `billing` (system_settings carries the markers)       |
+| `inbox`    | webhook_events                                                                                                                                                                                                       | N-10b; callbacks are recorded into D1 during the freeze, never refused |
+
+Each family: `node scripts/cf/cutover-platform-family.mjs --family <name> --d1 ebda-platform --d1-target remote --d1-config apps/api/wrangler.jsonc --pg-url "$CUTOVER_PG_URL"` (dry run), then the same plus `--commit`. One family at a time; `--status` shows marker and freeze.
+
 ## How the switch works
 
 The API (`apps/api/src/services/platform/{cutover,router}.ts`) answers every `prisma.<billing model>.*` call from D1 when D1

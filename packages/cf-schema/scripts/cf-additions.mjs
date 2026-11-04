@@ -16,6 +16,8 @@ const f = (name, type, opts = {}) => ({
     ...(opts.enumValues ? { enumValues: opts.enumValues } : {}),
   },
   cfNote: opts.note,
+  // A column added AFTER 0001 was applied to a live database: 0001 must not carry it (the migration `since` adds it, once).
+  cfSince: opts.since,
 });
 
 // Normalised COD return reasons. The raw carrier text is always kept next to the code, so the closed
@@ -44,7 +46,50 @@ export const COMMERCE_OUTCOME_KINDS = [
   'refunded',
 ];
 
+// Columns that exist only in D1 and were added after `0001_init.sql` reached the production database. `since` is the
+// migration number that adds the column (generated into `migrations/platform/<since>_late_columns.sql`); 0001 is generated
+// WITHOUT it, so a fresh database gets the column exactly once and a live one gets it from the numbered migration.
+export const LATE_COLUMN_MIGRATIONS = { 3: 'late_columns' };
+
 export const extraColumns = {
+  // TAX-1 (NEON-FOLD-1 9.1): Ebda's own invoices are VAT / ETA ready. Filled and policed by 0004_billing_tax_ready.sql.
+  BillingEvent: [
+    f('netMinor', 'Int', { default: '0', since: 3, note: 'minor units, excl. VAT (gross - vat)' }),
+    f('vatRateBp', 'Int', {
+      default: '0',
+      since: 3,
+      note: 'basis points (1400 = 14%) the VAT was computed at',
+    }),
+    f('grossMinor', 'Int', {
+      default: '0',
+      since: 3,
+      note: 'minor units incl. VAT (= amount_minor); gross = net + vat',
+    }),
+    f('sellerLegalName', 'String', {
+      optional: true,
+      since: 3,
+      note: 'SELLER snapshot (packages/shared brand/billing-vat)',
+    }),
+    f('sellerTaxId', 'String', {
+      optional: true,
+      since: 3,
+      note: 'SELLER snapshot, NULL until filled',
+    }),
+    f('buyerTaxId', 'String', { optional: true, since: 3, note: 'B2B buyer tax id, optional' }),
+    f('etaUuid', 'String', { optional: true, since: 3, note: 'ETA-issued document uuid' }),
+    f('etaStatus', 'String', {
+      kind: 'enum',
+      enumValues: ['not_submitted', 'submitted', 'accepted', 'rejected'],
+      default: 'not_submitted',
+      since: 3,
+      note: 'e-invoice status; no submission code ships yet',
+    }),
+    f('etaSubmittedAt', 'DateTime', {
+      optional: true,
+      since: 3,
+      note: 'when the invoice was submitted to ETA',
+    }),
+  ],
   Store: [
     f('storageBackend', 'String', {
       kind: 'enum',

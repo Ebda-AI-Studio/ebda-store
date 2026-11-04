@@ -23,7 +23,7 @@ import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
 
-export type PlatformFamily = 'billing' | 'access';
+export type PlatformFamily = 'billing' | 'access' | 'platform' | 'inbox';
 
 /** Prisma model names (delegate form) that each family owns. */
 export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
@@ -39,6 +39,22 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   ],
   // NEON-ZERO-1 (N-6/N-7): store membership. The access gate, staff, staff invites and owner/staff listings.
   access: ['storeStaff', 'staffInvite'],
+  // N-10b. Everything else in the platform D1 that the API reads or writes by model and that has no ledger coupling.
+  platform: [
+    'systemSetting',
+    'storeFeature',
+    'legalAcceptance',
+    'legalNoticeSend',
+    'legalNoticeDelivery',
+    'providerVerification',
+    'providerVerificationEvent',
+    'providerActivationRequest',
+    'merchantApiKey',
+    'slugRedirect',
+  ],
+  // The payment-webhook inbox: reached only through SQL definers (services/platform/inbox-d1.ts), its own marker because
+  // its writers (provider callbacks) run on a different cadence from the admin surface.
+  inbox: ['webhookEvent'],
 };
 
 export const OFF_TTL_MS = 10_000;
@@ -118,6 +134,11 @@ export async function isFamilyFrozen(family: PlatformFamily): Promise<boolean> {
   const d1 = binding();
   if (!d1) return false;
   return (await readKeys(d1, family)).frozen;
+}
+
+/** Throws the retryable 503 when the family is frozen (for Postgres-side writes that bypass the router). */
+export async function assertNotFrozen(family: PlatformFamily): Promise<void> {
+  if (await isFamilyFrozen(family)) throw frozenError(family);
 }
 
 /** Sync view for guards: has this isolate already seen the marker? */
