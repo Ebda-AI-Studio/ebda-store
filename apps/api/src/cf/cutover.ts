@@ -125,6 +125,20 @@ export async function routeCutover(request: Request, env: CfBindings): Promise<R
         argsJson: string
       ): Promise<{ ok: boolean; [k: string]: unknown }>;
     };
+    // Once the store's marker exists (store-create's `markCustomerAuthOnDo`, `--global`, a flip whose run did not finish) the DO is the
+    // source of truth: an import could overwrite what it accepted since. Refused 423, whatever the DO's own live flag says.
+    if (
+      body.op === 'importRows' &&
+      (await (await import('../lib/customer-auth.js')).customerAuthOnDo(id.data))
+    )
+      return json(
+        {
+          ok: false,
+          code: 'CUSTOMER_AUTH_LIVE',
+          error: 'customer auth is served by the StoreDO: imports are closed',
+        },
+        423
+      );
     const a = await authStub.authOp(id.data, body.op, encodeRpc(body.args ?? {}));
     return json(a, a.ok ? 200 : (a.status as number) || 500);
   }

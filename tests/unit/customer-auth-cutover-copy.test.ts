@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import * as A from '../../packages/repo/src/do/customer-auth';
 // @ts-expect-error plain .mjs without types
-import { TABLES, digestRows } from '../../scripts/cf/lib/customer-auth-copy.mjs';
+import { TABLES, digestRows, stableRows } from '../../scripts/cf/lib/customer-auth-copy.mjs';
 
 const T = new Date('2026-10-01T10:00:00.000Z');
 const pgUser = {
@@ -106,5 +106,40 @@ describe('customer-auth cutover copy', () => {
     expect(
       A.importRows(db, { table: '_cauth_users', rows: [TABLES._cauth_users.map(pgUser)] })
     ).toMatchObject({ ok: false, status: 423 });
+  });
+});
+
+describe('drift check ignores the clock (stableRows)', () => {
+  const day = 86_400_000;
+  const refresh = (id: string, expires: number, revoked: number | null) => [
+    id,
+    't',
+    'u1',
+    expires,
+    0,
+    null,
+    revoked,
+    null,
+  ];
+  it('a token that expired during the run, or a revocation that aged out, is not drift', async () => {
+    const cutoff = 1_800_000_000_000;
+    const before = [
+      refresh('a', cutoff + day, null), // still live
+      refresh('b', cutoff - 5, null), // expired DURING the run
+      refresh('c', cutoff + day, cutoff - 31 * day), // revocation aged out of the 30 day window
+      refresh('d', cutoff + day, cutoff - 2 * day), // recently revoked: kept
+    ];
+    const after = [before[0], before[3]]; // what a fresh query returns at the check
+    const cols = TABLES._cauth_refresh.cols;
+    const a = await digestRows(cols, stableRows('_cauth_refresh', before, cutoff));
+    const b = await digestRows(cols, stableRows('_cauth_refresh', after, cutoff));
+    expect(a).toEqual(b);
+    // but a REAL change inside the window still shows
+    const tampered = [before[0], refresh('d', cutoff + day, null)];
+    expect(await digestRows(cols, stableRows('_cauth_refresh', tampered, cutoff))).not.toEqual(a);
+  });
+  it('other tables are never reduced', () => {
+    const rows = [[1], [2]];
+    expect(stableRows('_cauth_users', rows, 0)).toBe(rows);
   });
 });

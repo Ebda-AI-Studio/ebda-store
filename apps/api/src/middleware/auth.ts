@@ -14,7 +14,6 @@ import { recordTiming } from '../lib/request-timing';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { customerAuthRoute } from '../lib/customer-auth';
 import { isPlatformOrigin } from '../lib/cors-cache';
-import { isIdentityManagedUser } from '../lib/identity-client';
 import {
   isAccountsToken,
   sessionRevoked,
@@ -596,11 +595,9 @@ export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: N
  */
 export async function rejectIdentityManaged(req: Request, _res: Response, next: NextFunction) {
   try {
-    if (
-      req.user &&
-      req.user.role !== 'customer' &&
-      (await isIdentityManagedUser(req.user.userId))
-    ) {
+    // Decided from the verified token, not a Postgres read: a non-customer without a store is an admin-namespace account, and
+    // those live in the identity service (a HS256 admin token and an identity ES256 token both carry no storeId).
+    if (req.user && req.user.role !== 'customer' && !req.user.storeId) {
       return next(
         new AppError(
           409,

@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   pushed: [] as Array<[string, number]>,
   doStores: new Set<string>(),
   users: new Map<string, { role: string; storeId: string | null }>(),
+  lookupFails: { v: false },
 }));
 
 vi.mock('@api/lib/customer-auth', async importOriginal => {
@@ -33,7 +34,10 @@ vi.mock('@api/lib/definer', async importOriginal => {
   const actual = await importOriginal<typeof import('@api/lib/definer')>();
   return {
     ...actual,
-    getUserState: async (id: string) => h.users.get(id) ?? null,
+    getUserState: async (id: string) => {
+      if (h.lookupFails.v) throw new Error('pg down');
+      return h.users.get(id) ?? null;
+    },
     revokeUserSessionsRow: h.pgRevoke,
   };
 });
@@ -55,6 +59,7 @@ beforeEach(() => {
   h.calls.length = 0;
   h.pushed.length = 0;
   h.pgRevoke.mockReset();
+  h.lookupFails.v = false;
   h.doStores = new Set([S]);
   h.users = new Map([
     ['cust-do', { role: 'customer', storeId: S }],
@@ -74,6 +79,18 @@ describe('revokeAllSessions without a scope', () => {
   it('an explicit scope with no storeId (an admin token) still resolves the store', async () => {
     await AuthService.revokeAllSessions('cust-do', 'revoke_all', { storeId: undefined });
     expect(h.calls).toHaveLength(1);
+  });
+});
+
+describe('fail closed', () => {
+  it('a Postgres blip while resolving the store is a retryable 503, never a silent Postgres-only revoke', async () => {
+    h.lookupFails.v = true;
+    await expect(AuthService.revokeAllSessions('cust-do')).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'REVOCATION_UNAVAILABLE',
+    });
+    expect(h.pgRevoke).not.toHaveBeenCalled();
+    expect(h.calls).toHaveLength(0);
   });
 });
 

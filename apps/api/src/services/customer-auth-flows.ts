@@ -21,6 +21,8 @@ import { signAccessToken, signRefreshToken, REFRESH_ROW_DAYS } from './session-t
 import { storeDb } from '../lib/repo-factory';
 
 const SALT_ROUNDS = 12;
+/** bcrypt of 32 random bytes whose plaintext was discarded: compared when the account is unknown (same constant as auth.service). */
+const DUMMY_PASSWORD_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 const EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const lang = (l: unknown): 'en' | 'ar' | undefined => (l === 'ar' || l === 'en' ? l : undefined);
@@ -46,6 +48,24 @@ export interface DoCustomer {
 }
 
 const rid = () => crypto.randomUUID();
+
+/**
+ * Ruling NZ-N9-1: TOTP is not ported to the StoreDO, so an account with it ON is refused everywhere a second factor would
+ * be needed (login, passkey step-up / enrol / sign-in). A password reset does NOT clear MFA (by design), so the copy says to ask
+ * the store, whose owner clears it, rather than to reset the password.
+ */
+export const mfaUnavailable = () =>
+  new AppError(
+    409,
+    'MFA_UNAVAILABLE',
+    'Two-factor sign-in is not available for this account on this store yet. Ask the store to turn it off for you, then sign in again.',
+    {
+      messageEn:
+        'Two-factor sign-in is not available for this account on this store yet. Ask the store to turn it off for you, then sign in again.',
+      messageAr:
+        'التحقق بخطوتين لسه مش متاح لحسابك في المتجر ده. اطلب من المتجر يقفله ليك وبعدها سجّل دخولك تاني.',
+    }
+  );
 
 async function sendVerification(
   c: CustomerAuthClient,
@@ -226,10 +246,21 @@ export const CustomerAuthFlows = {
   async login(c: CustomerAuthClient, email: string, password: string, ip?: string) {
     const lockoutKey = loginGate.lockoutKey(email, c.storeId);
     await loginGate.assertNotLocked(lockoutKey);
-    const r = await c.call<{ valid: boolean; user?: DoCustomer; mfa?: boolean }>('login', {
-      email,
-      password,
-    });
+    // The compare runs HERE, in the Worker (bcrypt cost 12 in the single-threaded store DO would let a login flood starve that
+    // store's checkout / stock). Unknown account: a dummy compare keeps the timing equal. The DO re-validates the hash it handed
+    // out when it stamps the success, so a reset / revoke that lands during the compare voids the login.
+    const cred = await c.call<{ id: string; hash: string; tokenVersion: number } | null>(
+      'credential',
+      { email }
+    );
+    const good = await bcrypt.compare(password, cred ? cred.hash : DUMMY_PASSWORD_HASH);
+    const r: { valid: boolean; user?: DoCustomer; mfa?: boolean } =
+      cred && good
+        ? {
+            valid: true,
+            ...(await c.call<{ user: DoCustomer; mfa: boolean }>('loginSucceeded', cred)),
+          }
+        : { valid: false };
     if (!r.valid || !r.user) {
       const res = await loginGate.recordFailure(lockoutKey, ip);
       if (res.locked) {
@@ -249,12 +280,7 @@ export const CustomerAuthFlows = {
     });
     // Ruling NZ-N9-1: TOTP for storefront customers is not offered by any storefront screen (no enrol UI) and is not ported.
     // An account that nevertheless has it ON is refused, never signed in without the second factor.
-    if (r.mfa)
-      throw new AppError(
-        409,
-        'MFA_UNAVAILABLE',
-        'Two-factor sign-in is not available for this account; reset your password to continue'
-      );
+    if (r.mfa) throw mfaUnavailable();
     return CustomerAuthFlows.issueSession(c, r.user);
   },
 
@@ -340,17 +366,25 @@ export const CustomerAuthFlows = {
     });
   },
 
+  /** Compare in the Worker, then ONE DO section (new hash + passkeys gone + everything revoked) that re-checks the hash is current. */
   async changePassword(c: CustomerAuthClient, userId: string, current: string, next: string) {
+    const cred = await c.call<{ id: string; hash: string } | null>('credentialById', { userId });
+    if (!cred) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    if (!(await bcrypt.compare(current, cred.hash)))
+      throw new AppError(400, 'INVALID_PASSWORD', 'Current password is incorrect');
     const newHash = await bcrypt.hash(next, SALT_ROUNDS);
     return c.call<{
       tokenVersion: number;
       purgedPasskeys: number;
       user: { id: string; email: string; firstName: string; language: string };
-    }>('changePassword', {
-      userId,
-      currentPassword: current,
-      newHash,
-    });
+    }>('changePassword', { userId, expectedHash: cred.hash, newHash });
+  },
+
+  /** Verify a customer's password in the Worker (passkey step-up). The hash is read from the DO and never leaves this process. */
+  async verifyPassword(c: CustomerAuthClient, userId: string, password: string): Promise<boolean> {
+    const cred = await c.call<{ id: string; hash: string } | null>('credentialById', { userId });
+    const ok = await bcrypt.compare(password, cred ? cred.hash : DUMMY_PASSWORD_HASH);
+    return ok && !!cred;
   },
 
   /** Profile in the shape `GET /auth/me` returns today (Dates, not epoch ms). */
