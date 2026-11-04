@@ -621,30 +621,14 @@ jobs:
 
   # Boot the API Worker in workerd (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot
   # see code that throws only on Workers (2026-10-08: `Prisma.dmmf` -> error 1101 on every request
-  # for ~4 minutes with every Node test green). Fresh Postgres migrated from scratch, the Worker
-  # built from the real wrangler config (always on a PR: a shared package or root config can break
-  # the Worker as easily as apps/api), then /health + a tenant-scoped public read must not 5xx.
+  # for ~4 minutes with every Node test green). The Worker built from the real wrangler config (always on
+  # a PR: a shared package or root config can break the Worker as easily as apps/api) boots against a local D1
+  # (no Postgres, N-17), then /health + the store-directory reads must not 5xx.
   api-workerd-smoke:
     name: API Worker boots on workerd
     if: github.event_name == 'pull_request'
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
-    services:
-      postgres:
-        image: pgvector/pgvector:0.8.0-pg17
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: ebda_smoke
-        ports:
-          - 5432
-        options: >-
-          --tmpfs /var/lib/postgresql/data:rw,size=1500m
-          --health-cmd "pg_isready -U test -d ebda_smoke"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 30s
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -665,9 +649,7 @@ jobs:
       - run: npm run db:generate
       - run: npm run build -w packages/shared
       - run: npm run build -w packages/database
-      - name: Migrate from scratch and boot the Worker on workerd
-        env:
-          SMOKE_PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+      - name: Boot the Worker on workerd (no Postgres, N-17)
         run: bash scripts/ci/workerd-smoke.sh
       # Search Task 11 review M8: embed() inside workerd with SEARCH_SEMANTIC_ENABLED=true and a fake
       # `AI` binding (AbortSignal.any, the binding call shape, error mapping). The smoke above strips

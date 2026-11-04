@@ -53,7 +53,7 @@ describe('queueOutcomesPort', () => {
   it('is a no-op outside a Worker (Node dev, unit tests) but FAILS LOUD inside one with no queue bound', async () => {
     clearCfBindings();
     await expect(queueOutcomesPort(() => undefined).emit([input])).resolves.toBeUndefined();
-    setCfBindings({ HYPERDRIVE: { connectionString: '' } });
+    setCfBindings({});
     await expect(queueOutcomesPort(() => undefined).emit([input])).rejects.toThrow(
       /CI_EVENTS_QUEUE/
     );
@@ -75,7 +75,7 @@ describe('queueOutcomesPort', () => {
 });
 
 describe('assertCiCaptureConfig', () => {
-  const base = { HYPERDRIVE: { connectionString: '' } };
+  const base = {};
   it('does nothing without the queue binding, and demands bucket, dataset and secret with it', () => {
     vi.stubEnv('SUITE_BUYER_KEY_SECRET', SECRET);
     expect(() => assertCiCaptureConfig(base)).not.toThrow();

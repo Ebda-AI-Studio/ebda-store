@@ -16,6 +16,7 @@
  */
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
+import { isWorkers } from './runtime';
 
 export type StoreBackend = 'do' | 'pg';
 
@@ -70,7 +71,11 @@ interface ListD1 {
 const unavailable = () =>
   new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend flag is unavailable');
 
-/** The backend that serves `storeId`, from server-side state only (see the file header). Takes no request. */
+/**
+ * The backend that serves `storeId`, from server-side state only (see the file header). Takes no request.
+ * N-14b (Ruling NZ-D7) NOT done here: the D1 read doubles as the store-exists / soft-delete gate and Node, tests and local dev
+ * still resolve `pg`; the constant-`do` collapse belongs to the N-16 dead-code PR together with the pg branches it removes.
+ */
 export async function backendFor(storeId: string): Promise<StoreBackend> {
   const d1 = (cfBindings() as { PLATFORM_DB?: FlagD1 } | undefined)?.PLATFORM_DB;
   if (!d1) {
@@ -88,6 +93,10 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
     throw unavailable();
   }
   if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  // NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres. A directory row still saying `pg` (only the soft-deleted QA
+  // store) is gone for good: 410, a clean answer instead of a Prisma call that throws POSTGRES_REMOVED.
+  if (row.storage_backend === 'pg' && isWorkers)
+    throw new AppError(410, 'STORE_STORAGE_REMOVED', 'This store is no longer available');
   if (row.storage_backend === 'do' || row.storage_backend === 'pg') return row.storage_backend;
   throw unavailable();
 }

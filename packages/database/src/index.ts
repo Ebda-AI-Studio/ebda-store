@@ -40,6 +40,11 @@ export {
 } from './request-db';
 export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
 export {
+  createPostgresRemovedClient,
+  PostgresRemovedError,
+  POSTGRES_REMOVED,
+} from './postgres-removed';
+export {
   TenantScopeViolation,
   assertTenantScoped,
   assertRawScoped,

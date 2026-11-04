@@ -52,9 +52,8 @@ export const config = {
   ordersUrl: process.env.ORDERS_URL || 'http://localhost:3002',
 
   // Database
-  // On Workers the database is the HYPERDRIVE binding (worker.ts binds a client per
-  // request); there is no connection string in the environment, and the owner-role
-  // DIRECT_URL is migration tooling that never reaches the runtime.
+  // On Workers there is NO database (NEON-ZERO N-17: worker.ts runs on a client that throws
+  // POSTGRES_REMOVED); no connection string in the environment.
   databaseUrl: isWorkers ? '' : getRequiredSecret('DATABASE_URL', 'Database URL'),
   // DIRECT_URL is the non-pooled Neon connection used for migrations
   // (prisma migrate deploy / interactive transactions). Without it, the

@@ -27,7 +27,6 @@ describe('revalidateStorefrontNow transport', () => {
   it('uses the STOREFRONT service binding when present, never the public URL', async () => {
     const bindingFetch = vi.fn(async () => new Response('{}', { status: 200 }));
     setCfBindings({
-      HYPERDRIVE: { connectionString: '' },
       STOREFRONT: { fetch: bindingFetch },
     } as unknown as CfBindings);
 

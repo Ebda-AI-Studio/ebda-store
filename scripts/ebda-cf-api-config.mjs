@@ -20,14 +20,14 @@ export function withImagesBinding(source, flag) {
 }
 
 function main() {
-  const bindings = ['EBDA_HYPERDRIVE_ID', 'EBDA_KV_CACHE_ID'];
+  const bindings = ['EBDA_KV_CACHE_ID'];
   const ids = bindings.map(name => {
     const value = process.env[name] || '';
     if (!/^[a-f0-9]{32}$/i.test(value) || /^0+$/.test(value))
       throw new Error(`${name} must be a provisioned Cloudflare resource ID`);
     return value;
   });
-  // D1 `ebda-platform` (task 2.4): a UUID, not the 32-hex shape of the two above.
+  // D1 `ebda-platform` (task 2.4): a UUID, not the 32-hex shape of the one above.
   const d1Id = process.env.EBDA_PLATFORM_D1_ID || '';
   const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
   if (

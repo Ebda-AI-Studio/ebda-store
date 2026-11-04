@@ -155,7 +155,6 @@ export interface AnalyticsEngineLike {
 }
 
 export interface CfBindings {
-  HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
   KV_CACHE?: KVNamespaceLike;
   /** Strong-consistency state: token denylist, tv, lockout / MFA counters, auth limits. */

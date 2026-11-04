@@ -16,8 +16,7 @@ SUITE_BUYER_KEY_SECRET=dev-only-suite-buyer-key-secret-0123456789
 TAP_API_KEY=dev-only-tap-api-key
 TAP_SECRET_KEY=dev-only-tap-secret-key
 TAP_WEBHOOK_SECRET=dev-only-tap-webhook-secret
-# Dev-only diagnostics routes GET /__dev/stats and /__dev/probe (src/cf/dev-stats.ts): isolate pool counters for the
-# Stage 2 burst / soak runs and the workerd db-scope tests. Never set in wrangler.jsonc or a deployed Worker.
+# Dev/test switch (src/worker.ts): enables POST /__dev/create-store for workers-test/pg-unreachable.test.ts. Never set in wrangler.jsonc or a deployed Worker.
 DEV_STATS=1
 # Semantic search (docs/ENVIRONMENT.md "Semantic search"). `npm run cf:dev` boots a copy of the config
 # WITHOUT the AI binding (no login needed; search stays lexical). `npm run cf:dev:ai` keeps it: the

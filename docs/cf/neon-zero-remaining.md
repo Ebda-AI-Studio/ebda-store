@@ -902,7 +902,7 @@ All other D1-target models are routed: billing family (#407), platform + inbox (
 | `services/billing/billing-notify.ts`                        | 1 (withStore 1)                                                          |
 | `services/billing/go-live-gate.ts`                          | 1 (withStore 1)                                                          |
 
-Hyperdrive binding references (N-17): `apps/api/src/worker.ts:184` (`env.HYPERDRIVE.connectionString`), `apps/api/src/cf/bindings.ts:158` (type), `apps/api/src/config/index.ts:55` (comment), plus `apps/api/wrangler.jsonc`, `scripts/ebda-cf-api-config.mjs`, `cf-api-deploy.yml`.
+**N-17 lite (Ruling NZ-D23) DONE in draft PR `feat/nz-remove-hyperdrive`: the references below are removed except comments in the legacy local-dev scripts (`ebda-dev-api.sh`, `ebda-parity-as-app.sh`, `stage1-exit-*`, `playwright.editor-live.config.ts`, `spikes/`), which die with N-16.** Hyperdrive binding references (N-17, before): `apps/api/src/worker.ts:184` (`env.HYPERDRIVE.connectionString`), `apps/api/src/cf/bindings.ts:158` (type), `apps/api/src/config/index.ts:55` (comment), plus `apps/api/wrangler.jsonc`, `scripts/ebda-cf-api-config.mjs`, `cf-api-deploy.yml`.
 
 ## G. Residuals of THIS PR (N-10d) that the final PRs must close
 

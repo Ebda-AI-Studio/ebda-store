@@ -16,7 +16,6 @@ const touch = vi.fn(async () => 'tok-1');
 
 function bind() {
   setCfBindings({
-    HYPERDRIVE: { connectionString: 'x' },
     JOBS_WORKFLOW: { create },
     JOBS_QUEUE: { send: qsend },
     JOB_GATE: { idFromName: (n: string) => n, get: () => ({ touch }) as never },

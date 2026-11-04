@@ -80,7 +80,7 @@ export interface RunWithRequestDbOptions {
 /**
  * Run `fn` with a request-bound Prisma client. `clientFactory` is called once
  * per request; the Worker shell passes
- * `() => createPrismaClient({ connectionString: env.HYPERDRIVE.connectionString, max: 1 })`.
+ * `() => createPostgresRemovedClient(...)` since NEON-ZERO N-17 (no Postgres on the Worker).
  *
  * Everything `fn` does through the exported `prisma` (and `runInTenantContext`,
  * `runInStoreScope`, `withStore`, ...) uses that client. Nothing outside `fn`

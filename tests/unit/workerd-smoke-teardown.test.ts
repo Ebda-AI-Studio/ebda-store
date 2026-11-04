@@ -78,10 +78,9 @@ describe('CI service containers and npm settings (2026-10-25 root-cause fixes)',
   const ci = readFileSync(join(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
   const deploy = readFileSync(join(__dirname, '../../.github/workflows/cf-api-deploy.yml'), 'utf8');
   it('every postgres healthcheck names the user and database (a bare pg_isready logs FATAL role "root" every 10 s and hides real failures)', () => {
-    for (const [name, src] of [
-      ['ci.yml', ci],
-      ['cf-api-deploy.yml', deploy],
-    ] as const) {
+    // N-17: cf-api-deploy.yml no longer has a Postgres service (the smoke needs none); ci.yml keeps them for Node tests.
+    expect(deploy).not.toMatch(/pg_isready/);
+    for (const [name, src] of [['ci.yml', ci]] as const) {
       const pg = [...src.matchAll(/--health-cmd (?:"(pg_isready[^"]*)"|(pg_isready)\b)/g)];
       expect(pg.length, `${name} has postgres service containers`).toBeGreaterThan(0);
       for (const m of pg) expect(m[1] ?? m[2], name).toMatch(/^pg_isready -U test -d \w+$/);

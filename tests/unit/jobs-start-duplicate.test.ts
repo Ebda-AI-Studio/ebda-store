@@ -17,7 +17,6 @@ describe('startJob duplicate instance', () => {
   };
   const bind = () =>
     setCfBindings({
-      HYPERDRIVE: { connectionString: 'x' },
       JOBS_WORKFLOW: { create },
       JOBS_QUEUE: { send: async () => undefined },
     });

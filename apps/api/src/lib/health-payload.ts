@@ -24,6 +24,8 @@ export async function healthPayload(
     status: platformUnbound ? 'degraded' : 'ok',
     timestamp: new Date().toISOString(),
     ...buildIdentity(),
+    // NEON-ZERO N-17 (Ruling NZ-D23): there is no Postgres to report on; a constant so a caller can tell "removed" from "not said".
+    postgres: 'removed',
     ...(vector ? { buyerKeyVector: vector } : {}),
     // Public: reachability only. The per-backend store COUNTS disclose the store count, so they are served only by
     // the super_admin GET /api/v1/health (app.ts).

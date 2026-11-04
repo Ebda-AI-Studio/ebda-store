@@ -1,37 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
-import { createConnection } from 'node:net';
 import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
-
-/**
- * Is the local database path (Postgres behind pgbouncer, apps/api/scripts/cf-pooler.sh) up? The
- * tests that need a database run only then; the Durable Object / limiter / entry tests never do.
- */
-async function dbReachable(): Promise<boolean> {
-  const { hostname, port } = new URL(LOCAL_DB);
-  return new Promise(resolve => {
-    const s = createConnection({ host: hostname, port: Number(port) });
-    const done = (ok: boolean) => {
-      s.destroy();
-      resolve(ok);
-    };
-    s.setTimeout(500, () => done(false));
-    s.once('connect', () => done(true));
-    s.once('error', () => done(false));
-  });
-}
-
-// The local dev path of apps/api/scripts/cf-pooler.sh: the non-bypass role through pgbouncer. The password
-// is the repo-wide fake one (CI role step, tests/integration/rls-*.test.ts); roles are cluster-wide.
-// EBDA_WORKERS_TEST_DB_URL points the DB-backed tests at another pooler / database (a host with several
-// concurrent runs: each takes its own pgbouncer), default = the cf-pooler.sh one.
-const LOCAL_DB =
-  process.env.EBDA_WORKERS_TEST_DB_URL ||
-  ['postgresql://ebda_app', process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'].join(':') +
-    '@127.0.0.1:6433/ebda_s1';
 
 const BUNDLE = here('./dist-cf/worker.js');
 if (!existsSync(BUNDLE)) {
@@ -53,7 +25,7 @@ const apiVars = {
   ADMIN_URL: 'http://localhost:3001',
   API_URL: 'http://localhost:8787',
   TRUST_PROXY_HOPS: '1',
-  // The dev-only /__dev/stats and /__dev/probe routes (src/cf/dev-stats.ts); never set in wrangler.jsonc.
+  // The dev-only POST /__dev/create-store route (src/worker.ts); never set in wrangler.jsonc.
   DEV_STATS: '1',
   // N-18: a store created on D1 + its DO (lib/store-create-do.ts); the pg-unreachable test creates one with Postgres dead.
   STORE_CREATE_ON_DO: '1',
@@ -85,7 +57,8 @@ export default defineConfig(async () => {
           compatibilityDate: '2026-08-01',
           compatibilityFlags: ['nodejs_compat'],
           bindings: {
-            E2E_DB: (await dbReachable()) ? '1' : '0',
+            // No Postgres in the Worker (NEON-ZERO N-17): the DB-backed describes are permanently skipped.
+            E2E_DB: '0',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
             // route-sweep.test.ts: the host env does not reach workerd's process.env, so the switches travel as bindings
             SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
@@ -182,9 +155,6 @@ export default defineConfig(async () => {
               },
               workflows: {
                 JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow' },
-              },
-              hyperdrives: {
-                HYPERDRIVE: LOCAL_DB,
               },
               // The identity service (Service Binding ACCOUNTS): the route sweep needs the account facts (MFA enrolled, active)
               // that the real one answers from D1 `ebda-identity`. A user named `super-*` is an enrolled platform admin.
