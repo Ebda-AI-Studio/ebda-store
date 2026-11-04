@@ -54,7 +54,8 @@
       "models": {
         "product": 1,
         "productVariant": 1,
-        "category": 1
+        "category": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/purchase-order.service.ts": {
@@ -69,7 +70,8 @@
       "kind": "pg-branch",
       "reason": "the reorder scan: a store on its Durable Object takes the storeMoney() reorderUpsert section (Ruling NZ-A-1); the remaining tx read is the Postgres upsert branch inside its tenant transaction.",
       "models": {
-        "reorderSuggestion": 1
+        "reorderSuggestion": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/stock-adjustment.service.ts": {

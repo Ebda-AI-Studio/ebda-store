@@ -90,6 +90,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'ShippingAreaRate',
   // reorder suggestions: the merchant dismisses / accepts them (NEON-ZERO-1 group A, Ruling NZ-A-1)
   'ReorderSuggestion',
+  // suppliers (NEON-ZERO-1 group A, Ruling NZ-A-1)
+  'Supplier',
   // catalogue import (#329) job / file / item rows and the Customer Intelligence hint log and per-store gate (#336) (Ruling INTEG-1)
   'CatalogImportJob',
   'CatalogImportFile',

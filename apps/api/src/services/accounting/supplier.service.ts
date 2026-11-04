@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../../lib/repo-factory';
 import type { Prisma, Supplier, SupplierPaymentTerms } from '@prisma/client';
 
 import { REGION } from '@ebda/shared';
@@ -19,7 +19,8 @@ export interface CreateSupplierInput {
 }
 
 export async function createSupplier(input: CreateSupplierInput): Promise<Supplier> {
-  return prisma.supplier.create({
+  const w = await storeWriter(input.storeId);
+  return w.supplier.create({
     data: {
       storeId: input.storeId,
       name: input.name,
@@ -73,12 +74,14 @@ export async function updateSupplier(
   id: string,
   patch: UpdateSupplierInput
 ): Promise<Supplier> {
-  const owned = await prisma.supplier.findFirst({
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  const owned = await db.supplier.findFirst({
     where: { id, storeId, deletedAt: null },
     select: { id: true },
   });
   if (!owned) throw new Error(`Supplier ${id} not found in store ${storeId}`);
-  return prisma.supplier.update({
+  return w.supplier.update({
     where: { id, storeId },
     data: {
       ...patch,
@@ -91,7 +94,8 @@ export async function listSuppliers(
   storeId: string,
   opts: { includeInactive?: boolean } = {}
 ): Promise<Supplier[]> {
-  return prisma.supplier.findMany({
+  const db = await storeDb(storeId);
+  return db.supplier.findMany({
     where: {
       storeId,
       deletedAt: null,
@@ -102,16 +106,18 @@ export async function listSuppliers(
 }
 
 export async function getSupplier(storeId: string, id: string): Promise<Supplier | null> {
-  return prisma.supplier.findFirst({ where: { id, storeId, deletedAt: null } });
+  return (await storeDb(storeId)).supplier.findFirst({ where: { id, storeId, deletedAt: null } });
 }
 
 export async function softDeleteSupplier(storeId: string, id: string): Promise<void> {
-  const owned = await prisma.supplier.findFirst({
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  const owned = await db.supplier.findFirst({
     where: { id, storeId, deletedAt: null },
     select: { id: true },
   });
   if (!owned) throw new Error(`Supplier ${id} not found in store ${storeId}`);
-  await prisma.supplier.update({
+  await w.supplier.update({
     where: { id, storeId },
     data: { deletedAt: new Date(), isActive: false },
   });
