@@ -15,7 +15,7 @@ the script writes the row. There is never a dual read.
 1. The code is deployed (`curl /health` commit equals the tip of `main`; check every pipeline the merge triggers).
 2. D1 schema applied: `wrangler d1 migrations apply ebda-platform --remote -c apps/api/wrangler.jsonc`.
 3. D1 `stores` already holds every store (the directory reconcile ran). The script's FK pre-check fails otherwise and lists the stores.
-4. Low traffic: writes that land in Postgres during the last seconds before the flip are lost (see step 4).
+4. Pick a quiet minute: the family is FROZEN for about a minute (45 s drain + copy + 12 s settle). Every write to it answers a retryable 503 (provider webhooks retry; the daily billing cycle retries on its next tick). Reads keep working.
 5. A fresh Neon dump exists (`com.forceai.neon-backup`) and the D1 backup sweep ran (`STORE_BACKUPS` manifest lists `billing_events`).
 
 ## Steps
@@ -29,9 +29,7 @@ node scripts/cf/cutover-platform-family.mjs $F --commit   # 2. copy (idempotent 
 node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 counts
 ```
 
-`--commit` refuses when the marker exists. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1 with
-the switch untouched and can simply be re-run. After the flip it re-digests Postgres: exit code 2 + a table list means a
-Postgres write landed in the flip window; re-apply those rows in D1 by hand (query Postgres on `updated_at`).
+`--commit` refuses when the marker exists. Order: FREEZE -> wait `--drain-ms` (45 s) -> open the Postgres snapshot -> copy -> verify -> flip -> wait `--settle-ms` (12 s) -> lift the freeze -> re-digest Postgres on a NEW connection. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1, lifts the freeze, leaves the switch untouched and can simply be re-run. Exit code 2 + a table list after the flip means a write still reached Postgres; re-apply those rows in D1 by hand. `--unfreeze` lifts a freeze left behind by a killed run; `--status` shows marker and freeze.
 
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 
@@ -54,18 +52,22 @@ to D1 after the flip are not in Postgres. After real traffic the answer is forwa
 
 ## Family `access` (store membership: `store_staff`, `staff_invites`)
 
-Same script, `--family access`. Differences (Rulings NZ-A1, NZ-A2):
+Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
 
-- **Freeze.** `--commit` writes `system_settings.platform_freeze.access` first: every Postgres WRITE of `storeStaff` / `staffInvite` (add/remove
-  staff, invite, accept, revoke) answers 503 `PLATFORM_FAMILY_FROZEN` until the script lifts it; reads and the access gate keep working from
-  Postgres. The script waits `--freeze-wait-ms` (default 20000, longer than the 5 s freeze cache and the 10 s cutover cache), only then opens
-  its snapshot, copies, verifies, flips, waits again, re-digests on a NEW connection and lifts the freeze. `--unfreeze` removes a left-over one.
-- **Directory check.** Before anything is written the script compares D1 `stores` with Postgres for every PG-backed store (owner, status,
-  billing suspension, deleted) and refuses on a difference or a missing store: the gate decides on those D1 columns after the flip. Fix with the
-  directory reconcile (`reconcileStoreDirectory`) and re-run. DO stores are skipped (their Postgres row is sealed).
-- **After the flip** the gate (`requireStoreAccess`, `checkStoreAccess`), staff routes, invite accept, `storesForUser` (token `stores[]`),
-  `ownedStoreIds`, merchant-MCP membership and the staff seat count read D1 only. Verify (VERIFIED / NOT VERIFIED): owner 200 and another
-  owner 403 on `/stores/:id/products`; add a staff member, then that user's GET is 200; remove them, the very next GET is 403; accept a fresh
-  invitation; `SELECT count(*) FROM store_staff` in D1 equals the dry-run PG count. NOT verifiable until the request transaction is lazy: an
-  admin GET with Postgres stopped (see the plan, N-6 evidence).
-- Rollback: only before traffic (`--delete-marker`).
+- **Freeze.** The generic freeze/drain/settle of the script applies (`--drain-ms`, `--settle-ms`): every Postgres WRITE of `storeStaff` /
+  `staffInvite` (add/remove staff, invite, accept, revoke) answers 503 `PLATFORM_FAMILY_FROZEN` until the script lifts it. The API ignores a freeze
+  older than 10 minutes (P1 alert); the script refuses to flip after `--max-freeze-ms` (8 min). `--unfreeze` removes a left-over one.
+- **Directory check.** Before anything is written the script compares D1 `stores` with Postgres for every PG-backed store (owner, status, billing
+  suspension, deleted) and refuses on a difference or a missing store: the gate decides on those D1 columns after the flip. Fix with the directory
+  reconcile and re-run. DO stores (D1 `storage_backend = 'do'`) are skipped; the column exists only in D1.
+- **Strays.** D1 rows that Postgres does not have are deleted inside the freeze (reported per table).
+- **Fail closed.** After the flip, the drift check and the settle wait, the copied Postgres rows are DELETED (by primary key, one transaction) so every
+  Postgres policy/definer that still reads `store_staff` denies. Needs a write URL: `--pg-write-url` (or `CUTOVER_PG_WRITE_URL`), plus
+  `--allow-prod-write` for a Neon host; a dry run and `--commit` without it refuse before freezing anything. The Neon dump (`com.forceai.neon-backup`)
+  must be fresh. Skipped on drift (those rows are the only copy of a write D1 lacks); exit code 3 if the emptying itself failed.
+- **After the flip** the gate (`requireStoreAccess`, `checkStoreAccess`), staff routes, invite accept, `storesForUser`, `ownedStoreIds`, merchant-MCP
+  membership, the staff seat count, `GET /admin/stores` (staff) and the payment timeline read D1 only. Verify (VERIFIED / NOT VERIFIED): owner 200
+  and another owner 403 on `/stores/:id/products`; add a staff member, then that user's GET is 200; remove them, the very next GET is 403 and
+  `GET /payments/:id/events` is 404 for them; accept a fresh invitation; `SELECT count(*) FROM store_staff` in D1 equals the dry-run PG count and
+  Postgres `store_staff` is empty. NOT verifiable until the request transaction is lazy: an admin GET with Postgres stopped.
+- Rollback: only before traffic (`--delete-marker`); the emptied Postgres rows come back from the dump.

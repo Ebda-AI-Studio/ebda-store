@@ -45,7 +45,12 @@ import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
 import { sendAlert } from '../alerts.service';
-import { lockSubscription, onD1 } from '../platform/billing-d1';
+import {
+  commitManualPaymentD1,
+  lockSubscription,
+  onD1,
+  type ManualPaymentD1,
+} from '../platform/billing-d1';
 import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
 import { goLiveVerdict } from './go-live-verdict';
 import {
@@ -912,6 +917,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await assertPayableStore(input.storeId);
 
+  let d1Pending: ManualPaymentD1 | null = null;
   const result = await withStore(input.storeId, async (tx: Tx) => {
     const existing = await tx.billingEvent.findUnique({
       where: { idempotencyKey: key, storeId: input.storeId },
@@ -924,54 +930,22 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
       : manualPeriodFor(sub, input.interval, now);
-    const eventId = crypto.randomUUID();
-    const { count } = await tx.billingEvent.createMany({
-      data: [
-        {
-          id: eventId,
-          storeId: input.storeId,
-          subscriptionId: sub?.id ?? null,
-          type: 'manual_payment',
-          planCode: plan.code,
-          billingInterval: input.interval,
-          forPeriodEnd: periodEnd,
-          amountMinor: input.amountMinor,
-          currency: 'EGP',
-          provider: 'manual',
-          providerRef: reference,
-          idempotencyKey: key,
-          status: 'succeeded',
-          vatMinor: paidVat.vatMinor,
-          vat: paidVat.vat ? (paidVat.vat as unknown as Prisma.InputJsonValue) : undefined,
-          raw: {
-            method: input.method,
-            paidAt: input.paidAt.toISOString(),
-            periodStart: periodStart.toISOString(),
-            periodEnd: periodEnd.toISOString(),
-            periodRule: explicit ? 'operator_override' : 'max(now, current_end)',
-            previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
-            previousStatus: sub?.status ?? null,
-            recordedBy: input.actorId,
-          },
-        },
-      ],
-      skipDuplicates: true,
-    });
-    if (count === 0) {
-      // The key exists but is not visible in this store's scope: the same
-      // reference was recorded for ANOTHER store (strict RLS hides it). Refuse.
-      const winner = await tx.billingEvent.findUnique({
-        where: { idempotencyKey: key, storeId: input.storeId },
-      });
-      if (!winner) {
-        throw new AppError(
-          409,
-          'REFERENCE_USED_ELSEWHERE',
-          'This reference was recorded for another store'
-        );
-      }
-      return { duplicate: true, billingEventId: winner.id } as ManualPaymentResult;
-    }
+    // D1: the event id is derived from the idempotency key, so a retry after a partial run reuses it (the Postgres half
+    // below is idempotent on it) and the D1 commit point comes LAST, after the Postgres transaction (Ruling NZ-10-2).
+    const d1 = await onD1();
+    const eventId = d1
+      ? deterministicUuid(`manual-payment:${input.storeId}:${key}`)
+      : crypto.randomUUID();
+    const ledgerRaw = {
+      method: input.method,
+      paidAt: input.paidAt.toISOString(),
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      periodRule: explicit ? 'operator_override' : 'max(now, current_end)',
+      previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
+      previousStatus: sub?.status ?? null,
+      recordedBy: input.actorId,
+    };
     const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
     const billingMethod = sub?.billingMethod === 'instapay' || !hasCard ? 'instapay' : 'card';
     const data = {
@@ -994,23 +968,70 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       nextRetryAt: null,
       billingMethod,
     };
-    try {
+    if (d1) {
+      d1Pending = {
+        eventId,
+        idempotencyKey: key,
+        storeId: input.storeId,
+        subscriptionId: sub?.id ?? null,
+        planCode: plan.code,
+        interval: input.interval,
+        periodStart,
+        periodEnd,
+        amountMinor: input.amountMinor,
+        providerRef: reference,
+        vatMinor: paidVat.vatMinor,
+        vat: paidVat.vat ?? null,
+        raw: ledgerRaw,
+        anchorDay: data.billingAnchorDay,
+        billingMethod,
+        expectedSubUpdatedAt: sub?.updatedAt ?? null,
+        now,
+      };
+    } else {
+      const { count } = await tx.billingEvent.createMany({
+        data: [
+          {
+            id: eventId,
+            storeId: input.storeId,
+            subscriptionId: sub?.id ?? null,
+            type: 'manual_payment',
+            planCode: plan.code,
+            billingInterval: input.interval,
+            forPeriodEnd: periodEnd,
+            amountMinor: input.amountMinor,
+            currency: 'EGP',
+            provider: 'manual',
+            providerRef: reference,
+            idempotencyKey: key,
+            status: 'succeeded',
+            vatMinor: paidVat.vatMinor,
+            vat: paidVat.vat ? (paidVat.vat as unknown as Prisma.InputJsonValue) : undefined,
+            raw: ledgerRaw,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (count === 0) {
+        // The key exists but is not visible in this store's scope: the same
+        // reference was recorded for ANOTHER store (strict RLS hides it). Refuse.
+        const winner = await tx.billingEvent.findUnique({
+          where: { idempotencyKey: key, storeId: input.storeId },
+        });
+        if (!winner) {
+          throw new AppError(
+            409,
+            'REFERENCE_USED_ELSEWHERE',
+            'This reference was recorded for another store'
+          );
+        }
+        return { duplicate: true, billingEventId: winner.id } as ManualPaymentResult;
+      }
       if (sub) {
         await tx.storeSubscription.update({ where: { storeId: input.storeId }, data });
       } else {
         await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
       }
-    } catch (err) {
-      // D1 has no transaction that would roll the ledger row back with this failure (Ruling NZ-10-2): the payment is
-      // recorded, the period is not. A retry returns `duplicate`, so name the exact repair and page.
-      if (await onD1()) {
-        void sendAlert({
-          level: 'p1',
-          title: 'Billing: manual payment recorded but the subscription was not updated',
-          body: `billing_events ${eventId} (store ${input.storeId}). Re-apply with the operator period override (periodStart ${periodStart.toISOString()}, periodEnd ${periodEnd.toISOString()}).`,
-        }).catch(() => undefined);
-      }
-      throw err;
     }
     await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: plan.featureTier } });
     // Confirm the merchant's claim: the named one, or the pending one with this reference.
@@ -1058,6 +1079,32 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     };
   });
 
+  const pending = d1Pending as ManualPaymentD1 | null;
+  if (pending) {
+    // The D1 commit point (ledger row + subscription, one atomic batch). The Postgres half above has committed and is
+    // idempotent on the derived event id, so a failure here is a plain retry; it still pages because the merchant's
+    // claim already reads "confirmed" while the plan has not moved.
+    let outcome: 'applied' | 'duplicate' | 'conflict';
+    try {
+      outcome = await commitManualPaymentD1(pending);
+    } catch (err) {
+      void sendAlert({
+        level: 'p1',
+        title: 'Billing: manual payment confirmed but the D1 commit failed',
+        body: `store ${input.storeId}, key ${key}, event ${pending.eventId}. Retry the same request (idempotent).`,
+      }).catch(() => undefined);
+      throw err;
+    }
+    if (outcome === 'conflict')
+      throw new AppError(
+        409,
+        'SUBSCRIPTION_CHANGED',
+        'The subscription changed while this payment was being recorded; retry',
+        { retryable: true }
+      );
+    if (outcome === 'duplicate') return { duplicate: true, billingEventId: pending.eventId };
+  }
+
   if (!result.duplicate) {
     // the approved receipts' screenshots are deleted now that the approval has committed (M-003; a miss is retried weekly)
     await InstapayReceiptService.deleteImages(input.storeId, result.approvedReceiptIds ?? []);
@@ -1076,6 +1123,13 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   }
   const { approvedReceiptIds: _internal, ...publicResult } = result;
   return publicResult;
+}
+
+/** A stable UUID (v4 shape) derived from `seed`, so a retried operation reuses the id it chose the first time. */
+function deterministicUuid(seed: string): string {
+  const h = crypto.createHash('sha256').update(seed).digest('hex');
+  const variant = ((parseInt(h.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${variant}${h.slice(18, 20)}-${h.slice(20, 32)}`;
 }
 
 // ───────────────────────── manual refund / void ───────────────────────────

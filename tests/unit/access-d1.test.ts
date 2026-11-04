@@ -6,17 +6,20 @@ import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
+vi.mock('../../apps/api/src/services/alerts.service', () => ({
+  sendAlert: vi.fn(async () => 'sent'),
+}));
 
 import { prisma } from '@ebda/database';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
 import {
-  FREEZE_TTL_MS,
+  FREEZE_MAX_AGE_MS,
   cutoverKey,
   freezeKey,
   resetCutoverCache,
-  resetFreezeCache,
 } from '../../apps/api/src/services/platform/cutover';
+import { sendAlert } from '../../apps/api/src/services/alerts.service';
+import { checkStoreAccess } from '../../apps/api/src/middleware/store-access';
 import {
   platformRouter,
   registerPlatformRouter,
@@ -24,7 +27,10 @@ import {
 import {
   acceptInviteWithinCap,
   addStaffWithinCap,
+  eraseUserAccess,
   gateRead,
+  removeStaffMember,
+  storeBriefsD1,
   liveStoreIdsD1,
   ownedStoreIdsD1,
 } from '../../apps/api/src/services/platform/access-d1';
@@ -117,7 +123,6 @@ function rig() {
 
 beforeEach(() => {
   resetCutoverCache();
-  resetFreezeCache();
   clearCfBindings();
   registerPlatformRouter();
 });
@@ -276,44 +281,135 @@ describe('routing through the prisma proxy', () => {
 });
 
 describe('copy-window freeze', () => {
-  it('a WRITE is refused 503 retryable while frozen, a READ is not; the marker wins over the freeze', async () => {
-    vi.useFakeTimers();
-    try {
-      const r = rig();
-      r.store(S1, 's1');
-      r.freeze();
-      setCfBindings({ PLATFORM_DB: r.d1 } as never);
-      const pg = vi.fn(async () => 'pg');
-      await expect(
-        platformRouter.route('storeStaff', 'create', [{ data: {} }], pg)
-      ).rejects.toMatchObject({ statusCode: 503, code: 'PLATFORM_FAMILY_FROZEN' });
-      expect(pg).not.toHaveBeenCalled();
-      expect(await platformRouter.route('storeStaff', 'findMany', [], pg)).toBe('pg');
+  const freezeAt = (r: ReturnType<typeof rig>, ageMs: number) =>
+    r.db
+      .prepare(`INSERT INTO system_settings (id, key, value, created_at) VALUES ('f1', ?, '{}', ?)`)
+      .run(freezeKey('access'), Date.now() - ageMs);
 
-      r.marker(); // flipped: D1 serves, the freeze no longer matters
-      vi.advanceTimersByTime(FREEZE_TTL_MS + 10_000);
-      resetCutoverCache();
-      await prisma.storeStaff.create({ data: { storeId: S1, userId: U1 } });
-      expect(r.seats(S1)).toBe(1);
-    } finally {
-      vi.useRealTimers();
-    }
+  it('a WRITE is refused 503 retryable while frozen, a READ is not; the marker wins over the freeze', async () => {
+    const r = rig();
+    r.store(S1, 's1');
+    freezeAt(r, 1000);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    const pg = vi.fn(async () => 'pg');
+    await expect(
+      platformRouter.route('storeStaff', 'create', [{ data: {} }], pg)
+    ).rejects.toMatchObject({ statusCode: 503, code: 'PLATFORM_FAMILY_FROZEN' });
+    expect(pg).not.toHaveBeenCalled();
+    expect(await platformRouter.route('storeStaff', 'findMany', [], pg)).toBe('pg');
+
+    r.marker(); // flipped: D1 serves, the freeze no longer matters
+    await prisma.storeStaff.create({ data: { storeId: S1, userId: U1 } });
+    expect(r.seats(S1)).toBe(1);
   });
 
-  it('lifting the freeze lets writes through within the cache TTL', async () => {
-    vi.useFakeTimers();
-    try {
-      const r = rig();
-      r.freeze();
-      setCfBindings({ PLATFORM_DB: r.d1 } as never);
-      const pg = vi.fn(async () => 'pg');
-      await expect(platformRouter.route('staffInvite', 'create', [], pg)).rejects.toBeTruthy();
-      r.db.prepare('DELETE FROM system_settings WHERE key = ?').run(freezeKey('access'));
-      vi.advanceTimersByTime(FREEZE_TTL_MS + 1);
-      expect(await platformRouter.route('staffInvite', 'create', [], pg)).toBe('pg');
-    } finally {
-      vi.useRealTimers();
-    }
+  it('a STUCK freeze (older than the max age) is ignored and raises a P1 once', async () => {
+    const r = rig();
+    freezeAt(r, FREEZE_MAX_AGE_MS + 1000);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    const pg = vi.fn(async () => 'pg');
+    expect(await platformRouter.route('staffInvite', 'create', [], pg)).toBe('pg');
+    expect(await platformRouter.route('staffInvite', 'create', [], pg)).toBe('pg');
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
+  });
+});
+
+describe('review fixes', () => {
+  it('checkStoreAccess on D1: owner ok, staff ok, removed staff denied, another store denied, unknown 404', async () => {
+    const r = rig();
+    r.store(S1, 's1');
+    r.store(S2, 's2', { owner: 'owner-2' });
+    r.staff(S1, U1);
+    r.marker();
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    expect((await checkStoreAccess(S1, { userId: OWNER, role: 'store_admin' })).ok).toBe(true);
+    expect((await checkStoreAccess(S1, { userId: U1, role: 'staff' })).ok).toBe(true);
+    expect((await checkStoreAccess(S2, { userId: U1, role: 'staff' })).ok).toBe(false);
+    expect((await checkStoreAccess(S2, { userId: OWNER, role: 'store_admin' })).ok).toBe(false);
+    r.db.prepare('DELETE FROM store_staff WHERE user_id = ?').run(U1);
+    expect(await checkStoreAccess(S1, { userId: U1, role: 'staff' })).toMatchObject({
+      ok: false,
+      status: 403,
+    });
+    expect(
+      await checkStoreAccess(crypto.randomUUID(), { userId: U1, role: 'staff' })
+    ).toMatchObject({
+      ok: false,
+      status: 404,
+    });
+  });
+
+  it('removeStaffMember: membership + pending invites (by address and by user) go in one batch; other stores untouched', async () => {
+    const r = rig();
+    r.store(S1, 's1');
+    r.store(S2, 's2');
+    r.staff(S1, U1);
+    r.staff(S2, U1);
+    r.invite('p1', S1, 'A@x.test');
+    r.invite('p2', S2, 'a@x.test');
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    expect(await removeStaffMember(S1, U1, 'a@x.test')).toBe(true);
+    expect(r.seats(S1)).toBe(0);
+    expect(r.seats(S2)).toBe(1);
+    expect(r.inviteStatus('p1')).toBe('expired');
+    expect(r.inviteStatus('p2')).toBe('pending');
+    expect(await removeStaffMember(S1, U1, 'a@x.test')).toBe(false); // idempotent
+  });
+
+  it('removeStaffMember with no resolvable address still removes the membership atomically', async () => {
+    const r = rig();
+    r.store(S1, 's1');
+    r.staff(S1, U1);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    expect(await removeStaffMember(S1, U1, null)).toBe(true);
+    expect(r.seats(S1)).toBe(0);
+  });
+
+  it('eraseUserAccess frees the seats, revokes pending invites by address, scrubs actor columns; idempotent', async () => {
+    const r = rig();
+    r.store(S1, 's1');
+    r.store(S2, 's2');
+    r.staff(S1, U1);
+    r.staff(S2, U1);
+    r.staff(S1, U2);
+    r.invite('p1', S1, 'gone@x.test');
+    r.invite('by', S1, 'z@x.test');
+    r.db
+      .prepare(
+        `UPDATE staff_invites SET invited_by = ?, status = 'accepted', accepted_by = ? WHERE id = 'by'`
+      )
+      .run(U1, U1);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    await eraseUserAccess(U1, 'Gone@x.test');
+    expect(r.seats(S1)).toBe(1); // U2 stays
+    expect(r.seats(S2)).toBe(0);
+    expect(r.inviteStatus('p1')).toBe('revoked');
+    const row = r.db
+      .prepare(`SELECT invited_by, accepted_by FROM staff_invites WHERE id = 'by'`)
+      .get() as Record<string, unknown>;
+    expect(row).toEqual({ invited_by: null, accepted_by: null });
+    await eraseUserAccess(U1, 'Gone@x.test'); // again: nothing left, no error
+  });
+
+  it('storeBriefsD1 lists live stores only', async () => {
+    const r = rig();
+    r.store(S1, 's1');
+    r.store(S2, 's2');
+    r.db.prepare('UPDATE stores SET deleted_at = ? WHERE id = ?').run(Date.now(), S2);
+    setCfBindings({ PLATFORM_DB: r.d1 } as never);
+    expect((await storeBriefsD1([S1, S2])).map(x => x.id)).toEqual([S1]);
+  });
+
+  it('the copy script never asks Postgres for storage_backend (D1-only column) and lists the access tables', async () => {
+    const src = fs.readFileSync(
+      new URL('../../scripts/cf/cutover-platform-family.mjs', import.meta.url),
+      'utf8'
+    );
+    const pgSql = /const STORE_FACTS_SQL_PG =\s*'([^']+)'/.exec(src)?.[1] ?? '';
+    expect(pgSql).toContain('FROM stores');
+    expect(pgSql).not.toContain('storage_backend');
+    expect(src).toContain("access: ['store_staff', 'staff_invites']");
   });
 });
 

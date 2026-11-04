@@ -22,7 +22,13 @@ import { getAccountState, getAccountsBrief, inviteIdentity } from '../lib/identi
 import { STAFF_INVITE_TTL_MINUTES, signStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
 import { getEntitlements } from '../services/plan-entitlements';
-import { addStaffWithinCap, inAccessScope, onAccessD1 } from '../services/platform/access-d1';
+import {
+  addStaffWithinCap,
+  inAccessScope,
+  onAccessD1,
+  removeStaffMember,
+} from '../services/platform/access-d1';
+import { sendAlert } from '../services/alerts.service';
 import { RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
 import { sendStaffInviteEmail } from '../services/platform-mailer';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -530,31 +536,69 @@ router.delete(
       // passkeys are per user, not per store; access is the membership row, re-checked on every request,
       // so deleting it is immediate. Signing them out (or touching their passkeys) here would let store A's
       // owner kick the same person out of store B or out of a store they own.
-      await inAccessScope(storeId, tx =>
-        tx.storeStaff.delete({
-          where: { userId_storeId: { userId, storeId } },
-        })
-      );
+      if (d1Access) {
+        // One atomic batch: the membership and every pending invitation that could bring the member back (Ruling ID-13).
+        if (!memberEmail)
+          logger.warn(
+            { storeId, userId },
+            'staff removal: no address for the member, invites matched by user only'
+          );
+        await removeStaffMember(storeId, userId, memberEmail);
+      } else {
+        await inAccessScope(storeId, tx =>
+          tx.storeStaff.delete({
+            where: { userId_storeId: { userId, storeId } },
+          })
+        );
 
-      // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
-      // cannot come back through an old link.
-      if (memberEmail)
+        // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
+        // cannot come back through an old link.
         await inAccessScope(storeId, tx =>
           tx.staffInvite.updateMany({
-            where: { storeId, email: memberEmail.toLowerCase(), status: 'pending' },
+            where: { storeId, email: memberEmail!.toLowerCase(), status: 'pending' },
             data: { status: 'expired', decidedAt: new Date() },
           })
         );
+      }
 
       // Their merchant-MCP keys die with the membership. verifyMerchantKey already
       // refuses a non-member on every call; revoking here also stops a key
       // resurrecting if the same person is later re-added to this store.
-      await withStore(storeId, tx =>
-        tx.merchantApiKey.updateMany({
-          where: { storeId, userId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        })
-      );
+      // Access has already ended (membership gone, atomically). The key rows are a Postgres write: after the cutover a failure
+      // is retried and, if it persists, raised as a P1 (never swallowed) so a later re-add cannot resurrect a live key.
+      const revokeKeys = () =>
+        withStore(storeId, tx =>
+          tx.merchantApiKey.updateMany({
+            where: { storeId, userId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          })
+        );
+      if (!d1Access) await revokeKeys();
+      else {
+        let lastErr: unknown;
+        let revoked = false;
+        for (let attempt = 0; attempt < 3 && !revoked; attempt++) {
+          try {
+            await revokeKeys();
+            revoked = true;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        if (!revoked) {
+          logger.error(
+            { err: lastErr, storeId, userId },
+            'staff removal: merchant key revoke failed'
+          );
+          void sendAlert({
+            level: 'p1',
+            source: 'staff.remove.key_revoke_failed',
+            title: 'Removed staff member still has live merchant MCP keys',
+            body: 'Membership was removed but the key revoke failed 3 times. Revoke the keys before the user is ever re-added to this store.',
+            context: { storeId, userId },
+          }).catch(() => undefined);
+        }
+      }
 
       await auditLog({
         action: 'staff.removed',

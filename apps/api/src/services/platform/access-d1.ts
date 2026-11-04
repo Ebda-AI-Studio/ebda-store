@@ -132,6 +132,54 @@ export async function liveStoreIdsD1(ids: string[]): Promise<Set<string>> {
   return out;
 }
 
+/** Directory facts of live stores for a staff member's store list (name, Arabic name, logo, slug, status), id order. */
+export async function storeBriefsD1(ids: string[]): Promise<
+  Array<{
+    id: string;
+    name: string;
+    nameAr: string | null;
+    logo: string | null;
+    slug: string;
+    status: string;
+  }>
+> {
+  const out: Array<{
+    id: string;
+    name: string;
+    nameAr: string | null;
+    logo: string | null;
+    slug: string;
+    status: string;
+  }> = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const marks = chunk.map((_, j) => `?${j + 1}`).join(', ');
+    const r = await raw()
+      .prepare(
+        `SELECT id, name, name_ar, logo, slug, status FROM stores WHERE deleted_at IS NULL AND id IN (${marks}) ORDER BY id`
+      )
+      .bind(...chunk)
+      .all<{
+        id: string;
+        name: string;
+        name_ar: string | null;
+        logo: string | null;
+        slug: string;
+        status: string;
+      }>();
+    for (const x of r.results ?? [])
+      out.push({
+        id: x.id,
+        name: x.name,
+        nameAr: x.name_ar,
+        logo: x.logo,
+        slug: x.slug,
+        status: x.status,
+      });
+  }
+  return out;
+}
+
 /** The live (not soft-deleted) stores `ownerId` owns, id order. D1 twin of `ebda_owned_store_ids`. */
 export async function ownedStoreIdsD1(ownerId: string): Promise<string[]> {
   const r = await raw()
@@ -216,4 +264,69 @@ export async function acceptInviteWithinCap(input: {
     added: Number(res[0]?.meta?.changes ?? 0) === 1,
     consumed: Number(res[1]?.meta?.changes ?? 0) === 1,
   };
+}
+
+/**
+ * User erasure on the access family (idempotent, verified). The Postgres twin is the FK cascade `store_staff.user_id -> users`;
+ * D1 has no FK to the identity-owned user, so the rows are removed here: memberships of the user, their pending invitations
+ * (by address), and the actor columns on surviving invitations (erasure classification `d1:staff_invites`). One atomic batch,
+ * then a read-back; anything left throws (503) so the caller does not report the erasure as done.
+ */
+export async function eraseUserAccess(userId: string, email: string | null): Promise<void> {
+  const d1 = raw();
+  const now = Date.now();
+  try {
+    await d1.batch([
+      d1.prepare('DELETE FROM store_staff WHERE user_id = ?1').bind(userId),
+      d1
+        .prepare(
+          "UPDATE staff_invites SET status = 'revoked', decided_at = ?2 WHERE lower(email) = lower(?1) AND status = 'pending'"
+        )
+        .bind(email ?? '', now),
+      d1.prepare('UPDATE staff_invites SET invited_by = NULL WHERE invited_by = ?1').bind(userId),
+      d1.prepare('UPDATE staff_invites SET accepted_by = NULL WHERE accepted_by = ?1').bind(userId),
+    ]);
+    const left = await d1
+      .prepare(
+        'SELECT (SELECT count(*) FROM store_staff WHERE user_id = ?1) + (SELECT count(*) FROM staff_invites WHERE invited_by = ?1 OR accepted_by = ?1) AS n'
+      )
+      .bind(userId)
+      .first<{ n: number }>();
+    if (Number(left?.n ?? 0) !== 0) throw new Error('rows remain');
+  } catch {
+    throw new AppError(
+      503,
+      'ERASURE_ACCESS_INCOMPLETE',
+      'User access cleanup did not complete, retry'
+    );
+  }
+}
+
+/**
+ * Remove a staff member in ONE atomic batch: the membership AND every pending invitation that could bring them back (by their
+ * address, and any pending row already tied to them), so a crash between the two can never leave a removed member able to
+ * rejoin through an old link. Returns whether a membership row was deleted.
+ */
+export async function removeStaffMember(
+  storeId: string,
+  userId: string,
+  email: string | null
+): Promise<boolean> {
+  const d1 = raw();
+  const now = Date.now();
+  try {
+    const res = await d1.batch([
+      d1
+        .prepare('DELETE FROM store_staff WHERE store_id = ?1 AND user_id = ?2')
+        .bind(storeId, userId),
+      d1
+        .prepare(
+          "UPDATE staff_invites SET status = 'expired', decided_at = ?2 WHERE store_id = ?1 AND status = 'pending' AND (accepted_by = ?3 OR lower(email) = lower(?4))"
+        )
+        .bind(storeId, now, userId, email ?? ''),
+    ]);
+    return Number(res[0]?.meta?.changes ?? 0) === 1;
+  } catch {
+    throw new AppError(503, 'ACCESS_UNAVAILABLE', 'Access change is unavailable, try again');
+  }
 }

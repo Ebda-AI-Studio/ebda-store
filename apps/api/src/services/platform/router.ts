@@ -8,11 +8,16 @@
  * docs/plans/2026-11-02-neon-zero.md section N-10 (Ruling NZ-10-2) with the replacement (one atomic statement, `$batch`,
  * a compare-and-set, or a compensating write).
  */
-import { setModelRouter, type ModelRouter } from '@ebda/database';
+import { notifyModelWrite, setModelRouter, type ModelRouter } from '@ebda/database';
 import { requirePlatformDb } from '../../lib/platform-db';
-import { FAMILY_MODELS, assertFamilyNotFrozen, familyOfModel, platformFamilyOnD1 } from './cutover';
+import {
+  FAMILY_MODELS,
+  familyOfModel,
+  platformFamilyOnD1,
+  platformFamilyOnD1ForWrite,
+} from './cutover';
 
-const WRITES: ReadonlySet<string> = new Set([
+const WRITES = new Set([
   'create',
   'createMany',
   'update',
@@ -29,14 +34,19 @@ export const platformRouter: ModelRouter = {
   async route(model, method, args, postgres) {
     const family = familyOfModel(model);
     if (!family) return postgres();
-    if (!(await platformFamilyOnD1(family))) {
-      if (WRITES.has(method)) await assertFamilyNotFrozen(family);
-      return postgres();
-    }
+    const onD1 = WRITES.has(method)
+      ? await platformFamilyOnD1ForWrite(family)
+      : await platformFamilyOnD1(family);
+    if (!onD1) return postgres();
     const client = await requirePlatformDb();
-    return (client[model] as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](
-      ...args
-    );
+    const result = await (client[model] as Record<string, (...a: unknown[]) => Promise<unknown>>)[
+      method
+    ](...args);
+    // The Postgres client extension reports every write to the write observer (Ebda Chat plan / catalog events);
+    // a D1-served write must do the same or those events silently stop.
+    if (WRITES.has(method))
+      notifyModelWrite(model[0].toUpperCase() + model.slice(1), method, args[0], result);
+    return result;
   },
 };
 

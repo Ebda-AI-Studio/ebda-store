@@ -78,6 +78,7 @@ import {
 } from '@ebda/shared';
 import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
+import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 import { referralSignupCounts } from '../services/lifecycle-emails.service';
@@ -263,7 +264,12 @@ router.get(
           });
           return;
         }
-        // Fetch the actual store rows for these ids
+        // Fetch the actual store rows for these ids. After the `access` cutover the Postgres `stores` policy (which reads the
+        // emptied Postgres membership) would show a staff member added after the flip an EMPTY list, so the rows come from D1.
+        if (await onAccessD1()) {
+          res.json({ success: true, data: { stores: await storeBriefsD1(storeIds) } });
+          return;
+        }
         const stores = await prisma.store.findMany({
           where: { id: { in: storeIds } },
           select: { id: true, name: true, nameAr: true, logo: true, slug: true, status: true },
@@ -1361,6 +1367,9 @@ router.delete(
       // The identity is erased FIRST: its sessions, refresh tokens and passkeys go with it, so no token of this user can be
       // honoured again and the Store cannot re-create the profile row from it. If this fails the user still exists everywhere.
       if (target.storeId === null && target.role !== 'customer') await eraseIdentityUser(id);
+      // After the `access` cutover the Postgres FK cascade no longer reaches the membership rows (they live in D1): an erased
+      // user would keep holding a staff seat. Idempotent and verified; a failure stops here, before the Postgres delete.
+      if (await onAccessD1()) await eraseUserAccess(id, target.email);
 
       // WA-CONSENT-1: withdraw the account's WhatsApp marketing consent before the hard delete.
       const doomed = await asPlatformOperator(req.user!.userId, () =>

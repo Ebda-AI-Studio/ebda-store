@@ -29,6 +29,8 @@ import {
   resolveStoreFromWebhookRef,
 } from '../lib/definer';
 import { OrderService } from '../services/order.service';
+import { checkStoreAccess } from '../middleware/store-access';
+import { onAccessD1 } from '../services/platform/access-d1';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
@@ -1415,6 +1417,17 @@ router.get(
  * payment with its store ownerId, then accept the request only when
  * the requester is super_admin or is the store owner.
  */
+/** D1 twin of `resolvePaymentEventsStore`: unknown payment and denied access are the same "not found". */
+async function resolvePaymentEventsStoreD1(
+  user: { userId: string; role: string },
+  paymentId: string
+): Promise<{ storeId: string; paymentId: string } | null> {
+  const storeId = await getPaymentStoreId(paymentId);
+  if (!storeId) return null;
+  const access = await checkStoreAccess(storeId, user);
+  return access.ok ? { storeId, paymentId } : null;
+}
+
 router.get('/:id/events', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = getAuthUser(req);
@@ -1423,7 +1436,11 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
     // The payment's store is found by a GUARDED definer (an active super_admin, or the owner /
     // staff of that payment's store; anyone else sees "not found"), then the events are read
     // inside that store's scope. Under strict RLS a contextless read would see no row at all.
-    const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
+    // After the `access` cutover the Postgres definer's staff branch reads a frozen/emptied copy, so access is decided from
+    // D1 instead: the payment's store by exact id, then the same gate every admin route uses (owner, live staff, super_admin).
+    const owner = (await onAccessD1())
+      ? await resolvePaymentEventsStoreD1(user, paymentId)
+      : await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
     if (!owner) {
       res.status(404).json({
         success: false,

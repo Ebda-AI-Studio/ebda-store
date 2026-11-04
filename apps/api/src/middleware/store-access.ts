@@ -18,14 +18,17 @@ async function readStoreForAccess<S extends Prisma.StoreSelect>(storeId: string,
  * D1 read, memoised for the request. Before the cutover: the Postgres reads above, unchanged. NEVER cached across requests
  * (access is a permission: see services/platform/access-d1.ts).
  */
-const requestMemo = new WeakMap<object, Promise<Awaited<ReturnType<typeof gateRead>>>>();
-function gateForRequest(req: Request, storeId: string, userId: string) {
-  let p = requestMemo.get(req);
-  if (!p) {
-    p = gateRead(storeId, userId);
-    requestMemo.set(req, p);
-  }
-  return p;
+type Gate = Awaited<ReturnType<typeof gateRead>>;
+const requestMemo = new WeakMap<object, Map<string, Gate>>();
+/** Keyed by store AND user: a request that touches two stores (or acts as two users) must never reuse the other's answer. */
+async function gateForRequest(req: Request, storeId: string, userId: string): Promise<Gate> {
+  let m = requestMemo.get(req);
+  if (!m) requestMemo.set(req, (m = new Map()));
+  const k = `${storeId}:${userId}`;
+  if (m.has(k)) return m.get(k) as Gate;
+  const g = await gateRead(storeId, userId); // resolved value shared, never the promise (workerd)
+  m.set(k, g);
+  return g;
 }
 
 /**

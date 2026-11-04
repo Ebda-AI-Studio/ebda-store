@@ -28,7 +28,10 @@ import {
 import { resolveStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
 import { addInterval, priceFor } from './period';
+import { sendAlert } from '../alerts.service';
+import { assertFamilyWritableOnPostgres } from '../platform/cutover';
 import {
+  applyGrantsBatchD1,
   claimRestoreD1,
   insertCappedGrant,
   lockSubscription,
@@ -355,6 +358,39 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
     where: { storeId, status: 'pending', type: { in: ['renewal', 'upgrade', 'checkout'] } },
   });
   if (inFlight > 0) return 0;
+  if (await onD1()) {
+    // One atomic batch: the subscription move and every grant claim commit together or not at all (Ruling NZ-10-2).
+    const chain: Array<{ id: string; before: Date; after: Date }> = [];
+    let cursor = base;
+    for (const g of pending) {
+      const next = addInterval(cursor, 'monthly');
+      chain.push({ id: g.id, before: cursor, after: next });
+      cursor = next;
+    }
+    const n = await applyGrantsBatchD1({
+      storeId,
+      status: sub.status,
+      currentPeriodEnd: sub.currentPeriodEnd,
+      trialEndsAt: sub.trialEndsAt,
+      grants: chain,
+      trialing: sub.status === 'trialing',
+      now,
+    });
+    if (n !== chain.length) {
+      // Nothing was applied: the subscription moved (or another run took the grants). They stay pending and the next
+      // sweep retries; the page is for the case where that never resolves.
+      logger.warn(
+        { storeId, pending: chain.length },
+        '[billing] free-month grants not applied: subscription moved'
+      );
+      void sendAlert({
+        level: 'p1',
+        title: 'Billing: free-month grants not applied (subscription changed underneath)',
+        body: `store ${storeId}: ${chain.length} pending grant(s) left pending; the daily sweep retries. Investigate if it repeats.`,
+      }).catch(() => undefined);
+    }
+    return n;
+  }
   let end = base;
   let applied = 0;
   for (const g of pending) {
@@ -369,31 +405,13 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
     applied += 1;
   }
   if (applied > 0) {
-    const data = {
-      currentPeriodEnd: end,
-      ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}),
-    };
-    if (await onD1()) {
-      // No row lock on D1: compare-and-set on the period this call read. A concurrent renewal / grant that moved it
-      // makes the CAS miss; the grants are already `applied` (one-way), so say so loudly instead of dropping them.
-      const moved = await tx.storeSubscription.updateMany({
-        where: {
-          storeId,
-          ...(sub.status === 'trialing'
-            ? { trialEndsAt: sub.trialEndsAt }
-            : { currentPeriodEnd: sub.currentPeriodEnd }),
-          status: sub.status,
-        },
-        data,
-      });
-      if (moved.count !== 1)
-        logger.error(
-          { storeId, applied },
-          '[billing] free-month grants applied but the subscription moved underneath: reconcile currentPeriodEnd by hand'
-        );
-    } else {
-      await tx.storeSubscription.update({ where: { storeId }, data });
-    }
+    await tx.storeSubscription.update({
+      where: { storeId },
+      data: {
+        currentPeriodEnd: end,
+        ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}),
+      },
+    });
   }
   return applied;
 }
@@ -427,10 +445,11 @@ export async function revokeGrantsForEvent(
   }
   const rows = (await onD1())
     ? await revokeGrantsD1(eventId, reason, now)
-    : await tx.$queryRaw<Array<{ id: string; beneficiary_id: string }>>`
+    : (await assertFamilyWritableOnPostgres('billing'),
+      await tx.$queryRaw<Array<{ id: string; beneficiary_id: string }>>`
     UPDATE billing_grants SET status = 'revoked', revoked_at = ${now}, revoke_reason = ${reason}
     WHERE source_event_id = ${eventId} AND status IN ('pending', 'applied')
-    RETURNING id, beneficiary_id`;
+    RETURNING id, beneficiary_id`);
   if (ownStoreId)
     for (const r of rows)
       if (r.beneficiary_id === ownStoreId) await restoreOne(tx, r.id, ownStoreId, now);
@@ -449,6 +468,7 @@ async function restoreOne(tx: Tx, grantId: string, storeId: string, now: Date): 
     const c = await claimRestoreD1(grantId, now);
     claimed = c ? [{ period_end_before: c.before, period_end_after: c.after }] : [];
   } else {
+    await assertFamilyWritableOnPostgres('billing');
     claimed = await tx.$queryRaw<
       Array<{ period_end_before: Date; period_end_after: Date }>
     >`UPDATE billing_grants SET restored_at = ${now}

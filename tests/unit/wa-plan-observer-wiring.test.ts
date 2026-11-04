@@ -100,12 +100,17 @@ describe('wiring', () => {
   });
 
   it('no code writes subscription / plan state with raw SQL (it would bypass the observer)', () => {
-    const raw = walk(SRC).filter(
-      f =>
+    // A raw D1 writer (services/platform/billing-d1.ts) tells the observer itself via notifyModelWrite and says so with
+    // the `wa-plan: observer notified` waiver.
+    const raw = walk(SRC).filter(f => {
+      const t = readFileSync(f, 'utf8');
+      if (/wa-plan: observer notified/.test(t) && /notifyModelWrite\(/.test(t)) return false;
+      return (
         /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(store_subscriptions|store_whatsapp_consents)"?/i.test(
-          readFileSync(f, 'utf8')
-        ) || /UPDATE\s+"?stores"?\s+SET\s+"?plan"?\b/i.test(readFileSync(f, 'utf8'))
-    );
+          t
+        ) || /UPDATE\s+"?stores"?\s+SET\s+"?plan"?\b/i.test(t)
+      );
+    });
     expect(raw.map(f => path.relative(SRC, f))).toEqual([]);
   });
 });
