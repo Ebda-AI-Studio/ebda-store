@@ -3,9 +3,14 @@
 // measures which routes still need Postgres, not the identity service.
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
+// An account id with this prefix is a super_admin in the fake (security tests of the admin user edit).
+const SUPER_TARGET_PREFIX = '00000000-0000-4000-8000-0000000000aa';
+
 export default class FakeAccounts extends WorkerEntrypoint {
   async fetch() {
-    return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ keys: [] }), {
+      headers: { 'content-type': 'application/json' },
+    });
   }
   async getAccountState(userId) {
     return {
@@ -29,7 +34,7 @@ export default class FakeAccounts extends WorkerEntrypoint {
       firstName: 'Sweep',
       lastName: 'User',
       status: 'active',
-      role: 'store_admin',
+      role: id.startsWith(SUPER_TARGET_PREFIX) ? 'super_admin' : 'store_admin',
       lastLoginAt: null,
       createdAt: new Date(0).toISOString(),
     }));
@@ -46,7 +51,9 @@ export default class FakeAccounts extends WorkerEntrypoint {
     return false;
   }
   async setStatus() {}
-  async updateProfile() {
+  async updateProfile(userId, _input, _reason, actorId) {
+    if (userId.startsWith(SUPER_TARGET_PREFIX) && actorId !== userId)
+      return { ok: false, code: 'FORBIDDEN_TARGET' };
     return { ok: true };
   }
 }

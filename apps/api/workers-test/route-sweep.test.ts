@@ -346,11 +346,28 @@ describe.skipIf(e.E2E_DB === '1')(
           },
         ],
         ['PUT', '/admin/users/:id', `/admin/users/${owner}`, adm, { status: 'active' }],
+        [
+          'PUT',
+          '/admin/users/:id (email)',
+          `/admin/users/${owner}`,
+          adm,
+          { email: 'takeover@exit-test.invalid' },
+        ],
+        [
+          'PUT',
+          '/admin/users/:id (super_admin target)',
+          '/admin/users/00000000-0000-4000-8000-0000000000aa',
+          adm,
+          { firstName: 'Mallory' },
+        ],
         ['GET', '/admin/users?search=sweep', '/admin/users?search=sweep', adm, undefined],
       ];
       for (const [m, route, path, headers, body] of seeded) {
         if (!inSubset(`${m} ${route}`)) continue;
-        await hit('SEEDED', m, route, BASE + path, headers, body);
+        const res = await hit('SEEDED', m, route, BASE + path, headers, body);
+        // The admin route never edits an e-mail (account takeover) and never edits ANOTHER super_admin's profile.
+        if (route === '/admin/users/:id (email)') expect(res?.status).toBe(409);
+        if (route === '/admin/users/:id (super_admin target)') expect(res?.status).toBe(403);
       }
       // A second store, created like the first (D1 + DO), deleted by its owner: the DO delete path (close, finish, directory).
       const extra = await e.API.fetch('https://api.ebda.app/__dev/create-store', {

@@ -1384,16 +1384,31 @@ router.put(
         identityManaged &&
         (data.password ||
           data.role === 'customer' ||
-          // with the hub on D1 the e-mail is edited through the identity service (`updateProfile`, below)
-          (!onHub && data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
+          (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
       ) {
+        // An e-mail is the recovery channel: changing another account's e-mail from an admin session (or a stolen one) and then
+        // resetting the password is an account takeover. Only the verified self-service flow may change it (security review).
+        if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'EMAIL_CHANGE_SELF_SERVICE',
+              message:
+                'An account e-mail is changed by its owner through the verified flow that confirms the new address and notifies the old one.',
+              messageEn:
+                'An account e-mail is changed by its owner through the verified flow that confirms the new address and notifies the old one.',
+              messageAr:
+                'يغيّر صاحب الحساب بريده بنفسه من خلال خطوات التحقق التي تؤكد البريد الجديد وتُنبّه البريد القديم.',
+            },
+          });
+          return;
+        }
         res.status(409).json({
           success: false,
           error: {
             code: 'MANAGED_BY_IDENTITY',
-            message: onHub
-              ? 'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password.'
-              : 'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password and email.',
+            message:
+              'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password.',
           },
         });
         return;
@@ -1409,36 +1424,40 @@ router.put(
         });
         return;
       }
-      // Name, phone and e-mail of an identity-managed account are the identity service's rows: a collision is the same 409 as below.
+      // Name and phone of an identity-managed account are the identity service's rows (never the e-mail, see above). A
+      // super_admin target is editable only by that same user (the identity service enforces it too).
       if (
         onHub &&
-        (data.firstName !== undefined ||
-          data.lastName !== undefined ||
-          data.phone !== undefined ||
-          (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
+        (data.firstName !== undefined || data.lastName !== undefined || data.phone !== undefined)
       ) {
+        if (existing.role === 'super_admin' && id !== req.user!.userId) {
+          res.status(403).json({
+            success: false,
+            error: {
+              code: 'SUPER_ADMIN_SELF_ONLY',
+              message: 'A platform administrator profile can only be edited by that administrator.',
+            },
+          });
+          return;
+        }
         const r = await updateIdentityProfile(
           id,
-          {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            email: data.email ? data.email.toLowerCase() : undefined,
-          },
-          'admin-update'
+          { firstName: data.firstName, lastName: data.lastName, phone: data.phone },
+          'admin-update',
+          req.user!.userId
         );
         if (!r.ok) {
-          if (r.code === 'EMAIL_TAKEN') {
-            res.status(409).json({
-              success: false,
-              error: { code: 'EMAIL_TAKEN', message: 'Another user already has this email' },
-            });
-          } else {
-            res.status(404).json({
-              success: false,
-              error: { code: 'NOT_FOUND', message: 'User not found' },
-            });
-          }
+          const forbidden = r.code === 'FORBIDDEN_TARGET';
+          res.status(forbidden ? 403 : 404).json({
+            success: false,
+            error: forbidden
+              ? {
+                  code: 'SUPER_ADMIN_SELF_ONLY',
+                  message:
+                    'A platform administrator profile can only be edited by that administrator.',
+                }
+              : { code: 'NOT_FOUND', message: 'User not found' },
+          });
           return;
         }
       }

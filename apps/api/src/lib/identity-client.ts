@@ -64,11 +64,12 @@ export const setAccountStatus = (
   thenInvalidate({ userId }, () => call('setStatus', r => r.setStatus?.(userId, status, reason)));
 export const updateIdentityProfile = (
   userId: string,
-  input: { firstName?: string; lastName?: string; phone?: string | null; email?: string },
-  reason = 'admin-update'
+  input: { firstName?: string; lastName?: string; phone?: string | null },
+  reason = 'admin-update',
+  actorId?: string
 ) =>
   thenInvalidate({ userId }, () =>
-    call('updateProfile', r => r.updateProfile?.(userId, input, reason))
+    call('updateProfile', r => r.updateProfile?.(userId, input, reason, actorId))
   );
 export const revokeIdentitySession = (sid: string, reason: string) =>
   call('revokeSession', r => r.revokeSession?.(sid, reason));

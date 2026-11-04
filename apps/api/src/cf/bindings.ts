@@ -74,12 +74,13 @@ export interface AccountsRpc {
     status: 'active' | 'inactive' | 'suspended',
     reason: string
   ): Promise<void>;
-  /** Edit name / phone / e-mail of a non-customer account (apps/accounts `updateProfile`); an e-mail collision is a result, not a throw. */
+  /** Edit name / phone of a non-customer account (apps/accounts `updateProfile`); never the e-mail, and a super_admin target only by that user. */
   updateProfile?(
     userId: string,
-    input: { firstName?: string; lastName?: string; phone?: string | null; email?: string },
-    reason?: string
-  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'EMAIL_TAKEN' }>;
+    input: { firstName?: string; lastName?: string; phone?: string | null },
+    reason?: string,
+    actorId?: string
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'FORBIDDEN_TARGET' }>;
   getAccountState?(userId: string): Promise<AccountState | null>;
   /** Display facts for up to 100 accounts in one call (apps/accounts `getAccountsBrief`). */
   getAccountsBrief?(userIds: string[]): Promise<AccountBrief[]>;

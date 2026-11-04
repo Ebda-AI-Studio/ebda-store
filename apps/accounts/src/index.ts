@@ -177,41 +177,36 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   }
 
   /**
-   * Edit the profile facts of a merchant / staff / super-admin account (a Store super-admin action). Only the fields passed
-   * change; `phone: null` clears it. The e-mail is one global, case-folded namespace: a collision returns
-   * `{ ok: false, code: 'EMAIL_TAKEN' }` and changes nothing. An e-mail change is a recovery-channel change, so it ends every
-   * session (like setRole). Customers are not reachable here (they live in their store). Credentials are never touched.
+   * Edit the NAME and PHONE of a merchant / staff / super-admin account (a Store super-admin action). Only the fields passed
+   * change; `phone: null` clears it. The e-mail is NOT editable here and `.strict()` rejects it: an e-mail is the recovery
+   * channel, so only the verified self-service flow (new address confirmed, old one notified) may change it; an admin edit
+   * would be an account-takeover path (security review). A `super_admin` target may be edited only by that same user
+   * (`actorId`); anyone else gets `{ ok:false, code:'FORBIDDEN_TARGET' }` and nothing changes. Customers are not reachable
+   * here (they live in their store). Credentials are never touched.
    */
   async updateProfile(
     userId: string,
-    input: { firstName?: string; lastName?: string; phone?: string | null; email?: string },
-    reason = 'profile-update'
-  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'EMAIL_TAKEN' }> {
+    input: { firstName?: string; lastName?: string; phone?: string | null },
+    reason = 'profile-update',
+    actorId?: string
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'FORBIDDEN_TARGET' }> {
     z.string().uuid().parse(userId);
     const v = z
       .object({
         firstName: z.string().trim().min(1).max(100).optional(),
         lastName: z.string().trim().min(1).max(100).optional(),
         phone: z.string().trim().max(40).nullable().optional(),
-        email: z.string().trim().toLowerCase().email().max(254).optional(),
       })
       .strict()
       .parse(input);
     const cur = await this.env.DB.prepare(
-      `SELECT email FROM users WHERE id = ?1 AND role != 'customer' AND deleted_at IS NULL`
+      `SELECT role FROM users WHERE id = ?1 AND role != 'customer' AND deleted_at IS NULL`
     )
       .bind(userId)
-      .first<{ email: string }>();
+      .first<{ role: string }>();
     if (!cur) return { ok: false, code: 'NOT_FOUND' };
-    const emailChanged = v.email !== undefined && v.email !== cur.email.toLowerCase();
-    if (emailChanged) {
-      const taken = await this.env.DB.prepare(
-        `SELECT 1 AS n FROM users WHERE lower(email) = ?1 AND id != ?2 AND deleted_at IS NULL`
-      )
-        .bind(v.email, userId)
-        .first();
-      if (taken) return { ok: false, code: 'EMAIL_TAKEN' };
-    }
+    if (cur.role === 'super_admin' && actorId !== userId)
+      return { ok: false, code: 'FORBIDDEN_TARGET' };
     const sets: string[] = [];
     const args: unknown[] = [];
     const add = (col: string, val: unknown) => {
@@ -221,20 +216,12 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     if (v.firstName !== undefined) add('first_name', v.firstName);
     if (v.lastName !== undefined) add('last_name', v.lastName);
     if (v.phone !== undefined) add('phone', v.phone === null || v.phone === '' ? null : v.phone);
-    if (emailChanged) add('email', v.email);
     if (sets.length === 0) return { ok: true };
     add('updated_at', new Date().toISOString());
-    try {
-      await this.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?1`)
-        .bind(userId, ...args)
-        .run();
-    } catch (e) {
-      // the unique index users_email_lower caught a race the pre-check could not
-      if (/UNIQUE|constraint/i.test(String((e as Error)?.message)))
-        return { ok: false, code: 'EMAIL_TAKEN' };
-      throw e;
-    }
-    if (emailChanged) await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+    await this.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?1`)
+      .bind(userId, ...args)
+      .run();
+    void reason;
     return { ok: true };
   }
 

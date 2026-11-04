@@ -68,27 +68,28 @@ describe('Accounts RPC for the Store', () => {
     await expect(rpc().updateProfile('not-a-uuid', { firstName: 'x' })).rejects.toThrow();
   });
 
-  it('updateProfile changes the e-mail (case-folded), ends sessions, and reports a collision as a typed result', async () => {
+  it('updateProfile never changes the e-mail (strict schema), and a super_admin target only by that same user', async () => {
     const u = await seedUser();
-    const other = await seedUser({ email: 'taken@example.com' });
-    const s = await login(u);
-    expect(await rpc().updateProfile(u.id, { email: 'TAKEN@example.com' })).toEqual({
-      ok: false,
-      code: 'EMAIL_TAKEN',
-    });
+    await expect(
+      rpc().updateProfile(u.id, { email: 'new@example.com' } as never)
+    ).rejects.toThrow();
     expect(
       await env.DB.prepare(`SELECT email FROM users WHERE id = ?1`).bind(u.id).first()
     ).toMatchObject({ email: u.email });
-    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(200);
-    expect(await rpc().updateProfile(u.id, { email: 'New.Name@Example.com' })).toEqual({
-      ok: true,
+    const admin = await seedUser({ role: 'super_admin' });
+    const other = await seedUser();
+    expect(await rpc().updateProfile(admin.id, { firstName: 'Hacked' }, 'x', other.id)).toEqual({
+      ok: false,
+      code: 'FORBIDDEN_TARGET',
+    });
+    expect(await rpc().updateProfile(admin.id, { firstName: 'Hacked' })).toEqual({
+      ok: false,
+      code: 'FORBIDDEN_TARGET',
     });
     expect(
-      await env.DB.prepare(`SELECT email FROM users WHERE id = ?1`).bind(u.id).first()
-    ).toMatchObject({ email: 'new.name@example.com' });
-    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
-    // the same e-mail as its own (case aside) is not a collision and not a change
-    expect(await rpc().updateProfile(other.id, { email: 'TAKEN@example.com' })).toEqual({
+      await env.DB.prepare(`SELECT first_name FROM users WHERE id = ?1`).bind(admin.id).first()
+    ).not.toMatchObject({ first_name: 'Hacked' });
+    expect(await rpc().updateProfile(admin.id, { firstName: 'Self' }, 'x', admin.id)).toEqual({
       ok: true,
     });
   });
