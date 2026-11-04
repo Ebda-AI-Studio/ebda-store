@@ -11,6 +11,7 @@ import { useT } from '@/i18n/useT';
 import { NotificationsEmptyState } from './_components/NotificationsEmptyState';
 import { SmsChannelCard } from './_components/SmsChannelCard';
 import { PushChannelCard } from './_components/PushChannelCard';
+import { EnableOrderAlertsButton } from '../../../../components/EnableOrderAlertsButton';
 import { BroadcastComposerCard } from './_components/BroadcastComposerCard';
 import { EventConfigTable } from './_components/EventConfigTable';
 import { NotificationsLog } from './_components/NotificationsLog';
@@ -262,6 +263,9 @@ export default function NotificationsPage() {
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
+      <div className="mb-6">
+        <EnableOrderAlertsButton />
+      </div>
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

@@ -224,12 +224,17 @@ const GAPS = [
   opt('loose', 'Loose', 'واسع'),
   opt('xloose', 'Extra loose', 'واسع جداً'),
 ];
-const PADDING = [opt('none', 'None', 'بدون'), ...GAPS];
+const PADDING = [opt('none', 'None', 'بدون'), ...GAPS, opt('xxloose', 'Huge', 'ضخم')];
 
 /** Padding + width. Visibility is NOT a setting: it is `hidden` / `responsive.<viewport>.hidden`. */
 export const spacingSettings = (): SettingDefinition[] => [
-  settingFactories.select('paddingTop', 'Top spacing', 'المسافة العلوية', PADDING),
-  settingFactories.select('paddingBottom', 'Bottom spacing', 'المسافة السفلية', PADDING),
+  // Per device (Ruling SP-1): tablet / mobile values live in `responsive.<vp>.settings`.
+  settingFactories.select('paddingTop', 'Top spacing', 'المسافة العلوية', PADDING, {
+    responsive: ['tablet', 'mobile'],
+  }),
+  settingFactories.select('paddingBottom', 'Bottom spacing', 'المسافة السفلية', PADDING, {
+    responsive: ['tablet', 'mobile'],
+  }),
   settingFactories.select('maxWidth', 'Width', 'العرض', [
     opt('contained', 'Contained', 'محدود'),
     opt('full', 'Full width', 'كامل العرض'),
@@ -557,6 +562,21 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
           opt('coolGrey', 'Cool grey', 'رمادي'),
           opt('pureWhite', 'White', 'أبيض'),
           opt('brandColor', 'Brand colour', 'لون العلامة'),
+        ],
+      },
+      {
+        // The look's section rhythm (`--space-unit`): scales every section whose spacing is unset.
+        // Offered as one of three feels in the Theme panel; only a store with a look reads it.
+        id: 'density',
+        type: 'select',
+        labelEn: 'Spacing between sections',
+        labelAr: 'المسافات بين الأقسام',
+        hintEn: 'Compact, regular or airy. It scales every section whose own spacing is not set.',
+        hintAr: 'ضيقة أو عادية أو واسعة. بتطبّق على كل قسم مسافاته مش مضبوطة بإيدك.',
+        options: [
+          opt('compact', 'Compact', 'ضيقة'),
+          opt('regular', 'Regular', 'عادية'),
+          opt('airy', 'Airy', 'واسعة'),
         ],
       },
       {

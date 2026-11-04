@@ -82,7 +82,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
-import { priceChangedLines } from '@/lib/gold-display';
+import { priceChangedLines, isDeferredGoldOption } from '@/lib/gold-display';
 import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
@@ -517,6 +517,32 @@ export default function CheckoutClient() {
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
+  // SHARIA-GOLD-1: with a gold line in the cart (and the merchant not allowing it) COD and installments are
+  // hidden. Display only: the API refuses them whatever this shows.
+  const [goldPrepaidOnly, setGoldPrepaidOnly] = useState(true);
+  const cartHasGold = cartContextItems.some(i => !i.unavailable && Boolean(i.gold));
+  const shownPaymentProviders = useMemo(
+    () =>
+      cartHasGold && goldPrepaidOnly
+        ? paymentProviders.filter(o => !isDeferredGoldOption(o.id))
+        : paymentProviders,
+    [cartHasGold, goldPrepaidOnly, paymentProviders]
+  );
+  // A gold cart on a store whose only online-capable options were hidden: nothing valid is left to pay with.
+  const goldNeedsOnlinePayment =
+    cartHasGold &&
+    goldPrepaidOnly &&
+    paymentProviders.length > 0 &&
+    shownPaymentProviders.length === 0;
+  useEffect(() => {
+    if (
+      shownPaymentProviders.length > 0 &&
+      !shownPaymentProviders.some(o => o.id === selectedProvider)
+    )
+      setSelectedProvider(shownPaymentProviders[0].id);
+    // Nothing left to choose: drop the stale default ('cod'), or Place order stays live and the COD fee still shows.
+    else if (shownPaymentProviders.length === 0 && selectedProvider !== '') setSelectedProvider('');
+  }, [shownPaymentProviders, selectedProvider]);
   // COD fee settings from /payments/config — the checkout quotes the fee with
   // the SAME function the order freezes it with (codFeeForOrder, MONEYB-3).
   const [codFeeConfig, setCodFeeConfig] = useState<CodFeeConfig | null>(null);
@@ -677,6 +703,8 @@ export default function CheckoutClient() {
             /** Per online provider, the methods the merchant turned on. */
             methods?: Record<string, Array<{ code: string; name: string; nameAr: string }>>;
             defaultProvider?: string;
+            /** SHARIA-GOLD-1: true unless the merchant allowed COD / installments for gold. */
+            goldPrepaidOnly?: boolean;
             cod?: {
               fixedFee: number;
               percentBps?: number;
@@ -777,6 +805,7 @@ export default function CheckoutClient() {
           }
 
           setPaymentProviders(allProviders);
+          setGoldPrepaidOnly(paymentResult.data.goldPrepaidOnly !== false);
           if (paymentResult.data.defaultProvider) {
             // The default is a provider id; a provider shown as several methods starts on its first.
             const def = paymentResult.data.defaultProvider;
@@ -2055,6 +2084,13 @@ export default function CheckoutClient() {
             'مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب لسه مستني تحديث النهارده. جرّب تاني بعد شوية أو كلّم المحل.'
           );
           break;
+        case 'GOLD_PREPAID_ONLY':
+          // SHARIA-GOLD-1: the server refused COD / installments for a gold order. Nothing was charged.
+          friendly = t(
+            'Orders with gold are paid in full online. Cash on delivery and installments are not available for gold.',
+            'طلبات الدهب بتتدفع كاملة أونلاين. الدفع عند الاستلام والتقسيط مش متاحين للدهب.'
+          );
+          break;
         case 'GOLD_PRICE_DRIFT':
           friendly = t(
             'One of the pieces cannot be ordered right now. Please try again in a moment.',
@@ -2780,7 +2816,8 @@ export default function CheckoutClient() {
                     formData={formData}
                     shippingNames={reviewPlaceNames}
                     onEditShipping={() => setStep(1)}
-                    paymentProviders={paymentProviders}
+                    paymentProviders={shownPaymentProviders}
+                    goldNeedsOnlinePayment={goldNeedsOnlinePayment}
                     paymentConfigError={paymentConfigError}
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}

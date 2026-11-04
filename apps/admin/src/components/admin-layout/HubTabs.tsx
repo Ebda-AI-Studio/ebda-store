@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useT } from '@/i18n/useT';
@@ -23,6 +24,8 @@ export interface HubTab {
    * (B2B review I5); the badge renders only while the count is above 0 and the store is on the plan.
    */
   badgeKey?: 'wholesalePending';
+  /** Draws a thin divider before this tab so a long strip reads as groups (audit 2.4 / M-2). */
+  groupStart?: boolean;
 }
 
 interface Props {
@@ -57,41 +60,52 @@ export function HubTabs({ items }: Props) {
     return best;
   }, null);
 
+  // A long strip must never open with the current tab clipped at an edge (audit M-2): bring it into view.
+  const activeRef = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [active]);
+
   return (
     <div className="border-b border-border bg-background sticky top-0 z-10">
       <nav
-        className="flex gap-1 overflow-x-auto px-4 py-1 text-sm"
+        className="flex items-center gap-1 overflow-x-auto px-4 py-1 text-sm [mask-image:linear-gradient(to_right,transparent,#000_12px,#000_calc(100%-12px),transparent)] [scroll-padding-inline:2rem]"
         aria-label={tr('hubSectionsAriaLabel')}
       >
         {items.map(t => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className={
-              /* min-h-11 = 44px satisfies Apple HIG / WCAG 2.5.5 touch target on mobile;
-                 md:min-h-9 relaxes to 36px on desktop to keep the tab bar compact. */
-              'inline-flex items-center px-3 min-h-11 md:min-h-9 rounded-md whitespace-nowrap transition-colors ' +
-              (active === t.href
-                ? 'bg-primary text-primary-foreground font-medium'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground')
-            }
-          >
-            {t.label}
-            {t.badgeKey === 'wholesalePending' && pendingCount > 0 ? (
-              <span
-                data-testid="wholesale-pending-badge"
-                aria-label={tr('wholesalePendingBadge', { count: pendingCount })}
-                className={
-                  'ms-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums ' +
-                  (active === t.href
-                    ? 'bg-primary-foreground text-primary'
-                    : 'bg-primary text-primary-foreground')
-                }
-              >
-                {pendingCount > 99 ? '99+' : pendingCount}
-              </span>
+          <Fragment key={t.href}>
+            {t.groupStart ? (
+              <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
             ) : null}
-          </Link>
+            <Link
+              ref={active === t.href ? activeRef : undefined}
+              href={t.href}
+              className={
+                /* min-h-11 = 44px satisfies Apple HIG / WCAG 2.5.5 touch target on mobile;
+                 md:min-h-9 relaxes to 36px on desktop to keep the tab bar compact. */
+                'inline-flex items-center px-3 min-h-11 md:min-h-9 rounded-md whitespace-nowrap transition-colors ' +
+                (active === t.href
+                  ? 'bg-primary text-primary-foreground font-medium'
+                  : 'hover:bg-muted text-muted-foreground hover:text-foreground')
+              }
+            >
+              {t.label}
+              {t.badgeKey === 'wholesalePending' && pendingCount > 0 ? (
+                <span
+                  data-testid="wholesale-pending-badge"
+                  aria-label={tr('wholesalePendingBadge', { count: pendingCount })}
+                  className={
+                    'ms-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums ' +
+                    (active === t.href
+                      ? 'bg-primary-foreground text-primary'
+                      : 'bg-primary text-primary-foreground')
+                  }
+                >
+                  {pendingCount > 99 ? '99+' : pendingCount}
+                </span>
+              ) : null}
+            </Link>
+          </Fragment>
         ))}
       </nav>
     </div>

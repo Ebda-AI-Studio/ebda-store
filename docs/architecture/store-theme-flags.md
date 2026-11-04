@@ -60,11 +60,11 @@ All flags ride the `StoreTheme` JSON column except `blogEnabled` (own `Store` co
 
 Looks (`docs/ebda/templates/looks.md`) own a set of `StoreTheme` keys, `LOOK_TOKEN_KEYS` in `packages/shared/src/looks/types.ts` (the colour keys, `headingFont`, `bodyFont`, `borderRadius`, `bgPage`, `bgSectionAlt` and three new ones). A stored value for one of them is a **merchant override**.
 
-| Key          | Type                                 | Default | Owner                                                                                                |
-| ------------ | ------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------- |
-| `density`    | `'compact' \| 'regular' \| 'airy'`   | unset   | set only by a look (`lookTheme`); `--space-unit` 0.875 / 1 / 1.25; scales UNSET section spacing only |
-| `imageRatio` | `'1/1' \| '4/5' \| '3/4' \| '4/3'`   | unset   | set only by a look; `--image-ratio`; product card media `aspect-[var(--image-ratio,4/5)]`            |
-| `motion`     | `'none' \| 'subtle' \| 'expressive'` | unset   | set only by a look; `--motion-duration` 0 / 180 / 280ms; forced to 0ms under reduced motion          |
+| Key          | Type                                 | Default | Owner                                                                                                                                                                                                    |
+| ------------ | ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `density`    | `'compact' \| 'regular' \| 'airy'`   | unset   | set by a look (`lookTheme`) or by the merchant in the Theme panel's "Spacing between sections" (draft key `density`, Ruling SP-1..3); `--space-unit` 0.875 / 1 / 1.25; scales UNSET section spacing only |
+| `imageRatio` | `'1/1' \| '4/5' \| '3/4' \| '4/3'`   | unset   | set only by a look; `--image-ratio`; product card media `aspect-[var(--image-ratio,4/5)]`                                                                                                                |
+| `motion`     | `'none' \| 'subtle' \| 'expressive'` | unset   | set only by a look; `--motion-duration` 0 / 180 / 280ms; forced to 0ms under reduced motion                                                                                                              |
 
 All three are optional and absent from `DEFAULT_THEME` (Ruling LOOKS-6): a legacy store (`stores.look` null) emits none of the look CSS variables and renders byte-identical.
 

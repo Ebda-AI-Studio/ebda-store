@@ -162,7 +162,7 @@ export default function MinimalHeader({
                       // 768-1023 px: the hamburger is absolutely placed at the start, so the logo (a flex item
                       // from md up) centres in the free space instead of sitting under it (WCAG 2.5.8 overlap)
                       'max-w-[calc(100%-13rem)] md:max-w-none md:max-lg:mx-auto'
-                    : 'max-w-[65%] md:max-w-none'
+                    : 'max-w-[calc(100%-13rem)] md:max-w-none'
             }`}
           >
             {displayLogo ? (
@@ -187,7 +187,7 @@ export default function MinimalHeader({
                       : wordmarkClass(wordmarkSize)
                     : isCentre
                       ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
-                      : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
+                      : 'block max-w-full truncate text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
                 }
                 data-zone="storeName"
                 translate="no"

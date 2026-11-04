@@ -96,8 +96,9 @@ describe('the registry rules', () => {
 
   it('retires the keys no skin reads, and keeps them out of the controls', () => {
     const hero = getSectionDefinition('hero')!;
-    expect(hero.retired).toEqual(['paddingTop', 'paddingBottom', 'maxWidth']);
-    expect(hero.settings.map(s => s.id)).not.toContain('paddingTop');
+    // Ruling SP-3: the hero is aspect-driven, so it retires only Width; its Top / Bottom spacing is an outer margin.
+    expect(hero.retired).toEqual(['maxWidth']);
+    expect(hero.settings.map(s => s.id)).not.toContain('maxWidth');
     for (const t of ['new-arrivals', 'best-sellers', 'product-carousel', 'testimonials'])
       expect(getSectionDefinition(t)!.retired).toEqual(['maxWidth']);
   });

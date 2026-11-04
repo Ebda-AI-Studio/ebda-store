@@ -11,6 +11,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet } from '../../../../lib/api';
 import { formatDateTime } from '../../../../lib/format';
+import { GoldPaymentPolicyCard } from './_components/GoldPaymentPolicyCard';
 import { GoldSettingsCard } from './_components/GoldSettingsCard';
 import { PendingRateBanner } from './_components/PendingRateBanner';
 import { RateEditor } from './_components/RateEditor';
@@ -105,6 +106,7 @@ export default function GoldRatesPage() {
               canEdit={canEdit}
               onSaved={refresh}
             />
+            <GoldPaymentPolicyCard storeId={storeId} canEdit={canEdit} />
             <RateHistory storeId={storeId} reloadKey={reload} />
           </>
         )}

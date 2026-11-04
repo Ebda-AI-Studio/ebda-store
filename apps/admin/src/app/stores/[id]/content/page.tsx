@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -190,6 +191,10 @@ function PageRowCard({
   const authored = row ? hasContent(row) : false;
   const titleEn = row?.title?.trim() || defaultTitleEn;
   const titleAr = row?.titleAr?.trim() || defaultTitleAr;
+  // The title in the admin's own language leads; the other language is the secondary line (audit S-5).
+  const isAr = useLocale() === 'ar';
+  const primaryTitle = isAr ? titleAr : titleEn;
+  const secondaryTitle = isAr ? titleEn : titleAr;
   return (
     <Link
       href={`/stores/${storeId}/content/${encodeURIComponent(slug)}`}
@@ -197,13 +202,13 @@ function PageRowCard({
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-foreground">{titleEn}</span>
+          <span className="text-base font-semibold text-foreground">{primaryTitle}</span>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
             {slug}
           </span>
         </div>
-        <p className="mt-0.5 text-sm text-muted-foreground" dir="rtl">
-          {titleAr}
+        <p className="mt-0.5 text-sm text-muted-foreground" dir={isAr ? 'ltr' : 'rtl'}>
+          {secondaryTitle}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span

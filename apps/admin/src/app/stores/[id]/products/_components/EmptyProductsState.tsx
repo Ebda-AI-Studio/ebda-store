@@ -10,14 +10,18 @@ interface EmptyProductsStateProps {
   /** Current products-list URL, used as the `returnTo` target for the
    *  "Add product" CTA so creating a product lands back on this view. */
   listUrl: string;
+  /** The default Active view is empty with no search or category: some products may be drafts. Offers a switch. */
+  onShowDrafts?: () => void;
 }
 
 export function EmptyProductsState({
   storeId,
   hasActiveFilters,
   listUrl,
+  onShowDrafts,
 }: EmptyProductsStateProps) {
   const t = useT('products.list.empty');
+  const draftsHint = !hasActiveFilters && Boolean(onShowDrafts);
 
   return (
     <div className="force-empty-state py-0">
@@ -36,10 +40,21 @@ export function EmptyProductsState({
           />
         </svg>
       </div>
-      <p className="font-semibold text-foreground">{t('title')}</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {hasActiveFilters ? t('descriptionFiltered') : t('description')}
+      <p className="font-semibold text-foreground">
+        {hasActiveFilters ? t('titleFiltered') : draftsHint ? t('titleActiveOnly') : t('title')}
       </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {hasActiveFilters
+          ? t('descriptionFiltered')
+          : draftsHint
+            ? t('descriptionActiveOnly')
+            : t('description')}
+      </p>
+      {draftsHint && (
+        <Button size="sm" variant="outline" className="mt-4 me-2" onClick={onShowDrafts}>
+          {t('showDrafts')}
+        </Button>
+      )}
       {!hasActiveFilters && (
         <Link
           href={`/stores/${storeId}/products/new?returnTo=${encodeURIComponent(listUrl)}`}

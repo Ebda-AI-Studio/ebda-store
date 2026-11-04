@@ -307,7 +307,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="min-h-6 min-w-6 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30"
+      className="min-h-8 min-w-8 rounded px-1.5 py-0.5 text-xs max-lg:min-h-11 max-lg:min-w-11 text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30"
     >
       {children}
     </button>

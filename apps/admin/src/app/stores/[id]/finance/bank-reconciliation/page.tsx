@@ -9,6 +9,7 @@ import { apiGetPage, apiDelete, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { withNumerals } from '@ebda/shared';
+import { intlLocaleForUi } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ interface BankStatementRow {
 
 function fmt(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB');
+  return new Date(iso).toLocaleDateString(intlLocaleForUi('en-GB'));
 }
 
 const STATUS_CLASS: Record<StatementStatus, string> = {

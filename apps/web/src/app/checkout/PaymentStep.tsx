@@ -20,6 +20,8 @@ interface PaymentStepProps {
   shippingNames?: { area?: LocalizedPlace; governorate?: LocalizedPlace };
   onEditShipping: () => void;
   paymentProviders: PaymentProvider[];
+  /** Gold cart, prepaid-only store, and every offered method was a deferred one: say it has to be paid online. */
+  goldNeedsOnlinePayment?: boolean;
   /** True when the payment-config request FAILED (vs. genuinely returned none). */
   paymentConfigError?: boolean;
   /** Re-run the checkout data load. */
@@ -68,6 +70,7 @@ export default function PaymentStep({
   shippingNames = {},
   onEditShipping,
   paymentProviders,
+  goldNeedsOnlinePayment = false,
   paymentConfigError = false,
   onRetryPaymentConfig,
   selectedProvider,
@@ -146,7 +149,18 @@ export default function PaymentStep({
                   )}
                 </div>
               ) : (
-                paymentProviders.length === 0 && (
+                paymentProviders.length === 0 &&
+                (goldNeedsOnlinePayment ? (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
+                  >
+                    {t(
+                      'This order has to be paid online. This store has no online payment method set up yet, so please contact the store owner.',
+                      'الطلب ده لازم يتدفع أونلاين. المتجر لسه معندوش طريقة دفع أونلاين متظبطة، كلّم صاحب المتجر.'
+                    )}
+                  </div>
+                ) : (
                   <div
                     role="alert"
                     className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
@@ -156,7 +170,7 @@ export default function PaymentStep({
                       'مفيش طرق دفع متظبطة للمتجر ده. كلّم صاحب المتجر.'
                     )}
                   </div>
-                )
+                ))
               )}
               {/* Render payment providers dynamically. We never fall back to
               DEFAULT_PAYMENT_PROVIDERS here — that list was a visual mock

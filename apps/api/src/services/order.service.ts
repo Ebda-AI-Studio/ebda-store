@@ -42,6 +42,7 @@ import { generateOrderNumber } from '../utils/order-number';
 import { countPriorCouponUses, type CouponLimitTx } from '../lib/coupon-per-customer-limit';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
 import { assertGoldLinesPriceable, assertSameRates } from './gold-rate/gate';
+import { assertGoldPaymentAllowed } from './gold-rate/payment-policy';
 import { redactOrderForCustomer } from './gold-rate/public';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { canSeeWholesaleOnly } from '../lib/audience';
@@ -1307,6 +1308,13 @@ export class OrderService {
         select: { settings: true, timezone: true },
       })
     );
+    // Ruling SHARIA-GOLD-1: a gold order is prepaid online unless the merchant allowed COD / installments.
+    // The check runs here, in the request that creates the order, whatever the checkout showed.
+    assertGoldPaymentAllowed({
+      hasGold: goldGate.snapshots.size > 0,
+      storeSettings: storeForMinOrder?.settings,
+      provider: data.paymentMethod,
+    });
     const minimumOrderFilsRaw = (storeForMinOrder?.settings as Record<string, unknown> | null)?.[
       'minimumOrderFils'
     ];
@@ -4151,6 +4159,19 @@ export class OrderService {
       })),
       { requireQuote: false }
     );
+    // Ruling SHARIA-GOLD-1: the manual-order path is held to the same prepaid-gold rule as checkout.
+    if (adminGoldGate.snapshots.size > 0) {
+      const adminStore = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+      );
+      assertGoldPaymentAllowed({
+        hasGold: true,
+        storeSettings: adminStore?.settings,
+        // BOTH fields: `{ paymentMethod: 'cod', paymentProvider: 'paymob' }` must not bypass the prepaid rule.
+        provider: data.paymentProvider,
+        method: data.paymentMethod,
+      });
+    }
     const adminResolver = await PriceResolver.forBuyer(
       storeId,
       pricingOpts.buyer ?? ANONYMOUS_BUYER,

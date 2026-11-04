@@ -94,6 +94,14 @@ const applyPalette = (
   updates: object
 ) => applySmartPalette(doc, palette, { ...updates });
 
+const VIEWPORT_KEY = 'ebda.builder.viewport';
+
+/** The device the editor opens on: the remembered one, else the one that fits the window. */
+export function initialViewport(stored: string | null, windowWidth: number): Viewport {
+  if (stored === 'desktop' || stored === 'tablet' || stored === 'mobile') return stored;
+  return windowWidth >= 1024 ? 'desktop' : windowWidth >= 768 ? 'tablet' : 'mobile';
+}
+
 export function BuilderEditor({
   storeId,
   pageKey = 'home',
@@ -116,7 +124,26 @@ export function BuilderEditor({
   // The LIVE typography (fonts + zones); the draft's patch is applied over it for the theme pane.
   const [liveTypography, setLiveTypography] = useState<unknown>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [viewport, setViewport] = useState<Viewport>('mobile');
+  // E-4: open on the device that matches the window (a desktop merchant starts on Desktop), or the
+  // last device they chose. The choice is a per-browser convenience, so storage may be unavailable.
+  const [viewport, setViewportState] = useState<Viewport>('mobile');
+  const setViewport = useCallback((v: Viewport) => {
+    setViewportState(v);
+    try {
+      window.localStorage.setItem(VIEWPORT_KEY, v);
+    } catch {
+      /* private window: the choice just is not remembered */
+    }
+  }, []);
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(VIEWPORT_KEY);
+    } catch {
+      /* storage blocked */
+    }
+    setViewportState(initialViewport(stored, window.innerWidth));
+  }, []);
   const [selection, setSelection] = useState<Selection | null>(null);
   // Keyboard path (Task 13): a request for the canvas to take focus, and the live-region text.
   const [focusRequest, setFocusRequest] = useState<{
@@ -349,6 +376,11 @@ export function BuilderEditor({
         setDrawer(d => (d === 'start' ? null : d));
       }
       if (msg.type === 'hover') setCanvasHover(msg.sectionId);
+      if (msg.type === 'open-admin') {
+        // A hint on the canvas ("add products"): the page opens beside the editor, the draft is untouched.
+        window.open(`/stores/${storeId}/${msg.target}`, '_blank', 'noopener');
+        return;
+      }
       if (msg.type === 'focus-tree') {
         // Esc in the canvas: back to the tree row of what is selected (the tree is the outline).
         setTab('sections');
@@ -800,6 +832,7 @@ export function BuilderEditor({
         doc={b.doc}
         selection={selection}
         viewport={viewport}
+        onViewportChange={setViewport}
         theme={effectiveTheme(store.theme, b.doc.theme)}
         template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
         look={store.look}

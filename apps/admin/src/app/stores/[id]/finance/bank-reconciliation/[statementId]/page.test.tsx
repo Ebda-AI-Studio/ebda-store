@@ -23,7 +23,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
-vi.mock('@/lib/format', () => ({ minorToMajor: (n: number) => String(n) }));
+vi.mock('@/lib/format', () => ({
+  minorToMajor: (n: number) => String(n),
+  intlLocaleForUi: () => 'en-GB',
+}));
 vi.mock('@/components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));

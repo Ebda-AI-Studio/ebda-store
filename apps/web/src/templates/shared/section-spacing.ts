@@ -1,4 +1,9 @@
-import { getLook, type SectionPaddingMaxWidthVisibility } from '@ebda/shared';
+import {
+  getLook,
+  type SectionPaddingMaxWidthVisibility,
+  type SectionSpacingPreset,
+  type Viewport,
+} from '@ebda/shared';
 
 /**
  * Padding-top preset → Tailwind class.
@@ -19,6 +24,7 @@ const PADDING_TOP_CLASSES: Record<
   normal: 'pt-12 sm:pt-16 lg:pt-20',
   loose: 'pt-16 sm:pt-20 lg:pt-28',
   xloose: 'pt-24 sm:pt-28 lg:pt-36',
+  xxloose: 'pt-28 sm:pt-36 lg:pt-44',
 };
 
 const PADDING_BOTTOM_CLASSES: Record<
@@ -30,7 +36,165 @@ const PADDING_BOTTOM_CLASSES: Record<
   normal: 'pb-12 sm:pb-16 lg:pb-20',
   loose: 'pb-16 sm:pb-20 lg:pb-28',
   xloose: 'pb-24 sm:pb-28 lg:pb-36',
+  xxloose: 'pb-28 sm:pb-36 lg:pb-44',
 };
+
+/**
+ * Per-device spacing (editor Ruling SP-1). Once an axis carries a tablet or mobile value it is
+ * emitted for all three devices as plain literals (Tailwind's JIT must see every class), with no
+ * `sm:` step, so nothing competes: mobile < 768 · tablet 768-1023 · desktop >= 1024.
+ * Rows follow SECTION_SPACING_PRESETS (none, tight, normal, loose, xloose, xxloose); the values
+ * are `SECTION_SPACING_PX / 4`, pinned by `tests/unit/section-spacing-device.test.ts`.
+ */
+export const DEVICE_SPACING_CLASSES = {
+  pt: {
+    mobile: [
+      'max-md:pt-0',
+      'max-md:pt-4',
+      'max-md:pt-12',
+      'max-md:pt-16',
+      'max-md:pt-24',
+      'max-md:pt-28',
+    ],
+    tablet: [
+      'md:max-lg:pt-0',
+      'md:max-lg:pt-6',
+      'md:max-lg:pt-16',
+      'md:max-lg:pt-20',
+      'md:max-lg:pt-28',
+      'md:max-lg:pt-36',
+    ],
+    desktop: ['lg:pt-0', 'lg:pt-8', 'lg:pt-20', 'lg:pt-28', 'lg:pt-36', 'lg:pt-44'],
+  },
+  pb: {
+    mobile: [
+      'max-md:pb-0',
+      'max-md:pb-4',
+      'max-md:pb-12',
+      'max-md:pb-16',
+      'max-md:pb-24',
+      'max-md:pb-28',
+    ],
+    tablet: [
+      'md:max-lg:pb-0',
+      'md:max-lg:pb-6',
+      'md:max-lg:pb-16',
+      'md:max-lg:pb-20',
+      'md:max-lg:pb-28',
+      'md:max-lg:pb-36',
+    ],
+    desktop: ['lg:pb-0', 'lg:pb-8', 'lg:pb-20', 'lg:pb-28', 'lg:pb-36', 'lg:pb-44'],
+  },
+  mt: {
+    mobile: [
+      'max-md:mt-0',
+      'max-md:mt-4',
+      'max-md:mt-12',
+      'max-md:mt-16',
+      'max-md:mt-24',
+      'max-md:mt-28',
+    ],
+    tablet: [
+      'md:max-lg:mt-0',
+      'md:max-lg:mt-6',
+      'md:max-lg:mt-16',
+      'md:max-lg:mt-20',
+      'md:max-lg:mt-28',
+      'md:max-lg:mt-36',
+    ],
+    desktop: ['lg:mt-0', 'lg:mt-8', 'lg:mt-20', 'lg:mt-28', 'lg:mt-36', 'lg:mt-44'],
+  },
+  mb: {
+    mobile: [
+      'max-md:mb-0',
+      'max-md:mb-4',
+      'max-md:mb-12',
+      'max-md:mb-16',
+      'max-md:mb-24',
+      'max-md:mb-28',
+    ],
+    tablet: [
+      'md:max-lg:mb-0',
+      'md:max-lg:mb-6',
+      'md:max-lg:mb-16',
+      'md:max-lg:mb-20',
+      'md:max-lg:mb-28',
+      'md:max-lg:mb-36',
+    ],
+    desktop: ['lg:mb-0', 'lg:mb-8', 'lg:mb-20', 'lg:mb-28', 'lg:mb-36', 'lg:mb-44'],
+  },
+} as const satisfies Record<string, Record<Viewport, readonly string[]>>;
+
+// Same steps as the padding maps above, as literal margin classes (Tailwind's JIT cannot see a
+// class built from a string).
+const MARGIN_TOP_CLASSES: Record<SectionSpacingPreset, string> = {
+  none: 'mt-0',
+  tight: 'mt-4 sm:mt-6 lg:mt-8',
+  normal: 'mt-12 sm:mt-16 lg:mt-20',
+  loose: 'mt-16 sm:mt-20 lg:mt-28',
+  xloose: 'mt-24 sm:mt-28 lg:mt-36',
+  xxloose: 'mt-28 sm:mt-36 lg:mt-44',
+};
+const MARGIN_BOTTOM_CLASSES: Record<SectionSpacingPreset, string> = {
+  none: 'mb-0',
+  tight: 'mb-4 sm:mb-6 lg:mb-8',
+  normal: 'mb-12 sm:mb-16 lg:mb-20',
+  loose: 'mb-16 sm:mb-20 lg:mb-28',
+  xloose: 'mb-24 sm:mb-28 lg:mb-36',
+  xxloose: 'mb-28 sm:mb-36 lg:mb-44',
+};
+
+const PRESET_INDEX: Record<SectionSpacingPreset, number> = {
+  none: 0,
+  tight: 1,
+  normal: 2,
+  loose: 3,
+  xloose: 4,
+  xxloose: 5,
+};
+const DEVICES: readonly Viewport[] = ['mobile', 'tablet', 'desktop'];
+
+type SpacingInput = Partial<SectionPaddingMaxWidthVisibility> | undefined;
+
+/** True when `axis` carries a tablet or mobile value. */
+function axisIsPerDevice(s: SpacingInput, axis: 'Top' | 'Bottom'): boolean {
+  return !!s && !!(s[`padding${axis}Tablet`] || s[`padding${axis}Mobile`]);
+}
+
+/**
+ * The three device classes for one axis. Resolution per device: device value, else the base value,
+ * else `fallback` (padding: the baseline `normal`; hero margin: `none`).
+ */
+function deviceAxisClasses(
+  s: NonNullable<SpacingInput>,
+  axis: 'Top' | 'Bottom',
+  prefix: 'pt' | 'pb' | 'mt' | 'mb',
+  fallback: SectionSpacingPreset
+): string {
+  const base = s[`padding${axis}`];
+  return DEVICES.map(v => {
+    const device =
+      v === 'desktop' ? undefined : s[`padding${axis}${v === 'tablet' ? 'Tablet' : 'Mobile'}`];
+    return DEVICE_SPACING_CLASSES[prefix][v][PRESET_INDEX[device ?? base ?? fallback]];
+  }).join(' ');
+}
+
+/**
+ * Outer margin classes for a section that lays out its own height (the hero, Ruling SP-3).
+ * Unset on both an axis and every device = nothing, so an untouched hero is unchanged.
+ */
+export function sectionMarginClasses(s: SpacingInput): string {
+  if (!s) return '';
+  const out: string[] = [];
+  for (const [axis, prefix, base, single] of [
+    ['Top', 'mt', MARGIN_TOP_CLASSES, s.paddingTop],
+    ['Bottom', 'mb', MARGIN_BOTTOM_CLASSES, s.paddingBottom],
+  ] as const) {
+    if (axisIsPerDevice(s, axis)) out.push(deviceAxisClasses(s, axis, prefix, 'none'));
+    else if (single) out.push(base[single]);
+  }
+  return out.join(' ');
+}
 
 /**
  * Visibility class for the outer section wrapper.
@@ -122,11 +286,20 @@ export function sectionSpacingClasses(
     };
   }
 
-  // Padding: use explicit preset when set; fall back to 'normal' baseline.
-  const ptClass = s.paddingTop ? PADDING_TOP_CLASSES[s.paddingTop] : 'pt-12 sm:pt-16 lg:pt-20';
-  const pbClass = s.paddingBottom
-    ? PADDING_BOTTOM_CLASSES[s.paddingBottom]
-    : 'pb-12 sm:pb-16 lg:pb-20';
+  // Padding: use explicit preset when set; fall back to 'normal' baseline. An axis with a tablet /
+  // mobile value is emitted per device (Ruling SP-1), without the look's density marker (SP-2).
+  const topPerDevice = axisIsPerDevice(s, 'Top');
+  const bottomPerDevice = axisIsPerDevice(s, 'Bottom');
+  const ptClass = topPerDevice
+    ? deviceAxisClasses(s, 'Top', 'pt', 'normal')
+    : s.paddingTop
+      ? PADDING_TOP_CLASSES[s.paddingTop]
+      : 'pt-12 sm:pt-16 lg:pt-20';
+  const pbClass = bottomPerDevice
+    ? deviceAxisClasses(s, 'Bottom', 'pb', 'normal')
+    : s.paddingBottom
+      ? PADDING_BOTTOM_CLASSES[s.paddingBottom]
+      : 'pb-12 sm:pb-16 lg:pb-20';
 
   // Visibility
   const vis = visibilityClass(s);
@@ -134,8 +307,8 @@ export function sectionSpacingClasses(
   const wrapperClass = [
     ptClass,
     pbClass,
-    mark && !s.paddingTop ? 'sp-top-default' : '',
-    mark && !s.paddingBottom ? 'sp-bottom-default' : '',
+    mark && !s.paddingTop && !topPerDevice ? 'sp-top-default' : '',
+    mark && !s.paddingBottom && !bottomPerDevice ? 'sp-bottom-default' : '',
     vis,
   ]
     .filter(Boolean)

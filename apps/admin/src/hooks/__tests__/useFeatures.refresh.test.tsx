@@ -21,10 +21,12 @@ import { AdminFeatureProvider, useFeatures } from '../useFeatures';
 let refreshFromTest: (() => Promise<void>) | null = null;
 
 function Probe() {
-  const { isEnabled, isLoading, refresh } = useFeatures();
+  const { isEnabled, isLoading, loadFailed, refresh } = useFeatures();
   refreshFromTest = refresh;
   return (
-    <p data-testid="mcp">{isLoading ? 'loading' : isEnabled('merchant_mcp') ? 'on' : 'off'}</p>
+    <p data-testid="mcp">
+      {isLoading ? 'loading' : loadFailed ? 'failed' : isEnabled('merchant_mcp') ? 'on' : 'off'}
+    </p>
   );
 }
 
@@ -50,6 +52,29 @@ afterEach(() => {
 });
 
 describe('AdminFeatureProvider revalidation', () => {
+  it('a failed FIRST fetch is loadFailed (and isEnabled stays true), not an empty "everything off"', async () => {
+    api.apiGet.mockResolvedValueOnce({ data: null, error: { status: 500 } });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('mcp').textContent).toBe('failed'));
+
+    api.apiGet.mockResolvedValueOnce(flags(false));
+    await act(async () => {
+      await refreshFromTest!();
+    });
+    expect(screen.getByTestId('mcp').textContent).toBe('off'); // now the server CONFIRMED it is off
+  });
+
+  it('a failed REFRESH after a good load keeps the last known flags', async () => {
+    api.apiGet.mockResolvedValueOnce(flags(true));
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('mcp').textContent).toBe('on'));
+    api.apiGet.mockResolvedValueOnce({ data: null, error: { status: 500 } });
+    await act(async () => {
+      await refreshFromTest!();
+    });
+    expect(screen.getByTestId('mcp').textContent).toBe('on');
+  });
+
   it('refresh() re-fetches and publishes the new flags without a remount', async () => {
     api.apiGet.mockResolvedValueOnce(flags(false));
     renderProvider();

@@ -28,6 +28,7 @@ import { useFeatures } from '../../../../../../hooks/useFeatures';
 import { uploadErrorText } from '../../../../../../hooks/useImageUpload';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
 import { ColorField } from '../../../../../../components/ColorField';
+import { intlLocaleForUi } from '@/lib/format';
 
 const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
@@ -464,7 +465,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
             <p className="text-xs text-muted-foreground">
               {t('stats', {
                 mb: mb(model.modelBytes),
-                vertices: (model.stats.vertices ?? 0).toLocaleString('en-US'),
+                vertices: (model.stats.vertices ?? 0).toLocaleString(intlLocaleForUi()),
                 materials: model.materials.length,
               })}
             </p>

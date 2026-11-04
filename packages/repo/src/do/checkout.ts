@@ -1,4 +1,10 @@
 import { normalizePhoneForStorage } from '../../../shared/src/region';
+import {
+  GOLD_PREPAID_ERROR_CODE,
+  GOLD_PREPAID_MESSAGE,
+  checkGoldPayment,
+  goldAllowsDeferredPayment,
+} from '../../../shared/src/commerce/payment-policy';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { decrementProduct, decrementVariant, forceDecrementVariant, recordMovement } from './stock';
 import { issueSaleDocument } from './fiscal';
@@ -624,6 +630,15 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         return {};
       }
     })();
+    // Ruling SHARIA-GOLD-1 (the Postgres twin is assertGoldPaymentAllowed): gold is prepaid online unless the merchant allowed COD / installments.
+    if (
+      !checkGoldPayment({
+        hasGold: gold !== null,
+        allowDeferred: goldAllowsDeferredPayment(settings),
+        provider: input.paymentMethod,
+      }).ok
+    )
+      throw new MoneyError(GOLD_PREPAID_ERROR_CODE, GOLD_PREPAID_MESSAGE.en, 409);
     const minOrder = typeof settings.minimumOrderFils === 'number' ? settings.minimumOrderFils : 0;
     if (minOrder > 0 && subtotal < minOrder)
       throw new MoneyError(

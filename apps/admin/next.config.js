@@ -53,9 +53,8 @@ const nextConfig = {
 
   // Next 16 + Turbopack default: tell the bundler the monorepo root so it
   // walks up to root node_modules for workspace-hoisted deps. Without this,
-  // `react-onesignal` (declared in apps/admin/package.json but hoisted to
-  // root) fails to resolve on Vercel. Previous Webpack default tolerated
-  // workspace-isolated resolution; Turbopack is stricter.
+  // hoisted workspace deps fail to resolve on Vercel. Previous Webpack default
+  // tolerated workspace-isolated resolution; Turbopack is stricter.
   outputFileTracingRoot: path.join(__dirname, '../..'),
 
   transpilePackages: ['@ebda/ui', '@ebda/shared'],

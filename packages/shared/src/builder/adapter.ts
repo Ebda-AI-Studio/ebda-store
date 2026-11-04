@@ -21,6 +21,8 @@
  *   - `hideOnDesktop`     -> `responsive.desktop.hidden` (+ `tablet` when the
  *                            legacy two-way mode applies),
  *   - `hideOnTablet`      -> `responsive.tablet.hidden`,
+ *   - `paddingTopTablet|Mobile`, `paddingBottomTablet|Mobile` (Ruling SP-1)
+ *                         -> `responsive.<tablet|mobile>.settings.paddingTop|paddingBottom`,
  *   - categories `layoutMobile` / `captionPositionMobile`
  *                         -> `responsive.mobile.settings.layout` / `.captionPosition`,
  *   - hero `slides`       -> ordered `blocks` of type `slide` (ids `slide-1`…).
@@ -67,6 +69,15 @@ type LegacyObject = Record<string, unknown>;
 /** Mobile-only legacy prop names, per registry responsive prop. */
 export const MOBILE_PROP_LEGACY_NAME: Record<string, Record<string, string>> = {
   categories: { layout: 'layoutMobile', captionPosition: 'captionPositionMobile' },
+};
+
+/**
+ * Per-device spacing (Ruling SP-1), every section: the legacy object keeps flat
+ * `paddingTopTablet` ... keys, the document keeps `responsive.<vp>.settings.paddingTop`.
+ */
+export const SPACING_VIEWPORT_LEGACY_NAME: Record<'tablet' | 'mobile', Record<string, string>> = {
+  tablet: { paddingTop: 'paddingTopTablet', paddingBottom: 'paddingBottomTablet' },
+  mobile: { paddingTop: 'paddingTopMobile', paddingBottom: 'paddingBottomMobile' },
 };
 
 const HEADER_GROUP: LegacyLayoutKey[] = ['announcement', 'header'];
@@ -157,6 +168,15 @@ function legacyToSection(
       }
     }
   }
+  for (const v of ['tablet', 'mobile'] as const) {
+    for (const [name, legacyName] of Object.entries(SPACING_VIEWPORT_LEGACY_NAME[v])) {
+      if (legacyName in settings) {
+        if (settings[legacyName] !== undefined)
+          (vp(v).settings ??= {})[name] = settings[legacyName];
+        delete settings[legacyName];
+      }
+    }
+  }
   if (Object.keys(responsive).length > 0) node.responsive = responsive;
   return node;
 }
@@ -186,6 +206,11 @@ export function sectionToLegacy(node: SectionNode, legacyKey: string): LegacyObj
   if (mobileNames && r?.mobile?.settings) {
     for (const [name, legacyName] of Object.entries(mobileNames)) {
       if (r.mobile.settings[name] !== undefined) out[legacyName] = r.mobile.settings[name];
+    }
+  }
+  for (const v of ['tablet', 'mobile'] as const) {
+    for (const [name, legacyName] of Object.entries(SPACING_VIEWPORT_LEGACY_NAME[v])) {
+      if (r?.[v]?.settings?.[name] !== undefined) out[legacyName] = r[v]!.settings![name];
     }
   }
   return out;

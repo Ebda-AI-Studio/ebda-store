@@ -24,6 +24,10 @@ A merchant can price a piece from today's gold rate instead of typing a price. T
 
 Every write takes a per-store advisory lock, then `FOR UPDATE` on `gold_rates_current`, writes an append-only history row (`gold_rates`) and audit rows, runs the repricer in the same transaction and, after the commit, purges the caches. Checkout reads the same rows `FOR SHARE`, so it waits for a rate write in flight and sees a committed one.
 
+## Payment for gold (Ruling SHARIA-GOLD-1)
+
+An order with a gold line is paid in full online by default: `assertGoldPaymentAllowed` refuses COD and installments (valU, Kiosk, Kashier `bnpl`) with 409 `GOLD_PREPAID_ONLY` in `OrderService.create`, `createAdminOrder` and `POST /payments/create`; the checkout hides them (`/payments/config` `goldPrepaidOnly`); a gateway page for a gold order leaves the installment methods out. The merchant switch is `store.settings.goldAllowDeferredPayment` (default off, server-owned key), written by `PUT /stores/:id/gold-rates/payment-policy` with `confirm: true`. The store Durable Object checkout (`packages/repo/src/do/checkout.ts`) runs the same shared rule against `store_config.settings`. Tests: `tests/unit/gold-payment-policy.test.ts`, `packages/repo/test/do-gold-payment-policy.test.ts`.
+
 ## Order paths (Ruling B5-17, B5-18)
 
 Every path that can create an order calls `assertGoldLinesPriceable` (rate present and inside the store's max age, else 409 `GOLD_RATE_STALE`; materialised price equals the recomputed one, else 409 `GOLD_PRICE_DRIFT` plus a P1 alert), writes `order_items.gold_snapshot` (karat, weight, rate, rate id, making, margin, step, unit price) and re-checks the rate ids inside the money transaction with `assertSameRates` (a rate that moved is `PRICE_CHANGED`). The paths: public checkout, signed-in checkout, admin phone order, payment links, the MCP `place_order`, cart quote. A static test (`tests/unit/gold-gate-every-order-path.test.ts`) fails if a new `order.create` appears without the gate. Refunds and returns use the snapshot, never today's rate; an exchange that includes a gold line is refused (`GOLD_EXCHANGE_UNSUPPORTED`, B5-19).

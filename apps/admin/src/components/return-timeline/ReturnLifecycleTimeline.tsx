@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet } from '../../lib/api';
 import { useT } from '@/i18n/useT';
+import { intlLocaleForUi } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -148,7 +149,10 @@ function relativeTime(iso: string): string {
 }
 
 function absoluteTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(iso).toLocaleString(intlLocaleForUi('en-GB'), {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 }
 
 // ---------------------------------------------------------------------------

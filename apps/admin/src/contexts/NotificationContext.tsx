@@ -1,5 +1,8 @@
 'use client';
 
+import { getFreshAccessToken } from '../lib/api';
+import { makeSocketAuth } from '../lib/socket-auth';
+import { handleSessionEnded } from '../lib/session-ended';
 import React, {
   createContext,
   useContext,
@@ -81,27 +84,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     import('socket.io-client').then(({ io }) => {
       if (cancelled) return;
 
-      // Pass the access token via the handshake auth payload — the
-      // API socket service accepts `socket.handshake.auth.token` ahead
-      // of cookies. Necessary for the iOS PWA where third-party
-      // cookies are stripped by WebKit; without this the socket never
-      // authenticates and the bell shows a permanent "Reconnecting…"
-      // footer even though OneSignal push is delivering the actual
-      // notifications.
-      const accessToken =
-        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-
-      // WebSocket only: on Cloudflare the API's realtime is a Durable Object that speaks the
-      // Socket.IO protocol over a plain WebSocket (no long-polling session). `uid` routes the
-      // socket to the user's Durable Object; the token (auth) must belong to that user.
+      // socket.io calls `auth` on EVERY (re)connect, so each attempt takes a fresh token from the same source as the rest
+      // of the app (P0 logout audit): never `localStorage.accessToken` (absent after an accounts sign-in), and a revoked
+      // session stops the socket for good and ends the session visibly.
+      // WebSocket only: on Cloudflare the API's realtime is a Durable Object that speaks the Socket.IO protocol over a
+      // plain WebSocket (no long-polling session). `uid` routes the socket to the user's Durable Object.
       socketRef.current = io(apiUrl, {
         transports: ['websocket'],
         query: { uid: user.id },
         withCredentials: true,
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 20,
         reconnectionDelay: 1000,
-        auth: accessToken ? { token: accessToken } : undefined,
+        reconnectionDelayMax: 30000,
+        auth: makeSocketAuth({
+          getToken: () => getFreshAccessToken(),
+          onRevoked: () => {
+            const sock = socketRef.current;
+            if (sock) {
+              sock.io.opts.reconnection = false;
+              sock.disconnect();
+            }
+            handleSessionEnded();
+          },
+        }),
       });
 
       socketRef.current.on('connect', () => {

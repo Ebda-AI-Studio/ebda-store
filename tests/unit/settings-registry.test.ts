@@ -217,6 +217,7 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
     'builder.typography-zones',
     'builder.section-typography',
     'builder.dividers',
+    'builder.section-spacing',
     'builder.video',
     'builder.page-settings',
     'builder.page-switcher',
