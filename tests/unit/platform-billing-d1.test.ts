@@ -136,6 +136,11 @@ describe('family table list', () => {
     };
     const { FAMILY_MODELS } = await import('../../apps/api/src/services/platform/cutover');
     for (const family of Object.keys(FAMILY_MODELS) as Array<keyof typeof FAMILY_MODELS>) {
+      // a family with no routed model (analytics, Ruling NZ-AN-1) has its own copy script and no table list here
+      if (!(family in FAMILIES)) {
+        expect(FAMILY_MODELS[family], family).toEqual([]);
+        continue;
+      }
       const tables = FAMILY_MODELS[family].map(m => {
         const model = meta.models[m[0].toUpperCase() + m.slice(1)];
         expect(model?.db, m).toBe('d1');
@@ -314,16 +319,19 @@ describe('cutover switch', () => {
     await expect(platformFamilyOnD1('billing')).rejects.toMatchObject({ statusCode: 503 });
   });
 
-  it('the router is registered on the prisma proxy for exactly the moved models', () => {
+  it('the router is registered on the prisma proxy for exactly the moved models (billing, access, platform, inbox, ai-usage)', () => {
     expect([...platformRouter.models].sort()).toEqual(
       [
+        'aiUsage', // Ruling NZ-AN-1: the platform-wide AI usage family
         'billingEvent',
         'billingGrant',
         'billingReferral',
         'billingReminder',
         'billingWebhookEvent',
         'plan',
+        'staffInvite',
         'storeLifecycleEmail',
+        'storeStaff',
         'storeSubscription',
         'systemSetting',
         'storeFeature',

@@ -100,10 +100,12 @@ describe('wiring', () => {
   });
 
   it('no code writes subscription / plan state with raw SQL (it would bypass the observer)', () => {
-    // A raw D1 writer (services/platform/billing-d1.ts) tells the observer itself via notifyModelWrite and says so with
-    // the `wa-plan: observer notified` waiver.
+    // Waivers: `wa-plan: new-store-not-linked` (lib/store-create-do.ts: the INITIAL subscription row of a store created a moment ago
+    // on D1, no WhatsApp link to tell; the `wa-plan-sync` cron reconciles every linked store) and `wa-plan: observer notified`
+    // (a raw D1 writer, services/platform/billing-d1.ts, tells the observer itself via notifyModelWrite).
     const raw = walk(SRC).filter(f => {
       const t = readFileSync(f, 'utf8');
+      if (/wa-plan: new-store-not-linked/.test(t)) return false;
       if (/wa-plan: observer notified/.test(t) && /notifyModelWrite\(/.test(t)) return false;
       return (
         /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(store_subscriptions|store_whatsapp_consents)"?/i.test(

@@ -1,4 +1,5 @@
 import { assertActiveProductPrice } from '../lib/sellable-price';
+import { customerRows } from '../lib/customer-directory';
 import {
   prisma,
   Prisma,
@@ -48,6 +49,7 @@ import {
 } from './product-search.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 import { storeDb, storeRepo, storeStock, storeWriter } from '../lib/repo-factory';
+import { getAccountsBrief } from '../lib/identity-client';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -470,8 +472,10 @@ const { store: _listingStore, ...PUBLIC_LISTING_SELECT_DO } = PUBLIC_LISTING_SEL
 void _listingStore;
 
 async function storeRefFor(storeId: string) {
-  return readInStoreContext(storeId, () =>
-    prisma.store.findUnique({
+  // Through the store's own backend: the Durable Object answers its `Store` record (NEON-ZERO-1 N-2), Postgres is the
+  // unchanged `prisma` proxy inside a store scope.
+  return readInStoreContext(storeId, async () =>
+    (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
       select: { id: true, name: true, slug: true },
     })
@@ -2371,12 +2375,21 @@ export class ProductService {
       Record<string, unknown> & { customerId?: string | null }
     >;
     const ids = [...new Set(rows.map(r => r.customerId).filter((v): v is string => !!v))];
-    const users = ids.length
-      ? await prisma.user.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, firstName: true, lastName: true },
-        })
-      : [];
+    // Reviewer names are identity data: a Durable Object store reads them from its customer directory once the customer-auth marker
+    // is set (N-9), else from the identity service (NEON-ZERO-1), in one call. They are display-only, so an identity outage renders
+    // the reviews anonymously instead of failing the page.
+    const fromDirectory = await customerRows(storeId, ids);
+    const onDo = (await storeRepo(storeId)).backend === 'do';
+    const users =
+      fromDirectory ??
+      (!ids.length
+        ? []
+        : onDo
+          ? await getAccountsBrief(ids).catch(() => [])
+          : await prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, firstName: true, lastName: true },
+            }));
     const byId = new Map(users.map(u => [u.id, { firstName: u.firstName, lastName: u.lastName }]));
     const withCustomer = rows.map(({ customerId, ...r }) => ({
       ...r,
@@ -2425,7 +2438,11 @@ export class ProductService {
       ratingStats,
       ...(await this.b2bPublicFields(storeId, product)),
       // Gold-rate pricing (Ruling B5-13): the storefront-safe view (no margin, no rate id, no source).
-      ...(await publicGoldFields(prisma as unknown as Prisma.TransactionClient, storeId, product)),
+      ...(await publicGoldFields(
+        (await storeDb(storeId)) as unknown as Prisma.TransactionClient,
+        storeId,
+        product
+      )),
     };
   }
 
@@ -2463,7 +2480,11 @@ export class ProductService {
       ratingStats,
       ...(await this.b2bPublicFields(storeId, product)),
       // Gold-rate pricing (Ruling B5-13): the storefront-safe view (no margin, no rate id, no source).
-      ...(await publicGoldFields(prisma as unknown as Prisma.TransactionClient, storeId, product)),
+      ...(await publicGoldFields(
+        (await storeDb(storeId)) as unknown as Prisma.TransactionClient,
+        storeId,
+        product
+      )),
     };
   }
 

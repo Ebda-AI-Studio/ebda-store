@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerAuthRoute } from '../lib/customer-auth';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
 import {
@@ -55,6 +56,9 @@ export { invalidateCustomersCache };
 // per call, esp. export.xlsx) the same way other heavy admin routes are
 // limited — see writeLimiter usage in ai.routes.ts / bulk.routes.ts /
 // order.routes.ts.
+/** BE:S-30: how deep a staff member can page the customer list (the owner is not capped). */
+export const STAFF_LIST_MAX_ROWS = 500;
+
 const adminMiddleware = [
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
@@ -562,6 +566,26 @@ router.get(
       const page = Math.max(1, Number(req.query.page ?? 1) || 1);
       // Hard-cap perPage so a caller can't request an unbounded page.
       const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
+      // BE:S-30 / D9: staff keep read access (order context), but cannot page through the whole PII list: they reach at most the
+      // first STAFF_LIST_MAX_ROWS rows of a view and must search to find anyone beyond it. Every staff list read leaves an audit row.
+      if (req.user?.role === 'staff') {
+        if (page * perPage > STAFF_LIST_MAX_ROWS)
+          throw new AppError(
+            400,
+            'PAGE_LIMIT_EXCEEDED',
+            `Staff can browse the first ${STAFF_LIST_MAX_ROWS} customers; search to find a specific one`
+          );
+        await auditLog({
+          action: 'customers.list_viewed',
+          userId: req.user.userId,
+          storeId,
+          resourceType: 'store',
+          resourceId: storeId,
+          details: { page, perPage, searched: Boolean(searchTerm(req, res)) },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
       // The KPI strip and the truncation notice describe the whole store (cached aggregate); a
       // search replaces only the rows (SQL match, see `aggregateCustomersMatching`).
       const { customers: allCustomers, truncated, summary } = await aggregateCustomers(storeId);
@@ -723,6 +747,13 @@ export async function resolveStoreCustomerOrThrow(storeId: string, customerId: s
   if (!CUSTOMER_ID_RE.test(customerId)) {
     throw new AppError(404, 'NOT_FOUND', 'Customer not found');
   }
+  // N-9: a customer of a store served by its StoreDO is that DO's.
+  const route = await customerAuthRoute(storeId, { write: false });
+  if (route.kind === 'do') {
+    const u = await route.client.call<unknown | null>('getProfile', { userId: customerId });
+    if (!u) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+    return { id: customerId, storeId, role: 'customer' as const };
+  }
   const user = await prisma.user.findUnique({
     where: { id: customerId, storeId },
     select: { id: true, storeId: true, role: true },
@@ -757,6 +788,7 @@ router.post(
       const outcome = await AuthService.eraseAccount(customerId, {
         scopeStoreId: storeId,
         actorId: req.user!.userId,
+        storeHint: storeId,
       });
       // #1880: the CRM copy is matched by email/phone and can be missed or
       // refused as ambiguous. Record what happened so a partial erasure is
@@ -814,7 +846,7 @@ router.get(
       const { storeId, customerId } = req.params;
       await resolveStoreCustomerOrThrow(storeId, customerId);
 
-      const bundle = await AuthService.exportAccount(customerId);
+      const bundle = await AuthService.exportAccount(customerId, storeId);
 
       await auditLog({
         action: 'customer.data.exported_by_merchant',

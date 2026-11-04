@@ -30,6 +30,13 @@ vi.mock('@api/lib/repo-factory', () => ({
       goldRateSettings: { findUnique: async () => h.settings },
       goldRateCurrent: { findMany: async () => h.current },
       product: { findFirst: async () => (h.sells ? { id: 'p' } : null) },
+      // the Store row is read through the store's backend (Ruling NZ-AN-1, N-13)
+      store: {
+        findUnique: async (a: { select: Record<string, unknown> }) =>
+          'owner' in a.select
+            ? { name: 'Dahab', slug: 'dahab', owner: { email: 'o@example.com' } }
+            : h.storeRow,
+      },
     },
   }),
 }));

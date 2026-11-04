@@ -407,7 +407,12 @@ export async function confirmPaymentFromProviderStatus(
     const failedClaim = await claimOrderFailed(order.id, order.storeId);
     if (failedClaim !== 'claimed') {
       return {
-        paymentStatus: failedClaim === 'already_failed' ? 'failed' : 'paid',
+        paymentStatus:
+          failedClaim === 'already_failed'
+            ? 'failed'
+            : failedClaim === 'not_found'
+              ? 'unpaid'
+              : 'paid',
         providerStatus: status,
         statusChanged: false,
       };

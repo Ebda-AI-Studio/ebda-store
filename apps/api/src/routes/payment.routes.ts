@@ -12,6 +12,7 @@ import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import {
@@ -29,6 +30,8 @@ import {
   resolveStoreFromWebhookRef,
 } from '../lib/definer';
 import { OrderService } from '../services/order.service';
+import { checkStoreAccess } from '../middleware/store-access';
+import { onAccessD1 } from '../services/platform/access-d1';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
@@ -110,12 +113,16 @@ const createPaymentSchema = z.object({
 });
 
 const refundSchema = z.object({
-  transactionId: z.string(),
+  // BE:S-12: bounded, both land in the audit log and the provider call.
+  transactionId: z.string().min(1).max(128),
   /** Narrows the lookup when two providers hold the same reference string (Ruling ITEST-14). */
   provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
   amount: z.number().int().positive().optional(),
-  reason: z.string().optional(),
+  reason: z.string().max(500).optional(),
 });
+
+// BE:S-13: the retry body names at most a provider.
+const retryBodySchema = z.object({ provider: z.enum(['paymob', 'kashier', 'fawry']).optional() });
 
 // ==========================================
 // Helper Functions
@@ -137,10 +144,10 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
     // resolved first (validated X-Store-ID / host, the same resolver the public
     // routes use) and every read below runs inside its scope.
     const storeId = await resolvePublicStoreId(req);
+    // BE:S-22: no resolvable store is a 404, never the platform default (and never "first store").
+    if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-    const data = await (storeId
-      ? withStore(storeId, () => loadCheckoutPaymentConfig(storeId))
-      : loadCheckoutPaymentConfig(undefined));
+    const data = await withStore(storeId, () => loadCheckoutPaymentConfig(storeId));
 
     res.json({ success: true, data });
   } catch (error) {
@@ -267,6 +274,7 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
     const currency = (req.query.currency as Currency) || REGION.currency;
     const provider = req.query.provider as PaymentProvider | undefined;
     const storeId = await resolvePublicStoreId(req);
+    if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // BE:S-22
 
     const methods = await PaymentService.getPaymentMethods(amount, currency, provider, storeId);
 
@@ -1172,6 +1180,9 @@ router.get(
 router.post(
   '/refund',
   authenticate,
+  // BE:S-2 / S-11 (Ruling FP-3): money out is never done from an impersonated session; super_admin needs MFA.
+  requireMfaEnrolled,
+  rejectImpersonated,
   requirePermission('orders:refund'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1200,12 +1211,17 @@ router.post(
         });
         return;
       }
-      if (user.role === 'store_admin' && paymentRow.order.store.ownerId !== user.userId) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment not found' },
-        });
-        return;
+      // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
+      // `orders:refund` (on any store) passed with no membership check at all.
+      if (user.role !== 'super_admin') {
+        const access = await checkStoreAccess(paymentRow.order.store.id, user);
+        if (!access.ok) {
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Payment not found' },
+          });
+          return;
+        }
       }
 
       const refundStoreId = paymentRow.order.store.id;
@@ -1295,12 +1311,15 @@ router.post(
 router.post(
   '/retry/:paymentId',
   authenticate,
+  rejectImpersonated,
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { paymentId } = req.params;
       const user = getAuthUser(req);
-      const provider = req.body.provider as PaymentProvider | undefined;
+      const provider = retryBodySchema.parse(req.body ?? {}).provider as
+        | PaymentProvider
+        | undefined;
 
       // The store is not known yet (strict RLS shows a contextless read nothing): a definer
       // maps the payment id to its store, then the ownership check reads inside that scope.
@@ -1415,6 +1434,17 @@ router.get(
  * payment with its store ownerId, then accept the request only when
  * the requester is super_admin or is the store owner.
  */
+/** D1 twin of `resolvePaymentEventsStore`: unknown payment and denied access are the same "not found". */
+async function resolvePaymentEventsStoreD1(
+  user: { userId: string; role: string },
+  paymentId: string
+): Promise<{ storeId: string; paymentId: string } | null> {
+  const storeId = await getPaymentStoreId(paymentId);
+  if (!storeId) return null;
+  const access = await checkStoreAccess(storeId, user);
+  return access.ok ? { storeId, paymentId } : null;
+}
+
 router.get('/:id/events', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = getAuthUser(req);
@@ -1423,7 +1453,11 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
     // The payment's store is found by a GUARDED definer (an active super_admin, or the owner /
     // staff of that payment's store; anyone else sees "not found"), then the events are read
     // inside that store's scope. Under strict RLS a contextless read would see no row at all.
-    const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
+    // After the `access` cutover the Postgres definer's staff branch reads a frozen/emptied copy, so access is decided from
+    // D1 instead: the payment's store by exact id, then the same gate every admin route uses (owner, live staff, super_admin).
+    const owner = (await onAccessD1())
+      ? await resolvePaymentEventsStoreD1(user, paymentId)
+      : await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
     if (!owner) {
       res.status(404).json({
         success: false,

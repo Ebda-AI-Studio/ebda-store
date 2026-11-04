@@ -1,4 +1,5 @@
 import { prisma } from '@ebda/database';
+import { customerRows } from '../lib/customer-directory';
 import { matchingCustomers } from './admin-search.service';
 
 /**
@@ -13,8 +14,10 @@ export async function searchOrderCustomers(storeId: string, q: string) {
   const matches = await matchingCustomers(storeId, q);
 
   // --- Registered customers: read back as this store's users (tenant guard: top-level storeId) ---
-  const registeredRows =
-    matches.userIds.length === 0
+  const doRows = await customerRows(storeId, matches.userIds.slice(0, 50));
+  const registeredRows = doRows
+    ? doRows.filter(u => u.deletedAt === null).slice(0, 10)
+    : matches.userIds.length === 0
       ? []
       : await prisma.user.findMany({
           where: { storeId, deletedAt: null, id: { in: matches.userIds.slice(0, 50) } },

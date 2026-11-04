@@ -26,11 +26,7 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   // notice fan-out reads `User` / `LegalNotice*`), so there is no store data to move
   'ebda-ads-conversion',
   'legal-notice-send',
-  // Ruling CF-JOBS-4B: GSC ingest reads the platform Store row and writes GscDailyMetric (analytics target, Postgres): no DO table is opened, so one cron serves every store
-  'gsc-ingest-cron',
-  'gsc-ingest-on-demand',
-  // Ruling CF-JOBS-4B (data retention): receipts and orders are swept on the DO store's own alarm
-  'search-log-purge-daily',
+  // identity rows only (the erasure itself already reaches the DO half)
   'soft-deleted-user-anonymize-monthly',
   // Ruling CF-JOBS-4: jobs that touch only platform (D1) rows or third parties, never a store-do table
   // third-party erasure (OneSignal, PostHog) + the CI bucket in R2, keyed by ids the event carries; the DO erasure scope is finalized by its last step (Ruling CF-OPUS-1)
@@ -154,6 +150,11 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'order-created-fanout',
   'order-status-changed-fanout',
   'order-refunded-fanout',
+  // Ruling NZ-AN-1: the GSC ingest and the search-log purge read and write the store's analytics tables, which live in its
+  // StoreDO (`analyticsWrite` / `analyticsMoney`, lib/analytics-backend.ts); the Store row is read through the store's backend
+  'gsc-ingest-cron',
+  'gsc-ingest-on-demand',
+  'search-log-purge-daily',
   // Ruling INTEG-1: the catalogue import and the weekly CI hint calibration reach their store only through `storeDb` /
   // `storeWriter` / `storeMoney.importBatch` (tests/unit/integ-1-on-do.test.ts)
   'catalog-import-run',
@@ -175,6 +176,10 @@ export const ALL_STORES_JOBS: ReadonlySet<string> = new Set([
   'answer-engine-citation-scan-cron',
   // lists every store and resolves each one's open hint logs; the platform check ranks all stores' rows together (Ruling INTEG-1)
   'ci-hint-calibration-weekly',
+  // Ruling NZ-AN-1: each lists every store (DO stores included, `allStoresDirectory` / the store directory) and reaches a store's
+  // analytics through its own backend, one failing store never stops the rest
+  'gsc-ingest-cron',
+  'search-log-purge-daily',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([]);

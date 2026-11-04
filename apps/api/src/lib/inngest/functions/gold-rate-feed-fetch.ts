@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { runInStoreScope, withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+import { runInStoreScope } from '@ebda/database';
 import { GOLD_KARATS } from '@ebda/shared';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
@@ -156,8 +157,8 @@ export async function handleGoldRateFeedFetch(
       // supersede the pending rows it just made). One email per pending rate id, marked after the send.
       await step.run(`notify-${s.storeId}`, async () => {
         try {
-          const info = await withStore(s.storeId, tx =>
-            tx.store.findUnique({
+          const info = await withStoreDb(s.storeId, db =>
+            db.store.findUnique({
               where: { id: s.storeId },
               select: { name: true, owner: { select: { email: true } } },
             })

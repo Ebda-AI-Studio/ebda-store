@@ -3,7 +3,8 @@
  * Postgres stores keep the SECURITY DEFINER functions (`goldFeedStores` / `goldRateWatch`, minus any store the job scope hides).
  * A store on its Durable Object is read from its own tables on its alarm: the alarm run is scoped to that one store.
  */
-import { dropHiddenStores, withStore } from '@ebda/database';
+import { withStoreDb } from './store-db';
+import { dropHiddenStores } from '@ebda/database';
 import { goldFeedStores, goldRateWatch } from '../definer';
 import { storeRepo } from '../repo-factory';
 import { alarmStoreId } from './store-scope';
@@ -16,8 +17,8 @@ const DEFAULT_MAX_AGE_MIN = 1560;
 
 /** `Store` is a platform row: the definer only returns active, non-deleted stores. */
 async function storeIsActive(storeId: string): Promise<boolean> {
-  const s = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { status: true, deletedAt: true } })
+  const s = await withStoreDb(storeId, db =>
+    db.store.findUnique({ where: { id: storeId }, select: { status: true, deletedAt: true } })
   );
   return !!s && s.deletedAt === null && String(s.status) === 'active';
 }

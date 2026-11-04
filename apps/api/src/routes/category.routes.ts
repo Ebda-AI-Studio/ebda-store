@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma, SlugEntityType } from '@ebda/database';
-import { storeWriter } from '../lib/repo-factory';
+import { storeWriter, storeDb } from '../lib/repo-factory';
 import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
 import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
@@ -15,7 +15,7 @@ import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
-const createCategorySchema = z.object({
+export const createCategorySchema = z.object({
   name: z.string().min(1).max(255),
   nameAr: z.string().max(255).optional(),
   slug: z
@@ -27,6 +27,11 @@ const createCategorySchema = z.object({
   description: z.string().optional(),
   descriptionAr: z.string().optional(),
   image: z.string().url().optional(),
+  // BE:F-6: the same photo shape the product API takes ({url, alt}[]); the first one is the category image.
+  images: z
+    .array(z.object({ url: z.string().url(), alt: z.string().max(255).optional() }))
+    .max(10)
+    .optional(),
   metaTitle: z.string().max(180).optional().nullable(),
   metaTitleAr: z.string().max(180).optional().nullable(),
   metaDescription: z.string().max(400).optional().nullable(),
@@ -37,6 +42,9 @@ const createCategorySchema = z.object({
   // Size chart inherited by this category's products on the PDP (B0 Task 9). null clears.
   sizeChartId: z.string().uuid().nullable().optional(),
 });
+
+/** BE:E-5: a store never has this many categories; the cap is a safety valve, not a page size. */
+const CATEGORY_LIST_MAX = 1000;
 
 export const updateCategorySchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -79,7 +87,9 @@ router.get(
       // shows an empty uploader and the next save kicks the column
       // into existence on Railway's Dockerfile-driven migrate-deploy.
       try {
-        const store = await prisma.store.findUnique({
+        const store = await (
+          await storeDb(storeId)
+        ).store.findUnique({
           where: { id: storeId },
           select: { bestSellersImage: true },
         });
@@ -111,7 +121,9 @@ router.put(
       });
       const data = schema.parse(req.body);
 
-      const existing = await prisma.store.findUnique({
+      const existing = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { bestSellersImage: true },
       });
@@ -169,6 +181,7 @@ router.get(
         // Merchant-defined order first (Category.position), name as the stable
         // tiebreaker so stores that never reordered keep their A→Z look.
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        take: CATEGORY_LIST_MAX, // BE:E-5
         include: {
           // Exclude archived/deleted from the category product count so it
           // reflects live catalog size, not historical/hidden products.
@@ -399,7 +412,7 @@ router.post(
           slug,
           description: data.description,
           descriptionAr: data.descriptionAr,
-          image: data.image,
+          image: data.image ?? data.images?.[0]?.url,
           // SEO meta — mirror the PUT path so fields are persisted at create
           // time. Without this block the fields pass Zod validation but are
           // silently dropped, making every newly created category lose all SEO.

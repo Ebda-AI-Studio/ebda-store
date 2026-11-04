@@ -140,6 +140,7 @@ vi.mock('@api/services/redis.service', () => ({
 vi.mock('@api/lib/revalidate-storefront', () => ({ revalidateStorefront: vi.fn() }));
 vi.mock('@api/lib/store-scoped-read', () => ({
   readInStoreContext: (_id: string, fn: () => unknown) => fn(),
+  inDoStoreScope: (_id: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/order-tax', () => ({
   resolveActiveTaxRate: vi.fn().mockResolvedValue({ ratePercent: 0, seller: null }),

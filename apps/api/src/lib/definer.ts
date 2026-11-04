@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { platformFamilyOnD1 } from '../services/platform/cutover';
+import { requirePlatformDb } from './platform-db';
 import {
   entityStoreIdD1,
   onD1 as onBillingD1,
@@ -6,6 +8,8 @@ import {
   refundStoreIdD1,
   storeIdsOnPlanD1,
 } from '../services/platform/billing-d1';
+import { prisma, withStore, withSystemJob, type Prisma } from '@ebda/database';
+import { onAccessD1, ownedStoreIdsD1 } from '../services/platform/access-d1';
 import {
   inboxGetD1,
   inboxListD1,
@@ -21,9 +25,9 @@ import {
   assertNotFrozen,
   isFamilyFrozen,
 } from '../services/platform/cutover';
-import { prisma, withSystemJob, type Prisma } from '@ebda/database';
 import { appendAudit, type AuditEntry, type AuditRow } from '../services/audit-sink';
 import { cfBindings } from '../cf/bindings';
+import { AppError } from '../middleware/error-handler';
 import {
   d1LookupStore,
   d1PublicStorePage,
@@ -32,7 +36,7 @@ import {
   d1StoreIdsClaimingDomain,
   platformDb,
 } from './platform-directory';
-import { backendFor, doStoreIdList } from './store-backend';
+import { backendFor, hasStoresOnBackend } from './store-backend';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
@@ -53,6 +57,9 @@ export async function resolveStoreId(match: {
   domain?: string | null;
 }): Promise<string | null> {
   if (!match.slug && !match.domain) return null;
+  // NEON-ZERO-1 (N-1 follow-up): a deployed Worker resolves a host from the D1 directory only (no Postgres fallback).
+  const d1 = platformDb();
+  if (d1) return (await d1LookupStore(d1, match, ['active']))?.id ?? null;
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_resolve_store_id(${match.slug ?? null}, ${match.domain ?? null}) AS id`;
   return rows[0]?.id ?? null;
@@ -196,6 +203,34 @@ export async function resolveStoreFromWebhookRef(ref: {
   preferStoreId?: string | null;
 }): Promise<string | null> {
   if (!ref.transactionId && !ref.invoiceId) return null;
+  // Ruling NZ-N12-1/2: with D1 bound the entity index answers first (a Durable Object store). On an index miss the Postgres
+  // definer is asked ONLY while a `pg` store exists in the directory, and its answer is accepted ONLY for a store the directory
+  // says is `pg` (a stale Postgres row of a flipped store is never routed). A Postgres failure on that leg is "unresolved"
+  // (the caller answers 503 + retry), never a 500.
+  if (platformDb()) {
+    const viaIndex = await resolveDoStoreFromWebhookRef(ref);
+    if (viaIndex) return viaIndex;
+    if (!(await hasStoresOnBackend('pg'))) return null;
+    try {
+      const viaPg = await resolveStoreFromWebhookRefPg(ref);
+      return viaPg && (await backendFor(viaPg)) === 'pg' ? viaPg : null;
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      return null;
+    }
+  }
+  const found = await resolveStoreFromWebhookRefPg(ref);
+  // Not a Postgres payment: a store on its Durable Object has no `payments` row here. Its references live in the D1 entity
+  // index (Ruling CF-PAY-1), written in the same DO section that created the payment.
+  return found ?? (await resolveDoStoreFromWebhookRef(ref));
+}
+
+async function resolveStoreFromWebhookRefPg(ref: {
+  transactionId?: string | null;
+  invoiceId?: string | null;
+  provider?: string | null;
+  preferStoreId?: string | null;
+}): Promise<string | null> {
   let found: string | null;
   if (ref.provider || ref.preferStoreId) {
     const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
@@ -206,9 +241,7 @@ export async function resolveStoreFromWebhookRef(ref: {
       SELECT public.ebda_webhook_resolve_store(${ref.transactionId ?? null}, ${ref.invoiceId ?? null}) AS id`;
     found = rows[0]?.id ?? null;
   }
-  // Not a Postgres payment: a store on its Durable Object has no `payments` row here. Its references live in the D1 entity
-  // index (Ruling CF-PAY-1), written in the same DO section that created the payment.
-  return found ?? (await resolveDoStoreFromWebhookRef(ref));
+  return found;
 }
 
 /**
@@ -225,14 +258,20 @@ export async function resolveDoStoreFromWebhookRef(ref: {
 }): Promise<string | null> {
   // Same contract as the Postgres resolver (`ebda_webhook_resolve_store_scoped`): a reference is unique per PROVIDER, so an
   // empty provider resolves nothing, and only the provider-scoped `webhook` key is read - never the unscoped `payment` kind.
-  if (!ref.provider || (await doStoreIdList()).length === 0) return null;
+  if (!ref.provider || !(await hasStoresOnBackend('do'))) return null;
   const d1 = (cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB;
   if (!d1) return null;
   const { resolveStoreId } = await import('@ebda-src/repo');
   for (const r of [ref.transactionId, ref.invoiceId]) {
     if (!r) continue;
     const id = await resolveStoreId(d1, 'webhook', `${ref.provider}:${r}`);
-    if (!id || (await backendFor(id)) !== 'do') continue;
+    if (!id) continue;
+    // An index row naming a store the directory does not know is not routable (backendFor: 404), never an error.
+    const backend = await backendFor(id).catch(e => {
+      if ((e as { statusCode?: number }).statusCode === 404) return null;
+      throw e;
+    });
+    if (backend !== 'do') continue;
     // a URL that names store A never accepts store B's reference: same answer as an unknown one
     if (ref.preferStoreId && id !== ref.preferStoreId) return null;
     return id;
@@ -253,18 +292,55 @@ export async function findOrderByIdempotencyKey(
     : null;
 }
 
-/** An order id -> its store id. */
+/**
+ * The Durable Object store that owns an order / payment id, via the D1 entity index (Ruling CF-PAY-1; NZ-N12-2), or null.
+ * Only a store the flag lists as `do` is returned (an index row of a store that went back to Postgres is stale; the definer
+ * owns it). Null when D1 is unbound (Node / tests / local dev) or the id is not indexed.
+ */
+async function doStoreFromIndex(kind: 'order' | 'payment', id: string): Promise<string | null> {
+  const d1 = platformDb();
+  if (!d1) return null;
+  let storeId: string | null;
+  try {
+    const { resolveStoreId: fromIndex } = await import('@ebda-src/repo');
+    storeId = await fromIndex(d1 as never, kind, id);
+  } catch {
+    throw new AppError(503, 'PLATFORM_DIRECTORY_UNAVAILABLE', 'Store directory is unavailable');
+  }
+  return storeId && (await backendFor(storeId)) === 'do' ? storeId : null;
+}
+
+/**
+ * Index miss with D1 bound: ask the Postgres definer only while a `pg` store exists, and accept its answer only for a store the
+ * directory says is `pg`. Unknown id (no `pg` store in the fleet) -> null (a 404), no Postgres touched (Ruling NZ-N12-2).
+ */
+async function pgStoreFallback(lookup: () => Promise<string | null>): Promise<string | null> {
+  if (!platformDb()) return lookup();
+  if (!(await hasStoresOnBackend('pg'))) return null;
+  const id = await lookup();
+  return id && (await backendFor(id)) === 'pg' ? id : null;
+}
+
+/** An order id -> its store id (a Durable Object store from the D1 index first, no Postgres touched; else the definer). */
 export async function getOrderStoreId(orderId: string): Promise<string | null> {
-  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
-    SELECT public.ebda_order_store_id(${orderId}) AS id`;
-  return rows[0]?.id ?? null;
+  const onDo = await doStoreFromIndex('order', orderId);
+  if (onDo) return onDo;
+  return pgStoreFallback(async () => {
+    const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+      SELECT public.ebda_order_store_id(${orderId}) AS id`;
+    return rows[0]?.id ?? null;
+  });
 }
 
 /** A payment id -> its store id (exact primary key). The caller then reads and authorises inside that store. */
 export async function getPaymentStoreId(paymentId: string): Promise<string | null> {
-  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
-    SELECT public.ebda_payment_store_id(${paymentId}) AS id`;
-  return rows[0]?.id ?? null;
+  const onDo = await doStoreFromIndex('payment', paymentId);
+  if (onDo) return onDo;
+  return pgStoreFallback(async () => {
+    const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+      SELECT public.ebda_payment_store_id(${paymentId}) AS id`;
+    return rows[0]?.id ?? null;
+  });
 }
 
 /**
@@ -540,6 +616,36 @@ export async function getStorefrontForPaymentRef(
   return rows[0] ?? null;
 }
 
+/**
+ * The storefront (slug + ACTIVE custom domain) of a store, for a payment-redirect callback. D1 directory when bound (no
+ * Postgres), else the Store row. Null for an unknown store.
+ */
+export async function storefrontForStoreId(
+  storeId: string
+): Promise<{ slug: string; domain: string | null } | null> {
+  const d1 = platformDb();
+  if (d1) {
+    let row: { slug: string; domain: string | null; domain_status: string | null } | null;
+    try {
+      row = await d1
+        .prepare(
+          'SELECT slug, domain, domain_status FROM stores WHERE id = ?1 AND deleted_at IS NULL'
+        )
+        .bind(storeId)
+        .first();
+    } catch {
+      throw new AppError(503, 'PLATFORM_DIRECTORY_UNAVAILABLE', 'Store directory is unavailable');
+    }
+    return row
+      ? { slug: row.slug, domain: row.domain_status === 'active' ? row.domain : null }
+      : null;
+  }
+  const store = await withStore(storeId, () =>
+    prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
+  );
+  return store ?? null;
+}
+
 /** A carrier tracking number -> the store that owns the shipment. */
 export async function getShipmentStoreIdByTracking(trackingNumber: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
@@ -804,6 +910,16 @@ export async function countAiUsage(opts: {
   cachedHit: boolean;
   feature?: string;
 }): Promise<number> {
+  // Ruling NZ-AN-1: after the `ai-usage` cutover the table is one platform table on D1 (a single indexed count, no RLS to bypass)
+  if (await platformFamilyOnD1('ai-usage')) {
+    return (await requirePlatformDb()).aiUsage.count({
+      where: {
+        createdAt: { gte: opts.since },
+        cachedHit: opts.cachedHit,
+        ...(opts.feature ? { feature: opts.feature } : {}),
+      },
+    });
+  }
   const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
     SELECT public.ebda_ai_usage_count(${opts.since}::timestamp, ${opts.cachedHit}, ${opts.feature ?? null}) AS n`;
   return Number(rows[0]?.n ?? 0);
@@ -1131,6 +1247,8 @@ export async function storeIdsClaimingDomain(domain: string): Promise<string[]> 
  * must BE `ownerId`, or an active super_admin; wrap the call in `withUser(ownerId, ...)`.
  */
 export async function ownedStoreIds(ownerId: string): Promise<string[]> {
+  // NEON-ZERO-1 (N-6): D1 `stores` answers once the `access` family is on D1 (same predicate as the SQL function below).
+  if (await onAccessD1()) return ownedStoreIdsD1(ownerId);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT ebda_owned_store_ids AS id FROM public.ebda_owned_store_ids(${ownerId})`;
   return rows.map(r => r.id);

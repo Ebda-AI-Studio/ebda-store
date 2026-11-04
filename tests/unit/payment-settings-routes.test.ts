@@ -71,7 +71,11 @@ vi.mock('@ebda/database', () => ({
   ProviderHealthStatus: undefined,
 }));
 
+vi.mock('@api/middleware/require-mfa', () => ({
+  requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
+}));
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, res: any, next: any) => {
     if (currentUser.anonymous) {
       res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'x' } });
@@ -334,6 +338,43 @@ describe('PUT /payment-settings/store/:storeId/:provider — a masked placeholde
     const res = await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ isEnabled: true });
 
     expect(res.status).toBe(404);
+    expect(mockPrisma.paymentConfig.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /payment-settings/store/:storeId/:provider — the provider is the URL, never the body (BE:S-3, S-10)', () => {
+  beforeEach(() => {
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
+    );
+    mockPrisma.paymentConfig.update.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
+    );
+  });
+
+  it('a body {provider:"paymob"} on a cod row is ignored: the update never carries a provider', async () => {
+    const res = await request(app)
+      .put(`${BASE}/store/${STORE_ID}/cod`)
+      .send({ provider: 'paymob', displayName: 'Cash' });
+
+    expect(res.status).toBeLessThan(400);
+    const updateCall = mockPrisma.paymentConfig.update.mock.calls[0][0];
+    expect(updateCall.data.provider).toBeUndefined();
+    expect(updateCall.data.displayName).toBe('Cash');
+  });
+
+  it('bounds the free-form lists and names (S-10)', async () => {
+    for (const body of [
+      { displayName: 'x'.repeat(121) },
+      { supportedMethods: Array.from({ length: 21 }, (_, i) => `m${i}`) },
+      { supportedMethods: ['x'.repeat(41)] },
+      { supportedCurrencies: ['EGPX'] },
+    ]) {
+      const res = await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    }
     expect(mockPrisma.paymentConfig.update).not.toHaveBeenCalled();
   });
 });

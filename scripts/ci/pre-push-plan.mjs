@@ -12,10 +12,12 @@
  *             file runs every UNIT test that imports it)
  *   exclude   globs handed to `vitest related` as --exclude: integration / E2E never run locally (PREPUSH-2)
  *   files     all changed files (prettier is run on exactly these)
+ *   scanners  (main() only) every repo-scanning unit test, always run whatever the mode (SCANNER_RULE below)
  *
  * Usage: node scripts/ci/pre-push-plan.mjs --base <sha>   |   --files a,b,c   (no git; tests)
  */
 import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classify, loadWorkspaces } from '../ci-affected.mjs';
@@ -38,6 +40,35 @@ export const PREPUSH_EXCLUDE = [
   '**/workers-test/**',
   '**/workers-do/**',
 ];
+
+/**
+ * SCANNER-1 (Ruling PREPUSH-3): the tests that read the SOURCE TREE rather than import one module. `vitest related` follows
+ * imports, so a repo-wide gate (an `apps/admin` string scan, a route-table walk, a `git grep` for a banned pattern) is never
+ * "related" to the file that broke it and only failed later in CI. Those tests ALWAYS run before a push.
+ *
+ * The rule is by content, not a list, so a new scanner is picked up the day it is written: a unit test (any depth under
+ * tests/unit) whose source walks the tree (`readdirSync`, `globSync`, a `walk…(` helper, `git ls-files`) or greps it
+ * (`git grep`). Fixture-only readers (`readFileSync` of one known file) are NOT scanners and are left to `related`.
+ */
+export const SCANNER_RULE =
+  /\b(readdirSync|globSync)\b|\bwalk\w*\(|git[ '",]+(ls-files|grep)\b|['"`]ls-files['"`]|['"`]grep['"`]/;
+
+export function scannerTests(root = ROOT, rel = 'tests/unit') {
+  const out = [];
+  const visit = dir => {
+    for (const e of readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) visit(p);
+      else if (
+        /\.test\.(ts|tsx|mjs|js)$/.test(e.name) &&
+        SCANNER_RULE.test(readFileSync(path.join(root, p), 'utf8'))
+      )
+        out.push(p);
+    }
+  };
+  visit(rel);
+  return out.sort();
+}
 
 export function plan(files, workspaces) {
   const changed = files.filter(Boolean);
@@ -67,7 +98,14 @@ function main(argv) {
     const base = arg('base');
     if (!base)
       return console.log(
-        JSON.stringify({ mode: 'full', lint: [], typecheck: [], related: [], files: [] })
+        JSON.stringify({
+          mode: 'full',
+          lint: [],
+          typecheck: [],
+          related: [],
+          files: [],
+          scanners: scannerTests(),
+        })
       );
     files = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], {
       cwd: ROOT,
@@ -76,7 +114,7 @@ function main(argv) {
       .trim()
       .split('\n');
   }
-  console.log(JSON.stringify(plan(files, loadWorkspaces())));
+  console.log(JSON.stringify({ ...plan(files, loadWorkspaces()), scanners: scannerTests() }));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))

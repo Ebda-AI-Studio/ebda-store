@@ -1,6 +1,18 @@
 import { runKeyed, ensureKeyedSchema } from './keyed-op';
 import {
+  awardBonusPoints,
+  awardReviewBonus,
   earnPointsFromPurchase,
+  getCustomerPoints,
+  getLoyaltyStats,
+  getTransactionHistory,
+  importLedgerRows,
+  importState,
+  markImported,
+  initializeCustomerPoints,
+  listMembers,
+  loyaltyStoreConfig,
+  listStoreTransactions,
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
 } from './loyalty';
@@ -79,6 +91,16 @@ import {
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import {
+  analyticsImportFinishOp,
+  analyticsImportOp,
+  analyticsImportStatusOp,
+  qrScanRecordOp,
+  searchInsightsOp,
+  searchLogPurgeOp,
+  searchLogRecordOp,
+  viewRecordOp,
+} from './analytics-ops';
+import {
   expenseDraftOp,
   expenseTransitionOp,
   lastPaidSalesOp,
@@ -132,6 +154,17 @@ export type MoneyOpName =
   | 'loyaltyEarn'
   | 'loyaltyReverseEarned'
   | 'loyaltyReverseRedeemed'
+  | 'loyaltyAward'
+  | 'loyaltyInit'
+  | 'loyaltyReviewBonus'
+  | 'loyaltyCustomerPoints'
+  | 'loyaltyHistory'
+  | 'loyaltyMembers'
+  | 'loyaltyStats'
+  | 'loyaltyStoreTransactions'
+  | 'loyaltyImport'
+  | 'loyaltyImportState'
+  | 'loyaltyMarkImported'
   | 'createOrder'
   | 'confirmPayment'
   | 'cancel'
@@ -218,11 +251,30 @@ export type MoneyOpName =
   | 'vectorCommit'
   | 'vectorStale'
   | 'vectorVisible'
-  | 'expenseTransition';
+  | 'expenseTransition'
+  | 'searchLogRecord'
+  | 'searchLogPurge'
+  | 'searchInsights'
+  | 'qrScanRecord'
+  | 'viewRecord'
+  | 'analyticsImportStatus'
+  | 'analyticsImport'
+  | 'analyticsImportFinish';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
   'loyaltyReverseRedeemed',
+  'loyaltyAward',
+  'loyaltyInit',
+  'loyaltyReviewBonus',
+  'loyaltyCustomerPoints',
+  'loyaltyHistory',
+  'loyaltyMembers',
+  'loyaltyStats',
+  'loyaltyStoreTransactions',
+  'loyaltyImport',
+  'loyaltyImportState',
+  'loyaltyMarkImported',
   'createOrder',
   'confirmPayment',
   'cancel',
@@ -310,6 +362,14 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'vectorStale',
   'vectorVisible',
   'expenseTransition',
+  'searchLogRecord',
+  'searchLogPurge',
+  'searchInsights',
+  'qrScanRecord',
+  'viewRecord',
+  'analyticsImportStatus',
+  'analyticsImport',
+  'analyticsImportFinish',
 ];
 
 const TABLE = '_money_ops';
@@ -341,6 +401,79 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     reverseEarnedPointsFromOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
   loyaltyReverseRedeemed: (db, storeId, a) =>
     reverseRedeemedPointsFromOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  /** L-1: manual / referral / birthday award (LoyaltyService.awardBonusPoints). */
+  loyaltyAward: (db, storeId, a) =>
+    awardBonusPoints(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      points: a.points as number,
+      type: a.type as string,
+      description: typeof a.description === 'string' ? a.description : null,
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyInit: (db, storeId, a) =>
+    initializeCustomerPoints(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      giveSignupBonus: a.giveSignupBonus !== false,
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyReviewBonus: (db, storeId, a) =>
+    awardReviewBonus(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      productId: id(a.productId, 'productId'),
+      reviewId: id(a.reviewId, 'reviewId'),
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyCustomerPoints: (db, storeId, a) =>
+    getCustomerPoints(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyHistory: (db, storeId, a) =>
+    getTransactionHistory(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      page: a.page as number | undefined,
+      limit: a.limit as number | undefined,
+    }),
+  loyaltyMembers: (db, storeId, a) =>
+    listMembers(db, {
+      storeId,
+      page: a.page as number | undefined,
+      limit: a.limit as number | undefined,
+      tier: typeof a.tier === 'string' ? a.tier : undefined,
+    }),
+  loyaltyStats: (db, storeId) => getLoyaltyStats(db, { storeId }),
+  loyaltyStoreTransactions: (db, storeId, a) =>
+    listStoreTransactions(db, {
+      storeId,
+      page: a.page as number | undefined,
+      limit: a.limit as number | undefined,
+      type: typeof a.type === 'string' ? a.type : undefined,
+      customerId: typeof a.customerId === 'string' ? a.customerId : undefined,
+      from: typeof a.from === 'number' ? a.from : null,
+      to: typeof a.to === 'number' ? a.to : null,
+    }),
+  /** FP-2 one-off migration: Postgres-only ledger rows of a DO store, idempotent by transaction id. */
+  loyaltyImport: (db, storeId, a) =>
+    importLedgerRows(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      rows: Array.isArray(a.rows) ? (a.rows as never) : [],
+      markDone: a.markDone === true,
+    }),
+  loyaltyImportState: (db, _storeId, a) =>
+    importState(db, { customerId: typeof a.customerId === 'string' ? a.customerId : undefined }),
+  // never records anything for a store without a loyalty config row (nothing was imported, nothing may be created)
+  loyaltyMarkImported: (db, storeId, a) => {
+    if (!loyaltyStoreConfig(db, storeId)) return { done: false };
+    return markImported(db, {
+      customerId: typeof a.customerId === 'string' ? a.customerId : undefined,
+    });
+  },
   /**
    * OrderService.create (Ruling CF-ORDERS-1): stock reserve, hold cap, coupon limit, loyalty redeem, wallet debit and the
    * order rows are ONE section. The caller never supplies `storeId` (bound by the DO) nor `now` (the DO clock).
@@ -630,6 +763,15 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  /** Per-store analytics on the DO (Ruling NZ-AN-1): see `analytics-ops.ts`. */
+  searchLogRecord: (db, storeId, a) => searchLogRecordOp(db, storeId, a),
+  searchLogPurge: (db, storeId, a) => searchLogPurgeOp(db, storeId, a),
+  searchInsights: (db, storeId, a) => searchInsightsOp(db, storeId, a),
+  qrScanRecord: (db, storeId, a) => qrScanRecordOp(db, storeId, a),
+  viewRecord: (db, storeId, a) => viewRecordOp(db, storeId, a),
+  analyticsImportStatus: (db, storeId) => analyticsImportStatusOp(db, storeId),
+  analyticsImport: (db, storeId, a) => analyticsImportOp(db, storeId, a),
+  analyticsImportFinish: (db, storeId, a) => analyticsImportFinishOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),

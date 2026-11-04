@@ -10,7 +10,7 @@ import request from 'supertest';
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    aiUsage: { count: vi.fn(), findMany: vi.fn() },
+    aiUsage: { count: vi.fn(), findMany: vi.fn(), aggregate: vi.fn() },
     $queryRaw: vi.fn(),
   },
 }));
@@ -95,12 +95,19 @@ describe('GET /usage/summary (#1036)', () => {
 
   afterEach(() => vi.clearAllMocks());
 
+  // Ruling NZ-AN-1: no raw SQL; cost is aggregate(_sum.costMicros), unpriced is count({costMicros: null})
+  const priced = (opts: { today: number | null; month: number | null; unpriced: number }) => {
+    mockPrisma.aiUsage.count.mockImplementation(async (a: { where: { costMicros?: null } }) =>
+      a.where.costMicros === null ? opts.unpriced : 10
+    );
+    mockPrisma.aiUsage.aggregate
+      .mockResolvedValueOnce({ _sum: { costMicros: opts.today } })
+      .mockResolvedValueOnce({ _sum: { costMicros: opts.month } });
+    mockPrisma.aiUsage.findMany.mockResolvedValue([]); // last30Days
+  };
+
   it('returns a cost figure (SUM of cost_micros), not just a call count', async () => {
-    mockPrisma.aiUsage.count.mockResolvedValue(10);
-    mockPrisma.$queryRaw
-      .mockResolvedValueOnce([{ total: 1500000n, unpriced: 2n }]) // today
-      .mockResolvedValueOnce([{ total: 45000000n, unpriced: 5n }]) // month
-      .mockResolvedValueOnce([]); // last30Days
+    priced({ today: 1500000, month: 45000000, unpriced: 2 });
 
     const res = await request(app).get(`/api/v1/stores/${STORE_ID}/ai/usage/summary`);
 
@@ -108,15 +115,11 @@ describe('GET /usage/summary (#1036)', () => {
     expect(res.body.data.todayCostMicros).toBe(1500000);
     expect(res.body.data.todayUnpricedCount).toBe(2);
     expect(res.body.data.monthCostMicros).toBe(45000000);
-    expect(res.body.data.monthUnpricedCount).toBe(5);
+    expect(res.body.data.monthUnpricedCount).toBe(2);
   });
 
   it('reports cost as null (not 0) when nothing in the window has a configured rate', async () => {
-    mockPrisma.aiUsage.count.mockResolvedValue(3);
-    mockPrisma.$queryRaw
-      .mockResolvedValueOnce([{ total: null, unpriced: 3n }])
-      .mockResolvedValueOnce([{ total: null, unpriced: 3n }])
-      .mockResolvedValueOnce([]);
+    priced({ today: null, month: null, unpriced: 3 });
 
     const res = await request(app).get(`/api/v1/stores/${STORE_ID}/ai/usage/summary`);
 

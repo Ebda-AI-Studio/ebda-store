@@ -129,3 +129,45 @@ describe('pre-push plan: unit tier only (PREPUSH-2)', () => {
     }
   }, 60_000);
 });
+
+// PREPUSH-3: the repo-scanning unit tests always run, found by content (not a hand-kept list).
+// @ts-expect-error plain .mjs without types
+import { scannerTests, SCANNER_RULE } from '../../scripts/ci/pre-push-plan.mjs';
+import { readFileSync as readSrc } from 'node:fs';
+
+describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
+  const found: string[] = scannerTests();
+
+  it('finds the repo-scanning tests, not an empty set', () => {
+    expect(found.length).toBeGreaterThan(100);
+    expect(found.every(f => f.startsWith('tests/unit/'))).toBe(true);
+  });
+
+  it('includes known tree-walkers and git-grep scanners', () => {
+    expect(found).toContain('tests/unit/admin-i18n-keys-resolve.test.ts');
+    expect(found).toContain('tests/unit/api-error-envelope-registry.test.ts');
+    expect(found).toContain('tests/unit/rulings-index.test.ts');
+  });
+
+  it('is by content: the rule matches walkers and greps, not a plain fixture read', () => {
+    expect(SCANNER_RULE.test('const files = readdirSync(dir)')).toBe(true);
+    expect(SCANNER_RULE.test("execSync('git grep -n foo')")).toBe(true);
+    expect(SCANNER_RULE.test("execFileSync('git', ['grep', '-n', 'x'])")).toBe(true);
+    expect(SCANNER_RULE.test('function walkRoutes(dir) {')).toBe(true);
+    expect(SCANNER_RULE.test("const text = readFileSync('one/file.ts', 'utf8')")).toBe(false);
+  });
+
+  it('every found file really matches the rule (no stale list)', () => {
+    for (const f of found) expect(SCANNER_RULE.test(readSrc(f, 'utf8'))).toBe(true);
+  });
+
+  it('the gate runs them whatever the diff', () => {
+    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    expect(gate).toContain('SCANNERS=$(field scanners)');
+    expect(gate).toMatch(/npx vitest run [^\n]*\$SCANNERS/);
+    // not nested inside the `affected` branch
+    expect(gate.indexOf('SCANNERS=$(field scanners)')).toBeGreaterThan(
+      gate.indexOf('if [ "$MODE" = "affected" ]')
+    );
+  });
+});

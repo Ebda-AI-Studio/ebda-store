@@ -100,8 +100,8 @@
     "reason": "3D/AR models per store"
   },
   "SearchQueryDaily": {
-    "target": "analytics",
-    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+    "target": "store-do",
+    "reason": "Ruling NZ-AN-1: per-store analytics live in the store's own StoreDO (cross-store reports fan out)"
   },
   "ProductEmbedding": {
     "target": "analytics",
@@ -228,8 +228,8 @@
     "reason": "push subscription; no storeId, hangs off Customer inside the DO"
   },
   "NotificationLog": {
-    "target": "analytics",
-    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+    "target": "store-do",
+    "reason": "Ruling NZ-AN-1: per-store analytics live in the store's own StoreDO (cross-store reports fan out)"
   },
   "AbandonedCart": {
     "target": "store-do",
@@ -368,8 +368,8 @@
     "reason": "storeId-scoped, read only in one store context"
   },
   "AiUsage": {
-    "target": "analytics",
-    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+    "target": "d1",
+    "reason": "Ruling NZ-AN-1: the AI quota counts usage across stores, so it is platform-wide on D1 (append-only, idempotent ids)"
   },
   "StoreFaq": {
     "target": "store-do",
@@ -464,16 +464,16 @@
     "reason": "plans/billing: platform-owned, read by super-admin across stores"
   },
   "ProductDailyView": {
-    "target": "analytics",
-    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+    "target": "store-do",
+    "reason": "Ruling NZ-AN-1: per-store analytics live in the store's own StoreDO (cross-store reports fan out)"
   },
   "QrScanDaily": {
-    "target": "analytics",
-    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+    "target": "store-do",
+    "reason": "Ruling NZ-AN-1: per-store analytics live in the store's own StoreDO (cross-store reports fan out)"
   },
   "GscDailyMetric": {
-    "target": "analytics",
-    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+    "target": "store-do",
+    "reason": "Ruling NZ-AN-1: per-store analytics live in the store's own StoreDO (cross-store reports fan out)"
   },
   "CiInsight": {
     "target": "d1",

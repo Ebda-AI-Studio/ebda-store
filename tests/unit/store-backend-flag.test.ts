@@ -55,8 +55,11 @@ describe('store backend flag', () => {
     it('backendFor takes no request: the retired x-ebda-backend header has no way in', () => {
       expect(backendFor.length).toBe(1);
     });
-    it('a store without a directory row is not flagged', async () => {
-      expect(await withD1(d1(null), () => backendFor(DEMO))).toBe('pg');
+    it('a store without a directory row does not exist: 404, never "pg" (NEON-ZERO-1 N-14)', async () => {
+      await expect(withD1(d1(null), () => backendFor(DEMO))).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'STORE_NOT_FOUND',
+      });
     });
     it('an unreadable or malformed flag is a 503, never a default to pg', async () => {
       await expect(withD1(d1(new Error('d1 down')), () => backendFor(DEMO))).rejects.toMatchObject({

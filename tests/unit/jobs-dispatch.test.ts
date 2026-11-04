@@ -89,8 +89,8 @@ describe('dispatchEvents', () => {
     expect(qsend).not.toHaveBeenCalled();
   });
 
-  it('an event nobody subscribes to is a no-op', async () => {
-    await dispatchEvents({ name: 'unknown/event' });
+  it('an event nobody subscribes to throws in the Worker (Ruling JOBS-ORPHAN-1), starting nothing', async () => {
+    await expect(dispatchEvents({ name: 'unknown/event' })).rejects.toThrow(/would start nothing/);
     expect(create).not.toHaveBeenCalled();
     expect(qsend).not.toHaveBeenCalled();
   });

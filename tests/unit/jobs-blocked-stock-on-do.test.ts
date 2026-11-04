@@ -48,6 +48,13 @@ vi.mock('@ebda/database', async () =>
 vi.mock('@api/lib/repo-factory', () => {
   const db = {
     product: { findMany: async () => h.products },
+    // the Store row is read through the store's backend (Ruling NZ-AN-1, N-13)
+    store: {
+      findUnique: async (a: { select: Record<string, unknown> }) =>
+        'owner' in a.select
+          ? { id: DO_STORE, name: 'Dahab', settings: {}, owner: { email: 'o@example.com' } }
+          : { plan: 'growth', name: 'Dahab' },
+    },
   };
   const writer = {
     deadStockFlag: {

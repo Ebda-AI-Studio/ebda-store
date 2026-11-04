@@ -1,7 +1,7 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
-import { prisma, runInStoreScope } from '@ebda/database';
+import { runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -115,7 +115,7 @@ const bulkAiTagsFn = inngest.createFunction(
       }
 
       const { storeName, productIds } = await step.run('load-items', async () => {
-        const store = await prisma.store.findUnique({
+        const store = await lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { name: true },
         });

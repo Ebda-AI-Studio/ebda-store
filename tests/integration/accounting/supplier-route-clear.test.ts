@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@ebda/database';
 
 vi.mock('../../../apps/api/src/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: undefined, role: 'store_admin' };
     next();

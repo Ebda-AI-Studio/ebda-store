@@ -2,11 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@ebda/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { runInTenantContext, withStore } from '@ebda/database';
 import {
   findOrderByIdempotencyKey,
   getOrderStoreId,
   getStorefrontForPaymentRef,
+  storefrontForStoreId,
   resolveStoreFromWebhookRef,
   webhookInbox,
 } from '../lib/definer';
@@ -21,7 +22,7 @@ import {
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
-import { doStoreIdList } from '../lib/store-backend';
+import { hasStoresOnBackend } from '../lib/store-backend';
 import { storeMoney } from '../lib/repo-factory';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { inngest } from '../lib/inngest/client';
@@ -247,7 +248,7 @@ async function gateDelivery(args: {
     // Once any store lives on its Durable Object an unresolvable reference may be ITS payment whose index row has not landed
     // (CF-PAY-1): never the constant 401 (the gateway would not retry and the order would stay unpaid), but 503 + retry and a
     // P0. The answer is the same for a forged delivery, so it reveals nothing; the alert is throttled by its fixed title.
-    if ((await doStoreIdList()).length > 0) {
+    if (await hasStoresOnBackend('do')) {
       await burnDummyWork(rawBody);
       respondUnresolvedForDoFleet(res, provider, idempotencyKey);
       return undefined;
@@ -282,6 +283,9 @@ async function checkIdempotency(
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
+  // A store on its Durable Object dedupes inside the DO (`payment_event_log`, same section as the effects, Ruling CF-PAY-1);
+  // there is no Postgres order row to look up (NZ-N12-3: nothing of a DO store's webhook may touch Postgres).
+  if (await storeMoney(storeId)) return { alreadyProcessed: false };
   // The store is not known yet, so this exact-key lookup is a definer
   // (`ebda_webhook_order_by_idempotency`), not a store-scoped read.
   const order = await findOrderByIdempotencyKey(idempotencyKey);
@@ -994,9 +998,7 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   async function getStorefrontUrl(storeId: string | null): Promise<string> {
     try {
       if (!storeId) return config.webUrl;
-      const store = await withStore(storeId, () =>
-        prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
-      );
+      const store = await storefrontForStoreId(storeId);
       if (store) return storefrontOrigin(store);
       return config.webUrl;
     } catch {

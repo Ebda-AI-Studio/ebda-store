@@ -128,6 +128,15 @@ export type WritableModel =
   | 'catalogImportItem'
   | 'ciHintLog'
   | 'ciStoreGate'
+  | 'searchQueryDaily'
+  | 'productDailyView'
+  | 'qrScanDaily'
+  | 'notificationLog'
+  | 'gscDailyMetric'
+  | 'wishlist'
+  | 'wishlistItem'
+  | 'bundle'
+  | 'bundleItem'
   | 'auditLog';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
@@ -358,6 +367,19 @@ export interface StockClient {
   }>;
 }
 
+/** A `loyalty_points` row as the DO returns it (Prisma field names, epoch-ms timestamps). */
+export interface DoLoyaltyPointsRow {
+  id: string;
+  storeId: string;
+  customerId: string;
+  points: number;
+  totalEarned: number;
+  totalRedeemed: number;
+  tier: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** An InstaPay order receipt as the DO returns it (`ReceiptRow` of `do/instapay-receipts.ts`). */
 export type DoReceipt = import('@ebda-src/repo').InstapayReceiptRow;
 
@@ -375,6 +397,92 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+  /** L-1 (Ruling FP-2): the admin / storefront reads and manual awards, on the DO ledger. Row timestamps are epoch ms. */
+  loyaltyAward(
+    a: {
+      customerId: string;
+      points: number;
+      type: string;
+      description?: string | null;
+      featureEnabled: boolean;
+    },
+    key?: string
+  ): Promise<{ newBalance: number }>;
+  loyaltyInit(
+    a: { customerId: string; giveSignupBonus: boolean; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ row: DoLoyaltyPointsRow; settings: Record<string, any> }>;
+  loyaltyReviewBonus(
+    a: { customerId: string; productId: string; reviewId: string; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ awarded: boolean; points: number }>;
+  loyaltyCustomerPoints(a: {
+    customerId: string;
+    featureEnabled: boolean;
+  }): Promise<{ row: DoLoyaltyPointsRow; settings: Record<string, any> } | null>;
+  loyaltyHistory(a: { customerId: string; page?: number; limit?: number }): Promise<{
+    transactions: Array<{
+      id: string;
+      storeId: string;
+      customerId: string;
+      orderId: string | null;
+      type: string;
+      points: number;
+      description: string | null;
+      expiresAt: number | null;
+      createdAt: number;
+      order: { id: string; orderNumber: string } | null;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
+  loyaltyMembers(a: { page?: number; limit?: number; tier?: string }): Promise<{
+    members: DoLoyaltyPointsRow[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
+  loyaltyStats(a?: Record<string, never>): Promise<{
+    totalMembers: number;
+    tierBreakdown: { bronze: number; silver: number; gold: number; platinum: number };
+    totalPointsIssued: number;
+    totalPointsRedeemed: number;
+    outstandingPoints: number;
+  }>;
+  loyaltyStoreTransactions(a: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    customerId?: string;
+    from?: number | null;
+    to?: number | null;
+  }): Promise<{
+    transactions: Array<{
+      id: string;
+      storeId: string;
+      customerId: string;
+      orderId: string | null;
+      type: string;
+      points: number;
+      description: string | null;
+      expiresAt: number | null;
+      createdAt: number;
+      order: { id: string; orderNumber: string } | null;
+    }>;
+    total: number;
+  }>;
+  loyaltyImportState(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyMarkImported(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyImport(a: {
+    customerId: string;
+    markDone?: boolean;
+    rows: Array<{
+      id: string;
+      orderId?: string | null;
+      type: string;
+      points: number;
+      description?: string | null;
+      expiresAt?: number | null;
+      createdAt: number;
+    }>;
+  }): Promise<{ inserted: number; skipped: number; newBalance: number; disabled?: true }>;
   /** WalletService.applyEntry on the DO (Ruling WALLET-GL-1): ledger row + balance + GL in one section. */
   walletEntry(
     a: {
@@ -639,6 +747,49 @@ export interface MoneyClient {
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** Per-store analytics counters and reads on the DO (Ruling NZ-AN-1). */
+  searchLogRecord(a: {
+    dayMs: number;
+    term: string;
+    count: number;
+    zero: number;
+    cap: number;
+  }): Promise<{ counted: boolean }>;
+  searchLogPurge(a: { cutoffMs: number }): Promise<{ deleted: number }>;
+  searchInsights(a: {
+    sinceMs: number;
+    minShown: number;
+    zeroOnly: boolean;
+    limit?: number;
+  }): Promise<{
+    totals: { searches: number; zero: number };
+    terms: Array<{
+      term: string;
+      searches: number;
+      zero_results: number;
+      last_result_count: number;
+    }>;
+  }>;
+  qrScanRecord(a: {
+    dayMs: number;
+    kind: string;
+    ref: string;
+    pruneBeforeMs?: number;
+  }): Promise<{ counted: true }>;
+  viewRecord(a: { dayMs: number; productId: string }): Promise<{ counted: true }>;
+  analyticsImportStatus(a: Record<string, never>): Promise<{
+    done: boolean;
+    batches: number;
+    tables: Record<string, { rows: number; sums: Record<string, number> }>;
+  }>;
+  analyticsImport(a: {
+    batchId: string;
+    table: string;
+    rows: Array<Record<string, unknown>>;
+  }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportFinish(a: {
+    expect: Record<string, { rows: number; sums: Record<string, number> }>;
+  }): Promise<{ done: true; tables: Record<string, number> }>;
   /** True while any indexable product still needs a vector. */
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
   /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
@@ -1085,6 +1236,17 @@ export function makeMoneyClient(
     loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+    loyaltyAward: (a, key) => call('loyaltyAward', a, key),
+    loyaltyInit: (a, key) => call('loyaltyInit', a, key),
+    loyaltyReviewBonus: (a, key) => call('loyaltyReviewBonus', a, key),
+    loyaltyCustomerPoints: a => call('loyaltyCustomerPoints', a),
+    loyaltyHistory: a => call('loyaltyHistory', a),
+    loyaltyMembers: a => call('loyaltyMembers', a),
+    loyaltyStats: a => call('loyaltyStats', a ?? {}),
+    loyaltyStoreTransactions: a => call('loyaltyStoreTransactions', a),
+    loyaltyImport: a => call('loyaltyImport', a),
+    loyaltyImportState: a => call('loyaltyImportState', a),
+    loyaltyMarkImported: a => call('loyaltyMarkImported', a),
     walletEntry: (a, key) => call('walletEntry', a, key),
     receiptCreate: a => call('receiptCreate', a),
     receiptExtraction: a => call('receiptExtraction', a),
@@ -1126,6 +1288,14 @@ export function makeMoneyClient(
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    searchLogRecord: a => call('searchLogRecord', a),
+    searchLogPurge: a => call('searchLogPurge', a),
+    searchInsights: a => call('searchInsights', a),
+    qrScanRecord: a => call('qrScanRecord', a),
+    viewRecord: a => call('viewRecord', a),
+    analyticsImportStatus: a => call('analyticsImportStatus', a),
+    analyticsImport: a => call('analyticsImport', a),
+    analyticsImportFinish: a => call('analyticsImportFinish', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),
@@ -1709,20 +1879,6 @@ export async function storeUpdateMany(
   const res = await db.store.updateMany(args);
   if (res.count > 0) await copyStoreSettings(args.where.id, args.data as Record<string, unknown>);
   return res;
-}
-
-/**
- * For a raw-SQL write to `stores` (jsonb_set on `settings`): re-read the named columns from the authoritative row and copy
- * them, so a partial JSON write reaches the DO as the whole resulting value.
- */
-export async function syncStoreFields(storeId: string, fields: string[]): Promise<void> {
-  if ((await storeRepo(storeId)).backend !== 'do') return;
-  const select = Object.fromEntries(fields.map(f => [f, true]));
-  const row = (await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select })
-  )) as Record<string, unknown> | null;
-  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
-  await copyStoreSettings(storeId, row);
 }
 
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */

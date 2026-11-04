@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
 import { matchingCustomers, type CustomerMatches } from './admin-search.service';
 export {
@@ -108,6 +109,18 @@ import {
   type CreateOrderArgs,
   type MoneyClient,
 } from '../lib/repo-factory';
+
+/**
+ * The store's `settings` + `timezone` from its own backend (NEON-ZERO-1 N-4): a Durable Object store's record is its DO, a
+ * Postgres store keeps the `withStore` read it always had. Same row, same select.
+ */
+async function readStoreSettings(storeId: string) {
+  const query = { where: { id: storeId }, select: { settings: true, timezone: true } } as const;
+  const repo = await storeRepo(storeId);
+  return repo.backend === 'do'
+    ? repo.db.store.findUnique(query)
+    : withStore(storeId, tx => tx.store.findUnique(query));
+}
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -492,12 +505,15 @@ async function attachCustomers<T extends { customerId: string | null }>(
   select: Prisma.UserSelect
 ): Promise<T[]> {
   const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
-  const users = ids.length
-    ? await prisma.user.findMany({
-        where: { id: { in: ids }, storeId },
-        select: { id: true, ...select },
-      })
-    : [];
+  const doRows = await customerRows(storeId, ids);
+  const users: Array<{ id: string }> = doRows
+    ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
+    : ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids }, storeId },
+          select: { id: true, ...select },
+        })
+      : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => ({
     ...r,
@@ -1302,12 +1318,7 @@ export class OrderService {
     // checkout path; the storefront cart/checkout mirror it for UX only.
     // Deliberately NOT applied to OrderService.createAdminOrder — merchants
     // must be able to override the minimum for phone/manual orders.
-    const storeForMinOrder = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { settings: true, timezone: true },
-      })
-    );
+    const storeForMinOrder = await readStoreSettings(storeId);
     // Ruling SHARIA-GOLD-1: a gold order is prepaid online unless the merchant allowed COD / installments.
     // The check runs here, in the request that creates the order, whatever the checkout showed.
     assertGoldPaymentAllowed({
@@ -2523,6 +2534,9 @@ export class OrderService {
           missingPersonalisation.map(i => i.productId).join(', '),
         { productIds: missingPersonalisation.map(i => i.productId) }
       );
+    // Ruling FP-2: the customer's Postgres loyalty history is in the DO ledger before the DO order operation redeems from it.
+    if (customerId && (data.pointsToRedeem ?? 0) > 0)
+      await LoyaltyService.ensureDoHistory(storeId, customerId);
     const [loyaltyOn, backorderOn, wholesale, walletOk] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'loyalty'),
       featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
@@ -2546,9 +2560,8 @@ export class OrderService {
     // A quote never refuses on it.
     let orderNotes: string | undefined = data.notes;
     // ONE primary-key read of the store row, shared by the delivery note and the per-store hold caps (QA-HOLDS-1).
-    const storeRow = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
-    );
+    // From the store's own backend (a Durable Object store's record is its DO, NEON-ZERO-1 N-4); same row, same select.
+    const storeRow = await readStoreSettings(storeId);
     if (!isQuote) {
       const leads = await (
         await storeDb(storeId)
@@ -4024,6 +4037,18 @@ export class OrderService {
     /** Who the order is priced for (Ruling B2B-2d): the Customer the merchant selected; absent = retail. */
     pricingOpts: { buyer?: BuyerIdentity } = {}
   ) {
+    // BE:S-23: a negotiated shipping fee replaces the computed one, so it is the owner's call (same roles as the coupon and MOQ
+    // overrides); staff place the order at the computed fee. The route writes the audit row.
+    if (
+      typeof data.shippingOverride === 'number' &&
+      (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+    )
+      throw new AppError(
+        403,
+        'SHIPPING_OVERRIDE_FORBIDDEN',
+        'Only a store admin can set a custom shipping fee on an order'
+      );
+
     await assertOrderAllowed(storeId);
     if (data.items.length === 0) {
       throw new AppError(400, 'NO_ITEMS', 'Order must have at least one item');
@@ -4035,10 +4060,14 @@ export class OrderService {
     // fabricated order and their name + email read back through the order
     // detail include. Validate it the same way.
     if (data.customerId) {
-      const customer = await prisma.user.findFirst({
-        where: { id: data.customerId, storeId, role: 'customer' },
-        select: { id: true, status: true, deletedAt: true },
-      });
+      const doCustomer = await customerRow(storeId, data.customerId);
+      const customer =
+        doCustomer !== undefined
+          ? doCustomer
+          : await prisma.user.findFirst({
+              where: { id: data.customerId, storeId, role: 'customer' },
+              select: { id: true, status: true, deletedAt: true },
+            });
       if (!customer) {
         throw new AppError(404, 'NOT_FOUND', 'Customer not found for this store');
       }

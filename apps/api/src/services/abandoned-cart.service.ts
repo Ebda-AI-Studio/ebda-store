@@ -10,6 +10,7 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import {
   prisma,
   acrossStoresFlat,
@@ -937,12 +938,14 @@ async function doRecoveredRevenue(db: StoreReads, storeId: string): Promise<numb
 /** `AbandonedCart.customer` (a platform `User`) for rows read from a DO. */
 async function withCustomers<T extends { customerId: string | null }>(storeId: string, rows: T[]) {
   const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
-  const users = ids.length
-    ? await prisma.user.findMany({
-        where: { id: { in: ids }, storeId },
-        select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-      })
-    : [];
+  const users =
+    (await customerRows(storeId, ids)) ??
+    (ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids }, storeId },
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+        })
+      : []);
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => ({
     ...r,

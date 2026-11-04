@@ -36,6 +36,7 @@ import {
 } from '../middleware/security';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
+import { customerAuthRoute } from '../lib/customer-auth';
 import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
@@ -801,7 +802,9 @@ router.post(
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await AuthService.revokeAllSessions(req.user!.userId);
+      await AuthService.revokeAllSessions(req.user!.userId, 'revoke_all', {
+        storeId: req.user!.storeId,
+      });
       clearSessionCookies(res);
       res.json({
         success: true,
@@ -820,7 +823,7 @@ router.get(
   rejectAdminOnMerchantOrigin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const user = await AuthService.getProfile(req.user!.userId);
+      const user = await AuthService.getProfile(req.user!.userId, { storeId: req.user!.storeId });
 
       res.json({
         success: true,
@@ -847,8 +850,30 @@ router.delete(
 
       // An identity-service account is deactivated THERE first (every session and refresh dies, sign-in is refused); if that
       // fails nothing has changed and the request fails.
-      if (await isIdentityManagedUser(userId))
+      if (req.user!.role !== 'customer' && (await isIdentityManagedUser(userId)))
         await setAccountStatus(userId, 'inactive', 'self-delete');
+
+      // N-9: a customer served by the StoreDO is deactivated there (soft-delete + immediate revocation in one section).
+      const delRoute = await customerAuthRoute(req.user!.storeId, { write: true });
+      if (delRoute.kind === 'do') {
+        const r = await delRoute.client.call<{ tokenVersion: number; phone: string | null }>(
+          'softDelete',
+          { userId }
+        );
+        await redis.setUserTokenVersion(userId, r.tokenVersion).catch(() => undefined);
+        await revokeForAccount(delRoute.client.storeId, userId, r.phone);
+        await auditLog({
+          action: 'user.account.deleted',
+          userId,
+          resourceType: 'user',
+          resourceId: userId,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        clearSessionCookies(res);
+        res.json({ success: true, data: { message: 'Account deleted successfully' } });
+        return;
+      }
 
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
       const before = await withUser(userId, tx =>
@@ -902,7 +927,10 @@ router.post(
       const userId = req.user!.userId;
 
       // The shopper's OWN erasure spans every store (Ruling W-7).
-      const outcome = await AuthService.eraseAccount(userId, { actorId: userId });
+      const outcome = await AuthService.eraseAccount(userId, {
+        actorId: userId,
+        storeHint: req.user!.storeId,
+      });
 
       // #1880: record what the merchant-CRM scrub did, so a self-service
       // erasure that left the CRM copy behind is queryable in the audit log.
@@ -952,7 +980,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
-      const bundle = await AuthService.exportAccount(userId);
+      const bundle = await AuthService.exportAccount(userId, req.user!.storeId);
 
       await auditLog({
         action: 'user.data.exported',
@@ -999,7 +1027,9 @@ router.put(
       });
 
       const data = updateSchema.parse(req.body);
-      const user = await AuthService.updateProfile(req.user!.userId, data);
+      const user = await AuthService.updateProfile(req.user!.userId, data, {
+        storeId: req.user!.storeId,
+      });
 
       res.json({
         success: true,
@@ -1033,7 +1063,9 @@ router.post(
       });
 
       const data = changePasswordSchema.parse(req.body);
-      await AuthService.changePassword(req.user!.userId, data.currentPassword, data.newPassword);
+      await AuthService.changePassword(req.user!.userId, data.currentPassword, data.newPassword, {
+        storeId: req.user!.storeId,
+      });
 
       res.json({
         success: true,
@@ -1167,10 +1199,13 @@ router.post(
         return;
       }
 
-      // A reset token is 32 random bytes as 64 lowercase hex chars. Anything else
+      // A reset token is 32 random bytes as 64 lowercase hex chars, with `<storeId>~` in front for a StoreDO store (N-9). Anything else
       // (an object, an array, a truncated paste) is answered exactly like an
       // unknown token, never as a distinct error and never as a 500.
-      if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) {
+      if (
+        typeof token !== 'string' ||
+        !/^([A-Za-z0-9][A-Za-z0-9._:-]{0,127}~)?[0-9a-f]{64}$/.test(token)
+      ) {
         throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
       }
 
@@ -1213,9 +1248,10 @@ router.post(
   verifyEmailLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { token } = req.body;
+      // BE:S-16: a non-string token (object / number / array) reached `verifyEmail` and answered 500. It is a 400 now.
+      const token: unknown = req.body?.token;
 
-      if (!token) {
+      if (typeof token !== 'string' || token.length === 0 || token.length > 512) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Verification token is required' },

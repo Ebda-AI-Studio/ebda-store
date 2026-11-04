@@ -3,7 +3,8 @@
  * its one-time-code mail through the Store's platform mailer. Called over Service Binding RPC (cf/identity-rpc in
  * worker.ts), never over HTTP. Token contract: business/ebda/plans/2026-10-24-ebda-identity-token-contract.md.
  */
-import { withUser } from '@ebda/database';
+import { prisma, withUser } from '@ebda/database';
+import { liveStoreIdsD1, onAccessD1 } from '../services/platform/access-d1';
 import { config } from '../config';
 import { lookupStore, ownedStoreIds } from './definer';
 import {
@@ -24,6 +25,23 @@ const STAFF: StoreRole = 'staff';
 /** owner = Store.ownerId (live stores), staff = a StoreStaff row on a live store. An owner is never listed twice. */
 export async function storesForUser(userId: string): Promise<StoreClaim[]> {
   if (!UUID_RE.test(userId)) throw new Error('storesForUser: userId must be a UUID');
+  // NEON-ZERO-1 (N-6): after the `access` cutover membership AND the live-store check are D1 (no Postgres scope, no relation).
+  if (await onAccessD1()) {
+    const owned = await ownedStoreIds(userId);
+    const staff = await prisma.storeStaff.findMany({
+      where: { userId },
+      select: { storeId: true },
+    });
+    const live = await liveStoreIdsD1(staff.map((s: { storeId: string }) => s.storeId));
+    const out: StoreClaim[] = owned.map(id => ({ id, role: OWNER }));
+    const seen = new Set(owned);
+    for (const s of staff as Array<{ storeId: string }>) {
+      if (seen.has(s.storeId) || !live.has(s.storeId)) continue;
+      seen.add(s.storeId);
+      out.push({ id: s.storeId, role: STAFF });
+    }
+    return out;
+  }
   return withUser(userId, async tx => {
     const owned = await ownedStoreIds(userId);
     const staff = await tx.storeStaff.findMany({

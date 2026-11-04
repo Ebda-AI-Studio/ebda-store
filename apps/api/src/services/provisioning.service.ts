@@ -32,7 +32,13 @@ import {
   defaultNewStoreLook,
   isBuiltSkin,
 } from '@ebda/shared';
-import { storeDb, storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
+import {
+  finishDoStoreCreate,
+  insertDoStore,
+  rollbackDoStore,
+  storeCreateOnDo,
+} from '../lib/store-create-do';
 
 // ==========================================
 // Store Provisioning Service
@@ -58,6 +64,8 @@ export interface ProvisionStoreInput {
   growthTrial?: boolean;
   /** Self-serve only: the plan + interval chosen at signup, billed at trial end. */
   trialChoice?: TrialChoice;
+  /** D1 path only: atomic plan gate (the owner's store allowance; null/absent = unlimited). */
+  maxOwnedStores?: number | null;
   /** Initial storefront skin: must be one a BUILT look renders with. Defaults to the registry default (Qamar). */
   template?: string;
   storeNameAr?: string;
@@ -173,6 +181,93 @@ export class ProvisioningService {
     // Hash password before entering transaction
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
+    // N-18 (Ruling NZ-D11): on D1 + the Durable Object the store has NO Postgres row. The owner is identity (Postgres until the
+    // identity track), so only the owner is found-or-created in a Postgres transaction; the store, its subscription / trial, VAT
+    // rate, COD config, chart of accounts and default category are D1 + DO writes (lib/store-create-do.ts).
+    const onDo = storeCreateOnDo();
+    const provisionOnDo = async () => {
+      const nameParts = ownerName.trim().split(' ');
+      // The owner is found-or-created in a Postgres transaction that stays OPEN until the D1 + DO create succeeded: a failed create
+      // rolls the owner back too (a retry is then a fresh account that gets its temporary password), as on the single-transaction
+      // Postgres path. If the COMMIT itself fails after the store exists, the store is rolled back (below).
+      let finished: string | undefined;
+      try {
+        return await withMoneyTx(prisma, async tx => {
+          const owner = await ensureAdminUser(
+            {
+              email: ownerEmail,
+              passwordHash,
+              firstName: nameParts[0],
+              lastName: nameParts.slice(1).join(' ') || '',
+              role: 'store_admin',
+              emailVerified: false,
+            },
+            tx
+          );
+          const { timezone: requestedZone, ...settingsRest } = settings ?? {};
+          const id = await insertDoStore({
+            name: storeName,
+            nameAr: storeNameAr ?? null,
+            slug,
+            domain: domain ?? null,
+            domainProvider: input.domainProvider ?? null,
+            ownerId: owner.id,
+            status,
+            plan,
+            template,
+            ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
+            settings: {
+              theme: settingsRest.theme || 'default',
+              currency: settingsRest.currency || REGION.currency,
+              ...settingsRest,
+              defaultLanguage:
+                (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                REGION.defaultLocale,
+            },
+            theme: {},
+            layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
+            vatRateHundredths: REGION.defaultVatBps,
+            trial: input.growthTrial ? { choice: input.trialChoice } : undefined,
+            maxOwnedStores: input.maxOwnedStores ?? null,
+            cod: {
+              name: 'Cash on Delivery',
+              nameAr: 'الدفع عند الاستلام',
+              currency: REGION.currency,
+            },
+          });
+          const created = await finishDoStoreCreate(id, {
+            slug,
+            domain: domain ?? null,
+            extra: async () => {
+              await (
+                await storeWriter(id)
+              ).category.create({
+                data: {
+                  storeId: id,
+                  name: 'Products',
+                  // BE:F-5: Arabic-default storefronts showed the English name for the default category.
+                  nameAr: 'المنتجات',
+                  slug: 'products',
+                  description: 'All products',
+                  descriptionAr: 'كل المنتجات',
+                  position: 0,
+                },
+              });
+            },
+          });
+          finished = id;
+          return {
+            store: created as { id: string; name: string; slug: string; domain: string | null },
+            owner,
+            isNewUser: owner.created,
+          };
+        });
+      } catch (e) {
+        if (finished) await rollbackDoStore(finished, 'owner-commit');
+        throw e;
+      }
+    };
+
     let result;
     try {
       // Create store, owner, and default category in a single transaction.
@@ -181,127 +276,132 @@ export class ProvisioningService {
       // it cannot start inside runInTenantContext: it creates the owner and the
       // store first, then switches its own transaction to the new store with a
       // transaction-local set_config before touching the tenant tables.
-      result = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-        // Find-or-create the owner in the ADMIN namespace (users.store_id NULL).
-        // Admin accounts are not visible from a store scope and the store does
-        // not exist yet, so this is the `ebda_admin_user_ensure` definer, run on
-        // THIS transaction (it is just a function call). An existing account is
-        // used as is, whatever its role, exactly as before.
-        const nameParts = ownerName.trim().split(' ');
-        const owner = await ensureAdminUser(
-          {
-            email: ownerEmail,
-            passwordHash,
-            firstName: nameParts[0],
-            lastName: nameParts.slice(1).join(' ') || '',
-            role: 'store_admin',
-            emailVerified: false,
-          },
-          tx
-        );
-        const isNewUser = owner.created;
-
-        // `timezone` governs the store's tax periods (Ruling FRT-2), so it goes
-        // to the `stores.timezone` COLUMN — validated, else the column default.
-        // It is deliberately NOT copied into the `settings` JSON, where no
-        // code reads it (issue 2412).
-        const { timezone: requestedZone, ...settingsRest } = settings ?? {};
-        // The store row is inserted AS ITS OWNER: the `stores` policy's WITH CHECK and the
-        // code-level tenant guard (R-EBDA-003) both admit a new store only when `owner_id`
-        // is the acting user. No caller can supply that scope (self-serve onboarding runs
-        // with no tenant context; super-admin provisioning acts as the operator, not as the
-        // new owner), so the transaction binds it itself, to the owner it just resolved.
-        const store = await scopeTransaction(tx, { userId: owner.id }, () =>
-          tx.store.create({
-            data: {
-              name: storeName,
-              slug,
-              domain,
-              // Operator-assigned (super_admin) domains are trusted: active at once.
-              ...(domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
-              domainProvider: input.domainProvider ?? null,
-              ...(storeNameAr ? { nameAr: storeNameAr } : {}),
-              ownerId: owner.id,
-              status,
-              template: template as StoreTemplate,
-              // A new store starts with NO trust strip: `items: []` marks the
-              // strip merchant-owned (empty = hidden). Stores that predate this
-              // have no `items` key and keep the fixed defaults (see
-              // TrustStripSettings.items). No migration needed.
-              layoutSettings: NEW_STORE_LAYOUT_SETTINGS,
-              plan,
-              ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
-              settings: {
-                theme: settingsRest.theme || 'default',
-                currency: settingsRest.currency || REGION.currency,
-                ...settingsRest,
-                // Arabic-first unless the caller said otherwise (spread above wins if present).
-                defaultLanguage:
-                  (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
-                  REGION.defaultLocale,
+      result = onDo
+        ? await provisionOnDo()
+        : await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+            // Find-or-create the owner in the ADMIN namespace (users.store_id NULL).
+            // Admin accounts are not visible from a store scope and the store does
+            // not exist yet, so this is the `ebda_admin_user_ensure` definer, run on
+            // THIS transaction (it is just a function call). An existing account is
+            // used as is, whatever its role, exactly as before.
+            const nameParts = ownerName.trim().split(' ');
+            const owner = await ensureAdminUser(
+              {
+                email: ownerEmail,
+                passwordHash,
+                firstName: nameParts[0],
+                lastName: nameParts.slice(1).join(' ') || '',
+                role: 'store_admin',
+                emailVerified: false,
               },
-            },
-          })
-        );
+              tx
+            );
+            const isNewUser = owner.created;
 
-        // The store exists now: from here the transaction acts as it, so the rows
-        // below satisfy the strict store policies (set_config, transaction-local) and
-        // the code-level tenant guard sees the store (`scopeTransaction`).
-        return scopeTransaction(tx, { storeId: store.id, userId: owner.id }, async () => {
-          // Subscription row for the plan the operator chose (SP5 plans engine).
-          // Super-admin provisioning is platform-controlled, so a custom domain
-          // here is NOT plan-gated (the operator is assigning the plan).
-          await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
-          if (input.growthTrial) await startSignupTrial(tx, store.id, input.trialChoice);
+            // `timezone` governs the store's tax periods (Ruling FRT-2), so it goes
+            // to the `stores.timezone` COLUMN — validated, else the column default.
+            // It is deliberately NOT copied into the `settings` JSON, where no
+            // code reads it (issue 2412).
+            const { timezone: requestedZone, ...settingsRest } = settings ?? {};
+            // The store row is inserted AS ITS OWNER: the `stores` policy's WITH CHECK and the
+            // code-level tenant guard (R-EBDA-003) both admit a new store only when `owner_id`
+            // is the acting user. No caller can supply that scope (self-serve onboarding runs
+            // with no tenant context; super-admin provisioning acts as the operator, not as the
+            // new owner), so the transaction binds it itself, to the owner it just resolved.
+            const store = await scopeTransaction(tx, { userId: owner.id }, () =>
+              tx.store.create({
+                data: {
+                  name: storeName,
+                  slug,
+                  domain,
+                  // Operator-assigned (super_admin) domains are trusted: active at once.
+                  ...(domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
+                  domainProvider: input.domainProvider ?? null,
+                  ...(storeNameAr ? { nameAr: storeNameAr } : {}),
+                  ownerId: owner.id,
+                  status,
+                  template: template as StoreTemplate,
+                  // A new store starts with NO trust strip: `items: []` marks the
+                  // strip merchant-owned (empty = hidden). Stores that predate this
+                  // have no `items` key and keep the fixed defaults (see
+                  // TrustStripSettings.items). No migration needed.
+                  layoutSettings: NEW_STORE_LAYOUT_SETTINGS,
+                  plan,
+                  ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
+                  settings: {
+                    theme: settingsRest.theme || 'default',
+                    currency: settingsRest.currency || REGION.currency,
+                    ...settingsRest,
+                    // Arabic-first unless the caller said otherwise (spread above wins if present).
+                    defaultLanguage:
+                      (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                      REGION.defaultLocale,
+                  },
+                },
+              })
+            );
 
-          // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an
-          // INACTIVE editable rate: a new store starts with VAT OFF and no active
-          // rate (ruling TAX-2). It is activated after the store's VAT
-          // registration is verified by a super-admin.
-          await tx.taxRate.create({
-            data: {
-              storeId: store.id,
-              name: 'VAT',
-              nameAr: 'ضريبة القيمة المضافة',
-              rate: REGION.defaultVatBps / 100,
-              isActive: false,
-            },
+            // The store exists now: from here the transaction acts as it, so the rows
+            // below satisfy the strict store policies (set_config, transaction-local) and
+            // the code-level tenant guard sees the store (`scopeTransaction`).
+            return scopeTransaction(tx, { storeId: store.id, userId: owner.id }, async () => {
+              // Subscription row for the plan the operator chose (SP5 plans engine).
+              // Super-admin provisioning is platform-controlled, so a custom domain
+              // here is NOT plan-gated (the operator is assigning the plan).
+              await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+              if (input.growthTrial) await startSignupTrial(tx, store.id, input.trialChoice);
+
+              // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an
+              // INACTIVE editable rate: a new store starts with VAT OFF and no active
+              // rate (ruling TAX-2). It is activated after the store's VAT
+              // registration is verified by a super-admin.
+              await tx.taxRate.create({
+                data: {
+                  storeId: store.id,
+                  name: 'VAT',
+                  nameAr: 'ضريبة القيمة المضافة',
+                  rate: REGION.defaultVatBps / 100,
+                  isActive: false,
+                },
+              });
+
+              // Create default category
+              await tx.category.create({
+                data: {
+                  storeId: store.id,
+                  name: 'Products',
+                  // BE:F-5: Arabic-default storefronts showed the English name for the default category.
+                  nameAr: 'المنتجات',
+                  slug: 'products',
+                  description: 'All products',
+                  descriptionAr: 'كل المنتجات',
+                  position: 0,
+                },
+              });
+
+              // Provision Cash on Delivery as the default payment method.
+              // Without this row the storefront's POST /payments/create returns 400
+              // (COD_NOT_AVAILABLE) and customers can't check out — even though the
+              // UI offers COD by default. Store owners can disable / configure a fee
+              // later via /admin/payment-settings.
+              await tx.paymentConfig.create({
+                data: {
+                  storeId: store.id,
+                  provider: 'cod',
+                  isEnabled: true,
+                  displayName: 'Cash on Delivery',
+                  displayNameAr: 'الدفع عند الاستلام',
+                  testMode: false,
+                  supportedMethods: ['cod'],
+                  supportedCurrencies: [REGION.currency],
+                  fixedFee: 0,
+                  percentageFee: 0,
+                },
+              });
+
+              return { store, owner, isNewUser };
+            });
           });
-
-          // Create default category
-          await tx.category.create({
-            data: {
-              storeId: store.id,
-              name: 'Products',
-              slug: 'products',
-              description: 'All products',
-              position: 0,
-            },
-          });
-
-          // Provision Cash on Delivery as the default payment method.
-          // Without this row the storefront's POST /payments/create returns 400
-          // (COD_NOT_AVAILABLE) and customers can't check out — even though the
-          // UI offers COD by default. Store owners can disable / configure a fee
-          // later via /admin/payment-settings.
-          await tx.paymentConfig.create({
-            data: {
-              storeId: store.id,
-              provider: 'cod',
-              isEnabled: true,
-              displayName: 'Cash on Delivery',
-              displayNameAr: 'الدفع عند الاستلام',
-              testMode: false,
-              supportedMethods: ['cod'],
-              supportedCurrencies: [REGION.currency],
-              fixedFee: 0,
-              percentageFee: 0,
-            },
-          });
-
-          return { store, owner, isNewUser };
-        });
-      });
 
       // Transaction committed — disarm the domain rollback so a successful
       // provision is never undone by a downstream error (e.g. welcome email
@@ -328,7 +428,7 @@ export class ProvisioningService {
 
     // Hotfix N-22: lookups read D1, so the committed store must be mirrored there or it 404s. A failure is loud (the store
     // exists in Postgres; the retry of the idempotent mirror converges).
-    await syncStoreDirectoryFromPg(result.store.id);
+    if (!onDo) await syncStoreDirectoryFromPg(result.store.id);
 
     // Self-serve (signup trial): start the lifecycle-emails run (setup nudges, trial recap). The
     // transaction has committed; an enqueue failure is logged, never fails the provisioning.

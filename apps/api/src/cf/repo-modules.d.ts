@@ -123,6 +123,23 @@ declare module '@ebda-src/repo' {
   export function ensureSearchIndex(db: SyncSql): void;
   export function ensurePaymentSchema(db: SyncSql): void;
   export function purgeErasureLedger(db: SyncSql, now?: number): number;
+  /** Storefront customer auth on the StoreDO (N-9; rpc/customer-auth.ts). */
+  export interface PasswordVerifier {
+    compare(plain: string, hash: string): Promise<boolean>;
+    dummyHash: string;
+  }
+  export type AuthAnswer =
+    | { ok: true; json: string }
+    | { ok: false; code: string; status: number; message: string };
+  export function answerAuthOp(
+    db: SyncSql,
+    v: PasswordVerifier,
+    op: string,
+    argsJson: string
+  ): Promise<AuthAnswer>;
+  export const AUTH_OP_NAMES: readonly string[];
+  export function ensureCustomerAuthSchema(db: SyncSql): void;
+  export function purgeCustomerAuth(db: SyncSql, now?: number): number;
   export function scrubReceiptsForOrders(
     db: SyncSql,
     a: { orderIds: string[]; now?: number }
@@ -230,6 +247,17 @@ declare module '@ebda-src/repo' {
     meta: Meta,
     storeId: string,
     fields: Record<string, unknown>
+  ): { profile: string[]; config: string[]; directoryOnly: string[] };
+  export function bootstrapStoreRows(
+    sql: SqlRunner,
+    meta: Meta,
+    storeId: string,
+    input: {
+      identity: { name: string; slug: string; ownerId: string };
+      fields: Record<string, unknown>;
+      vat?: { id: string; name: string; nameAr: string; rate: number };
+      cod?: { id: string; name: string; nameAr: string; currency: string };
+    }
   ): { profile: string[]; config: string[]; directoryOnly: string[] };
   export type StockAnswer =
     | { ok: true; json: string }

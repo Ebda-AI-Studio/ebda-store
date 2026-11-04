@@ -8,6 +8,8 @@
  */
 import { withStore, withUser } from '@ebda/database';
 import { storesForUser } from './identity-directory';
+import { getAccountsBrief } from './identity-client';
+import { gateRead, inAccessScope, onAccessD1 } from '../services/platform/access-d1';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MEMBERS = 500;
@@ -48,6 +50,7 @@ export async function listStoreMembers(
 ): Promise<{ items: StoreMember[] }> {
   assertUuid(storeId, asUserId);
   if ((await memberRole(storeId, asUserId)) !== OWNER) throw new Error('FORBIDDEN');
+  if (await onAccessD1()) return listStoreMembersD1(storeId, asUserId);
   const [owner, storeRow, staff] = await Promise.all([
     withUser(asUserId, tx =>
       tx.user.findUnique({
@@ -86,6 +89,45 @@ export async function listStoreMembers(
       displayName: name(s.user),
       role: STAFF,
       addedAt: s.createdAt.toISOString(),
+    });
+  }
+  return { items };
+}
+
+/** The same list after the `access` cutover: memberships from D1, display facts from the identity service in one call. */
+async function listStoreMembersD1(
+  storeId: string,
+  asUserId: string
+): Promise<{ items: StoreMember[] }> {
+  const rows = (await inAccessScope(storeId, tx =>
+    tx.storeStaff.findMany({
+      where: { storeId },
+      select: { userId: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+      take: MAX_MEMBERS,
+    })
+  )) as Array<{ userId: string; createdAt: Date }>;
+  const briefs = new Map(
+    (await getAccountsBrief([asUserId, ...rows.map(r => r.userId)])).map(b => [b.id, b])
+  );
+  const gate = await gateRead(storeId, null);
+  const items: StoreMember[] = [];
+  const owner = briefs.get(asUserId);
+  if (owner && gate)
+    items.push({
+      userId: asUserId,
+      displayName: name(owner),
+      role: OWNER,
+      addedAt: (gate.store.createdAt ?? new Date(0)).toISOString(),
+    });
+  for (const r of rows) {
+    const b = briefs.get(r.userId);
+    if (!b || b.status !== 'active' || r.userId === asUserId) continue;
+    items.push({
+      userId: r.userId,
+      displayName: name(b),
+      role: STAFF,
+      addedAt: r.createdAt.toISOString(),
     });
   }
   return { items };

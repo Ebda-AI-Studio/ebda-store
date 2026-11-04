@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { z } from 'zod/v3';
 import { storeDb, storeRepo } from '../lib/repo-factory';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { shippingCarrierRouteContext } from '../middleware/tenant-context';
 import { requireFeature } from '../middleware/feature-gate';
@@ -205,6 +206,7 @@ router.get(
 router.put(
   '/:storeId/shipping-carriers/configs/:carrier',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, carrier } = req.params;
@@ -298,6 +300,7 @@ router.put(
 router.delete(
   '/:storeId/shipping-carriers/configs/:carrier',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, carrier } = req.params;
@@ -639,6 +642,7 @@ router.post(
 router.post(
   '/:storeId/shipping-carriers/webhook-secret/:carrier/rotate',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, carrier } = req.params;
@@ -761,9 +765,12 @@ router.get(
         const o = shipment.order as unknown as Record<string, unknown> | null;
         const customerId = o?.customerId as string | null | undefined;
         if (o) {
-          o.customer = customerId
-            ? await prisma.user.findFirst({ where: { id: customerId }, select: customerSelect })
-            : null;
+          const doCustomer = customerId ? await customerRow(storeId, customerId) : undefined;
+          o.customer = !customerId
+            ? null
+            : doCustomer !== undefined
+              ? doCustomer
+              : await prisma.user.findFirst({ where: { id: customerId }, select: customerSelect });
           delete o.customerId;
         }
       }

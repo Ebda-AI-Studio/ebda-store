@@ -15,6 +15,7 @@ import { planService } from '../../apps/api/src/services/plan.service';
 import { productVelocityResponseSchema } from '../../packages/shared/src/schemas/analytics';
 
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };
     next();

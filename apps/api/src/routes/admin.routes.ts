@@ -1,4 +1,7 @@
 import { revokeForAccount } from '../lib/wa/consent';
+import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
+import { platformFamilyOnD1 } from '../services/platform/cutover';
+import { customerAuthRoute } from '../lib/customer-auth';
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -61,6 +64,7 @@ import {
   asPlatformOperator,
   currentTenantGucs,
   currentStoreId,
+  storeDirectory,
   Prisma,
   UserRole,
   ProductStatus,
@@ -78,10 +82,12 @@ import {
 } from '@ebda/shared';
 import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
+import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 import { referralSignupCounts } from '../services/lifecycle-emails.service';
 import { storeUpdate } from '../lib/repo-factory';
+import { toSafeStoreResponse } from '../lib/store-response';
 
 const router = Router();
 
@@ -138,6 +144,24 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * none given = every store; a malformed id matches no store (as before, an
  * empty page rather than an error).
  */
+/**
+ * BE:E-4: the super-admin pages fan out one short tenant transaction per store. That is O(stores) per request and was
+ * unbounded; past a few hundred stores a page would sit behind hundreds of sequential-ish transactions. Every fan-out below
+ * now takes its store list through this guard: at most SUPER_ADMIN_FANOUT_CAP stores per request, with a warning when the
+ * list is cut. RESIDUAL (Ruling FP-7): beyond the cap the totals cover the first CAP stores by id; a cursor/rollup table is the
+ * real fix and is a platform decision. Cost if wrong: a platform with more stores than the cap sees partial super-admin totals.
+ */
+export const SUPER_ADMIN_FANOUT_CAP = 500;
+export async function boundedFanoutStoreIds(ids?: string[]): Promise<string[]> {
+  const all = ids ?? (await storeDirectory()).map(s => s.id);
+  if (all.length <= SUPER_ADMIN_FANOUT_CAP) return all;
+  logger.warn(
+    { stores: all.length, cap: SUPER_ADMIN_FANOUT_CAP },
+    '[admin] cross-store fan-out truncated to the cap'
+  );
+  return all.slice(0, SUPER_ADMIN_FANOUT_CAP);
+}
+
 function storeIdsFromFilter(storeId: unknown): string[] | undefined {
   if (!storeId) return undefined;
   return UUID_RE.test(String(storeId)) ? [String(storeId)] : [];
@@ -263,7 +287,12 @@ router.get(
           });
           return;
         }
-        // Fetch the actual store rows for these ids
+        // Fetch the actual store rows for these ids. After the `access` cutover the Postgres `stores` policy (which reads the
+        // emptied Postgres membership) would show a staff member added after the flip an EMPTY list, so the rows come from D1.
+        if (await onAccessD1()) {
+          res.json({ success: true, data: { stores: await storeBriefsD1(storeIds) } });
+          return;
+        }
         const stores = await prisma.store.findMany({
           where: { id: { in: storeIds } },
           select: { id: true, name: true, nameAr: true, logo: true, slug: true, status: true },
@@ -341,13 +370,15 @@ router.get(
 
       res.json({
         success: true,
-        data: { store, stats },
+        data: { store: toSafeStoreResponse(store), stats },
       });
     } catch (error) {
       next(error);
     }
   }
 );
+
+const adminStoreStatusBody = z.object({ status: z.enum(['active', 'inactive', 'suspended']) });
 
 /**
  * PATCH /admin/stores/:id/status
@@ -359,15 +390,16 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { status } = req.body;
-
-      if (!['active', 'inactive', 'suspended'].includes(status)) {
+      // BE:S-15: shape-checked, so a non-object body is the same 400.
+      const parsedStatus = adminStoreStatusBody.safeParse(req.body);
+      if (!parsedStatus.success) {
         res.status(400).json({
           success: false,
           error: { code: 'INVALID_STATUS', message: 'Invalid status' },
         });
         return;
       }
+      const { status } = parsedStatus.data;
 
       const store = await ProvisioningService.updateStoreStatus(id, status);
 
@@ -383,7 +415,7 @@ router.patch(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -852,7 +884,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1126,6 +1158,49 @@ router.put(
         return;
       }
 
+      // N-9: a customer of a store served by its StoreDO lives THERE (its Postgres row is a stale copy). Status goes to the DO,
+      // where it revokes every session in the same section; every other field would only edit the stale copy, so it is refused.
+      if (existing.role === 'customer' && existing.storeId) {
+        const doRoute = await customerAuthRoute(existing.storeId, { write: true });
+        if (doRoute.kind === 'do') {
+          const other = Object.keys(data).filter(
+            k => k !== 'status' && (data as never)[k] !== undefined
+          );
+          if (other.length > 0) {
+            res.status(409).json({
+              success: false,
+              error: {
+                code: 'CUSTOMER_ON_STORE_DO',
+                message:
+                  'This customer is served by its store: only the status can be changed here (it signs them out at once).',
+              },
+            });
+            return;
+          }
+          if (data.status !== undefined) {
+            await AuthService.setCustomerStatusOnDo(id, existing.storeId, data.status);
+            await auditLog({
+              action: 'user.updated',
+              userId: req.user!.userId,
+              resourceType: 'user',
+              resourceId: id,
+              details: {
+                changedFields: 'status',
+                transitions: { status: { from: existing.status, to: data.status } },
+                backend: 'store-do',
+              },
+              ip: req.ip,
+              userAgent: req.headers['user-agent'],
+            });
+          }
+          const profile = await doRoute.client.call<Record<string, unknown> | null>('getProfile', {
+            userId: id,
+          });
+          res.json({ success: true, data: { user: profile } });
+          return;
+        }
+      }
+
       // Merchant, staff and super-admin accounts (users.store_id NULL) keep their credentials, email, role and status in the
       // shared identity service (Rulings ID-1/ID-2). The Store refuses to edit a credential or an email here (it would only
       // change a profile row the identity service ignores); status and role go to the identity service first.
@@ -1358,9 +1433,35 @@ router.delete(
         return;
       }
 
+      // N-9: a customer served by its StoreDO is erased there (store rows + auth rows + sessions), not hard-deleted from the stale
+      // Postgres copy, which would leave the live account signing in.
+      if (target.role === 'customer' && target.storeId) {
+        const doRoute = await customerAuthRoute(target.storeId, { write: true });
+        if (doRoute.kind === 'do') {
+          await AuthService.eraseAccount(id, {
+            actorId: req.user!.userId,
+            storeHint: target.storeId,
+          });
+          await auditLog({
+            action: 'user.deleted',
+            userId: req.user!.userId,
+            resourceType: 'user',
+            resourceId: id,
+            details: { email: target.email, role: target.role, backend: 'store-do' },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+          res.json({ success: true, data: { message: 'User deleted' } });
+          return;
+        }
+      }
+
       // The identity is erased FIRST: its sessions, refresh tokens and passkeys go with it, so no token of this user can be
       // honoured again and the Store cannot re-create the profile row from it. If this fails the user still exists everywhere.
       if (target.storeId === null && target.role !== 'customer') await eraseIdentityUser(id);
+      // After the `access` cutover the Postgres FK cascade no longer reaches the membership rows (they live in D1): an erased
+      // user would keep holding a staff seat. Idempotent and verified; a failure stops here, before the Postgres delete.
+      if (await onAccessD1()) await eraseUserAccess(id, target.email);
 
       // WA-CONSENT-1: withdraw the account's WhatsApp marketing consent before the hard delete.
       const doomed = await asPlatformOperator(req.user!.userId, () =>
@@ -1424,7 +1525,7 @@ router.get(
       // aggregate is assembled store by store (`acrossStores`: one short tenant
       // transaction per store) and merged here. A store admin's dashboard spans
       // only the stores they own.
-      const dashboardStoreIds = await ownedStoreIds(ownerScope);
+      const dashboardStoreIds = await boundedFanoutStoreIds(await ownedStoreIds(ownerScope));
       const [storeCount, userCount, orderTotals, recentStores, recentOrdersPage] =
         await Promise.all([
           prisma.store.count({ where: storeFilter }),
@@ -1861,7 +1962,7 @@ router.get(
       // aiUsage has RLS: aggregate store by store (`acrossStores`, one short tenant
       // transaction each) and merge the per-store partials.
       const result = await (async () => {
-        const perStore = await acrossStores(async storeId => {
+        const perStoreFn = async (storeId: string) => {
           const [today, month, cached] = await Promise.all([
             prisma.aiUsage.count({
               where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
@@ -1873,42 +1974,42 @@ router.get(
               where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: true },
             }),
           ]);
-          // Per-store aggregations: today count, month count, last call, feature breakdown
-          const stats = await prisma.$queryRaw<
-            Array<{
-              store_id: string;
-              today_count: bigint;
-              month_count: bigint;
-              last_call_at: Date | null;
-              feature: string;
-              feature_count: bigint;
-              month_cost_micros: bigint | null;
-              month_unpriced: bigint;
-            }>
-          >`
-          SELECT
-            store_id,
-            COUNT(*) FILTER (WHERE created_at >= ${startOfDay} AND cached_hit = false) AS today_count,
-            COUNT(*) FILTER (WHERE created_at >= ${startOfMonth} AND cached_hit = false) AS month_count,
-            MAX(created_at) AS last_call_at,
-            feature,
-            COUNT(*) AS feature_count,
-            -- Spend this month. SUM ignores NULLs, so unpriced rows do not
-            -- silently contribute 0 - they are counted separately below and
-            -- surfaced in the UI, because "no rate configured" and "free" are
-            -- different facts and folding them together makes an unpriced
-            -- deployment look free. See apps/api/src/lib/ai-pricing.ts.
-            SUM(cost_micros) FILTER (WHERE created_at >= ${startOfMonth}) AS month_cost_micros,
-            COUNT(*) FILTER (
-              WHERE created_at >= ${startOfMonth}
-                AND cached_hit = false
-                AND cost_micros IS NULL
-            ) AS month_unpriced
-          FROM ai_usage
-          GROUP BY store_id, feature
-        `;
+          // Per-store aggregations: today count, month count, last call, feature breakdown. No raw SQL (Ruling NZ-AN-1): the
+          // model router serves D1 or Postgres. SUM ignores NULLs, so unpriced rows do not silently contribute 0 - they are
+          // counted separately and surfaced in the UI ("no rate configured" and "free" are different facts; ai-pricing.ts).
+          const features = await aiUsageFeatureStats(storeId, startOfDay, startOfMonth);
+          const stats = features.map(f => ({
+            store_id: storeId,
+            today_count: f.todayCount,
+            month_count: f.monthCount,
+            last_call_at: f.lastCallAt,
+            feature: f.feature,
+            feature_count: f.featureCount,
+            month_cost_micros: f.monthCostMicros,
+            month_unpriced: f.monthUnpriced,
+          }));
           return { today, month, cached, stats };
-        });
+        };
+        const storeIdsForAi = await boundedFanoutStoreIds();
+        // `ai_usage` on D1 has no RLS: one plain pass, no Postgres transaction per store. Before the cutover it is store by store
+        // (`acrossStores`, one short tenant transaction each) because the Postgres table is strict-RLS.
+        const perStore = (await platformFamilyOnD1('ai-usage'))
+          ? await (async () => {
+              // bounded concurrency: 500 stores x 8 statements at once would queue behind D1's single writer thread
+              const out: Array<{ storeId: string; value: Awaited<ReturnType<typeof perStoreFn>> }> =
+                [];
+              let next = 0;
+              await Promise.all(
+                Array.from({ length: 6 }, async () => {
+                  while (next < storeIdsForAi.length) {
+                    const storeId = storeIdsForAi[next++];
+                    out.push({ storeId, value: await perStoreFn(storeId) });
+                  }
+                })
+              );
+              return out;
+            })()
+          : await acrossStores(perStoreFn, { storeIds: storeIdsForAi });
         const platformToday = perStore.reduce((n, p) => n + p.value.today, 0);
         const platformMonth = perStore.reduce((n, p) => n + p.value.month, 0);
         const platformCached = perStore.reduce((n, p) => n + p.value.cached, 0);
@@ -2072,8 +2173,9 @@ export async function loadUsageHistoryRows(
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
-  const perStore = await acrossStores(storeId =>
-    loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId)
+  const perStore = await acrossStores(
+    storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
+    { storeIds: await boundedFanoutStoreIds() }
   );
   const rows = perStore.flatMap(p => p.value);
   const keep = new Set(
@@ -2196,20 +2298,29 @@ const EXPORT_CHUNK_SIZE = 250;
  *   from?          – ISO date string (createdAt >=)
  *   to?            – ISO date string (createdAt <=)
  */
+const exportOrdersQuery = z.object({
+  storeId: z.string().uuid().optional(),
+  status: z.nativeEnum(OrderStatus).optional(),
+  paymentStatus: z.nativeEnum(OrderPaymentStatus).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
 router.get(
   '/export/orders',
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { storeId, status, paymentStatus, from, to } = req.query;
+      // BE:S-21: every filter is validated; an unknown status / unparseable date used to reach Prisma (or `new Date(...)`) and 500.
+      const { storeId, status, paymentStatus, from, to } = exportOrdersQuery.parse(req.query);
 
       const where: Prisma.OrderWhereInput = {};
-      if (status) where.status = status as OrderStatus;
-      if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
+      if (status) where.status = status;
+      if (paymentStatus) where.paymentStatus = paymentStatus;
       if (from || to) {
         where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from as string);
-        if (to) where.createdAt.lte = new Date(to as string);
+        if (from) where.createdAt.gte = from;
+        if (to) where.createdAt.lte = to;
       }
 
       const filename = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -2650,13 +2761,18 @@ router.get(
   }
 );
 
+const webhookReplayParams = z.object({ id: z.string().uuid() });
+const webhookReplayBody = z.object({ force: z.boolean().optional() });
+
 router.post(
   '/webhook-events/:id/replay',
   requireRole(['super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
-      const force = req.body?.force === true || req.query.force === 'true';
+      // BE:S-32: a non-uuid id / non-boolean force is a 400, not a database error.
+      const { id } = webhookReplayParams.parse(req.params);
+      const force =
+        webhookReplayBody.parse(req.body ?? {}).force === true || req.query.force === 'true';
       const row = await webhookInbox.get(id);
       if (!row) {
         res.status(404).json({

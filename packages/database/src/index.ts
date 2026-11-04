@@ -107,7 +107,7 @@ function ambientGucs(): TenantGucs | undefined {
   const tx = tenantStorage.getStore();
   if (tx) return txGucs.get(tx as object);
   const scope = storeScope.getStore();
-  return scope ? { storeId: scope.storeId } : undefined;
+  return scope ? { storeId: scope.storeId, userId: scope.userId } : undefined;
 }
 
 /**
@@ -127,9 +127,13 @@ function isScopedOp(v: unknown): v is ScopedOp {
   return Boolean(v && typeof v === 'object' && (v as Record<symbol, unknown>)[SCOPED_OP]);
 }
 
-function scopedOp(storeId: string, exec: () => Promise<unknown>): ScopedOp & Promise<unknown> {
+function scopedOp(
+  storeId: string,
+  exec: () => Promise<unknown>,
+  userId?: string
+): ScopedOp & Promise<unknown> {
   let started: Promise<unknown> | undefined;
-  const run = () => (started ??= runInTenantContext(storeId, exec));
+  const run = () => (started ??= runInTenantContext(storeId, exec, userId));
   const op = {
     [SCOPED_OP]: true as const,
     exec,
@@ -464,8 +468,10 @@ function proxiedGet(prop: string | symbol): unknown {
       const self = prisma as unknown as Record<string, unknown>;
       if (PROXIED_PRISMA_METHODS.has(prop)) {
         return (...args: unknown[]) =>
-          scopedOp(scope.storeId, () =>
-            (self[prop] as (...a: unknown[]) => Promise<unknown>)(...args)
+          scopedOp(
+            scope.storeId,
+            () => (self[prop] as (...a: unknown[]) => Promise<unknown>)(...args),
+            scope.userId
           );
       }
       const value = Reflect.get(target, prop, receiver);
@@ -475,10 +481,14 @@ function proxiedGet(prop: string | symbol): unknown {
             const v = Reflect.get(delegate, method, r);
             if (typeof v !== 'function' || typeof method !== 'string') return v;
             return (...args: unknown[]) =>
-              scopedOp(scope.storeId, () => {
-                const d = self[prop] as Record<string, (...a: unknown[]) => Promise<unknown>>;
-                return d[method](...args);
-              });
+              scopedOp(
+                scope.storeId,
+                () => {
+                  const d = self[prop] as Record<string, (...a: unknown[]) => Promise<unknown>>;
+                  return d[method](...args);
+                },
+                scope.userId
+              );
           },
         });
       }
@@ -707,11 +717,15 @@ export async function withTenantContext<T>(
  * identical on the owner role — the only cost is one short transaction per
  * query, negligible next to an AI call.
  */
-export function runInStoreScope<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+export function runInStoreScope<T>(
+  storeId: string,
+  fn: () => Promise<T>,
+  userId?: string
+): Promise<T> {
   if (!UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return storeScope.run({ storeId }, () => settleInScope(fn));
+  return storeScope.run({ storeId, userId }, () => settleInScope(fn));
 }
 
 // ---------------------------------------------------------------------------

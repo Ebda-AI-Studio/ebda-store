@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { storeCustomerWhere } from '../lib/store-customer';
 import {
   currentStoreId,
@@ -192,10 +193,14 @@ export class WalletService {
           // account OF THIS STORE — customer accounts are store-scoped users,
           // and a store must never be able to mint a wallet row against
           // another store's shopper.
-          const customer = await c.user.findFirst({
-            where: storeCustomerWhere(storeId, customerId),
-            select: { id: true },
-          });
+          const doCustomer = await customerRow(storeId, customerId);
+          const customer =
+            doCustomer !== undefined
+              ? doCustomer
+              : await c.user.findFirst({
+                  where: storeCustomerWhere(storeId, customerId),
+                  select: { id: true },
+                });
           if (!customer) {
             throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found in this store');
           }

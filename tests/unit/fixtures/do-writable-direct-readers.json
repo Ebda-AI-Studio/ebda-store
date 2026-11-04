@@ -16,6 +16,14 @@
         "product": 3
       }
     },
+    "apps/api/src/routes/notification.routes.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: notification log list/count/stats. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "notificationLog": 4
+      }
+    },
     "apps/api/src/services/abandoned-cart.service.ts": {
       "kind": "pg-branch",
       "reason": "processReminders / getStats / candidate load: each Postgres read sits in the `backend !== 'do'` / `onDo` else-branch next to the DO read (CF-R4-5).",
@@ -30,6 +38,14 @@
       "models": {
         "product": 1,
         "productVariant": 1
+      }
+    },
+    "apps/api/src/services/accounting/analytics-rollup.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: daily product-view total of the analytics rollup. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "productDailyView": 1
       }
     },
     "apps/api/src/services/accounting/assert-store-owns.ts": {
@@ -55,6 +71,14 @@
       "models": {
         "productVariant": 1,
         "product": 1
+      }
+    },
+    "apps/api/src/services/answer-engine/gsc-dashboard.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: GSC dashboard trend read. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "gscDailyMetric": 1
       }
     },
     "apps/api/src/services/auth.service.ts": {
@@ -94,7 +118,8 @@
       "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
       "models": {
         "product": 4,
-        "productPriceTier": 1
+        "productPriceTier": 1,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/gold-rate/repricer.ts": {
@@ -110,7 +135,8 @@
       "reason": "adjustInventory / bulkAdjustInventory / setInventory: after `if (stock)` early return (CF-STOCK-1); the remaining reads are the Postgres branch.",
       "models": {
         "product": 3,
-        "productVariant": 1
+        "productVariant": 1,
+        "wishlistItem": 1
       }
     },
     "apps/api/src/services/notification-config.service.ts": {
@@ -136,7 +162,9 @@
         "cartBundle": 1,
         "productVariant": 1,
         "abandonedCart": 1,
-        "cart": 1
+        "cart": 1,
+        "bundle": 1,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/product.service.ts": {
@@ -144,6 +172,14 @@
       "reason": "update(): the `tx` body is the Postgres transaction path; a DO store takes updateOnDo (CF-WRITES-2).",
       "models": {
         "productCategory": 1
+      }
+    },
+    "apps/api/src/services/sms-queue.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: SMS idempotency lookup. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "notificationLog": 1
       }
     },
     "apps/api/src/services/variant.service.ts": {
@@ -159,7 +195,15 @@
       "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1).",
       "models": {
         "product": 2,
-        "productVariant": 1
+        "productVariant": 2
+      }
+    },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
       }
     }
   }

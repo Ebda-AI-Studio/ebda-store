@@ -13,6 +13,21 @@ import { sendAlert } from './alerts.service';
 import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
 import { isWorkers } from '../lib/runtime';
 import { cfBindings } from '../cf/bindings';
+import { analyticsRead, analyticsWrite } from '../lib/analytics-backend';
+
+type SmsLogUpsert = Parameters<typeof prisma.notificationLog.upsert>[0];
+/** The SMS delivery log row, keyed by its idempotency key; in the store's DO once its analytics moved (Ruling NZ-AN-1). */
+const smsLogUpsert = (storeId: string, args: SmsLogUpsert) =>
+  analyticsWrite(
+    storeId,
+    w =>
+      w.notificationLog.upsert({
+        where: { idempotencyKey: args.where.idempotencyKey as string },
+        create: args.create,
+        update: args.update,
+      }),
+    () => prisma.notificationLog.upsert(args)
+  );
 
 export interface QueuedSms {
   id: string;
@@ -118,22 +133,20 @@ class SmsQueueService {
   async parkDeadLetter(sms: QueuedSms, why = 'max attempts reached'): Promise<void> {
     logger.error({ smsId: sms.id, why }, '[SMS QUEUE] SMS failed permanently');
     const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
-    await prisma.notificationLog
-      .upsert({
-        where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
-        create: {
-          storeId: sms.storeId,
-          channel: 'sms',
-          event: sms.event,
-          recipientPhoneHash,
-          status: 'failed',
-          idempotencyKey: sms.idempotencyKey,
-          error: sms.error ?? why,
-          metadata: { attempts: sms.attempts },
-        },
-        update: { status: 'failed', error: sms.error ?? why, metadata: { attempts: sms.attempts } },
-      })
-      .catch(err => logger.error({ err }, '[SMS QUEUE] Failed to write failure log'));
+    await smsLogUpsert(sms.storeId, {
+      where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
+      create: {
+        storeId: sms.storeId,
+        channel: 'sms',
+        event: sms.event,
+        recipientPhoneHash,
+        status: 'failed',
+        idempotencyKey: sms.idempotencyKey,
+        error: sms.error ?? why,
+        metadata: { attempts: sms.attempts },
+      },
+      update: { status: 'failed', error: sms.error ?? why, metadata: { attempts: sms.attempts } },
+    }).catch(err => logger.error({ err }, '[SMS QUEUE] Failed to write failure log'));
     if (redis.isAvailable()) {
       await redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(sms));
     }
@@ -240,9 +253,14 @@ class SmsQueueService {
       // Idempotency check — INSIDE the try (issue 2371): a throw here (a DB
       // blip) used to escape to processQueue's catch after the rpop, and the
       // SMS was gone. It now retries and, on the last attempt, dead-letters.
-      const existing = await prisma.notificationLog.findUnique({
-        where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
-      });
+      const existing = await analyticsRead(
+        sms.storeId,
+        r => r.notificationLog.findFirst({ where: { idempotencyKey: sms.idempotencyKey } }),
+        () =>
+          prisma.notificationLog.findUnique({
+            where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
+          })
+      );
 
       if (existing && existing.status === 'sent') {
         logger.info(
@@ -265,7 +283,7 @@ class SmsQueueService {
       sentMessageId = result.messageId;
 
       // Log success
-      await prisma.notificationLog.upsert({
+      await smsLogUpsert(sms.storeId, {
         where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
         create: {
           storeId: sms.storeId,
@@ -327,28 +345,26 @@ class SmsQueueService {
           '[SMS QUEUE] SMS failed permanently'
         );
 
-        await prisma.notificationLog
-          .upsert({
-            where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
-            create: {
-              storeId: sms.storeId,
-              channel: 'sms',
-              event: sms.event,
-              recipientPhoneHash,
-              status: 'failed',
-              idempotencyKey: sms.idempotencyKey,
-              error: sms.error,
-              metadata: { attempts: sms.attempts },
-            },
-            update: {
-              status: 'failed',
-              error: sms.error,
-              metadata: { attempts: sms.attempts },
-            },
-          })
-          .catch(err => {
-            logger.error({ err }, '[SMS QUEUE] Failed to write failure log');
-          });
+        await smsLogUpsert(sms.storeId, {
+          where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
+          create: {
+            storeId: sms.storeId,
+            channel: 'sms',
+            event: sms.event,
+            recipientPhoneHash,
+            status: 'failed',
+            idempotencyKey: sms.idempotencyKey,
+            error: sms.error,
+            metadata: { attempts: sms.attempts },
+          },
+          update: {
+            status: 'failed',
+            error: sms.error,
+            metadata: { attempts: sms.attempts },
+          },
+        }).catch(err => {
+          logger.error({ err }, '[SMS QUEUE] Failed to write failure log');
+        });
 
         if (redis.isAvailable()) {
           await redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(sms));

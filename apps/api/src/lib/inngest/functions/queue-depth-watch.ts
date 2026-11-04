@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { withStore } from '@ebda/database';
-import { sweepStoresDb, withStoreRw } from '../../jobs/store-db';
+
+import { sweepStoresDb, withStoreRw, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -8,11 +8,12 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 
 /**
  * Hourly watcher that surfaces stuck background jobs as P1
- * Telegram alerts. The Inngest dashboard already shows function-level
- * status; this catches the failure modes that Inngest itself can't:
+ * Telegram alerts (jobs run on Cloudflare Workflows + Queues). It catches
+ * what the run itself cannot report:
  *
- *   1. A BulkAiJob row stuck in `queued` for >30 min — typical cause:
- *      the job's start failed or its Workflow instance errored.
+ *   1. A BulkAiJob row stuck in `queued` for >30 min — the start event was
+ *      lost or had no runner. Re-dispatched ONCE (auto_resume_count), then
+ *      marked failed ('never started') with a single alert.
  *
  *   2. A BulkAiJob row stuck in `running` for >60 min — typical cause:
  *      the worker crashed mid-run without writing status=failed.
@@ -97,7 +98,15 @@ const queueDepthWatchFn = inngest.createFunction(
       fetch: (storeId, db) =>
         db.bulkAiJob.findMany({
           where: { storeId, status: 'queued', createdAt: { lt: queuedThreshold } },
-          select: { id: true, storeId: true, kind: true, createdAt: true },
+          select: {
+            id: true,
+            storeId: true,
+            kind: true,
+            createdAt: true,
+            force: true,
+            direction: true,
+            autoResumeCount: true,
+          },
           orderBy: { createdAt: 'asc' },
           take: 20,
         }),
@@ -127,8 +136,8 @@ const queueDepthWatchFn = inngest.createFunction(
     });
     const labels = new Map<string, { name: string; slug?: string }>();
     for (const id of new Set([...queued, ...running].map(j => j.storeId))) {
-      const st = await withStore(id, tx =>
-        tx.store.findUnique({ where: { id }, select: { name: true, slug: true } })
+      const st = await withStoreDb(id, db =>
+        db.store.findUnique({ where: { id }, select: { name: true, slug: true } })
       );
       labels.set(id, { name: st?.name ?? id, slug: st?.slug ?? undefined });
     }
@@ -146,21 +155,89 @@ const queueDepthWatchFn = inngest.createFunction(
       return { ok: true, stuckQueued: 0, stuckRunning: 0 };
     }
 
+    let autoResumed = 0;
+    let autoReaped = 0;
+    let queuedResent = 0;
+    let queuedFailed = 0;
+
+    // A row still `queued` after the threshold never started (the start event was lost or had no
+    // runner). It gets ONE re-dispatch (counted in auto_resume_count); if it is still queued at a
+    // later tick it is marked failed and alerted ONCE (it leaves `queued`, so the next tick is silent).
     for (const job of stuckQueued) {
       const ageMin = Math.floor((now - job.createdAt.getTime()) / 60_000);
+      const resendEvent = RESUME_EVENT_BY_KIND[job.kind];
+      const store = {
+        id: job.storeId,
+        name: job.store?.name ?? job.storeId,
+        slug: job.store?.slug,
+      };
+      let failReason = resendEvent
+        ? 'still queued after one re-dispatch'
+        : 'no re-dispatch mapping for this job kind';
+
+      if (resendEvent && job.autoResumeCount < 1) {
+        try {
+          const claimed = await withStoreRw(job.storeId, tx =>
+            tx.bulkAiJob.updateMany({
+              where: { id: job.id, storeId: job.storeId, status: 'queued' },
+              data: { autoResumeCount: { increment: 1 } },
+            })
+          );
+          if (claimed.count === 0) continue; // it started (or finished) meanwhile
+          await inngest.send({
+            name: resendEvent,
+            data: {
+              jobId: job.id,
+              storeId: job.storeId,
+              force: job.force,
+              ...(job.kind === 'translate' ? { direction: job.direction } : {}),
+            },
+          });
+          queuedResent++;
+          logger.warn(
+            { jobId: job.id, storeId: job.storeId, kind: job.kind, ageMin, event: resendEvent },
+            'queue-depth-watch: re-dispatched a job stuck in queued'
+          );
+          continue;
+        } catch (err) {
+          logger.error(
+            { jobId: job.id, event: resendEvent, err: (err as Error).message },
+            'queue-depth-watch: re-dispatch of a queued job failed'
+          );
+          failReason = 're-dispatch failed';
+        }
+      }
+
+      try {
+        await withStoreRw(job.storeId, tx =>
+          tx.bulkAiJob.updateMany({
+            where: { id: job.id, storeId: job.storeId, status: 'queued' },
+            data: { status: 'failed', errorMessage: 'never started', completedAt: new Date() },
+          })
+        );
+        queuedFailed++;
+      } catch (err) {
+        logger.error(
+          { jobId: job.id, err: (err as Error).message },
+          'queue-depth-watch: could not fail a never-started job'
+        );
+      }
       await sendAlert({
         level: 'p1',
         scope: 'store',
-        store: { id: job.storeId, name: job.store?.name ?? job.storeId, slug: job.store?.slug },
-        source: 'inngest.queue-depth',
-        title: `bulk-ai-job stuck in queued (${job.kind}) — ${ageMin}m old`,
-        body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" has been queued for ${ageMin} minutes. Most likely cause: Inngest function not registered after a deploy. Check the Inngest dashboard and re-PUT /api/v1/inngest if needed.`,
-        context: { jobId: job.id, kind: job.kind, ageMinutes: ageMin, type: 'stuck_queued' },
+        store,
+        source: 'jobs.queue-depth',
+        title: `bulk-ai-job never started (${job.kind}) - ${ageMin}m queued`,
+        body: `Job ${job.id} for store "${store.name}" sat queued ${ageMin} min and never started (${failReason}); it was marked failed (error "never started"). Check the Cloudflare Workflows and Queues (JOBS_WORKFLOW / JOBS_QUEUE bindings, Worker logs for job ${job.id}), then retry the job from the UI.`,
+        context: {
+          jobId: job.id,
+          kind: job.kind,
+          ageMinutes: ageMin,
+          type: 'never_started',
+          reason: failReason,
+        },
       });
     }
-
-    let autoResumed = 0;
-    let autoReaped = 0;
 
     for (const job of stuckRunning) {
       const ageMin = Math.floor((now - (job.startedAt?.getTime() ?? now)) / 60_000);
@@ -218,7 +295,7 @@ const queueDepthWatchFn = inngest.createFunction(
             level: 'info',
             scope: 'store',
             store: { id: job.storeId, name: job.store?.name ?? job.storeId, slug: job.store?.slug },
-            source: 'inngest.queue-depth',
+            source: 'jobs.queue-depth',
             title: `bulk-ai-job auto-resumed after ${ageMin}m stuck running (${job.kind}, ${progress})`,
             body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" was running ${ageMin} min at progress ${progress} without updates — re-enqueued (attempt ${job.autoResumeCount + 1}/${MAX_AUTO_RESUMES}). It will resume from the first unfinished batch.`,
             context: {
@@ -255,7 +332,7 @@ const queueDepthWatchFn = inngest.createFunction(
             where: { id: job.id, storeId: job.storeId },
             data: {
               status: 'failed',
-              errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress} (${reason}). likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,
+              errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress} (${reason}). likely cause: worker died mid-execution (deploy window / crash / Worker restart). retry from UI.`,
               completedAt: new Date(),
             },
           })
@@ -270,7 +347,7 @@ const queueDepthWatchFn = inngest.createFunction(
         level: 'p1',
         scope: 'store',
         store: { id: job.storeId, name: job.store?.name ?? job.storeId, slug: job.store?.slug },
-        source: 'inngest.queue-depth',
+        source: 'jobs.queue-depth',
         title: `bulk-ai-job auto-reaped after ${ageMin}m stuck running (${job.kind}, ${progress})`,
         body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" was running ${ageMin} min at progress ${progress} without updates — auto-marked failed (${reason}). Merchant can retry from the UI; partial progress up to the last completed batch is lost.`,
         context: {
@@ -289,6 +366,8 @@ const queueDepthWatchFn = inngest.createFunction(
         stuckRunning: stuckRunning.length,
         autoResumed,
         autoReaped,
+        queuedResent,
+        queuedFailed,
       },
       'queue-depth-watch: stuck jobs detected, alerts dispatched'
     );
@@ -299,6 +378,8 @@ const queueDepthWatchFn = inngest.createFunction(
       stuckRunning: stuckRunning.length,
       autoResumed,
       autoReaped,
+      queuedResent,
+      queuedFailed,
     };
   }
 );

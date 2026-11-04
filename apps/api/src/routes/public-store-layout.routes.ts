@@ -6,12 +6,11 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma, withStore } from '@ebda/database';
 import { lookupStoreCached } from '../lib/store-directory';
 import { isSectionPageKind, normalizeLegacyTemplate, resolveLayoutSettings } from '@ebda/shared';
 import { redis } from '../services/redis.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
-import { storeRepo } from '../lib/repo-factory';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { customersById } from '../lib/jobs/store-db';
 import {
   getPublishedDefinition,
@@ -55,8 +54,8 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     // definer, then its row inside its own scope.
     const hit = await lookupStoreCached({ id: storeId }, ['active']);
     const store = hit
-      ? await withStore(hit.id, tx =>
-          tx.store.findUnique({
+      ? await readInStoreContext(hit.id, async () =>
+          (await storeDb(hit.id)).store.findUnique({
             where: { id: hit.id },
             select: { layoutSettings: true, template: true, look: true, isDemo: true },
           })
