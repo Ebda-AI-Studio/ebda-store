@@ -135,12 +135,19 @@ describe('family table list', () => {
       models: Record<string, { table: string; db: string }>;
     };
     const { FAMILY_MODELS } = await import('../../apps/api/src/services/platform/cutover');
-    const tables = FAMILY_MODELS.billing.map(m => {
-      const model = meta.models[m[0].toUpperCase() + m.slice(1)];
-      expect(model?.db, m).toBe('d1');
-      return model.table;
-    });
-    expect([...tables].sort()).toEqual([...FAMILIES.billing].sort());
+    for (const family of Object.keys(FAMILY_MODELS) as Array<keyof typeof FAMILY_MODELS>) {
+      const tables = FAMILY_MODELS[family].map(m => {
+        const model = meta.models[m[0].toUpperCase() + m.slice(1)];
+        expect(model?.db, m).toBe('d1');
+        return model.table;
+      });
+      expect([...tables].sort(), family).toEqual(
+        [...(FAMILIES as Record<string, string[]>)[family]].sort()
+      );
+    }
+    // no model is owned by two families, and the router set is their union
+    const all = Object.values(FAMILY_MODELS).flat();
+    expect(new Set(all).size).toBe(all.length);
   });
 });
 
@@ -307,7 +314,7 @@ describe('cutover switch', () => {
     await expect(platformFamilyOnD1('billing')).rejects.toMatchObject({ statusCode: 503 });
   });
 
-  it('the router is registered on the prisma proxy for exactly the billing models', () => {
+  it('the router is registered on the prisma proxy for exactly the moved models', () => {
     expect([...platformRouter.models].sort()).toEqual(
       [
         'billingEvent',
@@ -318,6 +325,17 @@ describe('cutover switch', () => {
         'plan',
         'storeLifecycleEmail',
         'storeSubscription',
+        'systemSetting',
+        'storeFeature',
+        'legalAcceptance',
+        'legalNoticeSend',
+        'legalNoticeDelivery',
+        'providerVerification',
+        'providerVerificationEvent',
+        'providerActivationRequest',
+        'merchantApiKey',
+        'slugRedirect',
+        'webhookEvent',
       ].sort()
     );
     setModelRouter(undefined);

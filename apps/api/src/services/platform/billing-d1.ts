@@ -16,7 +16,7 @@
 import { acrossStores, notifyModelWrite, type Prisma } from '@ebda/database';
 import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
-import { platformFamilyOnD1 } from './cutover';
+import { platformFamilyOnD1, type PlatformFamily } from './cutover';
 
 interface RawD1 {
   prepare(sql: string): {
@@ -35,7 +35,7 @@ function raw(): RawD1 {
   return d1;
 }
 
-async function all<T>(sql: string, ...params: unknown[]): Promise<T[]> {
+export async function d1All<T>(sql: string, ...params: unknown[]): Promise<T[]> {
   return (
     (
       await raw()
@@ -46,7 +46,7 @@ async function all<T>(sql: string, ...params: unknown[]): Promise<T[]> {
   );
 }
 
-async function run(sql: string, ...params: unknown[]): Promise<number> {
+export async function d1Run(sql: string, ...params: unknown[]): Promise<number> {
   return Number(
     (
       await raw()
@@ -60,7 +60,8 @@ async function run(sql: string, ...params: unknown[]): Promise<number> {
 export const fromMs = (v: number | null | undefined): Date | null =>
   v === null || v === undefined ? null : new Date(Number(v));
 
-export const onD1 = (): Promise<boolean> => platformFamilyOnD1('billing');
+export const onD1 = (family: PlatformFamily = 'billing'): Promise<boolean> =>
+  platformFamilyOnD1(family);
 
 type Tx = Prisma.TransactionClient;
 
@@ -70,7 +71,7 @@ type Tx = Prisma.TransactionClient;
  */
 export async function lockSubscription(tx: Tx, storeId: string): Promise<boolean> {
   if (await onD1()) {
-    const rows = await all<{ id: string }>(
+    const rows = await d1All<{ id: string }>(
       'SELECT id FROM store_subscriptions WHERE store_id = ?1',
       storeId
     );
@@ -83,7 +84,7 @@ export async function lockSubscription(tx: Tx, storeId: string): Promise<boolean
 
 /** `ebda_plan_subscriber_counts()`. The caller is a super_admin route (the definer's own check is the route's `authorize`). */
 export async function planSubscriberCountsD1(): Promise<Map<string, number>> {
-  const rows = await all<{ plan_code: string; n: number }>(
+  const rows = await d1All<{ plan_code: string; n: number }>(
     'SELECT plan_code, COUNT(*) AS n FROM store_subscriptions GROUP BY plan_code'
   );
   return new Map(rows.map(r => [r.plan_code, Number(r.n)]));
@@ -92,7 +93,7 @@ export async function planSubscriberCountsD1(): Promise<Map<string, number>> {
 /** `ebda_plan_store_ids(code)`. */
 export async function storeIdsOnPlanD1(planCode: string): Promise<string[]> {
   return (
-    await all<{ store_id: string }>(
+    await d1All<{ store_id: string }>(
       'SELECT store_id FROM store_subscriptions WHERE plan_code = ?1',
       planCode
     )
@@ -105,7 +106,7 @@ export async function entityStoreIdD1(
   id: string
 ): Promise<string | null> {
   const table = kind === 'billing_event' ? 'billing_events' : 'store_subscriptions';
-  const rows = await all<{ store_id: string }>(
+  const rows = await d1All<{ store_id: string }>(
     `SELECT store_id FROM ${table} WHERE id = ?1 LIMIT 1`,
     id
   );
@@ -117,7 +118,7 @@ export async function refundStoreIdD1(
   provider: string,
   providerRef: string
 ): Promise<string | null> {
-  const rows = await all<{ store_id: string }>(
+  const rows = await d1All<{ store_id: string }>(
     `SELECT store_id FROM billing_events
       WHERE type = 'refund' AND status = 'pending' AND provider = ?1 AND provider_ref = ?2 LIMIT 1`,
     provider,
@@ -145,7 +146,7 @@ export async function insertCappedGrant(
   g: GrantInsert,
   cap: { kind: string; beneficiaryId?: string; max: number }
 ): Promise<boolean> {
-  const changes = await run(
+  const changes = await d1Run(
     `INSERT INTO billing_grants (id, kind, beneficiary_id, counterpart_id, months, value_minor, status, idempotency_key, source_event_id, source_store_id)
      SELECT ?1, ?2, ?3, ?4, 1, ?5, 'pending', ?6, ?7, ?8
       WHERE (SELECT COUNT(*) FROM billing_grants
@@ -172,7 +173,7 @@ export async function revokeGrantsD1(
   reason: string,
   now: Date
 ): Promise<Array<{ id: string; beneficiary_id: string }>> {
-  return all(
+  return d1All(
     `UPDATE billing_grants SET status = 'revoked', revoked_at = ?1, revoke_reason = ?2
       WHERE source_event_id = ?3 AND status IN ('pending', 'applied')
       RETURNING id, beneficiary_id`,
@@ -187,7 +188,7 @@ export async function claimRestoreD1(
   grantId: string,
   now: Date
 ): Promise<{ before: Date; after: Date } | null> {
-  const rows = await all<{ period_end_before: number; period_end_after: number }>(
+  const rows = await d1All<{ period_end_before: number; period_end_after: number }>(
     `UPDATE billing_grants SET restored_at = ?1
       WHERE id = ?2 AND status = 'revoked' AND restored_at IS NULL AND period_end_after IS NOT NULL
       RETURNING period_end_before, period_end_after`,
@@ -317,7 +318,7 @@ export async function commitManualPaymentD1(
     );
     return 'applied';
   }
-  const existing = await all<{ id: string }>(
+  const existing = await d1All<{ id: string }>(
     'SELECT id FROM billing_events WHERE idempotency_key = ?1 AND store_id = ?2',
     a.idempotencyKey,
     a.storeId
@@ -406,7 +407,7 @@ export async function applyGrantsBatchD1(a: GrantBatchD1): Promise<number> {
 
 /** The store that already holds this idempotency key in the ledger (any store), or null. */
 export async function idempotencyKeyStoreD1(key: string): Promise<string | null> {
-  const rows = await all<{ store_id: string }>(
+  const rows = await d1All<{ store_id: string }>(
     'SELECT store_id FROM billing_events WHERE idempotency_key = ?1 LIMIT 1',
     key
   );
@@ -417,7 +418,7 @@ export async function idempotencyKeyStoreD1(key: string): Promise<string | null>
 export async function planTierDriftD1(
   limit: number
 ): Promise<Array<{ storeId: string; current: string; tier: string }>> {
-  return all<{ storeId: string; current: string; tier: string }>(
+  return d1All<{ storeId: string; current: string; tier: string }>(
     `SELECT s.id AS storeId, s.plan AS current, p.feature_tier AS tier
        FROM store_subscriptions ss
        JOIN stores s ON s.id = ss.store_id
@@ -439,7 +440,7 @@ export async function deferBillingWebhookD1(a: {
   eventType: string;
   payload: unknown;
 }): Promise<boolean> {
-  const changes = await run(
+  const changes = await d1Run(
     `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at)
      VALUES (?1, ?2, ?3, ?4, 'deferred', ?5, ?6)
      ON CONFLICT (provider, event_id) DO NOTHING`,
@@ -456,7 +457,7 @@ export async function deferBillingWebhookD1(a: {
 export async function listDeferredBillingWebhooksD1(
   limit: number
 ): Promise<Array<{ provider: string; eventId: string; detail: string }>> {
-  return all<{ provider: string; eventId: string; detail: string }>(
+  return d1All<{ provider: string; eventId: string; detail: string }>(
     `SELECT provider, event_id AS eventId, detail FROM billing_webhook_events
       WHERE outcome = 'deferred' ORDER BY received_at ASC LIMIT ?1`,
     limit

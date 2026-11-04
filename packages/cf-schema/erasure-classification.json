@@ -1262,7 +1262,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "seller_legal_name is the SELLER (the company issuing the invoice), not a person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column.",
+    "reviewedNotPii": ["seller_legal_name"]
   },
   "d1:instapay_receipts": {
     "db": "d1",

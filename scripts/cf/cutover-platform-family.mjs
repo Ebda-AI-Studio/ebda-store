@@ -42,6 +42,21 @@ export const FAMILIES = {
     'billing_webhook_events',
     'store_lifecycle_emails',
   ],
+  // N-10b. system_settings holds the cutover / freeze bookkeeping rows too; they are excluded from the digest.
+  platform: [
+    'system_settings',
+    'store_features',
+    'legal_acceptances',
+    'legal_notice_sends',
+    'legal_notice_deliveries',
+    'provider_verifications',
+    'provider_verification_events',
+    'provider_activation_requests',
+    'merchant_api_keys',
+    'SlugRedirect',
+  ],
+  // The payment-webhook inbox. A provider callback is never refused: during the freeze it is recorded straight into D1.
+  inbox: ['webhook_events'],
 };
 
 const markerKey = family => `platform_cutover.${family}`;
@@ -256,6 +271,14 @@ async function main() {
         await d1Statements(d, [`DELETE FROM billing_webhook_events WHERE outcome = 'deferred';`]);
       console.log(`  ${deferred.length} deferred webhook(s) set aside`);
     }
+    // 2c. inbox: callbacks recorded into D1 during the freeze are set aside, the Postgres rows copied, then the set-aside
+    // rows put back unless Postgres already holds that idempotency key (a redelivery of a known event is the dedupe).
+    let inboxStash = [];
+    if (tables.includes('webhook_events')) {
+      inboxStash = await d1Query(d, 'SELECT * FROM webhook_events');
+      if (inboxStash.length) await d1Statements(d, ['DELETE FROM webhook_events;']);
+      console.log(`  ${inboxStash.length} freeze-born inbox row(s) set aside`);
+    }
     // 3. copy (idempotent upserts, FK order)
     let stmts = [];
     let bytes = 0;
@@ -278,6 +301,19 @@ async function main() {
       console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
     }
 
+    if (inboxStash.length) {
+      const cols = Object.keys(inboxStash[0]);
+      await d1Statements(
+        d,
+        inboxStash.map(
+          r =>
+            `INSERT INTO webhook_events (${cols.map(q).join(', ')}) VALUES (${cols.map(c => lit(r[c])).join(', ')}) ON CONFLICT (idempotency_key) DO NOTHING;`
+        )
+      );
+      console.log(
+        `  ${inboxStash.length} freeze-born inbox row(s) put back (already-known ones dropped)`
+      );
+    }
     if (deferred.length) {
       await d1Statements(
         d,
@@ -292,7 +328,7 @@ async function main() {
     const results = await d1QueryMany(d, [
       ...fam.map(
         bt =>
-          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name)} ORDER BY ${bt.pk.map(q).join(', ')}`
+          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name, inboxStash)} ORDER BY ${bt.pk.map(q).join(', ')}`
       ),
       'PRAGMA foreign_key_check',
     ]);
@@ -370,11 +406,14 @@ async function main() {
 }
 
 /** D1 rows to compare: the cutover bookkeeping rows live in system_settings and are not part of the copied data. */
-function verifyWhere(table) {
+function verifyWhere(table, inboxStash = []) {
   if (table === 'system_settings')
     return ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`;
   // webhooks that arrived during the freeze are stored here as `deferred` (D1 only); they are not part of the copy
   if (table === 'billing_webhook_events') return ` WHERE outcome <> 'deferred'`;
+  // callbacks recorded during the freeze are D1-only rows, not part of the copied data
+  if (table === 'webhook_events' && inboxStash.length)
+    return ` WHERE id NOT IN (${inboxStash.map(r => lit(r.id)).join(', ')})`;
   return '';
 }
 
