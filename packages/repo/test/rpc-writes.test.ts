@@ -351,7 +351,13 @@ describe('audit trail is append-only on the DO write path (N-10d security review
 
   it('the named procedures do the three narrow edits and refuse a young purge', async () => {
     const r = rig();
-    await r.run({ ops: [audit('r1'), audit('r2', { userId: 'u2' })] });
+    await r.run({
+      ops: [
+        audit('r1', { action: 'agent.write.denied', details: { count: 1 } }),
+        audit('r2', { userId: 'u2', action: 'agent.write.denied', details: { count: 1 } }),
+        audit('r3'),
+      ],
+    });
     const proc = (op: string, args: Record<string, unknown>) =>
       r.run({ ops: [{ model: '$proc', op, args } as never] });
     expect(
@@ -363,7 +369,17 @@ describe('audit trail is append-only on the DO write path (N-10d security review
     // another store's id changes nothing
     await proc('auditSetDetails', { id: 'r2', storeId: 'other', details: { count: 9 } });
     expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r2'`).get()).toEqual({
+      details: '{"count":1}',
+    });
+    // a row that is not a coalesced agent-denial row (r3: other action, no count) is never rewritten; nor is a bad shape
+    await proc('auditSetDetails', { id: 'r3', storeId: STORE, details: { count: 3 } });
+    expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r3'`).get()).toEqual({
       details: '{}',
+    });
+    expect(
+      await proc('auditSetDetails', { id: 'r1', storeId: STORE, details: { x: 1 } })
+    ).toMatchObject({
+      ok: false,
     });
     await proc('auditUnlinkUser', { userId: 'u2' });
     expect(r.db.prepare(`SELECT user_id FROM audit_logs WHERE id='r2'`).get()).toEqual({
@@ -372,8 +388,8 @@ describe('audit trail is append-only on the DO write path (N-10d security review
     expect(await proc('auditPurge', { before: Date.now(), upToId: 'zzz' })).toMatchObject({
       ok: false,
     });
-    expect(r.count('audit_logs')).toBe(2);
+    expect(r.count('audit_logs')).toBe(3);
     await proc('auditPurge', { before: Date.now() - 40 * 86_400_000, upToId: 'zzz' });
-    expect(r.count('audit_logs')).toBe(2); // nothing is that old
+    expect(r.count('audit_logs')).toBe(3); // nothing is that old
   });
 });

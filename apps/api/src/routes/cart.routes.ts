@@ -51,6 +51,7 @@ const addBundleToCartSchema = z.object({
 const getSessionId = (req: Request): string => {
   const sessionId = req.headers['x-session-id'] as string;
   if (!sessionId) {
+    // An AppError, not a bare Error with a `statusCode`: the error handler answers 500 for the latter.
     throw new AppError(400, 'MISSING_SESSION', 'Session ID required');
   }
   return sessionId;

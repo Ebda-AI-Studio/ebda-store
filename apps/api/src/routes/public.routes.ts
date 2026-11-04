@@ -11,6 +11,8 @@ import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
+import { cfBindings } from '../cf/bindings';
+import { withStoreRead } from '../lib/store-read';
 import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 import { inDoStoreScope, readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
@@ -132,7 +134,14 @@ router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
 router.get('/health', async (_req: Request, res: Response) => {
   try {
     // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
+    // A deployed Worker has no Postgres to ping: the platform D1 is the database it stands on (NEON-ZERO-1).
+    const d1 = (
+      cfBindings() as
+        | { PLATFORM_DB?: { prepare(q: string): { first(): Promise<unknown> } } }
+        | undefined
+    )?.PLATFORM_DB;
+    if (d1) await d1.prepare('SELECT 1').first();
+    else await prisma.$queryRaw`SELECT 1`;
 
     res.json({
       success: true,
@@ -1873,7 +1882,9 @@ router.get(
       }
 
       // Verify store exists and is active before querying wishlists
-      const store = await prisma.store.findFirst({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findFirst({
         where: { id: storeId, status: 'active' },
         select: { id: true },
       });
@@ -2032,7 +2043,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
     const stores = (
       await Promise.all(
         storePage.ids.map(id =>
-          withStore(id, tx =>
+          withStoreRead(id, tx =>
             tx.store.findUnique({
               where: { id },
               select: {

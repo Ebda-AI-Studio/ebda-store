@@ -1,3 +1,4 @@
+import { readAuditByResource } from '../lib/audit-read';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod/v3';
@@ -2369,12 +2370,7 @@ router.get(
       const rows: TimelineRow[] = [];
 
       // 1. Audit log entries for this order
-      const audits = await prisma.auditLog.findMany({
-        where: { storeId, resourceType: 'order', resourceId: orderId },
-        include: { user: { select: { firstName: true, lastName: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
+      const audits = await readAuditByResource(storeId, 'order', orderId);
 
       const auditKinds = new Set<string>();
       for (const a of audits) {

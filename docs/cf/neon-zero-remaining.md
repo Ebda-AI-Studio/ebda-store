@@ -4,6 +4,8 @@ Input for the final PRs N-15 (workers-test sweep with PG dead), N-16 (delete dea
 
 ## N-15 runtime route sweep (Postgres dead, all markers set)
 
+# NEON-ZERO remaining Postgres dependencies (N-15 route sweep)
+
 Source: `apps/api/workers-test/route-sweep.test.ts` on `integ/neon-zero` (all twelve NEON-ZERO PRs merged), the BUILT Worker, Postgres at a dead port (`EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x`), a store created on D1 + its Durable Object (N-18), every cutover marker set in D1 (`platform_cutover.{billing,access,platform,inbox,ai-usage,analytics}`, `customer_auth_cutover.__all`), tokens for store_admin (the store owner), super_admin and a storefront customer.
 
 Measured: **907 requests** over the real router table (858 method+path pairs + the storefront flow, webhooks and cron ticks): **100 2xx**, **538 expected 4xx** (validation, not-found, plan-gate 402/403, unauthenticated), **269 failing (5xx or no answer)** over **268 distinct routes**. Every one of the 5xx is `connection attempt failed` from the first Postgres use (the request opened Postgres); the exceptions are listed under their own heading.

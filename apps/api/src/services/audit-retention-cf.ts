@@ -67,11 +67,10 @@ export async function archiveStoreAuditDo(
         found.map(r => JSON.stringify(r)).join('\n') + '\n'
       );
       after = found[found.length - 1].id;
+      // the generic path refuses deletes on the audit trail (AUDIT_APPEND_ONLY): the purge is a named DO procedure
       await (
         await storeWriter(storeId)
-      ).auditLog.deleteMany({
-        where: { createdAt: { lt: cutoff }, id: { lte: after } },
-      });
+      ).$proc('auditPurge', { before: cutoff.getTime(), upToId: after });
       rows += found.length;
       if (found.length < PAGE) break;
     }

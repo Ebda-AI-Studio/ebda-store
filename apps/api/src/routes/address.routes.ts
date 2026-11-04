@@ -1,13 +1,58 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
+import { AppError } from '../middleware/error-handler';
 import { egyptAddressSchema } from '@ebda/shared';
 import { authenticate } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
-import { storeDb, storeWriter } from '../lib/repo-factory';
-import { atomicWrites } from '../lib/atomic-writes';
 
 const router = Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALIDATED_STORE = Symbol('ebda.addressStore');
+
+/**
+ * Ruling NZ-SF-5: a shopper's address book lives in the customer's StoreDO (per store, like the per-store account). The store is
+ * decided ONCE, here, from the verified token and nothing else:
+ *  - a customer always uses `req.user.storeId` (the store the token was issued for). An `X-Store-ID` header is never trusted:
+ *    absent is fine, present must be ONE well-formed id equal to the token's store, otherwise 403 (an array, a duplicate that
+ *    Node joins with a comma, or any other shape is a 400). A customer token with no store is a 400 `STORE_REQUIRED`.
+ *  - every other role ignores `X-Store-ID` entirely and keeps the Postgres address book it always had.
+ * The one validated id is what `userContext` and `storeWriter` both receive.
+ */
+function resolveAddressStore(req: Request, _res: Response, next: NextFunction): void {
+  try {
+    let store: string | undefined;
+    if (req.user?.role === 'customer') {
+      const claim = (req.user as { storeId?: string }).storeId;
+      if (typeof claim !== 'string' || !UUID_RE.test(claim))
+        throw new AppError(400, 'STORE_REQUIRED', 'Store is required for the address book');
+      const header = req.headers['x-store-id'];
+      if (header !== undefined) {
+        if (typeof header !== 'string' || !UUID_RE.test(header))
+          throw new AppError(400, 'INVALID_STORE', 'X-Store-ID must be a single store id');
+        if (header.toLowerCase() !== claim.toLowerCase())
+          throw new AppError(403, 'STORE_MISMATCH', 'This account belongs to another store');
+      }
+      store = claim.toLowerCase();
+    }
+    (req as unknown as Record<symbol, string | undefined>)[VALIDATED_STORE] = store;
+    next();
+  } catch (e) {
+    next(e);
+  }
+}
+
+const addressStoreId = (req: Request): string | undefined =>
+  (req as unknown as Record<symbol, string | undefined>)[VALIDATED_STORE];
+
+/** The address client of the validated store: its DO for a DO store, `prisma` for a Postgres store or a non-customer token. */
+async function addressDb(req: Request) {
+  const storeId = addressStoreId(req);
+  if (!storeId) return prisma;
+  return (await storeWriter(storeId)) as unknown as typeof prisma;
+}
 
 // RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — this router
 // is mounted BARE at `/addresses` (routes/index.ts), with no `:storeId`/`:id`
@@ -35,26 +80,13 @@ const router = Router();
 // will 404 instead of 403 — the DB backstop doing its job (don't reveal
 // existence of another user's row). Expected; do not try to preserve 403.
 router.use(authenticate);
-router.use(userContext(req => req.user!.userId, addressStoreId));
-
-/**
- * The store an address request belongs to: the customer token's store, else the `x-store-id` header (the wishlist's
- * convention). A Durable Object store keeps its address book in its DO; no store (or a Postgres store) is the unchanged prisma.
- */
-function addressStoreId(req: Request): string | null {
-  const fromToken = req.user?.storeId;
-  if (fromToken) return fromToken;
-  const h = req.headers['x-store-id'];
-  return typeof h === 'string' && h ? h : null;
-}
-async function addressDb(req: Request) {
-  const id = addressStoreId(req);
-  return (id ? await storeDb(id) : prisma) as unknown as typeof prisma;
-}
-async function addressWriter(req: Request) {
-  const id = addressStoreId(req);
-  return (id ? await storeWriter(id) : prisma) as unknown as typeof prisma;
-}
+router.use(resolveAddressStore);
+router.use(
+  userContext(
+    req => req.user!.userId,
+    req => addressStoreId(req)
+  )
+);
 
 // Validation schema for creating/updating an address.
 //
@@ -115,14 +147,23 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const data = parsed.data;
 
-    const db = await addressDb(req);
-    const w = await addressWriter(req);
+    // If this address is being set as default, unset all other defaults first
+    if (data.isDefault) {
+      await (
+        await addressDb(req)
+      ).address.updateMany({
+        where: { userId, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
 
     // If this is the user's first address, make it default automatically
-    const existingCount = await db.address.count({ where: { userId } });
+    const existingCount = await (await addressDb(req)).address.count({ where: { userId } });
     const isDefault = data.isDefault ?? existingCount === 0;
 
-    const createAddress = w.address.create({
+    const address = await (
+      await addressDb(req)
+    ).address.create({
       data: {
         userId,
         firstName: data.firstName,
@@ -147,16 +188,6 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         isDefault,
       },
     });
-    let address;
-    if (data.isDefault) {
-      // If this address is being set as default, unset all other defaults in the same atomic batch
-      [, address] = await atomicWrites(addressStoreId(req), w, [
-        w.address.updateMany({ where: { userId, isDefault: true }, data: { isDefault: false } }),
-        createAddress,
-      ]);
-    } else {
-      address = await createAddress;
-    }
 
     res.status(201).json({
       success: true,
@@ -208,8 +239,18 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const data = parsed.data;
 
     // If setting this address as default, unset others
-    const w = await addressWriter(req);
-    const updateAddress = w.address.update({
+    if (data.isDefault) {
+      await (
+        await addressDb(req)
+      ).address.updateMany({
+        where: { userId, isDefault: true, id: { not: id } },
+        data: { isDefault: false },
+      });
+    }
+
+    const address = await (
+      await addressDb(req)
+    ).address.update({
       where: { id, userId },
       data: {
         ...(data.firstName !== undefined && { firstName: data.firstName }),
@@ -232,18 +273,6 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
         ...(data.isDefault !== undefined && { isDefault: data.isDefault }),
       },
     });
-    let address;
-    if (data.isDefault) {
-      [, address] = await atomicWrites(addressStoreId(req), w, [
-        w.address.updateMany({
-          where: { userId, isDefault: true, id: { not: id } },
-          data: { isDefault: false },
-        }),
-        updateAddress,
-      ]);
-    } else {
-      address = await updateAddress;
-    }
 
     res.json({
       success: true,
@@ -278,23 +307,21 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    const w = await addressWriter(req);
-    // If the deleted address was default, promote the most recently created other address in the same atomic batch
-    const next = existing.isDefault
-      ? await (
+    await (await addressDb(req)).address.delete({ where: { id, userId } });
+
+    // If the deleted address was default, promote the most recently created address
+    if (existing.isDefault) {
+      const next = await (
+        await addressDb(req)
+      ).address.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (next) {
+        await (
           await addressDb(req)
-        ).address.findFirst({
-          where: { userId, id: { not: id } },
-          orderBy: { createdAt: 'desc' },
-        })
-      : null;
-    if (next) {
-      await atomicWrites(addressStoreId(req), w, [
-        w.address.delete({ where: { id, userId } }),
-        w.address.update({ where: { id: next.id, userId }, data: { isDefault: true } }),
-      ]);
-    } else {
-      await w.address.delete({ where: { id, userId } });
+        ).address.update({ where: { id: next.id, userId }, data: { isDefault: true } });
+      }
     }
 
     res.json({

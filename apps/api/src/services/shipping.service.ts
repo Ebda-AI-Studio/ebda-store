@@ -1,6 +1,7 @@
 import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { zoneForAddress } from '@ebda/shared';
+import { storeDb } from '../lib/repo-factory';
 
 // ─── Pure fee resolver (no DB) ────────────────────────────────────────────────
 
@@ -374,7 +375,9 @@ export class ShippingService {
    * Get public shipping zones for storefront
    */
   static async getPublicZones(storeId: string) {
-    const zones = await prisma.shippingZone.findMany({
+    const zones = await (
+      await storeDb(storeId)
+    ).shippingZone.findMany({
       where: { storeId, isActive: true },
       orderBy: { position: 'asc' },
       select: {
