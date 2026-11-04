@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
 import { csvField } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
@@ -219,7 +218,9 @@ router.post(
       // Fetch the store context for the branded shell.
       // `defaultLanguage` lives inside the `settings` JSON column, not a
       // first-class column, so we read `settings` and extract it manually.
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: {
           name: true,

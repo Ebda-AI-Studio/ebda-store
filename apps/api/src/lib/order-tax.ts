@@ -1,4 +1,5 @@
 import { withStore } from '@ebda/database';
+import { storeRepo, type StoreReads } from './repo-factory';
 
 /**
  * `computeOrderTax` now lives in `@ebda/shared` so the storefront checkout
@@ -45,22 +46,28 @@ export async function resolveActiveTaxRate(storeId: string): Promise<ActiveTaxRa
   // The public storefront payloads call this before any store scope exists;
   // order creation calls it inside one. withStore serves both (and reuses an
   // existing scope for the same store).
-  const [store, rates, profile] = await withStore(storeId, tx =>
+  // The three reads are the same on both backends; a store on its Durable Object reads its own tables (TaxRate and
+  // StoreTaxProfile are store-do models) and never opens a Postgres transaction (NEON-ZERO-1 N-5).
+  const read = (db: StoreReads) =>
     Promise.all([
-      tx.store.findUnique({
+      db.store.findUnique({
         where: { id: storeId },
         select: { taxEnabled: true, taxIncludedInPrice: true },
       }),
-      tx.taxRate.findMany({
+      db.taxRate.findMany({
         where: { storeId, isActive: true },
         select: { rate: true },
       }),
-      tx.storeTaxProfile.findUnique({
+      db.storeTaxProfile.findUnique({
         where: { storeId },
         select: { status: true, taxRegistrationNumber: true, legalName: true },
       }),
-    ])
-  );
+    ]);
+  const repo = await storeRepo(storeId);
+  const [store, rates, profile] =
+    repo.backend === 'do'
+      ? await read(repo.db)
+      : await withStore(storeId, tx => read(tx as unknown as StoreReads));
 
   // Rates are Decimal(5,2)-shaped percentages; sum in hundredths so 0.1 + 0.2
   // is exactly 0.3, never 0.30000000000000004.

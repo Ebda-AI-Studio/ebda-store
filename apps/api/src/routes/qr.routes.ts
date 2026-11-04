@@ -9,6 +9,7 @@ import { StoreService } from '../services/store.service';
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { qrStats, readQrSettings } from '../services/qr.service';
+import { storeDb } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -28,7 +29,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const store = await prisma.store.findFirst({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findFirst({
         where: { id: storeId },
         select: { slug: true, domain: true, domainStatus: true, whatsapp: true, settings: true },
       });

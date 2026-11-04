@@ -11,8 +11,8 @@ import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
-import { storeDb, storeWriter } from '../lib/repo-factory';
-import { readInStoreContext } from '../lib/store-scoped-read';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
+import { inDoStoreScope, readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { recordQrScan, resolveQrScan } from '../services/qr.service';
 import { AppError } from '../middleware/error-handler';
@@ -585,7 +585,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     if (!enabled) {
       throw new AppError(404, 'NOT_FOUND', 'Not found');
     }
-    const store = await prisma.store.findUniqueOrThrow({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUniqueOrThrow({
       where: { id: storeId },
       select: { id: true, name: true, slug: true, currency: true, domain: true },
     });
@@ -2067,6 +2069,36 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
  * scope (`readInStoreContext`), so RLS still filters every table.
  */
 async function fetchStoreExtras(storeId: string) {
+  // A store on its Durable Object reads the same three sets from its own tables, in one DO round trip batch (NEON-ZERO-1 N-5).
+  const repo = await storeRepo(storeId);
+  if (repo.backend === 'do') {
+    const db = repo.db;
+    const [faqs, howtos, disabled] = await Promise.all([
+      db.storeFaq.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { orderIndex: 'asc' },
+        select: { id: true, question: true, questionAr: true, answer: true, answerAr: true },
+      }),
+      db.storeHowto.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { orderIndex: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          titleAr: true,
+          description: true,
+          descriptionAr: true,
+          steps: true,
+          stepsAr: true,
+        },
+      }),
+      db.storePage.findMany({
+        where: { storeId, isPublished: false },
+        select: { slug: true },
+      }),
+    ]);
+    return { faqs, howtos, disabledCmsSlugs: disabled.map(p => p.slug) };
+  }
   return readInStoreContext(storeId, async () => {
     const rows = await prisma.$queryRaw<
       Array<{ faqs: unknown; howtos: unknown; disabled: unknown }>
@@ -2205,118 +2237,123 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         'active',
         'suspended',
       ]);
-      const store = hit
-        ? await readInStoreContext(hit.id, async () =>
-            (await storeDb(hit.id)).store.findUnique({
-              where: { id: hit.id },
-              select: {
-                id: true,
-                name: true,
-                nameAr: true,
-                slug: true,
-                domain: true,
-                status: true,
-                logo: true,
-                logoAr: true,
-                favicon: true,
-                description: true,
-                descriptionAr: true,
-                currency: true,
-                timezone: true,
-                template: true,
-                look: true,
-                isDemo: true,
-                theme: true,
-                typography: true,
-                socialLinks: true,
-                email: true,
-                phone: true,
-                phoneAr: true,
-                whatsapp: true,
-                address: true,
-                addressAr: true,
-                announcementBar: true,
-                metaTitle: true,
-                metaTitleAr: true,
-                metaDescription: true,
-                metaDescriptionAr: true,
-                metaDescriptionAeo: true,
-                metaDescriptionAeoAr: true,
-                ogImage: true,
-                twitterHandle: true,
-                googleSiteVerification: true,
-                settings: true,
-                taxEnabled: true,
-                taxIncludedInPrice: true,
-                marketingPixels: true,
-                pwaEnabled: true,
-                pwaSettings: true,
-                blogEnabled: true,
-                locationsEnabled: true,
-                returnWindowDays: true,
-                returnFeesPaidBy: true,
-                heroTitle: true,
-                heroTitleAr: true,
-                heroSubtitle: true,
-                heroSubtitleAr: true,
-                heroCtaText: true,
-                heroCtaTextAr: true,
-                heroCtaLink: true,
-                heroImage: true,
-                createdAt: true,
-                llmsTxt: true,
-                aboutJson: true,
-              },
-            })
-          )
-        : null;
+      if (!hit) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+      // A Durable Object store runs the rest of the fill in a bare store scope, so the settings, tax, features and
+      // entitlement reads below open no Postgres transaction for it (NEON-ZERO-1 N-2); a Postgres store is unchanged.
+      return inDoStoreScope(hit.id, async () => {
+        const store = hit
+          ? await readInStoreContext(hit.id, async () =>
+              (await storeDb(hit.id)).store.findUnique({
+                where: { id: hit.id },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  slug: true,
+                  domain: true,
+                  status: true,
+                  logo: true,
+                  logoAr: true,
+                  favicon: true,
+                  description: true,
+                  descriptionAr: true,
+                  currency: true,
+                  timezone: true,
+                  template: true,
+                  look: true,
+                  isDemo: true,
+                  theme: true,
+                  typography: true,
+                  socialLinks: true,
+                  email: true,
+                  phone: true,
+                  phoneAr: true,
+                  whatsapp: true,
+                  address: true,
+                  addressAr: true,
+                  announcementBar: true,
+                  metaTitle: true,
+                  metaTitleAr: true,
+                  metaDescription: true,
+                  metaDescriptionAr: true,
+                  metaDescriptionAeo: true,
+                  metaDescriptionAeoAr: true,
+                  ogImage: true,
+                  twitterHandle: true,
+                  googleSiteVerification: true,
+                  settings: true,
+                  taxEnabled: true,
+                  taxIncludedInPrice: true,
+                  marketingPixels: true,
+                  pwaEnabled: true,
+                  pwaSettings: true,
+                  blogEnabled: true,
+                  locationsEnabled: true,
+                  returnWindowDays: true,
+                  returnFeesPaidBy: true,
+                  heroTitle: true,
+                  heroTitleAr: true,
+                  heroSubtitle: true,
+                  heroSubtitleAr: true,
+                  heroCtaText: true,
+                  heroCtaTextAr: true,
+                  heroCtaLink: true,
+                  heroImage: true,
+                  createdAt: true,
+                  llmsTxt: true,
+                  aboutJson: true,
+                },
+              })
+            )
+          : null;
 
-      if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+        if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-      // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
-      // access tokens) before this store object reaches the public storefront
-      // (and the edge cache). The browser pixel snippets only use the public
-      // pixel IDs — the tokens must never be exposed to anonymous visitors.
-      const publicStore = {
-        ...store,
-        // A store still holding a retired Force skin renders as its mapped Ebda template, at
-        // read time, with no database write (Ruling SKIN-DEL-8).
-        template: normalizeLegacyTemplate(store.template),
-        marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
-        settings: publicStoreSettings(store.settings),
-        // The checkout/cart tax line needs the rate, not just the
-        // enabled/included booleans already on the Store row. The SAME
-        // resolver order creation charges against (ruling M3-9), so it carries
-        // the VAT gate (ruling TAX-2): an unverified store is never shown a
-        // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
-        // rows still `isActive: true`. `taxEnabled` is overwritten with the
-        // EFFECTIVE value so no storefront code can key on the merchant's wish.
-        ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-        ...(await fetchStoreFaqsAndHowtos(store.id)),
-        // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
-        // this is true (sms feature on + provider configured + a promotional
-        // event enabled), so a store without SMS marketing shows no new UI.
-        // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
-        // SWR 600; a provider switched on/off shows up within that window.
-        // It is display-only — the send gate re-checks everything live.
-        smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-        cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-        whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
-      };
+        // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
+        // access tokens) before this store object reaches the public storefront
+        // (and the edge cache). The browser pixel snippets only use the public
+        // pixel IDs — the tokens must never be exposed to anonymous visitors.
+        const publicStore = {
+          ...store,
+          // A store still holding a retired Force skin renders as its mapped Ebda template, at
+          // read time, with no database write (Ruling SKIN-DEL-8).
+          template: normalizeLegacyTemplate(store.template),
+          marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+          settings: publicStoreSettings(store.settings),
+          // The checkout/cart tax line needs the rate, not just the
+          // enabled/included booleans already on the Store row. The SAME
+          // resolver order creation charges against (ruling M3-9), so it carries
+          // the VAT gate (ruling TAX-2): an unverified store is never shown a
+          // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
+          // rows still `isActive: true`. `taxEnabled` is overwritten with the
+          // EFFECTIVE value so no storefront code can key on the merchant's wish.
+          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
+          ...(await fetchStoreFaqsAndHowtos(store.id)),
+          // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
+          // this is true (sms feature on + provider configured + a promotional
+          // event enabled), so a store without SMS marketing shows no new UI.
+          // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
+          // SWR 600; a provider switched on/off shows up within that window.
+          // It is display-only — the send gate re-checks everything live.
+          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+        };
 
-      const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-      // Mirror the /store/resolve endpoint: surface explicitly-disabled
-      // CMS pages so the storefront footer can hide their links rather
-      // than rendering a "Page unavailable" landing on click.
-      const disabledPages = await readInStoreContext(store.id, async () =>
-        (await storeDb(store.id)).storePage.findMany({
-          where: { storeId: store.id, isPublished: false },
-          select: { slug: true },
-        })
-      );
-      const disabledCmsSlugs = disabledPages.map(p => p.slug);
-      const locations = await fetchFooterLocations(store);
-      return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+        // Mirror the /store/resolve endpoint: surface explicitly-disabled
+        // CMS pages so the storefront footer can hide their links rather
+        // than rendering a "Page unavailable" landing on click.
+        const disabledPages = await readInStoreContext(store.id, async () =>
+          (await storeDb(store.id)).storePage.findMany({
+            where: { storeId: store.id, isPublished: false },
+            select: { slug: true },
+          })
+        );
+        const disabledCmsSlugs = disabledPages.map(p => p.slug);
+        const locations = await fetchFooterLocations(store);
+        return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+      });
     });
 
     if (!result) {
@@ -2500,38 +2537,41 @@ router.get(
         if (!store)
           throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
 
-        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+        // Durable Object store: the rest of the fill runs in a bare store scope (no Postgres transaction), see /stores/:slugOrId.
+        return inDoStoreScope(store.id, async () => {
+          const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
 
-        // Surface CMS pages that the merchant has explicitly turned off
-        // ("Show on storefront" toggle in /content). The storefront uses
-        // this to hide footer links pointing at those slugs — without it,
-        // a customer would click "Privacy" in the footer and land on a
-        // "Page unavailable" message, which is a worse UX than the link
-        // simply not being there. Only rows that exist AND are unpublished
-        // need to be reported; if the row is missing the storefront falls
-        // back to its built-in copy and the link should still work.
-        const extras = await fetchStoreExtras(store.id);
-        const disabledCmsSlugs = extras.disabledCmsSlugs;
+          // Surface CMS pages that the merchant has explicitly turned off
+          // ("Show on storefront" toggle in /content). The storefront uses
+          // this to hide footer links pointing at those slugs — without it,
+          // a customer would click "Privacy" in the footer and land on a
+          // "Page unavailable" message, which is a worse UX than the link
+          // simply not being there. Only rows that exist AND are unpublished
+          // need to be reported; if the row is missing the storefront falls
+          // back to its built-in copy and the link should still work.
+          const extras = await fetchStoreExtras(store.id);
+          const disabledCmsSlugs = extras.disabledCmsSlugs;
 
-        // Strip server-only marketing-pixel secrets before the store reaches the
-        // public storefront + edge cache (browser pixels use public IDs only).
-        const publicStore = {
-          ...store,
-          template: normalizeLegacyTemplate(store.template),
-          marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
-          settings: publicStoreSettings(store.settings),
-          // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
-          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-          faqs: extras.faqs,
-          howtos: extras.howtos,
-          // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
-          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
-        };
+          // Strip server-only marketing-pixel secrets before the store reaches the
+          // public storefront + edge cache (browser pixels use public IDs only).
+          const publicStore = {
+            ...store,
+            template: normalizeLegacyTemplate(store.template),
+            marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+            settings: publicStoreSettings(store.settings),
+            // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
+            ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
+            faqs: extras.faqs,
+            howtos: extras.howtos,
+            // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
+            smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+            cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+            whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+          };
 
-        const locations = await fetchFooterLocations(store);
-        return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+          const locations = await fetchFooterLocations(store);
+          return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+        });
       };
 
       if (previewStoreId) {
@@ -2685,7 +2725,9 @@ router.get(
       const { orderId, productId, token } = schema.parse(req.query);
       const storeId = await getStoreIdFromRequest(req);
 
-      const order = await prisma.order.findUnique({
+      const order = await (
+        await storeDb(storeId)
+      ).order.findUnique({
         where: { id: orderId, storeId },
         select: {
           id: true,
@@ -2740,7 +2782,9 @@ router.get(
         return;
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(order.storeId)
+      ).store.findUnique({
         where: { id: order.storeId },
         select: { name: true, nameAr: true, slug: true, logo: true },
       });
@@ -2773,7 +2817,9 @@ router.post(
       const storeId = await getStoreIdFromRequest(req);
 
       // Re-validate token + order state — never trust the form's prior check
-      const order = await prisma.order.findUnique({
+      const order = await (
+        await storeDb(storeId)
+      ).order.findUnique({
         where: { id: data.orderId, storeId },
         select: {
           id: true,
@@ -2796,7 +2842,9 @@ router.post(
       }
 
       // Verify the product is actually in this order (defense-in-depth)
-      const orderItem = await prisma.orderItem.findFirst({
+      const orderItem = await (
+        await storeDb(storeId)
+      ).orderItem.findFirst({
         where: { orderId: data.orderId, productId: data.productId },
         select: { id: true },
       });
@@ -2806,7 +2854,9 @@ router.post(
       }
 
       // Create the review — status 'pending' until AI spam-check + moderation
-      const review = await prisma.review.create({
+      const review = await (
+        await storeWriter(order.storeId)
+      ).review.create({
         data: {
           productId: data.productId,
           storeId: order.storeId,
@@ -2870,7 +2920,9 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
       return;
     }
 
-    const store = await prisma.store.findUnique({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { isDemo: true },
     });

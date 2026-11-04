@@ -7,17 +7,21 @@
  * this unit pin is what the defence-mutation record runs.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 
 const h = vi.hoisted(() => ({
   gucs: undefined as { storeId?: string; userId?: string } | undefined,
   runInTenantContext: vi.fn(),
+  runInStoreScope: vi.fn(),
+  backend: 'pg' as 'pg' | 'do',
 }));
 
 vi.mock('@ebda/database', () => ({
   currentTenantGucs: () => h.gucs,
   runInTenantContext: h.runInTenantContext,
+  runInStoreScope: h.runInStoreScope,
+}));
+vi.mock('../../apps/api/src/lib/repo-factory', () => ({
+  storeRepo: async () => ({ backend: h.backend }),
 }));
 
 import { readInStoreContext } from '../../apps/api/src/lib/store-scoped-read';
@@ -27,9 +31,11 @@ const STORE_B = '22222222-2222-4222-8222-222222222222';
 
 describe('readInStoreContext — ambient store must match (issue 2041)', () => {
   beforeEach(() => {
+    h.backend = 'pg';
     h.runInTenantContext
       .mockReset()
       .mockImplementation(async (_s: string, fn: () => unknown) => fn());
+    h.runInStoreScope.mockReset().mockImplementation(async (_s: string, fn: () => unknown) => fn());
   });
 
   it('opens a scoped transaction when the ambient one has NO store (user-scoped router)', async () => {
@@ -56,11 +62,18 @@ describe('readInStoreContext — ambient store must match (issue 2041)', () => {
     expect(h.runInTenantContext).toHaveBeenCalledWith(STORE_B, expect.any(Function));
   });
 
-  it('does NOT branch on the store backend: a DO store still gets its tenant context (raw Postgres readers need it)', () => {
-    const src = readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/lib/store-scoped-read.ts'),
-      'utf8'
-    );
-    expect(src).not.toMatch(/from '\.\/repo-factory'|storeRepo|backendFor/);
+  it('a DO store gets a bare store scope instead: no Postgres transaction is opened for it (NEON-ZERO-1)', async () => {
+    h.backend = 'do';
+    h.gucs = undefined;
+    await expect(readInStoreContext(STORE_B, async () => 9)).resolves.toBe(9);
+    expect(h.runInTenantContext).not.toHaveBeenCalled();
+    expect(h.runInStoreScope).toHaveBeenCalledWith(STORE_B, expect.any(Function));
+  });
+
+  it('a DO store already inside its own tenant transaction just runs', async () => {
+    h.backend = 'do';
+    h.gucs = { storeId: STORE_B };
+    await expect(readInStoreContext(STORE_B, async () => 3)).resolves.toBe(3);
+    expect(h.runInStoreScope).not.toHaveBeenCalled();
   });
 });

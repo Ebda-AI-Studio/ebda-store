@@ -7,6 +7,7 @@ import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { getAutomationFlags } from './plan-entitlements';
+import { readStorePlan } from '../lib/store-plan';
 import { storeUpdate } from '../lib/repo-factory';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
@@ -192,7 +193,7 @@ class FeatureService {
     // Redis-cached). Everything is read inside one store-scope tx.
     const [store, rows, flags] = await withStore(storeId, async tx => {
       const [storeRow, featureRows] = await Promise.all([
-        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
+        readStorePlan(tx, storeId),
         tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },

@@ -20,7 +20,7 @@ export class StoreError extends Error {
 }
 
 export interface SeedRows {
-  store?: { id: string };
+  store?: { id: string; slug?: string; name?: string; currency?: string; ownerId?: string };
   products: Array<{
     id: string;
     storeId: string;
@@ -49,6 +49,19 @@ export interface SeedRows {
 
 export function seed(db: SyncSql, rows: SeedRows): { products: number; variants: number } {
   return db.transactionSync(() => {
+    // The store's identity row (what a created store has from bootstrap): lets the spike store answer the Store record read.
+    if (rows.store?.slug) {
+      db.run(
+        `INSERT OR IGNORE INTO store_profile (store_id, name, slug, owner_id, currency) VALUES (?, ?, ?, ?, ?)`,
+        [
+          rows.store.id,
+          rows.store.name ?? 'Store',
+          rows.store.slug,
+          rows.store.ownerId ?? 'owner-1',
+          rows.store.currency ?? 'EGP',
+        ]
+      );
+    }
     for (const p of rows.products) {
       const now = Date.now();
       db.run(
