@@ -11,6 +11,7 @@ import { imagesBinding, renderIcon } from '../lib/images/icon-resizer';
 import { redis } from './redis.service';
 import { sendAlert } from './alerts.service';
 import { storeUpdate } from '../lib/repo-factory';
+import { withStoreRead } from '../lib/store-read';
 
 // PWA Settings structure
 export interface PWASettings {
@@ -319,7 +320,7 @@ export class PWAService {
    * Get store PWA settings
    */
   static async getSettings(storeId: string): Promise<PWASettingsResponse> {
-    const store = await withStore(storeId, tx =>
+    const store = await withStoreRead(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
         select: {
@@ -417,7 +418,7 @@ export class PWAService {
    */
   static async generateManifest(storeId: string): Promise<object | null> {
     const [store, pwaEnabled] = await Promise.all([
-      withStore(storeId, tx =>
+      withStoreRead(storeId, tx =>
         tx.store.findUnique({
           where: { id: storeId },
           select: {
@@ -543,7 +544,7 @@ export class PWAService {
     pushEnabled: boolean;
   }> {
     const [store, pwaEnabled] = await Promise.all([
-      withStore(storeId, tx =>
+      withStoreRead(storeId, tx =>
         tx.store.findUnique({
           where: { id: storeId },
           select: {
@@ -581,7 +582,7 @@ export class PWAService {
     title: string;
   } | null> {
     const [store, pwaEnabled] = await Promise.all([
-      withStore(storeId, tx =>
+      withStoreRead(storeId, tx =>
         tx.store.findUnique({
           where: { id: storeId },
           select: {

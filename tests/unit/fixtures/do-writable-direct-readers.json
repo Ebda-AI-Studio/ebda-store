@@ -99,7 +99,8 @@
       "kind": "platform",
       "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
       "models": {
-        "campaignRecipient": 1
+        "campaignRecipient": 1,
+        "address": 1
       }
     },
     "apps/api/src/services/barcode-scan.service.ts": {
