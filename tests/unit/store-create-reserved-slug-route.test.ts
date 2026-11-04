@@ -19,6 +19,7 @@ import { RESERVED_SLUGS, STORE_SLUG_MIN_LENGTH } from '@ebda/shared';
 const RESERVED_CREATABLE = RESERVED_SLUGS.filter(s => s.length >= STORE_SLUG_MIN_LENGTH);
 
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };
     next();

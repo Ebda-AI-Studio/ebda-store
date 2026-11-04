@@ -16,13 +16,24 @@ import { Router, Request, Response } from 'express';
 import { withUser } from '@ebda/database';
 import { authenticate } from '../middleware/auth';
 import { getAuthUser } from '../utils/store-helpers';
+import { currentImpersonator } from '../lib/impersonation-context';
 
 const router = Router();
 
 // GET /api/v1/realtime/session -> who the token is
 router.get('/session', authenticate, (req: Request, res: Response) => {
   const u = getAuthUser(req);
-  res.json({ success: true, data: { userId: u.userId, email: u.email, role: u.role } });
+  // `impersonatedBy`: the token holder's own session fact; it also lets the workerd test prove the impersonation scope
+  // (AsyncLocalStorage.run) survives `authenticate` on Workers (workers-test/impersonation.test.ts).
+  res.json({
+    success: true,
+    data: {
+      userId: u.userId,
+      email: u.email,
+      role: u.role,
+      impersonatedBy: currentImpersonator() ?? null,
+    },
+  });
 });
 
 // GET /api/v1/realtime/stores/:storeId/access -> may this token subscribe to the store's room?

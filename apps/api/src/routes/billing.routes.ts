@@ -43,7 +43,8 @@ import { auditLog } from '../middleware/security';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { prisma, withStore } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { getUsageSummary } from '../services/plan-limit.service';
 import { planService } from '../services/plan.service';
@@ -116,7 +117,21 @@ router.get(
   }
 );
 
-const guard = [authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess];
+const guard = [
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+];
+// BE:S-2 (Ruling FP-3): every billing WRITE (and the checkout-return that applies a charge) moves money or a stored card/plan, so
+// an impersonated support session is refused. Reads keep `guard`.
+const writeGuard = [
+  authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+];
 
 const checkoutSchema = z.object({
   planCode: z.string().min(1).max(64),
@@ -133,7 +148,7 @@ router.get('/invoices', ...guard, async (req: Request, res: Response, next: Next
 });
 
 /** POST /checkout — hosted card page + first charge. Refuses a plan with no price. */
-router.post('/checkout', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/checkout', ...writeGuard, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = checkoutSchema.parse(req.body);
     const out = await startCheckout({ storeId: req.params.storeId, ...input });
@@ -150,7 +165,7 @@ router.post('/checkout', ...guard, async (req: Request, res: Response, next: Nex
  */
 router.get(
   '/checkout/return',
-  ...guard,
+  ...writeGuard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const hint = getBillingProvider().parseReturn(req.query as Record<string, unknown>);
@@ -178,44 +193,52 @@ router.get(
  * PUT /trial-plan — the plan (and interval) billed when the Growth trial ends
  * (signup funnel, Ruling EBDA-FUNNEL-3). Only while trialing.
  */
-router.put('/trial-plan', ...guard, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const input = z
-      .object({
-        planCode: z.enum(SIGNUP_PLAN_CODES),
-        interval: z.enum(['monthly', 'yearly']),
-      })
-      .strict()
-      .parse(req.body);
-    res.json({
-      success: true,
-      data: await selectTrialPlan({ storeId: req.params.storeId, ...input }),
-    });
-  } catch (err) {
-    next(err);
+router.put(
+  '/trial-plan',
+  ...writeGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = z
+        .object({
+          planCode: z.enum(SIGNUP_PLAN_CODES),
+          interval: z.enum(['monthly', 'yearly']),
+        })
+        .strict()
+        .parse(req.body);
+      res.json({
+        success: true,
+        data: await selectTrialPlan({ storeId: req.params.storeId, ...input }),
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * POST /card-setup — hosted "save your card" page; NOTHING is charged. `from`
  * picks where the browser comes back (onboarding or this billing page); the
  * return URL is built here from config, never taken from the client.
  */
-router.post('/card-setup', ...guard, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { from } = z
-      .object({ from: z.enum(['onboarding', 'billing']).default('onboarding') })
-      .parse(req.body ?? {});
-    const returnUrl =
-      from === 'billing'
-        ? `${config.adminUrl}/stores/${req.params.storeId}/billing?card=return`
-        : `${config.adminUrl}/onboarding?card=return`;
-    const out = await startCardSetup({ storeId: req.params.storeId, returnUrl });
-    res.status(201).json({ success: true, data: out });
-  } catch (err) {
-    next(err);
+router.post(
+  '/card-setup',
+  ...writeGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { from } = z
+        .object({ from: z.enum(['onboarding', 'billing']).default('onboarding') })
+        .parse(req.body ?? {});
+      const returnUrl =
+        from === 'billing'
+          ? `${config.adminUrl}/stores/${req.params.storeId}/billing?card=return`
+          : `${config.adminUrl}/onboarding?card=return`;
+      const out = await startCardSetup({ storeId: req.params.storeId, returnUrl });
+      res.status(201).json({ success: true, data: out });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * POST /payment-method — the merchant pays by InstaPay instead of a card (Ruling
@@ -223,7 +246,7 @@ router.post('/card-setup', ...guard, async (req: Request, res: Response, next: N
  */
 router.post(
   '/payment-method',
-  ...guard,
+  ...writeGuard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       z.object({ method: z.literal('instapay') })
@@ -261,7 +284,7 @@ router.get('/payment-claims', ...guard, async (req: Request, res: Response, next
  * proof. The merchant uploads the InstaPay receipt screenshot (POST /receipts), then
  * submits the checked fields (POST /receipts/:id/submit). 410 tells an old client why.
  */
-router.post('/payment-claims', ...guard, (_req: Request, res: Response) => {
+router.post('/payment-claims', ...writeGuard, (_req: Request, res: Response) => {
   res.status(410).json({
     success: false,
     error: {
@@ -276,28 +299,32 @@ router.post('/payment-claims', ...guard, (_req: Request, res: Response) => {
  * upgrade, downgrade, or pick a plan to come back from canceled. Nothing is charged
  * and the tier does not change until Ebda approves the payment.
  */
-router.post('/instapay-plan', ...guard, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const input = z
-      .object({ planCode: z.string().min(1).max(64), interval: z.enum(['monthly', 'yearly']) })
-      .strict()
-      .parse(req.body);
-    const details = await chooseInstapayPlan({ storeId: req.params.storeId, ...input });
-    await auditLog({
-      action: 'billing.instapay_plan_chosen',
-      userId: req.user!.userId,
-      storeId: req.params.storeId,
-      resourceType: 'store_subscription',
-      resourceId: req.params.storeId,
-      details: input,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
-    res.json({ success: true, data: details });
-  } catch (err) {
-    next(err);
+router.post(
+  '/instapay-plan',
+  ...writeGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = z
+        .object({ planCode: z.string().min(1).max(64), interval: z.enum(['monthly', 'yearly']) })
+        .strict()
+        .parse(req.body);
+      const details = await chooseInstapayPlan({ storeId: req.params.storeId, ...input });
+      await auditLog({
+        action: 'billing.instapay_plan_chosen',
+        userId: req.user!.userId,
+        storeId: req.params.storeId,
+        resourceType: 'store_subscription',
+        resourceId: req.params.storeId,
+        details: input,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: details });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 const receiptUpload = multer({
   storage: multer.memoryStorage(),
@@ -311,7 +338,7 @@ const receiptUpload = multer({
  */
 router.post(
   '/receipts',
-  ...guard,
+  ...writeGuard,
   uploadLimiter,
   dailyUploadLimiter,
   receiptUpload.single('file'),
@@ -355,7 +382,7 @@ router.get(
  */
 router.post(
   '/receipts/:receiptId/submit',
-  ...guard,
+  ...writeGuard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const receiptId = z.string().uuid().parse(req.params.receiptId);
@@ -390,19 +417,23 @@ router.post(
   }
 );
 
-router.post('/change-plan', ...guard, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { planCode } = z.object({ planCode: z.string().min(1).max(64) }).parse(req.body);
-    res.json({
-      success: true,
-      data: await changePlan({ storeId: req.params.storeId, planCode }),
-    });
-  } catch (err) {
-    next(err);
+router.post(
+  '/change-plan',
+  ...writeGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { planCode } = z.object({ planCode: z.string().min(1).max(64) }).parse(req.body);
+      res.json({
+        success: true,
+        data: await changePlan({ storeId: req.params.storeId, planCode }),
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
-router.post('/cancel', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/cancel', ...writeGuard, async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json({ success: true, data: await cancelSubscription({ storeId: req.params.storeId }) });
   } catch (err) {
@@ -410,7 +441,7 @@ router.post('/cancel', ...guard, async (req: Request, res: Response, next: NextF
   }
 });
 
-router.post('/resume', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/resume', ...writeGuard, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await resumeSubscription({ storeId: req.params.storeId });
     res.json({ success: true });
@@ -427,7 +458,7 @@ router.post('/resume', ...guard, async (req: Request, res: Response, next: NextF
  */
 router.post(
   '/checkout/stub-confirm',
-  ...guard,
+  ...writeGuard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (process.env.NODE_ENV === 'production' || getBillingProvider().name !== 'stub') {

@@ -1,3 +1,8 @@
+import {
+  UPLOAD_ERROR_FALLBACK,
+  UPLOAD_ERROR_MESSAGES,
+  VALIDATION_ERROR_MESSAGE,
+} from '../lib/localized-error';
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod/v3';
 import { Prisma } from '@ebda/database';
@@ -198,9 +203,15 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   const multerErr = multerClientError(err);
   if (multerErr) {
     logger.debug({ err: { code: multerErr.code, message: err.message } }, 'Multer upload error');
+    // E-7: the text is a fixed bilingual sentence, never multer's raw English (which can name the field).
+    const bilingual = UPLOAD_ERROR_MESSAGES[multerErr.code] ?? UPLOAD_ERROR_FALLBACK;
     res.status(multerErr.status).json({
       success: false,
-      error: { code: multerErr.code, message: multerErr.message },
+      error: {
+        code: multerErr.code,
+        message: bilingual.messageEn,
+        details: bilingual,
+      },
     });
     return;
   }
@@ -221,7 +232,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   // Handle Zod validation errors
   if (isZodError(err)) {
     logger.debug({ issues: err.issues }, 'Validation error');
-    const details: Record<string, string[]> = {};
+    const details: Record<string, unknown> = {};
     // A duck-typed ZodError (another zod copy) only promises an `issues` array: an issue
     // without a `path` array is filed under the root key, never a 500 (review M-1).
     for (const issue of err.issues as unknown[]) {
@@ -232,8 +243,10 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
       if (!details[path]) {
         details[path] = [];
       }
-      details[path].push(message);
+      (details[path] as string[]).push(message);
     }
+    // E-2: the field map stays; the bilingual sentence rides next to it for the admin's localizer.
+    Object.assign(details, VALIDATION_ERROR_MESSAGE);
 
     res.status(400).json({
       success: false,

@@ -17,6 +17,7 @@ import { hasDb } from '../helpers/bundle-fixtures';
 
 const calls: string[] = [];
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
   authenticate: (req: any, _res: any, next: any) => {
     calls.push('authenticate');
     req.user = { userId: 'user-1', role: req.header('x-test-role') ?? 'store_admin' };
