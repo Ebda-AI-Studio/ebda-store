@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { withStore, type Prisma } from '@ebda/database';
 import { AppError } from './error-handler';
 import { auditLog } from './security';
+import { gateRead, onAccessD1 } from '../services/platform/access-d1';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -10,6 +11,21 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 async function readStoreForAccess<S extends Prisma.StoreSelect>(storeId: string, select: S) {
   if (!UUID_RE.test(storeId)) return null;
   return withStore(storeId, tx => tx.store.findUnique({ where: { id: storeId }, select }));
+}
+
+/**
+ * NEON-ZERO-1 (N-6): once the `access` family is on D1 the whole decision input (store row + this user's membership) is ONE
+ * D1 read, memoised for the request. Before the cutover: the Postgres reads above, unchanged. NEVER cached across requests
+ * (access is a permission: see services/platform/access-d1.ts).
+ */
+const requestMemo = new WeakMap<object, Promise<Awaited<ReturnType<typeof gateRead>>>>();
+function gateForRequest(req: Request, storeId: string, userId: string) {
+  let p = requestMemo.get(req);
+  if (!p) {
+    p = gateRead(storeId, userId);
+    requestMemo.set(req, p);
+  }
+  return p;
 }
 
 /**
@@ -48,13 +64,17 @@ export async function requireStoreAccess(
     // Validate store exists. `stores` is under RLS (R-EBDA-005): the row this check
     // decides on is read inside THAT store's scope (like the staff membership below);
     // the access decision itself is made here, from ownerId / role / membership.
-    const store = await readStoreForAccess(storeId, {
-      id: true,
-      ownerId: true,
-      name: true,
-      status: true,
-      billingSuspendedReason: true,
-    });
+    const onD1 = UUID_RE.test(storeId) && (await onAccessD1());
+    const d1Gate = onD1 ? await gateForRequest(req, storeId, user.userId) : null;
+    const store = onD1
+      ? (d1Gate?.store ?? null)
+      : await readStoreForAccess(storeId, {
+          id: true,
+          ownerId: true,
+          name: true,
+          status: true,
+          billingSuspendedReason: true,
+        });
 
     if (!store) {
       throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
@@ -138,12 +158,14 @@ export async function requireStoreAccess(
 
     // Staff users can access stores they are explicitly added to
     if (user.role === 'staff') {
-      const membership = await withStore(storeId, tx =>
-        tx.storeStaff.findUnique({
-          where: { userId_storeId: { userId: user.userId, storeId } },
-          select: { id: true },
-        })
-      );
+      const membership = onD1
+        ? d1Gate?.isStaff
+        : await withStore(storeId, tx =>
+            tx.storeStaff.findUnique({
+              where: { userId_storeId: { userId: user.userId, storeId } },
+              select: { id: true },
+            })
+          );
 
       if (!membership) {
         await auditLog({
@@ -193,11 +215,11 @@ export async function checkStoreAccess(
   | { ok: true; store: { id: string; ownerId: string; status: string } }
   | { ok: false; status: number; code: string; message: string }
 > {
-  const store = await readStoreForAccess(storeId, {
-    id: true,
-    ownerId: true,
-    status: true,
-  });
+  const onD1 = UUID_RE.test(storeId) && (await onAccessD1());
+  const d1Gate = onD1 ? await gateRead(storeId, user.userId) : null;
+  const store = onD1
+    ? (d1Gate?.store ?? null)
+    : await readStoreForAccess(storeId, { id: true, ownerId: true, status: true });
   if (!store) {
     return { ok: false, status: 404, code: 'STORE_NOT_FOUND', message: 'Store not found' };
   }
@@ -208,12 +230,14 @@ export async function checkStoreAccess(
     return { ok: true, store };
   }
   if (user.role === 'staff') {
-    const membership = await withStore(storeId, tx =>
-      tx.storeStaff.findUnique({
-        where: { userId_storeId: { userId: user.userId, storeId } },
-        select: { id: true },
-      })
-    );
+    const membership = onD1
+      ? d1Gate?.isStaff
+      : await withStore(storeId, tx =>
+          tx.storeStaff.findUnique({
+            where: { userId_storeId: { userId: user.userId, storeId } },
+            select: { id: true },
+          })
+        );
     if (membership) {
       return { ok: true, store };
     }

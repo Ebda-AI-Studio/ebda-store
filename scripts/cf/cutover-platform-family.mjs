@@ -38,7 +38,42 @@ export const FAMILIES = {
     'billing_webhook_events',
     'store_lifecycle_emails',
   ],
+  // N-6/N-7: store membership (the access gate, staff, staff invites). Keep in step with FAMILY_MODELS.access.
+  access: ['store_staff', 'staff_invites'],
 };
+
+/**
+ * Extra pre-flip checks per family (SELECT-only, both sides). `access`: the gate decides on D1 `stores` (owner, status,
+ * billing suspension, deleted) once the marker exists, so a store whose directory row differs from Postgres would be decided
+ * on stale facts the moment we flip. The directory mirror is dual-written; this proves it before the switch.
+ */
+const STORE_FACTS_SQL_PG =
+  "SELECT id, owner_id, status, billing_suspended_reason, deleted_at IS NOT NULL AS deleted FROM stores WHERE storage_backend <> 'do'";
+async function storeFactMismatches(client, d) {
+  const fact = r =>
+    `${r.owner_id}|${r.status}|${r.billing_suspended_reason ?? ''}|${r.deleted ? 1 : 0}`;
+  const pg = new Map((await client.query(STORE_FACTS_SQL_PG)).rows.map(r => [r.id, fact(r)]));
+  const d1 = new Map(
+    (
+      await d1Query(
+        d,
+        'SELECT id, owner_id, status, billing_suspended_reason, deleted_at IS NOT NULL AS deleted, storage_backend FROM stores'
+      )
+    ).map(r => [r.id, { v: fact(r), backend: r.storage_backend }])
+  );
+  const bad = [];
+  for (const [id, v] of pg) {
+    const row = d1.get(id);
+    // Stores D1 owns (`do`) are skipped: their Postgres row is sealed and stale by design. A PG store missing from D1
+    // would be a 404 at the gate, so it counts as drift.
+    if (!row) bad.push(id);
+    else if (row.backend !== 'do' && row.v !== v) bad.push(id);
+  }
+  return bad;
+}
+
+const freezeKey = family => `platform_freeze.${family}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const markerKey = family => `platform_cutover.${family}`;
 const q = s => `"${s}"`;
@@ -59,9 +94,12 @@ async function main() {
     'd1-target': { type: 'string', default: 'local' },
     'd1-config': { type: 'string' },
     'persist-to': { type: 'string' },
+    // The API caches the freeze marker for 5 s and the cutover marker for 10 s per isolate: wait longer than both.
+    'freeze-wait-ms': { type: 'string', default: '20000' },
     commit: { type: 'boolean', default: false },
     status: { type: 'boolean', default: false },
     'delete-marker': { type: 'boolean', default: false },
+    unfreeze: { type: 'boolean', default: false },
   });
   const tables = FAMILIES[args.family];
   if (!tables) throw new Error(`pass --family <${Object.keys(FAMILIES).join('|')}>`);
@@ -78,6 +116,13 @@ async function main() {
       await d1Query(d, `SELECT id, value, created_at FROM system_settings WHERE key = ${lit(key)}`)
     )[0];
 
+  if (args.unfreeze) {
+    await d1Statements(d, [
+      `DELETE FROM system_settings WHERE key = ${lit(freezeKey(args.family))};`,
+    ]);
+    console.log(`freeze ${freezeKey(args.family)} removed`);
+    return;
+  }
   if (args['delete-marker']) {
     await d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(key)};`]);
     console.log(
@@ -103,7 +148,7 @@ async function main() {
 
   const t0 = performance.now();
   const plan = loadPlan();
-  const client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+  let client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
   const bound = await bindPlan(client, plan);
   const fam = bound.platform.tables.filter(bt => tables.includes(bt.name)); // already FK-ordered
   const missing = tables.filter(t => !fam.some(bt => bt.name === t));
@@ -164,6 +209,16 @@ async function main() {
       'stores must be in D1 first (run the directory reconcile / migrate-platform-to-d1 for stores)'
     );
   }
+  if (args.family === 'access') {
+    const drift = await storeFactMismatches(client, d);
+    if (drift.length) {
+      console.log(
+        `STORE DIRECTORY DRIFT (owner/status/suspension/deleted): ${drift.slice(0, 10).join(', ')} (${drift.length})`
+      );
+      throw new Error('D1 stores differ from Postgres: run the directory reconcile, then re-run');
+    }
+    console.log('  store directory facts equal on both sides');
+  }
   if (!args.commit) {
     await client.query('ROLLBACK');
     await client.end();
@@ -173,97 +228,139 @@ async function main() {
     return;
   }
 
-  // 2. copy (idempotent upserts, FK order)
-  let stmts = [];
-  let bytes = 0;
-  const flush = async () => {
-    if (stmts.length) await d1Statements(d, stmts);
-    stmts = [];
-    bytes = 0;
-  };
-  const before = {};
-  for (const bt of fam) {
-    before[bt.name] = await sourceDigest(client, bt, plan.platform, 'all');
-    const names = bt.columns.map(c => c.col);
-    for await (const page of sourcePages(client, bt, plan.platform, 'all', null, args.pageSize))
-      for (const r of page) {
-        const s = upsert(bt.name, names, bt.pk, r);
-        stmts.push(s);
-        bytes += s.length;
-        if (bytes >= MAX_FILE_BYTES) await flush();
-      }
-    await flush();
-    console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
-  }
-
-  // 3. verify: count + digest on both sides, foreign keys
-  const results = await d1QueryMany(d, [
-    ...fam.map(
-      bt =>
-        `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)} ORDER BY ${bt.pk.map(q).join(', ')}`
-    ),
-    'PRAGMA foreign_key_check',
-  ]);
-  const bad = [];
-  for (const [i, bt] of fam.entries()) {
-    const dg = new TableDigest();
-    const cn = bt.columns.map(c => c.col);
-    for (const r of results[i])
-      await dg.add(
-        cn,
-        cn.map(c => r[c]),
-        bt.pk
-      );
-    const dst = await dg.finish();
-    const src = await sourceDigest(client, bt, plan.platform, 'all');
-    const ok = src.count === dst.count && src.digest === dst.digest;
-    console.log(
-      `  verify ${bt.name.padEnd(28)} ${ok ? 'EQUAL' : 'MISMATCH'}  src ${src.count} ${src.digest.slice(0, 12)}  d1 ${dst.count} ${dst.digest.slice(0, 12)}`
-    );
-    if (!ok) bad.push(bt.name);
-  }
-  const fkRows = results.at(-1);
-  if (fkRows.length) bad.push(`foreign_key_check:${JSON.stringify(fkRows.slice(0, 5))}`);
-  if (bad.length) {
-    await client.query('ROLLBACK');
-    await client.end();
-    throw new Error(
-      `verification failed (${bad.join(', ')}); the switch was NOT flipped. Re-run (a write may have landed in Postgres mid-copy).`
-    );
-  }
-
-  // 4. flip
-  const value = JSON.stringify({
-    family: args.family,
-    copiedAt: new Date().toISOString(),
-    tables: Object.fromEntries(fam.map(bt => [bt.name, before[bt.name]])),
-  });
-  await d1Statements(d, [
-    `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(key)}, ${lit(value)}, 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
-  ]);
-  if (!(await marker())) throw new Error('marker was not written');
-  console.log(
-    `FLIPPED: ${key} written. The API serves ${args.family} from D1 within 10 s per isolate.`
-  );
-
-  // 5. drift report
-  const drift = [];
-  for (const bt of fam) {
-    const now = await sourceDigest(client, bt, plan.platform, 'all');
-    if (now.count !== before[bt.name].count || now.digest !== before[bt.name].digest)
-      drift.push(bt.name);
-  }
+  // 1b. FREEZE writes to the family (retryable 503 from the API), wait out the isolate caches, and only THEN take the snapshot
+  // we copy from: one REPEATABLE READ snapshot taken earlier would hide writes made during the copy (lost silently).
+  const freezeWait = Number(args['freeze-wait-ms']);
+  const setFreeze = on =>
+    d1Statements(d, [
+      on
+        ? `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(freezeKey(args.family))}, ${lit(new Date().toISOString())}, 'cutover', 0) ON CONFLICT (key) DO NOTHING;`
+        : `DELETE FROM system_settings WHERE key = ${lit(freezeKey(args.family))};`,
+    ]);
   await client.query('ROLLBACK');
   await client.end();
-  if (drift.length) {
-    console.log(
-      `DRIFT: Postgres changed after the copy in ${drift.join(', ')} (writes during the 10 s flip window). Re-apply those rows by hand; list them with a PG query on updated_at.`
-    );
-    process.exit(2);
-  }
+  await setFreeze(true);
   console.log(
-    `done in ${fmtMs(performance.now() - t0)}; Postgres digests unchanged since the copy.`
+    `FROZEN ${args.family}: writes get 503 PLATFORM_FAMILY_FROZEN; waiting ${freezeWait} ms for isolates`
   );
+  let flipped = false;
+  try {
+    await sleep(freezeWait);
+    client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+    if (args.family === 'access') {
+      const drift = await storeFactMismatches(client, d);
+      if (drift.length)
+        throw new Error(`store directory drift after the freeze: ${drift.slice(0, 5).join(', ')}`);
+    }
+
+    // 2. copy (idempotent upserts, FK order)
+    let stmts = [];
+    let bytes = 0;
+    const flush = async () => {
+      if (stmts.length) await d1Statements(d, stmts);
+      stmts = [];
+      bytes = 0;
+    };
+    const before = {};
+    for (const bt of fam) {
+      before[bt.name] = await sourceDigest(client, bt, plan.platform, 'all');
+      const names = bt.columns.map(c => c.col);
+      for await (const page of sourcePages(client, bt, plan.platform, 'all', null, args.pageSize))
+        for (const r of page) {
+          const s = upsert(bt.name, names, bt.pk, r);
+          stmts.push(s);
+          bytes += s.length;
+          if (bytes >= MAX_FILE_BYTES) await flush();
+        }
+      await flush();
+      console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
+    }
+
+    // 3. verify: count + digest on both sides, foreign keys
+    const results = await d1QueryMany(d, [
+      ...fam.map(
+        bt =>
+          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)} ORDER BY ${bt.pk.map(q).join(', ')}`
+      ),
+      'PRAGMA foreign_key_check',
+    ]);
+    const bad = [];
+    for (const [i, bt] of fam.entries()) {
+      const dg = new TableDigest();
+      const cn = bt.columns.map(c => c.col);
+      for (const r of results[i])
+        await dg.add(
+          cn,
+          cn.map(c => r[c]),
+          bt.pk
+        );
+      const dst = await dg.finish();
+      const src = await sourceDigest(client, bt, plan.platform, 'all');
+      const ok = src.count === dst.count && src.digest === dst.digest;
+      console.log(
+        `  verify ${bt.name.padEnd(28)} ${ok ? 'EQUAL' : 'MISMATCH'}  src ${src.count} ${src.digest.slice(0, 12)}  d1 ${dst.count} ${dst.digest.slice(0, 12)}`
+      );
+      if (!ok) bad.push(bt.name);
+    }
+    const fkRows = results.at(-1);
+    if (fkRows.length) bad.push(`foreign_key_check:${JSON.stringify(fkRows.slice(0, 5))}`);
+    if (bad.length) {
+      await client.query('ROLLBACK');
+      await client.end();
+      throw new Error(
+        `verification failed (${bad.join(', ')}); the switch was NOT flipped. Re-run (a write may have landed in Postgres mid-copy).`
+      );
+    }
+
+    // 4. flip
+    const value = JSON.stringify({
+      family: args.family,
+      copiedAt: new Date().toISOString(),
+      tables: Object.fromEntries(fam.map(bt => [bt.name, before[bt.name]])),
+    });
+    await d1Statements(d, [
+      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(key)}, ${lit(value)}, 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
+    ]);
+    if (!(await marker())) throw new Error('marker was not written');
+    flipped = true;
+    console.log(
+      `FLIPPED: ${key} written. The API serves ${args.family} from D1 within 10 s per isolate; the freeze stays until then.`
+    );
+
+    // 5. wait out the isolate caches, then verify on a NEW connection (a fresh snapshot sees every Postgres write that landed
+    // in the window) and re-digest D1; only then lift the freeze.
+    await client.query('ROLLBACK');
+    await client.end();
+    await sleep(freezeWait);
+    client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+    const drift = [];
+    for (const bt of fam) {
+      const now = await sourceDigest(client, bt, plan.platform, 'all');
+      if (now.count !== before[bt.name].count || now.digest !== before[bt.name].digest)
+        drift.push(bt.name);
+    }
+    await client.query('ROLLBACK');
+    await client.end();
+    await setFreeze(false);
+    console.log(`UNFROZEN ${args.family}`);
+    if (drift.length) {
+      console.log(
+        `DRIFT: Postgres changed after the copy in ${drift.join(', ')} (writes during the 10 s flip window). Re-apply those rows by hand; list them with a PG query on updated_at.`
+      );
+      process.exit(2);
+    }
+    console.log(
+      `done in ${fmtMs(performance.now() - t0)}; Postgres digests unchanged since the copy (verified on a new connection).`
+    );
+  } catch (e) {
+    // Before the flip a failure is safe to retry: lift the freeze. After the flip the freeze is lifted by step 5; if the
+    // script died between, the freeze is harmless (the marker wins) and `--unfreeze` removes it.
+    if (!flipped) {
+      await setFreeze(false).catch(() => {});
+      console.log(`UNFROZEN ${args.family} (copy aborted before the flip)`);
+    }
+    throw e;
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

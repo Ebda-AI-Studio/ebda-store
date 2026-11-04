@@ -152,7 +152,7 @@ describe('cutover switch', () => {
     await expect(platformFamilyOnD1('billing')).rejects.toMatchObject({ statusCode: 503 });
   });
 
-  it('the router is registered on the prisma proxy for exactly the billing models', () => {
+  it('the router is registered on the prisma proxy for exactly the billing + access models', () => {
     expect([...platformRouter.models].sort()).toEqual(
       [
         'billingEvent',
@@ -161,7 +161,9 @@ describe('cutover switch', () => {
         'billingReminder',
         'billingWebhookEvent',
         'plan',
+        'staffInvite',
         'storeLifecycleEmail',
+        'storeStaff',
         'storeSubscription',
       ].sort()
     );

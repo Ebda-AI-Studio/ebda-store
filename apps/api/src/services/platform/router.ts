@@ -10,7 +10,17 @@
  */
 import { setModelRouter, type ModelRouter } from '@ebda/database';
 import { requirePlatformDb } from '../../lib/platform-db';
-import { FAMILY_MODELS, familyOfModel, platformFamilyOnD1 } from './cutover';
+import { FAMILY_MODELS, assertFamilyNotFrozen, familyOfModel, platformFamilyOnD1 } from './cutover';
+
+const WRITES: ReadonlySet<string> = new Set([
+  'create',
+  'createMany',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany',
+]);
 
 const MODELS: ReadonlySet<string> = new Set(Object.values(FAMILY_MODELS).flat());
 
@@ -18,7 +28,11 @@ export const platformRouter: ModelRouter = {
   models: MODELS,
   async route(model, method, args, postgres) {
     const family = familyOfModel(model);
-    if (!family || !(await platformFamilyOnD1(family))) return postgres();
+    if (!family) return postgres();
+    if (!(await platformFamilyOnD1(family))) {
+      if (WRITES.has(method)) await assertFamilyNotFrozen(family);
+      return postgres();
+    }
     const client = await requirePlatformDb();
     return (client[model] as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](
       ...args
