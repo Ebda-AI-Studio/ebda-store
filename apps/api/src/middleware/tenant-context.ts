@@ -483,6 +483,27 @@ export function userContext(
     const rawStoreId = getStoreId?.(req);
     const storeId = rawStoreId && UUID_RE.test(rawStoreId) ? rawStoreId : undefined;
 
+    // NEON-ZERO-1 (NZ-TX-1 on top, N-3): a user-scoped request that names a Durable Object store (the storefront wishlist) opens
+    // no Postgres transaction either; the scope carries the user. A request with no store keeps the transaction.
+    if (storeId) {
+      backendFor(storeId).then(backend => {
+        if (res.destroyed || res.writableEnded) return;
+        if (backend === 'do') openDoRequest(res, next, storeId, userId);
+        else openUserTransaction(res, next, storeId, userId);
+      }, next);
+      return;
+    }
+    openUserTransaction(res, next, storeId, userId);
+  };
+}
+
+function openUserTransaction(
+  res: Response,
+  next: NextFunction,
+  storeId: string | undefined,
+  userId: string
+): void {
+  {
     // Same COMMIT → release → drain ordering as `tenantContext` above; a
     // fire-and-forget promise started by a user-scoped handler inherits this
     // transaction too. See lib/after-tenant-commit.ts.
@@ -497,7 +518,7 @@ export function userContext(
         ),
       { userId, storeId, middleware: 'userContext' }
     );
-  };
+  }
 }
 
 /**

@@ -551,11 +551,11 @@ router.post(
       let created: { id: string };
       if (await bundlesOnDo(storeId)) {
         // The Durable Object takes the bundle and its components as ONE atomic batch (no nested relation writes there).
-        const w = await storeWriter(storeId);
+        const dw = await storeWriter(storeId);
         const id = randomUUID();
-        await w.$transaction([
-          w.bundle.create({ data: { id, ...bundleData } as never }),
-          w.bundleItem.createMany({
+        await dw.$transaction([
+          dw.bundle.create({ data: { id, ...bundleData } as never }),
+          dw.bundleItem.createMany({
             data: componentRows.map(r => ({ bundleId: id, ...r })) as never,
           }),
         ]);
@@ -649,13 +649,13 @@ router.put(
       };
       if (await bundlesOnDo(storeId)) {
         // Durable Object: no nested relation writes, so the component wipe + rewrite and the update are ONE atomic batch.
-        const w = await storeWriter(storeId);
-        await w.$transaction([
-          ...(data.items ? [w.bundleItem.deleteMany({ where: { bundleId: id } })] : []),
-          w.bundle.update({ where: { id, storeId }, data: scalarPatch as never }),
+        const dw = await storeWriter(storeId);
+        await dw.$transaction([
+          ...(data.items ? [dw.bundleItem.deleteMany({ where: { bundleId: id } })] : []),
+          dw.bundle.update({ where: { id, storeId }, data: scalarPatch as never }),
           ...(data.items
             ? [
-                w.bundleItem.createMany({
+                dw.bundleItem.createMany({
                   data: data.items.map(item => ({
                     bundleId: id,
                     productId: item.productId,

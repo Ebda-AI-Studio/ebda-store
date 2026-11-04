@@ -55,6 +55,7 @@ export async function accessToken(claims: {
       email: 'tester@exit-test.invalid',
       role: claims.role ?? 'store_admin',
       tv: claims.tv ?? 0,
+      ...(claims.storeId ? { storeId: claims.storeId } : {}),
       jti: claims.jti,
       ...(claims.impersonatedBy ? { impersonatedBy: claims.impersonatedBy } : {}),
       iss: JWT_ISSUER,

@@ -17,3 +17,5 @@ Evidence: `tests/unit/tenant-context-do-store.test.ts`, `tests/unit/store-scoped
 `tests/unit/storefront-do-reads.test.ts`, `apps/api/workers-test/pg-unreachable.test.ts` (Postgres at a dead port). Cost if
 wrong: a DO-store handler that still reads Postgres inside this scope runs each such read in its own short transaction instead of
 the request's single one, so two such reads in one request are no longer atomic with each other.
+
+Update 2026-11-04: the `tenantContext` fork itself is Ruling NZ-TX-1 (`openForBackend` / `openDoRequest`, PR nz-tenant-ctx-do-main), the one mechanism; this ruling's duplicate was dropped when #413 was rebased onto it. What remains here is `readInStoreContext` / `inDoStoreScope` (handlers that open their own scope) and, on top of NZ-TX-1, the same fork in `userContext` for a user-scoped request that names a DO store (the storefront wishlist).

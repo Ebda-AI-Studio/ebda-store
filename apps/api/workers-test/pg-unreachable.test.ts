@@ -145,6 +145,39 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
           }),
         }),
     ],
+    // N-3: bundles (public list), the guest payment return (read of the order from the DO: an unknown order is a 404 from the
+    // DO, never a Postgres 500) and the customer wishlist (the DO writer behind userContext).
+    ['public bundle list', () => api(`/stores/public/${SID}/bundles`, { headers: H })],
+    [
+      'verify-payment (order read from the DO)',
+      () =>
+        api('/public/orders/33333333-3333-4333-8333-333333333333/verify-payment', {
+          method: 'POST',
+          headers: { ...H, ...json },
+          body: '{}',
+        }),
+    ],
+    [
+      'wishlist read + add + remove (customer, DO writer)',
+      async () => {
+        const { accessToken, authState } = await import('./helpers');
+        await authState('user:tv:cust-1', [['set', 'user:tv:cust-1', '0', {}]]);
+        const tok = await accessToken({
+          userId: 'cust-1',
+          jti: 'jw1',
+          role: 'customer',
+          storeId: SID,
+        });
+        const h = { ...H, authorization: `Bearer ${tok}`, ...json };
+        const add = await api('/wishlist', {
+          method: 'POST',
+          headers: h,
+          body: JSON.stringify({ productId: PID }),
+        });
+        if (add.status >= 300) return add;
+        return api('/wishlist', { headers: h });
+      },
+    ],
   ];
   it('seed', async () => {
     await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
@@ -178,7 +211,7 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
     expect(r.status).toBe(200);
     // The steady state of production: the store's feature map is in the cache (5 min TTL, features:store:v3:<id>). Its COLD
     // read is the platform feature tables (N-10b), not this PR's reads, so the harness starts warm.
-    const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(k => [k, false]));
+    const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(k => [k, k === 'bundles']));
     await e.KV_CACHE.put(`cache:features:store:v3:${SID}`, JSON.stringify(map), {
       expirationTtl: 600,
     });
@@ -187,13 +220,15 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
   // this PR: the plan entitlement (billing family, N-10a, served by D1 only after its cutover marker) and the per-store
   // `store_features` override (N-10b). `it.fails` is the tripwire: it goes red the day the quote works, so the flag is flipped.
   const blocked = new Set(['checkout quote']);
+  const expect404 = new Set(['verify-payment (order read from the DO)']);
   for (const [name, call] of probe) {
     const run = async () => {
       const r = await call();
       const body = await r.text();
       if (r.status >= 300 && !blocked.has(name))
         console.log(`PROBE ${name}: ${r.status} ${body.slice(0, 300)}`);
-      expect(r.status).toBeLessThan(300);
+      if (expect404.has(name)) expect(r.status).toBe(404);
+      else expect(r.status).toBeLessThan(300);
     };
     if (blocked.has(name)) it.fails(`${name} (blocked on N-10a/N-10b)`, run);
     else it(name, run);

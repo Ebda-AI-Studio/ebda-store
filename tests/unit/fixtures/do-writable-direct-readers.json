@@ -94,7 +94,8 @@
       "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
       "models": {
         "product": 4,
-        "productPriceTier": 1
+        "productPriceTier": 1,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/gold-rate/repricer.ts": {
@@ -110,7 +111,8 @@
       "reason": "adjustInventory / bulkAdjustInventory / setInventory: after `if (stock)` early return (CF-STOCK-1); the remaining reads are the Postgres branch.",
       "models": {
         "product": 3,
-        "productVariant": 1
+        "productVariant": 1,
+        "wishlistItem": 1
       }
     },
     "apps/api/src/services/notification-config.service.ts": {
@@ -136,7 +138,9 @@
         "cartBundle": 1,
         "productVariant": 1,
         "abandonedCart": 1,
-        "cart": 1
+        "cart": 1,
+        "bundle": 1,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/product.service.ts": {
@@ -160,6 +164,14 @@
       "models": {
         "product": 2,
         "productVariant": 1
+      }
+    },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
       }
     }
   }

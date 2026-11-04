@@ -1604,7 +1604,9 @@ router.post(
       const body = verifyPaymentSchema.parse(req.body ?? {});
       const storeId = await getStoreIdFromRequest(req);
 
-      const order = await prisma.order.findFirst({
+      const order = await (
+        await storeDb(storeId)
+      ).order.findFirst({
         where: { id, storeId, deletedAt: null },
         select: {
           id: true,
@@ -1868,7 +1870,9 @@ router.get(
         return;
       }
 
-      const wishlist = await prisma.wishlist.findFirst({
+      const wishlist = await (
+        await storeDb(storeId)
+      ).wishlist.findFirst({
         where: { userId, storeId },
         include: {
           items: {
