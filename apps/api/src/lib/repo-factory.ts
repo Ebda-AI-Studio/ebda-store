@@ -1444,6 +1444,7 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
+  await mirrorEntitlementToPg(storeId, data); // NZ-D21: Postgres sources the entitlement copy-back
   // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
     throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
@@ -1543,6 +1544,28 @@ const ENTITLEMENT_FIELDS: readonly string[] = [
 ];
 const touchesEntitlement = (data: Record<string, unknown>): boolean =>
   ENTITLEMENT_FIELDS.some(f => data[f] !== undefined);
+
+/**
+ * Postgres is the SOURCE of the entitlement fields that `syncStoreEntitlement` copies to D1 / the DO and that the hourly reconciler
+ * reads (Ruling NZ-D21). An IMMEDIATE D1 + DO write of plan / billing suspension / status / deletion (`storeUpdateOnDo`, the
+ * compare-and-set `storeUpdateMany`) therefore also writes them to Postgres, FIRST (a failure here changes nothing), so a later
+ * copy-back or repair sources the value that was just written, never a stale one. Only those fields; absent row = no-op.
+ */
+async function mirrorEntitlementToPg(
+  storeId: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const patch = Object.fromEntries(
+    ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
+  );
+  if (Object.keys(patch).length === 0) return;
+  await withStore(storeId, async tx => {
+    await (tx as unknown as StoreUpdateManyClient).store.updateMany({
+      where: { id: storeId },
+      data: patch,
+    });
+  });
+}
 
 /** The row an update WILL produce (current record with the patch laid over it), read without writing. */
 async function projectStoreUpdate(
@@ -1676,7 +1699,10 @@ export async function storeUpdateMany(
     const res = {
       count: await d1StoreWrite(args.where as Record<string, unknown>, d1StorePatch(data)),
     } as Prisma.BatchPayload;
-    if (res.count > 0) await copyStoreSettings(args.where.id, data);
+    if (res.count > 0) {
+      await mirrorEntitlementToPg(args.where.id, data); // NZ-D21
+      await copyStoreSettings(args.where.id, data);
+    }
     return res;
   }
   const res = await db.store.updateMany(args);

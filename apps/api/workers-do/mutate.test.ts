@@ -55,6 +55,16 @@ describe('StoreDO.mutate', () => {
     ).rejects.toThrow(/another batch/);
   });
 
+  it('a closed store answers STORE_CLOSED with status 410, never a status-less answer (Ruling NZ-D20)', async () => {
+    const stub = stubFor('mut-closed');
+    expect(await stub.closeIfNoMoneyInFlight('mut-closed')).toMatchObject({ ok: true });
+    expect(
+      await stub.mutate('mut-closed', {
+        ops: [{ model: 'StorePage', op: 'create', args: page('mut-closed', 'x') }],
+      })
+    ).toMatchObject({ ok: false, code: 'STORE_CLOSED', status: 410 });
+  });
+
   it('refuses money models and stock writes as an answer (nothing is written)', async () => {
     const stub = stubFor('mut-refuse');
     expect(
