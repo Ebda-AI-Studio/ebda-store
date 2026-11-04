@@ -12,6 +12,9 @@ vi.mock('../../apps/api/src/services/billing/billing-notify', () => ({
   runBillingEffects: vi.fn(async () => undefined),
 }));
 const storeUpdateMock = vi.hoisted(() => vi.fn(async () => ({})));
+const captured = vi.hoisted(() => ({
+  guard: undefined as undefined | ((m: string, o: string) => void),
+}));
 vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
   ...(await importOriginal<object>()),
   storeUpdate: storeUpdateMock,
@@ -20,6 +23,10 @@ vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/database')>();
   return {
     ...real,
+    setRoutedModelGuard: (fn: (m: string, o: string) => void) => {
+      captured.guard = fn;
+      real.setRoutedModelGuard(fn);
+    },
     withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(real.prisma),
     currentStoreId: () => '11111111-1111-4111-8111-111111111111',
   };
@@ -27,13 +34,25 @@ vi.mock('@ebda/database', async importOriginal => {
 
 import { prisma, setModelWriteObserver } from '@ebda/database';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
-import { cutoverKey, resetCutoverCache } from '../../apps/api/src/services/platform/cutover';
+import {
+  cutoverKey,
+  freezeKey,
+  platformFamilyOnD1,
+  platformFamilyOnD1ForWrite,
+  resetCutoverCache,
+} from '../../apps/api/src/services/platform/cutover';
+import { sendAlert } from '../../apps/api/src/services/alerts.service';
+import { reconcilePlanTiers } from '../../apps/api/src/services/billing/subscription-billing.service';
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
 import {
   applyGrantsBatchD1,
   commitManualPaymentD1,
+  planTierDriftD1,
 } from '../../apps/api/src/services/platform/billing-d1';
+import { setBillingProviderForTests } from '../../apps/api/src/services/billing';
 import {
+  handleBillingWebhook,
+  processDeferredBillingWebhooks,
   applyWebhookEvent,
   expireStaleCheckouts,
   settleInTx,
@@ -219,7 +238,8 @@ describe('settle lease', () => {
       (db.prepare('SELECT current_period_start s FROM store_subscriptions').get() as { s: number })
         .s
     ).toBe(startedBefore);
-    expect(effects).toHaveLength(0);
+    expect(storeUpdateMock).toHaveBeenCalledTimes(1); // the Postgres tier is repeated (idempotent), not skipped
+    expect(effects).toContainEqual(expect.objectContaining({ kind: 'payment_recorded' }));
   });
 
   it('expireStaleCheckouts leaves a row that holds the lease alone', async () => {
@@ -395,5 +415,234 @@ describe('the write observer (Ebda Chat plan_changed) still sees D1 writes', () 
     } finally {
       setModelWriteObserver(undefined);
     }
+  });
+});
+
+describe('freeze lifecycle', () => {
+  const putFreeze = (db: DatabaseSync, expiresAt?: number) =>
+    db
+      .prepare(`INSERT INTO system_settings (id, key, value) VALUES ('f', ?, ?)`)
+      .run(freezeKey('billing'), JSON.stringify(expiresAt === undefined ? {} : { expiresAt }));
+
+  it('an EXPIRED freeze is ignored (writes flow) and pages once', async () => {
+    const db = rig();
+    db.prepare('DELETE FROM system_settings').run(); // no marker
+    putFreeze(db, Date.now() - 1000);
+    vi.mocked(sendAlert).mockClear();
+    expect(await platformFamilyOnD1ForWrite('billing')).toBe(false); // not frozen, not moved
+    expect(await platformFamilyOnD1ForWrite('billing')).toBe(false);
+    expect(vi.mocked(sendAlert)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
+  });
+
+  it('marker AND freeze: writes are refused (no mixed backends in the settle window); reads see D1', async () => {
+    const db = rig();
+    putFreeze(db, Date.now() + 60_000);
+    await expect(platformFamilyOnD1ForWrite('billing')).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'PLATFORM_FAMILY_FROZEN',
+    });
+    expect(await platformFamilyOnD1('billing')).toBe(true);
+    db.prepare('DELETE FROM system_settings WHERE key = ?').run(freezeKey('billing'));
+    expect(await platformFamilyOnD1ForWrite('billing')).toBe(true);
+  });
+
+  it('"off" is never cached while a freeze row exists', async () => {
+    const db = rig();
+    db.prepare('DELETE FROM system_settings').run();
+    putFreeze(db, Date.now() + 60_000);
+    expect(await platformFamilyOnD1('billing')).toBe(false);
+    db.prepare(`INSERT INTO system_settings (id, key, value) VALUES ('c2', ?, '{}')`).run(
+      cutoverKey('billing')
+    );
+    expect(await platformFamilyOnD1('billing')).toBe(true); // the very next read sees the marker, no 10 s wait
+  });
+
+  it('the frozen error carries a retry hint and an Arabic message for the admin UI', async () => {
+    const db = rig();
+    db.prepare('DELETE FROM system_settings').run();
+    putFreeze(db, Date.now() + 60_000);
+    await expect(platformFamilyOnD1ForWrite('billing')).rejects.toMatchObject({
+      details: { retryable: true, messageAr: expect.stringContaining('جرّب تاني') },
+    });
+  });
+});
+
+describe('runtime guard: a routed model reaching Postgres after the flip throws', () => {
+  it('the registered guard fires for a cached-on family only', async () => {
+    rig();
+    const guard = captured.guard!;
+    expect(() => guard('Plan', 'findMany')).not.toThrow(); // not yet seen on in this isolate: the router's Postgres leg
+    await platformFamilyOnD1('billing'); // marker seen -> cached on
+    expect(() => guard('Plan', 'findMany')).toThrow(/ROUTED_MODEL_ON_POSTGRES/);
+    expect(() => guard('StoreSubscription', 'update')).toThrow(/ROUTED_MODEL_ON_POSTGRES/);
+    expect(() => guard('Product', 'findMany')).not.toThrow(); // a model of no routed family is untouched
+  });
+});
+
+describe('grants batch is chunked under the bound-parameter cap', () => {
+  it('120 pending grants apply in chunks, in order, each chunk atomic', async () => {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status, current_period_end) VALUES ('s1', ?, 'growth', 'active', 1000)`
+    ).run(STORE);
+    const grants = Array.from({ length: 120 }, (_, i) => {
+      db.prepare(
+        `INSERT INTO billing_grants (id, kind, beneficiary_id, status, idempotency_key) VALUES (?, 'founding', ?, 'pending', ?)`
+      ).run(`g${i}`, STORE, `k${i}`);
+      return { id: `g${i}`, before: new Date(1000 + i), after: new Date(1001 + i) };
+    });
+    const n = await applyGrantsBatchD1({
+      storeId: STORE,
+      status: 'active',
+      currentPeriodEnd: new Date(1000),
+      trialEndsAt: null,
+      trialing: false,
+      now: new Date(5000),
+      grants,
+    } as never);
+    expect(n).toBe(120);
+    expect(
+      db.prepare(`SELECT COUNT(*) n FROM billing_grants WHERE status = 'applied'`).get()
+    ).toEqual({ n: 120 });
+    expect(db.prepare('SELECT current_period_end e FROM store_subscriptions').get()).toEqual({
+      e: 1120,
+    });
+  });
+});
+
+describe('stuck leases and tier reconciliation', () => {
+  it('a STALE lease no longer blocks expiry; a live one still does', async () => {
+    const db = rig();
+    const old = Date.now() - 10 * 86_400_000;
+    ledger(db, { failure_reason: 'settling', created_at: old, updated_at: Date.now() - 600_000 });
+    expect(await expireStaleCheckouts(new Date())).toBe(1);
+  });
+
+  it('reconcilePlanTiers repairs stores.plan to the subscription tier and pages', async () => {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'growth', 'active')`
+    ).run(STORE);
+    db.prepare(`UPDATE stores SET plan = 'free' WHERE id = ?`).run(STORE);
+    expect(await planTierDriftD1(10)).toEqual([
+      { storeId: STORE, current: 'free', tier: 'professional' },
+    ]);
+    vi.mocked(sendAlert).mockClear();
+    expect(await reconcilePlanTiers()).toEqual({ checked: 1, repaired: 1 });
+    expect(storeUpdateMock).toHaveBeenCalledWith(expect.anything(), {
+      where: { id: STORE },
+      data: { plan: 'professional' },
+    });
+    expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
+  });
+});
+
+describe('webhooks during the freeze are deferred, not 503d, and applied exactly once', () => {
+  const event = {
+    eventId: 'wh-frozen',
+    kind: 'charge.succeeded',
+    merchantOrderId: EV,
+    providerRef: 'ref-9',
+    amountMinor: null,
+    currency: 'EGP',
+    failureReason: undefined,
+    card: undefined,
+    occurredAt: new Date(),
+    raw: {},
+  };
+  const provider = {
+    name: 'stub',
+    isConfigured: () => true,
+    verifyWebhook: vi.fn(() => ({ ...event })),
+  };
+  const freezeNow = (db: DatabaseSync) =>
+    db
+      .prepare(`INSERT INTO system_settings (id, key, value) VALUES ('fz', ?, ?)`)
+      .run(freezeKey('billing'), JSON.stringify({ expiresAt: Date.now() + 60_000 }));
+  const unfreeze = (db: DatabaseSync) =>
+    db.prepare('DELETE FROM system_settings WHERE key = ?').run(freezeKey('billing'));
+
+  function frozenWorld() {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'free', 'active')`
+    ).run(STORE);
+    ledger(db);
+    setBillingProviderForTests(provider as never);
+    freezeNow(db);
+    return db;
+  }
+
+  it('authenticated -> stored deferred -> 200; duplicates collapse; nothing applied while frozen', async () => {
+    const db = frozenWorld();
+    const first = await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    expect(first).toEqual({ duplicate: false, outcome: 'deferred', detail: 'family_frozen' });
+    await handleBillingWebhook('stub', Buffer.from('{}'), {}); // the provider delivers it twice
+    expect(db.prepare(`SELECT outcome FROM billing_webhook_events`).all()).toEqual([
+      { outcome: 'deferred' },
+    ]);
+    expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+      status: 'pending',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(0); // still frozen
+    expect(storeUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('a bad signature is NOT stored (authenticate first)', async () => {
+    const db = frozenWorld();
+    provider.verifyWebhook.mockImplementationOnce(() => {
+      throw new Error('INVALID_SIGNATURE');
+    });
+    await expect(handleBillingWebhook('stub', Buffer.from('{}'), {})).rejects.toThrow(
+      'INVALID_SIGNATURE'
+    );
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_webhook_events').get()).toEqual({ n: 0 });
+  });
+
+  it('after the freeze the queue is processed exactly once; a live redelivery afterwards is a replay', async () => {
+    const db = frozenWorld();
+    await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    unfreeze(db);
+    expect(await processDeferredBillingWebhooks()).toBe(1);
+    expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+      status: 'succeeded',
+    });
+    expect(db.prepare('SELECT plan_code p FROM store_subscriptions').get()).toEqual({ p: 'basic' });
+    expect(db.prepare('SELECT outcome FROM billing_webhook_events').get()).toEqual({
+      outcome: 'processed',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(0);
+    expect(await handleBillingWebhook('stub', Buffer.from('{}'), {})).toMatchObject({
+      duplicate: true,
+      detail: 'replay',
+    });
+    expect(storeUpdateMock).toHaveBeenCalledTimes(1); // ONE effect
+  });
+
+  it('a live delivery that beats the processor takes the deferred row over; the processor then finds nothing', async () => {
+    const db = frozenWorld();
+    await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    unfreeze(db);
+    expect(await handleBillingWebhook('stub', Buffer.from('{}'), {})).toMatchObject({
+      outcome: 'processed',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(0);
+    expect(storeUpdateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed apply puts the row BACK in the queue (the payment is never forgotten) and the next run applies it', async () => {
+    const db = frozenWorld();
+    await handleBillingWebhook('stub', Buffer.from('{}'), {});
+    unfreeze(db);
+    storeUpdateMock.mockRejectedValueOnce(new Error('postgres down'));
+    expect(await processDeferredBillingWebhooks()).toBe(0);
+    expect(db.prepare('SELECT outcome FROM billing_webhook_events').get()).toEqual({
+      outcome: 'deferred',
+    });
+    expect(await processDeferredBillingWebhooks()).toBe(1);
+    expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+      status: 'succeeded',
+    });
   });
 });

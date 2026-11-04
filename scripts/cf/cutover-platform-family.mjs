@@ -74,6 +74,8 @@ async function main() {
     unfreeze: { type: 'boolean', default: false },
     'drain-ms': { type: 'string', default: '45000' },
     'settle-ms': { type: 'string', default: '12000' },
+    // a freeze carries its own expiry: if this script dies without lifting it the API ignores it after this long and pages
+    'freeze-ttl-ms': { type: 'string', default: '900000' },
   });
   const tables = FAMILIES[args.family];
   if (!tables) throw new Error(`pass --family <${Object.keys(FAMILIES).join('|')}>`);
@@ -92,7 +94,7 @@ async function main() {
     )[0];
   const setFreeze = () =>
     d1Statements(d, [
-      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(fkey)}, '{}', 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
+      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(fkey)}, ${lit(JSON.stringify({ expiresAt: Date.now() + Number(args['freeze-ttl-ms']), by: 'cutover-platform-family' }))}, 'cutover', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`,
     ]);
   const liftFreeze = () =>
     d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(fkey)};`]);
@@ -211,7 +213,29 @@ async function main() {
 
   // 2. FREEZE and drain BEFORE the snapshot: a snapshot opened earlier would not see the writes the drain waits for,
   //    and a write after it would be lost.
+  let frozenNow = false;
+  const lift = async () => {
+    if (!frozenNow) return;
+    try {
+      await liftFreeze();
+      frozenNow = false;
+    } catch (e) {
+      // LOUD: a freeze left behind stops every write to the family until it expires (the API ignores it after its
+      // expiresAt and pages). Non-zero exit; the operator must run --unfreeze.
+      console.error(`!!! COULD NOT LIFT THE FREEZE ${fkey}: ${e.message}`);
+      console.error(
+        `!!! run: node scripts/cf/cutover-platform-family.mjs --family ${args.family} --unfreeze (same --d1 flags)`
+      );
+      process.exitCode = 1;
+    }
+  };
+  for (const sig of ['SIGINT', 'SIGTERM'])
+    process.once(sig, () => {
+      console.error(`${sig}: lifting the freeze before exit`);
+      lift().finally(() => process.exit(130));
+    });
   await setFreeze();
+  frozenNow = true;
   console.log(
     `FROZEN ${args.family}: writes are refused (503, retryable). Draining ${args['drain-ms']} ms ...`
   );
@@ -222,6 +246,19 @@ async function main() {
     await sleep(Number(args['drain-ms']));
     const { client, fam } = await open();
     famNames = fam.map(b => b.name);
+    // 2b. billing: webhooks deferred during the freeze live in the dedupe table and could collide with a Postgres row of
+    // the same (provider, event_id) on copy. Set them aside, copy, then put back those Postgres does not already know
+    // (one it knows was already applied: dropping it IS the dedupe).
+    let deferred = [];
+    if (tables.includes('billing_webhook_events')) {
+      deferred = await d1Query(
+        d,
+        `SELECT id, provider, event_id, event_type, outcome, detail, received_at FROM billing_webhook_events WHERE outcome = 'deferred'`
+      );
+      if (deferred.length)
+        await d1Statements(d, [`DELETE FROM billing_webhook_events WHERE outcome = 'deferred';`]);
+      console.log(`  ${deferred.length} deferred webhook(s) set aside`);
+    }
     // 3. copy (idempotent upserts, FK order)
     let stmts = [];
     let bytes = 0;
@@ -244,6 +281,16 @@ async function main() {
       console.log(`  copied ${bt.name} (${before[bt.name].count} rows)`);
     }
 
+    if (deferred.length) {
+      await d1Statements(
+        d,
+        deferred.map(
+          r =>
+            `INSERT INTO billing_webhook_events (id, provider, event_id, event_type, outcome, detail, received_at) VALUES (${[r.id, r.provider, r.event_id, r.event_type, r.outcome, r.detail, r.received_at].map(lit).join(', ')}) ON CONFLICT (provider, event_id) DO NOTHING;`
+        )
+      );
+      console.log(`  ${deferred.length} deferred webhook(s) put back (already-known ones dropped)`);
+    }
     // 4. verify: count + digest on both sides, foreign keys
     const results = await d1QueryMany(d, [
       ...fam.map(
@@ -295,12 +342,13 @@ async function main() {
     );
   } finally {
     if (!flipped) {
-      await liftFreeze().catch(() => {});
-      console.log('freeze lifted (nothing was flipped).');
+      await lift();
+      if (!frozenNow) console.log('freeze lifted (nothing was flipped).');
     }
   }
   await sleep(Number(args['settle-ms']));
-  await liftFreeze();
+  await lift();
+  if (frozenNow) throw new Error('the freeze is still up (see above); run --unfreeze');
   console.log('freeze lifted.');
 
   // 6. drift: a NEW connection = a snapshot taken after the flip. Any difference is a write that reached Postgres.
@@ -326,9 +374,11 @@ async function main() {
 
 /** D1 rows to compare: the cutover bookkeeping rows live in system_settings and are not part of the copied data. */
 function verifyWhere(table) {
-  return table === 'system_settings'
-    ? ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`
-    : '';
+  if (table === 'system_settings')
+    return ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`;
+  // webhooks that arrived during the freeze are stored here as `deferred` (D1 only); they are not part of the copy
+  if (table === 'billing_webhook_events') return ` WHERE outcome <> 'deferred'`;
+  return '';
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

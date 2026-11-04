@@ -31,6 +31,12 @@ node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 count
 
 `--commit` refuses when the marker exists. Order: FREEZE -> wait `--drain-ms` (45 s) -> open the Postgres snapshot -> copy -> verify -> flip -> wait `--settle-ms` (12 s) -> lift the freeze -> re-digest Postgres on a NEW connection. It flips only if EVERY table is equal on both sides; on a mismatch it exits 1, lifts the freeze, leaves the switch untouched and can simply be re-run. Exit code 2 + a table list after the flip means a write still reached Postgres; re-apply those rows in D1 by hand. `--unfreeze` lifts a freeze left behind by a killed run; `--status` shows marker and freeze.
 
+## What the freeze does to callers (about a minute)
+
+- Every write answers `503 PLATFORM_FAMILY_FROZEN` with `details.retryable`, `retryAfterSeconds: 30` and `details.messageAr` (the admin UI shows it). Reads keep working.
+- Billing webhooks are NOT refused: Paymob documents no retry for a failed delivery and Kashier's is unverified, so a 503 could lose a payment notification. The webhook is authenticated first (signature / HMAC; a bad one is rejected and stored nowhere), then stored durably as `billing_webhook_events.outcome = 'deferred'` (idempotent on provider + event id) and answered 200 `{ outcome: 'deferred' }`. Once the freeze is lifted the queue is applied exactly once (confirm-before-apply runs then): by the first webhook after the freeze, by the `*/15` cron job `billing-deferred-webhooks`, and by the daily billing cycle. A live redelivery that wins the race takes the deferred row over (one flip `deferred -> processing`); a failed apply puts the row back. `sweepStuckCharges` still asks the gateway about renewals pending over an hour. The copy script sets deferred rows aside during the copy and puts back the ones Postgres does not already know.
+- The freeze row carries `expiresAt` (`--freeze-ttl-ms`, default 15 min). If the script dies without lifting it the API IGNORES it after that and pages (P1); SIGINT/SIGTERM lift it; a failed lift is loud and exits non-zero (`--unfreeze` removes it).
+
 ## Verify after the flip (VERIFIED / NOT VERIFIED, both halves)
 
 - `--status` shows `marker: PRESENT`, D1 counts equal the dry-run PG counts.

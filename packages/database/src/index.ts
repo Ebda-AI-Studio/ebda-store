@@ -51,6 +51,7 @@ export {
   setDbHopObserver,
   setModelWriteObserver,
   notifyModelWrite,
+  setRoutedModelGuard,
   type ModelWriteEvent,
 } from './tenant-guard';
 export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
