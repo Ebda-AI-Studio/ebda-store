@@ -95,7 +95,7 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
           <Link
             key={tab.key}
             href={tab.href}
-            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
+            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
               active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -116,7 +116,7 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
         type="button"
         onClick={onOpenMore}
         aria-label={t('more')}
-        className="flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+        className="flex h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path

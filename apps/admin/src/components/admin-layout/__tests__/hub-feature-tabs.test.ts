@@ -12,10 +12,11 @@ import { buildStorePaletteItems } from '../buildPaletteItems';
 import type { NavItem } from '../buildStoreAdminNav';
 
 const labels = new Proxy({} as HubLabels, { get: (_t, key) => String(key) });
-const sales = HUBS.find(h => h.key === 'sales')!;
+// The wallet moved from Sales to the Marketing and offers hub with coupons, promotions, loyalty, bundles (UX:N-1).
+const sales = HUBS.find(h => h.key === 'marketing')!;
 
-describe('Sales hub — Wallet tab', () => {
-  it('carries the customer_wallet feature key; no other Sales tab is feature-keyed', () => {
+describe('Marketing hub — Wallet tab', () => {
+  it('carries the customer_wallet feature key; no other Marketing tab is feature-keyed', () => {
     const tabs = sales.buildTabs('s1', labels);
     const keyed = tabs.filter(t => t.featureKey);
     expect(keyed).toEqual([
@@ -23,13 +24,13 @@ describe('Sales hub — Wallet tab', () => {
     ]);
   });
 
-  it('routes /wallet to the Sales hub', () => {
+  it('routes /wallet to the Marketing hub', () => {
     expect(sales.urlPrefixes).toContain('/wallet');
   });
 
   it('the command palette drops a feature-keyed tab the store cannot see', () => {
     const nav: NavItem[] = [
-      { name: 'Sales', href: '/stores/s1/orders', icon: '', hubKey: 'sales' },
+      { name: 'Marketing', href: '/stores/s1/coupons', icon: '', hubKey: 'marketing' },
     ];
     const settings = new Proxy({} as never, { get: (_t, k) => String(k) });
     const hidden = buildStorePaletteItems(nav, 's1', labels, settings, t => !t.featureKey);

@@ -40,7 +40,7 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
         <span className="font-semibold text-foreground">
           {t('backgroundLabel', { label: displayLabel })}
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground">{resolved}</span>
+        <span className="font-mono text-xs text-muted-foreground">{resolved}</span>
       </div>
       <div className="grid grid-cols-3 gap-2">
         {roles.map(role => (
@@ -53,7 +53,7 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
           </div>
         ))}
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs">
         <span className="text-muted-foreground">
           {/* i18n-gate-allow: standard name */}
           {t('autoFixedLabel')} <span className="font-mono">{autoFg}</span> · WCAG{' '}
@@ -61,7 +61,7 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
           {autoRatio >= HEADING_AA_MIN ? '✓' : autoRatio >= LARGE_AA_MIN ? '⚠' : '✗'}
         </span>
         {warn && merchantRatio !== null ? (
-          <span className="text-amber-600">
+          <span className="text-warning-ink">
             ⚠{' '}
             {t('pickedTextWarning', {
               ratio: merchantRatio.toFixed(1),

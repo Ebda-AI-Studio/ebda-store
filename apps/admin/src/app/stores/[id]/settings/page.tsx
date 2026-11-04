@@ -11,6 +11,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
 import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@ebda/shared';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
+import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
 
 /**
  * Fetches the store theme and surfaces the aiAutopilot flag as a small
@@ -47,7 +48,10 @@ function AiAutopilotChip({ storeId }: { storeId: string }) {
             : 'bg-muted text-muted-ink border-border'
         }`}
       >
-        ✨ {t('aiAutopilotChip.label')}{' '}
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z" />
+        </svg>
+        {t('aiAutopilotChip.label')}{' '}
         <strong>{autopilot ? t('aiAutopilotChip.on') : t('aiAutopilotChip.off')}</strong>
       </span>
     </div>
@@ -185,7 +189,7 @@ export default function StoreSettingsPage() {
     {
       key: 'announcement',
       href: `/stores/${storeId}/announcement`,
-      color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -200,7 +204,7 @@ export default function StoreSettingsPage() {
     {
       key: 'categories',
       href: `/stores/${storeId}/categories`,
-      color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -246,7 +250,7 @@ export default function StoreSettingsPage() {
     {
       key: 'paymentSettings',
       href: `/stores/${storeId}/payment-settings`,
-      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -261,7 +265,7 @@ export default function StoreSettingsPage() {
     {
       key: 'shipping',
       href: `/stores/${storeId}/shipping`,
-      color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -276,7 +280,7 @@ export default function StoreSettingsPage() {
     {
       key: 'taxSettings',
       href: `/stores/${storeId}/tax`,
-      color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
+      color: 'bg-primary/10 text-primary-ink',
       // No featureKey (issue 2358): the tax page is reachable on every plan.
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -292,7 +296,7 @@ export default function StoreSettingsPage() {
     {
       key: 'checkoutDelivery',
       href: `/stores/${storeId}/delivery`,
-      color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -307,7 +311,7 @@ export default function StoreSettingsPage() {
     {
       key: 'pwaSettings',
       href: `/stores/${storeId}/pwa`,
-      color: 'bg-violet-100 text-violet-600',
+      color: 'bg-primary/10 text-primary-ink',
       featureKey: 'pwa',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -353,7 +357,7 @@ export default function StoreSettingsPage() {
     {
       key: 'language',
       href: `/stores/${storeId}/language`,
-      color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -361,6 +365,22 @@ export default function StoreSettingsPage() {
             strokeLinejoin="round"
             strokeWidth={2}
             d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
+          />
+        </svg>
+      ),
+    },
+    {
+      // Staff-accessible page that lives in the Marketing hub (Ruling T3-1): this card is the Settings door to it.
+      key: 'notifications',
+      href: `/stores/${storeId}/notifications`,
+      color: 'bg-primary/10 text-primary-ink',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
           />
         </svg>
       ),
@@ -445,7 +465,7 @@ export default function StoreSettingsPage() {
       // Plan, usage vs limits, upgrade (SP5 plans engine).
       key: 'billing',
       href: `/stores/${storeId}/billing`,
-      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -460,7 +480,7 @@ export default function StoreSettingsPage() {
     {
       key: 'staff',
       href: `/stores/${storeId}/staff`,
-      color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -475,21 +495,12 @@ export default function StoreSettingsPage() {
   ];
 
   return (
-    <AdminLayout
-      title={t('page.title')}
-      subtitle={t('page.subtitle')}
-      actions={
-        <Link href={`/stores/${storeId}`}>
-          <Button type="button" variant="outline">
-            {t('page.backToStore')}
-          </Button>
-        </Link>
-      }
-    >
+    <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       <SettingsSearch />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {isLoading
-          ? Array.from({ length: 9 }).map((_, i) => (
+      <div className="space-y-8">
+        {isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}
                 className="flex items-start gap-4 rounded-xl border bg-card p-6 shadow-sm animate-pulse"
@@ -500,31 +511,60 @@ export default function StoreSettingsPage() {
                   <div className="h-3 w-full rounded bg-muted" />
                 </div>
               </div>
-            ))
-          : cards
-              .filter(card => !card.featureKey || isEnabled(card.featureKey))
-              .map(card => (
-                <Link
-                  key={card.href}
-                  href={card.href}
-                  className="group flex items-start gap-4 rounded-xl border bg-card p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
-                >
-                  <div
-                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+            ))}
+          </div>
+        ) : (
+          SETTINGS_GROUPS.map(group => {
+            const groupCards = group.items
+              .map(item => cards.find(c => c.key === item.card))
+              .filter((c): c is SettingsCard => !!c && (!c.featureKey || isEnabled(c.featureKey)));
+            if (groupCards.length === 0) return null;
+            const grid = (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {groupCards.map(card => (
+                  <Link
+                    key={card.href}
+                    href={card.href}
+                    className="group flex min-h-20 items-start gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"
                   >
-                    {card.icon}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {tCards(`${card.key}.title`)}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground leading-snug">
-                      {tCards(`${card.key}.description`)}
-                    </p>
-                    {card.key === 'branding' && <AiAutopilotChip storeId={storeId} />}
-                  </div>
-                </Link>
-              ))}
+                    <div
+                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+                    >
+                      {card.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {tCards(`${card.key}.title`)}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground leading-snug">
+                        {tCards(`${card.key}.description`)}
+                      </p>
+                      {card.key === 'branding' && <AiAutopilotChip storeId={storeId} />}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            );
+            return group.collapsed ? (
+              <details key={group.key} className="group/dev">
+                <summary className="mb-3 cursor-pointer select-none text-sm font-semibold text-foreground">
+                  {t(`groups.${group.key}`)}
+                </summary>
+                {grid}
+              </details>
+            ) : (
+              <section key={group.key} aria-labelledby={`settings-group-${group.key}`}>
+                <h2
+                  id={`settings-group-${group.key}`}
+                  className="mb-3 text-sm font-semibold text-foreground"
+                >
+                  {t(`groups.${group.key}`)}
+                </h2>
+                {grid}
+              </section>
+            );
+          })
+        )}
       </div>
 
       {/* ── Super-admin: Plan info + Danger Zone ─────────────────────────── */}
