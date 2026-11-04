@@ -670,7 +670,9 @@ const fontUpload = multer({
 router.post(
   '/font',
   authenticate,
-  requirePermission('settings:write'),
+  // BE:S-18: `settings:write` is super_admin only, so every merchant got 403 on the typography page. The store owner's own
+  // permission is `store:settings`; `checkStoreAccess` below still pins the upload to a store the caller can manage.
+  requirePermission('store:settings'),
   uploadLimiter,
   dailyUploadLimiter,
   fontUpload.single('file'),

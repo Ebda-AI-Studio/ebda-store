@@ -26,7 +26,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -103,6 +103,7 @@ router.get(
 router.post(
   '/:id/integrations/agent-key',
   ...chain,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -165,6 +166,7 @@ router.post(
 router.delete(
   '/:id/integrations/agent-key',
   ...chain,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
