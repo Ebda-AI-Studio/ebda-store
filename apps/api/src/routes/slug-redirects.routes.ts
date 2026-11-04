@@ -3,7 +3,7 @@ import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { runInTenantContext } from '@ebda/database';
+import { runInStoreTenantContext as runInTenantContext } from '../lib/store-scoped-read';
 import { listSlugRedirects, deleteSlugRedirect } from '../services/slug-redirect.service';
 
 // #903: SlugRedirect had no admin UI surface at all — a merchant could not

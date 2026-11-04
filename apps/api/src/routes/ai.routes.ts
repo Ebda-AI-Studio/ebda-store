@@ -1816,17 +1816,14 @@ router.get(
     try {
       const storeId = (req.params as { storeId: string }).storeId;
 
-      const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
-        (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
-        (await storeDb(currentStoreId())).aiRecommendation
-          .findMany({
-            where: { storeId },
-            distinct: ['sourceProductId'],
-            select: { sourceProductId: true },
-          })
-          .then(rows => rows.length),
-        (await storeDb(currentStoreId())).aiRecommendation.count({ where: { storeId } }),
+      const db = await storeDb(storeId);
+      const [totalProducts, recSources] = await Promise.all([
+        db.product.count({ where: { storeId, deletedAt: null } }),
+        // no `distinct` (not served by the DO client): the distinct sources are counted in memory
+        db.aiRecommendation.findMany({ where: { storeId }, select: { sourceProductId: true } }),
       ]);
+      const totalRecs = recSources.length;
+      const distinctSourcesWithRecs = new Set(recSources.map(r => r.sourceProductId)).size;
 
       res.json({
         success: true,
