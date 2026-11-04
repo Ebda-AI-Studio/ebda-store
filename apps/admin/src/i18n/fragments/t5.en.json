@@ -60,6 +60,18 @@
       "faqs": {
         "deletedToast": "Question deleted",
         "undo": "Undo"
+      },
+      "tabs": {
+        "label": "Product page sections",
+        "edit": "Edit",
+        "overview": "Overview"
+      },
+      "deleteDialog": {
+        "object": "Product “{name}”",
+        "consequence": "It is removed from the store and new orders, and cannot be restored.",
+        "confirmLabel": "Delete product",
+        "done": "Product deleted",
+        "failed": "We could not delete the product. Try again."
       }
     },
     "variants": {
@@ -85,6 +97,12 @@
         "object": "The product's 3D model",
         "consequence": "Shoppers will see photos only.",
         "confirmLabel": "Remove the model"
+      }
+    },
+    "list": {
+      "actions": {
+        "overview": "Overview",
+        "menu": "Options for product {name}"
       }
     }
   },

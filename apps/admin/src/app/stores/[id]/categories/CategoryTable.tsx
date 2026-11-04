@@ -298,8 +298,71 @@ export function CategoryTable({
 
   const showDragHandle = !!onDragEnd;
 
+  // Below md the table becomes a card per category (UX:M-2); drag-reorder stays a desktop affordance.
+  const mobileCards = (
+    <ul className="divide-y divide-border md:hidden" aria-label={t('label')}>
+      {categories.map(cat => {
+        const name = isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || '';
+        const altName = isRtl ? cat.name : cat.nameAr;
+        return (
+          <li key={cat.id} className="space-y-3 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{name}</p>
+                {altName && <p className="text-sm text-muted-foreground">{altName}</p>}
+                {!cat.nameAr?.trim() && (
+                  <span className="mt-1 inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
+                    {t('missingArabicName')}
+                  </span>
+                )}
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                  cat.isActive ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {cat.isActive ? t('active') : t('inactive')}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t('products')}: {cat._count?.products ?? 0}
+            </p>
+            <RowActions
+              menuLabel={t('rowMenu', { name })}
+              primary={
+                <button
+                  type="button"
+                  onClick={() => onEdit(cat)}
+                  className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  {t('edit')}
+                </button>
+              }
+              items={[
+                ...((cat._count?.products ?? 0) > 1
+                  ? [
+                      {
+                        label: tOrder('title'),
+                        href: `/stores/${storeId}/categories/${cat.id}/order`,
+                      },
+                    ]
+                  : []),
+                {
+                  label: deletingId === cat.id ? t('deleting') : t('delete'),
+                  destructive: true,
+                  disabled: deletingId === cat.id,
+                  onSelect: () => onDelete({ id: cat.id, name }),
+                },
+              ]}
+            />
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   const tableBody = (
-    <div className="overflow-x-auto">
+    <div className="hidden overflow-x-auto md:block">
       <table className="w-full" aria-label={t('label')}>
         <thead className="bg-muted border-b">
           <tr>
@@ -357,14 +420,22 @@ export function CategoryTable({
   );
 
   if (!onDragEnd) {
-    return tableBody;
+    return (
+      <>
+        {mobileCards}
+        {tableBody}
+      </>
+    );
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-      <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-        {tableBody}
-      </SortableContext>
-    </DndContext>
+    <>
+      {mobileCards}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+          {tableBody}
+        </SortableContext>
+      </DndContext>
+    </>
   );
 }

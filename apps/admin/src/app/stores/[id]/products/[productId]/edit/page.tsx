@@ -3,9 +3,12 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
-import { Button, Input, Textarea, Select, buttonVariants, cn, useToast } from '@ebda/ui';
+import { Badge, Button, Input, Textarea, Select, buttonVariants, cn, useToast } from '@ebda/ui';
 import { storefrontOrigin } from '@ebda/shared';
 import { StickySaveBar } from '@/components/StickySaveBar';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ProductInfoSections, ProductSidebar } from '../_components/ProductInfoSections';
+import { Product3dModelCard } from '../_components/Product3dModelCard';
 import { RowActions } from '@/components/RowActions';
 import {
   recommendedSizeTextForTemplate,
@@ -28,7 +31,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../../../components/AITranslateMissingButton';
 import { useAuth } from '../../../../../../lib/auth';
-import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../lib/api';
 import { productTextFields } from '../../../../../../lib/product-payload';
 import { sanitizeReturnTo } from '../../../../../../lib/return-to';
 import { EditSidebar } from './_components/EditSidebar';
@@ -123,6 +126,34 @@ export default function EditProductPage() {
   const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
   const toast = useToast();
+  const askConfirm = useConfirm();
+  // The old read-only product page is folded in here as the "overview" tab (UX:PE-3); the old URL redirects to it.
+  const [tab, setTab] = useState<'edit' | 'overview'>(
+    searchParams.get('tab') === 'overview' ? 'overview' : 'edit'
+  );
+  const tTabs = useT('products.edit.tabs');
+  const tDetail = useT('products.detail');
+  const statusBadge = (status: string) => (
+    <Badge variant={status === 'active' ? 'default' : 'secondary'}>
+      {tDetail(`status.${status}` as 'status.active')}
+    </Badge>
+  );
+  const deleteProduct = async () => {
+    if (!product) return;
+    const ok = await askConfirm({
+      object: t('deleteDialog.object', { name: product.name }),
+      consequence: t('deleteDialog.consequence'),
+      confirmLabel: t('deleteDialog.confirmLabel'),
+    });
+    if (!ok) return;
+    const { error: delError } = await apiDelete(`/api/v1/stores/${storeId}/products/${product.id}`);
+    if (delError) {
+      toast.error(t('deleteDialog.failed'));
+      return;
+    }
+    toast.success(t('deleteDialog.done'));
+    router.push(returnTo);
+  };
   const formRef = useRef<HTMLFormElement>(null);
   const [storeHost, setStoreHost] = useState<{ slug: string; domain?: string | null } | null>(null);
   const [priceError, setPriceError] = useState<string | null>(null);
@@ -756,13 +787,61 @@ export default function EditProductPage() {
                   label: t('recommendations'),
                   href: `/stores/${storeId}/products/${product.id}/recommendations`,
                 },
+                {
+                  label: t('deleteDialog.confirmLabel'),
+                  destructive: true,
+                  onSelect: () => void deleteProduct(),
+                },
               ]}
             />
           </div>
         ) : undefined
       }
     >
-      <form ref={formRef} onSubmit={handleSubmit}>
+      {product && (
+        <div role="tablist" aria-label={tTabs('label')} className="mb-6 flex gap-2">
+          {(['edit', 'overview'] as const).map(id => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                'min-h-11 rounded-lg px-4 text-sm font-medium transition-colors',
+                tab === id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              )}
+            >
+              {tTabs(id)}
+            </button>
+          ))}
+        </div>
+      )}
+      {product && tab === 'overview' && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <ProductInfoSections
+              // The edit loader keeps the API's raw product, which carries the overview fields.
+              product={product as unknown as Parameters<typeof ProductInfoSections>[0]['product']}
+              statusBadge={statusBadge(product.status)}
+              fallbackSku={tDetail('fallbackSku')}
+            />
+            <Product3dModelCard storeId={storeId} productId={product.id} />
+          </div>
+          <div className="space-y-6">
+            <ProductSidebar
+              product={product as unknown as Parameters<typeof ProductSidebar>[0]['product']}
+            />
+          </div>
+        </div>
+      )}
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className={tab === 'overview' ? 'hidden' : undefined}
+      >
         {justCreated && product && (
           <div
             role="status"
