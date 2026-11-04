@@ -92,6 +92,7 @@ import {
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import {
   analyticsImportFinishOp,
+  analyticsImportResetOp,
   analyticsImportOp,
   analyticsImportStatusOp,
   qrScanRecordOp,
@@ -259,7 +260,8 @@ export type MoneyOpName =
   | 'viewRecord'
   | 'analyticsImportStatus'
   | 'analyticsImport'
-  | 'analyticsImportFinish';
+  | 'analyticsImportFinish'
+  | 'analyticsImportReset';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -370,6 +372,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsImportStatus',
   'analyticsImport',
   'analyticsImportFinish',
+  'analyticsImportReset',
 ];
 
 const TABLE = '_money_ops';
@@ -772,6 +775,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsImportStatus: (db, storeId) => analyticsImportStatusOp(db, storeId),
   analyticsImport: (db, storeId, a) => analyticsImportOp(db, storeId, a),
   analyticsImportFinish: (db, storeId, a) => analyticsImportFinishOp(db, storeId, a),
+  analyticsImportReset: (db, storeId, a) => analyticsImportResetOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),

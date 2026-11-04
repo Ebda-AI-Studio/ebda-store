@@ -51,6 +51,7 @@ import {
   lockSubscription,
   onD1,
 } from '../platform/billing-d1';
+import { platformFamilyOnD1 } from '../platform/cutover';
 import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
 import { goLiveVerdict } from './go-live-verdict';
 import {
@@ -61,7 +62,7 @@ import {
   type LedgerVat,
 } from './charge-amount';
 import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
-import { scheduleClaimRelease, withClaimReleases } from '../../lib/instapay-ref-claim';
+import { releaseInstapayReference, withClaimReleases } from '../../lib/instapay-ref-claim';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -589,6 +590,28 @@ export async function suggestManualPeriod(
 // ───────────────────────────── claims ─────────────────────────────────────
 
 /**
+ * Put a receipt this call just submitted back to draft and free its cross-store transfer reference. The reference is
+ * released DIRECTLY, not queued: every caller throws right after, and a queued release is dropped on a throw
+ * (`withClaimReleases`), which left the D1 reference bound to a draft receipt (the re-upload then failed with
+ * DUPLICATE_REFERENCE). The release is idempotent and only frees a claim bound to THIS receipt.
+ */
+export async function undoSubmittedReceipt(
+  tx: Pick<Tx, 'instapayReceipt'>,
+  receipt: { id: string; referenceKey: string | null },
+  storeId: string
+): Promise<void> {
+  await tx.instapayReceipt.updateMany({
+    where: { id: receipt.id, storeId },
+    data: { status: 'draft', referenceKey: null, submittedAt: null },
+  });
+  if (receipt.referenceKey) {
+    await releaseInstapayReference(receipt.referenceKey, storeId, receipt.id).catch(
+      () => undefined
+    );
+  }
+}
+
+/**
  * Merchant: submit the InstaPay receipt for the subscription (the screenshot was
  * uploaded first, the AI pre-filled it, the merchant corrected it). Creates the claim
  * the super-admin reviews. NEVER activates anything (only the super-admin's recorded
@@ -636,6 +659,8 @@ async function submitSubscriptionReceiptInner(args: {
       notBefore,
       now,
     });
+    // The receipt is a draft again: its D1 reference claim (Ruling INSTAPAY-DO-1) is freed once this transaction commits.
+    const undoReceiptSubmit = () => undoSubmittedReceipt(tx, receipt, args.storeId);
     let claim;
     try {
       claim = await withSavepoint(() =>
@@ -653,27 +678,36 @@ async function submitSubscriptionReceiptInner(args: {
         })
       );
     } catch (err) {
-      if ((err as { code?: string }).code !== 'P2002') throw err;
+      if ((err as { code?: string }).code !== 'P2002') {
+        // Postgres rolls the receipt submit back with this transaction; on D1 (Ruling NZ-10D-3) there is no transaction, so the
+        // receipt would stay `submitted` without a claim. Undo it by hand, then surface the original error.
+        if (await platformFamilyOnD1('payments')) await undoReceiptSubmit().catch(() => undefined);
+        throw err;
+      }
       // A legacy claim already holds this transfer reference: undo the receipt claim.
-      await tx.instapayReceipt.updateMany({
-        where: { id: receipt.id, storeId: args.storeId },
-        data: { status: 'draft', referenceKey: null, submittedAt: null },
-      });
-      // The receipt is a draft again: free its D1 reference claim (Ruling INSTAPAY-DO-1) once this transaction commits.
-      if (receipt.referenceKey)
-        scheduleClaimRelease([
-          { referenceKey: receipt.referenceKey, storeId: args.storeId, receiptId: receipt.id },
-        ]);
+      await undoReceiptSubmit();
       throw new AppError(
         409,
         'DUPLICATE_REFERENCE',
         'This transfer reference was already used. Each transfer can pay only once.'
       );
     }
-    const linked = await tx.instapayReceipt.update({
-      where: { id: receipt.id, storeId: args.storeId },
-      data: { claimId: claim.id },
-    });
+    let linked;
+    try {
+      linked = await tx.instapayReceipt.update({
+        where: { id: receipt.id, storeId: args.storeId },
+        data: { claimId: claim.id },
+      });
+    } catch (err) {
+      // D1 has no rollback (see above): remove the claim THIS call made and reopen the receipt.
+      if (await platformFamilyOnD1('payments')) {
+        await tx.manualPaymentClaim
+          .deleteMany({ where: { id: claim.id, storeId: args.storeId, status: 'pending' } })
+          .catch(() => undefined);
+        await undoReceiptSubmit().catch(() => undefined);
+      }
+      throw err;
+    }
     return { claim, receipt: toReceiptView(linked) };
   });
 }
@@ -746,7 +780,7 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
     store: { select: { name: true, slug: true, status: true, billingSuspendedReason: true } },
   } as const;
   // D1: ONE query over every store's claims (the oldest 200 of the queue), no Postgres scope per store.
-  const parts = (await onD1())
+  const parts = (await platformFamilyOnD1('payments'))
     ? [
         {
           value: await shape(

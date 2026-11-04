@@ -73,17 +73,21 @@ export const paymentWebhookProcess: JobDef = inngest.createFunction(
     //    route's checkIdempotency / resolveStoreIdFromWebhookPayload reads.
     // The inbox row must be read BEFORE a store scope exists (store_id may be
     // NULL), so every inbox access here is a SECURITY DEFINER function.
-    const row = await step.run('load-inbox', async () => webhookInbox.get(webhookEventId));
-
-    if (!row) {
-      logger.error(
-        { webhookEventId, idempotencyKey },
-        '[payment-webhook-process] inbox row not found — retrying'
-      );
-      // The route already answered the gateway 2xx for this row: returning here would drop a paid order's webhook. THROW so the
-      // job retries (a row recorded moments ago, a D1 blip) and the failure watch sees it if it never appears.
-      throw new Error(`payment-webhook-process: inbox row ${webhookEventId} not found`);
-    }
+    // A miss THROWS (the step is retried, then dead-lettered P0): never a silent return. During a cutover the row can be
+    // in the middle of being put back into D1; a miss here must not drop a payment notification.
+    const row = await step.run('load-inbox', async () => {
+      const found = await webhookInbox.get(webhookEventId);
+      if (!found) {
+        logger.error(
+          { webhookEventId, idempotencyKey },
+          '[payment-webhook-process] inbox row not found — retrying'
+        );
+        throw new Error(
+          `webhook inbox row ${webhookEventId} not found (retry; it may be mid-cutover)`
+        );
+      }
+      return found;
+    });
 
     // Idempotency layer 1 — already fully processed, this is a retry / duplicate
     // enqueue. No-op. (Pure decision in shouldProcessInboxRow for unit testing.)

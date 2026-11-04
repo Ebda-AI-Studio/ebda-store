@@ -117,3 +117,52 @@ describe('routeCutover', () => {
     expect(r?.status).toBe(503);
   });
 });
+
+describe('__analytics (Ruling NZ-AN-1)', () => {
+  const post = (op: string) =>
+    new Request(URL_(ID, '__analytics'), {
+      method: 'POST',
+      headers: { ...bearer(), 'content-type': 'application/json' },
+      body: JSON.stringify({ op, args: { confirm: ID } }),
+    });
+  const d1 = (marked: boolean) =>
+    ({
+      prepare: () => ({ bind: () => ({ first: async () => (marked ? { n: 1 } : null) }) }),
+    }) as never;
+
+  it('forwards the copy ops to the DO, which still receives the body', async () => {
+    const { e, fetched } = env({ PLATFORM_DB: d1(false) } as never);
+    const r = await routeCutover(post('analyticsImportStatus'), e);
+    expect(r?.status).toBe(200);
+    expect(fetched).toHaveLength(1);
+    expect(((await fetched[0].json()) as { op: string }).op).toBe('analyticsImportStatus');
+  });
+
+  it('a reset is forwarded before the marker and refused 409 after it (the DO is never reached)', async () => {
+    const before = env({ PLATFORM_DB: d1(false) } as never);
+    expect((await routeCutover(post('analyticsImportReset'), before.e))?.status).toBe(200);
+    expect(before.fetched).toHaveLength(1);
+    const after = env({ PLATFORM_DB: d1(true) } as never);
+    const r = await routeCutover(post('analyticsImportReset'), after.e);
+    expect(r?.status).toBe(409);
+    expect(after.fetched).toHaveLength(0);
+  });
+
+  it('a reset with the platform D1 unbound or unreadable is refused (fail closed)', async () => {
+    const unbound = env();
+    expect((await routeCutover(post('analyticsImportReset'), unbound.e))?.status).toBe(503);
+    const broken = env({
+      PLATFORM_DB: {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => {
+              throw new Error('d1 down');
+            },
+          }),
+        }),
+      },
+    } as never);
+    expect((await routeCutover(post('analyticsImportReset'), broken.e))?.status).toBe(503);
+    expect(broken.fetched).toHaveLength(0);
+  });
+});

@@ -35,7 +35,6 @@ import {
   registerPlatformRouter,
 } from '../../apps/api/src/services/platform/router';
 import { requireMfaEnrolled } from '../../apps/api/src/middleware/require-mfa';
-import { insertAuditLog } from '../../apps/api/src/lib/definer';
 import { listGrants } from '../../apps/api/src/services/billing/grants.service';
 import { listClaimsForAdmin } from '../../apps/api/src/services/billing/account.service';
 import { listLedger } from '../../apps/api/src/services/billing/subscription-billing.service';
@@ -53,7 +52,7 @@ const MIG = fs
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 
-function world(markers: string[] = ['billing', 'access']) {
+function world(markers: string[] = ['billing', 'access', 'payments']) {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(MIG[0]);
@@ -190,32 +189,6 @@ describe('requireMfaEnrolled asks the identity service, not Postgres', () => {
 
   it('other roles pass through untouched', async () => {
     expect((await run({ userId: 'u', role: 'store_admin' }, {})).passed).toBe(true);
-  });
-});
-
-describe('platform events are audited in D1', () => {
-  it('a platform event (no store) lands in platform_audit_log and never asks Postgres; a store event still goes to the definer', async () => {
-    const db = world();
-    await insertAuditLog({
-      action: 'platform.cross_store_read',
-      userId: 'super-1',
-      resourceType: 'webhook_events',
-      details: { fn: 'x' },
-      ip: '1.2.3.4',
-    });
-    expect(pg.calls).toEqual([]);
-    const row = db
-      .prepare('SELECT actor_id a, action, target_type t, store_id s, meta FROM platform_audit_log')
-      .get() as { a: string; action: string; t: string; s: null; meta: string };
-    expect(row).toMatchObject({
-      a: 'super-1',
-      action: 'platform.cross_store_read',
-      t: 'webhook_events',
-      s: null,
-    });
-    expect(JSON.parse(row.meta)).toMatchObject({ fn: 'x', ip: '1.2.3.4' });
-    await insertAuditLog({ action: 'order.updated', storeId: A, resourceType: 'order' });
-    expect(pg.calls).toEqual(['$queryRaw']); // a store's own row is not a platform event
   });
 });
 

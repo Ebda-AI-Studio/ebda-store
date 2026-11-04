@@ -9,6 +9,7 @@
  * a compare-and-set, or a compensating write).
  */
 import {
+  prisma,
   notifyModelWrite,
   setModelRouter,
   setRoutedModelGuard,
@@ -27,7 +28,9 @@ import {
   platformFamilyOnD1,
   platformFamilyOnD1ForWrite,
   isFamilyCachedOnD1,
+  type PlatformFamily,
 } from './cutover';
+import { AppError } from '../../middleware/error-handler';
 
 const WRITES = new Set([
   'create',
@@ -38,6 +41,31 @@ const WRITES = new Set([
   'delete',
   'deleteMany',
 ]);
+
+/** The platform VAT setting key (Ruling TAX-6/TAX-8): only an active super_admin may change it. */
+const PLATFORM_VAT_KEY = 'ebda.vat';
+
+/**
+ * Postgres enforces TAX-8 with the trigger `system_settings_platform_vat_guard` (only an active super_admin writes
+ * `ebda.vat`). On D1 there is no trigger, so the router enforces the same rule on the same signal: the acting user the
+ * request already carries (`ebda_is_super_admin()` reads `app.current_user_id`, identity still lives in Postgres).
+ * Replaceable in tests.
+ */
+export const vatGuard = {
+  isSuperAdmin: async (): Promise<boolean> => {
+    const rows = await prisma.$queryRaw<
+      Array<{ ok: boolean }>
+    >`SELECT public.ebda_is_super_admin() AS ok`;
+    return rows[0]?.ok === true;
+  },
+};
+
+/** Does this write name `ebda.vat`, or could it (a bulk write whose key filter is not a literal)? Conservative. */
+function touchesPlatformVat(method: string, arg: unknown): boolean {
+  const a = (arg ?? {}) as { where?: { key?: unknown } };
+  if (JSON.stringify(arg ?? null).includes(PLATFORM_VAT_KEY)) return true;
+  return (method === 'updateMany' || method === 'deleteMany') && typeof a.where?.key !== 'string';
+}
 
 const MODELS: ReadonlySet<string> = new Set([...Object.values(FAMILY_MODELS).flat(), 'store']);
 
@@ -74,6 +102,26 @@ function storeReadServedByD1(method: string, arg: unknown): boolean {
   return onlyDirectoryColumns(a.where);
 }
 
+/**
+ * A family that must not be on D1 unless another one already is. `payments` (claims, receipts) is confirmed inside the
+ * billing ledger flow: with the claim on D1 and the ledger still on Postgres, a Postgres rollback would leave a claim
+ * `confirmed` against an event that does not exist. The copy script refuses the same order; this makes the code refuse it
+ * too (fail closed, retryable 503) if the markers are ever set out of order by hand.
+ */
+export const FAMILY_REQUIRES: Partial<Record<PlatformFamily, PlatformFamily>> = {
+  payments: 'billing',
+};
+async function assertFamilyOrder(family: PlatformFamily): Promise<void> {
+  const need = FAMILY_REQUIRES[family];
+  if (need && !(await platformFamilyOnD1(need)))
+    throw new AppError(
+      503,
+      'PLATFORM_FAMILY_ORDER',
+      `${family} is on D1 but ${need} is not: refusing to serve a split money flow`,
+      { retryable: true, family }
+    );
+}
+
 export const platformRouter: ModelRouter = {
   models: MODELS,
   async route(model, method, args, postgres) {
@@ -96,6 +144,15 @@ export const platformRouter: ModelRouter = {
       ? await platformFamilyOnD1ForWrite(family)
       : await platformFamilyOnD1(family);
     if (!onD1) return postgres();
+    if (model === 'systemSetting' && WRITES.has(method) && touchesPlatformVat(method, args[0])) {
+      if (!(await vatGuard.isSuperAdmin()))
+        throw new AppError(
+          403,
+          'PLATFORM_VAT_FORBIDDEN',
+          'ebda.vat: only a super_admin may change the platform VAT setting'
+        );
+    }
+    await assertFamilyOrder(family);
     const client = await requirePlatformDb();
     const result = await (client[model] as Record<string, (...a: unknown[]) => Promise<unknown>>)[
       method

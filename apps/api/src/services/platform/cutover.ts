@@ -23,7 +23,16 @@ import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
 
-export type PlatformFamily = 'billing' | 'access' | 'platform' | 'inbox' | 'ai-usage' | 'analytics';
+export type PlatformFamily =
+  | 'billing'
+  | 'access'
+  | 'platform'
+  | 'inbox'
+  | 'ai-usage'
+  | 'analytics'
+  | 'payments'
+  | 'ops'
+  | 'audit';
 
 /** Prisma model names (delegate form) that each family owns. */
 export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
@@ -36,9 +45,6 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
     'billingReminder',
     'billingWebhookEvent',
     'storeLifecycleEmail',
-    // the InstaPay claims and receipts of a subscription payment (and the order receipts of a Postgres store)
-    'manualPaymentClaim',
-    'instapayReceipt',
   ],
   // NEON-ZERO-1 (N-6/N-7): store membership. The access gate, staff, staff invites and owner/staff listings.
   access: ['storeStaff', 'staffInvite'],
@@ -58,6 +64,15 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   // The payment-webhook inbox: reached only through SQL definers (services/platform/inbox-d1.ts), its own marker because
   // its writers (provider callbacks) run on a different cadence from the admin surface.
   inbox: ['webhookEvent'],
+  // N-10d. MONEY: the InstaPay receipts of the subscription flow (and of order flows of stores still on Postgres) and the
+  // manual-payment claims a super-admin confirms into the billing ledger. Own marker (never folded into `billing`, whose
+  // marker may already exist in production: adding models to a flipped family would serve them empty).
+  payments: ['instapayReceipt', 'manualPaymentClaim'],
+  // N-10d. Non-money platform tables: per-store monthly usage snapshots, platform CI findings, answer-engine provider keys.
+  ops: ['answerEngineProviderConfig', 'storeUsageSnapshot', 'ciInsight'],
+  // N-10d. The audit trail has no Prisma model on D1 (it is written through `services/audit-sink.ts`, never the router);
+  // the marker only says "store-less audit rows go to D1 platform_audit_log and DO-store rows to their StoreDO".
+  audit: [],
   // Ruling NZ-AN-1: the AI quota counts usage across stores, so `ai_usage` is one platform table on D1 (append-only)
   'ai-usage': ['aiUsage'],
   // Ruling NZ-AN-1: no routed model. The marker + freeze only gate WHEN a Durable Object store's per-store analytics tables
@@ -182,7 +197,7 @@ const frozenError = (family: PlatformFamily) =>
     retryable: true,
     family,
     retryAfterSeconds: 30,
-    messageAr: 'بنحدّث بيانات الاشتراكات دلوقتي، جرّب تاني بعد دقيقة.',
+    messageAr: 'بنحدّث بيانات الدفع والاشتراكات دلوقتي، جرّب تاني بعد دقيقة.',
   });
 
 /**
@@ -220,6 +235,24 @@ export async function platformFamilyOnD1ForWrite(family: PlatformFamily): Promis
     return true;
   }
   return false;
+}
+
+/**
+ * AUDIT family (N-10d): where do STORE-LESS audit rows go right now? D1 once the marker exists OR while the copy script's
+ * freeze is up (the freeze means "new rows already go to the new home": audit never refuses a write, it only redirects it;
+ * the copy script then copies the Postgres history written before the freeze). Marker unreadable -> throws (the sink
+ * queues the row for retry instead of guessing a home). No D1 binding -> false (Postgres, as before).
+ */
+export async function auditStoreLessOnD1(): Promise<boolean> {
+  if (on.has('audit')) return true;
+  const d1 = binding();
+  if (!d1) return false;
+  const { moved, frozen } = await readKeys(d1, 'audit');
+  if (moved) {
+    on.add('audit');
+    return true;
+  }
+  return frozen;
 }
 
 /** For a raw SQL write that bypasses the router (Postgres-only branch): throws when the family is frozen or moved. */

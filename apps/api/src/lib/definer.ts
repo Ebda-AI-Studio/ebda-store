@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { requirePlatformDb } from './platform-db';
 import {
-  d1Run,
   entityStoreIdD1,
   onD1 as onBillingD1,
   planSubscriberCountsD1,
@@ -21,10 +20,12 @@ import {
   withdrawLegalSendD1,
 } from '../services/platform/platform-d1';
 import {
+  auditStoreLessOnD1,
   assertFamilyWritableOnPostgres,
   assertNotFrozen,
   isFamilyFrozen,
 } from '../services/platform/cutover';
+import { appendAudit, type AuditEntry, type AuditRow } from '../services/audit-sink';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import {
@@ -115,52 +116,31 @@ export async function findUserIdByEmail(
   return rows[0]?.id ?? null;
 }
 
-export interface AuditEntry {
-  action: string;
-  userId?: string | null;
-  storeId?: string | null;
-  resourceType: string;
-  resourceId?: string | null;
-  details?: unknown;
-  ip?: string | null;
-  userAgent?: string | null;
+export type { AuditEntry } from '../services/audit-sink';
+
+/** The Postgres leg: one append through the definer (row id and time fixed by the sink, so a replay is the same row). */
+async function insertAuditLogPg(row: AuditRow): Promise<void> {
+  await prisma.$queryRaw`
+    SELECT public.ebda_audit_log_insert(
+      ${row.id}, ${row.action}, ${row.userId ?? null}, ${row.storeId ?? null},
+      ${row.resourceType}, ${row.resourceId ?? null},
+      ${JSON.stringify(row.details ?? {})}::jsonb,
+      ${row.ip ?? null}, ${row.userAgent ?? null}
+    )`;
 }
 
 /**
- * Append one audit row. `audit_logs` is store-scoped under RLS, but platform
- * events (a failed login, a super-admin action) carry no store and a request may
- * log against a store other than its own, so the write goes through a definer.
- * Append-only: `ebda_app` still reads its store's rows through the policy.
+ * Append one audit row (NEON-ZERO-1 N-10d: services/audit-sink.ts decides the home). A store on its Durable Object gets the
+ * row in its StoreDO, a store-less row goes to D1 `platform_audit_log` after the `audit` cutover; a Postgres store keeps the
+ * definer below: `audit_logs` is store-scoped under RLS, but platform events (a failed login, a super-admin action) carry no
+ * store and a request may log against a store other than its own, so the write goes through a definer. Append-only.
  */
 export async function insertAuditLog(entry: AuditEntry): Promise<void> {
-  // NEON-ZERO-1: a PLATFORM event (no store) goes to the platform audit trail in D1; a store's own rows live in its
-  // Durable Object. Postgres is not asked on a Worker that has D1.
-  if (!entry.storeId && platformDb()) {
-    await d1Run(
-      `INSERT INTO platform_audit_log (id, actor_id, action, target_type, target_id, store_id, meta, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7)`,
-      randomUUID(),
-      entry.userId ?? null,
-      entry.action,
-      entry.resourceType,
-      entry.resourceId ?? null,
-      JSON.stringify({
-        ...(entry.details && typeof entry.details === 'object' ? entry.details : {}),
-        ...(entry.ip ? { ip: entry.ip } : {}),
-        ...(entry.userAgent ? { userAgent: entry.userAgent } : {}),
-      }),
-      Date.now()
-    );
-    return;
-  }
-  await prisma.$queryRaw`
-    SELECT public.ebda_audit_log_insert(
-      ${randomUUID()}, ${entry.action}, ${entry.userId ?? null}, ${entry.storeId ?? null},
-      ${entry.resourceType}, ${entry.resourceId ?? null},
-      ${JSON.stringify(entry.details ?? {})}::jsonb,
-      ${entry.ip ?? null}, ${entry.userAgent ?? null}
-    )`;
+  await appendAudit(entry, insertAuditLogPg);
 }
+
+/** Replay of a queued audit row (queue handler): same definer leg. */
+export const replayAuditRowPg = insertAuditLogPg;
 
 export interface AdminUser {
   id: string;
@@ -463,7 +443,15 @@ export const webhookInbox = {
   }): Promise<string> {
     // A provider callback is the one thing that must never be refused (nobody may retry it). During the cutover freeze it
     // is recorded straight into D1: the copy script sets such rows aside and merges them (cutover-platform-family.mjs).
-    if ((await onBillingD1('inbox')) || (await isFamilyFrozen('inbox')))
+    const onD1Inbox = await onBillingD1('inbox');
+    if (!onD1Inbox && (await isFamilyFrozen('inbox'))) {
+      // Postgres is being copied: an event it already holds is NOT recorded a second time (read-only lookup); the
+      // existing row (and its processing state) stays the single record.
+      const known = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM public.ebda_webhook_inbox_by_key(${input.idempotencyKey})`;
+      if (known[0]) return known[0].id;
+    }
+    if (onD1Inbox || (await isFamilyFrozen('inbox')))
       return inboxRecordD1({
         id: randomUUID(),
         provider: input.provider,
@@ -726,16 +714,158 @@ export async function getEntityStoreId(
   return rows[0]?.id ?? null;
 }
 
+type AuditViewRow = {
+  id: string;
+  action: string;
+  userId: string | null;
+  storeId: string | null;
+  resourceType: string;
+  resourceId: string | null;
+  details: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  user: {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+};
+
+/** The viewer read on D1 (+ one store's own DO rows when `storeId` is given). The viewer's own audit row is written by the sink. */
+async function listAuditD1(input: {
+  actorUserId: string;
+  action?: string;
+  userId?: string;
+  resourceType?: string;
+  storeId?: string;
+  limit: number;
+  offset: number;
+}): Promise<{ total: number; rows: AuditViewRow[] }> {
+  const { d1All } = await import('../services/platform/billing-d1.js');
+  const limit = Math.min(Math.max(input.limit, 0), 200);
+  const offset = Math.max(input.offset, 0);
+  // The view is audited on EVERY path (D1 list and a DO store's own rows), before anything is read.
+  await insertAuditLog({
+    action: 'audit.platform_viewed',
+    userId: input.actorUserId,
+    resourceType: 'audit_log',
+    details: {
+      action: input.action ?? null,
+      userId: input.userId ?? null,
+      resourceType: input.resourceType ?? null,
+      storeId: input.storeId ?? null,
+    },
+  });
+  if (input.storeId) {
+    // one store on its Durable Object: its own rows (the D1 mirror only holds impersonated actions)
+    const repo = await (await import('./repo-factory.js')).storeRepo(input.storeId);
+    const where = {
+      storeId: input.storeId,
+      ...(input.action ? { action: input.action } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
+      ...(input.resourceType ? { resourceType: input.resourceType } : {}),
+    };
+    const page = {
+      orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+      take: limit,
+      skip: offset,
+    };
+    // a store on its DO is read from its DO; a store still on Postgres from Postgres (its rows are not in D1 unless impersonated)
+    const [found, total] =
+      repo.backend === 'do'
+        ? await Promise.all([
+            repo.db.auditLog.findMany({ where, ...page }),
+            repo.db.auditLog.count({ where }),
+          ])
+        : await withStore(input.storeId, async tx =>
+            Promise.all([tx.auditLog.findMany({ where, ...page }), tx.auditLog.count({ where })])
+          );
+    return {
+      total,
+      rows: found.map(r => ({
+        id: r.id,
+        action: r.action,
+        userId: r.userId,
+        storeId: r.storeId,
+        resourceType: r.resourceType,
+        resourceId: r.resourceId,
+        details: r.details,
+        ipAddress: r.ipAddress,
+        userAgent: r.userAgent,
+        createdAt: r.createdAt,
+        user: r.userId ? { id: r.userId, email: null, firstName: null, lastName: null } : null,
+      })),
+    };
+  }
+  const rows = await d1All<{
+    id: string;
+    actor_id: string | null;
+    action: string;
+    target_type: string | null;
+    target_id: string | null;
+    store_id: string | null;
+    meta: string;
+    created_at: number;
+    total: number;
+  }>(
+    `SELECT id, actor_id, action, target_type, target_id, store_id, meta, created_at, count(*) OVER () AS total
+       FROM platform_audit_log
+      WHERE (?1 IS NULL OR action = ?1) AND (?2 IS NULL OR actor_id = ?2)
+        AND (?3 IS NULL OR target_type = ?3) AND (?4 IS NULL OR store_id = ?4)
+      ORDER BY created_at DESC, id DESC LIMIT ?5 OFFSET ?6`,
+    input.action ?? null,
+    input.userId ?? null,
+    input.resourceType ?? null,
+    input.storeId ?? null,
+    limit,
+    offset
+  );
+  return {
+    total: rows[0] ? Number(rows[0].total) : 0,
+    rows: rows.map(r => {
+      let meta: { details?: unknown; ipAddress?: string | null; userAgent?: string | null } = {};
+      try {
+        meta = JSON.parse(r.meta);
+      } catch {
+        /* unreadable meta shows as empty */
+      }
+      return {
+        id: r.id,
+        action: r.action,
+        userId: r.actor_id,
+        storeId: r.store_id,
+        resourceType: r.target_type ?? '',
+        resourceId: r.target_id,
+        details: meta.details ?? {},
+        ipAddress: meta.ipAddress ?? null,
+        userAgent: meta.userAgent ?? null,
+        createdAt: new Date(Number(r.created_at)),
+        // identity lives in ebda-accounts: the id is shown, the name/email are not joined here
+        user: r.actor_id ? { id: r.actor_id, email: null, firstName: null, lastName: null } : null,
+      };
+    }),
+  };
+}
+
 export const platformAuditLogs = {
-  /** The super-admin audit viewer: store-scoped rows and store-less platform events. */
+  /**
+   * The super-admin audit viewer. Postgres: store-scoped rows and store-less platform events in one list (the definer).
+   * After the `audit` cutover (Ruling NZ-10D-2): the store-less rows and the impersonated-store mirror live in D1
+   * `platform_audit_log` and are listed from there; the rows of a store on its Durable Object are listed per store
+   * (`storeId`), because they live in that store's DO and a cross-DO scan is not a request-time operation.
+   */
   async list(input: {
     actorUserId: string;
     action?: string;
     userId?: string;
     resourceType?: string;
+    storeId?: string;
     limit: number;
     offset: number;
   }) {
+    if (await auditStoreLessOnD1()) return listAuditD1(input);
     const rows = await prisma.$queryRaw<
       Array<{
         id: string;
@@ -787,20 +917,37 @@ export const platformAuditLogs = {
  * rows leave the database). The global AI caps and the paid answer-engine budget
  * are cross-store questions on a hot path.
  */
+export const AI_COUNT_TTL_MS = 30_000;
+const aiCountCache = new Map<string, { n: number; until: number }>();
+/** Test seam. */
+export const resetAiCountCache = (): void => aiCountCache.clear();
+
 export async function countAiUsage(opts: {
   since: Date;
   cachedHit: boolean;
   feature?: string;
 }): Promise<number> {
-  // Ruling NZ-AN-1: after the `ai-usage` cutover the table is one platform table on D1 (a single indexed count, no RLS to bypass)
+  // Ruling NZ-AN-1: after the `ai-usage` cutover the table is one platform table on D1 (a single indexed count, no RLS to bypass).
+  // STALENESS CLASS: BOUNDED-stale. The platform-wide daily / monthly AI caps are cost guards, not entitlements or prices: this
+  // count runs on every AI call, so an isolate answers it from memory for AI_COUNT_TTL_MS (30 s). Residual window: a cap can be
+  // overshot by the calls made during that window, per isolate; the per-STORE cap (ai-quota.ts, uncached) is unaffected.
+  // Nothing invalidates it on purpose: the TTL is the whole mechanism, and an expired entry is a fresh D1 read.
   if (await platformFamilyOnD1('ai-usage')) {
-    return (await requirePlatformDb()).aiUsage.count({
+    const key = `${opts.since.getTime()}|${opts.cachedHit}|${opts.feature ?? ''}`;
+    const hit = aiCountCache.get(key);
+    if (hit && hit.until > Date.now()) return hit.n;
+    const n = await (
+      await requirePlatformDb()
+    ).aiUsage.count({
       where: {
         createdAt: { gte: opts.since },
         cachedHit: opts.cachedHit,
         ...(opts.feature ? { feature: opts.feature } : {}),
       },
     });
+    if (aiCountCache.size > 64) aiCountCache.clear();
+    aiCountCache.set(key, { n, until: Date.now() + AI_COUNT_TTL_MS });
+    return n;
   }
   const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
     SELECT public.ebda_ai_usage_count(${opts.since}::timestamp, ${opts.cachedHit}, ${opts.feature ?? null}) AS n`;
@@ -818,7 +965,53 @@ export async function detachStoreAuditLogs(
 ): Promise<number> {
   const rows = await db.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_audit_logs_detach_store(${storeId}) AS n`;
-  return Number(rows[0]?.n ?? 0);
+  // the impersonation mirror in D1 keeps the trail too (the DO's own rows go with the DO)
+  const d1 = await detachD1(
+    `UPDATE platform_audit_log SET store_id = NULL WHERE store_id = ?1`,
+    storeId
+  );
+  return Number(rows[0]?.n ?? 0) + d1;
+}
+
+/**
+ * Erasure reaches the audit rows that live in every store's Durable Object too: `user_id` is nulled in each (bounded
+ * parallelism). A store that cannot be reached FAILS the erasure (thrown after every store was tried; the call is idempotent,
+ * so the caller simply retries) - an erasure that skipped a store would be reported as complete.
+ */
+async function unlinkUserAuditLogsInDoStores(userId: string): Promise<number> {
+  if (!(cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB) return 0;
+  const [{ doStoreIdList }, { storeWriter }] = await Promise.all([
+    import('./store-backend.js'),
+    import('./repo-factory.js'),
+  ]);
+  const ids = await doStoreIdList();
+  let total = 0;
+  const failed: string[] = [];
+  const BATCH = 5;
+  for (let i = 0; i < ids.length; i += BATCH) {
+    await Promise.all(
+      ids.slice(i, i + BATCH).map(async id => {
+        try {
+          const n = await (await storeWriter(id)).$proc('auditUnlinkUser', { userId });
+          total += Number(n) || 0;
+        } catch {
+          failed.push(id);
+        }
+      })
+    );
+  }
+  if (failed.length)
+    throw new Error(
+      `audit unlink: ${failed.length} store DO(s) not reached (${failed.slice(0, 5).join(', ')}); retry the erasure`
+    );
+  return total;
+}
+
+/** One UPDATE on D1 `platform_audit_log` when the platform D1 is bound (0 otherwise: local / unit tests). */
+async function detachD1(sql: string, id: string): Promise<number> {
+  if (!(cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB) return 0;
+  const { d1Run } = await import('../services/platform/billing-d1.js');
+  return d1Run(sql, id);
 }
 
 /** Null `user_id` on every audit row of a user about to be deleted (any store). */
@@ -826,9 +1019,20 @@ export async function unlinkUserAuditLogs(
   userId: string,
   db: Pick<Prisma.TransactionClient, '$queryRaw'> = prisma
 ): Promise<number> {
+  // The tombstone goes FIRST, before every unlink below (Postgres, D1, each DO store): a queued audit replay that lands after it
+  // drops the user id (services/audit-sink.ts), and one that wrote before it is nulled by the unlinks.
+  await detachD1(
+    `INSERT OR IGNORE INTO platform_audit_log (id, actor_id, action, target_type, target_id, store_id, meta, created_at)
+     VALUES (?1, NULL, 'audit.user_erased', 'user', ?1, NULL, '{}', CAST(unixepoch('subsec') * 1000 AS INTEGER))`,
+    userId
+  );
   const rows = await db.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_audit_logs_unlink_user(${userId}) AS n`;
-  return Number(rows[0]?.n ?? 0);
+  const d1 = await detachD1(
+    `UPDATE platform_audit_log SET actor_id = NULL WHERE actor_id = ?1`,
+    userId
+  );
+  return Number(rows[0]?.n ?? 0) + d1 + (await unlinkUserAuditLogsInDoStores(userId));
 }
 
 /** The consent row an SMS opt-out token names (the store is on the row, not the token). */
@@ -867,6 +1071,16 @@ export async function auditLogExists(
   resourceType: string,
   resourceId: string
 ): Promise<boolean> {
+  if (await auditStoreLessOnD1()) {
+    const { d1All } = await import('../services/platform/billing-d1.js');
+    const rows = await d1All<{ ok: number }>(
+      'SELECT 1 AS ok FROM platform_audit_log WHERE action = ?1 AND target_type = ?2 AND target_id = ?3 LIMIT 1',
+      action,
+      resourceType,
+      resourceId
+    );
+    return rows.length > 0;
+  }
   const rows = await prisma.$queryRaw<Array<{ ok: boolean }>>`
     SELECT public.ebda_audit_log_exists(${action}, ${resourceType}, ${resourceId}) AS ok`;
   return rows[0]?.ok === true;

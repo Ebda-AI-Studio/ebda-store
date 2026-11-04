@@ -19,6 +19,14 @@ import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
 import ROUTES from './route-table.json';
 
+/**
+ * SWEEP_FILTER=<regex> keeps only the routes whose "METHOD /path" matches (the routes of one PR / one family). Without it
+ * every route runs. The storefront flow, the webhooks and the cron ticks run only when no filter is set.
+ */
+const sweepEnv = env as unknown as { SWEEP_FILTER?: string; SWEEP_STRICT?: string };
+const FILTER = sweepEnv.SWEEP_FILTER ? new RegExp(sweepEnv.SWEEP_FILTER) : undefined;
+const routes = (): string[] => (ROUTES as string[]).filter(r => !FILTER || FILTER.test(r));
+
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };
   E2E_DB: string;
@@ -37,6 +45,9 @@ const MARKER_KEYS = [
   'platform_cutover.inbox',
   'platform_cutover.ai-usage',
   'platform_cutover.analytics',
+  'platform_cutover.payments',
+  'platform_cutover.ops',
+  'platform_cutover.audit',
   'customer_auth_cutover.__all',
 ];
 
@@ -108,14 +119,6 @@ async function hit(
 }
 
 const failing = (r: Result) => r.status < 0 || r.status >= 500;
-
-/**
- * SWEEP_FILTER=<regex> keeps only the routes whose "METHOD /path" matches (the routes of one PR / one family). Without it
- * every route runs. The storefront flow, the webhooks and the cron ticks run only when no filter is set.
- */
-const sweepEnv = env as unknown as { SWEEP_FILTER?: string; SWEEP_STRICT?: string };
-const FILTER = sweepEnv.SWEEP_FILTER ? new RegExp(sweepEnv.SWEEP_FILTER) : undefined;
-const routes = (): string[] => (ROUTES as string[]).filter(r => !FILTER || FILTER.test(r));
 
 /** Run `fns` with a bounded number in flight. */
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<unknown>): Promise<void> {
@@ -310,6 +313,39 @@ describe.skipIf(e.E2E_DB === '1')(
           productId = j.data?.id ?? j.data?.product?.id ?? ZERO;
         } catch {
           /* creation failed: the following steps still run against a missing product and are recorded */
+        }
+        if (productId === ZERO) {
+          // Product create is its own fix (group B). The cart / quote / order steps below must not be skipped meanwhile:
+          // seed one product through the operator seed route so they run against a real, priced, in-stock row.
+          const seeded = crypto.randomUUID();
+          const now = Date.now();
+          const r = await e.API.fetch(
+            `https://api.ebda.app/api/v1/internal/store-do/${storeId}/seed`,
+            {
+              method: 'POST',
+              headers: {
+                authorization: 'Bearer workers-test-seed-token',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                products: [
+                  {
+                    id: seeded,
+                    storeId,
+                    name: 'Seeded Sweep Product',
+                    slug: 'seeded-sweep',
+                    price: 5000,
+                    inventory: 10,
+                    status: 'active',
+                    hasVariants: false,
+                    createdAt: now,
+                    updatedAt: now,
+                  },
+                ],
+              }),
+            }
+          );
+          if (r.status === 200) productId = seeded;
         }
         void cat;
         await hit('FLOW', 'GET', '/public/categories', `${BASE}/public/categories`, h);

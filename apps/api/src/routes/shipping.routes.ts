@@ -11,6 +11,7 @@ import { prisma } from '@ebda/database';
 import { EGYPT_GOVERNORATES, minorToDecimalString, REGION, BRAND } from '@ebda/shared';
 import { parsePriceCell } from '../services/price-cell';
 import { tenantContext } from '../middleware/tenant-context';
+import { storeDb } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -1013,7 +1014,9 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const rates = await prisma.shippingAreaRate.findMany({
+      const rates = await (
+        await storeDb(storeId)
+      ).shippingAreaRate.findMany({
         where: { storeId, isActive: true },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
         take: AREA_RATES_MAX, // BE:E-5

@@ -337,3 +337,67 @@ describe('__rebase', () => {
     expect((await post(storeDo(), '__rebase', '')).status).toBe(409);
   });
 });
+
+describe('__auditimport (N-10d): the one write a sealed store accepts', () => {
+  const row = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    action: 'order.updated',
+    user_id: 'u1',
+    store_id: 's1',
+    resource_type: 'order',
+    resource_id: 'o1',
+    details: '{"a":1}',
+    ip_address: '1.1.1.1',
+    user_agent: 'ua',
+    created_at: 1_790_000_000_000,
+    ...over,
+  });
+  const send = (ctx: ReturnType<typeof storeDo>, rows: unknown[]) =>
+    handleStoreAdmin(
+      new Request(`${URL_}/__auditimport`, {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      ctx
+    );
+  const rig = () => {
+    const ctx = storeDo();
+    ctx.db.exec(`CREATE TABLE IF NOT EXISTS _identity (k TEXT PRIMARY KEY, v TEXT)`);
+    ctx.db.exec(`INSERT INTO _identity (k, v) VALUES ('store_id', 's1')`);
+    return ctx;
+  };
+
+  it('inserts by id, is idempotent, and reports how many of the sent ids the table holds', async () => {
+    const ctx = rig();
+    const a = await (await send(ctx, [row('a1'), row('a2')])).json();
+    expect(a).toMatchObject({ ok: true, inserted: 2, present: 2, sent: 2 });
+    const b = await (await send(ctx, [row('a1'), row('a3')])).json();
+    expect(b).toMatchObject({ ok: true, inserted: 1, present: 2, sent: 2 });
+    expect((ctx.db.prepare('SELECT count(*) n FROM audit_logs').get() as { n: number }).n).toBe(3);
+    expect(
+      ctx.db.prepare(`SELECT details, created_at FROM audit_logs WHERE id='a1'`).get()
+    ).toEqual({
+      details: '{"a":1}',
+      created_at: 1_790_000_000_000,
+    });
+  });
+
+  it('refuses a row of another store and an oversized batch, and never overwrites an existing row', async () => {
+    const ctx = rig();
+    expect((await send(ctx, [row('x', { store_id: 'other' })])).status).toBe(400);
+    expect(
+      (
+        await send(
+          ctx,
+          Array.from({ length: 501 }, (_, i) => row(`r${i}`))
+        )
+      ).status
+    ).toBe(400);
+    await send(ctx, [row('a1')]);
+    await send(ctx, [row('a1', { action: 'tampered' })]);
+    expect(ctx.db.prepare(`SELECT action FROM audit_logs WHERE id='a1'`).get()).toEqual({
+      action: 'order.updated',
+    });
+  });
+});

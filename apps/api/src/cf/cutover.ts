@@ -1,7 +1,7 @@
 /**
  * The cutover admin surface on the API Worker (Rulings CUTOVER-2/3/4, docs/runbooks/cutover-cf.md):
  *
- *   /cutover/stores/<storeId>/{__import,__verify,__seal,__status,__unseal,__rebase,__diff,__analytics}
+ *   /cutover/stores/<storeId>/{__import,__auditimport,__verify,__seal,__status,__unseal,__rebase,__diff,__analytics}
  *
  * The bearer check against CUTOVER_IMPORT_SECRET happens HERE, before the StoreDO sees the request, with
  * the constant-time compare that lives next to the handler (packages/cf-migrate, shared with the rehearsal
@@ -18,6 +18,7 @@ export const CUTOVER_PREFIX = '/cutover/';
 const ACTIONS = {
   __import: 'POST',
   __verify: 'POST',
+  __auditimport: 'POST',
   __seal: 'POST',
   __unseal: 'POST',
   __rebase: 'POST',
@@ -71,6 +72,41 @@ export async function routeCutover(request: Request, env: CfBindings): Promise<R
   if (!id.success) return json({ ok: false, error: 'invalid store id' }, 400);
   if (request.method !== ACTIONS[action as keyof typeof ACTIONS])
     return json({ ok: false, error: 'method not allowed' }, 405);
+
+  // Ruling NZ-AN-1: the analytics copy may WIPE a DO's analytics tables to restart cleanly, but only while the D1 marker does not
+  // exist (after it the DO holds native rows that exist nowhere else). The DO cannot see D1, so the check lives here.
+  if (action === '__analytics') {
+    let op: unknown;
+    try {
+      op = ((await request.clone().json()) as { op?: unknown }).op;
+    } catch {
+      return json({ ok: false, error: 'bad json' }, 400);
+    }
+    if (op === 'analyticsImportReset') {
+      const d1 = (
+        env as unknown as {
+          PLATFORM_DB?: {
+            prepare(sql: string): { bind(...v: unknown[]): { first(): Promise<unknown> } };
+          };
+        }
+      ).PLATFORM_DB;
+      if (!d1) return json({ ok: false, error: 'PLATFORM_DB is not bound' }, 503);
+      let marked: unknown;
+      try {
+        marked = await d1
+          .prepare('SELECT 1 AS n FROM system_settings WHERE key = ?1')
+          .bind('platform_cutover.analytics')
+          .first();
+      } catch {
+        return json({ ok: false, error: 'marker unreadable' }, 503);
+      }
+      if (marked)
+        return json(
+          { ok: false, code: 'ANALYTICS_MARKER_SET', message: 'reset refused after the marker' },
+          409
+        );
+    }
+  }
 
   const ns = env.STORE_DO;
   if (!ns) return json({ ok: false, error: 'STORE_DO is not bound' }, 503);

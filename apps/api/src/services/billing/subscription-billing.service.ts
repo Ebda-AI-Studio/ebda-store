@@ -1712,7 +1712,8 @@ export async function applyWebhookEvent(
       const out = await applyInner(tx);
       await tx.billingWebhookEvent.updateMany({
         where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_PROCESSING },
-        data: { outcome: 'processed' },
+        // `detail` held the encrypted deferred event (card token included): gone once applied
+        data: { outcome: 'processed', detail: null },
       });
       return out;
     } catch (err) {
@@ -1795,7 +1796,10 @@ export async function handleBillingWebhook(
       provider: provider.name,
       eventId: event.eventId,
       eventType: event.kind,
-      payload: { event, rawBody: Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody },
+      // The raw body is NEVER stored (the signature is verified, it is not needed again). The parsed event may carry a card
+      // token, so the whole blob is encrypted at rest; it is decrypted by processDeferredBillingWebhooks and erased
+      // (detail = NULL) the moment the event is applied.
+      payload: encryption.encrypt(JSON.stringify({ event })),
     });
     return { duplicate: false, outcome: 'deferred', detail: 'family_frozen' };
   }
@@ -1823,7 +1827,9 @@ export async function processDeferredBillingWebhooks(limit = 50): Promise<number
   let applied = 0;
   for (const row of await listDeferredBillingWebhooksD1(limit)) {
     try {
-      const { event } = JSON.parse(row.detail) as { event: BillingWebhookEvent };
+      const { event } = JSON.parse(encryption.decrypt(row.detail)) as {
+        event: BillingWebhookEvent;
+      };
       event.occurredAt = new Date(event.occurredAt);
       const provider = billingWebhookProvider(row.provider);
       await confirmAndApplyWebhook(provider, event);
