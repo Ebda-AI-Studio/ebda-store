@@ -23,6 +23,10 @@ interface CouponFormModalProps {
   /** Why the server refused the save (already in the admin language). */
   saveError?: string | null;
   onDismissError?: () => void;
+  /** Client-side check of the discount value, shown at the field before any request (UX:S-2). */
+  valueError?: string | null;
+  /** The save failed with no readable reason: one generic Arabic line (UX:S-1). */
+  saveFailed?: boolean;
 }
 
 /**
@@ -41,6 +45,8 @@ export function CouponFormModal({
   customerGroups,
   saveError,
   onDismissError,
+  valueError,
+  saveFailed,
 }: CouponFormModalProps) {
   const tModal = useT('coupons.modal');
   const tForm = useT('coupons.form');
@@ -78,12 +84,12 @@ export function CouponFormModal({
       }
     >
       <form id={FORM_ID} onSubmit={onSubmit} className="space-y-6">
-        {saveError ? (
+        {saveError || saveFailed ? (
           <div
             role="alert"
             className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-ink"
           >
-            {saveError}
+            {saveError || tModal('saveFailed')}
             {onDismissError ? (
               <button type="button" onClick={onDismissError} className="ms-3 underline">
                 ×
@@ -103,7 +109,7 @@ export function CouponFormModal({
               value={formData.code}
               onChange={e => onChange({ ...formData, code: e.target.value.toUpperCase() })}
               placeholder={tForm('codePlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono uppercase"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono uppercase"
             />
           </div>
           <div>
@@ -116,7 +122,7 @@ export function CouponFormModal({
               value={formData.name}
               onChange={e => onChange({ ...formData, name: e.target.value })}
               placeholder={tForm('namePlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
@@ -133,7 +139,7 @@ export function CouponFormModal({
               value={formData.nameAr}
               onChange={e => onChange({ ...formData, nameAr: e.target.value })}
               placeholder={tForm('nameArPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
@@ -145,7 +151,7 @@ export function CouponFormModal({
               value={formData.description}
               onChange={e => onChange({ ...formData, description: e.target.value })}
               placeholder={tForm('descriptionPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
@@ -161,7 +167,7 @@ export function CouponFormModal({
             value={formData.descriptionAr}
             onChange={e => onChange({ ...formData, descriptionAr: e.target.value })}
             placeholder={tForm('descriptionArPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
 
@@ -174,30 +180,46 @@ export function CouponFormModal({
             <select
               value={formData.type}
               onChange={e => onChange({ ...formData, type: e.target.value as CouponType })}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="percentage">{tType('percentage')}</option>
               <option value="fixed">{tType('fixed')}</option>
               <option value="free_shipping">{tType('freeShipping')}</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              {formData.type === 'percentage'
-                ? tForm('valuePercentageLabel')
-                : tForm('valueAmountLabel')}
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              dir="ltr"
-              required
-              value={formData.value}
-              onChange={e => onChange({ ...formData, value: e.target.value })}
-              disabled={formData.type === 'free_shipping'}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted"
-            />
-          </div>
+          {formData.type !== 'free_shipping' && (
+            <div>
+              <label
+                htmlFor="coupon-value"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                {formData.type === 'percentage'
+                  ? tForm('valuePercentageLabel')
+                  : tForm('valueAmountLabel')}
+              </label>
+              <input
+                id="coupon-value"
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                required
+                aria-invalid={valueError ? true : undefined}
+                aria-describedby={valueError ? 'coupon-value-error' : undefined}
+                value={formData.value}
+                onChange={e => onChange({ ...formData, value: e.target.value })}
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary aria-[invalid=true]:border-destructive-ink"
+              />
+              {valueError && (
+                <p
+                  id="coupon-value-error"
+                  role="alert"
+                  className="mt-1 text-sm text-destructive-ink"
+                >
+                  {valueError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Limits */}
@@ -213,7 +235,7 @@ export function CouponFormModal({
               value={formData.minOrderAmount}
               onChange={e => onChange({ ...formData, minOrderAmount: e.target.value })}
               placeholder={tForm('minOrderPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           {formData.type === 'percentage' && (
@@ -228,7 +250,7 @@ export function CouponFormModal({
                 value={formData.maxDiscount}
                 onChange={e => onChange({ ...formData, maxDiscount: e.target.value })}
                 placeholder={tForm('maxDiscountPlaceholder')}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
           )}
@@ -245,7 +267,7 @@ export function CouponFormModal({
               value={formData.usageLimit}
               onChange={e => onChange({ ...formData, usageLimit: e.target.value })}
               placeholder={tForm('usageLimitPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
@@ -258,7 +280,7 @@ export function CouponFormModal({
               value={formData.usageLimitPerUser}
               onChange={e => onChange({ ...formData, usageLimitPerUser: e.target.value })}
               placeholder={tForm('usageLimitPerUserPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
@@ -273,7 +295,7 @@ export function CouponFormModal({
               type="datetime-local"
               value={formData.startsAt}
               onChange={e => onChange({ ...formData, startsAt: e.target.value })}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
@@ -284,7 +306,7 @@ export function CouponFormModal({
               type="datetime-local"
               value={formData.expiresAt}
               onChange={e => onChange({ ...formData, expiresAt: e.target.value })}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
@@ -317,7 +339,7 @@ export function CouponFormModal({
               <select
                 value={formData.customerGroupId}
                 onChange={e => onChange({ ...formData, customerGroupId: e.target.value })}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="">{tTargeting('allCustomers')}</option>
                 {customerGroups.map(g => (
@@ -337,7 +359,7 @@ export function CouponFormModal({
                 value={formData.minQuantity}
                 onChange={e => onChange({ ...formData, minQuantity: e.target.value })}
                 placeholder={tTargeting('minQuantityPlaceholder')}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
           </div>

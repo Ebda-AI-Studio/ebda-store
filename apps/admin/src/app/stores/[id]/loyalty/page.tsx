@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useLatestRequest } from '../../../../hooks/useLatestRequest';
@@ -36,6 +37,9 @@ export default function LoyaltySettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
   const [settings, setSettings] = useState<LoyaltySettings>(DEFAULT_SETTINGS);
+  // Last saved copy: the sticky bar (one Save for all three forms) shows only while this differs.
+  const [savedSettings, setSavedSettings] = useState<LoyaltySettings>(DEFAULT_SETTINGS);
+  const dirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const [stats, setStats] = useState<LoyaltyStats | null>(null);
   const [members, setMembers] = useState<LoyaltyMember[]>([]);
   const [activeTab, setActiveTab] = useState<'settings' | 'members'>('settings');
@@ -59,7 +63,9 @@ export default function LoyaltySettingsPage() {
     );
     if (data) {
       setLoyaltyEnabled(data.loyaltyEnabled || false);
-      setSettings({ ...DEFAULT_SETTINGS, ...(data.settings || {}) });
+      const loaded = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+      setSettings(loaded);
+      setSavedSettings(loaded);
     }
   }, [storeId]);
 
@@ -142,6 +148,7 @@ export default function LoyaltySettingsPage() {
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/loyalty/settings`, { settings });
       if (!error) {
+        setSavedSettings(settings);
         toastSuccess(tToast('savedTitle'), tToast('savedDescription'));
       } else {
         showError(tToast('errorTitle'), tToast('saveFailed'));
@@ -291,19 +298,13 @@ export default function LoyaltySettingsPage() {
               />
 
               {loyaltyEnabled && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={handleSaveSettings}
-                    disabled={saving}
-                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {saving && (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    )}
-                    {tPage('saveSettings')}
-                  </button>
-                </div>
+                <StickySaveBar
+                  dirty={dirty}
+                  saving={saving}
+                  onSave={handleSaveSettings}
+                  onReset={() => setSettings(savedSettings)}
+                  saveLabel={tPage('saveSettings')}
+                />
               )}
             </div>
           )}
