@@ -404,7 +404,7 @@ describe('tax rates on the DO', () => {
       expect((await TaxService.toggleRate(STORE, b.id)).isActive).toBe(true);
       await TaxService.updateRate(STORE, a.id, { rate: 15 } as never);
       expect(rows('SELECT rate FROM tax_rates ORDER BY rate').map(r => Number(r.rate))).toEqual([
-        1, 15,
+        100, 1500,
       ]);
       await TaxService.deleteRate(STORE, a.id);
       await expect(TaxService.getRate(STORE, a.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
