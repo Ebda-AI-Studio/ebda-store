@@ -123,6 +123,12 @@ retry budgets, and leave job rows stuck in `failed` state.
 
 ## Queue depth monitoring
 
+> Jobs run on Cloudflare Workflows + Queues (Inngest was removed in #294). A job row still `queued` after 30 min is
+> re-dispatched once by `queue-depth-watch`; if it is still queued at a later tick it is marked failed
+> (`error_message = 'never started'`) and ONE P1 alert (source `jobs.queue-depth`) names the job id. Check the
+> JOBS_WORKFLOW / JOBS_QUEUE bindings and the Worker logs; there is no `/api/v1/inngest` to re-PUT. Enqueue failures
+> mark the row failed immediately; a dispatch that would start nothing throws in the Worker (Ruling JOBS-ORPHAN-1).
+
 The `queue-depth-watch` cron fires hourly (Ruling INNGEST-BUDGET-1) and writes a summary to
 Telegram at the `info` level when the queue depth exceeds a threshold:
 

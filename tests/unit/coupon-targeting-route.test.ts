@@ -20,6 +20,8 @@ const { mockPrisma } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    // BE:S-25: the targeted customer group must belong to the store
+    customerGroup: { findFirst: vi.fn().mockResolvedValue({ id: 'group' }) },
   },
 }));
 

@@ -24,6 +24,7 @@ vi.mock('@api/middleware/auth', () => ({
     next();
   },
   customerUserId: () => null,
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),

@@ -86,7 +86,7 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
                         ? 'secondary'
                         : 'destructive'
                   }
-                  className="text-[10px] px-2 py-0.5 capitalize"
+                  className="text-xs px-2 py-0.5 capitalize"
                 >
                   {order.status}
                 </Badge>

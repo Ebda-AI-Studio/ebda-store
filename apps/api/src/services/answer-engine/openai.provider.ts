@@ -50,6 +50,7 @@
  */
 import logger from '../../lib/logger';
 import type { AnswerEngineProvider, EngineAnswer } from './provider';
+import { fetchWithTimeout, LLM_FETCH_TIMEOUT_MS } from '../../lib/fetch-timeout';
 
 const ENDPOINT = 'https://api.openai.com/v1/responses';
 const MODEL = process.env.ANSWER_ENGINE_OPENAI_MODEL || 'gpt-4o-mini';
@@ -69,7 +70,8 @@ export class OpenAiAnswerEngineProvider implements AnswerEngineProvider {
   async query(_storeId: string, prompt: string): Promise<EngineAnswer> {
     let res: Response;
     try {
-      res = await fetch(ENDPOINT, {
+      res = await fetchWithTimeout(ENDPOINT, {
+        timeoutMs: LLM_FETCH_TIMEOUT_MS,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

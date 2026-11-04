@@ -185,7 +185,7 @@ export async function handleRefundReversalStuckSweep(
           `${veryStale.length} refunded/cancelled order(s) still have no reversal after ` +
           `> ${3 * REFUND_REVERSAL_STUCK_MINUTES}m — inventory NOT restored, coupon/loyalty/` +
           `affiliate NOT reversed. Stock is silently missing from the catalogue. ` +
-          `Re-send isn't landing; investigate Inngest delivery.`,
+          `Re-send isn't landing; check the Cloudflare job dispatch (Worker logs, JOBS_WORKFLOW / JOBS_QUEUE).`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
           oldestRequestedAt: veryStale[0] ? requestedAt(veryStale[0]).toISOString() : undefined,
@@ -313,7 +313,7 @@ export async function handlePartialReturnReversalSweep(
         body:
           `${veryStale.length} completed partial return(s) still have no item-level reversal after ` +
           `> ${3 * REFUND_REVERSAL_STUCK_MINUTES}m — returned stock NOT restored, pro-rata GL ` +
-          `adjustment NOT posted. Re-send isn't landing; investigate Inngest delivery.`,
+          `adjustment NOT posted. Re-send isn't landing; check the Cloudflare job dispatch (Worker logs, JOBS_WORKFLOW / JOBS_QUEUE).`,
         context: { returnIds: veryStale.slice(0, 20).map(r => r.id) },
       }).catch(() => undefined);
     });
