@@ -17,7 +17,17 @@ import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
-import ROUTES from './route-table.json';
+import ALL_ROUTES from './route-table.json';
+
+/** SWEEP_ONLY="re1,re2": keep only the routes (`METHOD /path`) matching any regex; unset = the whole table. */
+const ONLY = ((env as unknown as { SWEEP_ONLY?: string }).SWEEP_ONLY ?? '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+  .map(s => new RegExp(s));
+const ROUTES: string[] = (ALL_ROUTES as string[]).filter(
+  r => ONLY.length === 0 || ONLY.some(re => re.test(r))
+);
 
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };
@@ -192,7 +202,7 @@ describe.skipIf(e.E2E_DB === '1')(
           headers
         );
       });
-      expect(results.length).toBeGreaterThan(300);
+      if (ONLY.length === 0) expect(results.length).toBeGreaterThan(300);
     }, 600_000);
 
     it('GET as a logged-in storefront customer (customer-scoped reads)', async () => {
@@ -396,7 +406,7 @@ describe.skipIf(e.E2E_DB === '1')(
       console.log(
         `SWEEP_SUMMARY total=${results.length} ok2xx=${results.filter(r => r.status >= 200 && r.status < 300).length} expected4xx=${results.filter(r => EXPECTED_4XX.has(r.status)).length} failing=${bad.length} odd=${odd.length}`
       );
-      if (process.env.SWEEP_STRICT === '1')
+      if ((env as unknown as { SWEEP_STRICT?: string }).SWEEP_STRICT === '1')
         expect(bad.map(r => `${r.method} ${r.route} ${r.status}`)).toEqual([]);
     });
   }

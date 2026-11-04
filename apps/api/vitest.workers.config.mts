@@ -82,6 +82,8 @@ export default defineConfig(async () => {
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
+            SWEEP_ONLY: process.env.SWEEP_ONLY ?? '',
+            SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
             ...apiVars,
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
