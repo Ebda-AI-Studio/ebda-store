@@ -66,3 +66,29 @@ describe.skipIf(e.E2E_DB === '1')('built Worker with Postgres unreachable', () =
     expect(counts.status).toBe(200);
   });
 });
+
+// NEON-ZERO-1 (Ruling NZ-TX-1): an authenticated admin request for a Durable Object store opens no Postgres transaction.
+describe.skipIf(e.E2E_DB === '1')(
+  'admin API for a Durable Object store with Postgres unreachable',
+  () => {
+    const STORE = '5d2c8e11-7b3a-4c6f-9a10-3e4f5a6b7c8d';
+    // BLOCKED on the access marker (PR nz-access-auth): until `requireStoreAccess` reads D1, the access check itself still reads
+    // Postgres (and the boot role guard 500s on the first Postgres use). Un-skip when that lands; the tenantContext half is
+    // proved in tests/unit/tenant-context-do-no-pg.test.ts.
+    it.skip('GET orders list answers 2xx', async () => {
+      const { accessToken, authState } = await import('./helpers');
+      await authState('user:tv:owner-9', [['set', 'user:tv:owner-9', '0', {}]]);
+      const tok = await accessToken({ userId: 'owner-9', jti: 'j9', role: 'store_admin' });
+      await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
+      await e.PLATFORM_DB.prepare(
+        'INSERT OR REPLACE INTO stores (id, name, slug, owner_id, storage_backend) VALUES (?1, ?2, ?3, ?4, ?5)'
+      )
+        .bind(STORE, 'adm', 'adm', 'owner-9', 'do')
+        .run();
+      const res = await e.API.fetch(`https://api.ebda.app/api/v1/stores/${STORE}/orders?limit=5`, {
+        headers: { authorization: `Bearer ${tok}` },
+      });
+      expect(`${res.status} ${(await res.text()).slice(0, 200)}`).toMatch(/^2\d\d /);
+    });
+  }
+);

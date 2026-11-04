@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { runInStoreScope, runInTenantContext } from '@ebda/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
+import { backendFor } from '../lib/store-backend';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';
 import { skipsRequestTransaction } from './public-read-limit';
@@ -140,12 +141,12 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
       .then(() => {
         // The client may have gone while the identity check ran: a transaction opened now would never see `close`.
         if (res.destroyed || res.writableEnded) return;
-        openTransaction(req, res, next, storeId, userId);
+        openForBackend(req, res, next, storeId, userId);
       })
       .catch(next);
     return;
   }
-  openTransaction(req, res, next, storeId, userId);
+  openForBackend(req, res, next, storeId, userId);
 }
 
 function bearerToken(req: Request): string | undefined {
@@ -186,6 +187,52 @@ async function preAuthenticate(req: Request, token: string): Promise<void> {
   } catch {
     /* authenticate (the route's own) reports it */
   }
+}
+
+/**
+ * NEON-ZERO-1 (Ruling NZ-TX-1): a store whose backend is `do` has its data in its Durable Object and its platform reads in D1, so
+ * the request opens NO Postgres transaction (BEGIN + set_config was a 500 on every admin route with Postgres dead). The flag is
+ * the D1 directory column (`backendFor`, the one source); an unreadable flag is a 503, never a Postgres fallback. A `pg` store
+ * keeps the request transaction of before.
+ */
+function openForBackend(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  storeId: string,
+  userId: string | undefined
+): void {
+  backendFor(storeId).then(backend => {
+    // The client may have gone while the flag was read: a transaction opened now would never see `close`.
+    if (res.destroyed || res.writableEnded) return;
+    if (backend === 'do') openDoRequest(res, next, storeId, userId);
+    else openTransaction(req, res, next, storeId, userId);
+  }, next);
+}
+
+/**
+ * The same lifecycle as `openTransaction` (response gate, then the deferred drain) with NO Postgres transaction. The scope
+ * carries the user, so a `withStore`/`prisma` call a handler still makes on the user-keyed tables (`users`, `addresses`) sees
+ * `app.current_user_id` exactly as under the request transaction. Residual (Ruling NZ-TX-1): a leftover Postgres WRITE on a DO
+ * request autocommits per query instead of rolling back with the request.
+ */
+function openDoRequest(
+  res: Response,
+  next: NextFunction,
+  storeId: string,
+  userId: string | undefined
+): void {
+  runRequestInTransaction(
+    res,
+    next,
+    (body, releaseResponse) =>
+      withDeferredWork(
+        { storeId, userId, noPgTx: true },
+        () => runInStoreScope(storeId, body, userId),
+        releaseResponse
+      ),
+    { storeId, middleware: 'tenantContext', backend: 'do' }
+  );
 }
 
 function openTransaction(
