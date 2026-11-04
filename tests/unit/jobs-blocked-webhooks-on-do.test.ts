@@ -110,6 +110,7 @@ vi.mock('@api/lib/repo-factory', () => {
     }),
   });
   const db = {
+    store: { findUnique: async () => ({ name: 'Dahab', owner: { email: 'o@example.com' } }) },
     webhookEndpoint: {
       findMany: endpoint.findMany,
       findFirst: endpoint.findFirst,

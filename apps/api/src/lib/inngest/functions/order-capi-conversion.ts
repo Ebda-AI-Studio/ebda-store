@@ -28,9 +28,9 @@
 
 import type { JobDef } from '../../jobs/types';
 import { storefrontOrigin } from '@ebda/shared';
-import { withStore } from '@ebda/database';
+
 import { storeDb } from '../../repo-factory';
-import { customersById, runInStoreCtx } from '../../jobs/store-db';
+import { customersById, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import {
@@ -80,8 +80,8 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
     // with runInTenantContext so RLS doesn't filter it out.
     const store = await step.run('load-store-pixels', () =>
       // `Store` is a platform row (D1): the same read for a Postgres store and a store on its Durable Object
-      withStore(storeId, tx =>
-        tx.store.findUnique({
+      withStoreDb(storeId, db =>
+        db.store.findUnique({
           where: { id: storeId },
           select: {
             marketingPixels: true,

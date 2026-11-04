@@ -1,5 +1,5 @@
 import { revokeForAccount } from '../lib/wa/consent';
-import { aiUsageFeatureStats } from '../services/ai-usage.service';
+import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';

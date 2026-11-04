@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
-import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
+import { lazyStoreDb, lazyStoreWriter, withStoreDb } from '../../jobs/store-db';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -136,8 +136,8 @@ async function ensureFooterSupportLinkEnabled(
   defaultNameAr: string
 ): Promise<void> {
   try {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
+    const store = await withStoreDb(storeId, db =>
+      db.store.findUnique({
         where: { id: storeId },
         select: { settings: true },
       })
@@ -321,7 +321,7 @@ const bulkAiFaqAeoFn = inngest.createFunction(
         let failed = 0;
 
         const [store, sampleCats, sampleProds, paymentConfigs] = await Promise.all([
-          prisma.store.findUnique({
+          lazyStoreDb(storeId).store.findUnique({
             where: { id: storeId },
             select: { name: true, nameAr: true, description: true },
           }),
@@ -656,7 +656,7 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
         let failed = 0;
 
         const [store, sampleCats, sampleProds] = await Promise.all([
-          prisma.store.findUnique({
+          lazyStoreDb(storeId).store.findUnique({
             where: { id: storeId },
             select: { name: true, nameAr: true, description: true },
           }),
@@ -964,7 +964,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       );
 
       const items: MetaWorkItem[] = await step.run('load-items', async () => {
-        const store = await prisma.store.findUnique({
+        const store = await lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { id: true },
         });
@@ -1004,7 +1004,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       }
 
       const store = await step.run('load-store', () =>
-        prisma.store.findUnique({
+        lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { name: true },
         })
@@ -1055,7 +1055,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
 
           for (const item of batchItems) {
             if (item.kind === 'store') {
-              const s = await prisma.store.findUnique({
+              const s = await lazyStoreDb(item.id).store.findUnique({
                 where: { id: item.id },
                 select: {
                   name: true,

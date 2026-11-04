@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { withStoreDb } from '../../jobs/store-db';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { storeDb, storeMoney } from '../../repo-factory';
 import { groupOrderLinesForDisplay, deliveryLineFromNotes } from '@ebda/shared';
@@ -188,8 +189,8 @@ export const orderCreated: JobDef = inngest.createFunction(
     const store = await step.run('load-store', () =>
       // Postgres: exactly as before; a DO store has no tenant transaction to open for a platform row
       (money
-        ? withStore(storeId, tx =>
-            tx.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+        ? withStoreDb(storeId, db =>
+            db.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
           )
         : runInTenantContext(storeId, () =>
             prisma.store.findUnique({

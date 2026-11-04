@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { analyticsOnDo } from '../../analytics-backend';
-import { aiUsageTotals } from '../../../services/ai-usage.service';
+import { aiUsageTotals } from '../../../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../../../services/platform/cutover';
 import { withStoreDb } from '../../jobs/store-db';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
@@ -260,9 +260,9 @@ export const storeUsageSnapshot: JobDef = inngest.createFunction(
           FROM stores s
           WHERE s.id = ${storeId} AND s.deleted_at IS NULL
         `;
-          }, acrossOpts(event)).then(async r =>
-            toJsonSafeRows(await withAiUsageFromD1(r, start, end))
-          )
+          }, acrossOpts(event))
+            .then(r => withAiUsageFromD1(r, start, end))
+            .then(toJsonSafeRows)
     );
 
     let written = 0;

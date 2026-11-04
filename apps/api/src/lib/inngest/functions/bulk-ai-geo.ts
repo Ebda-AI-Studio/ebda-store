@@ -156,7 +156,7 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
           let failed = 0;
 
           const [store, categories, sampleProducts] = await Promise.all([
-            prisma.store.findUnique({
+            lazyStoreDb(storeId).store.findUnique({
               where: { id: storeId },
               select: {
                 name: true,
@@ -406,7 +406,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
       );
 
       const { storeFound, productIds } = await step.run('load-items', async () => {
-        const store = await prisma.store.findUnique({
+        const store = await lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { id: true },
         });
@@ -433,7 +433,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
       }
 
       const store = await step.run('load-store', () =>
-        prisma.store.findUnique({
+        lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { name: true, nameAr: true },
         })
@@ -720,7 +720,7 @@ const bulkAiBrandFactsFn = inngest.createFunction(
           let failed = 0;
 
           const [store, sampleCats] = await Promise.all([
-            prisma.store.findUnique({
+            lazyStoreDb(storeId).store.findUnique({
               where: { id: storeId },
               select: {
                 name: true,

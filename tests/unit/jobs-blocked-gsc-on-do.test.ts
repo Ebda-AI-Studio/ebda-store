@@ -88,7 +88,7 @@ vi.mock('@api/services/answer-engine/gsc-client', () => ({
 }));
 
 import { gscIngestCron, gscIngestOnDemand } from '@api/lib/inngest/functions/gsc-ingest';
-import { NO_STORE_DATA_JOBS } from '@api/lib/jobs/job-data';
+import { PORTED_JOBS } from '@api/lib/jobs/job-data';
 import { decideRunForStore } from '@api/lib/jobs/do-guard';
 
 type Handler = { handler: (a: unknown) => Promise<unknown> };
@@ -108,9 +108,9 @@ beforeEach(() => {
 
 describe('gsc ingest for a DO store', () => {
   it.each(['gsc-ingest-cron', 'gsc-ingest-on-demand'])(
-    '%s is classified store-data-free and runs',
+    '%s is a ported job and runs for a DO store',
     async id => {
-      expect(NO_STORE_DATA_JOBS.has(id)).toBe(true);
+      expect(PORTED_JOBS.has(id)).toBe(true);
       expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
     }
   );

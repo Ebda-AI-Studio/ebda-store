@@ -21,8 +21,8 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInStoreScope, withStore } from '@ebda/database';
-import { allStoresDirectory } from '../../jobs/store-db';
+import { prisma, runInStoreScope } from '@ebda/database';
+import { allStoresDirectory, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
@@ -265,8 +265,8 @@ export const answerEngineScanOnDemand: JobDef = inngest.createFunction(
     // One step for both gates: on a Workflow only step bodies hold a database connection.
     const { enabled, store } = await step.run('gates', async () => ({
       enabled: await featureService.isFeatureEnabled(storeId, 'answer_engine_insights'),
-      store: await withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      store: await withStoreDb(storeId, db =>
+        db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
       ),
     }));
     if (!enabled) {

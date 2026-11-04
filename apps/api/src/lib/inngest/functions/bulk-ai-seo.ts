@@ -114,7 +114,7 @@ const bulkAiSeoFn = inngest.createFunction(
       );
 
       const items: WorkItem[] = await step.run('load-items', async () => {
-        const store = await prisma.store.findUnique({
+        const store = await lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { id: true },
         });
@@ -161,7 +161,7 @@ const bulkAiSeoFn = inngest.createFunction(
       }
 
       const store = await step.run('load-store', () =>
-        prisma.store.findUnique({
+        lazyStoreDb(storeId).store.findUnique({
           where: { id: storeId },
           select: { name: true, nameAr: true },
         })
@@ -203,7 +203,7 @@ const bulkAiSeoFn = inngest.createFunction(
             // entity kind, we re-derive its current SEO-completeness right
             // before deciding whether to call Gemini.
             if (item.kind === 'store') {
-              const s = await prisma.store.findUnique({
+              const s = await lazyStoreDb(item.id).store.findUnique({
                 where: { id: item.id },
                 select: {
                   name: true,

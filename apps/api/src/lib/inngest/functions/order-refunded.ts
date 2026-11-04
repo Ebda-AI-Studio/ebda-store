@@ -1,7 +1,7 @@
 import { NonRetriableError } from '../../jobs/errors';
 import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext, withMoneyTx, withStore, type Prisma } from '@ebda/database';
-import { runInStoreCtx } from '../../jobs/store-db';
+import { runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import { storeDb, storeMoney } from '../../repo-factory';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
@@ -1030,8 +1030,8 @@ export async function handleOrderRefunded(
     const store = await step.run('load-store', () =>
       // Postgres: exactly as before; a DO store has no tenant transaction to open for a platform row
       (money
-        ? withStore(storeId, tx =>
-            tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
+        ? withStoreDb(storeId, db =>
+            db.store.findUnique({ where: { id: storeId }, select: { name: true } })
           )
         : runInTenantContext(storeId, () =>
             prisma.store.findUnique({ where: { id: storeId }, select: { name: true } })

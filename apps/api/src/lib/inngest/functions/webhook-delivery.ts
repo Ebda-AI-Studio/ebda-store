@@ -1,7 +1,7 @@
 import type { JobDef } from '../../jobs/types';
-import { acrossStores, storeDirectory, withStore } from '@ebda/database';
+import { acrossStores, storeDirectory } from '@ebda/database';
 import { alarmStoreId } from '../../jobs/store-scope';
-import { runInStoreCtx, storeRwClient } from '../../jobs/store-db';
+import { runInStoreCtx, storeRwClient, withStoreDb } from '../../jobs/store-db';
 import { storeRepo } from '../../repo-factory';
 import {
   WEBHOOK_CONSECUTIVE_FAILURE_LIMIT,
@@ -140,8 +140,8 @@ async function notifyEndpointDisabled(storeId: string, endpointId: string): Prom
       select: { url: true },
     });
     // `Store` and its owner are platform rows (read from Postgres for either backend)
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
+    const store = await withStoreDb(storeId, db =>
+      db.store.findUnique({
         where: { id: storeId },
         select: { name: true, owner: { select: { email: true } } },
       })

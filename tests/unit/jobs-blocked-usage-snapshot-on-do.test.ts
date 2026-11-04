@@ -65,7 +65,7 @@ vi.mock('@api/lib/repo-factory', () => ({
 }));
 vi.mock('@api/lib/analytics-backend', () => ({ analyticsOnDo: async () => true }));
 vi.mock('@api/services/platform/cutover', () => ({ platformFamilyOnD1: async () => true }));
-vi.mock('@api/services/ai-usage.service', () => ({
+vi.mock('@api/services/usage-aggregates.service', () => ({
   aiUsageTotals: async () => ({
     calls: 3,
     billableCalls: 2,

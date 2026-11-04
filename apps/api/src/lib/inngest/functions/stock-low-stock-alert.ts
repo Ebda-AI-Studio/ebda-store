@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+import { storeDirectory } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
@@ -111,8 +112,8 @@ export const stockLowStockAlertCron: JobDef = inngest.createFunction(
           await step.run(`send-email-${store.id}`, async () => {
             // Load the store name for the email subject/body.
             // withRlsBypass is needed here too because we're outside HTTP context.
-            const storeRow = await withStore(store.id, tx =>
-              tx.store.findUnique({
+            const storeRow = await withStoreDb(store.id, db =>
+              db.store.findUnique({
                 where: { id: store.id },
                 select: { name: true },
               })
@@ -209,8 +210,8 @@ export const stockLowStockAlertOnDemand: JobDef = inngest.createFunction(
     let emailed = false;
     if (scanResult.alertedProducts.length > 0 && scanResult.recipientEmail) {
       await step.run('send-email', async () => {
-        const storeRow = await withStore(storeId, tx =>
-          tx.store.findUnique({
+        const storeRow = await withStoreDb(storeId, db =>
+          db.store.findUnique({
             where: { id: storeId },
             select: { name: true },
           })

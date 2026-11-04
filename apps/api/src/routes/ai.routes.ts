@@ -6,7 +6,7 @@
  * `writeLimiter` per-IP rate limiter on top of the AI service's own
  * per-store daily token budget.
  */
-import { aiUsageCost, aiUsageLast30Days } from '../services/ai-usage.service';
+import { aiUsageCost, aiUsageLast30Days } from '../services/usage-aggregates.service';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';

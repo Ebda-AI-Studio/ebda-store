@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
-import { acrossStoresDb, readStoreDb } from '../../jobs/store-db';
+import { prisma, runInTenantContext } from '@ebda/database';
+import { acrossStoresDb, readStoreDb, withStoreDb } from '../../jobs/store-db';
 import { alarmStoreId } from '../../jobs/store-scope';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
@@ -222,8 +222,8 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   );
   if (!row) throw new Error(`abandoned cart ${cartId} not visible yet`);
   // `Store` is a platform row, not a store-DO one: read it for either backend
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({
+  const store = await withStoreDb(storeId, db =>
+    db.store.findUnique({
       where: { id: storeId },
       select: { slug: true, domain: true, settings: true },
     })
