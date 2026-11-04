@@ -710,7 +710,7 @@ enforced CODEOWNERS here, so the controls are in code. They are enforced by test
   only on push to `main` or manual dispatch; `db-backup.yml` only on schedule or dispatch.
 - **A change to how production deploys needs a human label.** The required check "Deploy workflow changes need the
   deploy-change label" (`.github/workflows/deploy-change-label.yml`, `scripts/ci/deploy-change-label.mjs`) fails a PR that edits
-  `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
+  `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/deploy-plan.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
   `scripts/ebda-cf-api-config.mjs` unless it carries the `deploy-change` label, which only a person applies after reading the diff.
 - **The CI Cloudflare token is `ebda-github-deploy` (`CLOUDFLARE_API_TOKEN`, production environment secret).** Checked in the
   Cloudflare dashboard on 2026-10-27 by the controller: it is scoped to **1 account (Ebda's) and 1 zone (`ebda.app`)**, never
