@@ -7,6 +7,7 @@ import { NotificationBell } from '../NotificationBell';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
 import { useT } from '@/i18n/useT';
+import { ArrowStart } from '../ArrowStart';
 
 interface TopBarProps {
   title: string;
@@ -17,6 +18,8 @@ interface TopBarProps {
   onOpenSidebar: () => void;
   onBack: () => void;
   viewStoreUrl: string | null;
+  /** Breadcrumb parent (UX:N-5): a quiet link above the title that goes up one level. */
+  parent?: { label: string; href: string };
 }
 
 export function TopBar({
@@ -28,6 +31,7 @@ export function TopBar({
   onOpenSidebar,
   onBack,
   viewStoreUrl,
+  parent,
 }: TopBarProps) {
   const t = useT('components.adminLayout');
   // One h1 per page (audit G-7): when the page body renders its own h1, the bar title is a plain paragraph so a
@@ -95,6 +99,15 @@ export function TopBar({
             </button>
           )}
           <div className="min-w-0">
+            {parent && (
+              <Link
+                href={parent.href}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ArrowStart className="h-3 w-3" />
+                {parent.label}
+              </Link>
+            )}
             <TitleTag className="truncate text-base font-bold text-foreground lg:text-lg">
               {title}
             </TitleTag>

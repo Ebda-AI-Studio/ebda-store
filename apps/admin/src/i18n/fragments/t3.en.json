@@ -20,7 +20,147 @@
       "hubTabs": {
         "categories": "Categories",
         "bundles": "Product bundles"
+      },
+      "navEditor": "Store look"
+    }
+  },
+  "stores": {
+    "dashboard": {
+      "openEditor": "Open the editor",
+      "details": {
+        "edit": "Edit",
+        "plan": "Plan"
+      },
+      "stats": {
+        "loadFailed": "We could not load the store numbers right now.",
+        "retry": "Try again"
+      },
+      "needsAction": {
+        "title": "Needs your attention",
+        "orders": "New orders",
+        "lowStock": "Products running low",
+        "returns": "Returns waiting for you",
+        "reviews": "Reviews waiting for approval",
+        "allClear": "Nothing is waiting for you right now.",
+        "loadFailed": "We could not load what needs your attention right now.",
+        "retry": "Try again"
+      },
+      "quickActions": {
+        "title": "Start here",
+        "suspend": "Suspend store",
+        "suspendDescription": "Visitors cannot open the store until you bring it back.",
+        "activate": "Activate store",
+        "activateDescription": "The store opens to visitors again.",
+        "addProduct": "Add a product",
+        "addProductBody": "A new product with photos and price",
+        "phoneOrder": "Record a phone order",
+        "phoneOrderBody": "Create an order for a customer who called",
+        "newCoupon": "New coupon",
+        "newCouponBody": "A discount code for your customers",
+        "shareLink": "Copy store link",
+        "shareLinkBody": "Send it on WhatsApp or Instagram",
+        "linkCopied": "Store link copied",
+        "linkCopyFailed": "Could not copy the link. Copy it from the address bar."
       }
     }
+  },
+  "settings": {
+    "groups": {
+      "store": "Store",
+      "sales": "Selling and payments",
+      "visibility": "Visibility",
+      "team": "Team and account",
+      "developers": "For developers"
+    },
+    "rail": {
+      "label": "Settings sections",
+      "allSettings": "All settings"
+    },
+    "page": {
+      "subtitle": "Everything about your store in one place"
+    },
+    "cards": {
+      "template": {
+        "title": "Store look",
+        "description": "Open the editor to change colors, pages and design"
+      },
+      "branding": {
+        "title": "Logo and colors",
+        "description": "Your logo, store colors and contact details"
+      },
+      "language": {
+        "title": "Language",
+        "description": "The language your store opens in for customers"
+      },
+      "announcement": {
+        "title": "Announcement bar",
+        "description": "A bar above the store for offers and news"
+      },
+      "categories": {
+        "title": "Categories",
+        "description": "Arrange product categories and their images"
+      },
+      "paymentSettings": {
+        "title": "Payments",
+        "description": "Choose the payment methods your customers use"
+      },
+      "shipping": {
+        "title": "Shipping",
+        "description": "Delivery areas and shipping prices"
+      },
+      "checkoutDelivery": {
+        "title": "Delivery times",
+        "description": "The delivery note and time slots customers see at checkout"
+      },
+      "taxSettings": {
+        "title": "Taxes",
+        "description": "Tax rates and exemptions"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "Customer messages and new order alerts"
+      },
+      "seo": {
+        "title": "Google visibility",
+        "description": "Titles and descriptions of your pages in search results"
+      },
+      "domain": {
+        "title": "Domain",
+        "description": "Connect a domain with your store name"
+      },
+      "pwaSettings": {
+        "title": "Mobile app",
+        "description": "Let customers install your store as an app on their phone"
+      },
+      "qrCodes": {
+        "title": "QR codes and barcodes",
+        "description": "A QR for the store and barcodes for products and invoices"
+      },
+      "staff": {
+        "title": "Team",
+        "description": "Add staff with limited permissions"
+      },
+      "billing": {
+        "title": "Plan and billing",
+        "description": "Your current plan and usage"
+      },
+      "agentKey": {
+        "title": "AI agent key",
+        "description": "A key that lets an AI agent order from your store"
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "description": "Send order and product events to your own server"
+      },
+      "merchantKeys": {
+        "title": "Merchant MCP keys",
+        "description": "Keys to run the store from Claude Code or any MCP tool"
+      }
+    }
+  },
+  "featureUpgrade": {
+    "availableOn": "Available on the {plan} plan and above.",
+    "upgradeCta": "Upgrade to {plan}",
+    "alsoIncluded": "Also included in this plan"
   }
 }

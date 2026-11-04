@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { formatPrice } from '../../../../lib/format';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../lib/api';
+import { Button } from '@ebda/ui';
 
 interface LiveStats {
   productCount: number;
@@ -26,17 +27,36 @@ interface StatsGridProps {
 export function StatsGrid({ storeId }: StatsGridProps) {
   const t = useT('stores.dashboard.stats');
   const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
+  // A failed read is an error tile with a retry, never a row of dashes that looks like "no data" (UX:D-3).
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setFailed(false);
     apiGet<LiveStats>(`/api/v1/stores/${storeId}/stats`).then(res => {
       if (cancelled) return;
       if (res.data) setLiveStats(res.data);
+      else setFailed(true);
     });
     return () => {
       cancelled = true;
     };
-  }, [storeId]);
+  }, [storeId, attempt]);
+
+  if (failed) {
+    return (
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+        role="alert"
+      >
+        <p className="text-sm text-destructive-ink">{t('loadFailed')}</p>
+        <Button variant="outline" size="sm" onClick={() => setAttempt(a => a + 1)}>
+          {t('retry')}
+        </Button>
+      </div>
+    );
+  }
 
   const stats = [
     {

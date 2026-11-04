@@ -159,7 +159,7 @@ export function ReceiptBarcodePicker({
           </span>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground">{BARCODE_SHAPE_CREDIT}</p>
+      <p className="text-xs text-muted-foreground">{BARCODE_SHAPE_CREDIT}</p>
     </section>
   );
 }

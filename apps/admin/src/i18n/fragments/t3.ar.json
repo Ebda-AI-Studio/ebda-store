@@ -20,7 +20,147 @@
       "hubTabs": {
         "categories": "الأقسام",
         "bundles": "مجموعات المنتجات"
+      },
+      "navEditor": "شكل المتجر"
+    }
+  },
+  "stores": {
+    "dashboard": {
+      "openEditor": "افتح المحرر",
+      "details": {
+        "edit": "عدّل",
+        "plan": "الباقة"
+      },
+      "stats": {
+        "loadFailed": "مقدرناش نجيب أرقام المتجر دلوقتي.",
+        "retry": "جرّب تاني"
+      },
+      "needsAction": {
+        "title": "محتاج تصرّف",
+        "orders": "طلبات جديدة",
+        "lowStock": "منتجات قربت تخلص",
+        "returns": "مرتجعات مستنية ردك",
+        "reviews": "تقييمات مستنية موافقتك",
+        "allClear": "مفيش حاجة مستنياك دلوقتي.",
+        "loadFailed": "مقدرناش نجيب اللي محتاج تصرّف دلوقتي.",
+        "retry": "جرّب تاني"
+      },
+      "quickActions": {
+        "title": "ابدأ من هنا",
+        "suspend": "علّق المتجر",
+        "suspendDescription": "الزوّار مش هيقدروا يفتحوا المتجر لحد ما ترجّعه.",
+        "activate": "فعّل المتجر",
+        "activateDescription": "المتجر هيفتح للزوّار تاني.",
+        "addProduct": "ضيف منتج",
+        "addProductBody": "منتج جديد بصوره وسعره",
+        "phoneOrder": "سجّل طلب تليفون",
+        "phoneOrderBody": "اعمل طلب لعميل كلّمك",
+        "newCoupon": "كوبون جديد",
+        "newCouponBody": "خصم بكود تبعته لعملائك",
+        "shareLink": "انسخ لينك المتجر",
+        "shareLinkBody": "ابعته على واتساب أو انستجرام",
+        "linkCopied": "اتنسخ لينك المتجر",
+        "linkCopyFailed": "مقدرناش ننسخ اللينك. انسخه من شريط العنوان."
       }
     }
+  },
+  "settings": {
+    "groups": {
+      "store": "المتجر",
+      "sales": "البيع والدفع",
+      "visibility": "الظهور",
+      "team": "الفريق والحساب",
+      "developers": "للمطورين"
+    },
+    "rail": {
+      "label": "أقسام الإعدادات",
+      "allSettings": "كل الإعدادات"
+    },
+    "page": {
+      "subtitle": "كل ما يخص متجرك في مكان واحد"
+    },
+    "cards": {
+      "template": {
+        "title": "شكل المتجر",
+        "description": "افتح المحرر وغيّر الألوان والصفحات والتصميم"
+      },
+      "branding": {
+        "title": "الشعار والألوان",
+        "description": "الشعار وألوان المتجر وبيانات التواصل"
+      },
+      "language": {
+        "title": "اللغة",
+        "description": "اللغة اللي المتجر بيفتح بيها لعملائك"
+      },
+      "announcement": {
+        "title": "شريط الإعلانات",
+        "description": "شريط فوق المتجر للعروض والأخبار"
+      },
+      "categories": {
+        "title": "الأقسام",
+        "description": "رتّب أقسام المنتجات وصورها"
+      },
+      "paymentSettings": {
+        "title": "الدفع",
+        "description": "اختار طرق الدفع اللي عملاءك يستخدموها"
+      },
+      "shipping": {
+        "title": "الشحن",
+        "description": "مناطق التوصيل وأسعار الشحن"
+      },
+      "checkoutDelivery": {
+        "title": "مواعيد التوصيل",
+        "description": "ملاحظة التوصيل ومواعيده اللي بتظهر للعميل وهو بيدفع"
+      },
+      "taxSettings": {
+        "title": "الضرائب",
+        "description": "نسب الضريبة وإعفاءاتها"
+      },
+      "notifications": {
+        "title": "الإشعارات",
+        "description": "رسائل العملاء وتنبيهات الطلبات الجديدة"
+      },
+      "seo": {
+        "title": "ظهور المتجر في جوجل",
+        "description": "عناوين وأوصاف صفحاتك في نتايج البحث"
+      },
+      "domain": {
+        "title": "الدومين",
+        "description": "اربط دومين خاص باسم متجرك"
+      },
+      "pwaSettings": {
+        "title": "تطبيق على الموبايل",
+        "description": "خلّي عملاءك يثبّتوا المتجر كتطبيق على تليفونهم"
+      },
+      "qrCodes": {
+        "title": "أكواد QR والباركود",
+        "description": "QR للمتجر وباركود للمنتجات والفواتير"
+      },
+      "staff": {
+        "title": "فريق العمل",
+        "description": "ضيف موظفين بصلاحيات محدودة"
+      },
+      "billing": {
+        "title": "الباقة والفواتير",
+        "description": "باقتك الحالية واستهلاكك"
+      },
+      "agentKey": {
+        "title": "مفتاح وكيل الذكاء الاصطناعي",
+        "description": "مفتاح بيخلّي وكيل ذكاء اصطناعي يطلب من متجرك"
+      },
+      "webhooks": {
+        "title": "ويب هوك",
+        "description": "ابعت أحداث الطلبات والمنتجات لسيرفرك"
+      },
+      "merchantKeys": {
+        "title": "مفاتيح MCP للتاجر",
+        "description": "مفاتيح بتدير بيها المتجر من Claude Code أو أي أداة MCP"
+      }
+    }
+  },
+  "featureUpgrade": {
+    "availableOn": "متاح في باقة {plan} وما فوقها.",
+    "upgradeCta": "اترقّى لباقة {plan}",
+    "alsoIncluded": "موجود كمان في الباقة دي"
   }
 }

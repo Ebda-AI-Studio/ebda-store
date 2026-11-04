@@ -15,7 +15,6 @@
     "app/stores/[id]/products/_components/ProductsToolbar.tsx",
     "app/stores/[id]/seo/page.tsx",
     "app/stores/[id]/seo/redirects/page.tsx",
-    "app/stores/[id]/settings/page.tsx",
     "app/stores/[id]/webhooks/page.tsx"
   ],
   "nativeDialog": [

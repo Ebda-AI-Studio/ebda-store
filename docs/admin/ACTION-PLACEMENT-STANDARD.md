@@ -37,3 +37,16 @@ One rule set for where buttons live on every admin page. Source: the 2026-11-04 
 ## Hubs
 
 Sales = orders, invoices, returns, then a "customers" group (customers, groups, wholesale, reviews, smart hints). Marketing and offers = coupons, promotions, bundles, loyalty, wallet, then campaigns and the rest. Categories, tags and bulk edit belong to Catalog; delivery and staff to Settings. `components/admin-layout/__tests__/hubs.test.ts` fails if a page directory belongs to no hub or a prefix belongs to two.
+
+## Titles (UX:C-10)
+
+A page title is a noun phrase naming what the merchant manages ("الشحن", "الكوبونات"). No "إعدادات" prefix, no store name, no verb. The title is the TopBar `h1`; the page body does not repeat it. Owner tracks set their titles in their i18n fragment. There is no uniform title key to scan, so this is a convention checked in review, not a lint.
+
+## Dashboard and Settings (T3)
+
+- Dashboard header: one primary, "افتح المحرر" ("شوف المتجر" is the TopBar button). "محتاج تصرّف" tiles come first (new orders, low stock, pending returns, pending reviews) and hide when nothing waits; one failed read never shows as zero. Suspend / activate is in the super-admin DangerZone, not in the quick actions.
+- Settings hub: five groups (المتجر، البيع والدفع، الظهور، الفريق والحساب، للمطورين collapsed). `lib/settings-groups.ts` feeds both the cards and the inline-start `SettingsRail` shown on every settings page. Settings pages carry a "الإعدادات" breadcrumb in the TopBar (`parent` prop of `AdminLayout`).
+
+## Ratchets
+
+`tests/unit/admin-copy-ratchets.test.ts` counts stiff Arabic openers per namespace, English literals passed to error setters / toasts, and text under 12px, against `admin-copy-ratchets-baseline.json`. Counts only go down; a track lowers its own numbers when it fixes its pages.
