@@ -44,7 +44,8 @@ import {
   type GatedLimitKey,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
-import { storeRepo } from '../lib/repo-factory';
+import { storeRepo, storeDb } from '../lib/repo-factory';
+import { backendFor } from '../lib/store-backend';
 import { onAccessD1 } from './platform/access-d1';
 import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlements';
 import { socketService } from './socket.service';
@@ -315,9 +316,15 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
  * is not this guard's business: the caller keeps its own not-found behaviour.
  */
 export async function assertNotDemoStore(storeId: string): Promise<void> {
-  const row = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
-  );
+  // N-9: a store served by its StoreDO is read through the split-aware store client (DO profile + D1 directory), not Postgres.
+  const row =
+    (await backendFor(storeId)) === 'do'
+      ? await (
+          await storeDb(storeId)
+        ).store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+      : await withStore(storeId, tx =>
+          tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+        );
   if (row?.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; this action is disabled', {
       messageEn: 'This is a demo store: this is turned off here',

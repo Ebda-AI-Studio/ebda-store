@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { z } from 'zod/v3';
 import { storeDb, storeRepo } from '../lib/repo-factory';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
@@ -764,9 +765,12 @@ router.get(
         const o = shipment.order as unknown as Record<string, unknown> | null;
         const customerId = o?.customerId as string | null | undefined;
         if (o) {
-          o.customer = customerId
-            ? await prisma.user.findFirst({ where: { id: customerId }, select: customerSelect })
-            : null;
+          const doCustomer = customerId ? await customerRow(storeId, customerId) : undefined;
+          o.customer = !customerId
+            ? null
+            : doCustomer !== undefined
+              ? doCustomer
+              : await prisma.user.findFirst({ where: { id: customerId }, select: customerSelect });
           delete o.customerId;
         }
       }

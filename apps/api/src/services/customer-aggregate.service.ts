@@ -1,4 +1,6 @@
 import { currentStoreId, prisma, Prisma, type RfmSegment } from '@ebda/database';
+import { customerRow } from '../lib/customer-directory';
+import { customerAuthRoute } from '../lib/customer-auth';
 import { storeDb } from '../lib/repo-factory';
 import { getCached, customersCacheKey } from '../lib/public-cache';
 import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
@@ -457,18 +459,56 @@ async function aggregateCustomersUncached(
   // scan). It is bounded: `MAX_ZERO_ORDER_CUSTOMERS` newest sign-ups, with
   // the overflow reported through the same `truncated` flag the page's notice
   // reads, never silently dropped.
-  const zeroOrderFetched = await prisma.user.findMany({
-    where: {
-      storeId,
-      role: 'customer',
-      deletedAt: null,
-      orders: { none: { storeId, deletedAt: null } },
-      ...(scope ? { id: { in: scope.zeroOrderUserIds } } : {}),
-    },
-    select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-    orderBy: { createdAt: 'desc' },
-    take: MAX_ZERO_ORDER_CUSTOMERS + 1,
-  });
+  // N-9: a DO-served store's registered customers are its DO's. "Never ordered" is decided against the store's own orders
+  // (also the DO's), in bounded batches over the newest sign-ups, so the cap and the truncation flag keep their meaning.
+  const zeroOrderViaDo = async () => {
+    const route = await customerAuthRoute(storeId, { write: false });
+    if (route.kind !== 'do') return null;
+    const out: Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+    }> = [];
+    const batch = await route.client.call<
+      Array<{
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        phone: string | null;
+      }>
+    >('newest', { limit: 5000, ...(scope ? { ids: scope.zeroOrderUserIds.slice(0, 500) } : {}) });
+    const odb = await storeDb(storeId);
+    for (let i = 0; i < batch.length && out.length <= MAX_ZERO_ORDER_CUSTOMERS; i += 200) {
+      const chunk = batch.slice(i, i + 200);
+      const ordered = new Set(
+        (
+          await odb.order.findMany({
+            where: { storeId, deletedAt: null, customerId: { in: chunk.map(u => u.id) } },
+            select: { customerId: true },
+          })
+        ).map(o => o.customerId)
+      );
+      for (const u of chunk) if (!ordered.has(u.id)) out.push(u);
+    }
+    return out.slice(0, MAX_ZERO_ORDER_CUSTOMERS + 1);
+  };
+  const zeroOrderFetched =
+    (await zeroOrderViaDo()) ??
+    (await prisma.user.findMany({
+      where: {
+        storeId,
+        role: 'customer',
+        deletedAt: null,
+        orders: { none: { storeId, deletedAt: null } },
+        ...(scope ? { id: { in: scope.zeroOrderUserIds } } : {}),
+      },
+      select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_ZERO_ORDER_CUSTOMERS + 1,
+    }));
   const zeroOrderTruncated = zeroOrderFetched.length > MAX_ZERO_ORDER_CUSTOMERS;
   const zeroOrderUsers = zeroOrderTruncated
     ? zeroOrderFetched.slice(0, MAX_ZERO_ORDER_CUSTOMERS)
@@ -676,17 +716,23 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     // the erase/export routes (PR #1852) unreachable through the admin
     // UI for that population even though the routes themselves work.
     if (isUuid) {
-      const zeroOrderUser = await prisma.user.findFirst({
-        where: { id: decodedKey, storeId, role: 'customer', deletedAt: null },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          createdAt: true,
-        },
-      });
+      const doZero = await customerRow(storeId, decodedKey);
+      const zeroOrderUser =
+        doZero !== undefined
+          ? doZero && doZero.deletedAt === null
+            ? doZero
+            : null
+          : await prisma.user.findFirst({
+              where: { id: decodedKey, storeId, role: 'customer', deletedAt: null },
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                createdAt: true,
+              },
+            });
       if (zeroOrderUser) {
         return {
           customer: {

@@ -24,11 +24,16 @@ const ACTIONS = {
   __diff: 'POST',
   // Ruling NZ-AN-1: the per-store analytics copy (scripts/cf/copy-analytics-to-do.mjs): status / import batch / finish
   __analytics: 'POST',
+  // N-9: the customer-auth import/verify channel (scripts/cf/cutover-customer-auth.mjs). Body {op, args}; only the ops below.
+  __auth: 'POST',
   __status: 'GET',
   // verify-store.mjs asks every DO for its table list (the DO must hold no table the cutover did not look at); without this
   // entry the Worker answered 404 and verify refused every store on the deployed API (found live 2026-10-31).
   __tables: 'GET',
 } as const;
+
+/** The only customer-auth operations the cutover channel may run (never login / refresh / reset). */
+const AUTH_CUTOVER_OPS = new Set(['importRows', 'exportRowsPage', 'counts', 'markLive', 'isLive']);
 
 /** Store ids are UUIDs (lowercase); the DO instance name IS the id (lib/store-backend.ts storeDo()). */
 const StoreId = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
@@ -69,6 +74,24 @@ export async function routeCutover(request: Request, env: CfBindings): Promise<R
 
   const ns = env.STORE_DO;
   if (!ns) return json({ ok: false, error: 'STORE_DO is not bound' }, 503);
+  if (action === '__auth') {
+    const body = (await request.json().catch(() => null)) as {
+      op?: unknown;
+      args?: unknown;
+    } | null;
+    if (!body || typeof body.op !== 'string' || !AUTH_CUTOVER_OPS.has(body.op))
+      return json({ ok: false, error: 'op not allowed' }, 400);
+    const { encodeRpc } = await import('@ebda-src/repo');
+    const authStub = ns.get(ns.idFromName(id.data)) as unknown as {
+      authOp(
+        storeId: string,
+        op: string,
+        argsJson: string
+      ): Promise<{ ok: boolean; [k: string]: unknown }>;
+    };
+    const a = await authStub.authOp(id.data, body.op, encodeRpc(body.args ?? {}));
+    return json(a, a.ok ? 200 : (a.status as number) || 500);
+  }
   const stub = ns.get(ns.idFromName(id.data)) as unknown as {
     fetch(r: Request): Promise<Response>;
   };

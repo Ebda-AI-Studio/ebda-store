@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, customerUserId } from '../middleware/auth';
@@ -46,10 +47,14 @@ const adjustSchema = z.object({
 
 /** 404 unless the id is a customer account of THIS store. */
 async function assertStoreCustomer(storeId: string, customerId: string, res: Response) {
-  const customer = await prisma.user.findFirst({
-    where: { ...storeCustomerWhere(storeId, customerId), storeId },
-    select: { id: true },
-  });
+  const doCustomer = await customerRow(storeId, customerId);
+  const customer =
+    doCustomer !== undefined
+      ? doCustomer
+      : await prisma.user.findFirst({
+          where: { ...storeCustomerWhere(storeId, customerId), storeId },
+          select: { id: true },
+        });
   if (!customer) {
     res.status(404).json({
       success: false,

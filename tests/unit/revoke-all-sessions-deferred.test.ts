@@ -66,6 +66,8 @@ const { mockPrisma, redisMock, sendMock, sendAlertMock } = vi.hoisted(() => {
 // The tokenVersion bump and the merchant-key revocation are ONE `ebda_user_revoke_sessions`
 // definer call (`revokeUserSessionsRow`); `user.update` stands in for it here.
 vi.mock('@api/lib/definer', () => ({
+  // N-9: an unscoped revoke resolves the user's store first; an admin-namespace / unknown user stays on Postgres
+  getUserState: async () => null,
   revokeUserSessionsRow: (userId: string) => mockPrisma.user.update({ where: { id: userId } }),
 }));
 

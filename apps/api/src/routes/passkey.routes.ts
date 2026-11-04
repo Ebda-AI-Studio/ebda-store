@@ -83,6 +83,7 @@ const originOf = (req: Request) => req.headers.origin as string | undefined;
 const actorOf = (req: Request) => ({
   userId: req.user!.userId,
   sessionId: (req as unknown as { tokenJti?: string }).tokenJti,
+  storeId: req.user!.storeId,
 });
 
 /** After `authenticate`: the request must come from the surface this account lives on (review M4). */
@@ -190,7 +191,7 @@ router.get(
   passkeyOriginGuard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const items = await PasskeyService.list(req.user!.userId, originOf(req));
+      const items = await PasskeyService.list(req.user!.userId, originOf(req), req.user!.storeId);
       res.json({ success: true, data: { passkeys: items } });
     } catch (error) {
       next(error);
@@ -222,7 +223,8 @@ router.post(
         req.user!.userId,
         actorOf(req).sessionId,
         parsed.data,
-        req.ip
+        req.ip,
+        req.user!.storeId
       );
       await auditLog({
         action: 'passkey.stepup',

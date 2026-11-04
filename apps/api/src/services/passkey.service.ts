@@ -16,6 +16,37 @@ import { AuthService } from './auth.service';
 import { loginGate } from './login-gate';
 import { sendPasskeyNotice } from './passkey-notices';
 import { redis } from './redis.service';
+import { customerAuthRoute, type CustomerAuthClient } from '../lib/customer-auth';
+import type { DoCustomer } from './customer-auth-flows';
+
+/** N-9: the store's StoreDO client when this shopper's credentials live there, else null (Postgres). */
+async function doClientFor(storeId: string | null | undefined): Promise<CustomerAuthClient | null> {
+  const r = await customerAuthRoute(storeId, { write: true });
+  return r.kind === 'do' ? r.client : null;
+}
+interface DoPasskey {
+  id: string;
+  userId: string;
+  credentialId: string;
+  publicKey: string;
+  counter: number;
+  transports: string[];
+  deviceType: string;
+  backedUp: boolean;
+  rpId: string;
+  name: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}
+const passkeyItem = (r: DoPasskey) => ({
+  id: r.id,
+  name: r.name,
+  createdAt: new Date(r.createdAt),
+  lastUsedAt: r.lastUsedAt === null ? null : new Date(r.lastUsedAt),
+  deviceType: r.deviceType,
+  backedUp: r.backedUp,
+  rpId: r.rpId,
+});
 
 /**
  * Passkeys (WebAuthn) for merchants/staff (admin) and shoppers (one store). Plan:
@@ -214,6 +245,8 @@ const userIdBytes = (id: string) => new TextEncoder().encode(id);
 export interface PasskeyActor {
   userId: string;
   sessionId: string | undefined;
+  /** The shopper's store (token claim); null for the admin namespace. */
+  storeId?: string | null;
 }
 
 // Ruling PASSKEY-12: the proof is bound to user + session. The key is derived from both (the session id is
@@ -235,9 +268,27 @@ async function requireStepUp(actor: PasskeyActor): Promise<void> {
 async function notifyPasskeyChange(
   userId: string,
   kind: 'added' | 'removed',
-  passkeyName: string
+  passkeyName: string,
+  storeId?: string | null
 ): Promise<void> {
   try {
+    const dc = await doClientFor(storeId);
+    if (dc) {
+      const p = await dc.call<DoCustomer | null>('getProfile', { userId });
+      if (!p) return;
+      await sendPasskeyNotice(
+        {
+          email: p.email,
+          name: p.firstName,
+          kind,
+          passkeyName,
+          at: new Date().toISOString(),
+          storeId: dc.storeId,
+        },
+        p.language === 'ar' ? 'ar' : 'en'
+      );
+      return;
+    }
     const u = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -271,10 +322,29 @@ export class PasskeyService {
     userId: string,
     sessionId: string | undefined,
     input: { password: string; code?: string },
-    ip?: string
+    ip?: string,
+    storeId?: string | null
   ): Promise<{ expiresInSeconds: number }> {
     const failed = () => new AppError(401, 'STEP_UP_FAILED', 'Could not confirm your identity');
     if (!sessionId) throw failed();
+    const dc = await doClientFor(storeId);
+    if (dc) {
+      const p = await dc.call<DoCustomer | null>('getProfile', { userId });
+      if (!p || p.status !== 'active' || p.deletedAt) throw failed();
+      const key = loginGate.lockoutKey(p.email, dc.storeId);
+      await loginGate.assertNotLocked(key);
+      // The compare runs INSIDE the DO. MFA is refused at login for DO customers (Ruling NZ-N9-1), so there is no TOTP leg.
+      const ok =
+        typeof input.password === 'string' &&
+        (await dc.call<{ valid: boolean }>('verifyPassword', { userId, password: input.password }))
+          .valid;
+      if (!ok) {
+        await loginGate.recordFailure(key, ip);
+        throw failed();
+      }
+      await PasskeyService.markStepUp(userId, sessionId);
+      return { expiresInSeconds: PASSKEY_STEP_UP_TTL_SECONDS };
+    }
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -331,28 +401,43 @@ export class PasskeyService {
   ) {
     const ctx = await resolvePasskeyContext(origin);
     await requireStepUp(actor);
-    const user = await withUser(actor.userId, tx =>
-      tx.user.findUnique({
-        where: { id: actor.userId },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          storeId: true,
-          status: true,
-        },
-      })
-    );
+    const dcBegin = await doClientFor(actor.storeId);
+    let doUser: DoCustomer | null = null;
+    let doExisting: DoPasskey[] = [];
+    if (dcBegin) {
+      doUser = await dcBegin.call<DoCustomer | null>('getProfile', { userId: actor.userId });
+      doExisting = await dcBegin.call<DoPasskey[]>('passkeyList', { userId: actor.userId });
+    }
+    const user = dcBegin
+      ? doUser && { ...doUser, storeId: dcBegin.storeId }
+      : await withUser(actor.userId, tx =>
+          tx.user.findUnique({
+            where: { id: actor.userId },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              storeId: true,
+              status: true,
+            },
+          })
+        );
     if (!user || user.status !== 'active' || !accountFitsContext(user, ctx)) throw notAllowed();
 
-    const existing = await withUser(actor.userId, tx =>
-      tx.passkeyCredential.findMany({
-        where: { userId: actor.userId },
-        select: { credentialId: true, transports: true, rpId: true },
-      })
-    );
+    const existing = dcBegin
+      ? doExisting.map(p => ({
+          credentialId: p.credentialId,
+          transports: p.transports,
+          rpId: p.rpId,
+        }))
+      : await withUser(actor.userId, tx =>
+          tx.passkeyCredential.findMany({
+            where: { userId: actor.userId },
+            select: { credentialId: true, transports: true, rpId: true },
+          })
+        );
     if (existing.length >= PASSKEY_MAX_PER_USER) {
       throw new AppError(409, 'PASSKEY_LIMIT', 'Too many passkeys on this account');
     }
@@ -418,6 +503,24 @@ export class PasskeyService {
 
     const { credential, credentialDeviceType, credentialBackedUp } = verified.registrationInfo;
     try {
+      const dcFin = await doClientFor(actor.storeId);
+      if (dcFin) {
+        const rowId = crypto.randomUUID();
+        const added = await dcFin.call<DoPasskey>('passkeyAdd', {
+          id: rowId,
+          userId: actor.userId,
+          credentialId: credential.id,
+          publicKey: Buffer.from(credential.publicKey).toString('base64url'),
+          counter: credential.counter,
+          transports: (credential.transports ?? []) as string[],
+          deviceType: credentialDeviceType,
+          backedUp: credentialBackedUp,
+          rpId: record.rpId,
+          name: cleanName(body.name),
+        });
+        await notifyPasskeyChange(actor.userId, 'added', added.name, actor.storeId);
+        return toItem(passkeyItem(added), record.rpId);
+      }
       const row = await withUser(actor.userId, tx =>
         tx.passkeyCredential.create({
           data: {
@@ -436,7 +539,8 @@ export class PasskeyService {
       await notifyPasskeyChange(actor.userId, 'added', row.name);
       return toItem(row, record.rpId);
     } catch (e) {
-      if (isP2002(e)) throw registrationFailed();
+      if (isP2002(e) || (e instanceof AppError && e.code === 'PASSKEY_EXISTS'))
+        throw registrationFailed();
       throw e;
     }
   }
@@ -506,28 +610,60 @@ export class PasskeyService {
     }
     if (ctx.rpId !== record.rpId || ctx.storeId !== record.storeId) return fail('context');
 
-    const stored = typeof response.id === 'string' ? await passkeyLookup(response.id) : null;
+    // N-9: a store served by its StoreDO looks the credential up THERE (its credentials are in no other DO), by construction.
+    const dcAuth = ctx.surface === 'storefront' ? await doClientFor(ctx.storeId) : null;
+    const doHit =
+      dcAuth && typeof response.id === 'string'
+        ? await dcAuth.call<{ passkey: DoPasskey; user: DoCustomer } | null>('passkeyLookup', {
+            credentialId: response.id,
+          })
+        : null;
+    const stored = dcAuth
+      ? doHit && {
+          id: doHit.passkey.id,
+          userId: doHit.passkey.userId,
+          publicKey: doHit.passkey.publicKey,
+          counter: doHit.passkey.counter,
+          transports: doHit.passkey.transports,
+          rpId: doHit.passkey.rpId,
+        }
+      : typeof response.id === 'string'
+        ? await passkeyLookup(response.id)
+        : null;
     if (!stored) return fail('unknown_credential');
     known.userId = stored.userId;
     if (stored.rpId !== record.rpId) return fail('rp_mismatch');
 
-    const user = await withUser(stored.userId, tx =>
-      tx.user.findUnique({
-        where: { id: stored.userId },
-        select: {
-          id: true,
-          email: true,
-          storeId: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          emailVerified: true,
-          tokenVersion: true,
-          status: true,
-          deletedAt: true,
-        },
-      })
-    );
+    const user = dcAuth
+      ? doHit && {
+          id: doHit.user.id,
+          email: doHit.user.email,
+          storeId: dcAuth.storeId as string | null,
+          firstName: doHit.user.firstName,
+          lastName: doHit.user.lastName,
+          role: 'customer',
+          emailVerified: doHit.user.emailVerified,
+          tokenVersion: doHit.user.tokenVersion,
+          status: doHit.user.status,
+          deletedAt: doHit.user.deletedAt === null ? null : new Date(doHit.user.deletedAt),
+        }
+      : await withUser(stored.userId, tx =>
+          tx.user.findUnique({
+            where: { id: stored.userId },
+            select: {
+              id: true,
+              email: true,
+              storeId: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              emailVerified: true,
+              tokenVersion: true,
+              status: true,
+              deletedAt: true,
+            },
+          })
+        );
     if (!user) return fail('account');
     const lockoutKey = loginGate.lockoutKey(user.email, user.storeId);
     known.lockoutKey = lockoutKey;
@@ -572,6 +708,17 @@ export class PasskeyService {
     if (!verified.verified) return failKnown('verification');
 
     const next = verified.authenticationInfo.newCounter;
+    if (dcAuth) {
+      const t = await dcAuth.call<{ touched: boolean }>('passkeyTouch', {
+        id: stored.id,
+        userId: user.id,
+        counter: next,
+        backedUp: verified.authenticationInfo.credentialBackedUp,
+      });
+      if (!t.touched) return failKnown('counter_race');
+      await loginGate.recordSuccess(lockoutKey, meta.ip).catch(() => undefined);
+      return { user, credentialRowId: stored.id };
+    }
     const touched = await withUser(user.id, tx =>
       tx.passkeyCredential.updateMany({
         // Compare-and-set on the sign count: two racing assertions cannot both advance it.
@@ -597,12 +744,21 @@ export class PasskeyService {
   // Management (authenticated)
   // -------------------------------------------------------------------------------------------
 
-  static async list(userId: string, origin?: string): Promise<PasskeyListItem[]> {
+  static async list(
+    userId: string,
+    origin?: string,
+    storeId?: string | null
+  ): Promise<PasskeyListItem[]> {
     let rpId: string | null = null;
     try {
       rpId = (await resolvePasskeyContext(origin)).rpId;
     } catch {
       rpId = null;
+    }
+    const dcList = await doClientFor(storeId);
+    if (dcList) {
+      const rows = await dcList.call<DoPasskey[]>('passkeyList', { userId });
+      return rows.map(r => toItem(passkeyItem(r), rpId));
     }
     const rows = await withUser(userId, tx =>
       tx.passkeyCredential.findMany({
@@ -625,6 +781,16 @@ export class PasskeyService {
   static async rename(actor: PasskeyActor, id: string, name: string): Promise<void> {
     await requireStepUp(actor);
     const { userId } = actor;
+    const dcRen = await doClientFor(actor.storeId);
+    if (dcRen) {
+      const r = await dcRen.call<{ updated: number }>('passkeyRename', {
+        userId,
+        id,
+        name: cleanName(name),
+      });
+      if (r.updated !== 1) throw new AppError(404, 'PASSKEY_NOT_FOUND', 'Passkey not found');
+      return;
+    }
     const res = await withUser(userId, tx =>
       tx.passkeyCredential.updateMany({
         where: { id, userId },
@@ -637,6 +803,17 @@ export class PasskeyService {
   static async remove(actor: PasskeyActor, id: string): Promise<void> {
     await requireStepUp(actor);
     const { userId } = actor;
+    const dcRem = await doClientFor(actor.storeId);
+    if (dcRem) {
+      const r = await dcRem.call<{ removed: number; name: string | null }>('passkeyRemove', {
+        userId,
+        id,
+      });
+      if (r.removed !== 1) throw new AppError(404, 'PASSKEY_NOT_FOUND', 'Passkey not found');
+      await AuthService.revokeAllSessions(userId, 'revoke_all', { storeId: actor.storeId });
+      await notifyPasskeyChange(userId, 'removed', r.name ?? 'Passkey', actor.storeId);
+      return;
+    }
     const row = await withUser(userId, tx =>
       tx.passkeyCredential.findMany({ where: { userId }, select: { id: true, name: true } })
     ).then(rows => rows.find(r => r.id === id));

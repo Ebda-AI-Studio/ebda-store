@@ -53,6 +53,7 @@ import {
   lockAccountConsent,
   phoneOnOwnOrder,
   revokeForPhoneChangeInTx,
+  revokeForPhoneChange,
 } from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
@@ -65,6 +66,16 @@ import { storeDb, storeRepo } from '../lib/repo-factory';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
 import { emitEbdaConversion } from './ebda-ads-emit';
+import { signSessionTokens } from './session-tokens';
+import {
+  clientForScopedToken,
+  customerAuthRoute,
+  assertNoCustomerAuthFreeze,
+  type CustomerAuthClient,
+} from '../lib/customer-auth';
+import { storeDo } from '../lib/store-backend';
+import { CustomerAuthFlows, type DoCustomer } from './customer-auth-flows';
+import { verifyRefreshJwt } from '../middleware/security';
 
 interface TokenPayload {
   userId: string;
@@ -381,6 +392,25 @@ export class AuthService {
   }) {
     const storeId = data.storeId ?? null;
 
+    // N-9: a DO store's customers live in its StoreDO (marker on); otherwise Postgres, refused while frozen for the copy.
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') {
+      let first = data.firstName;
+      let last = data.lastName;
+      if (data.name && !first) {
+        const parts = data.name.trim().split(' ');
+        first = parts[0];
+        last = parts.slice(1).join(' ') || '';
+      }
+      return CustomerAuthFlows.register(route.client, {
+        email: data.email,
+        password: data.password,
+        firstName: first || '',
+        lastName: last || '',
+        language: data.language,
+      });
+    }
+
     // Check if user exists in the target scope. Customers in different
     // stores can share an email — the lookup must use the composite key.
     // `users` is under strict RLS: a storefront registration is read inside the
@@ -603,6 +633,10 @@ export class AuthService {
   static async verifyEmail(
     token: string
   ): Promise<{ success: boolean; message: string; registrationEventId?: string }> {
+    // N-9: a token minted for a DO store carries its store id (lib/customer-auth.ts).
+    const doClient = await clientForScopedToken(token);
+    if (doClient) return CustomerAuthFlows.verifyEmail(doClient, token);
+
     // Hash the provided token
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -667,6 +701,9 @@ export class AuthService {
       return { success: true, message: 'Email already verified' };
     }
 
+    // N-9: this redemption writes Postgres rows of a customer; refused (503) while the store's rows are frozen for the copy.
+    await customerAuthRoute(tokenUser.storeId, { write: true });
+
     // Update user as verified and mark token as used
     await withUser(
       verificationToken.userId,
@@ -724,6 +761,9 @@ export class AuthService {
     email: string,
     storeId: string | null = null
   ): Promise<{ success: boolean; message: string }> {
+    if (typeof email !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') return CustomerAuthFlows.resend(route.client, email);
     const user = await findUserInScope(
       email,
       storeId,
@@ -789,6 +829,9 @@ export class AuthService {
     // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
     // exact-case key let an attacker reset the 5-per-15-min budget by
     // re-casing the address (Ebda SP5 review).
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') return CustomerAuthFlows.login(route.client, email, password, ip);
+
     const lockoutKey = loginGate.lockoutKey(email, storeId);
     await loginGate.assertNotLocked(lockoutKey);
 
@@ -935,6 +978,11 @@ export class AuthService {
         'Sign in through the Ebda AI Studio account service'
       );
     }
+
+    // N-9: a passkey completion for a StoreDO customer mints its refresh row in the DO.
+    const issueRoute = await customerAuthRoute(user.storeId, { write: true });
+    if (issueRoute.kind === 'do')
+      return CustomerAuthFlows.issueSession(issueRoute.client, user as unknown as DoCustomer);
 
     const tokens = await this.generateTokens({
       userId: user.id,
@@ -1132,6 +1180,14 @@ export class AuthService {
   }
 
   static async refreshTokens(refreshToken: string): Promise<AuthTokens> {
+    // N-9: the (verified) refresh JWT names the store; a DO store on the marker rotates inside its StoreDO.
+    const claims = verifyRefreshJwt(refreshToken, { ignoreExpiration: true });
+    const refreshRoute = await customerAuthRoute(
+      typeof claims?.storeId === 'string' ? claims.storeId : null,
+      { write: true }
+    );
+    if (refreshRoute.kind === 'do' && claims)
+      return CustomerAuthFlows.refresh(refreshRoute.client, refreshToken, claims as never);
     // Hash the token to look it up
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
@@ -1427,6 +1483,14 @@ export class AuthService {
   }
 
   static async logout(refreshToken: string): Promise<void> {
+    const claims = verifyRefreshJwt(refreshToken, { ignoreExpiration: true });
+    const route = await customerAuthRoute(
+      typeof claims?.storeId === 'string' ? claims.storeId : null,
+      {
+        write: true,
+      }
+    );
+    if (route.kind === 'do') return CustomerAuthFlows.logout(route.client, refreshToken);
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     // Mark instead of delete so a stolen copy of the same token replayed
     // after logout still triggers the reuse-detection path in
@@ -1443,7 +1507,13 @@ export class AuthService {
     );
   }
 
-  static async getProfile(userId: string) {
+  static async getProfile(userId: string, scope?: { storeId?: string | null }) {
+    const route = await customerAuthRoute(scope?.storeId, { write: false });
+    if (route.kind === 'do') {
+      const u = await route.client.call<DoCustomer | null>('getProfile', { userId });
+      if (!u) throw new AppError(404, 'NOT_FOUND', 'User not found');
+      return CustomerAuthFlows.toProfile(u);
+    }
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -1477,8 +1547,20 @@ export class AuthService {
 
   static async updateProfile(
     userId: string,
-    data: { firstName?: string; lastName?: string; phone?: string }
+    data: { firstName?: string; lastName?: string; phone?: string },
+    tenant?: { storeId?: string | null }
   ) {
+    const route = await customerAuthRoute(tenant?.storeId, { write: true });
+    if (route.kind === 'do') {
+      // WA-CONSENT-1: the old number's consent ends with the number. Revoked FIRST; a failed revoke aborts the update.
+      if (data.phone !== undefined) {
+        const cur = await route.client.call<DoCustomer | null>('getProfile', { userId });
+        if (cur?.phone && toE164(cur.phone) !== toE164(data.phone))
+          await revokeForPhoneChange(route.client.storeId, userId, cur.phone);
+      }
+      const r = await route.client.call<{ user: DoCustomer }>('updateProfile', { userId, ...data });
+      return CustomerAuthFlows.toProfile(r.user);
+    }
     // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one needs
     // a fresh tick and proof). For a store customer the revoke and the phone write are ONE transaction
     // holding the account's consent lock, the same lock a grant takes, so a grant can never land on a
@@ -1536,7 +1618,29 @@ export class AuthService {
     });
   }
 
-  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    scope?: { storeId?: string | null }
+  ) {
+    const route = await customerAuthRoute(scope?.storeId, { write: true });
+    if (route.kind === 'do') {
+      // One DO section: verify the current password, set the new hash, drop every passkey, bump the version, revoke every session.
+      const r = await CustomerAuthFlows.changePassword(
+        route.client,
+        userId,
+        currentPassword,
+        newPassword
+      );
+      await pushTokenVersion(userId, r.tokenVersion, 'auth.changePassword.setTokenVersion');
+      await announcePasskeyPurge({
+        user: { ...r.user, storeId: route.client.storeId },
+        count: r.purgedPasskeys,
+        reason: 'password_changed',
+      });
+      return;
+    }
     // Needs the hash to verify the CURRENT password — opt back in by name.
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
@@ -1595,8 +1699,23 @@ export class AuthService {
    */
   static async revokeAllSessions(
     userId: string,
-    reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all'
+    reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all',
+    scope?: { storeId?: string | null }
   ): Promise<void> {
+    // No scope given (admin suspend, MFA change, any sibling path): resolve the customer's store from the user row, so a DO-served
+    // customer is revoked in its DO and never only in a stale Postgres row (security review of 5bd6aac92).
+    let scopeStoreId = scope?.storeId ?? null;
+    if (!scopeStoreId) {
+      const st = await getUserState(userId).catch(() => null);
+      if (st?.role === 'customer') scopeStoreId = st.storeId;
+    }
+    const route = await customerAuthRoute(scopeStoreId, { write: true });
+    if (route.kind === 'do') {
+      // The DO is the revocation authority: the bump and the refresh revocation are one section; the cache push follows.
+      const r = await route.client.call<{ tokenVersion: number }>('revokeAll', { userId, reason });
+      await pushTokenVersion(userId, r.tokenVersion, 'auth.revokeAllSessions.setTokenVersion');
+      return;
+    }
     // Atomically increment tokenVersion and read the new value — and revoke the
     // user's merchant MCP keys in EVERY store they hold one for. One definer call
     // (`ebda_user_revoke_sessions`): it runs inside the caller's transaction (so
@@ -1676,6 +1795,23 @@ export class AuthService {
   }
 
   /**
+   * Operator / merchant status change of a CUSTOMER served by a StoreDO: status + version bump + revocation of every session in
+   * ONE DO section, then the cache push. Returns false when the customer is not DO-served (the caller keeps its Postgres write).
+   * Throws if the store is DO-served and the DO does not know the customer: a Postgres-only write there would leave it active.
+   */
+  static async setCustomerStatusOnDo(
+    userId: string,
+    storeId: string | null,
+    status: 'active' | 'inactive' | 'suspended'
+  ): Promise<boolean> {
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind !== 'do') return false;
+    const r = await route.client.call<{ tokenVersion: number }>('setStatus', { userId, status });
+    await pushTokenVersion(userId, r.tokenVersion, 'auth.setCustomerStatus.setTokenVersion');
+    return true;
+  }
+
+  /**
    * Create a single-use password-set/reset token for a known account and store
    * its hash as a `reset:<hash>` RefreshToken row (redeemed by `resetPassword`,
    * same as a self-service "forgot password"). Only the SHA-256 is stored; the
@@ -1725,6 +1861,9 @@ export class AuthService {
     email: string,
     storeId: string | null = null
   ): Promise<{ userId: string } | null> {
+    if (typeof email !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') return CustomerAuthFlows.requestReset(route.client, email);
     // Tenant-scoped lookup so a Store A reset request doesn't leak the
     // existence of an account on Store B with the same email.
     const user = await findUserInScope(
@@ -1791,6 +1930,26 @@ export class AuthService {
    * reset proves control of the inbox, not of the second factor.
    */
   static async resetPassword(token: string, newPassword: string): Promise<{ userId: string }> {
+    const doClient = await clientForScopedToken(token);
+    if (doClient) {
+      const r = await CustomerAuthFlows.resetPassword(doClient, token, newPassword);
+      await pushTokenVersion(r.userId, r.tokenVersion, 'auth.resetPassword.setTokenVersion');
+      await announcePasskeyPurge({
+        user: {
+          id: r.userId,
+          email: r.email,
+          firstName: r.firstName,
+          language: r.language,
+          storeId: doClient.storeId,
+        },
+        count: r.purgedPasskeys,
+        reason: 'password_reset',
+      });
+      await accountLockout
+        .unlockAccount(`${doClient.storeId}:${r.email.trim().toLowerCase()}`)
+        .catch(err => logger.warn({ err, userId: r.userId }, 'lockout clear after reset failed'));
+      return { userId: r.userId };
+    }
     // Hash the provided token. The lookup below is an equality match on this
     // SHA-256 digest, never on the plaintext: a timing difference in the
     // index walk can only leak bits of a hash of 256 random bits, which says
@@ -1820,6 +1979,9 @@ export class AuthService {
     if (!storedToken) {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
     }
+
+    // N-9: a Postgres redemption writes a customer's rows; refused (503) while that store is frozen for the copy.
+    await assertNoCustomerAuthFreeze();
 
     // Hash new password (slow) BEFORE claiming the token, so the claim and the
     // password write sit as close together as possible.
@@ -1928,8 +2090,14 @@ export class AuthService {
    */
   static async eraseAccount(
     userId: string,
-    opts: { scopeStoreId?: string; actorId?: string } = {}
+    opts: { scopeStoreId?: string; actorId?: string; storeHint?: string | null } = {}
   ): Promise<EraseOutcome> {
+    // N-9: a customer served by the StoreDO is erased there (store rows AND the auth rows), with no Postgres transaction.
+    const hint = opts.storeHint ?? opts.scopeStoreId;
+    const doRoute = hint
+      ? await customerAuthRoute(hint, { write: true })
+      : ({ kind: 'pg' } as const);
+    if (doRoute.kind === 'do') return AuthService.eraseOnDo(doRoute.client, userId, opts);
     const actorId = opts.actorId ?? 'system';
     const eraseUserSelect = {
       id: true,
@@ -2549,6 +2717,116 @@ export class AuthService {
   }
 
   /**
+   * Erasure of a customer served by the StoreDO (N-9). The store-owned rows (orders, wallet, carts, consents, CRM copy) are
+   * erased by the DO's own `eraseShopper` section (Ruling CF-R6A-3), the auth rows by `eraseCustomer`; nothing touches
+   * Postgres. Both are idempotent, so a retry after a failure in either converges.
+   */
+  private static async eraseOnDo(
+    client: CustomerAuthClient,
+    userId: string,
+    opts: { scopeStoreId?: string; actorId?: string }
+  ): Promise<EraseOutcome> {
+    const actorId = opts.actorId ?? 'system';
+    const storeId = client.storeId;
+    if (opts.scopeStoreId !== undefined && opts.scopeStoreId !== storeId)
+      throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+    const user = await client.call<DoCustomer | null>('getProfile', { userId });
+    if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    const doMoney = (await storeRepo(storeId)).money;
+    if (!doMoney)
+      throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend is unavailable');
+    const db = await storeDb(storeId);
+    const oneSignalPlayerIds =
+      (
+        await (db as any).oneSignalSubscription
+          ?.findMany({ where: { userId }, select: { playerId: true } })
+          .catch(() => [])
+      )?.map((x: { playerId: string }) => x.playerId) ?? [];
+    const key = await buyerKeyForErasure(user.phone);
+    const provenKey =
+      key && user.phone && (await phoneOnOwnOrder(storeId, userId, user.phone, db as never))
+        ? key
+        : undefined;
+    const doErase = await doMoney.eraseShopper({
+      userId,
+      role: user.role,
+      email: user.email,
+      phone: user.phone,
+      smsPhoneKey: smsConsentPhoneKey(user.phone),
+      provenBuyerKey: provenKey ?? null,
+      actorId,
+      capWindowMs: SEND_CAP_WINDOW_MS,
+    });
+    const auth = await client.call<{ erased: boolean; tokenVersion: number | null }>(
+      'eraseCustomer',
+      { userId }
+    );
+    if (auth.tokenVersion !== null)
+      await pushTokenVersion(userId, auth.tokenVersion, 'auth.eraseAccount.revoke-sessions');
+    if (doErase.receiptIds.length > 0)
+      void InstapayReceiptService.deleteImages(storeId, doErase.receiptIds).catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')
+      );
+    if (user.avatar)
+      void deleteR2ObjectIfOrphan(user.avatar, { ownerStoreId: storeId }).catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
+      );
+    const eraseProvenBuyerKey = doErase.provenBuyerKey ?? undefined;
+    void inngest
+      .send({
+        name: 'account/erased',
+        data: {
+          userId,
+          oneSignalPlayerIds,
+          storeId,
+          buyerKey: eraseProvenBuyerKey,
+          ciProven: eraseProvenBuyerKey ? { storeId, buyerKeys: [eraseProvenBuyerKey] } : undefined,
+          ciScope: {
+            storeId,
+            orderIds: doErase.orderIds,
+            buyerKeys: doErase.buyerKeys,
+            sinceDay: ciSinceDay(doErase.since == null ? [] : [new Date(doErase.since)]),
+          },
+        },
+      })
+      .catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
+      );
+    return {
+      crmChecked: doErase.crmChecked,
+      crmRowsScrubbed: doErase.crmRowsScrubbed,
+      crmAmbiguous: doErase.crmAmbiguous,
+    };
+  }
+
+  /**
+   * Data portability for a StoreDO customer: the auth slice (profile + passkey LABELS, never a hash or key) plus every
+   * customer-pii table of the store DO, found by the same registry the PDPL job uses (cf/erasure/registry.ts).
+   */
+  private static async exportOnDo(client: CustomerAuthClient, userId: string) {
+    const acct = await client.call<{ profile: unknown; passkeys: unknown[] } | null>(
+      'exportCustomer',
+      { userId }
+    );
+    if (!acct) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    const profile = acct.profile as DoCustomer;
+    const key = await buyerKeyForErasure(profile.phone);
+    const stub = storeDo(client.storeId) as unknown as {
+      exportSubject(s: Record<string, unknown>): Promise<{ tables: Record<string, unknown[]> }>;
+    };
+    const store = await stub.exportSubject({
+      kind: 'customer',
+      requestId: crypto.randomUUID(),
+      buyerKey: key ?? '',
+      email: profile.email,
+      phoneE164: profile.phone ? (toE164(profile.phone) ?? undefined) : undefined,
+      userId,
+      storeIds: [client.storeId],
+    });
+    return { account: acct.profile, passkeys: acct.passkeys, store: store.tables };
+  }
+
+  /**
    * Right to data portability (GDPR Art. 20 and applicable GCC
    * data-protection law — see docs/privacy/data-map.md).
    *
@@ -2557,7 +2835,9 @@ export class AuthService {
    * exported file is the user's data, not a marketing surface, so field
    * names match the schema for transparency.
    */
-  static async exportAccount(userId: string) {
+  static async exportAccount(userId: string, storeHint?: string | null) {
+    const exportRoute = await customerAuthRoute(storeHint, { write: false });
+    if (exportRoute.kind === 'do') return AuthService.exportOnDo(exportRoute.client, userId);
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -2784,39 +3064,8 @@ export class AuthService {
     payload: TokenPayload,
     refreshRowExpiresAt?: Date
   ): Promise<AuthTokens> {
-    // Generate access token — stamped with a unique jti (for per-token
-    // revocation via the JTI denylist) and a tv (token version, for
-    // bulk revocation on logout-all / password change).
-    const accessJti = crypto.randomUUID();
-    const accessToken = jwt.sign({ ...payload, tv: payload.tv ?? 0 }, config.jwtSecret, {
-      algorithm: 'HS256',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expiresIn: config.jwtExpiresIn as any,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      subject: payload.userId,
-      jwtid: accessJti,
-    });
-
-    // Generate refresh token. Long-lived (1 year) so the admin PWA on
-    // a phone keeps the user signed in between order pings — they can
-    // tap a push notification weeks later and still land authenticated.
-    // The token is single-use server-side: each refresh issues a new
-    // hash and invalidates the old one (see auth.service rotation).
-    const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, config.jwtSecret, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expiresIn: config.refreshTokenExpiresIn as any,
-      algorithm: 'HS256',
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      subject: payload.userId,
-      // Unique token id. Without it, two refresh tokens minted for the same
-      // user in the same second (login immediately followed by a refresh, or a
-      // fast client) produce a byte-identical JWT -> identical SHA-256 hash ->
-      // duplicate key on refresh_tokens.token (P2002) -> 500. The jti nonce
-      // guarantees every issued token is distinct regardless of timing.
-      jwtid: crypto.randomUUID(),
-    });
+    // Access + refresh JWTs: one signer shared with the StoreDO customer flow (services/session-tokens.ts).
+    const { accessToken, refreshToken } = signSessionTokens(payload);
 
     // Store hashed refresh token in database. The DB row expiry must
     // match the JWT's own `exp` claim or rotation breaks early — 1 year

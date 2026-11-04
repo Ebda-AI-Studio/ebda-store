@@ -1,4 +1,5 @@
 import { assertActiveProductPrice } from '../lib/sellable-price';
+import { customerRows } from '../lib/customer-directory';
 import {
   prisma,
   Prisma,
@@ -2374,17 +2375,21 @@ export class ProductService {
       Record<string, unknown> & { customerId?: string | null }
     >;
     const ids = [...new Set(rows.map(r => r.customerId).filter((v): v is string => !!v))];
-    // Reviewer names are identity data: a Durable Object store reads them from the identity service (NEON-ZERO-1), in
-    // one call. They are display-only, so an identity outage renders the reviews anonymously instead of failing the page.
+    // Reviewer names are identity data: a Durable Object store reads them from its customer directory once the customer-auth marker
+    // is set (N-9), else from the identity service (NEON-ZERO-1), in one call. They are display-only, so an identity outage renders
+    // the reviews anonymously instead of failing the page.
+    const fromDirectory = await customerRows(storeId, ids);
     const onDo = (await storeRepo(storeId)).backend === 'do';
-    const users = !ids.length
-      ? []
-      : onDo
-        ? await getAccountsBrief(ids).catch(() => [])
-        : await prisma.user.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, firstName: true, lastName: true },
-          });
+    const users =
+      fromDirectory ??
+      (!ids.length
+        ? []
+        : onDo
+          ? await getAccountsBrief(ids).catch(() => [])
+          : await prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, firstName: true, lastName: true },
+            }));
     const byId = new Map(users.map(u => [u.id, { firstName: u.firstName, lastName: u.lastName }]));
     const withCustomer = rows.map(({ customerId, ...r }) => ({
       ...r,

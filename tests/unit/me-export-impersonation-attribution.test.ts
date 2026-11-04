@@ -89,7 +89,7 @@ describe('GET /auth/me/export — impersonation attribution', () => {
     h.caller = { userId: 'victim-1', role: 'customer', impersonatedBy: 'admin-9' };
     const res = await request(app).get('/api/v1/auth/me/export');
     expect(res.status).toBe(200);
-    expect(h.exportAccount).toHaveBeenCalledWith('victim-1');
+    expect(h.exportAccount).toHaveBeenCalledWith('victim-1', undefined);
     const call = h.auditLog.mock.calls[0][0];
     expect(call.action).toBe('user.data.exported');
     expect(call.details).toEqual({ impersonatedBy: 'admin-9' });

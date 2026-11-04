@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerAuthRoute } from '../lib/customer-auth';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
 import {
@@ -746,6 +747,13 @@ export async function resolveStoreCustomerOrThrow(storeId: string, customerId: s
   if (!CUSTOMER_ID_RE.test(customerId)) {
     throw new AppError(404, 'NOT_FOUND', 'Customer not found');
   }
+  // N-9: a customer of a store served by its StoreDO is that DO's.
+  const route = await customerAuthRoute(storeId, { write: false });
+  if (route.kind === 'do') {
+    const u = await route.client.call<unknown | null>('getProfile', { userId: customerId });
+    if (!u) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+    return { id: customerId, storeId, role: 'customer' as const };
+  }
   const user = await prisma.user.findUnique({
     where: { id: customerId, storeId },
     select: { id: true, storeId: true, role: true },
@@ -780,6 +788,7 @@ router.post(
       const outcome = await AuthService.eraseAccount(customerId, {
         scopeStoreId: storeId,
         actorId: req.user!.userId,
+        storeHint: storeId,
       });
       // #1880: the CRM copy is matched by email/phone and can be missed or
       // refused as ambiguous. Record what happened so a partial erasure is
@@ -837,7 +846,7 @@ router.get(
       const { storeId, customerId } = req.params;
       await resolveStoreCustomerOrThrow(storeId, customerId);
 
-      const bundle = await AuthService.exportAccount(customerId);
+      const bundle = await AuthService.exportAccount(customerId, storeId);
 
       await auditLog({
         action: 'customer.data.exported_by_merchant',

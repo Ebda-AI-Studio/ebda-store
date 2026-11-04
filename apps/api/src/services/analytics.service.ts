@@ -1,4 +1,5 @@
 import { currentStoreId, prisma, Prisma } from '@ebda/database';
+import { customerRows } from '../lib/customer-directory';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
 import { storeDb } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
@@ -836,10 +837,12 @@ export class AnalyticsService {
     const topCustomerIds = topOrderGroups
       .map(g => g.customerId)
       .filter((id): id is string => id != null);
-    const customerDetails = await prisma.user.findMany({
-      where: { id: { in: topCustomerIds }, storeId },
-      select: { id: true, email: true, firstName: true, lastName: true },
-    });
+    const customerDetails =
+      (await customerRows(storeId, topCustomerIds)) ??
+      (await prisma.user.findMany({
+        where: { id: { in: topCustomerIds }, storeId },
+        select: { id: true, email: true, firstName: true, lastName: true },
+      }));
 
     const customerById = new Map(customerDetails.map(c => [c.id, c]));
 

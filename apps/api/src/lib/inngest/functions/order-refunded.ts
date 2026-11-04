@@ -1,4 +1,12 @@
 import { NonRetriableError } from '../../jobs/errors';
+import { customerRow, isLiveCustomer } from '../../customer-directory';
+
+/** The customer to mail: a DO-served store's customer comes from its DO and only when still active (N-9); else Postgres. */
+async function customerOf(storeId: string, id: string) {
+  const doRow = await customerRow(storeId, id);
+  if (doRow !== undefined) return doRow && isLiveCustomer(doRow) ? doRow : null;
+  return withStore(storeId, tx => tx.user.findFirst({ where: { id } }));
+}
 import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext, withMoneyTx, withStore, type Prisma } from '@ebda/database';
 import { runInStoreCtx, withStoreDb } from '../../jobs/store-db';
@@ -204,9 +212,7 @@ export async function handleOrderRefunded(
       });
       if (!row) throw new Error(`Order ${orderId} not found`);
       // the customer is an identity row (not in the DO): read from the platform
-      const customer = row.customerId
-        ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
-        : null;
+      const customer = row.customerId ? await customerOf(storeId, row.customerId!) : null;
       return { ...row, customer };
     }
     return runInTenantContext(storeId, async () => {

@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerRow, customerRows } from '../lib/customer-directory';
 import { z } from 'zod/v3';
 import { runInTenantContext, withUser } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
@@ -48,12 +49,16 @@ async function customerContext(req: Request, res: Response) {
     return null;
   }
   const storeId = await getStoreIdFromRequest(req);
-  const user = await withUser(userId, tx =>
-    tx.user.findUnique({
-      where: { id: userId },
-      select: { phone: true, storeId: true },
-    })
-  );
+  const doUser = await customerRow(storeId, userId);
+  const user =
+    doUser !== undefined
+      ? doUser && { phone: doUser.phone, storeId }
+      : await withUser(userId, tx =>
+          tx.user.findUnique({
+            where: { id: userId },
+            select: { phone: true, storeId: true },
+          })
+        );
   // A store-scoped account belongs to one store; a legacy account
   // (storeId NULL) may hold consent in any store it shops at.
   if (!user || (user.storeId && user.storeId !== storeId)) {

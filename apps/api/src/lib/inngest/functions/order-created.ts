@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { withStoreDb } from '../../jobs/store-db';
+import { customerRow, isLiveCustomer } from '../../customer-directory';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { storeDb, storeMoney } from '../../repo-factory';
 import { groupOrderLinesForDisplay, deliveryLineFromNotes } from '@ebda/shared';
@@ -9,6 +10,13 @@ import { OneSignalService } from '../../../services/onesignal.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { resolveOrderInvoiceRecipient } from '../../order-notification-address';
+
+/** The customer to mail: a DO-served store's customer comes from its DO and only when still active (N-9); else Postgres. */
+async function customerOf(storeId: string, id: string) {
+  const doRow = await customerRow(storeId, id);
+  if (doRow !== undefined) return doRow && isLiveCustomer(doRow) ? doRow : null;
+  return withStore(storeId, tx => tx.user.findFirst({ where: { id } }));
+}
 
 /**
  * Fans out the post-checkout side effects for a freshly-committed order.
@@ -92,9 +100,7 @@ export const orderCreated: JobDef = inngest.createFunction(
           },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
-        const customer = row.customerId
-          ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
-          : null;
+        const customer = row.customerId ? await customerOf(storeId, row.customerId!) : null;
         return { ...row, customer };
       }
       return runInTenantContext(storeId, async () => {

@@ -3,6 +3,7 @@
  * On the Durable Object the read client talks to the store's DO directly. On Postgres the same client is the `prisma`
  * proxy, so it needs the store's tenant scope, exactly as before the port.
  */
+import { customerRows } from '../customer-directory';
 import {
   acrossStores,
   prisma,
@@ -153,6 +154,9 @@ export async function customersById(
 > {
   const want = [...new Set(ids.filter((x): x is string => !!x))];
   if (want.length === 0) return new Map();
+  const doUsers = await customerRows(storeId, want);
+  // an erased / deleted account is not a recipient (its email is anonymised)
+  if (doUsers) return new Map(doUsers.filter(u => u.deletedAt === null).map(u => [u.id, u]));
   const users = await withStore(storeId, tx =>
     tx.user.findMany({
       where: { id: { in: want }, storeId },

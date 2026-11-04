@@ -173,6 +173,13 @@ interface StoreDoStub {
     day: string
   ): Promise<DoResult<Record<string, { rows: number; sha256: string; ok: boolean }>>>;
   pitrBookmark(): Promise<string>;
+  authOp(
+    storeId: string,
+    op: string,
+    argsJson: string
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
+  >;
 }
 
 /** The StoreDO stub for a store. Throws when the binding is absent (Node / tests): never silently falls back. */
