@@ -107,7 +107,7 @@ describe('ci.yml triggers', () => {
     // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
     const uncached = steps.filter(
       b =>
-        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ vars\.EBDA_RUNS_ON == '' && 'npm' \|\| '' \}\}/.test(
+        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ \(!contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci-umbra'\) && vars\.EBDA_RUNS_ON == ''\) && 'npm' \|\| '' \}\}/.test(
           b.split('\n\n')[0] + '\n'
         )
     );

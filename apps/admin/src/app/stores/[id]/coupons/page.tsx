@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@ebda/ui';
 import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
+import { PageState } from '../../../../components/PageState';
 import { apiGet } from '../../../../lib/api';
 import { CouponFormModal } from './_components/CouponFormModal';
 import { CouponsFilters } from './_components/CouponsFilters';
@@ -13,6 +14,7 @@ import { CouponsTable } from './_components/CouponsTable';
 import type { Coupon, CouponFormData } from './_components/types';
 import { INITIAL_FORM_DATA } from './_components/types';
 import { useCoupons } from './_hooks/useCoupons';
+import { parseCouponValue } from './_hooks/coupon-value';
 import { dateTimeLocalValue } from '@/lib/form-text';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
@@ -31,6 +33,8 @@ export default function CouponsPage() {
 
   const tPage = useT('coupons.page');
   const tActions = useT('coupons.actions');
+  const tModal = useT('coupons.modal');
+  const toast = useToast();
 
   const [customerGroups, setCustomerGroups] = useState<CustomerGroupOption[]>([]);
 
@@ -54,7 +58,21 @@ export default function CouponsPage() {
     clearSaveError,
     deleteCoupon,
     toggleActive,
+    loadFailed,
+    saveFailed,
+    actionError,
+    clearActionError,
   } = useCoupons(storeId);
+
+  // Row actions (delete / toggle) report failure as a toast; the hook only records which one failed.
+  useEffect(() => {
+    if (!actionError) return;
+    toast.error(tPage(actionError === 'delete' ? 'deleteFailed' : 'toggleFailed'));
+    clearActionError();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionError]);
+
+  const [valueError, setValueError] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -101,10 +119,23 @@ export default function CouponsPage() {
   function closeModal() {
     setShowModal(false);
     resetForm();
+    setValueError(null);
+  }
+
+  /** UX:S-2 - the discount value is checked before any request, with the field named. */
+  function validateValue(data: CouponFormData): string | null {
+    if (data.type === 'free_shipping') return null;
+    const n = parseCouponValue(data.value);
+    if (Number.isNaN(n) || n <= 0) return tModal('valueInvalid');
+    if (data.type === 'percentage' && n > 100) return tModal('valuePercentMax');
+    return null;
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const invalid = validateValue(formData);
+    setValueError(invalid);
+    if (invalid) return;
     const success = await saveCoupon(formData, editingCoupon?.id ?? null);
     if (success) {
       closeModal();
@@ -131,7 +162,7 @@ export default function CouponsPage() {
         <button
           type="button"
           onClick={openCreateModal}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium flex items-center gap-2"
+          className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -140,9 +171,11 @@ export default function CouponsPage() {
         </button>
       }
     >
-      {isLoading ? (
-        <AdminSkeletonTable rows={6} columns={6} />
-      ) : (
+      <PageState
+        loading={isLoading}
+        error={loadFailed ? tPage('loadFailed') : null}
+        onRetry={fetchCoupons}
+      >
         <div className="space-y-6">
           <CouponsFilters
             searchTerm={searchTerm}
@@ -164,9 +197,14 @@ export default function CouponsPage() {
             <CouponFormModal
               isEditing={editingCoupon !== null}
               formData={formData}
-              onChange={setFormData}
+              onChange={next => {
+                setFormData(next);
+                if (valueError) setValueError(null);
+              }}
               onSubmit={handleSubmit}
               saveError={saveError}
+              saveFailed={saveFailed}
+              valueError={valueError}
               onDismissError={clearSaveError}
               onClose={closeModal}
               storeId={storeId}
@@ -174,7 +212,7 @@ export default function CouponsPage() {
             />
           )}
         </div>
-      )}
+      </PageState>
     </AdminLayout>
   );
 }

@@ -61,6 +61,12 @@ vi.mock('@ebda/database', () => {
         row.points += data.points.increment;
         return row;
       },
+      updateMany: async ({ where, data }: any) => {
+        const row = db.lp.find(r => r.id === where.id && r.points >= where.points.gte);
+        if (row) row.points += data.points.increment;
+        return { count: row ? 1 : 0 };
+      },
+      findUniqueOrThrow: async ({ where }: any) => db.lp.find(r => r.id === where.id)!,
       findMany: async ({ where }: { where: any }) =>
         db.lp
           .filter(r => r.storeId === where.storeId)
@@ -72,8 +78,14 @@ vi.mock('@ebda/database', () => {
           .map(r => ({ ...r, customer: { id: r.customerId, email: `${r.customerId}@x.test` } })),
       count: async () => 0,
     },
-    loyaltyTransaction: { create: (a: unknown) => ({ tx: a }) },
-    $transaction: async (ops: any[]) => {
+    loyaltyTransaction: { create: async (a: unknown) => ({ tx: a }) },
+    $transaction: async (ops: any) => {
+      // interactive form (BE: negative awards are conditional): run the callback with this same client
+      if (typeof ops === 'function') {
+        const r = await ops(prisma);
+        db.tx.push([r]);
+        return r;
+      }
       db.tx.push(ops);
       return Promise.all(ops);
     },
@@ -180,5 +192,21 @@ describe('LoyaltyService.listMembers', () => {
     ];
     const { members } = await LoyaltyService.listMembers(STORE_A);
     expect(members.map((m: any) => m.customerId)).toEqual([CUST_A]);
+  });
+});
+
+describe('LoyaltyService.awardBonusPoints deductions never go below zero (Postgres path)', () => {
+  it('refuses a deduction larger than the balance with 409 INSUFFICIENT_POINTS and bilingual details', async () => {
+    await LoyaltyService.awardBonusPoints(STORE_A, CUST_A, 5, 'earn_manual' as any);
+    await expect(
+      LoyaltyService.awardBonusPoints(STORE_A, CUST_A, -6, 'adjust' as any)
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'INSUFFICIENT_POINTS',
+      details: { messageAr: expect.any(String), messageEn: expect.any(String) },
+    });
+    expect(db.lp[0].points).toBe(5);
+    const r = await LoyaltyService.awardBonusPoints(STORE_A, CUST_A, -5, 'adjust' as any);
+    expect(r.newBalance).toBe(0);
   });
 });

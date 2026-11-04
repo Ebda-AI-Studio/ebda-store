@@ -8,6 +8,7 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { OnboardingService } from '../services/onboarding.service';
 import { createStoreSchema } from './onboarding.schemas';
 import { applyOnboardingInstapay } from '../services/onboarding-instapay';
+import { toSafeStoreResponse } from '../lib/store-response';
 
 /**
  * Self-serve onboarding, mounted at `/onboarding`.
@@ -74,7 +75,9 @@ router.post(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.status(201).json({ success: true, data: { store, lookApplied } });
+      res
+        .status(201)
+        .json({ success: true, data: { store: toSafeStoreResponse(store), lookApplied } });
     } catch (error) {
       next(error);
     }
@@ -153,7 +156,7 @@ router.post(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.json({ success: true, data: { store } });
+      res.json({ success: true, data: { store: toSafeStoreResponse(store) } });
     } catch (error) {
       next(error);
     }

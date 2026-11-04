@@ -164,8 +164,11 @@ describe.skipIf(!hasDb)('catalogue import', () => {
 
   it('a free plan store is refused', async () => {
     const res = await upload(free, [[JPEG, 'menu.jpg']]);
+    // refused by the route's plan gate (BE:S-6, `bulk_operations`) before the service is reached
     expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('FEATURE_NOT_AVAILABLE');
+    expect(res.body.error.code).toBe('FEATURE_DISABLED');
+    expect(res.body.code).toBe('FEATURE_DISABLED');
+    expect(res.body.feature).toBe('bulk_operations');
   });
 
   it('too many files, and a PDF over the page cap, are 400', async () => {

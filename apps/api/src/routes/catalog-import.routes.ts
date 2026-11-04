@@ -2,7 +2,7 @@
  * Catalogue import: upload photos / PDFs, review the extracted products, create drafts, publish.
  *
  * Mounted at the bare `/stores` prefix; every route declares its own `/:storeId/...` path.
- * Chain on every route: authenticate -> authorize('store_admin','super_admin') -> requireStoreAccess.
+ * Chain on every route: authenticate -> authorize('store_admin','super_admin') -> requireStoreAccess -> requireFeature('bulk_operations').
  * The plan allowance (`plans.limits.catalogImportPagesPerMonth`) is enforced in the service.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -10,6 +10,7 @@ import multer from 'multer';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { tenantContext } from '../middleware/tenant-context';
 import {
   uploadLimiter,
@@ -31,7 +32,13 @@ const upload = multer({
   limits: { fileSize: Math.max(lim.maxImageBytes, lim.maxPdfBytes), files: lim.maxFilesPerJob },
 });
 
-const admin = [authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess] as const;
+// BE:S-6: the same plan gate the /bulk page applies in the UI (bulk_operations), enforced here too.
+const admin = [
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('bulk_operations'),
+] as const;
 
 const wrap =
   (fn: (req: Request, res: Response) => Promise<unknown>) =>
