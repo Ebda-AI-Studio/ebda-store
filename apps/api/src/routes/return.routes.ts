@@ -6,6 +6,7 @@ import { requirePermission, hasPermission, type Role } from '../middleware/rbac'
 import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
@@ -82,6 +83,7 @@ const createReturnSchema = z
 router.get(
   '/',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -121,6 +123,7 @@ router.get(
 router.post(
   '/',
   authenticate,
+  requireCustomerStoreMatch,
   writeLimiter,
   requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -166,6 +169,7 @@ router.post(
 router.get(
   '/:id',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

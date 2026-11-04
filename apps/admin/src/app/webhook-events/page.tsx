@@ -61,7 +61,7 @@ export default function WebhookEventsPage() {
     try {
       const qs = status ? `?status=${encodeURIComponent(status)}&limit=100` : '?limit=100';
       const { data, error } = await apiGet<{ events: WebhookEvent[] }>(
-        `/admin/webhook-events${qs}`
+        `/api/v1/admin/webhook-events${qs}`
       );
       if (!isLatest()) return;
       setLoadError(!!error);
@@ -84,7 +84,10 @@ export default function WebhookEventsPage() {
     setReplaying(id);
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
-    const res = await apiPost(`/admin/webhook-events/${id}/replay`, force ? { force: true } : {});
+    const res = await apiPost(
+      `/api/v1/admin/webhook-events/${id}/replay`,
+      force ? { force: true } : {}
+    );
     if (res.error) {
       // Money-path guard: an already-processed webhook needs explicit confirm
       // before re-firing the payment event (idempotency-safe, but deliberate).

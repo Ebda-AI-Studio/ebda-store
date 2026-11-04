@@ -50,7 +50,7 @@ export default function EmailQueuePage() {
         emails: FailedEmail[];
         stats: { pending: number; failed: number; corrupt?: number };
         corrupt?: Array<{ position: number; bytes: number }>;
-      }>('/admin/email-queue/failed?limit=100');
+      }>('/api/v1/admin/email-queue/failed?limit=100');
       setLoadError(!!error);
       setEmails(data?.emails || []);
       setStats(data?.stats ?? null);
@@ -73,7 +73,7 @@ export default function EmailQueuePage() {
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
     const res = await apiPost<{ retried: number; skipped?: number; kept?: number }>(
-      '/admin/email-queue/failed/retry',
+      '/api/v1/admin/email-queue/failed/retry',
       {}
     );
     if (res.error) {
@@ -98,7 +98,10 @@ export default function EmailQueuePage() {
     if (!window.confirm(t('corrupt.confirmDiscard'))) return;
     setDiscarding(true);
     setMessage(null);
-    const res = await apiPost<{ discarded: number }>('/admin/email-queue/corrupt/discard', {});
+    const res = await apiPost<{ discarded: number }>(
+      '/api/v1/admin/email-queue/corrupt/discard',
+      {}
+    );
     if (res.error) {
       setMessage(t('retryFailed', { message: res.error.message || 'error' }));
     } else {
