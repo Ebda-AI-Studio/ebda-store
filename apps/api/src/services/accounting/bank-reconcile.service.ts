@@ -457,7 +457,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
     });
 
     if (!btx || btx.storeId !== storeId) {
-      throw Object.assign(new Error('not_found'), { statusCode: 404 });
+      throw new AppError(404, 'not_found', 'not_found');
     }
 
     if (action === 'unmatch') {
@@ -480,9 +480,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
 
     // action === 'match'
     if (!journalEntryId) {
-      throw Object.assign(new Error('journalEntryId required for match action'), {
-        statusCode: 400,
-      });
+      throw new AppError(400, 'bad_request', 'journalEntryId required for match action');
     }
 
     // Verify journal entry belongs to this store
@@ -491,7 +489,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
       select: { id: true },
     });
     if (!entry) {
-      throw Object.assign(new Error('journal_entry_not_found'), { statusCode: 404 });
+      throw new AppError(404, 'journal_entry_not_found', 'journal_entry_not_found');
     }
 
     // Guard: entry must not already be matched to a different bank tx
@@ -504,7 +502,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
       select: { id: true },
     });
     if (existing) {
-      throw Object.assign(new Error('journal_entry_already_matched'), { statusCode: 409 });
+      throw new AppError(409, 'journal_entry_already_matched', 'journal_entry_already_matched');
     }
 
     const updated = await tx.bankTransaction.update({
@@ -644,7 +642,7 @@ export async function getReconciliationDifference(
     });
 
     if (!stmt) {
-      throw Object.assign(new Error('statement_not_found'), { statusCode: 404 });
+      throw new AppError(404, 'statement_not_found', 'statement_not_found');
     }
 
     const { glAccountId, periodEnd } = stmt;

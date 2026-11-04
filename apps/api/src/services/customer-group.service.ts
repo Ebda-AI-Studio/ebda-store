@@ -13,6 +13,7 @@
  * is exactly why the index exists underneath.
  */
 import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
+import { randomUUID } from 'node:crypto';
 import { prisma, Prisma } from '@ebda/database';
 import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 import { atomicWrites } from '../lib/atomic-writes';
@@ -541,19 +542,88 @@ export const CustomerGroupService = {
 };
 
 /**
- * The write client of the CRM `customers` row. A store served by its Durable Object has no generic writer for `Customer`
- * yet (it is not in DO_WRITABLE_MODELS), so the assign / link / unlink writes answer a clear 501 there instead of reaching
- * Postgres (no pg fallback for DO stores). Postgres stores keep the unchanged prisma client.
+ * The write client of the CRM `customers` row. Postgres stores keep the unchanged prisma client. A store served by its
+ * Durable Object has NO generic writer for `Customer`; the only columns the admin path writes there are the group
+ * membership, through the named procedures `customerSetGroup` / `customerCreateInGroup` (packages/repo/src/rpc/writes.ts),
+ * each batched atomically with its audit row.
  */
 async function customerWrites(storeId: string): Promise<typeof prisma.customer> {
   const repo = await storeRepo(storeId);
-  if (repo.backend === 'do')
-    throw new AppError(
-      501,
-      'CUSTOMER_GROUP_ASSIGN_UNSUPPORTED',
-      'Assigning customers to groups is not available for this store yet.'
-    );
-  return prisma.customer;
+  if (repo.backend !== 'do') return prisma.customer;
+  const w = repo.writer;
+  const unwrap = async (run: () => Promise<unknown[]>) => {
+    try {
+      return (await run())[0] as Record<string, unknown>;
+    } catch (e) {
+      const m = (e as Error)?.message ?? '';
+      if (m === 'group not found') throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
+      if (m === 'customer not found') throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+      throw e;
+    }
+  };
+  return {
+    update: (args: { where: { id: string }; data: { groupId?: string | null } }) => {
+      const keys = Object.keys(args.data ?? {});
+      if (keys.length !== 1 || keys[0] !== 'groupId')
+        throw new AppError(
+          501,
+          'CUSTOMER_WRITE_UNSUPPORTED',
+          'Only the group can be changed here.'
+        );
+      const groupId = args.data.groupId ?? null;
+      return unwrap(() =>
+        atomicWrites(storeId, w, [
+          w.$proc('customerSetGroup', { storeId, customerId: args.where.id, groupId }),
+          w.auditLog.create({
+            data: {
+              action: 'customer.group_assigned',
+              resourceType: 'customer',
+              resourceId: args.where.id,
+              storeId,
+              details: { groupId },
+            },
+          }),
+        ])
+      );
+    },
+    create: (args: {
+      data: {
+        storeId: string;
+        userId?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        firstName: string;
+        lastName: string;
+        groupId: string;
+      };
+    }) => {
+      const d = args.data;
+      const id = randomUUID();
+      return unwrap(() =>
+        atomicWrites(storeId, w, [
+          w.$proc('customerCreateInGroup', {
+            id,
+            storeId,
+            userId: d.userId ?? null,
+            email: d.email ?? null,
+            phone: d.phone ?? null,
+            firstName: d.firstName,
+            lastName: d.lastName,
+            groupId: d.groupId,
+          }),
+          w.auditLog.create({
+            data: {
+              action: 'customer.group_assigned',
+              resourceType: 'customer',
+              resourceId: id,
+              storeId,
+              details: { groupId: d.groupId, created: true },
+            },
+          }),
+        ])
+      );
+    },
+  } as unknown as typeof prisma.customer;
 }
 
 const assignReturnSelect = {

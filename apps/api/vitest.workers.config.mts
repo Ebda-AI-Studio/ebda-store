@@ -67,6 +67,30 @@ const apiVars = {
 // worker, which reaches it through the `API` service binding and shares its Durable Objects / KV by
 // binding them with `scriptName: 'api'`. The bundle is never sent through Vite (an 11 MB module cannot
 // travel over the pool's websocket, and 143k lines of Express / Prisma CJS should not be re-transformed).
+const ACCOUNTS_STUB = `
+import { WorkerEntrypoint } from 'cloudflare:workers';
+const state = id => ({
+  id,
+  email: id + '@exit-test.invalid',
+  emailVerified: true,
+  mfaEnabled: false,
+  mfaEnrolledAt: null,
+  status: 'active',
+  role: /^cust[-_]/.test(id) ? 'customer' : 'store_admin',
+  firstName: 'Test',
+  lastName: 'Account',
+  phone: null,
+  language: 'ar',
+});
+export class Accounts extends WorkerEntrypoint {
+  async getAccountState(id) { return state(id); }
+  async getAccountsBrief(ids) {
+    return ids.map(id => { const s = state(id); return { id, email: s.email, firstName: s.firstName, lastName: s.lastName, status: s.status, role: s.role, lastLoginAt: null, createdAt: new Date(0).toISOString() }; });
+  }
+}
+export default { fetch() { return new Response('accounts stub'); } };
+`;
+
 export default defineConfig(async () => {
   // D1 `ebda-platform` (task 2.4): the REAL cf-schema platform migrations, applied by the test, shared by both workers.
   const platformMigrations = await readD1Migrations(
@@ -108,6 +132,13 @@ export default defineConfig(async () => {
           },
           workers: [
             {
+              name: 'accounts',
+              modules: true,
+              compatibilityDate: '2026-08-01',
+              compatibilityFlags: ['nodejs_compat'],
+              script: ACCOUNTS_STUB,
+            },
+            {
               name: 'api',
               modulesRoot: here('./dist-cf'),
               modules: [
@@ -134,10 +165,16 @@ export default defineConfig(async () => {
               hyperdrives: {
                 HYPERDRIVE: LOCAL_DB,
               },
+              // The shared identity service (wrangler.jsonc: ACCOUNTS -> ebda-accounts#Accounts), stubbed: every id is a
+              // verified, active merchant account unless it starts with `cust-`/`cust_` (a shopper). Enough for the merchant
+              // onboarding reads (verified flag, name, phone); the real service has its own tests (apps/accounts).
+              serviceBindings: { ACCOUNTS: { name: 'accounts', entrypoint: 'Accounts' } },
               queueProducers: {
                 EMAIL_QUEUE: { queueName: 'ebda-email' },
                 SMS_QUEUE: { queueName: 'ebda-sms' },
                 JOBS_QUEUE: { queueName: 'ebda-jobs' },
+                // Store -> Ebda Chat events (lib/wa/events.ts throws without it, by design)
+                WA_EVENTS_QUEUE: { queueName: 'ebda-wa-events' },
               },
               // The consumers of wrangler.jsonc, with the retry delay shortened so a test can watch a
               // message travel main queue -> retry -> dead-letter queue -> the replay list in seconds.

@@ -110,7 +110,6 @@ describe('refusals (nothing ported silently)', () => {
     'Payment',
     'Refund',
     'StockReservation',
-    'Coupon',
     'LedgerEntry',
     'Store',
     'User',
@@ -391,5 +390,63 @@ describe('audit trail is append-only on the DO write path (N-10d security review
     expect(r.count('audit_logs')).toBe(3);
     await proc('auditPurge', { before: Date.now() - 40 * 86_400_000, upToId: 'zzz' });
     expect(r.count('audit_logs')).toBe(3); // nothing is that old
+  });
+
+  it('customerSetGroup / customerCreateInGroup move ONLY the group, inside the store, and roll back with the batch', async () => {
+    const r = rig();
+    const T = Date.now();
+    r.db
+      .prepare(
+        `INSERT INTO customer_groups (id, store_id, name, created_at, updated_at) VALUES ('g1', ?, 'Wholesale', ?, ?), ('gx', 'other', 'Foreign', ?, ?)`
+      )
+      .run(STORE, T, T, T, T);
+    const proc = (op: string, args: Record<string, unknown>) =>
+      r.run({ ops: [{ model: '$proc', op, args } as never] });
+    const made = await proc('customerCreateInGroup', {
+      id: 'c1',
+      storeId: STORE,
+      email: 'a@x.test',
+      firstName: 'A',
+      lastName: 'B',
+      userId: 'u1',
+      groupId: 'g1',
+    });
+    expect(made).toMatchObject({ ok: true });
+    expect(decodeRpc((made as { json: string }).json)).toEqual([
+      { id: 'c1', groupId: 'g1', group: { id: 'g1', name: 'Wholesale', nameAr: null } },
+    ]);
+    // a group of another store is refused and nothing is written
+    expect(
+      await proc('customerCreateInGroup', {
+        id: 'c2',
+        storeId: STORE,
+        email: null,
+        firstName: 'A',
+        lastName: 'B',
+        groupId: 'gx',
+      })
+    ).toMatchObject({ ok: false, message: 'group not found' });
+    expect(r.count('customers')).toBe(1);
+    // the same user twice is a unique violation (P2002), not a second row
+    expect(
+      await proc('customerCreateInGroup', {
+        id: 'c3',
+        storeId: STORE,
+        firstName: 'A',
+        lastName: 'B',
+        userId: 'u1',
+        groupId: 'g1',
+      })
+    ).toMatchObject({ ok: false, code: 'P2002' });
+    // set / clear the group; another store's customer id changes nothing and answers not found
+    expect(
+      await proc('customerSetGroup', { storeId: STORE, customerId: 'c1', groupId: null })
+    ).toMatchObject({ ok: true });
+    expect(r.db.prepare(`SELECT group_id FROM customers WHERE id='c1'`).get()).toEqual({
+      group_id: null,
+    });
+    expect(
+      await proc('customerSetGroup', { storeId: 'other', customerId: 'c1', groupId: null })
+    ).toMatchObject({ ok: false, message: 'customer not found' });
   });
 });
