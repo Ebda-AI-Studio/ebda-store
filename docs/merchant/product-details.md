@@ -53,3 +53,13 @@ Admin → **Builder** → the hero block → each slide has **video** and **vide
 Nothing to set up: a sticky add-to-cart bar on phones, a sticky total bar in the cart, and the receipt-style order confirmation page.
 
 لا تحتاج أي إعداد: شريط إضافة للسلة ثابت على الجوال، وشريط إجمالي ثابت في السلة، وصفحة تأكيد الطلب على شكل إيصال.
+
+---
+
+## Adding and editing a product (admin fix pass) — إضافة وتعديل المنتج
+
+- **New product** asks for the essentials only: name (in your store's default language first; the other language is optional under "تفاصيل أكتر"), price (must be more than zero), quantity, category, status and photos. Description, discount, cost, search words and the card badge are under **تفاصيل أكتر**. After **ضيف المنتج** you land on the product's edit page with a banner offering **ضيف المتغيرات**; the button stays disabled until the page changes, so one click makes one product.
+- **Editing** shows one **احفظ المنتج** bar at the bottom only while you have unsaved changes (with **تراجع**). **شوف في المتجر** opens the product on your store; variants and recommendations are in the **...** menu. Deleting an FAQ row shows an undo toast for six seconds.
+
+- **منتج جديد** بيطلب الأساسيات بس: الاسم (بلغة المتجر الأساسية الأول، واللغة التانية اختيارية تحت "تفاصيل أكتر")، السعر (لازم أكتر من صفر)، الكمية، القسم، الحالة والصور. الوصف والخصم والتكلفة وكلمات البحث والشارة تحت **تفاصيل أكتر**. بعد **ضيف المنتج** بتروح لصفحة تعديل المنتج وفيها **ضيف المتغيرات**، والزرار بيفضل مقفول لحد ما الصفحة تتغير فمنتج واحد بس بيتعمل.
+- **التعديل:** شريط **احفظ المنتج** بيظهر تحت بس لما يكون فيه تغييرات (مع **تراجع**). **شوف في المتجر** بيفتح المنتج في متجرك، والمتغيرات والمقترحات في قايمة **...**. مسح سؤال من الأسئلة الشائعة بيظهر زرار تراجع 6 ثواني.

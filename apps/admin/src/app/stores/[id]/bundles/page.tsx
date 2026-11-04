@@ -43,6 +43,9 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { computeBundlePrice, isAllocatable, type BundlePricingType } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { RowActions } from '@/components/RowActions';
+import { BottomSheet } from '@/components/mobile/BottomSheet';
+import { useConfirm } from '@/hooks/useConfirm';
 import { formatPrice, minorToMajor } from '@/lib/format';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
@@ -148,6 +151,7 @@ export default function BundlesPage() {
   const params = useParams();
   const storeId = params.id as string;
   const t = useT('bundles.page');
+  const askConfirm = useConfirm();
   const locale = useLocale();
   const isRtl = locale === 'ar';
 
@@ -417,7 +421,12 @@ export default function BundlesPage() {
   };
 
   const deactivate = async (bundle: Bundle) => {
-    if (!window.confirm(t('deactivateConfirm', { name: bundle.name }))) return;
+    const ok = await askConfirm({
+      object: t('deactivateDialog.object', { name: bundle.name }),
+      consequence: t('deactivateDialog.consequence'),
+      confirmLabel: t('deactivateDialog.confirmLabel'),
+    });
+    if (!ok) return;
     setError(null);
     try {
       const { error: err } = await apiDelete(`/api/v1/stores/${storeId}/bundles/${bundle.id}`);
@@ -491,24 +500,29 @@ export default function BundlesPage() {
       alignEnd: true,
       mobileActions: true,
       cell: bundle => (
-        <>
-          <button
-            type="button"
-            onClick={() => void openEdit(bundle)}
-            className="text-primary hover:underline"
-          >
-            {t('edit')}
-          </button>
-          {bundle.isActive && (
+        <RowActions
+          menuLabel={t('rowMenu', { name: bundle.name })}
+          primary={
             <button
               type="button"
-              onClick={() => void deactivate(bundle)}
-              className="ms-3 text-destructive-ink hover:underline"
+              onClick={() => void openEdit(bundle)}
+              className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium hover:bg-muted"
             >
-              {t('deactivate')}
+              {t('edit')}
             </button>
-          )}
-        </>
+          }
+          items={
+            bundle.isActive
+              ? [
+                  {
+                    label: t('deactivate'),
+                    destructive: true,
+                    onSelect: () => void deactivate(bundle),
+                  },
+                ]
+              : []
+          }
+        />
       ),
     },
   ];
@@ -525,7 +539,7 @@ export default function BundlesPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+          className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >
           {t('addNew')}
         </button>
@@ -547,6 +561,13 @@ export default function BundlesPage() {
           <div className="rounded-md border border-dashed py-12 text-center">
             <p className="text-sm font-medium">{t('emptyTitle')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="mt-4 min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              {t('addFirst')}
+            </button>
           </div>
         ) : (
           <DataTable<Bundle>
@@ -562,19 +583,46 @@ export default function BundlesPage() {
         )}
 
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-background p-5 shadow-lg">
-              <h2 className="mb-4 text-lg font-semibold">
-                {editingId ? t('editTitle') : t('createTitle')}
-              </h2>
-
+          <BottomSheet
+            open
+            onClose={() => setShowModal(false)}
+            title={editingId ? t('editTitle') : t('createTitle')}
+            footer={
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="min-h-11 flex-1 rounded-lg border border-border px-4 py-2 text-foreground hover:bg-muted"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  form="bundle-form"
+                  disabled={
+                    saving || !form.name.trim() || !form.slug.trim() || form.items.length === 0
+                  }
+                  className="min-h-11 flex-1 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {saving ? t('saving') : t('save')}
+                </button>
+              </div>
+            }
+          >
+            <form
+              id="bundle-form"
+              onSubmit={e => {
+                e.preventDefault();
+                void save();
+              }}
+            >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium">{t('name')}</span>
                   <input
                     value={form.name}
                     onChange={e => handleNameChange(e.target.value)}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -583,7 +631,7 @@ export default function BundlesPage() {
                     value={form.nameAr}
                     onChange={e => setForm({ ...form, nameAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -597,7 +645,7 @@ export default function BundlesPage() {
                     setForm({ ...form, slug: e.target.value });
                   }}
                   dir="ltr"
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-input px-3 py-2 text-sm"
                 />
               </label>
 
@@ -607,7 +655,7 @@ export default function BundlesPage() {
                   <input
                     value={form.description}
                     onChange={e => setForm({ ...form, description: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -616,7 +664,7 @@ export default function BundlesPage() {
                     value={form.descriptionAr}
                     onChange={e => setForm({ ...form, descriptionAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -644,7 +692,7 @@ export default function BundlesPage() {
                     onChange={e =>
                       setForm({ ...form, pricingType: e.target.value as BundlePricingType })
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   >
                     <option value="fixed_price">{t('pricingTypeFixedPrice')}</option>
                     <option value="percentage">{t('pricingTypePercentage')}</option>
@@ -682,7 +730,7 @@ export default function BundlesPage() {
                     step={form.pricingType === 'percentage' ? 0.01 : 0.01}
                     value={form.pricingValueInput}
                     onChange={e => setForm({ ...form, pricingValueInput: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -703,7 +751,7 @@ export default function BundlesPage() {
                     type="datetime-local"
                     value={form.startsAt}
                     onChange={e => setForm({ ...form, startsAt: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -712,7 +760,7 @@ export default function BundlesPage() {
                     type="datetime-local"
                     value={form.expiresAt}
                     onChange={e => setForm({ ...form, expiresAt: e.target.value })}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                 </label>
               </div>
@@ -789,28 +837,8 @@ export default function BundlesPage() {
                   {error}
                 </div>
               )}
-
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-md border px-3 py-2 text-sm"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void save()}
-                  disabled={
-                    saving || !form.name.trim() || !form.slug.trim() || form.items.length === 0
-                  }
-                  className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                >
-                  {saving ? t('saving') : t('save')}
-                </button>
-              </div>
-            </div>
-          </div>
+            </form>
+          </BottomSheet>
         )}
       </div>
     </AdminLayout>

@@ -10,9 +10,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LABEL = 'deploy-change';
-/** Files that decide what reaches production: the deploy workflows, the backup workflow, the deploy guard and its secret list. */
+/** Files that decide what reaches production: the deploy workflows, the backup workflow, the deploy guard, the deploy planner and the secret list. */
 export const DEPLOY_FILE =
-  /^(\.github\/workflows\/(cf-[a-z0-9-]+-deploy|db-backup)\.yml|scripts\/ci\/(deploy-guard\.mjs|api-required-secrets\.json)|scripts\/cf-build\.sh|scripts\/ebda-cf-api-config\.mjs)$/;
+  /^(\.github\/workflows\/(cf-[a-z0-9-]+-deploy|db-backup)\.yml|scripts\/ci\/(deploy-guard\.mjs|deploy-plan\.mjs|api-required-secrets\.json)|scripts\/cf-build\.sh|scripts\/ebda-cf-api-config\.mjs)$/;
 
 export function deployFilesChanged(files) {
   return files.filter(f => DEPLOY_FILE.test(f));

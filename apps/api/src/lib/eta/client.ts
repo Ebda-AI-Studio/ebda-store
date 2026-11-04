@@ -1,4 +1,5 @@
 import { ETA_HOSTS, type EtaEnvironment } from '@ebda/shared';
+import { fetchWithTimeout } from '../fetch-timeout';
 
 /**
  * ETA e-receipt API client (per-merchant credentials, Ruling ETA-1).
@@ -73,7 +74,7 @@ export class EtaClient {
   constructor(
     private readonly env: EtaEnvironment,
     private readonly creds: EtaCredentials,
-    private readonly doFetch: Fetch = (u, i) => fetch(u, i),
+    private readonly doFetch: Fetch = (u, i) => fetchWithTimeout(u, i),
     private readonly now: () => number = Date.now
   ) {}
 

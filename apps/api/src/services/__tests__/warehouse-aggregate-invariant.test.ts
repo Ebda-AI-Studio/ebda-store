@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sqlLog: string[] = [];
 const variantCount = vi.fn();
+const variantFindFirst = vi.fn(async () => ({ id: 'v1' }));
 const bustMock = vi.fn(async () => undefined);
 
 function tagged(strings: TemplateStringsArray): unknown[] {
@@ -32,7 +33,11 @@ vi.mock('@ebda/database', () => ({
   prisma: {
     warehouse: { findFirst: vi.fn(async () => ({ id: 'w1', code: 'W1' })) },
     product: { findFirst: vi.fn(async () => ({ id: 'p1' })) },
-    productVariant: { count: (...a: unknown[]) => variantCount(...a) },
+    productVariant: {
+      count: (...a: unknown[]) => variantCount(...a),
+      // BE:S-25: the variant must belong to the (store's) product
+      findFirst: (...a: unknown[]) => variantFindFirst(...(a as [])),
+    },
   },
   Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
   withMoneyTx: (_c: unknown, fn: (tx: unknown) => unknown) => fn(fakeTx),
