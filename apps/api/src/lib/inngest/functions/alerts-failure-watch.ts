@@ -50,7 +50,7 @@ export const alertsFailureWatch: JobDef = inngest.createFunction(
       source: `inngest.${functionId}`,
       title: isPaymentPath
         ? `PAYMENT webhook processing failed past final retry: ${functionId}`
-        : `inngest function failed: ${functionId}`,
+        : `background job failed: ${functionId}`,
       body: errorBlob.message ?? 'unknown error',
       context: {
         functionId,
@@ -59,7 +59,7 @@ export const alertsFailureWatch: JobDef = inngest.createFunction(
         // truncate stack to avoid Telegram's 4096 cap eating up signal
         errorStack: errorBlob.stack?.slice(0, 800),
         // surface the original triggering event so the operator can
-        // reproduce / requeue from the inngest dashboard
+        // reproduce / requeue from the Cloudflare Workflows dashboard
         triggeringEvent: (data.event as { name?: string } | undefined)?.name,
       },
     });
