@@ -102,6 +102,7 @@ export default function LoyaltyTransactionsPage() {
   // Latest-request-wins: a slower response for a previous page/filter must not repaint its rows
   // (or its pager `meta`) under the new one.
   const beginRequest = useLatestRequest();
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const fetchTransactions = useCallback(async () => {
     const isLatest = beginRequest();
@@ -116,16 +117,18 @@ export default function LoyaltyTransactionsPage() {
       const range = localDayRange(dateFrom, dateTo);
       if (range) for (const [k, v] of Object.entries(reportRangeParams(range))) qs.set(k, v);
 
-      const { data } = await apiGet<{ transactions: LoyaltyTransaction[]; meta: Meta }>(
-        `/api/v1/stores/${storeId}/loyalty/transactions?${qs}`
-      );
+      const { data, error: apiError } = await apiGet<{
+        transactions: LoyaltyTransaction[];
+        meta: Meta;
+      }>(`/api/v1/stores/${storeId}/loyalty/transactions?${qs}`);
       if (!isLatest()) return;
+      setLoadFailed(!!apiError);
       if (data) {
         setTransactions(data.transactions ?? []);
         setMeta(data.meta ?? null);
       }
     } catch {
-      // error shown via empty state
+      if (isLatest()) setLoadFailed(true);
     } finally {
       if (isLatest()) setLoading(false);
     }
@@ -293,6 +296,23 @@ export default function LoyaltyTransactionsPage() {
             </button>
           </form>
         </div>
+
+        {/* A failed read is an error with a retry, never "no transactions". */}
+        {loadFailed && !loading && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink"
+          >
+            {t('loadFailed')}
+            <button
+              type="button"
+              className="ms-4 font-medium underline"
+              onClick={fetchTransactions}
+            >
+              {t('retry')}
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         {loading ? (

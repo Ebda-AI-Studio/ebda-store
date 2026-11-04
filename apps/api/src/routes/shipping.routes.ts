@@ -14,6 +14,9 @@ import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
 
+/** BE:E-5: safety valve on the area-rate lists (the full canonical Egypt template is well under this). */
+const AREA_RATES_MAX = 10_000;
+
 // Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
 // NOT populate req.params.storeId at the mount level — every route below
 // declares its own '/:storeId/...' path. router.param runs AFTER Express
@@ -85,6 +88,7 @@ router.get(
       const rates = await prisma.shippingAreaRate.findMany({
         where: { storeId },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+        take: AREA_RATES_MAX, // BE:E-5
       });
 
       res.json({
@@ -115,6 +119,7 @@ router.get(
       const rates = await prisma.shippingAreaRate.findMany({
         where: { storeId },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+        take: AREA_RATES_MAX, // BE:E-5
       });
 
       const workbook = new (await loadExcelJS()).Workbook();
@@ -701,6 +706,7 @@ router.put(
       const rates_result = await prisma.shippingAreaRate.findMany({
         where: { storeId },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+        take: AREA_RATES_MAX, // BE:E-5
       });
 
       res.json({
@@ -1010,6 +1016,7 @@ router.get(
       const rates = await prisma.shippingAreaRate.findMany({
         where: { storeId, isActive: true },
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+        take: AREA_RATES_MAX, // BE:E-5
         select: {
           governorate: true,
           governorateAr: true,
