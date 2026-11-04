@@ -117,6 +117,28 @@ function assertEditable(status: TaxProfileStatusValue): void {
   }
 }
 
+/** The DO's review guard (and the Postgres trigger) refuse a non-super-admin write with this message prefix. */
+async function guarded<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (/tax profile: /.test(msg))
+      throw new AppError(
+        403,
+        'TAX_PROFILE_FORBIDDEN',
+        'This change is reserved to a platform super admin'
+      );
+    throw err;
+  }
+}
+
+const readProfile = async (storeId: string) =>
+  (await storeDb(storeId)).storeTaxProfile.findUnique({
+    where: { storeId },
+    select: PROFILE_SELECT,
+  });
+
 /** Sniff the real type from the first bytes; the client's mimetype is not trusted. */
 export function sniffTaxDocumentMime(buf: Buffer): (typeof TAX_DOCUMENT_MIME_TYPES)[number] | null {
   if (buf.length >= 5 && buf.subarray(0, 5).toString('latin1') === '%PDF-')
@@ -239,13 +261,15 @@ export class TaxProfileService {
   ): Promise<TaxProfileView> {
     const current = await loadOrCreate(storeId);
     assertEditable(current.status);
-    const p = await (
-      await storeWriter(storeId)
-    ).storeTaxProfile.update({
-      where: { storeId },
-      data: { taxRegistrationNumber: data.taxRegistrationNumber, legalName: data.legalName },
-      select: PROFILE_SELECT,
-    });
+    // ONE conditional write: a super-admin approving between the read above and this write is not overwritten.
+    const written = await guarded(async () =>
+      (await storeWriter(storeId)).storeTaxProfile.updateMany({
+        where: { storeId, status: { in: [...TAX_PROFILE_EDITABLE_STATUSES] } },
+        data: { taxRegistrationNumber: data.taxRegistrationNumber, legalName: data.legalName },
+      })
+    );
+    const p = await readProfile(storeId);
+    if (written.count === 0) assertEditable((p?.status ?? 'pending') as TaxProfileStatusValue);
     await auditLog({
       action: 'tax_profile.details_updated',
       userId: actor.userId,
@@ -302,22 +326,22 @@ export class TaxProfileService {
     });
     let doc;
     try {
-      doc = await (
-        await storeWriter(storeId)
-      ).storeTaxDocument.create({
-        data: {
-          storeId,
-          profileId: current.id,
-          kind,
-          storageKey: key,
-          fileName,
-          mimeType: mime,
-          sizeBytes: file.buffer.length,
-          sha256,
-          uploadedBy: actor.userId,
-        },
-        select: PROFILE_SELECT.documents.select,
-      });
+      doc = await guarded(async () =>
+        (await storeWriter(storeId)).storeTaxDocument.create({
+          data: {
+            storeId,
+            profileId: current.id,
+            kind,
+            storageKey: key,
+            fileName,
+            mimeType: mime,
+            sizeBytes: file.buffer.length,
+            sha256,
+            uploadedBy: actor.userId,
+          },
+          select: PROFILE_SELECT.documents.select,
+        })
+      );
     } catch (err) {
       // Compensate: the object would otherwise sit unreferenced in the private
       // bucket (no orphan sweep runs there).
@@ -349,7 +373,9 @@ export class TaxProfileService {
       select: { id: true, storageKey: true, kind: true },
     });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-    await (await storeWriter(storeId)).storeTaxDocument.delete({ where: { id: doc.id, storeId } });
+    await guarded(async () =>
+      (await storeWriter(storeId)).storeTaxDocument.delete({ where: { id: doc.id, storeId } })
+    );
     const storageKey = doc.storageKey;
     void deferAfterTenantCommit('taxProfile.deletePrivateObject', () =>
       StorageService.deletePrivate(storageKey)
@@ -413,19 +439,34 @@ export class TaxProfileService {
       );
     }
     const now = new Date();
-    const p = await (
-      await storeWriter(storeId)
-    ).storeTaxProfile.update({
-      where: { storeId },
-      data: {
-        status: 'pending',
-        attestedAt: now,
-        submittedAt: now,
-        submittedBy: actor.userId,
-        rejectionReason: null,
-      },
-      select: PROFILE_SELECT,
-    });
+    // conditional at the storage layer: only an editable, complete profile with evidence moves to pending
+    const moved = await guarded(async () =>
+      (await storeWriter(storeId)).storeTaxProfile.updateMany({
+        where: {
+          storeId,
+          status: { in: [...TAX_PROFILE_EDITABLE_STATUSES] },
+          taxRegistrationNumber: { not: null },
+          legalName: { not: null },
+          documents: { some: {} },
+        },
+        data: {
+          status: 'pending',
+          attestedAt: now,
+          submittedAt: now,
+          submittedBy: actor.userId,
+          rejectionReason: null,
+        },
+      })
+    );
+    const p = await readProfile(storeId);
+    if (moved.count === 0) {
+      assertEditable((p?.status ?? 'pending') as TaxProfileStatusValue);
+      throw new AppError(
+        400,
+        'TAX_PROFILE_INCOMPLETE',
+        'Enter your tax registration number and legal name and upload your tax card first. / أدخل رقم التسجيل الضريبي والاسم القانوني وارفع البطاقة الضريبية أولًا.'
+      );
+    }
     bustPublicTaxCaches(storeId);
     await auditLog({
       action: 'tax_profile.submitted',
@@ -509,13 +550,21 @@ export class TaxProfileService {
             rejectionReason: decision.reason,
           };
         }
-        const p = await (
-          await storeWriter(storeId)
-        ).storeTaxProfile.update({
-          where: { storeId },
-          data,
-          select: PROFILE_SELECT,
-        });
+        // conditional on the status the decision was read against: two reviewers cannot both move one profile
+        const from = decision.decision === 'revoke' ? 'verified' : 'pending';
+        const moved = await guarded(async () =>
+          (await storeWriter(storeId)).storeTaxProfile.updateMany({
+            where: { storeId, status: from },
+            data: data as never,
+          })
+        );
+        if (moved.count === 0)
+          throw new AppError(
+            409,
+            'INVALID_TRANSITION',
+            `Cannot ${decision.decision} this profile any more`
+          );
+        const p = await readProfile(storeId);
         if (decision.decision === 'revoke') {
           // Turn the merchant's switch off too: a later re-verification must not
           // silently restart VAT without the merchant choosing it (ruling TAX-3).

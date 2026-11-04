@@ -1177,7 +1177,11 @@ interface QueryStub {
   >;
   mutate(
     storeId: string,
-    m: { key?: string; ops: Array<{ model: string; op: string; args?: Record<string, unknown> }> }
+    m: {
+      key?: string;
+      actorRole?: string;
+      ops: Array<{ model: string; op: string; args?: Record<string, unknown> }>;
+    }
   ): Promise<
     { ok: true; json: string } | { ok: false; code: string; message: string; json?: string }
   >;
@@ -1450,10 +1454,19 @@ async function doClients(
       createDoClient(send as never) as unknown as StoreReads,
       doStoreDelegate(storeId, stub, decodeRpc as never)
     ),
-    writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
+    writer: createDoClient(send as never, m =>
+      // the caller's role, from the verified token of THIS request (the DO's tax-profile review guard reads it)
+      stub.mutate(storeId, { ...m, actorRole: currentActorRole() })
+    ) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
   };
+}
+
+/** The authenticated role of the current request, or undefined outside one (jobs, crons: never a super_admin). */
+function currentActorRole(): string | undefined {
+  const role = (scopes.getStore()?.req as { user?: { role?: unknown } } | undefined)?.user?.role;
+  return typeof role === 'string' ? role : undefined;
 }
 
 /** The DO read client plus the split-aware `store` delegate (the DO tables have no `Store`). */
