@@ -8,16 +8,10 @@
  * and Persian digits and the Arabic decimal mark to Latin, and never invents a 0: an unreadable value stays NaN and is
  * sent as 0, which the API refuses with a clear message (COUPON_VALUE_REQUIRED).
  */
-const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩';
-const PERSIAN = '۰۱۲۳۴۵۶۷۸۹';
+import { toAsciiDigits } from '@ebda/shared';
 
 export function normalizeNumberText(raw: string): string {
-  return raw
-    .replace(/[٠-٩]/g, d => String(ARABIC_INDIC.indexOf(d)))
-    .replace(/[۰-۹]/g, d => String(PERSIAN.indexOf(d)))
-    .replace(/[٫,،]/g, '.')
-    .replace(/\s+/g, '')
-    .trim();
+  return toAsciiDigits(raw).replace(/[٫,،]/g, '.').replace(/\s+/g, '').trim();
 }
 
 /** The typed value as a number, or NaN when it is empty or not a number. Never 0 by default. */
