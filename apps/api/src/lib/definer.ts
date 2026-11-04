@@ -753,39 +753,43 @@ async function listAuditD1(input: {
   if (input.storeId) {
     // one store on its Durable Object: its own rows (the D1 mirror only holds impersonated actions)
     const repo = await (await import('./repo-factory.js')).storeRepo(input.storeId);
-    if (repo.backend === 'do') {
-      const where = {
-        storeId: input.storeId,
-        ...(input.action ? { action: input.action } : {}),
-        ...(input.userId ? { userId: input.userId } : {}),
-        ...(input.resourceType ? { resourceType: input.resourceType } : {}),
-      };
-      const [found, total] = await Promise.all([
-        repo.db.auditLog.findMany({
-          where,
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-          take: limit,
-          skip: offset,
-        }),
-        repo.db.auditLog.count({ where }),
-      ]);
-      return {
-        total,
-        rows: found.map(r => ({
-          id: r.id,
-          action: r.action,
-          userId: r.userId,
-          storeId: r.storeId,
-          resourceType: r.resourceType,
-          resourceId: r.resourceId,
-          details: r.details,
-          ipAddress: r.ipAddress,
-          userAgent: r.userAgent,
-          createdAt: r.createdAt,
-          user: r.userId ? { id: r.userId, email: null, firstName: null, lastName: null } : null,
-        })),
-      };
-    }
+    const where = {
+      storeId: input.storeId,
+      ...(input.action ? { action: input.action } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
+      ...(input.resourceType ? { resourceType: input.resourceType } : {}),
+    };
+    const page = {
+      orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+      take: limit,
+      skip: offset,
+    };
+    // a store on its DO is read from its DO; a store still on Postgres from Postgres (its rows are not in D1 unless impersonated)
+    const [found, total] =
+      repo.backend === 'do'
+        ? await Promise.all([
+            repo.db.auditLog.findMany({ where, ...page }),
+            repo.db.auditLog.count({ where }),
+          ])
+        : await withStore(input.storeId, async tx =>
+            Promise.all([tx.auditLog.findMany({ where, ...page }), tx.auditLog.count({ where })])
+          );
+    return {
+      total,
+      rows: found.map(r => ({
+        id: r.id,
+        action: r.action,
+        userId: r.userId,
+        storeId: r.storeId,
+        resourceType: r.resourceType,
+        resourceId: r.resourceId,
+        details: r.details,
+        ipAddress: r.ipAddress,
+        userAgent: r.userAgent,
+        createdAt: r.createdAt,
+        user: r.userId ? { id: r.userId, email: null, firstName: null, lastName: null } : null,
+      })),
+    };
   }
   const rows = await d1All<{
     id: string;
@@ -994,6 +998,12 @@ export async function unlinkUserAuditLogs(
     SELECT public.ebda_audit_logs_unlink_user(${userId}) AS n`;
   const d1 = await detachD1(
     `UPDATE platform_audit_log SET actor_id = NULL WHERE actor_id = ?1`,
+    userId
+  );
+  // tombstone FIRST: a queued audit row that names this user is replayed without the id (services/audit-sink.ts)
+  await detachD1(
+    `INSERT OR IGNORE INTO platform_audit_log (id, actor_id, action, target_type, target_id, store_id, meta, created_at)
+     VALUES (?1, NULL, 'audit.user_erased', 'user', ?1, NULL, '{}', CAST(unixepoch('subsec') * 1000 AS INTEGER))`,
     userId
   );
   return Number(rows[0]?.n ?? 0) + d1 + (await unlinkUserAuditLogsInDoStores(userId));

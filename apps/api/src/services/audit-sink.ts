@@ -39,6 +39,8 @@ export interface AuditRow extends AuditEntry {
 export interface AuditWriteRetryMessage {
   kind: 'audit-write-retry';
   row: AuditRow;
+  /** The legs still to write (a Postgres leg that already succeeded is never repeated). Absent = decide the home again. */
+  only?: Array<'pg' | 'do' | 'd1'>;
 }
 
 export const isAuditWriteRetry = (v: unknown): v is AuditWriteRetryMessage =>
@@ -62,7 +64,8 @@ export async function auditTargets(row: AuditRow): Promise<Target[]> {
   if (row.storeId) {
     const { storeWritesToDo } = await import('../lib/repo-factory.js');
     if (await storeWritesToDo(row.storeId)) return isImpersonated(row) ? ['do', 'd1'] : ['do'];
-    return ['pg'];
+    // a Postgres store's impersonated action is mirrored to D1 too: the cross-store viewer would not see it otherwise
+    return isImpersonated(row) ? ['pg', 'd1'] : ['pg'];
   }
   return (await auditStoreLessOnD1()) ? ['d1'] : ['pg'];
 }
@@ -130,7 +133,7 @@ export async function deliverAuditRow(row: AuditRow, targets: Target[]): Promise
 }
 
 /** Put a row that could not be written on the jobs queue; if that fails too, park it in R2 and page (the row itself is never logged). Never throws. */
-export async function queueAuditRetry(row: AuditRow, err: unknown): Promise<void> {
+export async function queueAuditRetry(row: AuditRow, err: unknown, only?: Target[]): Promise<void> {
   const message = err instanceof Error ? err.message : String(err);
   logger.warn(
     { err, auditId: row.id, action: row.action },
@@ -139,9 +142,16 @@ export async function queueAuditRetry(row: AuditRow, err: unknown): Promise<void
   try {
     const q = cfBindings()?.JOBS_QUEUE;
     if (!q) throw new Error('JOBS_QUEUE binding missing');
-    await q.send({ kind: 'audit-write-retry', row } satisfies AuditWriteRetryMessage, {
-      contentType: 'json',
-    });
+    await q.send(
+      {
+        kind: 'audit-write-retry',
+        row,
+        ...(only ? { only } : {}),
+      } satisfies AuditWriteRetryMessage,
+      {
+        contentType: 'json',
+      }
+    );
   } catch (e) {
     // LAST RESORT: the row carries IP, user agent and free-form details, so it is NEVER logged. Park it in R2; if that
     // fails too, page with the ids only (the row is lost, and the page says so).
@@ -180,11 +190,16 @@ export async function appendAudit(
     await queueAuditRetry(row, err);
     return;
   }
-  if (targets.length === 1 && targets[0] === 'pg') return pgInsert(row);
+  // The Postgres leg keeps the caller's transaction semantics: it runs first and its failure propagates. NOTE (documented
+  // limit): a DO / D1 leg is NOT part of that transaction, so a caller that later rolls back still leaves its audit row.
+  // That is the safe direction for an audit trail (a refused or failed action is evidence too).
+  if (targets.includes('pg')) await pgInsert(row);
+  const cf = targets.filter(t => t !== 'pg');
+  if (cf.length === 0) return;
   try {
-    await withCap(deliverAuditRow(row, targets));
+    await withCap(deliverAuditRow(row, cf));
   } catch (err) {
-    await queueAuditRetry(row, err);
+    await queueAuditRetry(row, err, cf);
   }
 }
 
@@ -197,14 +212,34 @@ export async function applyAuditRetry(
   deps: { pgInsert: (row: AuditRow) => Promise<void> }
 ): Promise<'done' | 'retry'> {
   try {
-    const targets = await auditTargets(m.row);
-    if (targets.length === 1 && targets[0] === 'pg') await deps.pgInsert(m.row);
-    else await deliverAuditRow(m.row, targets);
+    // An erasure that ran while this row waited must not be undone by the replay: the user id is dropped.
+    const row =
+      m.row.userId && (await userWasErased(m.row.userId)) ? { ...m.row, userId: null } : m.row;
+    const targets = m.only ?? (await auditTargets(row));
+    if (targets.includes('pg')) await deps.pgInsert(row);
+    await deliverAuditRow(
+      row,
+      targets.filter(t => t !== 'pg')
+    );
     return 'done';
   } catch (err) {
     logger.warn({ err, auditId: m.row.id }, '[audit] retry failed; will redeliver');
     return 'retry';
   }
+}
+
+export const USER_ERASED_ACTION = 'audit.user_erased';
+
+/** Tombstone written by the erasure (lib/definer.ts `unlinkUserAuditLogs`): a queued row naming this user is replayed without the id. */
+export async function userWasErased(userId: string): Promise<boolean> {
+  if (!(cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB) return false;
+  const { d1All } = await import('./platform/billing-d1.js');
+  const rows = await d1All(
+    `SELECT 1 AS x FROM platform_audit_log WHERE action = ?1 AND target_id = ?2 LIMIT 1`,
+    USER_ERASED_ACTION,
+    userId
+  );
+  return rows.length > 0;
 }
 
 interface R2PutLike {

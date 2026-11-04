@@ -661,14 +661,37 @@ async function* auditPages(client, size) {
 
 async function auditDigest(client, size, olderThanMs) {
   const dg = new TableDigest();
+  const ids = [];
   let all = 0;
   for await (const rows of auditPages(client, size))
     for (const r of rows) {
       all++;
-      if (olderThanMs === null || Number(r.created_ms) < olderThanMs)
+      if (olderThanMs === null || Number(r.created_ms) < olderThanMs) {
         await dg.add(AUDIT_COLS, auditRowToD1(r), ['id']);
+        ids.push(r.id);
+      }
     }
-  return { ...(await dg.finish()), all };
+  return { ...(await dg.finish()), all, ids };
+}
+
+/** Digest of exactly these ids on the D1 side (BY ID: D1 may also hold mirrored impersonation rows or rows of an aborted run). */
+export async function d1AuditDigestByIds(d, ids, query = d1Query) {
+  const dg = new TableDigest();
+  const sorted = [...ids].sort();
+  for (let i = 0; i < sorted.length; i += 400) {
+    const chunk = sorted.slice(i, i + 400);
+    const rows = await query(
+      d,
+      `SELECT ${AUDIT_COLS.map(q).join(', ')} FROM platform_audit_log WHERE store_id IS NULL AND id IN (${chunk.map(lit).join(', ')}) ORDER BY id`
+    );
+    for (const r of rows)
+      await dg.add(
+        AUDIT_COLS,
+        AUDIT_COLS.map(c => r[c]),
+        ['id']
+      );
+  }
+  return dg.finish();
 }
 
 /** Postgres audit row -> the `__auditimport` row shape (snake_case, details as JSON text, created_at epoch ms). */
@@ -856,18 +879,7 @@ async function auditCutover(args) {
     console.log(
       `  copied ${copied} row(s); ${copied - before.count} newer than the freeze instant (stragglers, kept)`
     );
-    const d1Rows = await d1Query(
-      d,
-      `SELECT ${AUDIT_COLS.map(q).join(', ')} FROM platform_audit_log WHERE created_at < ${Number(T)} ORDER BY id`
-    );
-    const dg = new TableDigest();
-    for (const r of d1Rows)
-      await dg.add(
-        AUDIT_COLS,
-        AUDIT_COLS.map(c => r[c]),
-        ['id']
-      );
-    const dst = await dg.finish();
+    const dst = await d1AuditDigestByIds(d, before.ids);
     const ok = dst.count === before.count && dst.digest === before.digest;
     console.log(
       `  verify platform_audit_log ${ok ? 'EQUAL' : 'MISMATCH'}  src ${before.count} ${before.digest.slice(0, 12)}  d1 ${dst.count} ${dst.digest.slice(0, 12)}`

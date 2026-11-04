@@ -130,9 +130,15 @@ export const DO_PROCS: Record<string, Proc> = {
     if (typeof id !== 'string' || !id) throw procErr('id');
     if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
     if (!details || typeof details !== 'object' || Array.isArray(details)) throw procErr('details');
+    const count = (details as { count?: unknown }).count;
+    if (!Number.isInteger(count) || (count as number) < 1) throw procErr('details.count');
     const json = JSON.stringify(details);
     if (json.length > 16_384) throw procErr('details');
-    sql.run('UPDATE audit_logs SET details = ? WHERE id = ? AND store_id = ?', [json, id, storeId]);
+    // only the coalesced agent-denial rows carry a count: any other row (or one without `count`) is never rewritten
+    sql.run(
+      `UPDATE audit_logs SET details = ? WHERE id = ? AND store_id = ? AND action LIKE 'agent.%' AND json_extract(details, '$.count') IS NOT NULL`,
+      [json, id, storeId]
+    );
     return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
   },
   /** Retention: delete rows older than `before` (epoch ms, at least 30 days ago) up to and including `upToId`. */

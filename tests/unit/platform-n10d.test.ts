@@ -16,16 +16,42 @@ const repo = vi.hoisted(() => ({
   dupNext: false,
   unreachable: new Set<string>(),
   procs: [] as Array<{ id: string; name: string; args: Record<string, unknown> }>,
+  hooks: {} as {
+    withStore?: (id: string, fn: (tx: unknown) => unknown) => unknown;
+    proc?: (name: string, args: Record<string, unknown>) => Promise<void>;
+    rows?: () => Array<{ id: string; created_at: number }>;
+  },
 }));
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeWritesToDo: async (id: string) => repo.doStores.has(id),
-  storeRepo: async () => ({
-    backend: 'do',
-    db: { auditLog: { findMany: async () => [], count: async () => 0 } },
+  storeDb: async () => ({
+    auditLog: {
+      findMany: async (a: { where?: { id?: { gt?: string }; createdAt?: { lt?: Date } } }) =>
+        (repo.hooks.rows?.() ?? [])
+          .filter(r => r.id > (a.where?.id?.gt ?? ''))
+          .filter(r => r.created_at < (a.where?.createdAt?.lt?.getTime() ?? Infinity))
+          .map(r => ({ id: r.id, createdAt: new Date(r.created_at) })),
+    },
+  }),
+  storeRepo: async (id: string) => ({
+    backend: repo.doStores.has(id) ? 'do' : 'pg',
+    db: {
+      auditLog: {
+        findMany: async (a: { where?: { id?: { gt?: string } } }) =>
+          repo.hooks.rows
+            ? repo.hooks
+                .rows()
+                .filter(r => r.id > (a.where?.id?.gt ?? ''))
+                .map(r => ({ ...r, createdAt: new Date(0) }))
+            : [],
+        count: async () => 0,
+      },
+    },
   }),
   storeWriter: async (id: string) => ({
     $proc: async (name: string, args: Record<string, unknown>) => {
       if (repo.unreachable.has(id)) throw new Error('do down');
+      if (repo.hooks.proc) await repo.hooks.proc(name, args);
       repo.procs.push({ id, name, args });
       return 2;
     },
@@ -42,6 +68,17 @@ vi.mock('../../apps/api/src/lib/repo-factory', () => ({
     },
   }),
 }));
+
+vi.mock('@ebda/database', async importOriginal => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withStore: (id: string, fn: (tx: unknown) => unknown) =>
+      repo.hooks.withStore
+        ? repo.hooks.withStore(id, fn)
+        : (actual.withStore as (i: string, f: unknown) => unknown)(id, fn),
+  };
+});
 
 import { prisma } from '@ebda/database';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
@@ -71,6 +108,13 @@ const MIG = ['0001_init.sql', '0002_invariants.sql', '0003_late_columns.sql']
   .join('\n');
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
+
+const MIG_AUDIT = fs
+  .readFileSync(
+    new URL('../../packages/cf-schema/migrations/platform/0001_init.sql', import.meta.url),
+    'utf8'
+  )
+  .match(/CREATE TABLE IF NOT EXISTS "platform_audit_log"[\s\S]*?\);\n/)![0];
 
 type Family = 'billing' | 'payments' | 'ops' | 'audit';
 function world(markers: Family[], extra: Record<string, unknown> = {}) {
@@ -120,6 +164,7 @@ beforeEach(() => {
   repo.dupNext = false;
   repo.unreachable.clear();
   repo.procs.length = 0;
+  repo.hooks = {};
 });
 
 const claim = (storeId: string, ref: string) => ({
@@ -733,5 +778,209 @@ describe('N-27 merchant erasure of payer PII in the platform payments tables', (
     expect(db.prepare('SELECT payer_name FROM instapay_receipts').get()).toEqual({
       payer_name: 'Ali',
     });
+  });
+});
+
+describe('opus review fixes', () => {
+  it('after the audit marker a Postgres store still shows in the super-admin viewer (read from Postgres)', async () => {
+    world(['audit']);
+    const tx = {
+      auditLog: {
+        findMany: async () => [
+          {
+            id: 'p1',
+            action: 'a',
+            userId: 'u',
+            storeId: B,
+            resourceType: 't',
+            resourceId: null,
+            details: {},
+            ipAddress: null,
+            userAgent: null,
+            createdAt: new Date(1),
+          },
+        ],
+        count: async () => 1,
+      },
+    };
+    let scoped: string | undefined;
+    repo.hooks.withStore = (id, fn) => ((scoped = id), fn(tx));
+    const { platformAuditLogs } = await import('../../apps/api/src/lib/definer');
+    const out = await platformAuditLogs.list({
+      actorUserId: 'root',
+      storeId: B,
+      limit: 10,
+      offset: 0,
+    });
+    expect(scoped).toBe(B);
+    expect(out).toMatchObject({ total: 1, rows: [{ id: 'p1', storeId: B }] });
+  });
+
+  it('weekly archive purges a DO store through the REAL write guard (generic deleteMany would be refused)', async () => {
+    const { openSqlite, META } = await import('../../packages/repo/test/diff-harness');
+    const { nodeSqlRunner } = await import('../../packages/repo/test/node-sql');
+    const { createPrismaLite } = await import('../../packages/repo/src/prisma-lite/client');
+    const { runWrites } = await import('../../packages/repo/src/rpc/writes');
+    const { archiveStoreAuditDo } = await import('../../apps/api/src/services/audit-retention-cf');
+    const db = openSqlite();
+    const sql = nodeSqlRunner(db);
+    const lite = createPrismaLite(META as never, sql, 'store-do', { storeId: A }) as never;
+    const old = Date.now() - 120 * 86_400_000;
+    for (const [id, t] of [
+      ['a1', old],
+      ['a2', old + 1],
+      ['a3', Date.now()],
+    ] as const)
+      db.prepare(
+        `INSERT INTO audit_logs (id, action, store_id, resource_type, details, created_at) VALUES (?, 'x', ?, 't', '{}', ?)`
+      ).run(id, A, t);
+    const writes: string[] = [];
+    repo.hooks.proc = async (name, args) => {
+      writes.push(name);
+      const r = await runWrites(lite, sql, { ops: [{ model: '$proc', op: name, args } as never] });
+      if (!r.ok) throw new Error(`refused ${r.code}`);
+    };
+    repo.hooks.rows = () =>
+      db.prepare('SELECT id, created_at FROM audit_logs ORDER BY id').all() as Array<{
+        id: string;
+        created_at: number;
+      }>;
+    // the DO id list comes from D1 stores
+    const w = world([]);
+    w.prepare(`UPDATE stores SET storage_backend = 'do' WHERE id = ?`).run(A);
+    const put = vi.fn(async () => undefined);
+    const out = await archiveStoreAuditDo(new Date(Date.now() - 90 * 86_400_000), put, 'S');
+    expect(out).toEqual({ stores: 1, rows: 2 });
+    expect(writes).toEqual(['auditPurge']);
+    expect(
+      (db.prepare('SELECT id FROM audit_logs').all() as Array<{ id: string }>).map(r => r.id)
+    ).toEqual(['a3']);
+    // and the generic path really is refused by the same guard
+    const refused = await runWrites(lite, sql, {
+      ops: [{ model: 'AuditLog', op: 'deleteMany', args: { where: {} } }],
+    });
+    expect(refused).toMatchObject({ ok: false, code: 'AUDIT_APPEND_ONLY' });
+  });
+
+  it('audit cutover verify is BY ID on store-less rows: mirrored DO rows and aborted-run rows do not break it', async () => {
+    const { d1AuditDigestByIds, auditRowToD1 } =
+      (await import('../../scripts/cf/cutover-platform-family.mjs')) as never as {
+        d1AuditDigestByIds: (
+          d: unknown,
+          ids: string[],
+          q: unknown
+        ) => Promise<{ count: number; digest: string }>;
+        auditRowToD1: (r: Record<string, unknown>) => unknown[];
+      };
+    const { TableDigest } = await import('../../packages/cf-migrate/src/canon.mjs');
+    const cols = [
+      'id',
+      'actor_id',
+      'action',
+      'target_type',
+      'target_id',
+      'store_id',
+      'meta',
+      'created_at',
+    ];
+    const pgRows = ['p1', 'p2'].map(id =>
+      auditRowToD1({
+        id,
+        user_id: 'u',
+        action: 'a',
+        resource_type: 't',
+        resource_id: null,
+        details: {},
+        ip_address: null,
+        user_agent: null,
+        created_ms: 1000,
+      })
+    );
+    const d1Rows = [
+      ...pgRows,
+      ['mirror', 'u', 'a', 't', null, 'store-x', '{}', 5], // mirrored impersonated DO row (store_id set)
+      ['aborted', 'u', 'a', 't', null, null, '{}', 6], // born in an aborted run, store-less, other id
+    ].map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]])));
+    const dg = new TableDigest();
+    for (const r of pgRows) await dg.add(cols, r as never, ['id']);
+    const want = await dg.finish();
+    const query = async (_d: unknown, sqlText: string) =>
+      d1Rows.filter(
+        r =>
+          sqlText.includes(`'${r.id}'`) &&
+          sqlText.includes('store_id IS NULL') &&
+          r.store_id === null
+      );
+    const got = await d1AuditDigestByIds({}, ['p1', 'p2'], query);
+    expect(got).toEqual(want);
+    // a PG row missing from D1 is a mismatch
+    const missing = await d1AuditDigestByIds({}, ['p1', 'p2', 'p3'], query);
+    expect(missing.count).toBe(2);
+  });
+
+  it('a Postgres store impersonated action is written to Postgres AND mirrored to D1; a failed mirror retries ONLY the mirror', async () => {
+    const { sent, q } = jobs();
+    const db = world([], { JOBS_QUEUE: q });
+    const impersonated = entry({ storeId: B, details: { impersonatedBy: 'root' } });
+    expect(await auditTargets({ ...impersonated, id: 'i', createdAt: 1 })).toEqual(['pg', 'd1']);
+    await appendAudit(impersonated, pg);
+    expect(pg).toHaveBeenCalledTimes(1);
+    expect(db.prepare('SELECT store_id FROM platform_audit_log').get()).toEqual({ store_id: B });
+    // mirror fails (D1 table gone): the row is queued with only the d1 leg, and the replay does not touch Postgres
+    pg.mockClear();
+    db.exec('DROP TABLE platform_audit_log');
+    await appendAudit(impersonated, pg);
+    expect(pg).toHaveBeenCalledTimes(1);
+    const msg = sent.at(-1) as { only?: string[]; row: AuditRow };
+    expect(msg.only).toEqual(['d1']);
+    db.exec(MIG_AUDIT);
+    pg.mockClear();
+    expect(await applyAuditRetry(msg as never, { pgInsert: pg })).toBe('done');
+    expect(pg).not.toHaveBeenCalled();
+    expect(db.prepare('SELECT COUNT(*) n FROM platform_audit_log').get()).toEqual({ n: 1 });
+  });
+
+  it('a queued row replayed after the user was erased is written without the user id', async () => {
+    const db = world([]);
+    repo.doStores.add(A);
+    const { unlinkUserAuditLogs } = await import('../../apps/api/src/lib/definer');
+    await unlinkUserAuditLogs('u1', { $queryRaw: async () => [{ n: 0 }] } as never);
+    expect(
+      db
+        .prepare(`SELECT COUNT(*) n FROM platform_audit_log WHERE action = 'audit.user_erased'`)
+        .get()
+    ).toEqual({ n: 1 });
+    const row: AuditRow = { ...entry({ storeId: A, userId: 'u1' }), id: 'late1', createdAt: 1 };
+    expect(await applyAuditRetry({ kind: 'audit-write-retry', row }, { pgInsert: pg })).toBe(
+      'done'
+    );
+    expect(repo.created.at(-1)?.data.userId).toBeNull();
+  });
+
+  it('a rolled-back submit frees the D1 reference at once, so the same transfer can be filed again', async () => {
+    const db = world(['billing', 'payments']);
+    const { claimInstapayReference } = await import('../../apps/api/src/lib/instapay-ref-claim');
+    const { undoSubmittedReceipt } =
+      await import('../../apps/api/src/services/billing/account.service');
+    const r = await prisma.instapayReceipt.create({
+      data: {
+        storeId: A,
+        kind: 'subscription',
+        storageKey: 'k',
+        mimeType: 'image/png',
+        sizeBytes: 10,
+        sha256: 'h',
+        status: 'submitted',
+        referenceKey: '12121212',
+        submittedAt: new Date(),
+      } as never,
+    });
+    expect(await claimInstapayReference('12121212', A, r.id)).toBe('claimed');
+    await undoSubmittedReceipt(prisma as never, { id: r.id, referenceKey: '12121212' }, A);
+    expect(
+      db.prepare('SELECT status, reference_key FROM instapay_receipts WHERE id = ?').get(r.id)
+    ).toEqual({ status: 'draft', reference_key: null });
+    // free again: another receipt can claim it
+    expect(await claimInstapayReference('12121212', B, 'other-receipt')).toBe('claimed');
   });
 });
