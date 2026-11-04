@@ -994,16 +994,17 @@ export async function unlinkUserAuditLogs(
   userId: string,
   db: Pick<Prisma.TransactionClient, '$queryRaw'> = prisma
 ): Promise<number> {
+  // The tombstone goes FIRST, before every unlink below (Postgres, D1, each DO store): a queued audit replay that lands after it
+  // drops the user id (services/audit-sink.ts), and one that wrote before it is nulled by the unlinks.
+  await detachD1(
+    `INSERT OR IGNORE INTO platform_audit_log (id, actor_id, action, target_type, target_id, store_id, meta, created_at)
+     VALUES (?1, NULL, 'audit.user_erased', 'user', ?1, NULL, '{}', CAST(unixepoch('subsec') * 1000 AS INTEGER))`,
+    userId
+  );
   const rows = await db.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_audit_logs_unlink_user(${userId}) AS n`;
   const d1 = await detachD1(
     `UPDATE platform_audit_log SET actor_id = NULL WHERE actor_id = ?1`,
-    userId
-  );
-  // tombstone FIRST: a queued audit row that names this user is replayed without the id (services/audit-sink.ts)
-  await detachD1(
-    `INSERT OR IGNORE INTO platform_audit_log (id, actor_id, action, target_type, target_id, store_id, meta, created_at)
-     VALUES (?1, NULL, 'audit.user_erased', 'user', ?1, NULL, '{}', CAST(unixepoch('subsec') * 1000 AS INTEGER))`,
     userId
   );
   return Number(rows[0]?.n ?? 0) + d1 + (await unlinkUserAuditLogsInDoStores(userId));

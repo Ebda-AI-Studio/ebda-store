@@ -1,3 +1,4 @@
+import { readAuditByResource } from '../lib/audit-read';
 import { storeDb } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
@@ -616,16 +617,7 @@ router.get(
       // Audit rows keyed by resourceId=returnId, scoped to the store (the tenant
       // guard refuses an OR over storeId; store-less legacy rows are not visible
       // to a store scope under strict RLS anyway).
-      const auditRows = await prisma.auditLog.findMany({
-        where: {
-          resourceType: 'return',
-          resourceId: returnId,
-          storeId,
-        },
-        include: { user: { select: { firstName: true, lastName: true, role: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
+      const auditRows = await readAuditByResource(storeId, 'return', returnId);
 
       const timeline = auditRows.map(row => {
         const details = row.details as Record<string, unknown>;

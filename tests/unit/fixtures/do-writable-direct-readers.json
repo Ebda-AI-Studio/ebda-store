@@ -9,6 +9,20 @@
     }
   },
   "baseline": {
+    "apps/api/src/lib/audit-read.ts": {
+      "kind": "pg-branch",
+      "reason": "readAuditByResource: a DO store returns early from storeDb; the prisma read is the Postgres store's audit trail (actor joined)",
+      "models": {
+        "auditLog": 1
+      }
+    },
+    "apps/api/src/lib/definer.ts": {
+      "kind": "pg-branch",
+      "reason": "platform audit viewer: a DO store is read through storeRepo(...).db; the withStore read is a Postgres store's own rows",
+      "models": {
+        "auditLog": 2
+      }
+    },
     "apps/api/src/routes/admin.routes.ts": {
       "kind": "platform",
       "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
@@ -113,6 +127,14 @@
         "product": 1
       }
     },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
+      }
+    },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {
       "kind": "pg-branch",
       "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
@@ -196,14 +218,6 @@
       "models": {
         "product": 2,
         "productVariant": 2
-      }
-    },
-    "apps/api/src/services/bundle.service.ts": {
-      "kind": "platform",
-      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
-      "models": {
-        "bundle": 3,
-        "bundleItem": 1
       }
     }
   }

@@ -217,14 +217,26 @@ export async function applyAuditRetry(
       m.row.userId && (await userWasErased(m.row.userId)) ? { ...m.row, userId: null } : m.row;
     const targets = m.only ?? (await auditTargets(row));
     if (targets.includes('pg')) await deps.pgInsert(row);
-    await deliverAuditRow(
-      row,
-      targets.filter(t => t !== 'pg')
-    );
+    const cf = targets.filter(t => t !== 'pg');
+    await deliverAuditRow(row, cf);
+    // Closes the window between the tombstone check above and the write: an erasure that ran in between has already
+    // passed this row by, so the user id is nulled here (idempotent, DO and D1 legs; the Postgres leg is erased by its own definer).
+    if (row.userId && (await userWasErased(row.userId))) await unlinkWrittenRow(row, cf);
     return 'done';
   } catch (err) {
     logger.warn({ err, auditId: m.row.id }, '[audit] retry failed; will redeliver');
     return 'retry';
+  }
+}
+
+async function unlinkWrittenRow(row: AuditRow, legs: Target[]): Promise<void> {
+  if (legs.includes('do') && row.storeId) {
+    const { storeWriter } = await import('../lib/repo-factory.js');
+    await (await storeWriter(row.storeId)).$proc('auditUnlinkUser', { userId: row.userId });
+  }
+  if (legs.includes('d1')) {
+    const { d1Run } = await import('./platform/billing-d1.js');
+    await d1Run('UPDATE platform_audit_log SET actor_id = NULL WHERE id = ?1', row.id);
   }
 }
 

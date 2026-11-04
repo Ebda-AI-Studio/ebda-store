@@ -17,6 +17,7 @@ const repo = vi.hoisted(() => ({
   unreachable: new Set<string>(),
   procs: [] as Array<{ id: string; name: string; args: Record<string, unknown> }>,
   hooks: {} as {
+    onCreate?: () => void;
     withStore?: (id: string, fn: (tx: unknown) => unknown) => unknown;
     proc?: (name: string, args: Record<string, unknown>) => Promise<void>;
     rows?: () => Array<{ id: string; created_at: number }>;
@@ -61,6 +62,7 @@ vi.mock('../../apps/api/src/lib/repo-factory', () => ({
           repo.failNext--;
           throw new Error('do unavailable');
         }
+        repo.hooks.onCreate?.();
         if (repo.dupNext) throw Object.assign(new Error('dup'), { code: 'P2002' });
         repo.created.push({ storeId: id, data });
         return data;
@@ -982,5 +984,44 @@ describe('opus review fixes', () => {
     ).toEqual({ status: 'draft', reference_key: null });
     // free again: another receipt can claim it
     expect(await claimInstapayReference('12121212', B, 'other-receipt')).toBe('claimed');
+  });
+
+  it('erasure interleavings: tombstone first; a replay racing the unlink is nulled either way', async () => {
+    const db = world([]);
+    db.prepare(`UPDATE stores SET storage_backend = 'do'`).run();
+    repo.doStores.add(A);
+    const { unlinkUserAuditLogs } = await import('../../apps/api/src/lib/definer');
+    const fake = { $queryRaw: async () => [{ n: 0 }] } as never;
+    const row: AuditRow = { ...entry({ storeId: A, userId: 'u7' }), id: 'race1', createdAt: 1 };
+    // (a) the replay passes the tombstone check, then the erasure writes the tombstone before the replay's write lands:
+    //     the post-write re-check nulls the id in the DO
+    repo.hooks.onCreate = () =>
+      void db
+        .prepare(
+          `INSERT OR IGNORE INTO platform_audit_log (id, action, target_type, target_id, created_at) VALUES ('u7', 'audit.user_erased', 'user', 'u7', 1)`
+        )
+        .run();
+    expect(await applyAuditRetry({ kind: 'audit-write-retry', row }, { pgInsert: pg })).toBe(
+      'done'
+    );
+    expect(repo.procs.some(p => p.name === 'auditUnlinkUser' && p.args.userId === 'u7')).toBe(true);
+    // (b) the replay wrote BEFORE the erasure: the unlink (after the tombstone) reaches the DO store
+    repo.hooks.onCreate = undefined;
+    repo.procs.length = 0;
+    db.prepare(`DELETE FROM platform_audit_log`).run();
+    await applyAuditRetry(
+      { kind: 'audit-write-retry', row: { ...row, id: 'race2' } },
+      { pgInsert: pg }
+    );
+    expect(repo.procs).toHaveLength(0);
+    const order: string[] = [];
+    repo.hooks.proc = async name => void order.push(name);
+    await unlinkUserAuditLogs('u7', fake);
+    expect(
+      db
+        .prepare(`SELECT COUNT(*) n FROM platform_audit_log WHERE action = 'audit.user_erased'`)
+        .get()
+    ).toEqual({ n: 1 });
+    expect(order).toContain('auditUnlinkUser');
   });
 });
