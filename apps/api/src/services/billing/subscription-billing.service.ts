@@ -31,13 +31,14 @@
  *    the store into the dunning window with a pay-now notice instead.
  */
 import crypto from 'crypto';
-import { prisma, withStore, acrossStores, currentStoreId, type Prisma } from '@ebda/database';
+import { prisma, withStore, currentStoreId, type Prisma } from '@ebda/database';
 import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { sendAlert } from '../alerts.service';
+import { acrossBilling, onD1 } from '../platform/billing-d1';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -230,6 +231,9 @@ async function downgradeToFree(
   effects: BillingEffect[]
 ): Promise<void> {
   const free = await tx.plan.findUnique({ where: { code: FREE_PLAN_CODE } });
+  // The Postgres half (stores.plan) goes FIRST: the subscription update is the D1 commit point, so a failure before it
+  // leaves a state a retry repeats idempotently (Ruling NZ-10-2).
+  if (free) await storeUpdate(tx, { where: { id: storeId }, data: { plan: free.featureTier } });
   await tx.storeSubscription.update({
     where: { storeId },
     data: {
@@ -247,7 +251,6 @@ async function downgradeToFree(
       providerPaymentMethodRef: null,
     },
   });
-  if (free) await storeUpdate(tx, { where: { id: storeId }, data: { plan: free.featureTier } });
   effects.push({ kind: 'downgraded', storeId, reason });
 }
 
@@ -296,12 +299,12 @@ async function applySuccess(
       ...(token ? { providerPaymentMethodRef: token, billingMethod: 'card' } : {}),
       ...(o.customerRef ? { providerCustomerId: o.customerRef } : {}),
     };
+    await applyPlan(tx, row.storeId, row.planCode); // Postgres half first; the subscription write is the commit point
     if (existing) {
       await tx.storeSubscription.update({ where: { storeId: row.storeId }, data });
     } else {
       await tx.storeSubscription.create({ data: { storeId: row.storeId, ...data } });
     }
-    await applyPlan(tx, row.storeId, row.planCode);
     effects.push({ kind: 'plan_changed', storeId: row.storeId });
     effects.push({ kind: 'payment_recorded', storeId: row.storeId });
     effects.push({ kind: 'subscription_paid', storeId: row.storeId, billingEventId: row.id });
@@ -346,6 +349,7 @@ async function applySuccess(
       start = now;
       anchor = now.getUTCDate();
     }
+    if (planCode !== sub.planCode) await applyPlan(tx, row.storeId, planCode);
     await tx.storeSubscription.update({
       where: { storeId: row.storeId },
       data: {
@@ -361,10 +365,7 @@ async function applySuccess(
         nextRetryAt: null,
       },
     });
-    if (planCode !== sub.planCode) {
-      await applyPlan(tx, row.storeId, planCode);
-      effects.push({ kind: 'plan_changed', storeId: row.storeId });
-    }
+    if (planCode !== sub.planCode) effects.push({ kind: 'plan_changed', storeId: row.storeId });
     effects.push({ kind: 'payment_recorded', storeId: row.storeId });
     // Only a charge that ENDS a trial can be the first paid payment (the trial-end charge is a
     // `renewal`); later renewals are not conversions, so they are not queued.
@@ -449,6 +450,42 @@ async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): P
   });
 }
 
+/** Webhook dedupe claim (see applyWebhookEvent): `outcome` while in flight, and how old it must be to be taken over. */
+const WEBHOOK_PROCESSING = 'processing';
+const WEBHOOK_CLAIM_STALE_MS = 120_000;
+
+/** D1 settle lease marker (stored in `failure_reason` while a success is being applied) and how long it holds. */
+const SETTLE_LEASE = 'settling';
+const SETTLE_LEASE_MS = 120_000;
+
+/** Did an earlier, interrupted settlement of this success already move the subscription? (D1 lease path only.) */
+async function alreadyApplied(tx: Tx, row: LedgerRow & { createdAt: Date }): Promise<boolean> {
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
+  if (!sub) return false;
+  const started = sub.currentPeriodStart?.getTime();
+  if (row.type === 'card_setup')
+    return (
+      !!sub.providerPaymentMethodRef &&
+      !!sub.paymentMethodSavedAt &&
+      sub.paymentMethodSavedAt >= row.createdAt
+    );
+  if (row.type === 'renewal')
+    return (
+      sub.status === 'active' &&
+      started !== undefined &&
+      !!row.forPeriodEnd &&
+      started >= row.forPeriodEnd.getTime()
+    );
+  if (row.type === 'checkout' || row.type === 'upgrade')
+    return (
+      sub.status === 'active' &&
+      sub.planCode === row.planCode &&
+      started !== undefined &&
+      started >= row.createdAt.getTime()
+    );
+  return false;
+}
+
 /**
  * Settle one charge row inside the caller's transaction. Guarded transitions:
  *  - succeeded: only from pending|failed (a late success after a failure still
@@ -474,14 +511,59 @@ export async function settleInTx(
     o = { ...o, status: 'failed', failureReason: 'card_setup_without_token' };
   }
   if (o.status === 'succeeded') {
+    const settled = {
+      status: 'succeeded' as const,
+      failureReason: null,
+      ...(o.providerRef ? { providerRef: o.providerRef } : {}),
+      ...(raw !== undefined ? { raw } : {}),
+    };
+    if (await onD1()) {
+      // D1 has no transaction and `succeeded` is final (billing_events_succeeded_final), so the order is: take a lease
+      // on the row, apply the subscription, THEN flip the status. A failure releases the lease and nothing is settled;
+      // a crash leaves the lease, which expires after SETTLE_LEASE_MS. (Ruling NZ-10-2.)
+      const leased = await tx.billingEvent.updateMany({
+        where: {
+          id: eventId,
+          storeId: row.storeId,
+          status: { in: ['pending', 'failed'] },
+          OR: [
+            { failureReason: null },
+            { failureReason: { not: SETTLE_LEASE } },
+            { updatedAt: { lt: new Date(now.getTime() - SETTLE_LEASE_MS) } },
+          ],
+        },
+        data: { failureReason: SETTLE_LEASE },
+      });
+      if (leased.count === 0) return { transitioned: false };
+      try {
+        // A previous attempt applied the subscription and then died before flipping the status (its lease expired):
+        // apply nothing twice, just finish the flip.
+        if (!(await alreadyApplied(tx, row))) await applySuccess(tx, row, o, now, effects);
+      } catch (err) {
+        await tx.billingEvent
+          .updateMany({
+            where: { id: eventId, storeId: row.storeId, failureReason: SETTLE_LEASE },
+            data: { failureReason: row.failureReason },
+          })
+          .catch(undo =>
+            logger.error({ err: undo, eventId }, '[billing] could not release a settle lease')
+          );
+        throw err;
+      }
+      const flipped = await tx.billingEvent.updateMany({
+        where: {
+          id: eventId,
+          storeId: row.storeId,
+          status: { in: ['pending', 'failed'] },
+          failureReason: SETTLE_LEASE,
+        },
+        data: settled,
+      });
+      return { transitioned: flipped.count === 1 };
+    }
     const upd = await tx.billingEvent.updateMany({
       where: { id: eventId, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
-      data: {
-        status: 'succeeded',
-        failureReason: null,
-        ...(o.providerRef ? { providerRef: o.providerRef } : {}),
-        ...(raw !== undefined ? { raw } : {}),
-      },
+      data: settled,
     });
     if (upd.count === 0) return { transitioned: false };
     await applySuccess(tx, row, o, now, effects);
@@ -497,7 +579,21 @@ export async function settleInTx(
     },
   });
   if (upd.count === 0) return { transitioned: false };
-  await applyFailure(tx, row, effects);
+  try {
+    await applyFailure(tx, row, effects);
+  } catch (err) {
+    if (await onD1()) {
+      await tx.billingEvent
+        .updateMany({
+          where: { id: eventId, storeId: row.storeId, status: 'failed' },
+          data: { status: 'pending' },
+        })
+        .catch(undo =>
+          logger.error({ err: undo, eventId }, '[billing] could not reopen a half-settled failure')
+        );
+    }
+    throw err;
+  }
   return { transitioned: true };
 }
 
@@ -1035,11 +1131,11 @@ export async function findDueSubscriptionIds(
 ): Promise<string[]> {
   // Per store, each in its own scope (store_subscriptions is strict-RLS): no
   // bypass, and a store whose scope fails does not hide the rest.
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           ...(only?.subscriptionIds ? { id: { in: only.subscriptionIds } } : {}),
           planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
           OR: [
@@ -1088,11 +1184,11 @@ export async function sweepStuckCharges(
   provider?: BillingProvider
 ): Promise<{ polled: number; settled: number; notFound: number; stillStuck: number }> {
   const cutoff = new Date(now.getTime() - STUCK_CHARGE_AFTER_MS);
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.billingEvent.findMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           type: { in: ['renewal', 'upgrade'] },
           status: 'pending',
           createdAt: { lt: cutoff },
@@ -1177,14 +1273,16 @@ export async function sweepStuckCharges(
 
 export async function expireStaleCheckouts(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_CHECKOUT_MS);
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.billingEvent.updateMany({
         where: {
-          storeId,
+          ...(storeId ? { storeId } : {}),
           type: { in: ['checkout', 'card_setup'] },
           status: 'pending',
           createdAt: { lt: cutoff },
+          // a row holding the D1 settle lease is being paid, not abandoned
+          OR: [{ failureReason: null }, { failureReason: { not: SETTLE_LEASE } }],
         },
         data: { status: 'failed', failureReason: 'abandoned' },
       }),
@@ -1426,20 +1524,7 @@ export async function applyWebhookEvent(
     webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
   }
   const scopedStoreId = webhookStoreId;
-  const apply = async (tx: Tx): Promise<WebhookResult> => {
-    const ins = await tx.billingWebhookEvent.createMany({
-      data: [
-        {
-          provider: providerName,
-          eventId: event.eventId,
-          eventType: event.kind,
-          outcome: 'processed',
-        },
-      ],
-      skipDuplicates: true,
-    });
-    if (ins.count === 0) return { duplicate: true, outcome: 'ignored', detail: 'replay' };
-
+  const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
         where: { provider: providerName, eventId: event.eventId },
@@ -1521,6 +1606,70 @@ export async function applyWebhookEvent(
       effects
     );
     return { duplicate: false, outcome: 'processed' };
+  };
+  // The dedupe row is a CLAIM, not a receipt: it is inserted as `processing` and finalised after the settlement. On
+  // Postgres a failure rolls the claim back with everything else; D1 commits the claim at once, so a failure deletes it
+  // and a crash leaves a `processing` row that the provider's retry may take over once it is stale. Without this a
+  // throw after the claim turned the provider's retry into a "replay" and the paid checkout never got its plan.
+  const apply = async (tx: Tx): Promise<WebhookResult> => {
+    const ins = await tx.billingWebhookEvent.createMany({
+      data: [
+        {
+          provider: providerName,
+          eventId: event.eventId,
+          eventType: event.kind,
+          outcome: WEBHOOK_PROCESSING,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    if (ins.count === 0) {
+      const takeover = await tx.billingWebhookEvent.updateMany({
+        where: {
+          provider: providerName,
+          eventId: event.eventId,
+          outcome: WEBHOOK_PROCESSING,
+          receivedAt: { lt: new Date(now.getTime() - WEBHOOK_CLAIM_STALE_MS) },
+        },
+        data: { receivedAt: now },
+      });
+      if (takeover.count === 0) {
+        const held = await tx.billingWebhookEvent.findFirst({
+          where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_PROCESSING },
+          select: { id: true },
+        });
+        if (held)
+          throw new AppError(
+            503,
+            'WEBHOOK_IN_FLIGHT',
+            'This webhook is being processed; retry shortly',
+            { retryable: true }
+          );
+        return { duplicate: true, outcome: 'ignored', detail: 'replay' };
+      }
+    }
+    try {
+      const out = await applyInner(tx);
+      await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_PROCESSING },
+        data: { outcome: 'processed' },
+      });
+      return out;
+    } catch (err) {
+      if (await onD1()) {
+        await tx.billingWebhookEvent
+          .deleteMany({
+            where: { provider: providerName, eventId: event.eventId, outcome: WEBHOOK_PROCESSING },
+          })
+          .catch(undo =>
+            logger.error(
+              { err: undo, eventId: event.eventId },
+              '[billing] could not release a webhook claim'
+            )
+          );
+      }
+      throw err;
+    }
   };
   const result = webhookStoreId
     ? await withStore(webhookStoreId, apply)
@@ -2012,10 +2161,13 @@ export async function listSubscriptionsForAdmin(
     select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
   });
   const vat = await resolvePlatformVat();
-  const parts = await acrossStores(
+  const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
-        where: args.status ? { storeId, status: args.status as never } : { storeId },
+        where: {
+          ...(storeId ? { storeId } : {}),
+          ...(args.status ? { status: args.status as never } : {}),
+        },
         include: {
           store: {
             select: {
