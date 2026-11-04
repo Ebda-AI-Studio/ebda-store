@@ -4,31 +4,16 @@ Input for the final PRs N-15 (workers-test sweep with PG dead), N-16 (delete dea
 
 ## N-15 runtime route sweep (Postgres dead, all markers set)
 
-Last run on `fix/nz-integ-gaps` (on top of `integ/neon-zero` d856da043): **907 requests, 238 2xx, 656 expected 4xx, 11 failing (5xx)**. History: 269 -> 26 -> 11. The sweep now treats a 503 that says an optional third party is not configured (`PUSH_NOT_CONFIGURED` OneSignal, `STORAGE_NOT_CONFIGURED`, `alerts_not_configured`) as the correct answer of a Worker without it; those three are not counted. The identity stub (`ACCOUNTS`) now answers `getAccountsBrief`, `isRevoked`, `setStatus`, `setRole`, `deleteStoreClients`, `eraseUser`, `exportUser`, so the `/admin/users`, `/admin/stores`, `/admin/dashboard` routes are real exercises; the test Worker has the `STORE_BACKUPS` R2 bucket and the `WA_EVENTS_QUEUE` producer.
-
-Reproduce: `cd apps/api && npm run cf:dry-run && EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`. `SWEEP_STRICT=1` prints `SWEEP_FAILING` and fails; `SWEEP_FILTER=<regex over "METHOD /path">` measures a subset.
+Last run (`SWEEP_STRICT=1`) on `integ/neon-zero` d2565d820, after #435, #436 and the customer-auth routes: **909 requests, 242 2xx, 663 expected 4xx, 2 failing (5xx)**. History: 269 -> 26 -> 11 -> 2. The three optional-provider 503s (`PUSH_NOT_CONFIGURED` OneSignal broadcasts, `STORAGE_NOT_CONFIGURED` upload list, `alerts_not_configured`) are the correct answer of a Worker without those services and are not counted.
 
 ### SWEEP_FAILING
 
-| Route                                                     | Status | Owner   | Cause                                               |
-| --------------------------------------------------------- | ------ | ------- | --------------------------------------------------- |
-| `GET /auth/passkeys/`                                     | 500    | unowned | passkey list: identity (N-8)                        |
-| `GET /onboarding/state`                                   | 500    | unowned | onboarding (N-18 follow-up)                         |
-| `POST /onboarding/store`                                  | 500    | unowned | onboarding store create                             |
-| `POST /onboarding/stores/:storeId/go-live`                | 500    | unowned | onboarding go-live                                  |
-| `GET /payment-settings/store/:storeId`                    | 500    | unowned | payment-settings (N-11 payments config)             |
-| `PUT /payment-settings/store/:storeId/:provider`          | 500    | unowned | same                                                |
-| `DELETE /payment-settings/store/:storeId/:provider`       | 500    | unowned | same                                                |
-| `POST /payment-settings/store/:storeId/:provider/toggle`  | 500    | unowned | same                                                |
-| `GET /admin/notifications/onesignal/devices`              | 500    | unowned | OneSignal device registry (`onesignalSubscription`) |
-| `DELETE /admin/notifications/onesignal/devices/:playerId` | 500    | unowned | same                                                |
-| `POST /auth/login` (storefront customer, flow step)       | 500    | #414    | customer login of the DO customer reaches Postgres  |
+| Route                                                     | Status | Owner   | Cause                                                                                                                                                                                                         |
+| --------------------------------------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/notifications/onesignal/devices`              | 500    | unowned | `OneSignalService.listSubscriptions`: the merchant/admin push-device registry (`onesignal_subscriptions`, keyed by an identity user) is still a Postgres table; it needs a D1 table (or the identity service) |
+| `DELETE /admin/notifications/onesignal/devices/:playerId` | 500    | unowned | same table                                                                                                                                                                                                    |
 
-Cron (one tick of each expression against a DO store): `refresh-token-cleanup` (#414: still sweeps Postgres RefreshToken) fails on Postgres. `backup-sweep` now RUNS (the `STORE_BACKUPS` bucket was the missing binding) and reports `missingYesterday` for every store, because every store in the sweep was created minutes ago and has no manifest from yesterday; that is the job working as designed on a day-zero store, not a Postgres dependency (a store younger than 24 h could be exempt: unowned, tiny). The other seven jobs are done.
-
-Storefront flow (own store, so the empty-body write sweep cannot cancel its subscription): home 200, category 201, product with `inventory` 201, PDP/list/search 200, register 200, cart add 200, **quote 200, order create 201 (COD, pending/unpaid: up to the payment step)**.
-
-Fixed in this pass (integration gaps): `POST /public/orders/quote` and `/public/orders` answering 402 `SUBSCRIPTION_REQUIRED` was a FIXTURE gap, not a bug: the write sweep hit `POST /stores/:storeId/billing/...` with `{}` on the same store and cancelled its subscription; a fresh DO store (subscription `active` in D1, billing marker on) checks out with Postgres dead (verified step by step). `GET /stores/` now lists from the D1 directory + each store's backend + the identity service. `/addresses` with a non-customer token is 400 `ADDRESS_BOOK_CUSTOMER_ONLY` (Ruling NZ-INTEG-ADDR-1). `order-capi-conversion` no longer throws an uncaught `TypeError` (`findUnique(...).catch` on a DO read client) after every order create.
+Reproduce: `cd apps/api && npm run cf:dry-run && SWEEP_STRICT=1 EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`.
 
 ## Method and limits (read first)
 
