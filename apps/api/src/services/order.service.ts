@@ -4163,7 +4163,9 @@ export class OrderService {
       assertGoldPaymentAllowed({
         hasGold: true,
         storeSettings: adminStore?.settings,
-        provider: data.paymentProvider ?? data.paymentMethod,
+        // BOTH fields: `{ paymentMethod: 'cod', paymentProvider: 'paymob' }` must not bypass the prepaid rule.
+        provider: data.paymentProvider,
+        method: data.paymentMethod,
       });
     }
     const adminResolver = await PriceResolver.forBuyer(

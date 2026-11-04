@@ -454,7 +454,8 @@ router.post(
           hasGold: true,
           storeSettings: storeRow?.settings,
           provider: data.provider,
-          method: data.method,
+          // Fawry's adapter defaults to settings.methods[0] (`payatfawry`, a reference paid at an outlet later) when no method is sent.
+          method: data.method ?? (data.provider === 'fawry' ? 'payatfawry' : undefined),
         });
       }
 

@@ -528,12 +528,20 @@ export default function CheckoutClient() {
         : paymentProviders,
     [cartHasGold, goldPrepaidOnly, paymentProviders]
   );
+  // A gold cart on a store whose only online-capable options were hidden: nothing valid is left to pay with.
+  const goldNeedsOnlinePayment =
+    cartHasGold &&
+    goldPrepaidOnly &&
+    paymentProviders.length > 0 &&
+    shownPaymentProviders.length === 0;
   useEffect(() => {
     if (
       shownPaymentProviders.length > 0 &&
       !shownPaymentProviders.some(o => o.id === selectedProvider)
     )
       setSelectedProvider(shownPaymentProviders[0].id);
+    // Nothing left to choose: drop the stale default ('cod'), or Place order stays live and the COD fee still shows.
+    else if (shownPaymentProviders.length === 0 && selectedProvider !== '') setSelectedProvider('');
   }, [shownPaymentProviders, selectedProvider]);
   // COD fee settings from /payments/config — the checkout quotes the fee with
   // the SAME function the order freezes it with (codFeeForOrder, MONEYB-3).
@@ -2076,6 +2084,13 @@ export default function CheckoutClient() {
             'مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب لسه مستني تحديث النهارده. جرّب تاني بعد شوية أو كلّم المحل.'
           );
           break;
+        case 'GOLD_PREPAID_ONLY':
+          // SHARIA-GOLD-1: the server refused COD / installments for a gold order. Nothing was charged.
+          friendly = t(
+            'Orders with gold are paid in full online. Cash on delivery and installments are not available for gold.',
+            'طلبات الدهب بتتدفع كاملة أونلاين. الدفع عند الاستلام والتقسيط مش متاحين للدهب.'
+          );
+          break;
         case 'GOLD_PRICE_DRIFT':
           friendly = t(
             'One of the pieces cannot be ordered right now. Please try again in a moment.',
@@ -2802,6 +2817,7 @@ export default function CheckoutClient() {
                     shippingNames={reviewPlaceNames}
                     onEditShipping={() => setStep(1)}
                     paymentProviders={shownPaymentProviders}
+                    goldNeedsOnlinePayment={goldNeedsOnlinePayment}
                     paymentConfigError={paymentConfigError}
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}

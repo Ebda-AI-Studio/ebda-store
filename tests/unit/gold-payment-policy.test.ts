@@ -104,9 +104,40 @@ describe('the switch is written only by its own audited route', () => {
 describe('storefront checkout hides deferred options on a gold cart', () => {
   it('cod and installment option ids are deferred; card, wallet, instapay, kashier are not', async () => {
     const { isDeferredGoldOption } = await import('../../apps/web/src/lib/gold-display');
-    for (const id of ['cod', 'paymob:valu', 'paymob:kiosk'])
+    for (const id of ['cod', 'paymob:valu', 'paymob:kiosk', 'fawry:payatfawry'])
       expect(isDeferredGoldOption(id)).toBe(true);
-    for (const id of ['paymob:card', 'paymob:wallet', 'instapay', 'kashier', 'fawry:payatfawry'])
+    for (const id of ['paymob:card', 'paymob:wallet', 'instapay', 'kashier', 'fawry:card'])
       expect(isDeferredGoldOption(id)).toBe(false);
+  });
+});
+
+describe('review fixes (2026-11-04)', () => {
+  it('a manual gold order checks BOTH paymentProvider and paymentMethod (cod behind paymob is still COD)', () => {
+    const svc = read('services/order.service.ts');
+    expect(svc).toMatch(/provider: data\.paymentProvider,\s*method: data\.paymentMethod,/);
+    expect(svc).not.toMatch(/provider: data\.paymentProvider \?\? data\.paymentMethod/);
+    expect(call({ hasGold: true, storeSettings: {}, provider: 'paymob', method: 'cod' })).toThrow();
+  });
+
+  it('Pay at Fawry is refused on gold, including the adapter default when no method is sent', () => {
+    expect(
+      call({ hasGold: true, storeSettings: {}, provider: 'fawry', method: 'payatfawry' })
+    ).toThrow(/paid in full/);
+    expect(
+      call({ hasGold: true, storeSettings: {}, provider: 'fawry', method: 'card' })
+    ).not.toThrow();
+    expect(read('routes/payment.routes.ts')).toMatch(
+      /method: data\.method \?\? \(data\.provider === 'fawry' \? 'payatfawry' : undefined\)/
+    );
+  });
+
+  it('checkout resets the selected provider when a gold cart leaves nothing to choose, and maps GOLD_PREPAID_ONLY', () => {
+    const web = path.resolve(__dirname, '../../apps/web/src/app/checkout');
+    const client = readFileSync(path.join(web, 'CheckoutClient.tsx'), 'utf8');
+    expect(client).toMatch(
+      /shownPaymentProviders\.length === 0 && selectedProvider !== ''\) setSelectedProvider\(''\)/
+    );
+    expect(client).toMatch(/case 'GOLD_PREPAID_ONLY':/);
+    expect(client).toMatch(/goldNeedsOnlinePayment=\{goldNeedsOnlinePayment\}/);
   });
 });

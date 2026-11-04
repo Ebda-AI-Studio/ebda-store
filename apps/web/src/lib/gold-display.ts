@@ -3,7 +3,12 @@
  * decides what can be ordered (GOLD_RATE_STALE at checkout), this tells the shopper early and disables the
  * button. Integers in, text out; no price is ever computed here.
  */
-import { isBnplMethod, mgToGramsString, type PublicGoldPricing } from '@ebda/shared';
+import {
+  isBnplMethod,
+  mgToGramsString,
+  PAY_LATER_REFERENCE_CODES,
+  type PublicGoldPricing,
+} from '@ebda/shared';
 
 /** Same rule as the server's `isRateStale`: age in whole minutes >= the store's limit. */
 export function goldRateIsStale(
@@ -88,11 +93,15 @@ export function goldSnapshotLine(
 }
 
 /**
- * Checkout option ids that defer payment (`cod`, `paymob:valu`, `paymob:kiosk`; Kashier's hosted page is
+ * Checkout option ids that defer payment (`cod`, `paymob:valu`, `paymob:kiosk`, `fawry:payatfawry`; Kashier's hosted page is
  * kept because the API drops its installment token for gold). Hidden for a gold cart unless the merchant
  * allowed them (Ruling SHARIA-GOLD-1). Display only: the server refuses these on a gold order regardless.
  */
 export function isDeferredGoldOption(optionId: string): boolean {
   const [provider, method] = optionId.toLowerCase().split(':');
-  return provider === 'cod' || isBnplMethod(method);
+  return (
+    provider === 'cod' ||
+    isBnplMethod(method) ||
+    (PAY_LATER_REFERENCE_CODES as readonly string[]).includes(method ?? '')
+  );
 }

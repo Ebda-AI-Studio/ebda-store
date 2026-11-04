@@ -11,6 +11,9 @@
 export const BNPL_METHOD_CODES = ['valu', 'kiosk', 'bnpl'] as const;
 export type BnplMethodCode = (typeof BNPL_METHOD_CODES)[number];
 
+/** Pay-later-at-an-outlet codes outside BNPL: the Fawry reference (`payatfawry`) is cash at a Fawry outlet after the sale. */
+export const PAY_LATER_REFERENCE_CODES = ['payatfawry'] as const;
+
 export function isBnplMethod(method: string | null | undefined): boolean {
   return (BNPL_METHOD_CODES as readonly string[]).includes(String(method ?? '').toLowerCase());
 }
@@ -42,8 +45,9 @@ export type GoldPaymentVerdict = { ok: true } | { ok: false; code: typeof GOLD_P
 /**
  * Whether `provider` (+ optional gateway `method`) may be used for an order. `provider` is the order's
  * payment method or the payment provider (`cod`, `instapay`, `paymob`, ...). Online card / wallet /
- * InstaPay / Fawry pay now and stay allowed; COD and any BNPL method defer payment and are refused on
- * gold unless the store allows it. An order without gold is never restricted by this rule.
+ * InstaPay / Fawry CARD pay now and stay allowed; COD, any BNPL method and a pay-later reference (Paymob
+ * kiosk, Pay at Fawry: cash at an outlet after the sale) defer payment and are refused on gold unless the
+ * store allows it. BOTH `provider` and `method` are checked, so `{cod, paymob}` cannot slip past on the provider. An order without gold is never restricted by this rule.
  */
 export function checkGoldPayment(input: {
   hasGold: boolean;
@@ -52,13 +56,17 @@ export function checkGoldPayment(input: {
   method?: string | null;
 }): GoldPaymentVerdict {
   if (!input.hasGold || input.allowDeferred) return { ok: true };
-  const provider = String(input.provider ?? '').toLowerCase();
-  const deferred =
-    provider === 'cod' ||
-    provider === 'cash' ||
-    provider === 'cash_on_delivery' ||
-    isBnplMethod(provider) ||
-    isBnplMethod(input.method);
+  const deferredCode = (raw: string | null | undefined): boolean => {
+    const code = String(raw ?? '').toLowerCase();
+    return (
+      code === 'cod' ||
+      code === 'cash' ||
+      code === 'cash_on_delivery' ||
+      isBnplMethod(code) ||
+      (PAY_LATER_REFERENCE_CODES as readonly string[]).includes(code)
+    );
+  };
+  const deferred = deferredCode(input.provider) || deferredCode(input.method);
   return deferred ? { ok: false, code: GOLD_PREPAID_ERROR_CODE } : { ok: true };
 }
 

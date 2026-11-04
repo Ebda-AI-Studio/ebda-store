@@ -46,11 +46,37 @@ describe('gold payment policy (SHARIA-GOLD-1)', () => {
       ['paymob', 'wallet'],
       ['kashier', undefined],
       ['instapay', undefined],
-      ['fawry', 'payatfawry'],
+      ['fawry', 'card'],
+      ['fawry', undefined], // method unknown at order creation; /payments/create checks it
     ] as const)
       expect(checkGoldPayment({ hasGold: true, allowDeferred: false, provider, method })).toEqual({
         ok: true,
       });
+  });
+
+  it('gold + a pay-later reference (Pay at Fawry) is refused: gold is paid at the contract, never at an outlet later', () => {
+    for (const [provider, method] of [
+      ['fawry', 'payatfawry'],
+      ['fawry', 'PAYATFAWRY'],
+      ['payatfawry', undefined],
+    ] as const) {
+      expect(checkGoldPayment({ hasGold: true, allowDeferred: false, provider, method })).toEqual({
+        ok: false,
+        code: 'GOLD_PREPAID_ONLY',
+      });
+      expect(checkGoldPayment({ hasGold: true, allowDeferred: true, provider, method })).toEqual({
+        ok: true,
+      });
+    }
+  });
+
+  it('checks BOTH fields: a COD method behind an online provider is still COD', () => {
+    expect(
+      checkGoldPayment({ hasGold: true, allowDeferred: false, provider: 'paymob', method: 'cod' })
+    ).toEqual({ ok: false, code: 'GOLD_PREPAID_ONLY' });
+    expect(
+      checkGoldPayment({ hasGold: true, allowDeferred: false, provider: 'cod', method: 'card' })
+    ).toEqual({ ok: false, code: 'GOLD_PREPAID_ONLY' });
   });
 
   it('only a literal true turns the setting on (default OFF)', () => {
