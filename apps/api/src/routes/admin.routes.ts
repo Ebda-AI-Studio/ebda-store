@@ -1398,7 +1398,7 @@ router.put(
               messageEn:
                 'An account e-mail is changed by its owner through the verified flow that confirms the new address and notifies the old one.',
               messageAr:
-                'يغيّر صاحب الحساب بريده بنفسه من خلال خطوات التحقق التي تؤكد البريد الجديد وتُنبّه البريد القديم.',
+                'صاحب الحساب هو اللي بيغيّر بريده بنفسه من خطوات التحقق، وبتأكد البريد الجديد وتبلّغ البريد القديم.',
             },
           });
           return;
