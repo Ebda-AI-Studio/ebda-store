@@ -12,6 +12,8 @@
 import { recordReferral } from './billing/grants.service';
 import { storeDb, storeRepo, storeUpdate, storeWritesToDo } from '../lib/repo-factory';
 import { requirePlatformDb } from '../lib/platform-db';
+import { getAccountState } from '../lib/identity-client';
+import { onAccessD1, ownedStoreIdsD1 } from './platform/access-d1';
 import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
@@ -63,6 +65,41 @@ export type SlugAvailability =
       message: string;
     };
 
+/**
+ * The signed-in merchant's account facts. After the `access` cutover the account lives in the identity service (Postgres `users`
+ * is a stale copy), so it is read there; before it, the RLS-scoped Postgres read, byte for byte as before.
+ * `storeId` is null for a merchant account (a shopper account is tied to one store).
+ */
+async function merchantAccount(userId: string) {
+  if (await onAccessD1()) {
+    const a = await getAccountState(userId);
+    if (!a || a.status !== 'active') return null;
+    return {
+      id: a.id,
+      email: a.email,
+      firstName: a.firstName,
+      lastName: a.lastName,
+      emailVerified: a.emailVerified,
+      phone: a.phone,
+      storeId: a.role === 'customer' ? ('customer' as string | null) : (null as string | null),
+    };
+  }
+  return withUser(userId, tx =>
+    tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        emailVerified: true,
+        phone: true,
+        storeId: true,
+      },
+    })
+  );
+}
+
 export class OnboardingService {
   /**
    * `allowProtected` is the super_admin support-claim override: it lifts ONLY
@@ -93,31 +130,35 @@ export class OnboardingService {
   }
 
   static async state(userId: string) {
-    // As that user: `users` is RLS-scoped to app.current_user_id.
-    const user = await withUser(userId, tx =>
-      tx.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, firstName: true, emailVerified: true, phone: true },
-      })
-    );
+    const user = await merchantAccount(userId);
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-    const store = await withUser(userId, tx =>
-      tx.store.findFirst({
-        where: { ownerId: userId, deletedAt: null },
-        orderBy: { createdAt: 'asc' },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          domain: true,
-          status: true,
-          template: true,
-          look: true,
-          plan: true,
-        },
-      })
-    );
+    const storeSelect = {
+      id: true,
+      name: true,
+      slug: true,
+      domain: true,
+      status: true,
+      template: true,
+      look: true,
+      plan: true,
+    } as const;
+    // After the `access` cutover the owner's store row is the D1 directory row (no Postgres `users` scope to open).
+    const store = (await onAccessD1())
+      ? await (
+          await requirePlatformDb()
+        ).store.findFirst({
+          where: { ownerId: userId, deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: storeSelect,
+        })
+      : await withUser(userId, tx =>
+          tx.store.findFirst({
+            where: { ownerId: userId, deletedAt: null },
+            orderBy: { createdAt: 'asc' },
+            select: storeSelect,
+          })
+        );
 
     let productCount = 0;
     let codEnabled = false;
@@ -192,20 +233,17 @@ export class OnboardingService {
       ref?: string;
     }
   ) {
-    const user = await withUser(owner.userId, tx =>
-      tx.user.findUnique({
-        where: { id: owner.userId },
-        select: { email: true, firstName: true, lastName: true, storeId: true },
-      })
-    );
+    const user = await merchantAccount(owner.userId);
     if (!user || user.storeId !== null) {
       throw new AppError(403, 'FORBIDDEN', 'Only merchant accounts can create a store');
     }
 
-    const owned = await countOwnerStores(owner.userId, () =>
-      withUser(owner.userId, tx =>
-        tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
-      )
+    const owned = await countOwnerStores(owner.userId, async () =>
+      (await onAccessD1())
+        ? (await ownedStoreIdsD1(owner.userId)).length
+        : withUser(owner.userId, tx =>
+            tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+          )
     );
     if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');

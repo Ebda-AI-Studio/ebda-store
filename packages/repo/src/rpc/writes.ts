@@ -115,11 +115,11 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   // per-store admin CRUD (NEON-ZERO-1 N-11 group B, Ruling NZ-N11-1): merchant-edited config/marketing rows, never a stock column
   'CustomerGroup',
   'Address',
+  'StoreTaxProfile',
   'CustomerAddress',
   'Coupon',
   'Promotion',
   'TaxRate',
-  'StoreTaxProfile',
   'StoreTaxDocument',
   'WholesaleApplication',
   'ProductModel',
@@ -162,6 +162,71 @@ export const DO_PROCS: Record<string, Proc> = {
       [json, id, storeId]
     );
     return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /**
+   * Customer -> group membership (NEON-ZERO N-11): the ONLY customers columns the admin path may write on a DO store is
+   * `group_id` (assign / wholesale approve & revoke), so it is a named op and `Customer` stays out of the generic writer.
+   * Runs inside the caller's `$transaction` batch next to its audit row. The group must belong to the same store.
+   * Returns the row in the shape the services select (`id`, `groupId`, `group`), or throws CUSTOMER_NOT_FOUND / GROUP_NOT_FOUND.
+   */
+  customerSetGroup(sql, a) {
+    const { storeId, customerId, groupId } = a as {
+      storeId: unknown;
+      customerId: unknown;
+      groupId: unknown;
+    };
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (typeof customerId !== 'string' || !customerId) throw procErr('customerId');
+    if (groupId !== null && (typeof groupId !== 'string' || !groupId)) throw procErr('groupId');
+    const group = groupIn(sql, storeId, groupId);
+    sql.run('UPDATE customers SET group_id = ?, updated_at = ? WHERE id = ? AND store_id = ?', [
+      groupId,
+      Date.now(),
+      customerId,
+      storeId,
+    ]);
+    if (sql.all('SELECT changes() AS n', [])[0]?.n !== 1)
+      throw Object.assign(new Error('customer not found'), { code: 'CUSTOMER_NOT_FOUND' });
+    return { id: customerId, groupId, group };
+  },
+  /** The wholesale-approval / identity-assign insert of a CRM row that is born inside a group. Same contract as above. */
+  customerCreateInGroup(sql, a) {
+    const r = a as Record<string, unknown>;
+    const str = (k: string, nullable: boolean) => {
+      const v = r[k];
+      if (v === null || v === undefined) {
+        if (nullable) return null;
+        throw procErr(k);
+      }
+      if (typeof v !== 'string' || v.length > 320) throw procErr(k);
+      return v;
+    };
+    const id = str('id', false) as string;
+    const storeId = str('storeId', false) as string;
+    const groupId = str('groupId', false) as string;
+    const group = groupIn(sql, storeId, groupId);
+    try {
+      sql.run(
+        'INSERT INTO customers (id, store_id, email, first_name, last_name, phone, user_id, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          storeId,
+          str('email', true),
+          str('firstName', false),
+          str('lastName', false),
+          str('phone', true),
+          str('userId', true),
+          groupId,
+          Date.now(),
+          Date.now(),
+        ]
+      );
+    } catch (e) {
+      if (/UNIQUE constraint failed/i.test(String((e as Error)?.message)))
+        throw Object.assign(new Error('customer already exists'), { code: 'P2002' });
+      throw e;
+    }
+    return { id, groupId, group };
   },
   /** Retention: delete rows older than `before` (epoch ms, at least 30 days ago) up to and including `upToId`. */
   auditPurge(sql, a) {
@@ -279,6 +344,20 @@ export const DO_PROCS: Record<string, Proc> = {
 };
 function procErr(what: string): Error {
   return Object.assign(new Error(`bad procedure argument: ${what}`), { code: 'BAD_PROC_ARGS' });
+}
+
+function groupIn(
+  sql: SqlRunner,
+  storeId: string,
+  groupId: unknown
+): { id: string; name: string; nameAr: string | null } | null {
+  if (groupId === null) return null;
+  const g = sql.all('SELECT id, name, name_ar FROM customer_groups WHERE id = ? AND store_id = ?', [
+    groupId,
+    storeId,
+  ])[0] as { id: string; name: string; name_ar: string | null } | undefined;
+  if (!g) throw Object.assign(new Error('group not found'), { code: 'GROUP_NOT_FOUND' });
+  return { id: g.id, name: g.name, nameAr: g.name_ar };
 }
 
 export interface DoMutation {

@@ -193,6 +193,7 @@ export default defineConfig(async () => {
                 EMAIL_QUEUE: { queueName: 'ebda-email' },
                 SMS_QUEUE: { queueName: 'ebda-sms' },
                 JOBS_QUEUE: { queueName: 'ebda-jobs' },
+                // Store -> Ebda Chat events (lib/wa/events.ts throws without it, by design)
                 WA_EVENTS_QUEUE: { queueName: 'ebda-wa-events' },
               },
               // The consumers of wrangler.jsonc, with the retry delay shortened so a test can watch a
