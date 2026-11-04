@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ bound: true, verified: true as boolean | null }));
+const h = vi.hoisted(() => ({
+  bound: true,
+  verified: true as boolean | null,
+  status: 'active' as 'active' | 'inactive' | 'suspended',
+}));
 vi.mock('@ebda/database', () => ({
   withUser: () => {
     throw new Error('Postgres touched: withUser');
@@ -8,7 +12,8 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('@api/cf/bindings', () => ({ cfBindings: () => (h.bound ? { ACCOUNTS: {} } : undefined) }));
 vi.mock('@api/lib/identity-client', () => ({
-  getAccountState: async () => (h.verified === null ? null : { emailVerified: h.verified }),
+  getAccountState: async () =>
+    h.verified === null ? null : { emailVerified: h.verified, status: h.status },
 }));
 
 import { requireVerifiedEmail } from '@api/middleware/require-verified-email';
@@ -35,6 +40,14 @@ describe('requireVerifiedEmail with the identity service bound', () => {
     expect((await run()).err?.code).toBe('EMAIL_NOT_VERIFIED');
     h.verified = null; // no account record = deleted
     expect((await run()).err?.code).toBe('EMAIL_NOT_VERIFIED');
+  });
+  it('a verified but suspended or inactive account is refused like a deleted one', async () => {
+    h.verified = true;
+    for (const status of ['suspended', 'inactive'] as const) {
+      h.status = status;
+      expect((await run()).err?.code).toBe('EMAIL_NOT_VERIFIED');
+    }
+    h.status = 'active';
   });
   it('super admins are exempt', async () => {
     h.verified = false;
