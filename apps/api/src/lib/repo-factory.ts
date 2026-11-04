@@ -1559,12 +1559,12 @@ async function mirrorEntitlementToPg(
     ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
   );
   if (Object.keys(patch).length === 0) return;
-  await withStore(storeId, tx =>
-    (tx as unknown as StoreUpdateManyClient).store.updateMany({
+  await withStore(storeId, async tx => {
+    await (tx as unknown as StoreUpdateManyClient).store.updateMany({
       where: { id: storeId },
       data: patch,
-    })
-  );
+    });
+  });
 }
 
 /** The row an update WILL produce (current record with the patch laid over it), read without writing. */
