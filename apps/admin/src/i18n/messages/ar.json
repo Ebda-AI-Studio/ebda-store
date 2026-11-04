@@ -502,6 +502,9 @@
         "title": "لسه مفيش منتجات",
         "description": "ضيف أول منتج وابدأ البيع.",
         "descriptionFiltered": "مفيش نتايج. جرّب تغيّر البحث أو الفلاتر.",
+        "titleActiveOnly": "مفيش منتجات مفعّلة",
+        "descriptionActiveOnly": "ممكن منتجاتك لسه مسودات. بص على المسودات، أو ضيف منتج.",
+        "showDrafts": "اعرض المسودات",
         "addProduct": "إضافة منتج",
         "titleFiltered": "مفيش منتجات مطابقة"
       },
@@ -7367,6 +7370,9 @@
     }
   },
   "featureUpgrade": {
+    "loadFailedTitle": "معرفناش نتأكد من باقتك",
+    "loadFailedBody": "النت قطع قبل ما نحمّل المميزات اللي في باقتك. جرّب تاني بعد شوية.",
+    "retryCta": "جرّب تاني",
     "lockedBadge": "مقفل",
     "availableOn": "متاح في خطة {plan} وما فوقها.",
     "upgradeCta": "الترقية إلى {plan}",

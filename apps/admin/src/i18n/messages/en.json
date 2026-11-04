@@ -502,6 +502,9 @@
         "title": "No products yet",
         "description": "Add your first product to start selling.",
         "descriptionFiltered": "No results. Try changing the search or filters.",
+        "titleActiveOnly": "No active products",
+        "descriptionActiveOnly": "Your products may still be drafts. Check the Drafts view, or add a product.",
+        "showDrafts": "Show drafts",
         "addProduct": "Add Product",
         "titleFiltered": "No matching products"
       },
@@ -7367,6 +7370,9 @@
     }
   },
   "featureUpgrade": {
+    "loadFailedTitle": "We couldn't check your plan",
+    "loadFailedBody": "The connection dropped before we could load what your plan includes. Try again in a moment.",
+    "retryCta": "Try again",
     "lockedBadge": "Locked",
     "availableOn": "Available on the {plan} plan and above.",
     "upgradeCta": "Upgrade to {plan}",

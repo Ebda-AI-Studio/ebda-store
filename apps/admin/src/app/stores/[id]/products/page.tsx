@@ -274,6 +274,9 @@ export default function StoreProductsPage() {
         products={products}
         loading={loading}
         hasActiveFilters={hasActiveFilters}
+        onShowDrafts={
+          statusFilter === 'active' ? () => handleStatusFilterChange('draft') : undefined
+        }
         onRequestDelete={product => {
           setProductToDelete(product);
           setIsDeleteModalOpen(true);

@@ -30,6 +30,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Toggle } from '../../../../../components/Toggle';
+import { ColorField } from '../../../../../components/ColorField';
 import { SmartPaletteModal } from '../../../../../components/SmartPaletteModal';
 import type { FontEntry } from '../../../../../components/section-design/FontsCard';
 import { FontsField } from './FontsField';
@@ -152,26 +153,28 @@ export function ThemeSettingsPanel({
     for (const key of overridden) await resetOne(key);
   };
 
-  /** A colour as a swatch: the colour itself is the control; the token dropdown is not offered here. */
+  /**
+   * A colour: the shared ColorField (repo rule: ColorField everywhere), bridged because the theme stores Tailwind HSL
+   * triplets ("H S% L%") while the field speaks hex. A brand token (`token:...`) passes through untouched.
+   */
   const renderSwatch = (s: Setting) => {
     const v = current[s.id];
-    const hex = typeof v === 'string' && v.trim() ? hslToHex(v) : undefined;
+    const stored = typeof v === 'string' ? v.trim() : '';
+    const shown =
+      !stored || stored.startsWith('token:') || stored.startsWith('#') ? stored : hslToHex(stored);
     return (
-      <div key={s.id} className="flex min-h-11 items-center gap-3 text-sm">
-        <input
-          type="color"
-          value={hex ?? '#000000'}
-          aria-label={labelOf(s)}
-          onChange={e => set(s.id, hexToHsl(e.target.value))}
-          className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
-        />
-        <span aria-hidden="true" className="flex-1 font-medium">
-          {labelOf(s)}
-        </span>
-        <span dir="ltr" className="text-xs tabular-nums text-muted-foreground">
-          {hex ?? t('inherit')}
-        </span>
-      </div>
+      <ColorField
+        key={s.id}
+        label={labelOf(s)}
+        value={shown}
+        theme={theme}
+        showContrastPreview={false}
+        onChange={next => {
+          // Clear = back to the look's default (a draft reset), never an empty string in the theme.
+          if (!next) void resetOne(String(s.id));
+          else set(s.id, next.startsWith('#') ? hexToHsl(next) : next);
+        }}
+      />
     );
   };
 

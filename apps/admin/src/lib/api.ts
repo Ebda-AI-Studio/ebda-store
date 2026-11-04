@@ -24,6 +24,7 @@ import { hasSessionHintCookie, sessionHintCookieClears } from '@ebda/shared';
 import {
   PLAN_GATE_FALLBACK,
   RAW_PLAN_GATE_MESSAGES,
+  PERMISSION_DENIED_FALLBACK,
   RAW_STATUS_MESSAGE,
   isPlanGateError,
 } from './route-feature-gates';
@@ -724,6 +725,9 @@ export async function apiRequest<T = unknown>(
         (RAW_STATUS_MESSAGE.test(message) || RAW_PLAN_GATE_MESSAGES.includes(message))
       ) {
         message = PLAN_GATE_FALLBACK[adminUiLocale()];
+      } else if (response.status === 403 && RAW_STATUS_MESSAGE.test(message)) {
+        // A bare 403 is a permission denial (Ruling ADMIN-GATE-1), not a plan refusal: say so, never "upgrade".
+        message = PERMISSION_DENIED_FALLBACK[adminUiLocale()];
       }
       if (options.quietUpsell) {
         // optional widget: no dialog

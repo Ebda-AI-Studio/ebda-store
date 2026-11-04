@@ -51,8 +51,10 @@ describe('isPlanGateError', () => {
   it('402 is a plan gate', () => expect(isPlanGateError({ status: 402 })).toBe(true));
   it('403 FEATURE_DISABLED is a plan gate', () =>
     expect(isPlanGateError({ status: 403, code: 'FEATURE_DISABLED' })).toBe(true));
-  it('a bare 403 (no code) is treated as a plan gate, never shown raw', () =>
-    expect(isPlanGateError({ status: 403, code: 'SERVER_ERROR' })).toBe(true));
+  it('a bare 403 or SERVER_ERROR is a permission denial, NOT an upsell', () => {
+    expect(isPlanGateError({ status: 403 })).toBe(false);
+    expect(isPlanGateError({ status: 403, code: 'SERVER_ERROR' })).toBe(false);
+  });
   it('a 403 with a real permission code is NOT a plan gate', () =>
     expect(isPlanGateError({ status: 403, code: 'FORBIDDEN' })).toBe(false));
   it('MFA setup is not a plan gate', () =>

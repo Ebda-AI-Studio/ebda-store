@@ -36,7 +36,6 @@ describe('plan-gate errors never carry raw API text', () => {
       'legacy string envelope',
       { success: false, error: 'Feature not available', code: 'FEATURE_DISABLED' },
     ],
-    ['bodiless 403', { success: false }],
   ])('403 %s -> Egyptian Arabic sentence in an RTL admin', async (_n, body) => {
     document.documentElement.dir = 'rtl';
     respond(403, body);
@@ -45,6 +44,16 @@ describe('plan-gate errors never carry raw API text', () => {
     expect(error?.message).not.toMatch(RAW);
     expect(error?.message).toMatch(/باقتك/);
     expect(error?.status).toBe(403);
+  });
+
+  it('a bodiless 403 is a permission denial: its own sentence, never the plan upsell, never raw', async () => {
+    document.documentElement.dir = 'rtl';
+    respond(403, { success: false });
+    const { apiGet } = await loadApi();
+    const { error } = await apiGet('/api/v1/stores/s1/finance/dashboard');
+    expect(error?.message).not.toMatch(RAW);
+    expect(error?.message).not.toMatch(/باقتك/);
+    expect(error?.message).toMatch(/مش مسموحلك/);
   });
 
   it('403 FEATURE_DISABLED in an LTR admin -> English plan sentence', async () => {

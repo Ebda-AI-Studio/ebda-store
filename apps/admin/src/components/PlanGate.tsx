@@ -1,7 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { Button } from '@ebda/ui';
 import { useFeatures } from '../hooks/useFeatures';
 import { useAuth } from '../lib/auth';
 import { isPlanGateError, PLAN_GATE_FALLBACK } from '../lib/route-feature-gates';
@@ -22,13 +23,28 @@ interface PlanGateProps {
  * designed locked card used on /ai-tools, and never renders `error.message`. Super admins pass through.
  */
 export function PlanGate({ storeId, featureKey, error, children }: PlanGateProps) {
-  const { isEnabled, isLoading } = useFeatures();
+  const { isEnabled, isLoading, loadFailed, refresh } = useFeatures();
+  const t = useTranslations('featureUpgrade');
   const { user } = useAuth();
   const locale = useLocale();
   const isSuperAdmin = user?.role === 'super_admin';
 
   if (isSuperAdmin) return <>{children}</>;
 
+  // The entitlements could not be read: say so with a retry. Never the locked card for a store that may have paid.
+  if (featureKey && !isLoading && loadFailed) {
+    return (
+      <AdminLayout title="">
+        <div className="mx-auto max-w-lg px-4 py-16 text-center" role="alert">
+          <h2 className="text-lg font-semibold text-foreground">{t('loadFailedTitle')}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{t('loadFailedBody')}</p>
+          <Button className="mt-4" onClick={() => void refresh()}>
+            {t('retryCta')}
+          </Button>
+        </div>
+      </AdminLayout>
+    );
+  }
   if (featureKey && !isLoading && !isEnabled(featureKey)) {
     return <FeatureUpgradeGate featureKey={featureKey} storeId={storeId} />;
   }

@@ -52,20 +52,27 @@ interface GateErrorShape {
 }
 
 /**
- * True for a response that means "your plan does not include this": 402, 403 FEATURE_DISABLED, or a bare 403 with no
- * meaningful code. A 403 with a real permission/MFA code is something else and keeps its own handling.
+ * True for a response that means "your plan does not include this": 402, or 403 with the explicit FEATURE_DISABLED code
+ * (the API's `requireFeature` always sends it). A bare 403, `SERVER_ERROR` or a permission/MFA code is NOT a plan refusal:
+ * a permission denial must never read as an upsell.
  */
 export function isPlanGateError(error: GateErrorShape | null | undefined): boolean {
   if (!error) return false;
   if (error.status === 402) return true;
   if (error.status !== 403) return false;
-  return !error.code || error.code === 'FEATURE_DISABLED' || error.code === 'SERVER_ERROR';
+  return error.code === 'FEATURE_DISABLED';
 }
 
 /** What a merchant reads when the API refused for plan reasons and sent no localized text. Never the raw API string. */
 export const PLAN_GATE_FALLBACK = {
   ar: 'الميزة دي مش متاحة في باقتك الحالية. اترقّى عشان تفتحها.',
   en: 'This feature is not included in your current plan. Upgrade to unlock it.',
+} as const;
+
+/** A 403 that is NOT a plan refusal and carried no text: a permission denial, in words, never an upsell and never raw. */
+export const PERMISSION_DENIED_FALLBACK = {
+  ar: 'مش مسموحلك تعمل الإجراء ده.',
+  en: "You don't have permission to do this.",
 } as const;
 
 /** API strings that must never reach a merchant verbatim. */

@@ -5,7 +5,7 @@
  * still a draft patch of changed keys only (Rulings THEME-DRAFT-1 / VE-4).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { THEME_SETTINGS_SCHEMA, getLook, hexToHsl } from '@ebda/shared';
 
 vi.mock('../../../../../lib/api', () => ({
@@ -69,11 +69,10 @@ describe('first screen', () => {
     mount();
     expect(screen.getAllByTestId(/^preset-/)).toHaveLength(THEME_PRESETS.length);
     const quick = screen.getByTestId('theme-quick');
-    expect(quick.querySelectorAll('input[type="color"]')).toHaveLength(3);
+    // three colours, each the shared ColorField (repo rule: no raw native colour input in the panel)
+    expect(within(quick).getAllByRole('combobox')).toHaveLength(3);
     for (const id of ['density', 'borderRadius', 'fontFamily'])
       expect(quick.querySelector(`[data-feel="${id}"]`), id).not.toBeNull();
-    // no token dropdown among the colours
-    expect(quick.querySelectorAll('select')).toHaveLength(0);
   });
 
   it('a preset puts its three colours in the draft patch and saves only those keys', async () => {
