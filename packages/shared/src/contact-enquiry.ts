@@ -4,6 +4,7 @@
  * (the API validates with zod against these same constants). Ruling CONTACT-FORM-1.
  */
 import { BRAND } from './brand';
+import { toAsciiDigits } from './instapay-receipt';
 
 /** What the visitor needs: the two products' support, each of the seven studio services (ids from BRAND.services), other. */
 export const CONTACT_TOPIC_IDS = [
@@ -43,17 +44,6 @@ export type ContactFieldError =
   | 'invalid_phone'
   | 'invalid_topic'
   | 'consent_required';
-
-const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩';
-const EXT_ARABIC_INDIC = '۰۱۲۳۴۵۶۷۸۹';
-
-/** Arabic-Indic and Persian digits to ASCII (Egyptian keyboards produce them). */
-export function toAsciiDigits(value: string): string {
-  return value.replace(/[٠-٩۰-۹]/g, ch => {
-    const i = ARABIC_INDIC.indexOf(ch);
-    return String(i >= 0 ? i : EXT_ARABIC_INDIC.indexOf(ch));
-  });
-}
 
 /**
  * Normalise a phone number to E.164. Egyptian mobiles (01[0125]xxxxxxxx, +20 1xx..., 0020..., spaces/dashes/Arabic digits)

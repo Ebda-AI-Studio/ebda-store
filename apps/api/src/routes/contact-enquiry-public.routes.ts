@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import express, { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { BRAND_MARKETING_URL } from '@ebda/shared/brand';
 import {
   CONTACT_HONEYPOT_FIELD,
@@ -55,10 +55,10 @@ const bodySchema = z.object({
     .transform(v => (v ? oneLine(v) : undefined)),
   phone: str(L.phone)
     .transform(v => normalizePhone(v))
-    .pipe(z.string({ error: 'invalid_phone' })),
+    .pipe(z.string()),
   email: str(L.email)
     .transform(v => normalizeEmail(v))
-    .pipe(z.string({ error: 'invalid_email' })),
+    .pipe(z.string()),
   topic: z.enum(CONTACT_TOPIC_IDS),
   message: str(L.message)
     .transform(v => v.replace(CTRL_MULTI, '').trim())

@@ -749,7 +749,7 @@ export const COPY: Record<Locale, Copy> = {
         errors: {
           required: 'الحقل ده مطلوب.',
           too_long: 'النص أطول من المسموح.',
-          too_short: 'الرسالة قصيرة، اكتب ١٠ حروف على الأقل.',
+          too_short: 'الرسالة قصيرة، اكتب 10 حروف على الأقل.',
           invalid_email: 'اكتب إيميل صحيح، مثلًا name@example.com.',
           invalid_phone: 'اكتب رقم موبايل صحيح، مثلًا 01012345678.',
           invalid_topic: 'اختار حاجة من القايمة.',
