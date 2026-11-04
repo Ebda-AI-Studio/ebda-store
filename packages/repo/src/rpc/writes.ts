@@ -91,6 +91,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'CatalogImportItem',
   'CiHintLog',
   'CiStoreGate',
+  // the per-store audit trail (NEON-ZERO N-10d): appended by services/audit-sink.ts, which only ever `create`s
+  'AuditLog',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

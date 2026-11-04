@@ -3,6 +3,7 @@ import { loadS3 } from '../../lazy-modules';
 import { auditRetention } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { archivePlatformAuditD1, archiveStoreAuditDo } from '../../../services/audit-retention-cf';
 
 /**
  * Weekly archive+delete of audit_logs rows older than 90 days.
@@ -21,6 +22,36 @@ const RETENTION_DAYS = 90;
 const DELETE_BATCH = 5000;
 const EXPORT_PAGE = 5000;
 
+/** An R2 `put` for the archive prefix, or null when STORAGE_* is not configured. */
+async function archivePut(): Promise<((key: string, body: string) => Promise<void>) | null> {
+  const endpoint = process.env.STORAGE_ENDPOINT;
+  const accessKey = process.env.STORAGE_ACCESS_KEY;
+  const secretKey = process.env.STORAGE_SECRET_KEY;
+  const bucket = process.env.STORAGE_BUCKET || 'uploads';
+  if (!endpoint || !accessKey || !secretKey) {
+    logger.warn('audit-log-archive: STORAGE_* not set, skipping the Cloudflare audit archive');
+    return null;
+  }
+  const { S3Client, PutObjectCommand } = await loadS3();
+  const s3 = new S3Client({
+    endpoint,
+    region: 'auto',
+    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
+    forcePathStyle: true,
+  });
+  return async (key, body) => {
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: Buffer.from(body, 'utf-8'),
+        ContentType: 'application/x-ndjson',
+        ContentEncoding: 'utf-8',
+      })
+    );
+  };
+}
+
 export const auditLogArchive: JobDef = inngest.createFunction(
   {
     id: 'audit-log-archive-weekly',
@@ -34,6 +65,18 @@ export const auditLogArchive: JobDef = inngest.createFunction(
     // audit_logs is a cross-tenant system table. Inngest crons run without any
     // HTTP tenant context so no store GUC is set. FORCE RLS on audit_logs would
     // filter every read to 0 rows. Use withRlsBypass for all DB access here.
+    // NEON-ZERO N-10d: the rows that no longer live in Postgres (D1 platform_audit_log, every DO store's audit_logs).
+    // Runs whether or not Postgres still holds old rows, and never lets a Cloudflare failure hide behind a Postgres result.
+    const cf = await step.run('archive-cloudflare-audit', async () => {
+      const put = await archivePut();
+      if (!put) return { skipped: true, d1: 0, stores: 0, storeRows: 0 };
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const d1 = await archivePlatformAuditD1(cutoff, put, stamp);
+      const doRows = await archiveStoreAuditDo(cutoff, put, stamp);
+      return { skipped: false, d1, stores: doRows.stores, storeRows: doRows.rows };
+    });
+    logger.info(cf, 'audit-log-archive: cloudflare audit archived');
+
     const total = await step.run('count-old-rows', () => auditRetention.count(cutoff));
 
     if (total === 0) {

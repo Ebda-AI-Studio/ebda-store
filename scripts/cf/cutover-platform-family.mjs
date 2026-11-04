@@ -57,7 +57,18 @@ export const FAMILIES = {
   ],
   // The payment-webhook inbox. A provider callback is never refused: during the freeze it is recorded straight into D1.
   inbox: ['webhook_events'],
+  // N-10d. MONEY. Refuses unless the `billing` marker exists (a claim is confirmed inside the billing ledger flow). The order
+  // receipts of stores that live on their Durable Object are NOT copied (their home is the DO, Ruling INSTAPAY-DO-1): the
+  // run counts them and refuses --commit until --accept-skipped-do-receipts <that count> acknowledges the number.
+  payments: ['instapay_receipts', 'manual_payment_claims'],
+  // N-10d. Non-money platform tables.
+  ops: ['answer_engine_provider_configs', 'store_usage_snapshots', 'ci_insights'],
+  // N-10d. The audit trail: Postgres `audit_logs` rows with NO store -> D1 `platform_audit_log` (own flow below: `auditCutover`).
+  audit: [],
 };
+
+/** Families the shared table-copy flow below handles; `audit` has its own flow. */
+const REQUIRES = { payments: 'billing' };
 
 const markerKey = family => `platform_cutover.${family}`;
 const freezeKey = family => `platform_freeze.${family}`;
@@ -84,6 +95,7 @@ async function main() {
     status: { type: 'boolean', default: false },
     'delete-marker': { type: 'boolean', default: false },
     unfreeze: { type: 'boolean', default: false },
+    'accept-skipped-do-receipts': { type: 'string' },
     'drain-ms': { type: 'string', default: '45000' },
     'settle-ms': { type: 'string', default: '12000' },
     // a freeze carries its own expiry: if this script dies without lifting it the API ignores it after this long and pages
@@ -91,6 +103,7 @@ async function main() {
   });
   const tables = FAMILIES[args.family];
   if (!tables) throw new Error(`pass --family <${Object.keys(FAMILIES).join('|')}>`);
+  if (args.family === 'audit') return auditCutover(args);
   if (!args.d1) throw new Error('pass --d1 <database name>');
   const d = {
     db: args.d1,
@@ -142,6 +155,39 @@ async function main() {
       `marker ${key} already exists: D1 is the source of truth for ${args.family}; refusing to overwrite it from Postgres`
     );
 
+  if (REQUIRES[args.family] && args.commit) {
+    const need = (
+      await d1Query(
+        d,
+        `SELECT 1 AS n FROM system_settings WHERE key = ${lit(markerKey(REQUIRES[args.family]))}`
+      )
+    )[0];
+    if (!need)
+      throw new Error(
+        `${args.family} requires the ${REQUIRES[args.family]} family to be on D1 first (marker ${markerKey(REQUIRES[args.family])} is absent)`
+      );
+  }
+  // payments: the order receipts of a DO store live in its DO (Ruling INSTAPAY-DO-1) and are not copied into D1.
+  const doStores =
+    args.family === 'payments'
+      ? new Set(
+          (await d1Query(d, `SELECT id FROM stores WHERE storage_backend = 'do'`)).map(r => r.id)
+        )
+      : new Set();
+  const skipRow = (bt, r) => {
+    if (bt.name !== 'instapay_receipts' || doStores.size === 0) return false;
+    const iStore = bt.columns.findIndex(c => c.col === 'store_id');
+    const iKind = bt.columns.findIndex(c => c.col === 'kind');
+    return r[iKind] === 'order' && doStores.has(r[iStore]);
+  };
+  const digestOf = async (client, bt, plan) => {
+    if (bt.name !== 'instapay_receipts') return sourceDigest(client, bt, plan.platform, 'all');
+    const dg = new TableDigest();
+    const names = bt.columns.map(c => c.col);
+    for await (const page of sourcePages(client, bt, plan.platform, 'all', null, 2000))
+      for (const r of page) if (!skipRow(bt, r)) await dg.add(names, r, bt.pk);
+    return dg.finish();
+  };
   const t0 = performance.now();
   const plan = loadPlan();
   const open = async () => {
@@ -178,6 +224,24 @@ async function main() {
       d,
       tables.map(t => `SELECT count(*) AS n FROM ${q(t)}`)
     );
+    let skippedDoReceipts = 0;
+    if (args.family === 'payments' && doStores.size) {
+      skippedDoReceipts = Number(
+        (
+          await client.query(
+            `SELECT count(*) AS n FROM "instapay_receipts" WHERE kind = 'order' AND store_id = ANY($1::text[])`,
+            [[...doStores]]
+          )
+        ).rows[0].n
+      );
+      console.log(
+        `  order receipts of ${doStores.size} DO store(s) in Postgres, NOT copied (their home is the DO): ${skippedDoReceipts}`
+      );
+      if (args.commit && skippedDoReceipts !== Number(args['accept-skipped-do-receipts'] ?? -1))
+        throw new Error(
+          `${skippedDoReceipts} DO-store order receipt(s) would be left in Postgres. Confirm they exist in their store DO (verify-store.mjs), then re-run with --accept-skipped-do-receipts ${skippedDoReceipts}`
+        );
+    }
     console.log(`family ${args.family}  marker: ${have ? 'PRESENT' : 'absent'}`);
     fam.forEach((bt, i) =>
       console.log(
@@ -288,10 +352,11 @@ async function main() {
       bytes = 0;
     };
     for (const bt of fam) {
-      before[bt.name] = await sourceDigest(client, bt, plan.platform, 'all');
+      before[bt.name] = await digestOf(client, bt, plan);
       const names = bt.columns.map(c => c.col);
       for await (const page of sourcePages(client, bt, plan.platform, 'all', null, args.pageSize))
         for (const r of page) {
+          if (skipRow(bt, r)) continue;
           const st = upsert(bt.name, names, bt.pk, r);
           stmts.push(st);
           bytes += st.length;
@@ -328,7 +393,7 @@ async function main() {
     const results = await d1QueryMany(d, [
       ...fam.map(
         bt =>
-          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name, inboxStash)} ORDER BY ${bt.pk.map(q).join(', ')}`
+          `SELECT ${bt.columns.map(c => q(c.col)).join(', ')} FROM ${q(bt.name)}${verifyWhere(bt.name, inboxStash, doStores)} ORDER BY ${bt.pk.map(q).join(', ')}`
       ),
       'PRAGMA foreign_key_check',
     ]);
@@ -388,7 +453,7 @@ async function main() {
   const after = await open();
   const drift = [];
   for (const bt of after.fam) {
-    const now = await sourceDigest(after.client, bt, plan.platform, 'all');
+    const now = await digestOf(after.client, bt, plan);
     if (now.count !== before[bt.name].count || now.digest !== before[bt.name].digest)
       drift.push(bt.name);
   }
@@ -405,8 +470,245 @@ async function main() {
   );
 }
 
+// ───────────────────────────── family `audit` (N-10d) ─────────────────────────────
+// Postgres `audit_logs` rows with NO store -> D1 `platform_audit_log`. Unlike the table families, audit NEVER refuses a write:
+// the freeze only REDIRECTS new store-less rows to D1 (services/platform/cutover.ts `auditStoreLessOnD1`), so nothing is lost
+// and nothing blocks. Flow: freeze (new rows -> D1) -> drain -> Postgres snapshot -> copy EVERY Postgres store-less row (id
+// upsert; rows born in D1 during the freeze have other ids) -> verify the rows older than T (the freeze instant: D1 holds only
+// copied rows there) -> flip the marker -> settle -> lift -> drift check on a NEW connection (a Postgres row that appeared
+// after the snapshot = a write that bypassed the sink). Rows of stores on their Durable Object that Postgres still holds are
+// REPORTED, not copied (their home is the DO; re-import with migrate-store-to-do.mjs, idempotent upsert).
+const AUDIT_COLS = [
+  'id',
+  'actor_id',
+  'action',
+  'target_type',
+  'target_id',
+  'store_id',
+  'meta',
+  'created_at',
+];
+const AUDIT_PG_SQL = `SELECT id, user_id, action, resource_type, resource_id, details, ip_address, user_agent,
+    (extract(epoch FROM created_at) * 1000)::bigint AS created_ms
+  FROM audit_logs WHERE store_id IS NULL AND id > $1 ORDER BY id LIMIT $2`;
+
+/** The D1 row (aligned with AUDIT_COLS) for one Postgres audit row. */
+export const auditRowToD1 = r => [
+  r.id,
+  r.user_id,
+  r.action,
+  r.resource_type,
+  r.resource_id,
+  null,
+  JSON.stringify({
+    details: r.details ?? {},
+    ipAddress: r.ip_address ?? null,
+    userAgent: r.user_agent ?? null,
+  }),
+  Number(r.created_ms),
+];
+
+async function* auditPages(client, size) {
+  let after = '';
+  for (;;) {
+    const rows = (await client.query(AUDIT_PG_SQL, [after, size])).rows;
+    if (rows.length === 0) return;
+    yield rows;
+    after = rows[rows.length - 1].id;
+    if (rows.length < size) return;
+  }
+}
+
+async function auditDigest(client, size, olderThanMs) {
+  const dg = new TableDigest();
+  let all = 0;
+  for await (const rows of auditPages(client, size))
+    for (const r of rows) {
+      all++;
+      if (olderThanMs === null || Number(r.created_ms) < olderThanMs)
+        await dg.add(AUDIT_COLS, auditRowToD1(r), ['id']);
+    }
+  return { ...(await dg.finish()), all };
+}
+
+async function auditCutover(args) {
+  if (!args.d1) throw new Error('pass --d1 <database name>');
+  const d = {
+    db: args.d1,
+    target: args['d1-target'],
+    config: args['d1-config'],
+    persistTo: args['persist-to'],
+  };
+  const key = markerKey('audit');
+  const fkey = freezeKey('audit');
+  const marker = async () =>
+    (
+      await d1Query(d, `SELECT id, value, created_at FROM system_settings WHERE key = ${lit(key)}`)
+    )[0];
+  const liftFreeze = () =>
+    d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(fkey)};`]);
+  if (args.unfreeze) {
+    await liftFreeze();
+    console.log(`freeze ${fkey} lifted.`);
+    return;
+  }
+  if (args['delete-marker']) {
+    await d1Statements(d, [`DELETE FROM system_settings WHERE key = ${lit(key)};`]);
+    console.log(`marker ${key} deleted (before traffic only).`);
+    return;
+  }
+  const have = await marker();
+  const n = await d1Query(d, 'SELECT count(*) AS n FROM platform_audit_log');
+  if (args.status) {
+    console.log(
+      `marker: ${have ? `PRESENT ${have.value}` : 'absent'}   platform_audit_log: ${n[0].n} row(s)`
+    );
+    return;
+  }
+  if (args.commit && have)
+    throw new Error(`marker ${key} already exists: D1 is the source of truth; refusing to re-copy`);
+  const size = args.pageSize || 1000;
+  const t0 = performance.now();
+  const doStores = (await d1Query(d, `SELECT id FROM stores WHERE storage_backend = 'do'`)).map(
+    r => r.id
+  );
+
+  const report = async client => {
+    const pg = Number(
+      (await client.query(`SELECT count(*) AS n FROM audit_logs WHERE store_id IS NULL`)).rows[0].n
+    );
+    const stranded = doStores.length
+      ? Number(
+          (
+            await client.query(
+              `SELECT count(*) AS n FROM audit_logs WHERE store_id = ANY($1::text[])`,
+              [doStores]
+            )
+          ).rows[0].n
+        )
+      : 0;
+    console.log(`audit: Postgres store-less rows ${pg}   D1 platform_audit_log ${n[0].n}`);
+    console.log(
+      `audit: rows of ${doStores.length} DO store(s) still in Postgres: ${stranded} (NOT copied; re-import with migrate-store-to-do.mjs)`
+    );
+  };
+  {
+    const client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+    await report(client);
+    await client.query('ROLLBACK');
+    await client.end();
+    if (!args.commit) {
+      console.log(`dry run: nothing written (${fmtMs(performance.now() - t0)}). Add --commit.`);
+      return;
+    }
+  }
+
+  const T = Date.now();
+  let frozenNow = false;
+  const lift = async () => {
+    if (!frozenNow) return;
+    try {
+      await liftFreeze();
+      frozenNow = false;
+    } catch (e) {
+      console.error(`!!! COULD NOT LIFT THE FREEZE ${fkey}: ${e.message}`);
+      console.error(
+        `!!! run: node scripts/cf/cutover-platform-family.mjs --family audit --unfreeze (same --d1 flags)`
+      );
+      process.exitCode = 1;
+    }
+  };
+  for (const sig of ['SIGINT', 'SIGTERM'])
+    process.once(sig, () => lift().finally(() => process.exit(130)));
+  await d1Statements(d, [
+    `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(fkey)}, ${lit(JSON.stringify({ expiresAt: Date.now() + Number(args['freeze-ttl-ms']), by: 'cutover-platform-family', t: T }))}, 'cutover', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`,
+  ]);
+  frozenNow = true;
+  console.log(
+    `REDIRECTING: new store-less audit rows now go to D1. Draining ${args['drain-ms']} ms ...`
+  );
+  let flipped = false;
+  let before;
+  try {
+    await sleep(Number(args['drain-ms']));
+    const client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+    before = await auditDigest(client, size, T);
+    let stmts = [];
+    let bytes = 0;
+    const flush = async () => {
+      if (stmts.length) await d1Statements(d, stmts);
+      stmts = [];
+      bytes = 0;
+    };
+    let copied = 0;
+    for await (const rows of auditPages(client, size))
+      for (const r of rows) {
+        const st = upsert('platform_audit_log', AUDIT_COLS, ['id'], auditRowToD1(r));
+        stmts.push(st);
+        bytes += st.length;
+        copied++;
+        if (bytes >= MAX_FILE_BYTES) await flush();
+      }
+    await flush();
+    console.log(
+      `  copied ${copied} row(s); ${copied - before.count} newer than the freeze instant (stragglers, kept)`
+    );
+    const d1Rows = await d1Query(
+      d,
+      `SELECT ${AUDIT_COLS.map(q).join(', ')} FROM platform_audit_log WHERE created_at < ${Number(T)} ORDER BY id`
+    );
+    const dg = new TableDigest();
+    for (const r of d1Rows)
+      await dg.add(
+        AUDIT_COLS,
+        AUDIT_COLS.map(c => r[c]),
+        ['id']
+      );
+    const dst = await dg.finish();
+    const ok = dst.count === before.count && dst.digest === before.digest;
+    console.log(
+      `  verify platform_audit_log ${ok ? 'EQUAL' : 'MISMATCH'}  src ${before.count} ${before.digest.slice(0, 12)}  d1 ${dst.count} ${dst.digest.slice(0, 12)}`
+    );
+    await client.query('ROLLBACK');
+    await client.end();
+    if (!ok)
+      throw new Error(
+        'verification failed; the switch was NOT flipped and the redirect is lifted. Re-run.'
+      );
+    await d1Statements(d, [
+      `INSERT INTO system_settings (id, key, value, category, is_public) VALUES (${lit(crypto.randomUUID())}, ${lit(key)}, ${lit(JSON.stringify({ family: 'audit', copiedAt: new Date().toISOString(), rows: before.all, freezeInstant: T }))}, 'cutover', 0) ON CONFLICT (key) DO NOTHING;`,
+    ]);
+    if (!(await marker())) throw new Error('marker was not written');
+    flipped = true;
+    console.log(`FLIPPED: ${key} written. Waiting ${args['settle-ms']} ms ...`);
+  } finally {
+    if (!flipped) {
+      await lift();
+      if (!frozenNow) console.log('redirect lifted (nothing was flipped).');
+    }
+  }
+  await sleep(Number(args['settle-ms']));
+  await lift();
+  if (frozenNow) throw new Error('the freeze is still up; run --unfreeze');
+  const after = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+  const now = await auditDigest(after, size, null);
+  await after.query('ROLLBACK');
+  await after.end();
+  if (now.all !== before.all) {
+    console.log(
+      `DRIFT: Postgres now holds ${now.all} store-less audit rows, ${before.all} at the copy. A write bypassed the sink: re-copy those rows (id > last copied) by hand.`
+    );
+    process.exit(2);
+  }
+  console.log(
+    `done in ${fmtMs(performance.now() - t0)}; Postgres store-less audit row count unchanged since the copy.`
+  );
+}
+
 /** D1 rows to compare: the cutover bookkeeping rows live in system_settings and are not part of the copied data. */
-function verifyWhere(table, inboxStash = []) {
+function verifyWhere(table, inboxStash = [], doStores = new Set()) {
+  if (table === 'instapay_receipts' && doStores.size)
+    return ` WHERE NOT (kind = 'order' AND store_id IN (${[...doStores].map(lit).join(', ')}))`;
   if (table === 'system_settings')
     return ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`;
   // webhooks that arrived during the freeze are stored here as `deferred` (D1 only); they are not part of the copy

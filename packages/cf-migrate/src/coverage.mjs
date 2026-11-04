@@ -34,7 +34,7 @@ export const CF_ONLY_TABLES = {
   },
   'd1:platform_audit_log': {
     how: 'starts-empty',
-    why: 'platform audit trail starts with the first live admin action; Postgres had no such table',
+    why: 'Postgres has no such table; the audit family copies store-less audit_logs rows in (N-10d), and rows born in D1 after that flip are not in Postgres',
     acceptable: [[]],
   },
 };

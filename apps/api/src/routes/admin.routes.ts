@@ -1784,7 +1784,7 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { page: pageStr, limit: limitStr, action, userId, resourceType } = req.query;
+      const { page: pageStr, limit: limitStr, action, userId, resourceType, storeId } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
       // audit_logs is store-scoped under RLS and also holds platform events with
@@ -1796,6 +1796,7 @@ router.get(
         action: typeof action === 'string' && action ? action : undefined,
         userId: typeof userId === 'string' && userId ? userId : undefined,
         resourceType: typeof resourceType === 'string' && resourceType ? resourceType : undefined,
+        storeId: typeof storeId === 'string' && storeId ? storeId : undefined,
         limit,
         offset: skip,
       });
