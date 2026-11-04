@@ -30,8 +30,6 @@ const ALLOWED: Record<string, string> = {
     'super-admin grants list; on the platform D1 prisma.store is answered by D1 (no store scope exists for a cross-store list)',
   'apps/api/src/services/provider-activation.service.ts::listAllRequests':
     'super-admin queue; on the platform D1 prisma.store is answered by D1, behind the admin router operator hatch',
-  'apps/api/src/services/tax-profile.service.ts::taxReviewQueueFromStores':
-    'super-admin queue; store names come from D1 (prisma.store routed), per-store reads run under withUser',
   'apps/api/src/services/ci-hints.service.ts::ciOverview':
     'only called from GET /stores/:storeId/ci/overview, behind requireStoreAccess (the request scope)',
   'apps/api/src/services/ci-hints.service.ts::setCiSharing':

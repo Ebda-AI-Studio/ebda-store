@@ -208,13 +208,6 @@
         "notificationLog": 1
       }
     },
-    "apps/api/src/services/tax-profile.service.ts": {
-      "kind": "platform",
-      "reason": "merchant tax-profile paths (get-or-create, submit, update) still read the profile through the store-scope prisma; the super-admin queue and decision already use storeDb / storeWriter (group C). The merchant paths belong to N-11 and are Postgres-store only until then.",
-      "models": {
-        "storeTaxProfile": 3
-      }
-    },
     "apps/api/src/services/variant.service.ts": {
       "kind": "pg-branch",
       "reason": "bulkUpdateInventory: after `if (stock)` early return (CF-STOCK-1).",

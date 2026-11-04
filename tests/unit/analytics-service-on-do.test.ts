@@ -92,6 +92,7 @@ const db = {
 };
 vi.mock('@api/lib/repo-factory', () => ({
   storeMoney: async () => money,
+  storeRepo: async () => ({ backend: 'do' }),
   storeDb: async () => db,
 }));
 

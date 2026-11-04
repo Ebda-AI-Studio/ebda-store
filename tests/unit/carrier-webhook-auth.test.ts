@@ -27,6 +27,7 @@ vi.mock('@ebda/database', () => {
     withMoneyTx: (fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
     runInTenantContext: (_id: string, fn: () => unknown) => fn(),
     runInStoreScope: (_id: string, fn: () => unknown) => fn(),
+    withStore: (_id: string, fn: (tx: unknown) => unknown) => Promise.resolve(fn(client)),
   };
 });
 vi.mock('@api/services/redis.service', () => ({
