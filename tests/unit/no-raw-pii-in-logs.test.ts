@@ -71,6 +71,10 @@ const SAFE_CALL = /^(mask|redact|hash)/i;
  * adding a line.
  */
 const REVIEWED_SPREADS: Record<string, string> = {
+  'apps/api/src/lib/inngest/functions/audit-log-archive.ts|cf':
+    'archive-cloudflare-audit step result → { skipped, d1, stores, storeRows } counts only',
+  'apps/api/src/services/billing/payments-reconcile.service.ts|report':
+    'ReconcileReport → linked / rolledBack / confirmed counts (undecided is logged as a count only)',
   'apps/api/src/app.ts|unset':
     'billingProviderUnsetWarning() → a fixed config warning string; no contact data',
   'apps/api/src/lib/database-role-guard.ts|detail':

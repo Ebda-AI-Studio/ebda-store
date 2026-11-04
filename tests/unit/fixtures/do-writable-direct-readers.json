@@ -9,6 +9,20 @@
     }
   },
   "baseline": {
+    "apps/api/src/lib/audit-read.ts": {
+      "kind": "pg-branch",
+      "reason": "readAuditByResource: a DO store returns early from storeDb; the prisma read is the Postgres store's audit trail (actor joined)",
+      "models": {
+        "auditLog": 1
+      }
+    },
+    "apps/api/src/lib/definer.ts": {
+      "kind": "pg-branch",
+      "reason": "platform audit viewer: a DO store is read through storeRepo(...).db; the withStore read is a Postgres store's own rows",
+      "models": {
+        "auditLog": 2
+      }
+    },
     "apps/api/src/routes/admin.routes.ts": {
       "kind": "platform",
       "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
