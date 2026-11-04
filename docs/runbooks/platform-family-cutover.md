@@ -16,7 +16,7 @@ the script writes the row. There is never a dual read.
 2. D1 schema applied: `wrangler d1 migrations apply ebda-platform --remote -c apps/api/wrangler.jsonc`.
 3. D1 `stores` already holds every store (the directory reconcile ran). The script's FK pre-check fails otherwise and lists the stores.
 4. Pick a quiet minute: the family is FROZEN for about a minute (45 s drain + copy + 12 s settle). Every write to it answers a retryable 503 (provider webhooks retry; the daily billing cycle retries on its next tick). Reads keep working.
-5. A fresh Neon dump exists (`com.forceai.neon-backup`) and the D1 backup sweep ran (`STORE_BACKUPS` manifest lists `billing_events`).
+5. A fresh Neon dump exists and the D1 backup sweep ran (`STORE_BACKUPS` manifest lists `billing_events`).
 
 ## Steps
 
