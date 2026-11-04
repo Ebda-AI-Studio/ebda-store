@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Modal } from '@ebda/ui';
 import { apiGet } from '@/lib/api';
 import { useT } from '@/i18n/useT';
-import { uiIntlTag } from '@/lib/format';
+import { intlLocaleForUi } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -169,7 +169,7 @@ function relativeTime(iso: string): string {
 }
 
 function absoluteTime(iso: string): string {
-  return new Date(iso).toLocaleString(uiIntlTag('en-GB'), {
+  return new Date(iso).toLocaleString(intlLocaleForUi('en-GB'), {
     dateStyle: 'medium',
     timeStyle: 'short',
   });

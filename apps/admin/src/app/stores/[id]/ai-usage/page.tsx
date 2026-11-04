@@ -23,7 +23,7 @@ import { DataTable, type DataTableColumn } from '../../../../components/mobile/D
 import { useT } from '../../../../i18n/useT';
 import { formatSpend } from '../../../../lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
-import { uiIntlTag } from '@/lib/format';
+import { intlLocaleForUi } from '@/lib/format';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ function formatFeature(feature: string): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(uiIntlTag('en-GB'), {
+  return new Date(iso).toLocaleString(intlLocaleForUi('en-GB'), {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

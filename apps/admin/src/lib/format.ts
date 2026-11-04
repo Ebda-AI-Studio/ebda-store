@@ -1,4 +1,9 @@
-import { formatPrice as sharedFormatPrice, minorToDecimalString, tryToMinor } from '@ebda/shared';
+import {
+  intlLocale,
+  formatPrice as sharedFormatPrice,
+  minorToDecimalString,
+  tryToMinor,
+} from '@ebda/shared';
 import { defaultLocale } from '../i18n/config';
 
 /**
@@ -14,18 +19,14 @@ function uiLocale(): 'ar' | 'en' {
   return defaultLocale;
 }
 
-/** Intl tag with Western digits in both languages (Ruling NUMERALS-1): Arabic month names, 0-9 numerals. */
-function intlTag(locale: 'ar' | 'en'): string {
-  return locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US';
-}
-
 /**
  * The Intl locale tag for the CURRENT UI language: use it instead of a hard-coded 'en-US' / 'en-GB' in
- * `toLocaleDateString(...)` so an Arabic admin never shows English month names (audit G-5).
- * `en` keeps its regional tag (day-first en-GB) when the caller asks for it.
+ * `toLocaleDateString(...)` so an Arabic admin never shows English month names (audit G-5). Arabic comes from the shared
+ * `intlLocale` (Western digits pinned, Rulings NUMERALS-1 / DIGITS-1); `en` keeps its regional tag (day-first en-GB)
+ * when the caller asks for it, and English always renders Western digits.
  */
-export function uiIntlTag(english: 'en-US' | 'en-GB' = 'en-US'): string {
-  return uiLocale() === 'ar' ? intlTag('ar') : english;
+export function intlLocaleForUi(english: 'en-US' | 'en-GB' = 'en-US'): string {
+  return uiLocale() === 'ar' ? intlLocale('ar') : english;
 }
 
 /**
@@ -50,7 +51,7 @@ export function formatPrice(
 
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '—';
-  return new Date(date).toLocaleDateString(intlTag(uiLocale()), {
+  return new Date(date).toLocaleDateString(intlLocaleForUi(), {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -60,7 +61,7 @@ export function formatDate(date: string | null | undefined): string {
 /** Date + time display (12-hour clock), in the UI language. */
 export function formatDateTime(date: string | null | undefined): string {
   if (!date) return '—';
-  return new Date(date).toLocaleString(intlTag(uiLocale()), {
+  return new Date(date).toLocaleString(intlLocaleForUi(), {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -78,7 +79,7 @@ export function minorToMajor(piastres: number): string {
 }
 
 export function formatNumber(num: number): string {
-  return new Intl.NumberFormat(intlTag(uiLocale())).format(num);
+  return new Intl.NumberFormat(intlLocaleForUi()).format(num);
 }
 
 /**

@@ -8,7 +8,7 @@ import { AdminLayout } from '../../../components/AdminLayout';
 import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
-import { uiIntlTag } from '@/lib/format';
+import { intlLocaleForUi } from '@/lib/format';
 
 interface UserDetail {
   id: string;
@@ -59,7 +59,7 @@ export default function UserDetailPage() {
 
   function formatDate(dateString: string | null) {
     if (!dateString) return t('neverLoggedIn');
-    return new Date(dateString).toLocaleDateString(uiIntlTag(), {
+    return new Date(dateString).toLocaleDateString(intlLocaleForUi(), {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
