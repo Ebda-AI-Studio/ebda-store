@@ -128,7 +128,7 @@ function isScopedOp(v: unknown): v is ScopedOp {
 }
 
 function scopedOp(
-  storeId: string,
+  storeId: string | undefined,
   exec: () => Promise<unknown>,
   userId?: string
 ): ScopedOp & Promise<unknown> {
@@ -726,6 +726,16 @@ export function runInStoreScope<T>(
     throw new Error('Invalid store ID format');
   }
   return storeScope.run({ storeId, userId }, () => settleInScope(fn));
+}
+
+/**
+ * NEON-ZERO (Ruling NZ-C-1): a USER scope with no store and no long-lived transaction. Like `runInStoreScope`, a `prisma` call
+ * inside runs in its own short tenant transaction carrying `app.current_user_id`, so a request that never touches Postgres
+ * (the super-admin hub once its platform families are on D1) never opens a connection, and a handler that still does keeps
+ * the user-keyed RLS it had under the request transaction.
+ */
+export function runInUserScope<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return storeScope.run({ userId }, () => settleInScope(fn));
 }
 
 // ---------------------------------------------------------------------------

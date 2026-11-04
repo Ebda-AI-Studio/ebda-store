@@ -67,6 +67,9 @@ const apiVars = {
 // worker, which reaches it through the `API` service binding and shares its Durable Objects / KV by
 // binding them with `scriptName: 'api'`. The bundle is never sent through Vite (an 11 MB module cannot
 // travel over the pool's websocket, and 143k lines of Express / Prisma CJS should not be re-transformed).
+// The route sweep (workers-test/route-sweep.test.ts) runs with a stand-in identity service behind `ACCOUNTS`; no other test does.
+const WITH_ACCOUNTS = process.argv.some(a => a.includes('route-sweep'));
+
 export default defineConfig(async () => {
   // D1 `ebda-platform` (task 2.4): the REAL cf-schema platform migrations, applied by the test, shared by both workers.
   const platformMigrations = await readD1Migrations(
@@ -81,6 +84,9 @@ export default defineConfig(async () => {
           compatibilityFlags: ['nodejs_compat'],
           bindings: {
             E2E_DB: (await dbReachable()) ? '1' : '0',
+            // route-sweep.test.ts: SWEEP_ONLY=<regex over "METHOD /route"> measures a subset, SWEEP_STRICT=1 turns a 5xx red.
+            SWEEP_ONLY: process.env.SWEEP_ONLY ?? '',
+            SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
             TEST_PLATFORM_MIGRATIONS: platformMigrations,
             ...apiVars,
           },
@@ -105,6 +111,17 @@ export default defineConfig(async () => {
             EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
           },
           workers: [
+            ...(WITH_ACCOUNTS
+              ? [
+                  {
+                    name: 'accounts',
+                    modulesRoot: here('./workers-test/fakes'),
+                    modules: [{ type: 'ESModule' as const, path: here('./workers-test/fakes/accounts.mjs') }],
+                    compatibilityDate: '2026-08-01',
+                    compatibilityFlags: ['nodejs_compat'],
+                  },
+                ]
+              : []),
             {
               name: 'api',
               modulesRoot: here('./dist-cf'),
@@ -119,6 +136,7 @@ export default defineConfig(async () => {
               bindings: apiVars,
               kvNamespaces: { KV_CACHE: 'kv-cache' },
               d1Databases: { PLATFORM_DB: 'platform-db' },
+              ...(WITH_ACCOUNTS ? { serviceBindings: { ACCOUNTS: 'accounts' } } : {}),
               durableObjects: {
                 AUTH_STATE: { className: 'AuthState', useSQLite: true },
                 STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },

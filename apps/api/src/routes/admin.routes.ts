@@ -80,7 +80,7 @@ import {
   assignSubscriptionSchema,
   isReservedSlug,
 } from '@ebda/shared';
-import { userContext } from '../middleware/tenant-context';
+import { platformUserContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
@@ -113,7 +113,7 @@ router.use(requireMfaEnrolled);
 // the user directory and the role checks all resolve under it. Exports stream
 // for longer than the 30s request-transaction budget, so they stay outside it
 // and scope themselves (they fan out per store).
-const adminUserContext = userContext(req => req.user?.userId);
+const adminUserContext = platformUserContext(req => req.user?.userId);
 router.use((req: Request, res: Response, next: NextFunction) =>
   req.path.startsWith('/export') ? next() : adminUserContext(req, res, next)
 );

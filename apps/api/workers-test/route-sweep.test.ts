@@ -22,6 +22,8 @@ import ROUTES from './route-table.json';
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };
   E2E_DB: string;
+  SWEEP_ONLY?: string;
+  SWEEP_STRICT?: string;
   PLATFORM_DB: {
     prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } };
   };
@@ -37,6 +39,9 @@ const MARKER_KEYS = [
   'platform_cutover.inbox',
   'platform_cutover.ai-usage',
   'platform_cutover.analytics',
+  'platform_cutover.payments',
+  'platform_cutover.ops',
+  'platform_cutover.audit',
   'customer_auth_cutover.__all',
 ];
 
@@ -67,6 +72,8 @@ async function hit(
   headers: Record<string, string>,
   body?: unknown
 ): Promise<Response | undefined> {
+  // SWEEP_ONLY=<regex over "METHOD /route">: measure a subset (a group owner re-checks only its routes).
+  if (e.SWEEP_ONLY && !new RegExp(e.SWEEP_ONLY).test(`${method} ${route}`)) return undefined;
   const t0 = Date.now();
   const r: Result = { group, method, route, url, status: 0, ms: 0 };
   let res: Response | undefined;
@@ -396,7 +403,7 @@ describe.skipIf(e.E2E_DB === '1')(
       console.log(
         `SWEEP_SUMMARY total=${results.length} ok2xx=${results.filter(r => r.status >= 200 && r.status < 300).length} expected4xx=${results.filter(r => EXPECTED_4XX.has(r.status)).length} failing=${bad.length} odd=${odd.length}`
       );
-      if (process.env.SWEEP_STRICT === '1')
+      if (e.SWEEP_STRICT === '1')
         expect(bad.map(r => `${r.method} ${r.route} ${r.status}`)).toEqual([]);
     });
   }
