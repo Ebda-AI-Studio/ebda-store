@@ -136,7 +136,7 @@ export function ShipmentsTable({
               value={carrierFilter}
               onChange={e => onCarrierFilterChange(e.target.value)}
               aria-label={t('filters.carrierLabel')}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="all">{t('filters.allCarriers')}</option>
               <option value="bosta">{t('carrierNames.bosta')}</option>
@@ -149,7 +149,7 @@ export function ShipmentsTable({
               value={statusFilter}
               onChange={e => onStatusFilterChange(e.target.value)}
               aria-label={t('filters.statusLabel')}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="all">{t('filters.allStatuses')}</option>
               <option value="created">{t('statuses.created')}</option>

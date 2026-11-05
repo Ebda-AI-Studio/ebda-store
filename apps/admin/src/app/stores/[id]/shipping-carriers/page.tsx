@@ -7,6 +7,7 @@ import { apiGet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
 import { BRAND, providerRequestMailto, providersOfKind } from '@ebda/shared';
+import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { ShippingCarriersEmptyState } from './_components/ShippingCarriersEmptyState';
 import { CarrierConnectCard } from './_components/CarrierConnectCard';
 import { ManualCarrierCard } from './_components/ManualCarrierCard';
@@ -25,6 +26,7 @@ export default function ShippingCarriersPage() {
   const storeId = params.id as string;
   const { isEnabled } = useFeatures();
   const tPage = useT('shipping.carriers.page');
+  const tHub = useT('shippingHub');
   const tConnect = useT('shipping.carriers.connect');
 
   const featureEnabled = isEnabled('shipping_carriers');
@@ -93,7 +95,8 @@ export default function ShippingCarriersPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
+    <AdminLayout title={tHub('title')} subtitle={tPage('subtitle')}>
+      <ShippingTabs />
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

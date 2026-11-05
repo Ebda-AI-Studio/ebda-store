@@ -240,18 +240,11 @@ export default function WebhooksPage() {
       title={t('page.title')}
       subtitle={t('page.subtitle')}
       actions={
-        <div className="flex gap-2">
-          <Link href={`/stores/${storeId}/settings`}>
-            <Button type="button" variant="outline" size="sm">
-              {t('page.backToSettings')}
-            </Button>
-          </Link>
-          {!needsUpgrade ? (
-            <Button type="button" size="sm" onClick={() => openForm(null)}>
-              {t('actions.add')}
-            </Button>
-          ) : null}
-        </div>
+        !needsUpgrade ? (
+          <Button type="button" className="min-h-11" onClick={() => openForm(null)}>
+            {t('actions.add')}
+          </Button>
+        ) : null
       }
     >
       <div className="space-y-4">

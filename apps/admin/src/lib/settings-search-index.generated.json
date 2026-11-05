@@ -101,6 +101,16 @@
     "synAr": "صفحات من نحن سياسة اتصل"
   },
   {
+    "id": "page:/content/faqs",
+    "kind": "page",
+    "route": "/content/faqs",
+    "access": "owner",
+    "en": "Frequently Asked Questions",
+    "ar": "الأسئلة الشائعة",
+    "synEn": "faq questions answers how to guides",
+    "synAr": "اسئلة واجوبة الاسئلة الشائعة ادلة خطوات"
+  },
+  {
     "id": "page:/blog",
     "kind": "page",
     "route": "/blog",
@@ -1043,28 +1053,26 @@
   {
     "id": "branding.blog",
     "kind": "setting",
-    "route": "/branding",
+    "route": "/blog",
     "access": "owner",
     "en": "Enable blog",
     "ar": "تفعيل المدونة",
     "synEn": "blog show blog turn on blog",
     "synAr": "تفعيل المدونة اظهار المدونة",
-    "query": "tab=theme",
-    "pageEn": "Store Branding",
-    "pageAr": "هوية المتجر"
+    "pageEn": "Blog",
+    "pageAr": "المدونة"
   },
   {
     "id": "branding.web-push",
     "kind": "setting",
-    "route": "/branding",
+    "route": "/notifications",
     "access": "owner",
     "en": "Storefront web push",
     "ar": "إشعارات الويب للمتجر",
     "synEn": "web push notifications subscribe prompt",
     "synAr": "اشعارات الويب اشتراك اشعارات",
-    "query": "tab=theme",
-    "pageEn": "Store Branding",
-    "pageAr": "هوية المتجر"
+    "pageEn": "Notifications",
+    "pageAr": "الإشعارات"
   },
   {
     "id": "branding.whatsapp-buttons",
@@ -1388,28 +1396,28 @@
   {
     "id": "seo.faqs",
     "kind": "setting",
-    "route": "/seo",
+    "route": "/content/faqs",
     "access": "owner",
     "en": "Frequently Asked Questions",
     "ar": "الأسئلة الشائعة",
     "synEn": "faq questions answers common questions",
     "synAr": "الاسئلة الشائعة اسئلة واجوبة",
     "feature": "seo",
-    "pageEn": "SEO Settings",
-    "pageAr": "إعدادات SEO"
+    "pageEn": "Frequently Asked Questions",
+    "pageAr": "الأسئلة الشائعة"
   },
   {
     "id": "seo.how-tos",
     "kind": "setting",
-    "route": "/seo",
+    "route": "/content/faqs",
     "access": "owner",
     "en": "How-To Guides",
     "ar": "أدلة الإرشادات",
     "synEn": "how to guides instructions steps",
     "synAr": "ادلة الارشادات تعليمات خطوات",
     "feature": "seo",
-    "pageEn": "SEO Settings",
-    "pageAr": "إعدادات SEO"
+    "pageEn": "Frequently Asked Questions",
+    "pageAr": "الأسئلة الشائعة"
   },
   {
     "id": "floating-widget.show",

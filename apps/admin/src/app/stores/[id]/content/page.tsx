@@ -93,15 +93,21 @@ export default function ContentListPage() {
         <button
           type="button"
           onClick={handleNewPage}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
         >
-          + {t('newPage')}
+          {t('newPage')}
         </button>
       }
     >
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
         <p className="mb-6 rounded-xl bg-muted/40 p-4 text-sm text-muted-foreground">
-          {t('emptyHint')}
+          {t('emptyHint')}{' '}
+          <Link
+            href={`/stores/${storeId}/content/faqs`}
+            className="font-medium text-primary-ink underline underline-offset-2"
+          >
+            {t('faqsLink')}
+          </Link>
         </p>
 
         {isLoading ? (

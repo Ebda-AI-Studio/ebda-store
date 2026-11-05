@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { AdminSkeletonDetail } from '../../../../components/AdminSkeleton';
 import { BrandingIdentityTab } from './_components/BrandingIdentityTab';
 import { BrandingTabs } from './_components/BrandingTabs';
@@ -68,10 +69,8 @@ export default function StoreBrandingPage() {
     [tMessages, tTabs]
   );
 
-  const { branding, setBranding, isLoading, isSaving, saveBranding } = useBranding(
-    storeId,
-    toastMessages
-  );
+  const { branding, setBranding, isLoading, isSaving, saveBranding, dirty, resetBranding } =
+    useBranding(storeId, toastMessages);
 
   // Loading + not-found render INSIDE <AdminLayout> so the sidebar, hub tabs
   // and topbar stay mounted — an early return before the layout made the
@@ -85,7 +84,10 @@ export default function StoreBrandingPage() {
         ) : (
           <div className="text-center py-12">
             <p className="text-muted-foreground">{tMessages('notFound')}</p>
-            <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
+            <Link
+              href="/stores"
+              className="mt-2 inline-flex min-h-11 items-center text-primary-ink hover:underline"
+            >
               {tActions('backToStores')}
             </Link>
           </div>
@@ -95,20 +97,7 @@ export default function StoreBrandingPage() {
   }
 
   return (
-    <AdminLayout
-      title={tPage('title')}
-      subtitle={tPage('subtitle', { name: branding.name })}
-      actions={
-        <button
-          type="button"
-          onClick={saveBranding}
-          disabled={isSaving}
-          className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-        >
-          {isSaving ? tActions('saving') : tActions('save')}
-        </button>
-      }
-    >
+    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle', { name: branding.name })}>
       <div className="space-y-6">
         <BrandingTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -128,6 +117,13 @@ export default function StoreBrandingPage() {
           <LocationsTab storeId={storeId} branding={branding} onChange={setBranding} />
         )}
       </div>
+      <StickySaveBar
+        dirty={dirty || isSaving}
+        onSave={saveBranding}
+        onReset={resetBranding}
+        saving={isSaving}
+        saveLabel={tActions('save')}
+      />
     </AdminLayout>
   );
 }

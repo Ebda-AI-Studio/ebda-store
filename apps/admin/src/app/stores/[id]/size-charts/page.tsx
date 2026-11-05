@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { sizeChartName, sizeChartSchema } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../../lib/api';
 import {
@@ -30,6 +31,7 @@ export default function SizeChartsPage() {
   const params = useParams();
   const storeId = params.id as string;
   const t = useT('sizeCharts.page');
+  const askConfirm = useConfirm();
   const tEditor = useT('sizeCharts.editor');
   const locale = useLocale();
   const lang = locale === 'en' ? 'en' : 'ar';
@@ -102,7 +104,13 @@ export default function SizeChartsPage() {
   };
 
   const remove = async (c: StoredSizeChart) => {
-    if (!window.confirm(t('deleteConfirm', { name: sizeChartName(c, lang) }))) return;
+    const ok = await askConfirm({
+      object: t('deleteObject', { name: sizeChartName(c, lang) }),
+      consequence: t('deleteConsequence'),
+      confirmLabel: t('deleteLabel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
     const { error: apiError } = await apiDelete(`/api/v1/stores/${storeId}/size-charts/${c.id}`);
     if (apiError) {
       setError(apiError.message || t('deleteFailed'));
