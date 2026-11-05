@@ -12,7 +12,7 @@ import {
   type ContactFieldError,
   type ContactTopicId,
 } from '@ebda/shared/contact-enquiry';
-import { COPY } from '../lib/content';
+import { CONTACT_FORM_COPY } from '../lib/contact-form-copy';
 import { pagePath, type Locale } from '../lib/site';
 
 /** Where the form posts (the API's public prefix). It is also the `action`, so the form works without JavaScript. */
@@ -51,7 +51,7 @@ function validate(v: Record<Field, string | boolean>): Errors {
  * validates, posts JSON, and shows the result in place (role=status), moving focus to the first error or the result.
  */
 export function ContactForm({ locale }: { locale: Locale }) {
-  const f = COPY[locale].contactPage.form;
+  const f = CONTACT_FORM_COPY[locale];
   const uid = useId();
   const id = (k: string) => `${uid}-${k}`;
   const formRef = useRef<HTMLFormElement>(null);

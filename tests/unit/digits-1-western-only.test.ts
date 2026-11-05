@@ -50,6 +50,7 @@ const NORMALISERS = [
   /packages\/shared\/src\/barcode\/ean\.ts$/, // scanner/typed barcode input normaliser
   /packages\/shared\/src\/tax-profile\.ts$/,
   /packages\/shared\/src\/instapay-receipt\.ts$/,
+  /packages\/shared\/src\/ascii-digits\.ts$/,
   /apps\/api\/src\/services\/price-cell\.ts$/,
   /apps\/api\/src\/services\/accounting\/bank-statement-parser\.ts$/,
   /apps\/api\/src\/services\/carriers\/egypt-areas\.ts$/,
