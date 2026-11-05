@@ -187,7 +187,9 @@
         "products": "المنتجات",
         "orders": "الطلبات",
         "customers": "العملاء",
-        "revenue": "الإيرادات"
+        "revenue": "الإيرادات",
+        "loadFailed": "مقدرناش نجيب أرقام المتجر دلوقتي.",
+        "retry": "جرّب تاني"
       },
       "accountingSummary": {
         "title": "نظرة سريعة على المالية والمخزون",
@@ -208,7 +210,7 @@
         "slugPlaceholder": "my-store-name",
         "slugHint": "سيكون متجرك على: {slug}.ebda.app",
         "slugHintPlaceholder": "your-slug",
-        "plan": "الخطة",
+        "plan": "الباقة",
         "status": "الحالة",
         "planFree": "مجاني",
         "planStarter": "مبتدئ",
@@ -230,7 +232,8 @@
           "slugTooLong": "يجب أن يكون المعرّف أقل من 50 حرفًا",
           "slugTaken": "هذا المعرّف مستخدم بالفعل"
         },
-        "activateCta": "فعّل المتجر"
+        "activateCta": "فعّل المتجر",
+        "edit": "عدّل"
       },
       "owner": {
         "title": "مالك المتجر",
@@ -264,11 +267,11 @@
         "columnValue": "القيمة"
       },
       "quickActions": {
-        "title": "إجراءات سريعة",
-        "suspend": "تعليق المتجر",
-        "suspendDescription": "تعطيل الوصول مؤقتًا",
-        "activate": "تفعيل المتجر",
-        "activateDescription": "تمكين الوصول إلى المتجر",
+        "title": "ابدأ من هنا",
+        "suspend": "علّق المتجر",
+        "suspendDescription": "الزوّار مش هيقدروا يفتحوا المتجر لحد ما ترجّعه.",
+        "activate": "فعّل المتجر",
+        "activateDescription": "المتجر هيفتح للزوّار تاني.",
         "viewProducts": "عرض المنتجات",
         "viewProductsCount": "{count} منتج",
         "viewOrders": "عرض الطلبات",
@@ -276,7 +279,17 @@
         "analytics": "التحليلات",
         "analyticsDescription": "عرض مؤشرات المتجر",
         "manageFeatures": "إدارة الميزات",
-        "manageFeaturesDescription": "تفعيل أو تعطيل إمكانيات المتجر"
+        "manageFeaturesDescription": "تفعيل أو تعطيل إمكانيات المتجر",
+        "addProduct": "ضيف منتج",
+        "addProductBody": "منتج جديد بصوره وسعره",
+        "phoneOrder": "سجّل طلب تليفون",
+        "phoneOrderBody": "اعمل طلب لعميل كلّمك",
+        "newCoupon": "كوبون جديد",
+        "newCouponBody": "خصم بكود تبعته لعملائك",
+        "shareLink": "انسخ لينك المتجر",
+        "shareLinkBody": "ابعته على واتساب أو انستجرام",
+        "linkCopied": "اتنسخ لينك المتجر",
+        "linkCopyFailed": "مقدرناش ننسخ اللينك. انسخه من شريط العنوان."
       },
       "settings": {
         "title": "الإعدادات والتكوين",
@@ -319,6 +332,17 @@
         "landing": "صفحة الدخول",
         "referrer": "جاي من",
         "firstSeen": "أول زيارة"
+      },
+      "openEditor": "افتح المحرر",
+      "needsAction": {
+        "title": "محتاج تصرّف",
+        "orders": "طلبات جديدة",
+        "lowStock": "منتجات قربت تخلص",
+        "returns": "مرتجعات مستنية ردك",
+        "reviews": "تقييمات مستنية موافقتك",
+        "allClear": "مفيش حاجة مستنياك دلوقتي.",
+        "loadFailed": "مقدرناش نجيب اللي محتاج تصرّف دلوقتي.",
+        "retry": "جرّب تاني"
       }
     },
     "list": {
@@ -372,9 +396,9 @@
       "title": "إنشاء متجر جديد",
       "subtitle": "إعداد متجر جديد على المنصة",
       "cancel": "إلغاء",
-      "successTitle": "تم إنشاء المتجر!",
+      "successTitle": "اتعمل المتجر!",
       "successSubtitle": "متجرك الجديد جاهز",
-      "successHeading": "تم إنشاء المتجر بنجاح!",
+      "successHeading": "اتعمل المتجر بنجاح!",
       "successMessage": "{name} أصبح جاهزًا لإضافة المنتجات.",
       "storeDetails": "تفاصيل المتجر",
       "storeUrl": "رابط المتجر:",
@@ -382,7 +406,7 @@
       "ownerEmail": "البريد الإلكتروني للمالك:",
       "tempPassword": "كلمة مرور مؤقتة:",
       "dnsRequired": "مطلوب إعداد DNS",
-      "dnsVerified": "تم التحقق",
+      "dnsVerified": "اتأكّد",
       "dnsPending": "قيد الانتظار",
       "dnsInstructions": "أضف سجل DNS التالي لدى مزوّد النطاق لإكمال الإعداد:",
       "dnsTableLabel": "سجلات DNS المطلوبة",
@@ -421,7 +445,7 @@
       "tempPasswordPlaceholder": "8 أحرف على الأقل",
       "tempPasswordHint": "سيُطلب من المالك تغييرها عند أول تسجيل دخول",
       "step3Heading": "المراجعة والإنشاء",
-      "step3Subtitle": "من فضلك راجع التفاصيل قبل ما تنشئ المتجر",
+      "step3Subtitle": "راجع التفاصيل قبل ما تعمل المتجر",
       "reviewStoreName": "الاسم:",
       "reviewStoreUrl": "الرابط الافتراضي:",
       "reviewCustomDomain": "النطاق المخصّص:",
@@ -439,7 +463,7 @@
         "storeUrlReserved": "هذا العنوان محجوز. اختر عنوانًا آخر",
         "storeUrlLength": "يجب أن يتكون العنوان من 3 إلى 40 حرفًا",
         "emailRequired": "البريد الإلكتروني مطلوب",
-        "emailInvalid": "من فضلك اكتب بريدًا إلكترونيًا صالحًا",
+        "emailInvalid": "اكتب إيميل صحيح",
         "ownerNameRequired": "اسم المالك مطلوب",
         "passwordRequired": "كلمة المرور مطلوبة",
         "passwordTooShort": "يجب ألا تقل كلمة المرور عن 8 أحرف",
@@ -478,12 +502,12 @@
       "fallbackStore": "المتجر",
       "fallbackThisStore": "هذا المتجر",
       "toolbar": {
-        "addProduct": "إضافة منتج",
-        "bulkImport": "استيراد جماعي",
+        "addProduct": "ضيف منتج",
+        "bulkImport": "استورد منتجات من ملف",
         "backToStore": "العودة إلى المتجر",
-        "orderNewArrivals": "ترتيب الوصول الجديد",
-        "orderBestSellers": "ترتيب الأكثر مبيعاً",
-        "more": "المزيد"
+        "orderNewArrivals": "رتّب وصل حديثًا",
+        "orderBestSellers": "رتّب الأكتر مبيعًا",
+        "more": "خيارات تانية للمنتجات"
       },
       "filters": {
         "ariaLabel": "تصفية المنتجات حسب الحالة",
@@ -515,9 +539,11 @@
       },
       "actions": {
         "variants": "المتغيرات",
-        "edit": "تعديل",
+        "edit": "عدّل",
         "view": "عرض",
-        "delete": "حذف"
+        "delete": "امسح المنتج",
+        "overview": "نظرة عامة",
+        "menu": "خيارات المنتج {name}"
       },
       "empty": {
         "title": "لسه مفيش منتجات",
@@ -692,14 +718,14 @@
       "notFound": "المنتج غير موجود",
       "notFoundBody": "قد يكون قد تم حذفه أو نقله إلى متجر آخر. استخدم الزر أدناه للعودة إلى قائمة المنتجات.",
       "loadFailed": "معرفناش نحمّل المنتج",
-      "updateFailed": "معرفناش نحدّث المنتج. جرّب تاني من فضلك.",
+      "updateFailed": "معرفناش نحفظ التعديلات. جرّب تاني.",
       "title": "تعديل: {name}",
       "fallbackTitle": "المنتج",
       "subtitle": "المتجر: {storeName}",
       "fallbackStore": "غير معروف",
       "backToProducts": "العودة إلى المنتجات",
-      "manageVariants": "إدارة المتغيرات",
-      "recommendations": "التوصيات",
+      "manageVariants": "ضيف المتغيرات",
+      "recommendations": "المنتجات المقترحة معاه",
       "sections": {
         "basicInformation": "المعلومات الأساسية",
         "media": "الوسائط",
@@ -760,7 +786,8 @@
         "searchTermsTruncated": "كلمات سيُقتطع منها ما زاد على 60 حرفًا: {count}",
         "searchTermsDropped": "كلمات لن تُحفظ لتجاوز الحد: {count}",
         "searchTermsAtLimit": "بلغت الحد الأقصى",
-        "searchTermsNearLimit": "اقتربت من الحد الأقصى"
+        "searchTermsNearLimit": "اقتربت من الحد الأقصى",
+        "priceMinError": "السعر لازم يكون أكتر من صفر."
       },
       "statusOptions": {
         "draft": "مسودة",
@@ -768,8 +795,9 @@
         "archived": "مؤرشف"
       },
       "actions": {
-        "saveChanges": "حفظ التغييرات",
-        "cancel": "إلغاء"
+        "saveChanges": "احفظ التعديلات",
+        "cancel": "إلغاء",
+        "saveProduct": "احفظ المنتج"
       },
       "faqs": {
         "title": "الأسئلة الشائعة",
@@ -792,7 +820,9 @@
         "aiSuccess": "أنشأ الذكاء الاصطناعي {count} أسئلة — راجع واحفظ كل واحدة.",
         "reviewNote": "مسودة الذكاء الاصطناعي — راجع قبل الحفظ",
         "saveAll": "حفظ جميع المسودات",
-        "discardAll": "تجاهل المسودات"
+        "discardAll": "تجاهل المسودات",
+        "deletedToast": "اتمسح السؤال",
+        "undo": "تراجع"
       },
       "seoSection": {
         "hint": "كيف يظهر هذا المنتج في جوجل وعند المشاركة.",
@@ -865,7 +895,26 @@
       "faqQuestionEnSample": "e.g. What sizes are available?",
       "faqQuestionArSample": "مثال: ما الأحجام المتوفرة؟",
       "faqAnswerEnSample": "e.g. Available in S, M, L, XL.",
-      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL."
+      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL.",
+      "viewInStore": "شوف في المتجر",
+      "moreMenu": "خيارات تانية للمنتج",
+      "createdBanner": "اتضاف المنتج. الخطوة الجاية: لو ليه مقاسات أو ألوان ضيفها.",
+      "addVariants": "ضيف المتغيرات",
+      "toast": {
+        "saved": "اتحفظ المنتج"
+      },
+      "tabs": {
+        "label": "أقسام صفحة المنتج",
+        "edit": "تعديل",
+        "overview": "نظرة عامة"
+      },
+      "deleteDialog": {
+        "object": "المنتج «{name}»",
+        "consequence": "هيتشال من المتجر ومن الطلبات الجديدة، ومش هتقدر ترجّعه.",
+        "confirmLabel": "امسح المنتج",
+        "done": "اتمسح المنتج",
+        "failed": "معرفناش نمسح المنتج. جرّب تاني."
+      }
     },
     "recommendations": {
       "loading": "جارٍ التحميل...",
@@ -929,6 +978,11 @@
           "title": "ترقية جميع التوصيات؟",
           "body": "سيضيف هذا <b>{count}</b> {count, plural, one {اقتراح ذكاء اصطناعي} other {اقتراحات ذكاء اصطناعي}} إلى قائمة البيع المتقاطع اليدوي.",
           "confirmButton": "ترقية {count}"
+        },
+        "demoteDialog": {
+          "object": "{count} منتج مقترح بالذكاء الاصطناعي",
+          "consequence": "هيتشالوا من قايمة البيع المتقاطع اليدوية، والمتجر هيرجع يعرض اقتراحات الذكاء الاصطناعي.",
+          "confirmLabel": "شيل الاقتراحات"
         }
       }
     },
@@ -982,34 +1036,45 @@
         "errorPriceInvalid": "سعر «{name}» يجب أن يكون رقمًا موجبًا.",
         "defaultOptionName": "Variant",
         "parentSkuNote": "تُولَّد أرقام SKU تلقائيًا بصيغة “{sku}-<اسم المتغير>”.",
-        "multiAxisLockNote": "أسماء المتغيرات متعددة المحاور مقفولة — تقدر تعدل السعر والمخزون والصورة بس."
+        "multiAxisLockNote": "أسماء المتغيرات متعددة المحاور مقفولة — تقدر تعدل السعر والمخزون والصورة بس.",
+        "deleteDialog": {
+          "object": "المتغير «{name}»",
+          "consequence": "هيتمسح من المنتج ومش هتقدر ترجّعه.",
+          "confirmLabel": "امسح المتغير"
+        }
       }
     },
     "new": {
-      "title": "إضافة منتج جديد",
-      "subtitle": "إنشاء منتج جديد لمتجرك",
+      "title": "منتج جديد",
+      "subtitle": "ابدأ بالأساسيات، وكمّل الباقي بعد ما تضيف المنتج",
       "sections": {
         "basicInformation": "المعلومات الأساسية",
         "media": "الوسائط",
-        "pricing": "التسعير",
+        "pricing": "الخصم والتكلفة",
         "inventory": "المخزون",
         "status": "الحالة",
-        "organization": "التنظيم"
+        "organization": "التنظيم",
+        "essentials": "الأساسيات",
+        "moreDetails": "تفاصيل أكتر",
+        "moreDetailsHint": "الوصف، الخصم، التكلفة، كلمات البحث والشارة. مش لازمين دلوقتي.",
+        "englishCopy": "نسخة إنجليزية (اختياري)",
+        "arabicCopy": "نسخة عربية (اختياري)",
+        "badge": "شارة على بطاقة المنتج"
       },
       "fields": {
         "name": "اسم المنتج",
-        "namePlaceholder": "أدخل اسم المنتج",
-        "nameAr": "اسم المنتج (بالعربية)",
-        "nameArPlaceholder": "ادخل اسم المنتج",
-        "description": "الوصف",
-        "descriptionPlaceholder": "صف منتجك...",
-        "descriptionAr": "الوصف (بالعربية)",
-        "descriptionArPlaceholder": "وصف المنتج...",
-        "badgeLabel": "شارة البطاقة (بالإنجليزية)",
+        "namePlaceholder": "e.g. White cotton shirt",
+        "nameAr": "اسم المنتج",
+        "nameArPlaceholder": "مثلاً: قميص قطن أبيض",
+        "description": "الوصف بالإنجليزي",
+        "descriptionPlaceholder": "Describe the product",
+        "descriptionAr": "الوصف بالعربي",
+        "descriptionArPlaceholder": "اكتب وصف المنتج",
+        "badgeLabel": "الشارة بالإنجليزي",
         "badgeLabelPlaceholder": "مثلاً Offer",
-        "badgeLabelAr": "شارة البطاقة (بالعربية)",
+        "badgeLabelAr": "الشارة بالعربي",
         "badgeLabelArPlaceholder": "مثلاً عرض",
-        "badgeLabelHint": "نص حر يظهر كشارة على بطاقة هذا المنتج وصفحته. اتركه فارغًا لإخفاء الشارة. 32 حرفًا كحد أقصى.",
+        "badgeLabelHint": "كلمة قصيرة تظهر على بطاقة المنتج وصفحته. سيبها فاضية لو مش عايز شارة. 32 حرف بحد أقصى.",
         "searchTerms": "كلمات البحث",
         "searchTermsPlaceholder": "جزمة، حذاء رياضي، 3abaya",
         "searchTermsHint": "افصل بين الكلمات بفاصلة. لا تظهر في المتجر. اتركها فارغة ليقترحها الذكاء الاصطناعي، ولن تُستبدل الكلمات التي تكتبها بنفسك.",
@@ -1017,12 +1082,12 @@
         "searchTermsDropped": "كلمات لن تُحفظ لتجاوز الحد: {count}",
         "searchTermsAtLimit": "بلغت الحد الأقصى",
         "searchTermsNearLimit": "اقتربت من الحد الأقصى",
-        "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
+        "mediaHint": "اسحب الصور هنا أو اضغط عشان تختارها",
         "mediaSizeHint": "الموصى به 1000×1000 (مربع). حتى 10 ميجابايت لكل ملف — نقوم بضغطها تلقائياً للمتجر.",
         "price": "السعر (ج.م)",
         "pricePlaceholder": "0.00",
         "costPrice": "التكلفة (ج.م)",
-        "pricingHint": "أدخل الأسعار بالجنيه المصري. تعيين الخصم سيضبط السعر قبل الخصم تلقائيًا في المتجر.",
+        "pricingHint": "الأسعار بالجنيه المصري. لو حطيت خصم، المتجر هيعرض السعر قبل الخصم مشطوب تلقائي.",
         "discountLabel": "الخصم",
         "discountNone": "بدون خصم",
         "discountPercentage": "نسبة مئوية (%)",
@@ -1035,23 +1100,29 @@
         "skuPlaceholder": "PROD-001",
         "quantity": "الكمية",
         "quantityPlaceholder": "0",
-        "productStatus": "حالة المنتج",
-        "category": "الفئة",
-        "noCategory": "بدون فئة",
+        "productStatus": "الحالة",
+        "category": "القسم",
+        "noCategory": "من غير قسم",
         "lowStockThreshold": "حد المخزون المنخفض",
-        "lowStockThresholdPlaceholder": "5"
+        "lowStockThresholdPlaceholder": "5",
+        "nameArOptional": "اسم المنتج بالعربي (اختياري)",
+        "nameOptional": "اسم المنتج بالإنجليزي (اختياري)"
       },
       "statusOptions": {
-        "draft": "مسودة",
-        "active": "نشط",
+        "draft": "مسودة (مش ظاهر في المتجر)",
+        "active": "ظاهر في المتجر",
         "archived": "مؤرشف"
       },
       "actions": {
-        "create": "إنشاء المنتج",
+        "create": "ضيف المنتج",
         "cancel": "إلغاء"
       },
       "errors": {
-        "createFailed": "معرفناش نعمل المنتج. جرّب تاني من فضلك."
+        "createFailed": "معرفناش نضيف المنتج. جرّب تاني.",
+        "priceMin": "السعر لازم يكون أكتر من صفر."
+      },
+      "toast": {
+        "created": "اتضاف المنتج"
       }
     },
     "newArrivalsOrder": {
@@ -1159,13 +1230,18 @@
         "silver": "فضة",
         "platinum": "بلاتين",
         "custom": "لون مخصص"
+      },
+      "removeDialog": {
+        "object": "المجسم ثلاثي الأبعاد للمنتج",
+        "consequence": "العملاء هيشوفوا صور المنتج بس.",
+        "confirmLabel": "شيل المجسم"
       }
     }
   },
   "orders": {
     "list": {
-      "title": "طلبات المتجر",
-      "subtitle": "عرض وإدارة طلبات هذا المتجر",
+      "title": "الطلبات",
+      "subtitle": "كل طلبات المتجر، من الجديد للمستلم",
       "backToStore": "العودة إلى المتجر",
       "search": {
         "placeholder": "البحث عن طلبات..."
@@ -1233,12 +1309,12 @@
         "perPage": "في الصفحة"
       },
       "confirm": {
-        "markPaid": "هل تؤكد استلام الدفع النقدي لهذا الطلب؟",
+        "markPaid": "استلمت فلوس الطلب ده كاش؟",
         "bulkMarkPaid": "تعليم {count} طلب كمدفوع؟",
         "markPaidTitle": "تعليم الطلب كمدفوع",
-        "markPaidDescription": "تأكيد استلام المبلغ نقدًا للطلب ده. مش هينفع تتراجع عن الإجراء ده.",
+        "markPaidDescription": "هنسجّل إنك استلمت المبلغ كاش للطلب ده، ومش هتقدر ترجّع الخطوة دي.",
         "bulkMarkPaidTitle": "تعليم الطلبات كمدفوعة",
-        "bulkMarkPaidDescription": "تعليم {count} طلب كمدفوع؟ مش هينفع تتراجع عن الإجراء ده.",
+        "bulkMarkPaidDescription": "هنعلّم {count} طلب كمدفوع، ومش هتقدر ترجّع الخطوة دي.",
         "confirm": "تأكيد",
         "cancel": "إلغاء",
         "manualRefundTitle": "تعليم الطلب كمسترد؟",
@@ -1256,7 +1332,10 @@
         "refundReferencePlaceholder": "رقم التحويل أو ملاحظة قصيرة",
         "refundFailed": "معرفناش نسجّل الاسترداد. جرّب تاني.",
         "instapayTitle": "تأكيد تحويل إنستاباي؟",
-        "instapayDescription": "أكّد أن مبلغ هذا الطلب وصل إلى حسابك في إنستاباي. سيصبح الطلب مؤكداً وجاهزاً للشحن. الضغط مرتين آمن."
+        "instapayDescription": "أكّد أن مبلغ هذا الطلب وصل إلى حسابك في إنستاباي. سيصبح الطلب مؤكداً وجاهزاً للشحن. الضغط مرتين آمن.",
+        "markPaidLabel": "علّم الطلب مدفوع",
+        "bulkMarkPaidLabel": "علّم الطلبات مدفوعة",
+        "instapayLabel": "أيوه، الفلوس وصلت"
       },
       "toast": {
         "errorTitle": "خطأ",
@@ -1270,21 +1349,24 @@
         "instapayAlready": "تم تأكيده من قبل"
       },
       "export": {
-        "button": "تصدير الطلبات",
-        "exporting": "جارٍ التصدير...",
-        "failed": "فشل التصدير"
+        "button": "نزّل الطلبات Excel",
+        "exporting": "بنجهّز الملف...",
+        "failed": "معرفناش نجهّز ملف الطلبات. جرّب تاني."
       },
       "errors": {
         "fetchFailed": "معرفناش نجيب الطلبات",
-        "connection": "معرفناش نتصل بالسيرفر. اتأكد من النت وجرّب تاني من فضلك.",
+        "connection": "معرفناش نتصل بالسيرفر. اتأكد من النت وجرّب تاني.",
         "statusUpdate": "معرفناش نحدّث الحالة",
         "markPaid": "معرفناش نعلّم الطلب كمدفوع",
         "bulkMarkPaid": "معرفناش نعلّم الطلبات كلها كمدفوعة",
         "retry": "إعادة المحاولة",
-        "confirmInstapay": "معرفناش نأكد دفعة إنستاباي"
+        "confirmInstapay": "معرفناش نأكد دفعة إنستاباي",
+        "invoiceLoad": "معرفناش نفتح الفاتورة",
+        "invoiceLoadHttp": "السيرفر رجّع خطأ {status}. جرّب تاني."
       },
       "agentBadge": "وكيل ذكي",
-      "newOrder": "+ طلب جديد"
+      "newOrder": "طلب تليفون جديد",
+      "moreMenu": "خيارات تانية للطلبات"
     },
     "status": {
       "pending": "قيد الانتظار",
@@ -1425,14 +1507,14 @@
       "whatsappCustomer": "واتساب",
       "actions": {
         "processed": "تمت المعالجة",
-        "cancel": "إلغاء",
-        "more": "المزيد",
-        "printInvoice": "طباعة الفاتورة",
-        "markPaid": "وضع كمدفوع",
+        "cancel": "ألغي الطلب",
+        "more": "خيارات تانية للطلب",
+        "printInvoice": "اطبع الفاتورة",
+        "markPaid": "علّم الطلب مدفوع",
         "addNote": "إضافة ملاحظة",
         "refund": "استرداد",
         "toolbarLabel": "إجراءات الطلب",
-        "confirmInstapay": "تم استلام المبلغ"
+        "confirmInstapay": "الفلوس وصلت"
       },
       "loading": "جاري تحميل الطلب…",
       "errors": {
@@ -1575,7 +1657,12 @@
       "priceTier": "سعر الجملة، {qty}+ وحدة",
       "priceWholesale": "سعر الجملة",
       "priceQuantity": "سعر الكمية، {qty}+ وحدة",
-      "priceGroup": "مجموعة السعر"
+      "priceGroup": "مجموعة السعر",
+      "cancelDialog": {
+        "object": "الطلب {number}",
+        "consequence": "الطلب هيتلغي ومش هتقدر ترجّع حالته.",
+        "confirmLabel": "ألغي الطلب"
+      }
     },
     "layout": {
       "common": {
@@ -1787,7 +1874,8 @@
         "noBuyersSub": "مفيش طلبات لسه",
         "ordersSub": "{count, plural, one {من طلب واحد} two {من طلبين} few {من {count, number, latn} طلبات} many {من {count, number, latn} طلبًا} other {من {count, number, latn} طلب}}",
         "spentSub": "كل الطلبات عدا الملغاة والمستردة وفاشلة الدفع (يُحتسب الدفع عند الاستلام غير المحصَّل)"
-      }
+      },
+      "moreMenu": "خيارات تانية للعملاء"
     },
     "detail": {
       "loading": "جاري التحميل…",
@@ -1969,7 +2057,7 @@
     "topProducts": {
       "title": "أفضل المنتجات",
       "empty": "مفيش بيانات مبيعات لسه",
-      "soldCount": "تم بيع {count}"
+      "soldCount": "اتباع {count}"
     },
     "recentOrders": {
       "title": "أحدث 5 طلبات (كل الفترات)",
@@ -1980,8 +2068,8 @@
       "pending": "قيد الانتظار",
       "confirmed": "مؤكد",
       "processing": "قيد المعالجة",
-      "shipped": "تم الشحن",
-      "delivered": "تم التسليم",
+      "shipped": "اتشحن",
+      "delivered": "اتسلّم",
       "cancelled": "ملغى",
       "refunded": "مُسترد"
     },
@@ -2018,7 +2106,10 @@
     "errors": {
       "loadFailedTitle": "معرفناش نحمّل بعض التحليلات",
       "loadFailedBody": "أحد الطلبات فشل. ممكن تكون الأرقام اللي تحت ناقصة.",
-      "retry": "إعادة المحاولة"
+      "retry": "إعادة المحاولة",
+      "cashflowLockedTitle": "حركة النقدية مقفولة على باقتك",
+      "cashflowLockedBody": "حركة النقدية والمخزون المالي متاحة لصاحب المتجر على الباقات اللي فيها المحاسبة.",
+      "cashflowLockedCta": "شوف الباقات"
     },
     "priceSource": {
       "title": "الجملة مقابل التجزئة",
@@ -2039,13 +2130,13 @@
   "settings": {
     "page": {
       "title": "إعدادات المتجر",
-      "subtitle": "إعداد جميع جوانب هذا المتجر",
+      "subtitle": "كل ما يخص متجرك في مكان واحد",
       "backToStore": "العودة إلى المتجر"
     },
     "cards": {
       "branding": {
-        "title": "الهوية البصرية",
-        "description": "الشعار، الألوان، الخطوط، معلومات التواصل وروابط التواصل الاجتماعي"
+        "title": "الشعار والألوان",
+        "description": "الشعار وألوان المتجر وبيانات التواصل"
       },
       "navigation": {
         "title": "التنقل",
@@ -2056,40 +2147,40 @@
         "description": "تخصيص القسم الرئيسي للصفحة الرئيسية — العنوان، النص التعريفي، زر الإجراء وصورة الخلفية"
       },
       "categories": {
-        "title": "الفئات",
-        "description": "إدارة فئات المنتجات، الصور وترتيب العرض"
+        "title": "الأقسام",
+        "description": "رتّب أقسام المنتجات وصورها"
       },
       "seo": {
-        "title": "SEO",
-        "description": "عناوين الميتا، أوصاف الميتا وتحسين محركات البحث"
+        "title": "ظهور المتجر في جوجل",
+        "description": "عناوين وأوصاف صفحاتك في نتايج البحث"
       },
       "announcement": {
         "title": "شريط الإعلانات",
-        "description": "عرض شريط أعلى متجرك للترويجات أو الأخبار"
+        "description": "شريط فوق المتجر للعروض والأخبار"
       },
       "domain": {
-        "title": "النطاق",
-        "description": "ربط نطاق مخصّص بمتجرك"
+        "title": "الدومين",
+        "description": "اربط دومين خاص باسم متجرك"
       },
       "paymentSettings": {
-        "title": "إعدادات الدفع",
-        "description": "تكوين مزوّدي الدفع: Paymob وKashier وفوري وإنستاباي والدفع عند الاستلام"
+        "title": "الدفع",
+        "description": "اختار طرق الدفع اللي عملاءك يستخدموها"
       },
       "shipping": {
         "title": "الشحن",
-        "description": "مناطق التوصيل، أسعار الشحن وإعدادات شركات الشحن"
+        "description": "مناطق التوصيل وأسعار الشحن"
       },
       "taxSettings": {
-        "title": "إعدادات الضرائب",
-        "description": "معدلات الضريبة، قواعد احتساب الضريبة والإعفاءات"
+        "title": "الضرائب",
+        "description": "نسب الضريبة وإعفاءاتها"
       },
       "pwaSettings": {
-        "title": "إعدادات PWA",
-        "description": "تكوين تطبيق الويب التقدمي لمستخدمي الأجهزة المحمولة"
+        "title": "تطبيق على الموبايل",
+        "description": "خلّي عملاءك يثبّتوا المتجر كتطبيق على تليفونهم"
       },
       "template": {
-        "title": "القالب",
-        "description": "اختر وخصّص قالب تصميم واجهة المتجر"
+        "title": "شكل المتجر",
+        "description": "افتح المحرر وغيّر الألوان والصفحات والتصميم"
       },
       "pages": {
         "title": "روابط التذييل",
@@ -2097,7 +2188,7 @@
       },
       "language": {
         "title": "اللغة",
-        "description": "حدّد اللغة الافتراضية لواجهة متجرك"
+        "description": "اللغة اللي المتجر بيفتح بيها لعملائك"
       },
       "marketingPixels": {
         "title": "بكسلات التسويق",
@@ -2105,7 +2196,7 @@
       },
       "notifications": {
         "title": "الإشعارات",
-        "description": "إعدادات الرسائل النصية والإشعارات الفورية"
+        "description": "رسائل العملاء وتنبيهات الطلبات الجديدة"
       },
       "affiliates": {
         "title": "برنامج التسويق بالعمولة",
@@ -2124,36 +2215,36 @@
         "description": "عرض وتصدير قائمة البريد المسجلة من واجهة متجرك"
       },
       "staff": {
-        "title": "أعضاء الفريق",
-        "description": "أضف موظفين بصلاحيات محدودة لإدارة الطلبات والمنتجات والمخزون"
+        "title": "فريق العمل",
+        "description": "ضيف موظفين بصلاحيات محدودة"
       },
       "waBotConfig": {
         "title": "إعدادات بوت واتساب",
         "description": "وضع البوت · قائمة الخدمات · بيانات كتالوج ميتا كوميرس"
       },
       "checkoutDelivery": {
-        "title": "التوصيل",
-        "description": "ملاحظة معلومات التوصيل ومُحدِّد مواعيد التوصيل التي تظهر عند الدفع"
+        "title": "مواعيد التوصيل",
+        "description": "ملاحظة التوصيل ومواعيده اللي بتظهر للعميل وهو بيدفع"
       },
       "agentKey": {
         "title": "مفتاح وكيل الذكاء الاصطناعي",
-        "description": "إصدار أو تدوير أو إلغاء المفتاح الذي يحتاجه وكيل الذكاء الاصطناعي للطلب من هذا المتجر"
+        "description": "مفتاح بيخلّي وكيل ذكاء اصطناعي يطلب من متجرك"
       },
       "merchantKeys": {
         "title": "مفاتيح MCP للتاجر",
-        "description": "أصدر مفاتيح لإدارة هذا المتجر من Claude Code أو أي عميل MCP"
+        "description": "مفاتيح بتدير بيها المتجر من Claude Code أو أي أداة MCP"
       },
       "billing": {
-        "title": "الفوترة",
-        "description": "الباقة والاستخدام والحدود"
+        "title": "الباقة والفواتير",
+        "description": "باقتك الحالية واستهلاكك"
       },
       "webhooks": {
         "title": "ويب هوك",
-        "description": "ابعت أحداث الطلبات والمنتجات لسيرفرك الخاص"
+        "description": "ابعت أحداث الطلبات والمنتجات لسيرفرك"
       },
       "qrCodes": {
         "title": "أكواد QR والباركود",
-        "description": "أكواد QR وملصقات باركود المنتجات وباركود الفاتورة، مع فحص القراءة"
+        "description": "QR للمتجر وباركود للمنتجات والفواتير"
       }
     },
     "metaCatalogCard": {
@@ -2186,15 +2277,26 @@
     "settingsSearch": {
       "placeholder": "ابحث في الإعدادات...",
       "noResults": "مفيش إعدادات"
+    },
+    "groups": {
+      "store": "المتجر",
+      "sales": "البيع والدفع",
+      "visibility": "الظهور",
+      "team": "الفريق والحساب",
+      "developers": "للمطورين"
+    },
+    "rail": {
+      "label": "أقسام الإعدادات",
+      "allSettings": "كل الإعدادات"
     }
   },
   "branding": {
     "page": {
       "title": "هوية المتجر",
-      "subtitle": "تخصيص الهوية البصرية لـ {name}"
+      "subtitle": "الاسم واللوجو والألوان وبيانات التواصل لـ {name}"
     },
     "actions": {
-      "save": "حفظ التغييرات",
+      "save": "احفظ الهوية",
       "saving": "جارٍ الحفظ...",
       "backToStores": "العودة إلى المتاجر"
     },
@@ -2209,10 +2311,10 @@
       "accessDeniedBody": "مفيش عندك صلاحية لتحديث المتجر ده",
       "sessionExpiredTitle": "انتهت الجلسة",
       "sessionExpiredBody": "سجّل الدخول تاني من فضلك",
-      "saveFailedPrefix": "معرفناش نحفظ ",
+      "saveFailedPrefix": "مقدرناش نحفظ الهوية",
       "serverError": "خطأ في الخادم",
-      "saveSuccessTitle": "تم حفظ الهوية البصرية",
-      "saveSuccessBody": "تم حفظ جميع التغييرات بنجاح"
+      "saveSuccessTitle": "اتحفظت الهوية",
+      "saveSuccessBody": "كل التغييرات اتحفظت مرة واحدة."
     },
     "tabs": {
       "ariaLabel": "تبويبات إعدادات الهوية البصرية",
@@ -2321,12 +2423,12 @@
         "hideMobileLabel": "إخفاء شعار التذييل على الجوال (يبقى شعار سطح المكتب ظاهرًا). مفيد عندما يكون شعار الهيدر على الجوال كبيرًا بالفعل ويكون التذييل أوضح كنص فقط."
       },
       "logoSize": {
-        "title": "حجم الشعار",
-        "hint": "حجم ظهور شعارك في الهيدر. \"تلقائي\" يضبط كل شعار حسب شكله. S / M / L ثلاثة أحجام ثابتة (S الأصغر، L بالحجم الكامل الافتراضي) — اختيار أي منها يغيّر الشعار فوراً. يؤثر على هذا المتجر فقط.",
+        "title": "حجم اللوجو",
+        "hint": "اختار حجم اللوجو في أعلى المتجر.",
         "auto": "تلقائي",
-        "sm": "S",
-        "md": "M",
-        "lg": "L"
+        "sm": "صغير",
+        "md": "وسط",
+        "lg": "كبير"
       },
       "blog": {
         "title": "تفعيل المدونة",
@@ -2388,6 +2490,17 @@
         "generateButton": "توليد لوحة الألوان من ألوان العلامة",
         "smartPaletteButton": "توليد من اللوحة الذكية",
         "editorLink": "اضبط الألوان في المحرر"
+      },
+      "elsewhere": {
+        "title": "إعدادات تانية بتلاقيها في مكانها",
+        "blog": "تشغيل المدونة بيتم من صفحة المدونة.",
+        "blogLink": "افتح المدونة",
+        "webPush": "إشعارات المتصفح للعملاء بتتشغل من صفحة الإشعارات.",
+        "webPushLink": "افتح الإشعارات"
+      },
+      "advanced": {
+        "title": "متقدم: شكل الأيقونات والفوتر",
+        "hint": "إعدادات بتتغير نادرًا. باقي تفاصيل الشكل بتلاقيها في المحرر."
       }
     },
     "preview": {
@@ -2508,16 +2621,25 @@
   "coupons": {
     "page": {
       "title": "كوبونات الخصم",
-      "subtitle": "إدارة أكواد الخصم والترويج"
+      "subtitle": "أكواد الخصم اللي العملاء بيكتبوها عند الدفع",
+      "loadFailed": "معرفناش نجيب الكوبونات. اتأكد من النت وجرّب تاني.",
+      "deleteFailed": "معرفناش نمسح الكوبون. جرّب تاني.",
+      "toggleFailed": "معرفناش نغيّر حالة الكوبون. جرّب تاني."
     },
     "actions": {
-      "create": "إنشاء كوبون",
-      "update": "تحديث الكوبون",
+      "create": "ضيف كوبون",
+      "update": "احفظ الكوبون",
       "cancel": "إلغاء",
       "edit": "تعديل",
-      "delete": "حذف",
-      "activate": "تفعيل",
-      "deactivate": "تعطيل"
+      "delete": "امسح الكوبون",
+      "activate": "فعّل الكوبون",
+      "deactivate": "وقّف الكوبون",
+      "menu": "خيارات الكوبون {code}",
+      "deleteDialog": {
+        "object": "الكوبون {code}",
+        "consequence": "العملاء مش هيقدروا يستخدموه تاني، ومش هتقدر ترجّعه.",
+        "confirmLabel": "امسح الكوبون"
+      }
     },
     "filters": {
       "searchPlaceholder": "البحث عن كوبونات...",
@@ -2550,12 +2672,15 @@
     },
     "empty": {
       "title": "مفيش كوبونات لسه",
-      "description": "تتيح الكوبونات تقديم خصومات نسبية أو ثابتة عند الدفع. أنشئ كوبونًا لإطلاق حملة ترويجية أو مكافأة العملاء الدائمين.",
-      "createFirst": "أنشئ أول كوبون لك"
+      "description": "الكوبون بيدّي العميل خصم بنسبة أو بمبلغ ثابت لما يكتبه عند الدفع. ابدأ بكوبون لحملة أو لعميل بيرجعلك.",
+      "createFirst": "ضيف أول كوبون"
     },
     "modal": {
-      "createTitle": "إنشاء كوبون",
-      "editTitle": "تعديل الكوبون"
+      "createTitle": "كوبون جديد",
+      "editTitle": "تعديل الكوبون",
+      "valueInvalid": "اكتب قيمة الخصم، لازم تكون أكبر من صفر.",
+      "valuePercentMax": "نسبة الخصم لازم تكون من 1 لـ 100.",
+      "saveFailed": "معرفناش نحفظ الكوبون. جرّب تاني."
     },
     "form": {
       "codeLabel": "كود الكوبون *",
@@ -2601,8 +2726,8 @@
   "promotions": {
     "page": {
       "title": "العروض الترويجية",
-      "subtitle": "خصومات تلقائية تُطبّق عند الدفع دون الحاجة لكود.",
-      "addNew": "عرض جديد",
+      "subtitle": "خصومات بتتطبق لوحدها عند الدفع من غير كود.",
+      "addNew": "ضيف عرض",
       "name": "الاسم",
       "nameAr": "الاسم (بالعربية)",
       "description": "الوصف",
@@ -2620,7 +2745,7 @@
       "activeLabel": "العرض مفعّل",
       "targetingHeading": "الاستهداف",
       "customerGroup": "مجموعة العملاء",
-      "allCustomers": "جميع العملاء",
+      "allCustomers": "كل العملاء",
       "minOrderAmount": "الحد الأدنى لمبلغ الطلب (ج.م)",
       "minQuantity": "الحد الأدنى للكمية",
       "firstOrderOnlyLabel": "الطلب الأول فقط",
@@ -2629,7 +2754,7 @@
       "scopeCategories": "فئات محددة",
       "scopeCategoriesPlaceholder": "البحث عن فئات…",
       "scopeEmptyHint": "مفيش نتائج",
-      "scopeRemove": "إزالة",
+      "scopeRemove": "شيل",
       "discount": "الخصم",
       "targeting": "الاستهداف",
       "firstOrderBadge": "الطلب الأول",
@@ -2637,95 +2762,109 @@
       "status": "الحالة",
       "actions": "الإجراءات",
       "edit": "تعديل",
-      "delete": "حذف",
+      "delete": "امسح العرض",
       "statusActive": "نشط",
       "statusInactive": "غير نشط",
       "loading": "جارٍ التحميل…",
       "emptyTitle": "مفيش عروض ترويجية لسه",
-      "emptyBody": "أنشئ عرضًا لتطبيق خصم تلقائي — دون الحاجة لكود عند الدفع.",
-      "createTitle": "عرض ترويجي جديد",
-      "editTitle": "تعديل العرض الترويجي",
-      "save": "حفظ",
-      "saving": "جارٍ الحفظ…",
+      "emptyBody": "العرض بيطبّق خصم تلقائي من غير ما العميل يكتب كود.",
+      "createTitle": "عرض جديد",
+      "editTitle": "تعديل العرض",
+      "save": "احفظ العرض",
+      "saving": "بنحفظ...",
       "cancel": "إلغاء",
       "deleteConfirm": "حذف \"{name}\"؟",
-      "loadFailed": "معرفناش نحمّل العروض الترويجية.",
-      "saveFailed": "معرفناش نحفظ العرض الترويجي.",
-      "deleteFailed": "معرفناش نمسح العرض الترويجي."
+      "loadFailed": "معرفناش نجيب العروض. جرّب تاني.",
+      "saveFailed": "معرفناش نحفظ العرض. جرّب تاني.",
+      "deleteFailed": "معرفناش نمسح العرض. جرّب تاني.",
+      "deleteDialog": {
+        "object": "العرض «{name}»",
+        "consequence": "هيقف فورًا ومش هتقدر ترجّعه.",
+        "confirmLabel": "امسح العرض"
+      },
+      "addFirst": "ضيف أول عرض",
+      "rowMenu": "خيارات العرض {name}"
     }
   },
   "bundles": {
     "page": {
-      "title": "الباقات",
-      "subtitle": "بيع مجموعة ثابتة من المنتجات كعنصر واحد بسعر واحد.",
-      "addNew": "باقة جديدة",
+      "title": "مجموعات المنتجات",
+      "subtitle": "بيع مجموعة منتجات ثابتة كأنها قطعة واحدة بسعر واحد.",
+      "addNew": "ضيف مجموعة",
       "name": "الاسم",
       "nameAr": "الاسم (بالعربية)",
       "slug": "المعرّف (Slug)",
       "description": "الوصف",
       "descriptionAr": "الوصف (بالعربية)",
       "image": "الصورة",
-      "uploadImage": "رفع صورة الباقة",
+      "uploadImage": "ارفع صورة المجموعة",
       "pricingHeading": "التسعير",
       "pricingType": "نوع التسعير",
       "pricingTypeFixedPrice": "سعر ثابت",
       "pricingTypePercentage": "نسبة خصم مئوية",
       "pricingTypeFixed": "مبلغ خصم ثابت",
-      "pricingValueLabelFixedPrice": "سعر الباقة (ج.م)",
+      "pricingValueLabelFixedPrice": "سعر المجموعة (ج.م)",
       "pricingValueLabelPercentage": "الخصم (%)",
       "pricingValueLabelFixed": "قيمة الخصم (ج.م)",
-      "activeLabel": "الباقة مفعّلة",
+      "activeLabel": "المجموعة شغالة",
       "startsAt": "تاريخ البدء",
       "expiresAt": "تاريخ الانتهاء",
       "itemsHeading": "العناصر",
       "componentSum": "إجمالي المكوّنات",
-      "derivedPrice": "سعر الباقة",
+      "derivedPrice": "سعر المجموعة",
       "derivedAvailability": "الكمية المتاحة حاليًا",
       "unlimited": "غير محدود",
-      "availableCount": "{count} باقة",
+      "availableCount": "{count} مجموعة",
       "mayNotSplitEvenly": "قد لا يُقسّم هذا السعر بالتساوي على العناصر — احفظ لترى الحل الدقيق إن وُجد.",
-      "discountAboveComponentSum": "خصم بقيمة {sum} أو أكثر يجعل الباقة مجانية — اجعله أقل من إجمالي المكونات.",
-      "zeroPriceWillNotSell": "لا تُباع الباقة بسعر 0 بينما تبلغ قيمة عناصرها {sum} — حدد سعرًا أعلى من 0 أو اجعل العناصر نفسها مجانية.",
-      "priceAboveComponentSum": "مينفعش سعر الباقة يكون أكتر من مجموع مكوناتها ({sum}) — اخفض السعر أو ضيف منتجات.",
+      "discountAboveComponentSum": "خصم بقيمة {sum} أو أكتر هيخلّي المجموعة ببلاش. خلّيه أقل من إجمالي المنتجات.",
+      "zeroPriceWillNotSell": "المجموعة مش هتتباع بسعر 0 وقيمة منتجاتها {sum}. حط سعر أكبر من 0 أو خلّي المنتجات نفسها ببلاش.",
+      "priceAboveComponentSum": "سعر المجموعة مينفعش يكون أكتر من مجموع منتجاتها ({sum}). قلّل السعر أو ضيف منتجات.",
       "priceNotAllocatable": "مينفعش نقسم {price} بالتساوي على العناصر دي — نستخدم {suggested}؟",
       "useSuggested": "استخدام {suggested}",
       "loading": "جارٍ التحميل…",
-      "emptyTitle": "مفيش باقات لسه",
-      "emptyBody": "أنشئ باقة لبيع مجموعة ثابتة من المنتجات كعنصر واحد بسعر واحد.",
+      "emptyTitle": "مفيش مجموعات منتجات لسه",
+      "emptyBody": "المجموعة بتبيع كذا منتج مع بعض بسعر واحد، زي طقم أو هدية.",
       "items": "العناصر",
       "itemsCount": "{count} عنصر",
       "price": "السعر",
       "availability": "التوفر",
       "ofComponentSum": "(من {sum})",
       "status": "الحالة",
-      "notPurchasableHint": "(غير قابلة للشراء حاليًا)",
+      "notPurchasableHint": "(مش متاحة للشراء دلوقتي)",
       "actions": "الإجراءات",
       "edit": "تعديل",
-      "deactivate": "إيقاف",
-      "statusActive": "نشطة",
-      "statusInactive": "غير نشطة",
-      "createTitle": "باقة جديدة",
-      "editTitle": "تعديل الباقة",
-      "save": "حفظ",
-      "saving": "جارٍ الحفظ…",
+      "deactivate": "وقّف المجموعة",
+      "statusActive": "شغالة",
+      "statusInactive": "واقفة",
+      "createTitle": "مجموعة جديدة",
+      "editTitle": "تعديل المجموعة",
+      "save": "احفظ المجموعة",
+      "saving": "بنحفظ...",
       "cancel": "إلغاء",
       "deactivateConfirm": "إيقاف \"{name}\"؟ ستتوقف عن البيع، لكن سيُحتفظ بالإشارات إليها في السلال والطلبات الحالية.",
-      "loadFailed": "معرفناش نحمّل الباقات. جرّب تاني",
-      "saveFailed": "معرفناش نحفظ الباقة.",
-      "deactivateFailed": "معرفناش نوقف الباقة. جرّب تاني"
+      "loadFailed": "معرفناش نجيب المجموعات. جرّب تاني.",
+      "saveFailed": "معرفناش نحفظ المجموعة. جرّب تاني.",
+      "deactivateFailed": "معرفناش نوقّف المجموعة. جرّب تاني.",
+      "deactivateDialog": {
+        "object": "المجموعة «{name}»",
+        "consequence": "هتبطل تتباع، لكن الطلبات والسلات الحالية هتفضل محتفظة بيها.",
+        "confirmLabel": "وقّف المجموعة"
+      },
+      "addFirst": "ضيف أول مجموعة",
+      "rowMenu": "خيارات المجموعة {name}"
     },
     "itemPicker": {
       "heading": "منتجات المكوّنات",
-      "limitReached": "تم الوصول للحد الأقصى {max} عنصرًا لكل باقة.",
+      "limitReached": "وصلت للحد الأقصى: {max} منتج في المجموعة.",
       "searchPlaceholder": "البحث عن منتجات…",
       "stockCount": "{count} متوفر بالمخزون",
       "notTracked": "غير متتبّع",
       "loadingVariants": "جارٍ تحميل المتغيرات…",
       "chooseVariant": "{product} — اختر متغيرًا:",
       "cancelVariant": "إلغاء",
-      "empty": "مفيش عناصر لسه. ابحث فوق عشان تضيف أول مكوّن.",
+      "empty": "لسه مفيش منتجات. دوّر فوق وضيف أول منتج.",
       "quantityLabel": "الكمية",
-      "removeLabel": "إزالة"
+      "removeLabel": "شيل"
     }
   },
   "shipping": {
@@ -2981,7 +3120,7 @@
       "sectionSubtitle": "حدّد رسوم التوصيل لكل منطقة في مصر. هذه هي الطريقة الموصى بها لتسعير التوصيل.",
       "applyAll": "تطبيق الرسوم على جميع مناطق المحافظة:",
       "applyBtn": "تطبيق",
-      "applyAllGlobal": "تطبيق على جميع المناطق (كل المحافظات)",
+      "applyAllGlobal": "طبّق سعر واحد على كل المحافظات",
       "applyAllGlobalFee": "الرسوم الثابتة",
       "applyAllGlobalThreshold": "حد الشحن المجاني",
       "applyAllGlobalFeeBtn": "تطبيق الرسوم على الكل",
@@ -3037,7 +3176,17 @@
       "cityEnSample": "e.g. Riyadh",
       "cityArSample": "مثال: الرياض",
       "districtEnSample": "e.g. Al Olaya",
-      "districtArSample": "مثال: العليا"
+      "districtArSample": "مثال: العليا",
+      "moreMenu": "خيارات تانية للأسعار",
+      "firstRunTitle": "سعر واحد لكل مصر؟",
+      "firstRunHint": "اكتب سعر الشحن مرة واحدة وهنطبّقه على كل المحافظات. تقدر تغيّر سعر محافظة معينة بعدين.",
+      "firstRunFee": "سعر الشحن",
+      "firstRunFeePlaceholder": "مثلًا 50",
+      "firstRunFreeOver": "الشحن ببلاش لو الطلب فوق (اختياري)",
+      "firstRunFreeOverPlaceholder": "مثلًا 1000",
+      "firstRunSave": "احفظ السعر ده لكل مصر",
+      "perGovernorateTitle": "أسعار مختلفة لكل محافظة",
+      "perGovernorateHint": "افتح المحافظة وحدد سعر كل منطقة فيها."
     },
     "returnPolicy": {
       "title": "سياسة الإرجاع",
@@ -3056,7 +3205,13 @@
   "tax": {
     "page": {
       "title": "الضرائب وضريبة القيمة المضافة",
-      "subtitle": "تسجيل ضريبة القيمة المضافة ومعدلات الضريبة وإعدادات متجرك"
+      "subtitle": "تسجيل ضريبة القيمة المضافة ومعدلات الضريبة وإعدادات متجرك",
+      "rateSaveFailed": "مقدرناش نحفظ النسبة",
+      "rateToggleFailed": "مقدرناش نغيّر حالة النسبة",
+      "rateDeleteFailed": "مقدرناش نمسح النسبة",
+      "rateDeleteObject": "نسبة الضريبة «{name}»",
+      "rateDeleteConsequence": "النسبة هتتشال من المتجر ومش هتتطبق على أي طلب جديد.",
+      "rateDeleteLabel": "امسح النسبة"
     },
     "settings": {
       "title": "الإعدادات العامة",
@@ -3139,6 +3294,13 @@
       "sum": "كل معدل مفعّل يُطبَّق على كل طلب، وتُجمع المعدلات المفعّلة معًا: 5% + 2% تُحصّل 7%. تعرض صفحة الدفع هذا المعدل المجمّع نفسه وتحصّله.",
       "combined": "المعدل المجمّع المحصّل حاليًا: {rate}%",
       "off": "تحصيل الضريبة متوقف — لا تُحصّل أي ضريبة مهما كانت المعدلات المدرجة."
+    },
+    "steps": {
+      "label": "خطوات إعداد الضريبة",
+      "register": "سجّل الرقم الضريبي",
+      "eta": "اربط الفاتورة الإلكترونية",
+      "rates": "حدد النسب",
+      "done": "خلصت"
     }
   },
   "inventory": {
@@ -3173,7 +3335,7 @@
       "searchPlaceholder": "البحث عن منتجات...",
       "tableLabel": "مخزون المنتجات",
       "empty": "مفيش منتجات متتبَّع مخزونها",
-      "emptyDescription": "تظهر هنا كل المنتجات التي تم تفعيل تتبّع المخزون لها. أضف منتجًا لبدء إدارة المخزون.",
+      "emptyDescription": "هنا بتظهر كل المنتجات اللي فعّلت لها تتبّع المخزون. ضيف منتج وابدأ تتابع مخزونه.",
       "adjustAction": "تعديل",
       "baseValue": "{value} ج.م",
       "filters": {
@@ -3259,14 +3421,17 @@
       "dismiss": "إغلاق"
     },
     "page": {
-      "title": "تطبيق ويب تقدمي",
-      "subtitle": "تمكين تجربة شبيهة بالتطبيق لعملائك"
+      "title": "تطبيق على موبايل العميل",
+      "subtitle": "العميل يثبّت متجرك على شاشة موبايله زي أي تطبيق",
+      "advanced": "متقدم: ملف التطبيق (manifest)",
+      "advancedHint": "ده اللي المتصفح بيقراه علشان يثبّت التطبيق. غالبًا مش هتحتاج تغيّر فيه حاجة."
     },
     "actions": {
       "statusLabel": "حالة PWA:",
-      "enabled": "مفعّل",
-      "disabled": "معطّل",
-      "save": "حفظ الإعدادات"
+      "enabled": "شغّال",
+      "disabled": "مقفول",
+      "save": "احفظ التطبيق",
+      "switchTitle": "شغّل التطبيق لعملاءك"
     },
     "messages": {
       "populated": "تم التعبئة من هوية المتجر",
@@ -4383,7 +4548,7 @@
     "list": {
       "title": "صفحات المحتوى",
       "subtitle": "حرّر صفحات من نحن، الخصوصية، الشروط وغيرها",
-      "newPage": "صفحة جديدة",
+      "newPage": "ضيف صفحة",
       "newPagePrompt": "معرّف الصفحة (حروف لاتينية صغيرة وأرقام وشرطات):",
       "openEditor": "تحرير",
       "loadError": "معرفناش نحمّل الصفحات.",
@@ -4394,7 +4559,8 @@
       "emptyHint": "اضغط على أي صفحة لكتابة محتواك. في حال عدم وجود محتوى مخصّص، يعرض المتجر النص الافتراضي.",
       "builtInsHeading": "الصفحات القياسية",
       "customHeading": "الصفحات المخصّصة",
-      "customEmpty": "مفيش صفحات مخصّصة لسه."
+      "customEmpty": "مفيش صفحات مخصّصة لسه.",
+      "faqsLink": "الأسئلة والأجوبة الشائعة بتلاقيها هنا."
     },
     "editor": {
       "title": "تحرير الصفحة",
@@ -4447,6 +4613,10 @@
       "wrapperNote": "المحرر ده بيتحكم في إطار الصفحة الثابت (صورة الغلاف والفقرات التعريفية وغيرها). محتوى الأكورديون اللي بيظهر في المتجر فعلاً بييجي من شاشة تانية.",
       "openFaqInSeo": "افتح الأسئلة الشائعة في السيو ←",
       "openHowToInSeo": "افتح أدلة الخطوات في السيو ←"
+    },
+    "faqsPage": {
+      "title": "أسئلة وأجوبة",
+      "subtitle": "الأسئلة اللي عملاءك بيسألوها وأدلة الخطوات. بتظهر في المتجر وفي نتايج البحث وإجابات الذكاء الاصطناعي."
     }
   },
   "pages": {
@@ -4547,7 +4717,12 @@
   "notifications": {
     "page": {
       "title": "الإشعارات",
-      "subtitle": "إعداد قنوات الرسائل النصية والإشعارات الفورية"
+      "subtitle": "اختار العميل يتبلّغ بإيه وعلى أنهي قناة",
+      "channelsTitle": "إعداد القنوات",
+      "channelsHint": "بيانات الربط بتتحط مرة واحدة. بعدها مش هتحتاج ترجعلها.",
+      "broadcastTitle": "ابعت إشعار لكل عملاءك دلوقتي",
+      "broadcastHint": "للرسائل اللي بتتبعت مرة واحدة زي العروض، الأفضل تستخدم الحملات.",
+      "campaignsLink": "افتح الحملات"
     },
     "empty": {
       "title": "مفيش قنوات إشعارات شغالة",
@@ -4584,12 +4759,12 @@
       "title": "الرسائل النصية",
       "subtitle": "رسائل نصية عبر Unifonic",
       "fields": {
-        "appSid": "App SID",
-        "senderId": "معرّف المرسل"
+        "appSid": "مفتاح التطبيق من Unifonic",
+        "senderId": "اسم المرسل اللي هيظهر للعميل"
       },
       "placeholders": {
-        "appSid": "Unifonic App SID",
-        "senderId": "مثال: MyStore"
+        "appSid": "المفتاح اللي هتلاقيه في حسابك على Unifonic",
+        "senderId": "مثلًا: MyStore"
       }
     },
     "push": {
@@ -4693,6 +4868,14 @@
       "testFailed": "فشل الاختبار.",
       "eventsSavedDescription": "تم حفظ إعدادات الأحداث.",
       "eventsSaveFailed": "معرفناش نحفظ إعدادات الأحداث."
+    },
+    "webPush": {
+      "title": "إشعارات المتصفح للعملاء",
+      "hint": "مقفولة في الأول. لما تشغّلها العميل يقدر يشترك ويستلم إشعارات على المتصفح (محتاجة إن باقتك فيها إشعارات الدفع).",
+      "onToast": "إشعارات المتصفح اشتغلت",
+      "offToast": "إشعارات المتصفح اتقفلت",
+      "failedTitle": "مقدرناش نغيّر إشعارات المتصفح",
+      "failedBody": "جرّب تاني بعد شوية."
     }
   },
   "loyalty": {
@@ -4822,7 +5005,9 @@
       "dateFromAriaLabel": "من تاريخ",
       "dateToAriaLabel": "إلى تاريخ",
       "customerIdPlaceholder": "رقم العميل...",
-      "customerIdAriaLabel": "تصفية حسب رقم العميل"
+      "customerIdAriaLabel": "تصفية حسب رقم العميل",
+      "loadFailed": "معرفناش نجيب حركات النقط.",
+      "retry": "جرّب تاني"
     }
   },
   "paymentSettings": {
@@ -4844,13 +5029,14 @@
       "loadFailed": "مقدرناش نجيب الإعداد الحالي."
     },
     "page": {
-      "title": "إعدادات الدفع",
-      "subtitle": "إعداد مزوّدي الدفع لهذا المتجر",
-      "intro": "فعّل أيّ مزوّد لتقبل وسيلة الدفع المقابلة عند الدفع. تحتاج كل بوّابة إلى بيانات اعتماد API من لوحة تحكّم المزوّد. الدفع عند الاستلام لا يتطلّب أيّ ربط — يكفي تفعيله.",
-      "testModeNote": "استخدم وضع الاختبار أثناء التحقق من الربط، ثم انتقل إلى الوضع المباشر قبل الإطلاق ليتمّ تنفيذ مدفوعات العملاء الفعلية."
+      "title": "وسائل الدفع",
+      "subtitle": "اختار العملاء يدفعوا بإيه، وفعّل أو أقفل كل وسيلة",
+      "intro": "شغّل أي وسيلة دفع علشان تظهر للعميل في الدفع. البوابات محتاجة بيانات الربط من لوحة المزوّد. الدفع عند الاستلام مش محتاج ربط، كفاية تشغّله.",
+      "testModeNote": "جرّب الربط على الوضع التجريبي الأول، وبعدين حوّل للوضع الفعلي قبل ما تفتح للعملاء."
     },
     "actions": {
-      "backToSettings": "العودة إلى الإعدادات"
+      "backToSettings": "العودة إلى الإعدادات",
+      "retry": "حاول تاني"
     },
     "errors": {
       "loadFailed": "معرفناش نحمّل إعدادات الدفع",
@@ -4864,9 +5050,9 @@
     "configure": "إعداد",
     "cod": {
       "displayNameLabel": "الاسم المعروض (الإنجليزية)",
-      "displayNamePlaceholder": "Cash on Delivery",
+      "displayNamePlaceholder": "مثلًا: Cash on Delivery",
       "displayNameArLabel": "الاسم المعروض (العربية)",
-      "displayNameArPlaceholder": "الدفع عند الاستلام",
+      "displayNameArPlaceholder": "مثلًا: الدفع عند الاستلام",
       "fixedFeeLabel": "رسوم إضافية (ج.م)",
       "fixedFeePlaceholder": "0.00",
       "fixedFeeEquals": "= {amount} ج.م",
@@ -4990,6 +5176,15 @@
         "payatfawry": "ادفع في فوري"
       },
       "requestProvider": "محتاج شركة دفع أو شحن تانية؟ كلّمنا"
+    },
+    "strip": {
+      "title": "شغّال دلوقتي",
+      "none": "مفيش وسيلة دفع شغّالة. شغّل واحدة من هنا أو ضيف وسيلة تحت.",
+      "count": "{count} وسيلة شغّالة",
+      "on": "شغّال",
+      "off": "مقفول",
+      "addTitle": "ضيف وسيلة دفع",
+      "addHint": "افتح الوسيلة، حط بيانات الربط، وجرّب الاتصال قبل ما تشغّلها."
     }
   },
   "hero": {
@@ -5035,30 +5230,30 @@
   },
   "announcement": {
     "page": {
-      "title": "شريط الإعلانات",
-      "subtitle": "عرض شريط أعلى متجرك",
+      "title": "شريط الإعلان",
+      "subtitle": "جملة قصيرة فوق المتجر كله، زي عرض أو شحن ببلاش",
       "loading": "جارٍ التحميل...",
       "backToSettings": "العودة إلى الإعدادات",
-      "saveChanges": "حفظ التغييرات",
+      "saveChanges": "احفظ الإعلان",
       "saving": "جارٍ الحفظ...",
       "preview": "معاينة",
       "content": "المحتوى",
       "textEnglish": "نص الإعلان (الإنجليزية)",
-      "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
+      "textEnglishPlaceholder": "Free shipping on orders over 500 EGP!",
       "textArabic": "نص الإعلان (العربية)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق 10 ج.م!",
+      "textArabicPlaceholder": "شحن ببلاش للطلبات فوق 500 جنيه!",
       "linkUrl": "رابط URL (اختياري)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "سيرتبط الشريط بالكامل بهذا الرابط عند النقر",
       "linkTextEnglish": "نص الرابط (الإنجليزية)",
-      "linkTextEnglishPlaceholder": "Shop Now",
+      "linkTextEnglishPlaceholder": "Shop now",
       "linkTextArabic": "نص الرابط (العربية)",
-      "linkTextArabicPlaceholder": "تسوق الآن",
+      "linkTextArabicPlaceholder": "اشتري دلوقتي",
       "colors": "الألوان",
       "textColor": "لون النص",
-      "successMessage": "تم حفظ إعدادات الإعلان بنجاح",
-      "failedMessage": "معرفناش نحفظ إعدادات الإعلان",
-      "connectionError": "معرفناش نتصل بالسيرفر"
+      "successMessage": "اتحفظ الإعلان",
+      "failedMessage": "مقدرناش نحفظ الإعلان",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني."
     }
   },
   "features": {
@@ -5194,7 +5389,7 @@
       "subtitle": "تحسين متجرك لمحركات البحث",
       "loading": "جارٍ التحميل...",
       "backToSettings": "العودة إلى الإعدادات",
-      "manageRedirects": "إدارة إعادة التوجيه",
+      "manageRedirects": "افتح التحويلات",
       "redirectsTitle": "إعادة توجيه الروابط",
       "redirectsSubtitle": "روابط قديمة تُحوَّل تلقائيًا (301) إلى منتج أو تصنيف أو مقالة تم تغيير رابطها.",
       "redirectsFromSlug": "من",
@@ -5212,7 +5407,7 @@
       "redirectsSearch": "بحث",
       "redirectsSearchPlaceholder": "ابحث بالرابط القديم أو الجديد",
       "redirectsShowingOf": "يتم عرض أحدث {shown} من أصل {total} إعادة توجيه. اعرض المزيد بالأسفل، أو استخدم البحث للعثور على إعادة توجيه أقدم.",
-      "saveChanges": "حفظ التغييرات",
+      "saveChanges": "احفظ إعدادات البحث",
       "saving": "جارٍ الحفظ...",
       "searchPreview": "معاينة نتيجة البحث",
       "previewDomain": "example.com",
@@ -5239,12 +5434,12 @@
       "googleSiteVerification": "التحقق من Google Search Console (للنطاق المخصص فقط)",
       "googleSiteVerificationPlaceholder": "الصق وسم meta كاملاً أو رمز التحقق فقط",
       "googleSiteVerificationHint": "متجرك موثّق بالفعل على ebda.app — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
-      "successMessage": "تم حفظ إعدادات SEO بنجاح",
-      "failedMessage": "معرفناش نحفظ إعدادات SEO",
-      "connectionError": "معرفناش نتصل بالسيرفر",
-      "aiGenerateTooltip": "إنشاء سيو بالذكاء الاصطناعي — يعبئ الحقول الفارغة فقط",
-      "aeoTitle": "تحسين نتائج محركات البحث الذكية",
-      "aeoHint": "تم تعبئة البيانات تلقائياً بواسطة نظام البحث الذكي، تقدر تعدل عليها حسب كل جهة.",
+      "successMessage": "اتحفظت إعدادات البحث",
+      "failedMessage": "مقدرناش نحفظ إعدادات البحث",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
+      "aiGenerateTooltip": "الذكاء الاصطناعي بيكتب عنوان ووصف للمتجر بالعربي والإنجليزي، وبيملأ الحقول الفاضية بس.",
+      "aeoTitle": "الإجابات اللي بتظهر في ChatGPT",
+      "aeoHint": "جملتين بسيطتين بتشرح بيهم متجرك، علشان مساعدات الذكاء الاصطناعي تقتبسهم لما حد يسأل عنك.",
       "aeoLabelEn": "وصف الميتا الخاص بـ AEO (إنجليزي)",
       "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Demo Shop is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "اترك الحقل فارغاً ليقوم نظام AEO بتعبئته تلقائياً. أسلوب إجابة مباشر، 130–160 حرف.",
@@ -5309,24 +5504,49 @@
       "socialYoutubePlaceholder": "https://youtube.com/@yourstore",
       "socialTwitter": "X (Twitter)",
       "socialTwitterPlaceholder": "https://twitter.com/yourstore",
-      "socialSaveError": "معرفناش نحفظ روابط التواصل",
+      "socialSaveError": "رابط ويكيبيديا أو ويكي داتا مش صحيح",
       "socialSaveSuccess": "تم حفظ روابط التواصل",
       "socialRedirectNote": "روابط منصات التواصل الاجتماعي (إنستغرام، فيسبوك، تيك توك...) تُدار في الهوية البصرية ← التواصل الاجتماعي. عدِّلها هناك لتُبقي كل شيء في مكان واحد.",
       "socialRedirectNoteLinkText": "الذهاب إلى الهوية البصرية ← التواصل الاجتماعي",
       "redirectsLoadMore": "عرض المزيد",
       "redirectsLoadingMore": "جارٍ التحميل…",
-      "generating": "جارٍ التوليد…",
-      "generateWithAi": "ولّد بالذكاء الاصطناعي",
-      "stepsCount": "{count, plural, one {خطوة} two {خطوتين} few {{count} خطوات} other {{count} خطوة}}"
+      "generating": "بكتب...",
+      "generateWithAi": "اكتب لي العنوان والوصف",
+      "stepsCount": "{count, plural, one {خطوة} two {خطوتين} few {{count} خطوات} other {{count} خطوة}}",
+      "redirectsPrompt": "عايز تحوّل رابط قديم لرابط جديد؟",
+      "faqsMovedLink": "الأسئلة والأجوبة بقت في المحتوى",
+      "aiFailedTitle": "مقدرناش نكتب النص",
+      "aiFailedBody": "جرّب تاني بعد شوية.",
+      "aiFilledTitle": "النص اتكتب",
+      "aiFilledBody": "ملينا: {fields}. راجعهم وبعدين احفظ.",
+      "aiNothingToFillTitle": "مفيش حقول فاضية",
+      "aiNothingToFillBody": "كل الحقول متملية. امسح اللي عايز تغيّره وجرّب تاني.",
+      "aiField": {
+        "metaTitle": "العنوان بالإنجليزي",
+        "metaTitleAr": "العنوان بالعربي",
+        "metaDescription": "الوصف بالإنجليزي",
+        "metaDescriptionAr": "الوصف بالعربي"
+      },
+      "languageGuardTitle": "في حقل إنجليزي فيه كلام عربي",
+      "languageGuardBody": "اكتب الإنجليزي في: {fields}. الكلام العربي مكانه الحقول العربي.",
+      "languageGuardField": {
+        "metaTitle": "العنوان بالإنجليزي",
+        "metaDescription": "الوصف بالإنجليزي",
+        "metaDescriptionAeo": "إجابة الذكاء الاصطناعي بالإنجليزي"
+      },
+      "advancedGroup": "متقدم",
+      "redirectsDeleteObject": "التحويل ده",
+      "redirectsDeleteConsequence": "الرابط القديم هيبطل يوديك للرابط الجديد، واللي بيفتحه هيلاقي صفحة مش موجودة.",
+      "redirectsDeleteLabel": "امسح التحويل"
     }
   },
   "language": {
     "page": {
-      "title": "إعدادات اللغة",
-      "subtitle": "حدّد اللغة الافتراضية لواجهة متجرك",
+      "title": "اللغة",
+      "subtitle": "لغة المتجر اللي بتظهر للعميل أول ما يفتحه",
       "loading": "جارٍ التحميل...",
       "backToSettings": "العودة إلى الإعدادات",
-      "save": "حفظ التغييرات",
+      "save": "احفظ اللغة",
       "saving": "جارٍ الحفظ...",
       "defaultTitle": "اللغة الافتراضية لواجهة المتجر",
       "defaultHint": "سيرى الزوار الجدد واجهة المتجر بهذه اللغة. يمكنهم التبديل يدويًا.",
@@ -5334,9 +5554,9 @@
       "englishLayout": "من اليسار إلى اليمين",
       "arabicName": "العربية",
       "arabicLayout": "من اليمين إلى اليسار",
-      "successMessage": "تم حفظ إعدادات اللغة بنجاح",
-      "failedMessage": "معرفناش نحفظ إعدادات اللغة",
-      "connectionError": "معرفناش نتصل بالسيرفر"
+      "successMessage": "اتحفظت لغة المتجر",
+      "failedMessage": "مقدرناش نحفظ اللغة",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني."
     }
   },
   "domain": {
@@ -5358,8 +5578,8 @@
       "verified": "تم التحقق",
       "pending": "بانتظار التحقق",
       "dnsRequired": "مطلوب إعداد DNS",
-      "dnsInstructions": "أضف سجل DNS التالي لدى مزوّد النطاق:",
-      "dnsPropagation": "قد تستغرق تغييرات DNS حتى 48 ساعة للانتشار.",
+      "dnsInstructions": "ضيف سجلات الـ DNS دي عند مزوّد الدومين:",
+      "dnsPropagation": "تغييرات الـ DNS ممكن تاخد لحد 48 ساعة.",
       "checkDns": "فحص DNS",
       "checkingDns": "جارٍ الفحص...",
       "claimPending": "في انتظار التحقق من DNS للنطاق {domain}. ضيف سجلات DNS تحت؛ النطاق لسه مش شغال. هنفك حجز النطاق تلقائيًا لو التحقق ماتمش خلال 72 ساعة.",
@@ -5384,8 +5604,8 @@
       "statusFailed": "فشل التحقق",
       "statusNotConfigured": "غير مهيأ",
       "emailSenderError": "معرفناش نحدّث مرسل البريد الإلكتروني. جرّب تاني.",
-      "dnsPointingTitle": "سجلات DNS لا تشير إلى Vercel بعد",
-      "dnsPointingMessage": "تم التأكد من ملكية النطاق، لكن سجلات A/CNAME العامة لا تزال تشير إلى مكان آخر. الزوار الذين يدخلون نطاقك الآن لن يصلوا إلى متجرك. حدّث السجلات أدناه لدى مزوّد النطاق.",
+      "dnsPointingTitle": "الدومين لسه مش موجّه لمتجرك",
+      "dnsPointingMessage": "اتأكدنا إن الدومين بتاعك، بس سجلات الـ DNS لسه بتوديه لمكان تاني. اللي يفتح دومينك دلوقتي مش هيوصل لمتجرك. غيّر السجلات اللي تحت عند مزوّد الدومين.",
       "dnsPropagationConfirmed": "متجرك متاح الآن على https://{domain}",
       "colPriority": "الأولوية",
       "colTtl": "TTL",
@@ -5393,23 +5613,34 @@
       "wwwAutoAttachedMessage": "سيصل الزوار الذين يكتبون www.{domain} إلى متجرك أيضاً. لا تحتاج إلى أي إعداد إضافي في DNS لـ www — نقوم بربطه تلقائياً على مستوى المنصة عند حفظ النطاق.",
       "copy": "نسخ",
       "copyValueAriaLabel": "نسخ قيمة {type}",
-      "ttlAuto": "ساعة"
+      "ttlAuto": "ساعة",
+      "dnsWaitingTitle": "مستنيين الـ DNS يتحدّث",
+      "dnsWaitingMessage": "ضيف السجلات اللي تحت عند مزوّد الدومين. التحديث ممكن ياخد لحد 48 ساعة، وإحنا هنتأكد تلقائيًا.",
+      "dnsEmailTitle": "فاضل سجلات الإيميل",
+      "copyAll": "انسخ كل السجلات",
+      "copiedAll": "اتنسخت السجلات",
+      "emailInstructions": "ابعت التعليمات بالإيميل لمين بيدير الدومين",
+      "emailSubject": "سجلات DNS لربط دومين المتجر",
+      "emailBody": "محتاج تضيف سجلات الـ DNS دي عند مزوّد الدومين (النوع، الاسم، القيمة):",
+      "removeObject": "الدومين {domain}",
+      "removeConsequence": "المتجر هيرجع للرابط الأساسي بتاعه، والرابط ده مش هيفتح متجرك تاني.",
+      "removeLabel": "شيل الدومين"
     }
   },
   "categories": {
     "page": {
       "title": "فئات المنتجات",
-      "subtitle": "إدارة فئات هذا المتجر",
+      "subtitle": "الأقسام اللي بتقسّم بيها منتجاتك في المتجر",
       "backToStore": "العودة إلى المتجر",
-      "addCategory": "إضافة فئة",
+      "addCategory": "ضيف قسم",
       "retry": "إعادة المحاولة",
       "connectionError": "معرفناش نتصل بالسيرفر. اتأكد من النت وجرّب تاني.",
       "fetchFailed": "معرفناش نجيب الفئات",
-      "deleteTitle": "حذف الفئة",
-      "deleteConfirm": "حذف الفئة \"{name}\"؟ مش هينفع تتراجع عن الخطوة دي.",
+      "deleteTitle": "امسح القسم",
+      "deleteConfirm": "هتمسح القسم «{name}». المنتجات نفسها مش هتتمسح.",
       "cancel": "إلغاء",
-      "delete": "حذف",
-      "deleting": "جارٍ الحذف...",
+      "delete": "امسح القسم",
+      "deleting": "بنمسح...",
       "toastDeletedTitle": "تم حذف الفئة",
       "toastDeletedBody": "تمت إزالة \"{name}\".",
       "errorTitle": "خطأ",
@@ -5432,7 +5663,8 @@
       "bestSellersCoverUpdated": "تم تحديث غلاف الأكثر مبيعًا",
       "bestSellersCoverRemoved": "تمت إزالة غلاف الأكثر مبيعًا",
       "countUnitEnSample": "pieces",
-      "countUnitArSample": "قطعة"
+      "countUnitArSample": "قطعة",
+      "moreMenu": "خيارات تانية للأقسام"
     },
     "form": {
       "editTitle": "تعديل الفئة",
@@ -5500,7 +5732,9 @@
       "edit": "تعديل",
       "delete": "حذف",
       "deleting": "جارٍ الحذف...",
-      "dragHandle": "اسحب لإعادة الترتيب"
+      "dragHandle": "اسحب لإعادة الترتيب",
+      "missingArabicName": "ناقص الاسم بالعربي",
+      "rowMenu": "خيارات القسم {name}"
     },
     "productOrder": {
       "title": "ترتيب المنتجات",
@@ -5910,12 +6144,12 @@
     "adminLayout": {
       "navDashboard": "لوحة التحكم",
       "navCatalog": "الكتالوج",
-      "navEditor": "المحرر",
+      "navEditor": "شكل المتجر",
       "navSales": "المبيعات",
       "navStock": "الجرد",
       "navFinance": "المحاسبة",
       "navAnalytics": "التحليلات",
-      "navMarketing": "التسويق",
+      "navMarketing": "التسويق والعروض",
       "navSettings": "الإعدادات",
       "navStores": "المتاجر",
       "navUsers": "المستخدمون",
@@ -5938,30 +6172,30 @@
         "coupons": "الكوبونات",
         "promotions": "العروض الترويجية",
         "loyalty": "الولاء",
-        "bundles": "الباقات",
+        "bundles": "مجموعات المنتجات",
         "stockDashboard": "نظرة عامة",
         "inventory": "الجرد",
         "warehouses": "المستودعات",
         "scan": "مسح الباركود",
-        "adjustments": "التسويات",
+        "adjustments": "تعديلات المخزون",
         "suppliers": "الموردون",
         "purchaseOrders": "أوامر الشراء",
         "backorders": "الطلبات الآجلة",
         "reorder": "إعادة الطلب",
         "deadstock": "البضاعة الراكدة",
-        "financeDashboard": "نظرة عامة",
+        "financeDashboard": "الأرباح والمصروفات",
         "accounts": "دليل الحسابات",
         "journal": "اليومية",
         "expenses": "المصروفات",
         "reports": "التقارير",
         "bankRec": "مطابقة كشف البنك",
         "analyticsOverview": "التحليلات",
-        "insightsDashboard": "الإحصاءات",
-        "insightsCohorts": "الشرائح الزمنية",
-        "insightsFunnel": "قمع الشراء",
-        "insightsSegments": "شرائح العملاء",
-        "insightsProducts": "المنتجات",
-        "insightsSearches": "عمليات البحث",
+        "insightsDashboard": "نظرة سريعة",
+        "insightsCohorts": "الراجعين",
+        "insightsFunnel": "فين بنخسر الزباين",
+        "insightsSegments": "أحسن العملاء",
+        "insightsProducts": "الأسرع بيعاً",
+        "insightsSearches": "بحث الزباين",
         "aiTools": "أدوات الذكاء الاصطناعي",
         "aiUsage": "الاستخدام",
         "answerEngine": "رؤى محركات الإجابة",
@@ -5977,7 +6211,8 @@
         "customerGroups": "مجموعات العملاء",
         "wallet": "المحفظة",
         "wholesaleApplications": "طلبات الجملة",
-        "customerIntelligence": "تلميحات ذكية"
+        "customerIntelligence": "تلميحات ذكية",
+        "categories": "الأقسام"
       },
       "superAdmin": "مدير عام",
       "superAdminHint": "صلاحية كاملة على المنصة",
@@ -6232,6 +6467,21 @@
       "enabling": "بنفعّل التنبيهات…",
       "later": "بعدين",
       "error": "معرفناش نفعّل التنبيهات. جرّب تاني."
+    },
+    "rowActions": {
+      "more": "خيارات تانية"
+    },
+    "stickySaveBar": {
+      "regionLabel": "حفظ التغييرات",
+      "dirtyMessage": "فيه تغييرات لسه ما اتحفظتش",
+      "reset": "تراجع",
+      "save": "احفظ"
+    },
+    "formFooter": {
+      "cancel": "إلغاء"
+    },
+    "confirm": {
+      "cancel": "إلغاء"
     }
   },
   "finance": {
@@ -6251,7 +6501,7 @@
       "noAccountsHint": "مفيش حسابات لسه. حدّث الصفحة أو كلّم الدعم.",
       "seedButton": "إنشاء الحسابات الافتراضية",
       "seeding": "جارٍ الإنشاء…",
-      "seedSuccess": "تم إنشاء {count} حساب.",
+      "seedSuccess": "اتعمل {count} حساب.",
       "seedError": "معرفناش نعمل الحسابات.",
       "createButton": "إضافة حساب مخصص",
       "createTitle": "إضافة حساب مخصص",
@@ -6263,7 +6513,8 @@
       "createSubmit": "إنشاء الحساب",
       "creating": "جارٍ الإنشاء…",
       "createError": "معرفناش نعمل الحساب.",
-      "cancel": "إلغاء"
+      "cancel": "إلغاء",
+      "loadFailed": "معرفناش نحمّل دليل الحسابات. جرّب تاني."
     },
     "journal": {
       "title": "قيود اليومية",
@@ -6280,11 +6531,14 @@
       "account": "الحساب",
       "noEntries": "مفيش قيود لسه — هتظهر هنا أول ما الطلبات تتم.",
       "totalLabel": "الإجمالي",
-      "totalCount": "{total} قيد"
+      "totalCount": "{total} قيد",
+      "loadFailed": "معرفناش نحمّل قيود اليومية. جرّب تاني.",
+      "entryNotFound": "القيد ده مش موجود.",
+      "loadEntryFailed": "معرفناش نحمّل القيد. جرّب تاني."
     },
     "newEntry": {
       "title": "قيد يدوي جديد",
-      "description": "أنشئ قيد تسوية. متاح لمسؤول النظام فقط. مجموع المدين يجب أن يساوي مجموع الدائن.",
+      "description": "سجّل قيد تعديل يدوي. متاح لمسؤول النظام بس. لازم مجموع المدين يساوي مجموع الدائن.",
       "memo": "البيان (إنجليزي)",
       "memoAr": "البيان (عربي)",
       "memoPlaceholder": "إهلاك آخر السنة، تسوية افتتاحية، …",
@@ -6295,7 +6549,7 @@
       "balanced": "✓ متوازن",
       "addLine": "+ إضافة سطر",
       "addNew": "+ قيد يدوي جديد",
-      "submit": "ترحيل القيد",
+      "submit": "سجّل القيد",
       "submitting": "جاري الترحيل…",
       "cancel": "إلغاء",
       "superAdminOnly": "صلاحيات غير كافية",
@@ -6305,11 +6559,11 @@
       }
     },
     "dashboard": {
-      "title": "نظرة عامة على المحاسبة",
-      "thisMonth": "هذا الشهر",
-      "revenue": "الإيرادات",
-      "expenses": "المصروفات",
-      "net": "صافي الدخل",
+      "title": "الأرباح والمصروفات",
+      "thisMonth": "الفترة اللي اخترتها",
+      "revenue": "اللي دخل",
+      "expenses": "اللي خرج",
+      "net": "الربح",
       "stockValue": "قيمة المخزون",
       "disabledVariantStockValue": "محتجزة في متغيّرات معطّلة: {amount} ج.م — غير محسوبة ضمن المخزون",
       "cash": "النقدية بحسب الحساب",
@@ -6345,7 +6599,7 @@
       "baseline28d": "خط الأساس الأسبوعي (الأسابيع الثلاثة السابقة)",
       "delta": "الفارق",
       "acknowledge": "تأكيد الاستلام",
-      "acknowledged": "تم التأكيد",
+      "acknowledged": "اتأكّد",
       "filter": {
         "all": "الكل",
         "open": "غير مؤكدة",
@@ -6356,7 +6610,7 @@
     "expenses": {
       "title": "المصروفات",
       "description": "المصروفات التشغيلية مسجّلة مقابل دليل الحسابات. المصروفات المعتمدة تُنشئ قيداً دفترياً متوازناً.",
-      "newButton": "+ مصروف جديد",
+      "newButton": "ضيف مصروف",
       "number": "الرقم",
       "date": "التاريخ",
       "vendor": "المورد",
@@ -6385,8 +6639,12 @@
       "actions": {
         "approve": "اعتماد",
         "post": "ترحيل",
-        "reject": "رفض",
-        "rejectConfirm": "رفض هذا المصروف؟ سيُوسَم بالرفض ولن يمكن ترحيله."
+        "reject": "ارفض المصروف",
+        "rejectConfirm": "رفض هذا المصروف؟ سيُوسَم بالرفض ولن يمكن ترحيله.",
+        "rejectObject": "المصروف ده",
+        "rejectConsequence": "هيتحط كمرفوض ومش هيدخل في الحسابات.",
+        "failed": "معرفناش ننفّذ الإجراء. جرّب تاني.",
+        "menu": "خيارات المصروف {number}"
       },
       "new": {
         "title": "مصروف جديد",
@@ -6401,13 +6659,13 @@
         "notesAr": "ملاحظات (عربي)",
         "receiptUrl": "رابط الإيصال",
         "receiptHint": "الصق رابط R2، أو استخدم قسم الرفع أعلاه.",
-        "submit": "إنشاء مصروف كمسودة",
+        "submit": "احفظ المصروف",
         "ocr": {
           "title": "رفع الإيصال (تعبئة تلقائية بالذكاء الاصطناعي)",
           "selectFile": "اختر صورة الإيصال",
           "upload": "رفع + معالجة",
           "processing": "جارٍ قراءة الإيصال بالذكاء الاصطناعي…",
-          "success": "تم إنشاء مسودة المصروف. راجع واعتمد.",
+          "success": "اتعملت مسودة المصروف. راجعها واعتمدها.",
           "timeout": "OCR يستغرق وقتاً أطول من المتوقع. تحقق من قائمة المصروفات بعد قليل.",
           "unsupported": "يُدعم فقط JPG وPNG وWebP.",
           "manualHint": "أو أدخل البيانات يدوياً أدناه"
@@ -6425,10 +6683,11 @@
         "errorAmountRequired": "يجب أن يكون المبلغ أكبر من 0",
         "errorFxRateRequired": "سعر الصرف مطلوب لمصروفات {currency} ويجب أن يكون رقمًا موجبًا",
         "uploadFailedGeneric": "فشل الرفع ({status})",
-        "uploadFailedRetry": "فشل الرفع. جرّب تاني من فضلك.",
+        "uploadFailedRetry": "الرفع فشل. جرّب تاني.",
         "totalInBaseConverted": "الإجمالي بالجنيه المصري (محوّل بسعر {rate}):",
         "minorUnitsSuffix": "(وحدات {currency} الصغرى)"
-      }
+      },
+      "loadFailed": "معرفناش نحمّل المصروفات. جرّب تاني."
     },
     "reports": {
       "title": "التقارير المالية",
@@ -6497,7 +6756,11 @@
         "entryCount": "{count} قيود ضريبية (مبيعات واستردادات/مرتجعات)",
         "entries": "القيود"
       },
-      "exportXlsxComing": "تصدير XLSX قادم قريباً"
+      "exportXlsxComing": "تصدير XLSX قادم قريباً",
+      "loadTrialFailed": "معرفناش نحمّل ميزان المراجعة. جرّب تاني.",
+      "loadPnlFailed": "معرفناش نحمّل تقرير الأرباح والخسائر. جرّب تاني.",
+      "loadBalanceFailed": "معرفناش نحمّل الميزانية. جرّب تاني.",
+      "loadTaxFailed": "معرفناش نحمّل تقرير الضريبة. جرّب تاني."
     },
     "bankRec": {
       "title": "مطابقة كشف البنك",
@@ -6536,10 +6799,10 @@
         "importing": "جارٍ الاستيراد…",
         "importButton": "استيراد",
         "parseErrors": "تحذيرات التحليل",
-        "success": "تم استيراد {count} معاملة.",
+        "success": "اتستوردت {count} معاملة.",
         "error": "فشل الاستيراد.",
         "fileTypesHint": "CSV أو Excel (.xlsx) أو OFX (بحد أقصى 5 ميغابايت)",
-        "skippedLabel": "تم التجاوز",
+        "skippedLabel": "اتخطّت",
         "viewReconciliation": "عرض المطابقة",
         "andMore": "…و{count} كمان"
       },
@@ -6600,14 +6863,20 @@
         "match": "معرفناش نطابق"
       },
       "filterAll": "الكل",
-      "totalCount": "{total} كشف حساب"
+      "totalCount": "{total} كشف حساب",
+      "loadFailed": "معرفناش نحمّل كشوف البنك. جرّب تاني.",
+      "deleteObject": "كشف البنك «{name}»",
+      "deleteConsequence": "هيتمسح الكشف وكل المعاملات المطابقة معاه.",
+      "deleteAction": "امسح الكشف",
+      "deleteFailed": "معرفناش نمسح الكشف. جرّب تاني.",
+      "rowMenu": "خيارات الكشف {name}"
     },
     "fxRates": {
       "title": "سجل أسعار الصرف",
       "subtitle": "تسجيل أسعار صرف المعاملات غير المصرية",
       "multiCurrencyAccounting": "المحاسبة متعددة العملات",
       "featureInactive": "الميزة غير مفعّلة",
-      "featureInactiveDesc": "ميزة المحاسبة — متعددة العملات غير مفعّلة لهذا المتجر. رقّي باقتك لخطة الأعمال عشان تفعّلها.",
+      "featureInactiveDesc": "العملات المتعددة في المحاسبة مش مفعّلة على باقتك. رقّي الباقة عشان تفعّلها.",
       "recordNewRate": "تسجيل سعر جديد",
       "rateMeaning": "معنى السعر: 1 وحدة من العملة المختارة = السعر بالجنيه المصري.",
       "rateExample": "مثال: الدولار الأمريكي بسعر 50.00 يعني 1 دولار = 50.00 جنيه مصري.",
@@ -6617,7 +6886,7 @@
       "ratePreview": "معاينة: 1 {currency} = {rate} ج.م | 100 {currency} = {rate100} ج.م",
       "saving": "جارٍ الحفظ…",
       "saveRate": "حفظ السعر",
-      "rateSaved": "تم حفظ السعر بنجاح.",
+      "rateSaved": "اتحفظ السعر.",
       "errorCurrencyRequired": "العملة مطلوبة",
       "errorRatePositive": "يجب أن يكون السعر رقمًا موجبًا",
       "errorSaveFailed": "معرفناش نحفظ السعر",
@@ -6670,17 +6939,25 @@
       "selectedCount": "{count} محدد",
       "bulkSetThreshold": "تحديد الحد",
       "bulkThresholdFailed": "فشل تحديث الحد",
-      "bulkThresholdDone": "تم تحديث {count} منتج",
+      "bulkThresholdDone": "اتحدّث {count} منتج",
       "clearFilter": "مسح الفلتر",
       "bulkBackorderDisableTip": "إيقاف الطلب الآجل لكل المنتجات النشطة",
       "bulkBackorderEnableTip": "السماح للعملاء بطلب كل المنتجات حتى عند نفاد المخزون",
-      "bulkBackorderDisable": "إيقاف الطلب الآجل لكل المنتجات",
-      "bulkBackorderEnable": "تفعيل الطلب الآجل لكل المنتجات",
+      "bulkBackorderDisable": "وقّف الطلب الآجل لكل المنتجات",
+      "bulkBackorderEnable": "فعّل الطلب الآجل لكل المنتجات",
       "loadFailed": "معرفناش نحمّل المنتجات — {error}",
       "filteredLabel": "الفلتر:",
       "filterLowStock": "مخزون منخفض",
       "filterOutOfStock": "نفد المخزون",
-      "showingFiltered": "عرض {shown} من {total} منتج"
+      "showingFiltered": "عرض {shown} من {total} منتج",
+      "backorderObject": "الطلب الآجل على {count} منتج",
+      "backorderEnableConsequence": "الزباين هيقدروا يطلبوا المنتجات حتى لو خلصت من المخزون.",
+      "backorderDisableConsequence": "المنتجات اللي خلصت من المخزون مش هينفع تتطلب.",
+      "backorderEnableFailed": "معرفناش نفعّل الطلب الآجل. جرّب تاني.",
+      "backorderDisableFailed": "معرفناش نوقّف الطلب الآجل. جرّب تاني.",
+      "backorderEnabledDone": "اتفعّل الطلب الآجل على {count} منتج",
+      "backorderDisabledDone": "اتوقّف الطلب الآجل على {count} منتج",
+      "moreActions": "خيارات المخزون"
     },
     "scan": {
       "title": "مسح الباركود",
@@ -6699,30 +6976,30 @@
       "orderNotFound": "الطلب غير موجود",
       "featureNotOnPlan": "مسح الباركود مش مشمول في باقتك الحالية. كلّم الدعم أو ارفع باقتك عشان تستخدمه.",
       "barcodeNotFound": "الباركود غير موجود في هذا المتجر",
-      "ambiguousWarning": "الباركود يطابق منتجاً وتنويعة في آنٍ واحد — سيتم استخدام التنويعة.",
+      "ambiguousWarning": "الباركود ده بيطابق منتج ونوع في نفس الوقت، فهنستخدم النوع.",
       "receiving": {
-        "success": "تم استلام {qty} وحدة من {name}. المخزون الجديد: {newQty}.",
+        "success": "اتستلمت {qty} وحدة من {name}. المخزون دلوقتي: {newQty}.",
         "errorGeneric": "فشل استلام المخزون. جرّب تاني."
       },
       "picking": {
-        "success": "تم تجهيز {qty} من {name}. التقدم: {picked}/{total}.",
+        "success": "اتجهّزت {qty} من {name}. التقدم: {picked}/{total}.",
         "itemNotFound": "هذا الباركود لا يطابق أي صنف في الطلب.",
         "notInOrder": "{name} مش في الطلب ده. رجّعه مكانه.",
         "alreadyPicked": "{name} اتجهّز بالكامل. ماتضيفش وحدة زيادة.",
-        "orderComplete": "تم تجهيز جميع أصناف الطلب.",
+        "orderComplete": "كل أصناف الطلب اتجهّزت.",
         "errorGeneric": "فشل تسجيل التجهيز. جرّب تاني."
       },
       "counting": {
-        "newSession": "جلسة جرد جديدة",
+        "newSession": "جرد جديد",
         "openSession": "استئناف جلسة مفتوحة",
         "noOpenSession": "مفيش جلسة مفتوحة. ابدأ جلسة جديدة.",
         "sessionNote": "ملاحظة الجلسة (اختياري)",
-        "startSession": "بدء الجلسة",
-        "closeSession": "إغلاق الجلسة",
+        "startSession": "ابدأ الجرد",
+        "closeSession": "اقفل الجرد",
         "closeConfirm": "عايز تقفل الجلسة؟ مش هينفع تضيف أسطر بعد القفل.",
-        "reconcile": "تسوية الفروقات",
+        "reconcile": "اعتمد فروقات الجرد",
         "reconcileConfirm": "هيتم تعديل المخزون لكل الفروقات اللي مش صفرية وهيتعمل قيد محاسبي. مش هينفع تتراجع عن ده.",
-        "reconciled": "تمت التسوية. رقم التسوية: {id}",
+        "reconciled": "اتعتمدت الفروقات. رقم التعديل: {id}",
         "noVariances": "جميع الكميات متطابقة — لا تعديلات مطلوبة.",
         "sessionStatus": "الجلسة: {status}",
         "linesCount": "{count} أسطر",
@@ -6731,7 +7008,12 @@
         "system": "النظام",
         "submitLine": "تسجيل الجرد",
         "scannedAt": "مُسح {time}",
-        "errorGeneric": "فشل تسجيل الجرد. جرّب تاني."
+        "errorGeneric": "فشل تسجيل الجرد. جرّب تاني.",
+        "closeObject": "قفل الجرد ({count} صنف اتعدّ)",
+        "closeConsequence": "مش هتقدر تضيف أصناف تانية للجرد ده بعد ما تقفله.",
+        "reconcileObject": "اعتماد فروقات الجرد: {count} صنف فيه فرق، صافي {units} وحدة",
+        "reconcileConsequence": "المخزون هيتعدّل لكل صنف فيه فرق وهيتسجّل في الحسابات. مش هتقدر تتراجع عن ده.",
+        "reconcileAction": "اعتمد الفروقات"
       },
       "cameraPermission": "اسمح بالوصول إلى الكاميرا لمسح الباركود، أو أدخله يدوياً أدناه.",
       "cameraNotSupported": "مسح الكاميرا غير مدعوم في هذا المتصفح. استخدم الإدخال اليدوي.",
@@ -6740,7 +7022,7 @@
       "helpTitle": "ماذا تفعل هذه الصفحة",
       "helpReceive": "امسح باركود المنتج وأدخل الكمية لتسجيل المخزون الوارد (توريد من مورّد).",
       "helpPick": "حمّل الطلب برقمه، ثم امسح كل صنف لتعليمه كمجهّز وتتبّع التنفيذ.",
-      "helpCount": "نفّذ جردًا دوريًا: امسح الأصناف على الرف وأدخل الكمية المعدودة — يقوم النظام بتسوية أي فرق عن المخزون المسجّل تلقائيًا.",
+      "helpCount": "اعمل جرد: امسح الأصناف على الرف واكتب الكمية اللي عدّيتها، والنظام يحسب الفرق عن المخزون المسجّل.",
       "helpCamera": "مسح الكاميرا يعمل في Chrome (أندرويد/سطح المكتب) و Safari على iPhone (iOS 17+). في المتصفحات الأخرى أدخل الباركود يدويًا. يجب أن يكون للمنتج باركود محدّد ليتم العثور عليه.",
       "scanWithCamera": "مسح بالكاميرا",
       "pickChangeOrder": "تغيير",
@@ -6752,15 +7034,15 @@
       "countSession": "جلسة جرد",
       "linesSuffix": "سطر",
       "systemQtyLabel": "الكمية في النظام:",
-      "adjustmentLabel": "التسوية:",
+      "adjustmentLabel": "التعديل:",
       "skuLabel": "رمز المنتج: {sku}",
       "linesAdjusted": "{count, plural, one {اتسوّى سطر واحد.} two {اتسوّى سطرين.} few {اتسوّت {count} سطور.} other {اتسوّى {count} سطر.}}",
       "sessionReconciledOn": "الجلسة اتسوّت في {date}."
     },
     "adjustments": {
-      "title": "تسويات المخزون",
-      "description": "كل تعديل يدوي للمخزون يُنشئ قيداً دفترياً متوازناً. التسويات المُرحّلة غير قابلة للتعديل.",
-      "newButton": "+ تسوية جديدة",
+      "title": "تعديلات المخزون",
+      "description": "أي تعديل يدوي على المخزون (جرد، تالف، لقيت بضاعة) بيتسجّل هنا. التعديل اللي اتعتمد مش بيتغيّر تاني.",
+      "newButton": "تعديل مخزون جديد",
       "number": "الرقم",
       "type": "النوع",
       "status": "الحالة",
@@ -6779,34 +7061,34 @@
         "theft_desc": "مخزون مفقود بسبب السرقة أو الفاقد.",
         "loss_desc": "مخزون ضائع أو في غير مكانه (ليس سرقة ولا تلفاً).",
         "write_off_desc": "إزالة متعمّدة — منتهي الصلاحية أو قديم.",
-        "found_desc": "تم العثور على مخزون كان مفقوداً — يزيد الكمية.",
+        "found_desc": "لقيت بضاعة كانت ناقصة من الجرد، فالكمية بتزيد.",
         "return_to_supplier_desc": "تمت إعادته إلى المورد — يقلّل الكمية."
       },
       "new": {
-        "title": "تسوية مخزون جديدة",
-        "description": "اختر نوع التسوية وحدد الكميات الجديدة. الحفظ كمسودة يتيح لك المراجعة قبل الترحيل؛ الترحيل لا رجعة منه.",
-        "typeLabel": "نوع التسوية",
+        "title": "تعديل مخزون جديد",
+        "description": "اختار نوع التعديل واكتب الكميات الجديدة. لو حفظته كمسودة تقدر تراجعه قبل ما تعتمده.",
+        "typeLabel": "نوع التعديل",
         "reasonLabel": "السبب (إنجليزي)",
         "reasonArLabel": "السبب (عربي)",
         "evidenceLabel": "رابط الدليل (اختياري)",
         "addItem": "+ إضافة منتج",
         "selectProduct": "اختر منتجاً",
         "newQty": "الكمية الجديدة",
-        "submitDraft": "حفظ كمسودة",
-        "submitPost": "حفظ وترحيل",
-        "typeTip": "تعداد_دوري = تصحيح إعادة العد الروتيني؛ ضرر = بضاعة تالفة غير قابلة للبيع؛ سرقة = خسارة بسبب السرقة أو الفقدان؛ فقدان = مفقودة (ليست سرقة أو ضررًا)؛ شطب = إزالة مقصودة (منتهية الصلاحية أو قديمة)؛ موجود = مخزون مفقود سابقًا تم العثور عليه (يزيد الكمية)؛ إرجاع_للمورد = إعادة البضاعة إلى المورد.",
-        "glJournalTip": "سجل الأستاذ = السجل المحاسبي (دفتر الأستاذ العام). يُنشئ الترحيل تلقائيًا قيد محاسبي متوازن — مثلًا: الشطب يُدين حساب الخسائر ويُقيّد المخزون — للحفاظ على دقة الحسابات. احفظ كمسودة للمراجعة قبل التأثير على دفاترك.",
+        "submitDraft": "احفظ كمسودة",
+        "submitPost": "اعتمد التعديل",
+        "typeTip": "جرد دوري: تصحيح بعد عدّ عادي. تالف: بضاعة اتبوظت ومش هتتباع. سرقة: اتسرقت أو اختفت. فاقد: ضاعت من غير سبب واضح. شطب: شلتها قصداً (انتهت صلاحيتها أو قديمة). لقيتها: بضاعة كانت ناقصة ولقيتها فالكمية بتزيد. مرتجع للمورد: رجّعتها للمورد.",
+        "glJournalTip": "لما تعتمد التعديل بيتسجّل تلقائي في الحسابات (مثلاً الشطب بيتحسب خسارة والمخزون بيقل) عشان أرقامك تفضل مظبوطة. لو عايز تراجع الأول احفظه كمسودة.",
         "tabCsv": "استيراد CSV",
         "tabManual": "إدخال يدوي",
         "csvHelpTitle": "كيفية استخدام استيراد CSV",
         "csvHelpStep1": "نزّل القالب أدناه واملأه بأعداد المخزون لديك.",
         "csvHelpStep2": "كل صف يحتاج <b>SKU</b> أو <b>باركود</b> لتحديد المنتج.",
-        "csvHelpStep3": "استخدم <b>الكمية الجديدة</b> للأعداد المطلقة (تعداد دوري)، أو <b>الفارق</b> (+/−) للتسويات الموقّعة (وحدات موجودة/تالفة).",
+        "csvHelpStep3": "استخدم <b>الكمية الجديدة</b> للعدد الفعلي بعد الجرد، أو <b>الفرق</b> (+/−) لو بتزوّد أو بتنقّص.",
         "csvHelpStep4": "ارفع الملف المعبأ وراجع المعاينة قبل التطبيق.",
         "csvDownloadTemplate": "تنزيل القالب (.csv)",
-        "csvRowErrorsLabel": "أخطاء الصفوف (تم تخطيها أثناء الاستيراد):",
+        "csvRowErrorsLabel": "صفوف فيها أخطاء (اتخطّت في الاستيراد):",
         "csvShowRowErrors": "عرض أخطاء الصفوف",
-        "csvViewAllAdjustments": "عرض كل التسويات",
+        "csvViewAllAdjustments": "شوف كل التعديلات",
         "csvClear": "مسح",
         "csvStatusError": "خطأ",
         "colSku": "رمز المنتج (SKU)",
@@ -6817,33 +7099,41 @@
         "colStatus": "الحالة",
         "csvStatusOk": "سليم",
         "csvDropzoneHint": "انقر لاختيار ملف CSV، أو اسحبه وأفلته هنا",
-        "csvParsedTotal": "تم تحليل {count} صف —",
+        "csvParsedTotal": "اتقرا {count} صف —",
         "csvParsedValid": "{count} صالح",
         "csvParsedErrors": "، {count} به أخطاء",
         "csvPreviewHeading": "معاينة — أول {count} صف",
         "csvPreviewOfTotal": "(من أصل {total})",
         "csvRowPrefix": "الصف {row}:",
-        "csvImportComplete": "اكتمل الاستيراد — التسوية رقم {number}",
+        "csvImportComplete": "خلص الاستيراد — تعديل رقم {number}",
         "csvTotalRows": "إجمالي الصفوف في الملف:",
-        "csvImported": "تم استيرادها:",
-        "csvSkipped": "تم تخطيها (أخطاء):",
+        "csvImported": "اتستوردت:",
+        "csvSkipped": "اتخطّت (فيها أخطاء):",
         "csvStatus": "الحالة:",
-        "csvStatusPosted": "مُرحّلة",
+        "csvStatusPosted": "اتعتمد",
         "csvStatusDraft": "مسودة",
         "csvImporting": "جارٍ الاستيراد…",
-        "csvSubmit": "استيراد وترحيل ({count} صف)",
-        "irreversibleNote": "الترحيل نهائي ومش هينفع تتراجع عنه — بيطبّق تغييرات المخزون ويرحّل قيد يومية في دفتر الأستاذ العام. احفظه كمسودة للمراجعة الأول.",
-        "itemsTableLabel": "بنود التسوية"
+        "csvSubmit": "استورد واعتمد ({count} صف)",
+        "irreversibleNote": "بعد ما تعتمد التعديل مش هتقدر تتراجع عنه: المخزون بيتغيّر وبيتسجّل في الحسابات. احفظه كمسودة الأول لو عايز تراجعه.",
+        "itemsTableLabel": "بنود التعديل",
+        "itemsRequired": "ضيف منتج واحد على الأقل وحدد كميته.",
+        "unexpectedResponse": "السيرفر رد بحاجة مش متوقعة. جرّب تاني.",
+        "postFailedAfterDraft": "اتحفظ كمسودة بس معرفناش نعتمده: {error}",
+        "postObject": "تعديل مخزون على {count} منتج",
+        "postConsequence": "المخزون هيتغيّر فعلاً ومش هتقدر تتراجع عن التعديل بعد ما يتعتمد. لو عايز تراجع الأول احفظه كمسودة.",
+        "cancel": "إلغاء",
+        "evidencePlaceholder": "https://… (رابط صورة أو ملف يثبت السبب)"
       },
-      "searchPlaceholder": "ابحث في التسويات…",
-      "emptyState": "مفيش تسويات مخزون لسه. أنشئ تسوية بالزر اللي فوق.",
+      "searchPlaceholder": "دوّر في التعديلات…",
+      "emptyState": "لسه مفيش تعديلات مخزون. دوس «تعديل مخزون جديد» فوق.",
       "reasonEnPlaceholder": "السبب بالإنجليزي (اختياري)",
-      "reasonArPlaceholder": "سبب التسوية بالعربي (اختياري)"
+      "reasonArPlaceholder": "سبب التعديل بالعربي (اختياري)",
+      "loadFailed": "معرفناش نحمّل تعديلات المخزون. جرّب تاني."
     },
     "suppliers": {
       "title": "الموردون",
       "description": "الموردون الذين تضع معهم أوامر الشراء.",
-      "newButton": "+ مورد جديد",
+      "newButton": "ضيف مورد",
       "name": "الاسم",
       "nameArLabel": "الاسم (عربي)",
       "contact": "جهة الاتصال",
@@ -6853,7 +7143,7 @@
       "paymentTerms": "شروط الدفع",
       "active": "نشط",
       "nameRequired": "الاسم مطلوب.",
-      "emptyState": "مفيش موردين لسه. أضف مورد بالزر اللي فوق.",
+      "emptyState": "لسه مضفتش موردين. دوس «ضيف مورد» فوق.",
       "terms": {
         "net0": "الدفع عند الاستلام",
         "net15": "صافي 15 يوماً",
@@ -6877,12 +7167,17 @@
       "termsDaysExample": "مثال: 45",
       "notesEnPlaceholder": "ملاحظات بالإنجليزي (اختياري)",
       "notesArPlaceholder": "ملاحظات بالعربي (اختياري)",
-      "termsDays": "{count, plural, one {يوم} two {يومين} few {{count} أيام} other {{count} يوم}}"
+      "termsDays": "{count, plural, one {يوم} two {يومين} few {{count} أيام} other {{count} يوم}}",
+      "loadFailed": "معرفناش نحمّل الموردين. جرّب تاني.",
+      "deactivateObject": "المورد «{name}»",
+      "deactivateConsequence": "هيتشال من القوايم الجديدة، وأوامر الشراء القديمة تفضل زي ما هي.",
+      "deactivateAction": "وقّف المورد",
+      "rowMenu": "خيارات المورد {name}"
     },
     "purchaseOrders": {
       "title": "أوامر الشراء",
       "description": "تتبع أوامر الشراء للموردين. استلام أمر الشراء يحدّث المخزون ويُسجّل في حسابات المخزون والذمم الدائنة.",
-      "newButton": "+ أمر شراء جديد",
+      "newButton": "أمر شراء جديد",
       "poNumber": "رقم الأمر",
       "supplier": "المورد",
       "status": "الحالة",
@@ -6906,7 +7201,7 @@
         "unitCost": "تكلفة الوحدة (ج.م)",
         "lineTotal": "إجمالي البند (ج.م)",
         "subtotal": "المجموع الفرعي",
-        "submit": "إنشاء مسودة أمر الشراء",
+        "submit": "احفظ أمر الشراء",
         "notesLabel": "ملاحظات (إنجليزي)",
         "notesArLabel": "ملاحظات (عربي)",
         "notesPlaceholder": "ملاحظات اختيارية",
@@ -6915,15 +7210,18 @@
         "variant": "المتغير",
         "selectProduct": "اختر المنتج",
         "selectVariant": "اختر المتغير",
-        "variantRequired": "اختر المتغير لكل سطر منتجه له متغيرات."
+        "variantRequired": "اختر المتغير لكل سطر منتجه له متغيرات.",
+        "supplierRequired": "اختار المورد الأول.",
+        "linesRequired": "ضيف بند واحد على الأقل فيه المنتج والكمية وسعر الوحدة.",
+        "loadFailed": "معرفناش نحمّل الموردين والمنتجات. جرّب تاني."
       },
       "detail": {
         "qtyReceived": "المستلَم",
         "qtyRemaining": "المتبقي",
         "receiveSection": "استلام البضائع",
-        "receiveButton": "استلام",
-        "receiveHelp": "الاستلام يحدّث مستويات المخزون ويرحّل قيوداً إلى حسابي المخزون والذمم الدائنة.",
-        "cancelButton": "إلغاء الأمر",
+        "receiveButton": "استلم البضاعة",
+        "receiveHelp": "لما تستلم، المخزون بيزيد وبيتسجّل في حسابات المخزون والموردين تلقائي.",
+        "cancelButton": "الغي الأمر",
         "cancelConfirm": "عايز تلغي الأمر ده؟ مش هينفع تتراجع عن الإجراء ده.",
         "totalLabel": "الإجمالي",
         "colProduct": "المنتج",
@@ -6931,7 +7229,13 @@
         "colReceiveQty": "كمية الاستلام",
         "cancelling": "جارٍ الإلغاء…",
         "receiving": "جارٍ الاستلام…",
-        "itemsTableLabel": "بنود أمر الشراء"
+        "itemsTableLabel": "بنود أمر الشراء",
+        "loadFailed": "معرفناش نحمّل أمر الشراء. جرّب تاني.",
+        "qtyRequired": "اكتب كمية واحدة على الأقل عشان تستلمها.",
+        "cancelObject": "أمر الشراء {number}",
+        "cancelConsequence": "هيتلغي ومش هتقدر ترجّعه. الكميات اللي اتستلمت قبل كده تفضل زي ما هي.",
+        "cancelAction": "الغي أمر الشراء",
+        "menuLabel": "خيارات أمر الشراء"
       },
       "searchPlaceholder": "ابحث في أوامر الشراء…",
       "errors": {
@@ -6940,10 +7244,11 @@
         "VARIANT_PRODUCT_MISMATCH": "أحد أسطر أمر الشراء يحدد متغيرًا لا ينتمي إلى منتجه.",
         "VARIANT_REQUIRED_RECEIVE": "السطر ده مش محدد متغيّر مع إن منتجه ليه متغيرات، عشان كده مش هينفع نستلمه. ألغِ أمر الشراء ده واعمله من جديد لكل متغيّر."
       },
-      "emptyState": "مفيش أوامر شراء لسه. أنشئ واحد بالزر اللي فوق.",
+      "emptyState": "لسه مفيش أوامر شراء. دوس «أمر شراء جديد» فوق.",
       "totalCount": "{total} أمر شراء",
       "backToPurchaseOrders": "→ رجوع لأوامر الشراء",
-      "notesArPlaceholder": "ملاحظات بالعربي (اختياري)"
+      "notesArPlaceholder": "ملاحظات بالعربي (اختياري)",
+      "loadFailed": "معرفناش نحمّل أوامر الشراء. جرّب تاني."
     },
     "backorders": {
       "title": "طلبات الانتظار المفتوحة",
@@ -6961,7 +7266,7 @@
         "confirm": "إلغاء البند وعكس البيع",
         "discard": "إبقاء",
         "body": "يلغي هذا البند المنتظر ويعكس بيعه في دفاترك. لا يرسل أي مبلغ إلى العميل — إذا كان قد دفع، فعليك استرداد قيمة هذا البند بنفسك لدى مزوّد الدفع.",
-        "doneTitle": "تم إلغاء الطلب الآجل",
+        "doneTitle": "اتلغى الطلب الآجل",
         "owedNotice": "لم يُرسل أي مبلغ. ما زلت مديناً للعميل بمبلغ {amount} عن هذا البند — استرده له لدى مزوّد الدفع.",
         "ok": "حسناً"
       },
@@ -6987,9 +7292,11 @@
         "variantLabel": "المتغير"
       },
       "draftPo": {
-        "created": "تم إنشاء أمر الشراء المسودة.",
+        "created": "اتعمل أمر الشراء كمسودة.",
         "failed": "معرفناش نعمل أمر الشراء"
-      }
+      },
+      "pagePrev": "الصفحة اللي قبلها",
+      "pageNext": "الصفحة اللي بعدها"
     },
     "deadstock": {
       "title": "البضاعة الراكدة",
@@ -7009,7 +7316,9 @@
         "valueUnknown": "غير معروفة (مفيش سعر تكلفة)",
         "neverSold": "لم يُبَع أبداً"
       },
-      "valueUnknownBanner": "{count, plural, one {منتج محدَّد واحد ليس له سعر تكلفة} other {{count, number, latn} منتجات محدَّدة ليس لها سعر تكلفة}}، لذا قيمة المخزون غير معروفة. أضف أسعار التكلفة من صفحة المنتج لتقييمها."
+      "valueUnknownBanner": "{count, plural, one {منتج محدَّد واحد ليس له سعر تكلفة} other {{count, number, latn} منتجات محدَّدة ليس لها سعر تكلفة}}، لذا قيمة المخزون غير معروفة. أضف أسعار التكلفة من صفحة المنتج لتقييمها.",
+      "pagePrev": "الصفحة اللي قبلها",
+      "pageNext": "الصفحة اللي بعدها"
     },
     "warehouses": {
       "title": "المستودعات",
@@ -7026,12 +7335,12 @@
       "colLocation": "الموقع",
       "default": "افتراضي",
       "setDefault": "تعيين كافتراضي",
-      "defaultSet": "تم تحديث المستودع الافتراضي",
+      "defaultSet": "المستودع الأساسي اتغيّر",
       "viewStock": "عرض المخزون",
       "deactivateConfirm": "إلغاء تفعيل {name}؟ تُحفظ بيانات المخزون.",
-      "deactivated": "تم إلغاء تفعيل المستودع",
-      "created": "تم إنشاء المستودع",
-      "updated": "تم تحديث المستودع",
+      "deactivated": "اتوقّف المستودع",
+      "created": "اتضاف المستودع",
+      "updated": "اتحفظت بيانات المستودع",
       "empty": "لا مستودعات بعد. أنشئ مستودعاً لبدء تتبع المخزون لكل موقع.",
       "form": {
         "name": "الاسم (إنجليزي)",
@@ -7048,7 +7357,14 @@
       },
       "warehouseNameEnSample": "Main Warehouse",
       "warehouseNameArSample": "المستودع الرئيسي",
-      "addressSample": "منطقة الشويخ الصناعية، مصر"
+      "addressSample": "منطقة الشويخ الصناعية، مصر",
+      "saveFailed": "معرفناش نحفظ المستودع. جرّب تاني.",
+      "deactivateFailed": "معرفناش نوقّف المستودع. جرّب تاني.",
+      "defaultFailed": "معرفناش نخلّيه المستودع الأساسي. جرّب تاني.",
+      "deactivateObject": "المستودع «{name}»",
+      "deactivateConsequence": "هيتوقّف من الاستخدام، وبيانات المخزون بتاعته بتتحفظ.",
+      "deactivateAction": "وقّف المستودع",
+      "rowMenu": "خيارات المستودع {name}"
     },
     "warehouseStock": {
       "title": "مخزون المستودع",
@@ -7066,8 +7382,8 @@
       "reasonLabel": "السبب (اختياري)",
       "reasonPlaceholder": "تصحيح جرد دوري، تلف، إلخ.",
       "applyAdjust": "تطبيق",
-      "adjustDone": "تم تعديل المخزون",
-      "qtyUpdated": "تم تحديث الكمية",
+      "adjustDone": "اتعدّل المخزون",
+      "qtyUpdated": "اتحدّثت الكمية",
       "clickToEdit": "انقر لتعديل الكمية",
       "invalidQty": "الكمية يجب أن تكون 0 أو أكثر",
       "zeroDelta": "التغيير لازم يكون مختلف عن صفر",
@@ -7081,13 +7397,19 @@
       "searchTruncated": "هذه أقرب النتائج فقط، أضف كلمة لتضييق البحث",
       "reconcileDone": "تمت مطابقة {reconciled} منتج (فشل {failed})",
       "reconcileStarted": "بدأت عملية المطابقة — ستُحدَّث أعداد المستودعات قريباً",
-      "deltaExample": "+10 أو -5"
+      "deltaExample": "+10 أو -5",
+      "saveFailed": "معرفناش نحفظ الكمية. جرّب تاني.",
+      "adjustFailed": "معرفناش نعدّل المخزون. جرّب تاني.",
+      "reconcileFailed": "معرفناش نبدأ مطابقة المخزون. جرّب تاني.",
+      "breadcrumb": "المستودعات",
+      "pagePrev": "الصفحة اللي قبلها",
+      "pageNext": "الصفحة اللي بعدها"
     }
   },
   "insights": {
     "navGroup": "تحليلات ذكية",
     "dashboard": {
-      "title": "الإحصاءات",
+      "title": "نظرة سريعة على متجرك",
       "aov": "متوسط قيمة الطلب",
       "mrr30d": "إيرادات 30 يوماً",
       "repeatPurchase": "معدل تكرار الشراء",
@@ -7105,10 +7427,11 @@
       "colSold7d": "المباع (7 أيام)",
       "colVelocity": "معدل البيع",
       "perDay": "/يوم",
-      "topSegmentCustomers": "{count, plural, one {عميل} two {عميلين} few {{count} عملاء} other {{count} عميل}}"
+      "topSegmentCustomers": "{count, plural, one {عميل} two {عميلين} few {{count} عملاء} other {{count} عميل}}",
+      "loadFailed": "معرفناش نحمّل الإحصاءات. جرّب تاني."
     },
     "cohorts": {
-      "title": "شرائح العملاء الزمنية",
+      "title": "العملاء اللي بيرجعوا",
       "description": "معدل الاستبقاء الشهري للعملاء المجمّعين حسب أول طلب مدفوع.",
       "monthLabel": "الشريحة",
       "periodLabel": "شهر",
@@ -7121,17 +7444,18 @@
       "colLtvPerCustomer": "القيمة الدائمة / عميل",
       "noDataYet": "مفيش بيانات مجموعات لسه. الرؤى هتظهر بعد أول تجميع ليلي الساعة 02:00 بتوقيت القاهرة.",
       "cellTitle": "{active} / {total} عميل نشط",
-      "legendNote": "الخلايا بتوضّح نسبة عملاء المجموعة اللي عملوا طلب في الفترة دي. الأخضر = احتفاظ عالي، والأحمر = احتفاظ ضعيف."
+      "legendNote": "الخلايا بتوضّح نسبة عملاء المجموعة اللي عملوا طلب في الفترة دي. الأخضر = احتفاظ عالي، والأحمر = احتفاظ ضعيف.",
+      "loadFailed": "معرفناش نحمّل بيانات العملاء الراجعين. جرّب تاني."
     },
     "funnel": {
-      "title": "قمع إتمام الشراء",
+      "title": "فين بيضيّعوا الزباين في الشراء",
       "description": "معدلات قمع الشراء اليومية. تتبع الجلسات الفردية قادم مع إطلاق SDK التحليلات.",
       "windowLabel": "الفترة",
       "window7d": "7 أيام",
       "window30d": "30 يوماً",
       "window90d": "90 يوماً",
       "views": "مشاهدات المنتجات",
-      "carts": "سلات تم إنشاؤها",
+      "carts": "سلات اتعملت",
       "checkouts": "عمليات دفع بدأت",
       "completed": "طلبات مكتملة",
       "abandoned": "مهجورة",
@@ -7142,10 +7466,11 @@
       "abandonedUnit": "سلة",
       "dailyBreakdownTitle": "التفصيل اليومي",
       "colDate": "التاريخ",
-      "noDataYet": "مفيش بيانات لمسار الشراء في الفترة دي لسه. الرؤى بتظهر بعد أول تجميع ليلي الساعة 02:00 بتوقيت القاهرة."
+      "noDataYet": "مفيش بيانات لمسار الشراء في الفترة دي لسه. الرؤى بتظهر بعد أول تجميع ليلي الساعة 02:00 بتوقيت القاهرة.",
+      "loadFailed": "معرفناش نحمّل بيانات رحلة الشراء. جرّب تاني."
     },
     "segments": {
-      "title": "شرائح العملاء (RFM)",
+      "title": "أحسن عملاءك",
       "description": "تصنيف العملاء حسب الحداثة × التكرار × القيمة المالية.",
       "segment": {
         "vip": "VIP",
@@ -7170,7 +7495,7 @@
       "viewSegmentCustomers": "عرض العملاء في شريحة {segment}"
     },
     "products": {
-      "title": "سرعة بيع المنتجات",
+      "title": "إيه اللي بيتباع بسرعة",
       "description": "أكثر المنتجات مبيعاً خلال آخر 30 يوماً، مرتبة حسب الوحدات المباعة، مع متوسط سعر البيع والمخزون المتاح.",
       "rank": "#",
       "sku": "الرمز",
@@ -7186,7 +7511,7 @@
       "loadFailed": "معرفناش نحمّل سرعة بيع المنتجات."
     },
     "searches": {
-      "title": "عمليات البحث",
+      "title": "الزباين بيدوّروا على إيه",
       "description": "الكلمات التي بحث عنها العملاء في متجرك، وأيّها لم تُظهر أي منتج. أضف الكلمة كـ«كلمة بحث» لمنتج مناسب لتظهر نتائجها.",
       "cardTitle": "عمليات بحث بلا نتائج (آخر 7 أيام)",
       "viewAll": "عرض الكل",
@@ -7247,10 +7572,12 @@
       "discard": "حذف",
       "discarding": "جارٍ الحذف…",
       "confirmDiscard": "حذف كل الإدخالات غير المقروءة؟ مش هتقدر تسترجعها بعد كده.",
-      "discarded": "تم حذف {count} من الإدخالات غير المقروءة"
+      "discarded": "تم حذف {count} من الإدخالات غير المقروءة",
+      "discardObject": "الرسائل التالفة"
     },
     "retryKept": "معرفناش نرجّع {kept} للقائمة لأن Redis رفض الكتابة — لسه موجودين في قائمة الفاشلة؛ جرّب تاني",
-    "smsQueueLink": "الرسائل النصية الفاشلة"
+    "smsQueueLink": "الرسائل النصية الفاشلة",
+    "confirmRetryObject": "إعادة إرسال كل الرسائل الفاشلة"
   },
   "smsQueue": {
     "title": "قائمة الرسائل النصية — الرسائل الفاشلة",
@@ -7285,8 +7612,10 @@
       "discard": "حذف",
       "discarding": "جارٍ الحذف…",
       "confirmDiscard": "حذف كل الإدخالات غير المقروءة؟ مش هتقدر تسترجعها بعد كده.",
-      "discarded": "تم حذف {count} من الإدخالات غير المقروءة"
-    }
+      "discarded": "تم حذف {count} من الإدخالات غير المقروءة",
+      "discardObject": "الرسائل التالفة"
+    },
+    "confirmRetryObject": "إعادة إرسال كل الرسائل الفاشلة"
   },
   "webhookEvents": {
     "emailQueueLink": "الرسائل الفاشلة",
@@ -7312,7 +7641,9 @@
       "resultOk": "تم",
       "lastError": "آخر خطأ",
       "action": "إجراء"
-    }
+    },
+    "replayObject": "حدث دفع اتعالج قبل كده",
+    "replayAction": "أعد المعالجة برضه"
   },
   "aiUsage": {
     "title": "استخدام الذكاء الاصطناعي",
@@ -7395,12 +7726,12 @@
     "loadFailedBody": "النت قطع قبل ما نحمّل المميزات اللي في باقتك. جرّب تاني بعد شوية.",
     "retryCta": "جرّب تاني",
     "lockedBadge": "مقفل",
-    "availableOn": "متاح في خطة {plan} وما فوقها.",
-    "upgradeCta": "الترقية إلى {plan}",
+    "availableOn": "متاح في باقة {plan} وما فوقها.",
+    "upgradeCta": "اترقّى لباقة {plan}",
     "seePlansCta": "شوف الباقات",
     "contactCta": "تواصل معنا",
     "requiresFeature": "يحتاج ميزة «{feature}».",
-    "alsoIncluded": "مشمول أيضًا في هذه الخطة"
+    "alsoIncluded": "موجود كمان في الباقة دي"
   },
   "aiTools": {
     "title": "أدوات الذكاء الاصطناعي",
@@ -7435,7 +7766,7 @@
         "title": "التراجع عن الموازنة",
         "body": "التراجع عن آخر عملية موازنة — يستعيد حقول الاسم والوصف الأصلية (باللغتين) قبل تطبيق الموازنة.",
         "button": "تراجع",
-        "forceTooltip": "يستعيد القيم الأصلية قبل الموازنة حتى لو تم تعديل الحقول منذ ذلك الحين."
+        "forceTooltip": "بيرجّع القيم الأصلية قبل الموازنة حتى لو الحقول اتعدّلت بعدها."
       },
       "fillMissingArabic": {
         "title": "تعبئة الحقول العربية الفارغة",
@@ -7557,7 +7888,7 @@
     },
     "activeJob": {
       "sweepSuffix": "مسح",
-      "statusCancelled": "تم الإلغاء",
+      "statusCancelled": "اتوقّف",
       "statusCompleted": "مكتمل",
       "statusCompletedAt": "اكتمل بتاريخ {date}",
       "statusStartedAt": "بدأ بتاريخ {date}",
@@ -7569,8 +7900,8 @@
       "hide": "إخفاء",
       "viewFailures": "عرض {count} فشل",
       "viewFailuresPlural": "عرض {count} حالة فشل",
-      "viewFilled": "عرض {count} منتج تم تعبئته",
-      "viewFilledPlural": "عرض {count} منتجات تم تعبئتها"
+      "viewFilled": "شوف {count} منتج اتعبّى",
+      "viewFilledPlural": "شوف {count} منتجات اتعبّت"
     },
     "stats": {
       "filled": "مُعبَّأ",
@@ -7646,7 +7977,7 @@
       "latestSeoFills": "آخر تعبئة سيو",
       "titleLabel": "العنوان:",
       "descLabel": "الوصف:",
-      "copied": "تم النسخ!",
+      "copied": "اتنسخ!",
       "copy": "نسخ",
       "openSeoPage": "فتح صفحة السيو",
       "faqUnit": "{count, plural, one {سؤال} other {أسئلة}}",
@@ -7675,7 +8006,7 @@
       "notGenerated": "لسه ما اتعملش. اضغط <b>إنشاء</b> فوق عشان تشغّل المسح.",
       "copy": "نسخ",
       "copyJson": "نسخ JSON",
-      "copiedToast": "تم نسخ {label}",
+      "copiedToast": "اتنسخ {label}",
       "llmsTxt": {
         "label": "LLMs.txt",
         "charsSuffix": "حرفًا"
@@ -7687,16 +8018,22 @@
       },
       "citationCopy": {
         "label": "نسخة الاستشهاد",
-        "filledOfTotal": "تم تعبئة {filled} من أصل {total} منتج",
+        "filledOfTotal": "اتعبّى {filled} من {total} منتج",
         "hint": "القيم الخاصة بكل منتج مرئية في صفحة تعديل المنتج ضمن <b>نسخة الاستشهاد</b>."
       }
-    }
+    },
+    "replaceObject": "مسح الذكاء الاصطناعي بالإجبار",
+    "replaceConsequence": "المحتوى الحالي اللي المسح ده بيغطيه هيتستبدل بنتيجة جديدة.",
+    "replaceAction": "استبدل المحتوى",
+    "cancelObject": "المسح الشغّال دلوقتي",
+    "cancelConsequence": "هيقف. اللي اتعالج قبل كده بيحتفظ بتعديلاته.",
+    "cancelAction": "وقّف المسح"
   },
   "account": {
     "security": {
       "title": "الأمان",
       "subtitle": "إدارة المصادقة الثنائية لحسابك",
-      "mfaBanner": "المصادقة الثنائية مطلوبة لحسابات المسؤول العام. قم بإعدادها الآن للاستمرار في استخدام المنصة.",
+      "mfaBanner": "المصادقة الثنائية مطلوبة لحسابات المسؤول العام. فعّلها دلوقتي عشان تكمّل استخدام المنصة.",
       "mfaBannerCta": "إعداد المصادقة الثنائية",
       "statusEnabled": "المصادقة الثنائية مفعّلة",
       "statusDisabled": "المصادقة الثنائية غير مفعّلة",
@@ -7715,8 +8052,8 @@
       "backupCodesTitle": "احفظ رموز الاحتياط",
       "backupCodesDescription": "احفظ الرموز الاحتياطية دي في مكان آمن. كل رمز يتقبل مرة واحدة بس. لو ضاع منك الوصول لتطبيق المصادقة، تقدر تستخدمها عشان تسجّل دخولك.",
       "copyCodesButton": "نسخ جميع الرموز",
-      "codeCopied": "تم النسخ!",
-      "savedButton": "لقد حفظت هذه الرموز",
+      "codeCopied": "اتنسخ!",
+      "savedButton": "حفظت الرموز دي",
       "disableTitle": "تعطيل المصادقة الثنائية",
       "disableDescription": "ستحتاج إلى إدخال رمز التحقق الحالي لتعطيل المصادقة الثنائية.",
       "disableButton": "تعطيل المصادقة الثنائية",
@@ -7725,11 +8062,11 @@
       "disableConfirmDescription": "الخطوة دي هتشيل طبقة الأمان الزيادة من حسابك. تقدر تفعّلها تاني في أي وقت.",
       "loading": "جاري التحميل…",
       "errorLoading": "معرفناش نحمّل إعدادات الأمان",
-      "errorBegin": "معرفناش نبدأ التسجيل. جرّب تاني من فضلك.",
+      "errorBegin": "معرفناش نبدأ التسجيل. جرّب تاني.",
       "errorVerify": "الرمز غلط. اتأكد من تطبيق المصادقة وجرّب تاني.",
-      "errorDisable": "الرمز غلط. جرّب تاني من فضلك.",
-      "successEnabled": "تم تفعيل المصادقة الثنائية لحسابك.",
-      "successDisabled": "تم تعطيل المصادقة الثنائية.",
+      "errorDisable": "الرمز غلط. جرّب تاني.",
+      "successEnabled": "اتفعّلت المصادقة الثنائية لحسابك.",
+      "successDisabled": "اتوقّفت المصادقة الثنائية.",
       "continueButton": "متابعة",
       "statusOn": "مفعّل",
       "statusOff": "غير مفعّل",
@@ -7759,8 +8096,8 @@
         "stepUpConfirm": "تأكيد",
         "stepUpFailed": "البيانات غير مطابقة. راجع كلمة المرور والرمز وحاول مرة أخرى.",
         "added": "تمت إضافة مفتاح المرور",
-        "renamed": "تم تعديل الاسم",
-        "removed": "تم حذف مفتاح المرور",
+        "renamed": "اتغيّر الاسم",
+        "removed": "اتمسح مفتاح المرور",
         "errorLoad": "معرفناش نحمّل مفاتيح المرور",
         "errorGeneric": "حصل خطأ ومفيش حاجة اتغيرت."
       },
@@ -7904,7 +8241,7 @@
     },
     "errors": {
       "loadFailed": "معرفناش نحمّل الموظفين.",
-      "networkError": "حصلت مشكلة في الاتصال. جرّب تاني من فضلك."
+      "networkError": "حصلت مشكلة في الاتصال. جرّب تاني."
     },
     "toasts": {
       "addedTitle": "تمت إضافة الموظف",
@@ -7956,13 +8293,13 @@
       "title": "المدونة",
       "subtitle": "اكتب مقالات وأخبار وقصص تظهر في مدونة متجرك.",
       "backToStore": "العودة للمتجر",
-      "newPost": "+ منشور جديد",
+      "newPost": "اكتب مقال جديد",
       "searchPlaceholder": "بحث في المنشورات...",
       "publishedCount": "{count} منشور منشور",
       "draftCount": "{count} مسودة",
       "draftsCount": "{count} مسودات",
-      "disabledTitle": "المدونة معطلة حالياً",
-      "disabledBody": "مدونتك غير ظاهرة في المتجر بعد. المنشورات التي تنشئها هنا تُحفظ كمسودات.",
+      "disabledTitle": "المدونة مقفولة دلوقتي",
+      "disabledBody": "المقالات اللي بتكتبها مش هتظهر للعملاء غير لما تشغّل المدونة.",
       "disabledLink": "فعّلها من إعدادات العلامة التجارية",
       "disabledSuffix": "للنشر.",
       "emptyTitle": "مفيش منشورات لسه",
@@ -7974,7 +8311,17 @@
       "postDelete": "حذف",
       "postDeleting": "جاري الحذف...",
       "postDeleteConfirm": "حذف المنشور ده؟ مش هينفع تتراجع عن الإجراء ده.",
-      "postDeleteFailed": "فشل الحذف"
+      "postDeleteFailed": "جرّب تاني بعد شوية.",
+      "enableBlog": "شغّل المدونة",
+      "enabledToast": "المدونة اشتغلت",
+      "enableFailedTitle": "مقدرناش نشغّل المدونة",
+      "enableFailed": "جرّب تاني بعد شوية.",
+      "postDeleteObject": "المقال «{title}»",
+      "postDeleteConsequence": "المقال هيتمسح نهائيًا ومش هتقدر ترجّعه.",
+      "postDeleteLabel": "امسح المقال",
+      "postDeleted": "اتمسح المقال",
+      "postDeleteFailedTitle": "مقدرناش نمسح المقال",
+      "postMenu": "خيارات المقال"
     },
     "editor": {
       "newTitle": "تدوينة جديدة",
@@ -8013,31 +8360,31 @@
       "subtitle": "ملاحظة معلومات التوصيل ومُحدِّد مواعيد التوصيل والحد الأدنى لقيمة الطلب عند الدفع",
       "loading": "جارٍ التحميل...",
       "backToSettings": "العودة إلى الإعدادات",
-      "save": "حفظ التغييرات",
+      "save": "احفظ وقت التوصيل",
       "saving": "جارٍ الحفظ...",
-      "successMessage": "تم حفظ إعدادات التوصيل بنجاح",
-      "failedMessage": "فشل حفظ إعدادات التوصيل",
-      "connectionError": "معرفناش نتصل بالسيرفر",
+      "successMessage": "اتحفظ وقت التوصيل",
+      "failedMessage": "مقدرناش نحفظ إعدادات التوصيل. جرّب تاني.",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
       "noteSectionTitle": "ملاحظة معلومات التوصيل",
-      "noteSectionHint": "تُعرض للعميل عند الدفع، فوق زر الدفع.",
+      "noteSectionHint": "بتظهر للعميل وهو بيدفع، فوق زرار الدفع.",
       "noteEnable": "إظهار ملاحظة التوصيل",
       "noteTextEn": "الملاحظة (إنجليزي)",
       "noteTextAr": "الملاحظة (عربي)",
       "windowsSectionTitle": "مواعيد التوصيل",
       "windowsSectionHint": "يختار العميل موعدًا واحدًا عند الدفع. يُغلق كل موعد عن الطلب في وقت الإغلاق الخاص به (أو وقت بدايته إن تُرك فارغًا). عند إغلاق جميع المواعيد لهذا اليوم، ينتقل المُحدِّد تلقائيًا إلى الغد بحيث تصبح كل المواعيد متاحة من جديد.",
       "windowsEnable": "إظهار مُحدِّد موعد التوصيل",
-      "addWindow": "+ إضافة موعد",
+      "addWindow": "ضيف ميعاد",
       "labelEn": "التسمية (إنجليزي)",
       "labelAr": "التسمية (عربي)",
       "startTime": "وقت البدء",
       "endTime": "وقت الانتهاء",
       "orderByTime": "وقت الإغلاق عن الطلب (اختياري)",
       "remove": "إزالة",
-      "noWindowsYet": "مفيش مواعيد توصيل لسه — ضيف ميعاد فوق.",
+      "noWindowsYet": "لسه مفيش مواعيد توصيل. ضيف أول ميعاد.",
       "minOrderSectionTitle": "الحد الأدنى لقيمة الطلب",
-      "minOrderSectionHint": "العملاء مش هيقدروا يكملوا الطلب لو إجمالي المنتجات أقل من المبلغ ده. سيبه فاضي أو اكتب 0 لإيقافه.",
+      "minOrderSectionHint": "العميل مش هيقدر يكمّل الطلب لو إجمالي المنتجات أقل من المبلغ ده. سيبه فاضي أو اكتب 0 لو مش عايز حد أدنى.",
       "minOrderLabel": "الحد الأدنى للطلب (ج.م)",
-      "minOrderPlaceholder": "مثال: 500.00",
+      "minOrderPlaceholder": "مثلًا 500",
       "invoiceEmailSectionTitle": "بريد فاتورة الطلب",
       "invoiceEmailSectionHint": "تُرسل فاتورة كل طلب في هذا المتجر إلى هذا البريد (مثل صاحب المتجر)، وتصل إليه تنبيهات الاسترداد أيضًا. لا تُرسل رسائل الطلبات إلى أي عنوان آخر. اتركه فارغًا للتعطيل.",
       "invoiceEmailLabel": "بريد مستلم الفاتورة",
@@ -8066,7 +8413,8 @@
         "title": "باركود الطلب",
         "body": "باركود الفاتورة وورقة التغليف بقى مع باقي الأكواد.",
         "link": "افتح أكواد QR والباركود"
-      }
+      },
+      "errorTitle": "مقدرناش نحفظ"
     }
   },
   "customerGroups": {
@@ -8107,7 +8455,12 @@
       "modeNone": "من غير خصم للمجموعة",
       "modePercent": "نسبة خصم من السعر",
       "discountPct": "الخصم (%)",
-      "discountHint": "بيتطبق لو أحسن من أي شريحة. الكوبونات مش بتتطبق على الأصناف دي."
+      "discountHint": "بيتطبق لو أحسن من أي شريحة. الكوبونات مش بتتطبق على الأصناف دي.",
+      "deleteDialog": {
+        "object": "المجموعة «{name}»",
+        "consequence": "{count} عميل هيفضلوا من غير مجموعة. العملاء نفسهم مش هيتمسحوا.",
+        "confirmLabel": "امسح المجموعة"
+      }
     }
   },
   "agentKey": {
@@ -8278,14 +8631,14 @@
       "left": "لليسار",
       "right": "لليمين"
     },
-    "pageTitle": "الودجة العائمة",
+    "pageTitle": "زرار الواتساب العايم",
     "common": {
       "loading": "جارٍ التحميل…"
     },
-    "premiumSubtitle": "إضافة مميزة",
+    "premiumSubtitle": "ميزة إضافية",
     "featureNotEnabledTitle": "الميزة غير مفعّلة",
     "featureNotEnabledBody": "الودجة العائمة إضافة مميزة. يجب أن يفعّلها مسؤول عام لهذا المتجر قبل أن تتمكن من إعدادها. تواصل مع ابدأ ستوديو للذكاء الاصطناعي لطلب الوصول.",
-    "mainSubtitle": "مجموعة أزرار ثابتة يراها عملاؤك في كل صفحة",
+    "mainSubtitle": "أزرار ثابتة بيشوفها عميلك في كل صفحة، زي الواتساب والاتصال",
     "showWidgetLabel": "إظهار الودجة في واجهة المتجر",
     "showWidgetHint": "عند التعطيل، لن تظهر الودجة حتى لو كانت الميزة مفعّلة.",
     "positionLabel": "الموضع",
@@ -8307,8 +8660,8 @@
     "moveDown": "نقل لأسفل",
     "removeButtonAria": "إزالة الزر",
     "kindLabel": "النوع",
-    "tooltipEnPlaceholder": "التلميح (إنجليزي)",
-    "tooltipArPlaceholder": "التسمية",
+    "tooltipEnPlaceholder": "النص بالإنجليزي",
+    "tooltipArPlaceholder": "النص بالعربي",
     "whatsappPhoneLabel": "الهاتف (دولي، بدون + أو مسافات)",
     "usingStoreWhatsapp": "باستخدام واتساب المتجر: {value}",
     "whatsappMessageLabel": "رسالة معبأة مسبقاً (اختياري)",
@@ -8337,10 +8690,10 @@
     "buttonBackgroundColorLabel": "لون الخلفية (اختياري)",
     "iconColorLabel": "لون الأيقونة (اختياري)",
     "saveFailedFallback": "فشل الحفظ",
-    "savedToast": "تم حفظ الودجة العائمة",
+    "savedToast": "اتحفظت الأزرار",
     "saveHint": "تُطبَّق التغييرات على واجهة المتجر الفعلية بعد الحفظ.",
     "saving": "جارٍ الحفظ…",
-    "saveChanges": "حفظ التغييرات",
+    "saveChanges": "احفظ الأزرار",
     "menuLabelEnSample": "Open menu",
     "menuLabelArSample": "القائمة",
     "prefillExample": "أهلاً! عايز أسأل عن…",
@@ -8454,7 +8807,8 @@
     "loadFailed": "معرفناش نحمّل المحافظ.",
     "retry": "إعادة المحاولة",
     "statusOn": "مفعّل",
-    "statusOff": "غير مفعّل"
+    "statusOff": "غير مفعّل",
+    "emptyAction": "روح للعملاء"
   },
   "usageHistory": {
     "title": "سجل استخدام المتاجر",
@@ -8538,8 +8892,8 @@
       "saveFailed": "معرفناش نحفظ الباقة."
     },
     "toasts": {
-      "savedTitle": "تم حفظ الباقة",
-      "savedDesc": "تم تحديث الباقة {code}.",
+      "savedTitle": "اتحفظت الباقة",
+      "savedDesc": "اتحدّثت الباقة {code}.",
       "errorTitle": "خطأ"
     }
   },
@@ -8586,7 +8940,7 @@
     "assigning": "جارٍ التطبيق…",
     "toasts": {
       "errorTitle": "معرفناش نغيّر الباقة",
-      "assignedTitle": "تم تحديث الباقة",
+      "assignedTitle": "اتحدّثت الباقة",
       "assignedDesc": "أصبح هذا المتجر على الباقة {code}."
     },
     "subscribeTitle": "اختر باقة",
@@ -8602,15 +8956,15 @@
     "checkoutError": "معرفناش نبدأ الدفع",
     "changeError": "معرفناش نغيّر الباقة",
     "upgradedToast": "تمت ترقية الباقة",
-    "upgradeDeclined": "تم رفض الدفعة. لم تتغير باقتك.",
+    "upgradeDeclined": "الدفعة اترفضت. باقتك ما اتغيّرتش.",
     "upgradePending": "جارٍ تأكيد الدفعة.",
     "scheduledToast": "تمت جدولة التغيير لنهاية الفترة الحالية.",
     "canceledToast": "ستنتهي باقتك في نهاية الفترة الحالية.",
-    "canceledNowToast": "تم إلغاء باقتك.",
-    "resumedToast": "تم إلغاء طلب الإنهاء.",
+    "canceledNowToast": "اتلغت باقتك.",
+    "resumedToast": "رجعت باقتك زي ما كانت، وإلغاء الاشتراك اتلغى.",
     "cancelPlan": "إلغاء الباقة",
     "resumePlan": "الاحتفاظ بباقتي",
-    "confirmCancel": "عايز تلغي باقتك؟ هتفضل شغالة لحد آخر الفترة الحالية، وبعدها المتجر هيتحول للباقة المجانية (بياناتك محفوظة).",
+    "confirmCancel": "الباقة هتفضل شغالة لحد آخر الفترة الحالية، وبعدها المتجر بيرجع للباقة المجانية (بياناتك بتفضل محفوظة).",
     "cancelsOn": "تنتهي في",
     "pendingPlan": "الانتقال إلى {plan} في {date}",
     "pastDueTitle": "معرفناش نخصم من بطاقتك",
@@ -8618,7 +8972,7 @@
     "canceledTitle": "اشتراكك خلص",
     "canceledBody": "متجرك مش بيستقبل طلبات جديدة. بياناتك محفوظة. اختار باقة وادفع عشان يرجع يشتغل.",
     "checkoutReturnPending": "جارٍ تأكيد الدفع…",
-    "checkoutReturnOk": "تم تأكيد الدفع. باقتك فعّالة الآن.",
+    "checkoutReturnOk": "الدفع اتأكد. باقتك شغالة دلوقتي.",
     "checkoutReturnFailed": "لم تتم عملية الدفع.",
     "checkoutReturnLater": "لم نستلم التأكيد بعد. ستتحدّث هذه الصفحة قريبًا.",
     "invoicesTitle": "الدفعات والفواتير",
@@ -8635,7 +8989,7 @@
       "renewal": "تجديد",
       "upgrade": "ترقية",
       "refund": "استرداد",
-      "card_setup": "تم حفظ البطاقة — لم يُخصم شيء",
+      "card_setup": "اتحفظ الكارت ومخصمناش حاجة",
       "manual_payment": "دفعة يدوية"
     },
     "invoiceStatuses": {
@@ -8671,10 +9025,10 @@
       "redirecting": "جارٍ التحويل…",
       "cardFailed": "معرفناش نبدأ إعداد البطاقة",
       "returnPending": "جارٍ تأكيد بطاقتك…",
-      "returnOk": "تم حفظ البطاقة. لم يُخصم أي مبلغ.",
+      "returnOk": "اتحفظ الكارت ومخصمناش أي مبلغ.",
       "returnFailed": "البطاقة ما اتحفظتش، وما اتخصمش أي مبلغ.",
       "returnLater": "لم نستلم التأكيد بعد. ستتحدّث الصفحة قريبًا.",
-      "stubSaved": "محاكاة: تم حفظ البطاقة",
+      "stubSaved": "تجربة: اتحفظ الكارت",
       "stubDecline": "محاكاة: رفض البطاقة",
       "instapay": "إنستاباي",
       "useInstapay": "الدفع عبر إنستاباي",
@@ -8682,7 +9036,7 @@
       "amount": "المبلغ بالضبط",
       "reference": "رقمك المرجعي",
       "copy": "نسخ",
-      "copied": "تم النسخ",
+      "copied": "اتنسخ",
       "claimSent": "شكرًا. فريق ابدأ ستوديو للذكاء الاصطناعي هيراجع التحويل ويفعّل باقتك أول ما يتأكد.",
       "instapayUnavailable": "إنستاباي غير متاح حاليًا",
       "instapayFailed": "معرفناش نجهز إنستاباي",
@@ -8692,7 +9046,7 @@
       "title": "تأكيدات الدفع",
       "status": {
         "pending": "بانتظارنا",
-        "confirmed": "تم التأكيد",
+        "confirmed": "اتأكّد",
         "rejected": "مرفوض"
       },
       "reference": "المرجع {ref}",
@@ -8730,7 +9084,7 @@
       "amount": "المبلغ بالضبط",
       "reference": "المرجع الخاص بك",
       "copy": "نسخ",
-      "copied": "تم النسخ",
+      "copied": "اتنسخ",
       "phoneTitle": "ادفع من هذا الهاتف",
       "phoneStep1": "انسخ عنوان إنستاباي بالأسفل.",
       "phoneStep2": "افتح تطبيق إنستاباي، واختر إرسال أموال، والصق العنوان.",
@@ -8750,7 +9104,9 @@
     "instapayPlanFailed": "معرفناش نبدأ دفع إنستاباي للباقة دي.",
     "instapayQuoteTitle": "ادفع ثمن {plan} ({interval})",
     "viewReceipt": "شوف الإيصال",
-    "receiptProcessing": "الدفع تم. الإيصال هيطلع هنا حالاً."
+    "receiptProcessing": "الدفع تم. الإيصال هيطلع هنا حالاً.",
+    "cancelObject": "إلغاء اشتراكك في الباقة",
+    "cancelAction": "الغي الاشتراك"
   },
   "planLimit": {
     "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. قم بالترقية لإضافة المزيد.",
@@ -8769,7 +9125,7 @@
   "onboarding": {
     "signup": {
       "title": "أنشئ متجرك",
-      "subtitle": "ابدأ البيع أونلاين في دقائق. تجربة مجانية 14 يومًا — لا يُخصم أي مبلغ اليوم.",
+      "subtitle": "ابدأ البيع أونلاين في دقايق. 14 يوم تجربة ببلاش، ومش هنخصم منك حاجة النهارده.",
       "name": "اسمك",
       "namePlaceholder": "منى حسن",
       "email": "البريد الإلكتروني",
@@ -8786,29 +9142,29 @@
       "signIn": "تسجيل الدخول",
       "errors": {
         "nameRequired": "أدخل اسمك",
-        "emailInvalid": "أدخل بريدًا إلكترونيًا صحيحًا",
+        "emailInvalid": "اكتب إيميل صحيح",
         "passwordWeak": "كلمة المرور تحتاج 8 أحرف على الأقل مع حروف كبيرة وصغيرة ورقم ورمز",
-        "phoneInvalid": "أدخل رقم موبايل مصري صحيح أو اتركه فارغًا",
-        "emailDisposable": "من فضلك استخدم بريد إلكتروني دائم، مش مؤقت",
-        "tooFast": "انتظر لحظة ثم أرسل مرة أخرى",
-        "formExpired": "انتهت صلاحية النموذج. أرسله مرة أخرى",
-        "rateLimited": "محاولات كثيرة. حاول مرة أخرى بعد قليل.",
+        "phoneInvalid": "اكتب رقم موبايل مصري صحيح أو سيبه فاضي",
+        "emailDisposable": "استخدم إيميل ثابت مش مؤقت",
+        "tooFast": "استنى لحظة وابعت تاني",
+        "formExpired": "الفورم خلصت مدته. ابعته تاني",
+        "rateLimited": "محاولات كتير. جرّب تاني بعد شوية.",
         "generic": "معرفناش نعمل حسابك. جرّب تاني.",
         "phoneRequired": "أدخل رقم الموبايل.",
-        "legalRequired": "وافق على الشروط والسياسات لإنشاء حسابك."
+        "legalRequired": "وافق على الشروط والسياسات عشان نعمل حسابك."
       },
       "sent": {
         "title": "تحقق من بريدك",
-        "body": "إذا كان هذا البريد صالحًا للاستخدام فقد أرسلنا رابط التأكيد إلى {email}. الرابط صالح لمدة 24 ساعة.",
-        "resend": "أرسل الرابط مرة أخرى",
+        "body": "لو الإيميل ده صحيح، بعتنالك رابط التأكيد على {email}. الرابط شغال 24 ساعة.",
+        "resend": "ابعتلي الرابط تاني",
         "resending": "جارٍ الإرسال…",
-        "resent": "إذا كان البريد صالحًا فسيصلك رابط جديد قريبًا.",
+        "resent": "لو الإيميل صحيح هيوصلك رابط جديد كمان شوية.",
         "backToLogin": "العودة لتسجيل الدخول"
       },
       "noAccount": "جديد على ابدأ ستور؟",
       "createStore": "أنشئ متجرك",
       "plan": {
-        "chip": "الباقة المختارة: {plan} · {interval} — تجربة 14 يومًا على باقة النمو",
+        "chip": "الباقة اللي اخترتها: {plan} · {interval} — 14 يوم تجربة على باقة النمو",
         "monthly": "شهريًا",
         "yearly": "سنويًا"
       },
@@ -8821,19 +9177,19 @@
     },
     "verify": {
       "verifying": "جارٍ تأكيد بريدك…",
-      "successTitle": "تم تأكيد البريد",
-      "successBody": "حسابك جاهز. هيا نجهّز متجرك.",
+      "successTitle": "اتأكد الإيميل",
+      "successBody": "حسابك جاهز. يلا نجهّز متجرك.",
       "continue": "متابعة",
       "failedTitle": "معرفناش نأكد بريدك",
-      "invalid": "هذا الرابط غير صالح أو سبق استخدامه.",
-      "expired": "انتهت صلاحية هذا الرابط. اطلب رابطًا جديدًا أدناه.",
-      "missing": "رابط التأكيد غير مكتمل.",
+      "invalid": "الرابط ده مش صالح أو اتستخدم قبل كده.",
+      "expired": "الرابط ده خلصت مدته. اطلب رابط جديد من تحت.",
+      "missing": "رابط التأكيد ناقص.",
       "generic": "حصلت مشكلة. جرّب تاني.",
-      "resendTitle": "احصل على رابط جديد",
+      "resendTitle": "هات رابط جديد",
       "email": "البريد الإلكتروني",
       "resend": "أرسل رابطًا جديدًا",
       "resending": "جارٍ الإرسال…",
-      "resent": "إذا كان البريد صالحًا فسيصلك رابط جديد قريبًا.",
+      "resent": "لو الإيميل صحيح هيوصلك رابط جديد كمان شوية.",
       "backToLogin": "العودة لتسجيل الدخول",
       "passwordTitle": "أكّد كلمة السر",
       "passwordBody": "اكتب كلمة السر اللي اخترتها وقت التسجيل عشان نكمّل تأكيد بريدك.",
@@ -8861,41 +9217,41 @@
       "loadFailed": "معرفناش نحمّل إعدادك. حدّث الصفحة.",
       "verifyGate": {
         "title": "أكّد بريدك للمتابعة",
-        "body": "أرسلنا رابط تأكيد إلى {email}. افتحه ثم عد وحدّث هذه الصفحة.",
-        "refresh": "لقد أكدت بريدي",
-        "resend": "أرسل الرابط مرة أخرى",
-        "resent": "إذا كان البريد صالحًا فسيصلك رابط جديد قريبًا.",
+        "body": "بعتنالك رابط تأكيد على {email}. افتحه وبعدين ارجع حدّث الصفحة دي.",
+        "refresh": "أكدت الإيميل",
+        "resend": "ابعتلي الرابط تاني",
+        "resent": "لو الإيميل صحيح هيوصلك رابط جديد كمان شوية.",
         "sendFailed": "معرفناش نبعت البريد تاني. جرّب تاني بعد شوية."
       },
       "store": {
         "title": "اختر اسم متجرك",
-        "subtitle": "اختر اسمًا وعنوان متجرك المجاني.",
+        "subtitle": "اختار اسم وعنوان لمتجرك المجاني.",
         "name": "اسم المتجر",
         "namePlaceholder": "متجري",
         "slug": "عنوان المتجر",
         "slugHelp": "حروف لاتينية وأرقام وشرطات بس. تقدر تضيف نطاقك الخاص بعدين.",
         "checking": "جارٍ التحقق…",
         "available": "{host} متاح",
-        "taken": "هذا العنوان مستخدم بالفعل",
-        "reserved": "هذا العنوان محجوز. اختر عنوانًا آخر.",
-        "protected": "هذا العنوان يطابق اسم علامة تجارية محمية. تواصل مع الدعم للمطالبة به، أو اختر عنوانًا آخر.",
-        "tooShort": "استخدم 3 أحرف على الأقل",
-        "tooLong": "استخدم 40 حرفًا على الأكثر",
-        "invalid": "استخدم حروفًا صغيرة وأرقامًا وشرطات مفردة فقط",
+        "taken": "العنوان ده مستخدم قبل كده",
+        "reserved": "العنوان ده محجوز. اختار عنوان تاني.",
+        "protected": "العنوان ده زي اسم علامة تجارية محمية. كلّم الدعم لو ده اسمك، أو اختار عنوان تاني.",
+        "tooShort": "اكتب 3 حروف على الأقل",
+        "tooLong": "اكتب 40 حرف على الأكتر",
+        "invalid": "استخدم حروف صغيرة وأرقام وشرطة واحدة بين الكلمات بس",
         "nameRequired": "أدخل اسم متجرك",
         "create": "إنشاء متجري",
         "creating": "جارٍ الإنشاء…",
         "createFailed": "معرفناش نعمل المتجر. جرّب تاني.",
-        "dailyLimit": "أنشأت عدة متاجر اليوم. حاول غدًا أو تواصل مع الدعم.",
-        "limit": "وصلت إلى الحد الأقصى للمتاجر في هذا الحساب."
+        "dailyLimit": "عملت كذا متجر النهارده. جرّب بكرة أو كلّم الدعم.",
+        "limit": "وصلت لأقصى عدد متاجر في الحساب ده."
       },
       "template": {
         "title": "اختر الشكل",
-        "subtitle": "اختر شكل متجرك. تقدر تغيّره في أي وقت.",
+        "subtitle": "اختار شكل متجرك. تقدر تغيّره في أي وقت.",
         "saveFailed": "معرفناش نحفظ الشكل. جرّب تاني.",
-        "previewNote": "المعاينات بمنتجات تجريبية. صورك ومنتجاتك تُضاف في الخطوة التالية.",
+        "previewNote": "المعاينات بمنتجات تجريبية. صورك ومنتجاتك هتضيفها في الخطوة الجاية.",
         "saving": "جارٍ الحفظ…",
-        "lookNotApplied": "متجرك اتعمل بس معرفناش نطبق الشكل. من فضلك اختار شكل تاني."
+        "lookNotApplied": "متجرك اتعمل بس معرفناش نطبّق الشكل. اختار شكل تاني."
       },
       "product": {
         "title": "أضف أول منتج",
@@ -8906,24 +9262,24 @@
         "pricePlaceholder": "250",
         "photo": "صورة (اختياري)",
         "nameRequired": "أدخل اسم المنتج",
-        "priceInvalid": "أدخل سعرًا أكبر من الصفر",
+        "priceInvalid": "اكتب سعر أكبر من صفر",
         "add": "إضافة المنتج",
         "adding": "جارٍ الإضافة…",
         "added": "تمت إضافة {name}.",
         "addFailed": "معرفناش نضيف المنتج. جرّب تاني.",
-        "limit": "وصلت إلى حد المنتجات في باقتك.",
+        "limit": "وصلت لأقصى عدد منتجات في باقتك.",
         "stock": "الكمية في المخزون",
-        "stockInvalid": "أدخل رقمًا صحيحًا، 0 أو أكثر"
+        "stockInvalid": "اكتب رقم صحيح، صفر أو أكتر"
       },
       "payment": {
-        "title": "كيف سيدفع عملاؤك؟",
+        "title": "العملاء هيدفعوا إزاي؟",
         "subtitle": "الدفع عند الاستلام مفعّل افتراضيًا.",
         "cod": "الدفع عند الاستلام",
         "codDesc": "يدفع العميل للمندوب عند وصول الطلب.",
         "moreLater": "بوابات الدفع بالبطاقة بتتجهّز بعدين من الإعدادات > المدفوعات.",
         "saveFailed": "معرفناش نحفظ إعدادات الدفع. جرّب تاني.",
-        "needOne": "أبقِ طريقة دفع واحدة على الأقل مفعّلة.",
-        "manualNote": "أنت بتأكد تحويلات إنستاباي يدويًا: أول ما الفلوس توصل حساب إنستاباي بتاعك افتح الطلب واضغط «تم استلام المبلغ». لحد وقتها الطلب بيفضل معلّق ومش بيتشحن.",
+        "needOne": "سيب طريقة دفع واحدة على الأقل شغّالة.",
+        "manualNote": "إنت اللي بتأكد تحويلات إنستاباي بإيدك: أول ما الفلوس توصل حسابك افتح الطلب واضغط «استلمت المبلغ». لحد وقتها الطلب بيفضل معلّق ومش بيتشحن.",
         "instapay": "إنستاباي",
         "instapayDesc": "العملاء بيحوّلوا على عنوان إنستاباي بتاعك وإنت بتأكد كل دفعة.",
         "handleLabel": "عنوان إنستاباي (IPA)",
@@ -8936,7 +9292,7 @@
       },
       "live": {
         "title": "جاهز للإطلاق",
-        "subtitle": "سيعمل متجرك على {host}.",
+        "subtitle": "متجرك هيشتغل على {host}.",
         "checklistName": "اسم المتجر",
         "checklistTemplate": "القالب",
         "checklistProduct": "المنتجات المضافة",
@@ -8946,65 +9302,65 @@
         "publishing": "جارٍ النشر…",
         "publishFailed": "معرفناش ننشر المتجر. جرّب تاني.",
         "doneTitle": "متجرك أصبح مباشرًا",
-        "doneBody": "شارك الرابط وابدأ البيع.",
+        "doneBody": "شارك الرابط وابدأ بيع.",
         "visit": "افتح متجري",
         "copy": "انسخ الرابط",
-        "copied": "تم النسخ",
+        "copied": "اتنسخ",
         "whatsapp": "شارك على واتساب",
-        "dashboard": "اذهب إلى لوحة التحكم",
+        "dashboard": "افتح لوحة التحكم",
         "addPayment": "إضافة طريقة دفع"
       },
       "retry": "حاول مرة أخرى",
       "plan": {
-        "title": "اختر باقتك",
-        "trialNote": "كل باقة بتبدأ بتجربة 14 يوم من باقة النمو. في اليوم الـ15 الباقة اللي اخترتها بتبقى مستحقة الدفع، ولو ما اتدفعتش متجرك بيرجع للباقة المجانية.",
+        "title": "اختار باقتك",
+        "trialNote": "14 يوم تجربة ببلاش على باقة النمو، وبعدها تختار.",
         "monthly": "شهريًا",
         "yearly": "سنويًا",
         "saveBadge": "وفّر 25%",
         "perMonth": "/ شهر",
         "perYear": "/ سنة",
-        "priceTbd": "السعر سيُعلن قريبًا",
+        "priceTbd": "السعر هيتعلن قريب",
         "saving": "جارٍ الحفظ…",
         "saveFailed": "معرفناش نحفظ الباقة. جرّب تاني.",
         "notTrialing": "فترة التجربة خلصت، فمش هتقدر تغيّر الباقة من هنا. افتح صفحة الفوترة عشان تغيّرها."
       },
       "billing": {
         "title": "كيف ستدفع؟",
-        "subtitle": "لن يتم خصم أي مبلغ اليوم. التجربة 14 يومًا؛ اختر طريقة الدفع عند انتهائها.",
+        "subtitle": "مش هنخصم منك حاجة النهارده. التجربة 14 يوم، وبعدها تختار طريقة الدفع.",
         "returnPending": "جارٍ تأكيد بطاقتك…",
-        "returnOk": "تم حفظ البطاقة. لم يُخصم أي مبلغ.",
+        "returnOk": "اتحفظ الكارت ومخصمناش أي مبلغ.",
         "returnFailed": "البطاقة ما اتحفظتش وما اتخصمش أي مبلغ. تقدر تجرّب تاني.",
-        "returnLater": "لم نستلم التأكيد بعد. حدّث الصفحة بعد لحظات.",
-        "stubSaved": "محاكاة: تم حفظ البطاقة",
+        "returnLater": "لسه ما وصلنا التأكيد. حدّث الصفحة بعد لحظات.",
+        "stubSaved": "تجربة: اتحفظ الكارت",
         "stubDecline": "محاكاة: رفض البطاقة",
         "noOption": "مفيش طريقة دفع يمكن إعدادها دلوقتي. تقدر تكمّل وتضيف واحدة من صفحة الفوترة قبل الإطلاق.",
         "cardTitle": "بطاقة",
-        "cardSaved": "تم حفظ البطاقة:",
+        "cardSaved": "اتحفظ الكارت:",
         "cardBody": "احفظ كارت. مفيش حاجة هتتخصم دلوقتي؛ هنخصم {amount} ({interval}) لباقة {plan} يوم {date}.",
-        "cardBodyNoAmount": "احفظ بطاقة. لن يُخصم شيء الآن؛ سنخصم سعر الباقة التي اخترتها بتاريخ {date}.",
+        "cardBodyNoAmount": "احفظ كارت. مش هنخصم حاجة دلوقتي؛ هنخصم سعر الباقة اللي اخترتها يوم {date}.",
         "cardCta": "حفظ بطاقة",
-        "redirecting": "جارٍ التحويل إلى الصفحة الآمنة…",
+        "redirecting": "بنحوّلك للصفحة الآمنة…",
         "cardFailed": "معرفناش نبدأ إعداد البطاقة. جرّب تاني.",
         "instapayTitle": "إنستاباي",
-        "instapayBody": "ادفع بتحويل بنكي عبر إنستاباي.",
+        "instapayBody": "ادفع بتحويل بنكي عن طريق إنستاباي.",
         "instapayCta": "الدفع عبر إنستاباي",
         "instapayHandle": "عنوان إنستاباي",
         "instapayAmount": "المبلغ بالضبط",
         "instapayReference": "رقمك المرجعي",
         "instapayHow": "حوّل قبل {date} بنفس المبلغ والرقم المرجعي بالضبط. بعدها أرسل لنا رقم عملية إنستاباي من صفحة الفوترة. نؤكدها وتستمر باقتك.",
         "copy": "نسخ",
-        "copied": "تم النسخ",
-        "instapayUnavailable": "إنستاباي غير متاح حاليًا.",
+        "copied": "اتنسخ",
+        "instapayUnavailable": "إنستاباي مش متاح دلوقتي.",
         "instapayFailed": "معرفناش نجهّز إنستاباي. جرّب تاني.",
-        "continueAnyway": "المتابعة بدون دفع الآن",
+        "continueAnyway": "كمّل من غير دفع دلوقتي",
         "intervalMonthly": "شهري",
         "intervalYearly": "سنوي"
       }
     },
     "setupGuide": {
       "title": "دليل الإعداد",
-      "subtitle": "أكمل هذه الخطوات لتحصل على أول طلب.",
-      "progress": "تم {done} من {total}",
+      "subtitle": "كمّل الخطوات دي عشان تاخد أول طلب.",
+      "progress": "خلّصت {done} من {total}",
       "loadFailed": "معرفناش نحمّل دليل الإعداد.",
       "dismiss": "إخفاء الدليل",
       "show": "إظهار دليل الإعداد",
@@ -9016,19 +9372,19 @@
       "items": {
         "add_product": {
           "title": "أضف منتجًا",
-          "desc": "أضف أول منتج مع صورة وسعر."
+          "desc": "ضيف أول منتج بصورة وسعر."
         },
         "brand": {
           "title": "حدد الشعار والألوان",
-          "desc": "اجعل المتجر يعبّر عن علامتك."
+          "desc": "خلّي المتجر يشبه علامتك."
         },
         "shipping": {
           "title": "حدد مناطق الشحن",
-          "desc": "أخبر العملاء أين توصّل وكم الرسوم."
+          "desc": "قول للعملاء بتوصّل فين وبكام."
         },
         "payment": {
           "title": "اختر طرق الدفع",
-          "desc": "الدفع عند الاستلام مفعّل. راجعه أو أضف المزيد."
+          "desc": "الدفع عند الاستلام شغّال. راجعه أو ضيف طرق تانية."
         },
         "domain": {
           "title": "اربط نطاقك الخاص",
@@ -9036,11 +9392,11 @@
         },
         "test_order": {
           "title": "جرّب طلبًا تجريبيًا",
-          "desc": "افتح متجرك واطلب منتجًا كأنك عميل."
+          "desc": "افتح متجرك واطلب منتج كأنك عميل."
         },
         "share": {
           "title": "شارك رابط متجرك",
-          "desc": "أرسل الرابط لعملائك على واتساب."
+          "desc": "ابعت الرابط لعملائك على واتساب."
         }
       }
     },
@@ -9117,7 +9473,7 @@
     "refund": "استرداد",
     "confirmRefund": "استرداد {amount} إلى بطاقة التاجر؟",
     "refundFailed": "فشل الاسترداد: {message}",
-    "refundDone": "تم تسجيل الاسترداد.",
+    "refundDone": "اتسجّل الاسترداد.",
     "columns": {
       "date": "التاريخ",
       "store": "المتجر",
@@ -9182,7 +9538,7 @@
       "failed": "معرفناش نسجّل الدفعة دي. جرّب تاني.",
       "saving": "جارٍ الحفظ…",
       "submit": "تسجيل الدفعة وتفعيل الباقة",
-      "recorded": "تم تسجيل الدفعة وتفعيل الباقة.",
+      "recorded": "اتسجّلت الدفعة واتفعّلت الباقة.",
       "duplicate": "هذا المرجع مسجّل من قبل. لم يتغيّر شيء.",
       "periodAuto": "فترة الدفع بتبدأ لما الفترة الحالية تخلص، فمفيش أيام مدفوعة بتضيع.",
       "periodSuggested": "فترة الدفع: من {start} إلى {end}",
@@ -9247,7 +9603,7 @@
       "statusFilter": "الحالة",
       "statuses": {
         "pending": "قيد المراجعة",
-        "confirmed": "تم التأكيد",
+        "confirmed": "اتأكّد",
         "rejected": "مرفوض"
       },
       "columns": {
@@ -9272,7 +9628,7 @@
       "noteRequired": "لازم سبب من 3 حروف على الأقل.",
       "rejectFailed": "معرفناش نرفض الإشعار ده.",
       "rejectSubmit": "رفض الإشعار",
-      "rejected": "تم رفض الإشعار.",
+      "rejected": "الإشعار اتّرفض.",
       "reviewButton": "مراجعة",
       "reviewTitle": "راجع تحويل متجر {store}",
       "approveLabel": "اقبل وفعّل",
@@ -9306,7 +9662,7 @@
       "noteRequired": "اكتب سبب من 3 حروف على الأقل.",
       "submit": "سجّل",
       "saving": "جاري الحفظ…",
-      "done": "تم التسجيل. فترة الدفع اتحدّثت.",
+      "done": "اتسجّل. فترة الدفع اتحدّثت.",
       "duplicate": "الرقم المرجعي ده اتسجّل قبل كده. مفيش حاجة اتغيّرت.",
       "failed": "معرفناش نسجّل ده. جرّب تاني.",
       "voidedFreed": "الرقم المرجعي اتحرّر. عشان تسجّل التحويل ده للمتجر الصح، استخدم تسجيل دفعة والصق معرّف الدفعة الملغاة: {id}"
@@ -9338,7 +9694,9 @@
         "pending": "مستني فترة اشتراك",
         "applied": "اتطبّق"
       }
-    }
+    },
+    "refundObject": "رد مبلغ {amount}",
+    "refundAction": "رجّع الفلوس"
   },
   "codReconciliation": {
     "title": "مطابقة المبالغ المحصّلة عند الاستلام",
@@ -9458,7 +9816,10 @@
       "tooLarge": "حجم الملف أكبر من 10 ميجابايت.",
       "noFile": "اختر ملفًا أولًا.",
       "tooMany": "الحد الأقصى 5 مستندات. احذف مستندًا أولًا.",
-      "openFailed": "معرفناش نفتح المستند."
+      "openFailed": "معرفناش نفتح المستند.",
+      "deleteObject": "المستند «{name}»",
+      "deleteConsequence": "المستند هيتمسح نهائيًا من ملف الضريبة بتاعك.",
+      "deleteLabel": "امسح المستند"
     },
     "submit": {
       "attest": "أقرّ بأن هذه المنشأة مسجّلة في ضريبة القيمة المضافة لدى مصلحة الضرائب المصرية",
@@ -9596,7 +9957,8 @@
       "approved": "تم الاعتماد",
       "rejected": "تم الرفض",
       "revoked": "تم الإلغاء",
-      "failed": "فشل تنفيذ القرار: {message}"
+      "failed": "فشل تنفيذ القرار: {message}",
+      "revokeObject": "توثيق الضريبة للمتجر ده"
     }
   },
   "platformSettings": {
@@ -9624,7 +9986,9 @@
       "lastSaved": "الإعداد الحالي: {state}، {rate}%",
       "stateOn": "مفعّلة",
       "stateOff": "متوقفة",
-      "saveFailed": "معرفناش نحفظ: {message}"
+      "saveFailed": "معرفناش نحفظ: {message}",
+      "enableObject": "تفعيل ضريبة القيمة المضافة على الفواتير",
+      "enableAction": "فعّل الضريبة"
     }
   },
   "builder": {
@@ -10348,7 +10712,10 @@
       "deleteFailed": "معرفناش نحذف الجدول.",
       "saveFailed": "معرفناش نحفظ الجدول.",
       "shape": "{columns} أعمدة × {rows} صفوف",
-      "usedBy": "{products} منتج · {categories} قسم"
+      "usedBy": "{products} منتج · {categories} قسم",
+      "deleteObject": "جدول المقاسات «{name}»",
+      "deleteConsequence": "المنتجات والأقسام المربوطة بيه هتظهر من غير جدول مقاسات.",
+      "deleteLabel": "امسح الجدول"
     },
     "editor": {
       "createTitle": "جدول مقاسات جديد",
@@ -10357,7 +10724,7 @@
       "templateAbaya": "عباية (مقاس × طول)",
       "templateClothing": "ملابس (S–XXL)",
       "templateRing": "مقاس الخاتم",
-      "templateReplace": "القالب هيستبدل الجدول الحالي. تكمل؟",
+      "templateReplace": "القالب هيستبدل الجدول اللي بتكتبه دلوقتي.",
       "nameAr": "الاسم بالعربي",
       "nameEn": "الاسم بالإنجليزي",
       "unit": "وحدة القياس",
@@ -10384,7 +10751,9 @@
       "saving": "جارٍ الحفظ…",
       "cancel": "إلغاء",
       "errorName": "اكتب اسم الجدول بلغة واحدة على الأقل.",
-      "errorInvalid": "راجع الجدول: من 2 لـ 10 أعمدة، ومن 1 لـ 30 صف، وكل خانة لحد 24 حرف."
+      "errorInvalid": "راجع الجدول: من 2 لـ 10 أعمدة، ومن 1 لـ 30 صف، وكل خانة لحد 24 حرف.",
+      "templateReplaceObject": "القالب الجاهز",
+      "templateReplaceLabel": "استبدل بالقالب"
     },
     "picker": {
       "label": "دليل المقاسات",
@@ -10766,7 +11135,8 @@
       "saveError": "معرفناش نحفظ الوسم.",
       "exists": "فيه وسم تاني بنفس الاسم.",
       "missingAr": "مفيش اسم عربي: الزوار بالعربي هيشوفوا الاسم الإنجليزي.",
-      "manage": "إدارة الوسوم"
+      "manage": "إدارة الوسوم",
+      "emptyAction": "روح للمنتجات"
     }
   },
   "providerUnverified": {
@@ -10984,6 +11354,16 @@
     },
     "receipt": {
       "intro": "باركود رقم الطلب المطبوع على الفاتورة وورقة التغليف."
+    },
+    "crossLink": {
+      "labels": {
+        "text": "استيكرات المنتجات بتستخدمها وانت بتجرد المخزون.",
+        "link": "افتح المخزون"
+      },
+      "receipt": {
+        "text": "باركود الإيصال بيظهر على الأوردرات اللي بتطبعها.",
+        "link": "افتح الطلبات"
+      }
     }
   },
   "labels": {
@@ -11156,5 +11536,19 @@
         "fee": "كارت مصاريف الشحن"
       }
     }
+  },
+  "shippingHub": {
+    "title": "الشحن والتوصيل",
+    "subtitle": "حدد بتشحن بكام، ومع مين، وإمتى بيوصل الطلب",
+    "tabs": {
+      "label": "أقسام الشحن والتوصيل",
+      "rates": "الأسعار",
+      "carriers": "شركات الشحن",
+      "delivery": "وقت التوصيل",
+      "cod": "تحصيل الدفع عند الاستلام"
+    },
+    "savedTitle": "اتحفظ الشحن",
+    "savedBody": "سياسة الإرجاع اتحدّثت.",
+    "saveLabel": "احفظ الشحن"
   }
 }
