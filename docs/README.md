@@ -280,6 +280,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-21-phase-b2-souq.md](plans/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/2026-10-21-phase-b3-jasmine.md](plans/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/2026-10-21-phase-b4-lamma.md](plans/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-05-nz-17-postgres-removal.md](plans/2026-11-05-nz-17-postgres-removal.md) - N-17: inventory of Postgres residue, what replaces the Postgres integration suite, CI footprint (2026-11-05)
 - [plans/2026-11-03-sharia-gold-bnpl-aup.md](plans/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
 - [plans/2026-10-21-phase-b5-dahab-looks.md](plans/2026-10-21-phase-b5-dahab-looks.md) - Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
 - [plans/2026-10-21-search-p3-catalogue-import.md](plans/2026-10-21-search-p3-catalogue-import.md) - Search P3: Catalogue Import from Photos and PDFs Implementation Plan

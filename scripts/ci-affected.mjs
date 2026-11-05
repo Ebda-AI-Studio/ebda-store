@@ -112,11 +112,8 @@ const WORKER_ROOT =
 
 const DOCS_ONLY = /^(docs\/|.*\.md$|\.github\/ISSUE_TEMPLATE\/|\.vscode\/|\.editorconfig$)/;
 
-/** Integration tests that have their own CI jobs (and are excluded from the shared integration run). */
-const OWN_JOB_INTEGRATION = new Set([
-  'tests/integration/rls-ebda-app.test.ts',
-  'tests/integration/rls-pooler-isolation.test.ts',
-]);
+/** Integration tests that have their own CI jobs (and are excluded from the shared integration run). None since NZ-17-RLS-1. */
+const OWN_JOB_INTEGRATION = new Set([]);
 /** More affected test files than this and the whole tier runs (a list that long is "everything" anyway). */
 const INTEGRATION_ALL_ABOVE = 40;
 const SRC_EXT = ['.ts', '.tsx', '.mts', '/index.ts'];
@@ -154,7 +151,8 @@ export function integrationPlan(files, root = ROOT) {
 
   for (const f of changed) {
     if (/^tests\/integration\/.*\.test\.ts$/.test(f)) {
-      if (!OWN_JOB_INTEGRATION.has(f)) run.add(f);
+      // a test the change DELETES is in `git diff --name-only` but not in the PR head: never emit it (vitest exits 1 on "No test files found")
+      if (!OWN_JOB_INTEGRATION.has(f) && existsSync(path.join(root, f))) run.add(f);
     } else if (
       f.startsWith('tests/integration/') || // fixtures, snapshots, golden files, stubs
       f.startsWith('tests/helpers/') ||

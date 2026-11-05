@@ -47,13 +47,7 @@ describe('vitest retry is scoped by tier, not a global default', () => {
   it('the network/DB-backed tiers explicitly opt into one retry at the call site', () => {
     const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 
-    const integrationRun = ci
-      .split('\n')
-      .find(
-        l =>
-          l.includes('npx vitest run $targets') &&
-          l.includes('--exclude tests/integration/rls-ebda-app')
-      );
+    const integrationRun = ci.split('\n').find(l => l.includes('npx vitest run $targets'));
     // $targets is `tests/integration apps/api/src` in the main lane, or the planner-selected files on a PR (ci.yml)
     expect(ci).toContain('targets="tests/integration apps/api/src"');
     expect(integrationRun, "ci.yml's integration command moved — re-point this test").toBeTruthy();
@@ -70,20 +64,5 @@ describe('vitest retry is scoped by tier, not a global default', () => {
       'e2e hits a real HTTP server + Postgres + Redis — it should opt into a retry ' +
         'explicitly rather than relying on a global default'
     ).toMatch(/--retry=1/);
-  });
-
-  it('the ebda_app RLS proof is an explicit, deliberate no-retry tier (issue 2101)', () => {
-    // ci.yml names FOUR tiers (unit / integration / RLS proof / e2e). The RLS
-    // proof used to inherit retry 0 silently when the policy moved retries to
-    // the call site; it is now explicit so neither direction can drift.
-    const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-    const rlsRun = ci
-      .split('\n')
-      .find(l => l.includes('vitest run tests/integration/rls-ebda-app.test.ts'));
-    expect(rlsRun, "ci.yml's RLS proof command moved — re-point this test").toBeTruthy();
-    expect(
-      rlsRun,
-      'the RLS proof must declare --retry=0: a security assertion that only passes on retry is a finding'
-    ).toMatch(/--retry=0(\s|$)/);
   });
 });

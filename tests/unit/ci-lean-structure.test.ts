@@ -37,8 +37,6 @@ const MAIN_LANE = [
   'build',
   'test-unit',
   'orphan-tests',
-  'test-rls-ebda-app',
-  'test-rls-payload-parity',
   'test-e2e',
   'builder-e2e',
   'security',
@@ -76,13 +74,10 @@ function skipsOnPr(name: string, seen = new Set<string>()): boolean {
 }
 
 describe('ci.yml triggers', () => {
-  it('runs on PRs to main, pushes to main, a Mon-Sat nightly, a Sunday full run and manual dispatch', () => {
+  it('runs on PRs to main, pushes to main, a Sunday full run and manual dispatch', () => {
     expect(ci.on.pull_request.branches).toEqual(['main']);
     expect(ci.on.push.branches).toEqual(['main']);
-    expect(ci.on.schedule.map((e: { cron: string }) => e.cron)).toEqual([
-      '17 1 * * 1-6',
-      '17 1 * * 0',
-    ]);
+    expect(ci.on.schedule.map((e: { cron: string }) => e.cron)).toEqual(['17 1 * * 0']);
     expect(ci.on).toHaveProperty('workflow_dispatch');
   });
 
@@ -144,12 +139,10 @@ describe('ci.yml lanes', () => {
     // a PR runs just the selected files; the main lane keeps the whole tier
     expect(raw).toContain('INTEGRATION_PATHS: ${{ needs.changes.outputs.integration_paths }}');
     expect(raw).toMatch(/targets="tests\/integration apps\/api\/src"/);
-    expect(raw).toMatch(
-      /npx vitest run \$targets --exclude tests\/integration\/rls-ebda-app\.test\.ts/
-    );
+    expect(raw).toMatch(/npx vitest run \$targets /);
   });
 
-  it('mutation tests are weekly or manual only, never on a push or the Mon-Sat nightly', () => {
+  it('mutation tests are weekly or manual only, never on a push', () => {
     const cond = ci.jobs.mutation.if ?? '';
     expect(cond).toMatch(
       /github\.event_name == 'schedule' && github\.event\.schedule == '17 1 \* \* 0'/
@@ -175,13 +168,6 @@ describe('ci.yml lanes', () => {
     expect(onPush.sort()).toEqual(['guards', 'notify-failure']);
   });
 
-  it('the strict-RLS proof runs on every cron (nightly), not only the Sunday full run', () => {
-    const cond = ci.jobs['test-rls-ebda-app'].if ?? '';
-    expect(cond).toMatch(/github\.event_name == 'schedule'/);
-    expect(cond).not.toMatch(/github\.event\.schedule/);
-    expect(ci.jobs['test-rls-ebda-app'].needs).toBeUndefined();
-  });
-
   it('the PR lane runs lint, typecheck and unit tests for changed paths only', () => {
     for (const name of ['lint', 'typecheck', 'unit', 'worker-dry-run']) {
       expect(ci.jobs[name].needs, name).toEqual(['changes']);
@@ -199,12 +185,12 @@ describe('ci.yml lanes', () => {
     expect(JSON.stringify(g.steps)).toMatch(/check-migration-order\.mjs/);
   });
 
-  it('keeps the strict-RLS jobs on ebda_app (never the superuser) in the main lane', () => {
+  it('keeps the integration job on ebda_app (never the superuser) and Redis in the main lane', () => {
     expect(raw).toMatch(/DB role check: current_user=ebda_app rolbypassrls=false/);
-    expect(raw).toMatch(/ALTER ROLE ebda_app WITH PASSWORD/);
-    expect(raw).toMatch(/postgresql:\/\/ebda_app:ci-only-app-pw@/);
     expect(raw).toMatch(/image: redis:7-alpine/);
-    expect(skipsOnPr('test-rls-ebda-app')).toBe(true);
+    // Ruling NZ-17-RLS-1: the dedicated RLS proof / payload-parity jobs are gone with the production Postgres
+    expect(ci.jobs['test-rls-ebda-app']).toBeUndefined();
+    expect(ci.jobs['test-rls-payload-parity']).toBeUndefined();
   });
 
   it('the PR unit paths are a subset of the main-lane unit globs', () => {
@@ -423,7 +409,7 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
     const all = files.map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
     expect(
       [...all.matchAll(/--tmpfs \/var\/lib\/postgresql\/data/g)].length
-    ).toBeGreaterThanOrEqual(4); // 6 before N-17 removed the deploy + smoke Postgres services
+    ).toBeGreaterThanOrEqual(2); // 6 before N-17 removed the deploy + smoke + RLS Postgres services (integration + e2e remain)
   });
 });
 

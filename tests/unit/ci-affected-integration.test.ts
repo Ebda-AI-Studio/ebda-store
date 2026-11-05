@@ -32,10 +32,6 @@ function fixtureRoot(extraTests = 0) {
     "import { o } from '@api/services/orders';\nvi.mock('@api/services/carriers/carrier.service');\n"
   );
   put('tests/integration/standalone.test.ts', "import { describe } from 'vitest';\n");
-  put(
-    'tests/integration/rls-ebda-app.test.ts',
-    "import { a } from '@api/services/carriers/carrier.service';\n"
-  );
   put('tests/integration/helpers/fixture.ts', 'export const f = 1;\n');
   for (let i = 0; i < extraTests; i++)
     put(
@@ -88,12 +84,17 @@ describe('integrationPlan', () => {
     });
   });
 
-  it('the tests with their own CI job (rls-ebda-app) are never added to the shared run', () => {
-    const r = integrationPlan(['tests/integration/rls-ebda-app.test.ts'], root);
-    expect(r).toEqual({ integration: false, paths: [] });
+  it('a deleted integration test is never selected; an all-deleted change plans nothing (job skips)', () => {
+    // standalone.test.ts exists in the fixture tree; gone.test.ts does not (the PR deleted it)
     expect(
-      integrationPlan(['apps/api/src/services/carriers/carrier.service.ts'], root).paths
-    ).not.toContain('tests/integration/rls-ebda-app.test.ts');
+      integrationPlan(
+        ['tests/integration/gone.test.ts', 'tests/integration/standalone.test.ts'],
+        root
+      )
+    ).toEqual({ integration: true, paths: ['tests/integration/standalone.test.ts'] });
+    expect(
+      integrationPlan(['tests/integration/gone.test.ts', 'tests/integration/gone2.test.ts'], root)
+    ).toEqual({ integration: false, paths: [] });
   });
 
   it('a shared fixture/helper, snapshot, or anything under packages/database runs the whole tier', () => {
