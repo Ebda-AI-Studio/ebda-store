@@ -4,6 +4,8 @@
 
 This monorepo deploys **web / admin / orders / marketing to Cloudflare Workers** (one standalone, path-filtered GitHub Actions workflow per app — `cf-{web,admin,orders,marketing}-deploy.yml`, each `push:main` + `workflow_dispatch` → OpenNext build → `wrangler deploy`, workers `ebda-web` / `ebda-admin` / `ebda-orders` / `ebda-marketing`) + the **API, also Cloudflare Workers** (`cf-api-deploy.yml`, `ebda-api` — **`workflow_dispatch`-ONLY**, so a push to `main` does NOT redeploy it; see `docs/migration/railway-actions-deploy.md` for the cutover history — Railway is retired for this app). Plus **Neon Postgres** (project `ebda` = `lucky-truth-54548746`, org `org-proud-silence-64969971` — a SEPARATE Neon org from Ahmad's other projects, since this repo sits in the `Whisky-11` GitHub org; RLS via AsyncLocalStorage, `middleware/tenant-context.ts`) and **Cloudflare R2** for assets.
 
+> **2026-11-05 data layer**: there is no Postgres. Data rollback is **D1 Time Travel (30 d)**, **StoreDO point-in-time recovery (30 d)** and the nightly age-encrypted R2 dumps (`cf/daily|weekly|monthly`, Ruling NZ-BACKUP-1). Commands and the drilled recovery steps: `docs/DB-BACKUP-RESTORE.md` "Real recovery". Every `neonctl`/`pg_dump`/branch instruction further down this file is retired history.
+
 ## Three rollback paths
 
 ### A. Per-worker fast-path — instant, no code change

@@ -27,6 +27,8 @@ const ACTIONS = {
   __analytics: 'POST',
   // N-9: the customer-auth import/verify channel (scripts/cf/cutover-customer-auth.mjs). Body {op, args}; only the ops below.
   __auth: 'POST',
+  // Ruling NZ-BACKUP-1: read-only page of a table for the nightly off-Cloudflare backup (scripts/ops/backup-cf.mjs).
+  __export: 'POST',
   __status: 'GET',
   // verify-store.mjs asks every DO for its table list (the DO must hold no table the cutover did not look at); without this
   // entry the Worker answered 404 and verify refused every store on the deployed API (found live 2026-10-31).
@@ -35,6 +37,9 @@ const ACTIONS = {
 
 /** The only customer-auth operations the cutover channel may run (never login / refresh / reset). */
 const AUTH_CUTOVER_OPS = new Set(['importRows', 'exportRowsPage', 'counts', 'markLive', 'isLive']);
+
+/** The only actions BACKUP_EXPORT_SECRET opens (Ruling NZ-BACKUP-1): reads, never a write. */
+export const BACKUP_READ_ACTIONS = new Set(['__export', '__tables', '__status']);
 
 /** Store ids are UUIDs (lowercase); the DO instance name IS the id (lib/store-backend.ts storeDo()). */
 const StoreId = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
@@ -51,21 +56,27 @@ export async function routeCutover(request: Request, env: CfBindings): Promise<R
   if (!url.pathname.startsWith(CUTOVER_PREFIX)) return null;
 
   const secret = typeof env.CUTOVER_IMPORT_SECRET === 'string' ? env.CUTOVER_IMPORT_SECRET : '';
-  if (secret.length < 24) {
+  // Ruling NZ-BACKUP-1: a SECOND secret that opens only the read-only actions, so the nightly backup never needs the cutover
+  // secret (which is deleted when the cutover window closes). It cannot reach __import / __seal / __unseal / ... .
+  const backupSecret = typeof env.BACKUP_EXPORT_SECRET === 'string' ? env.BACKUP_EXPORT_SECRET : '';
+  if (secret.length < 24 && backupSecret.length < 24) {
     // Unset (or too short to be a secret): the window is not open. Closed, and loud in the logs.
     logger.warn(
-      { configured: secret.length > 0 },
-      '[cutover] refused: CUTOVER_IMPORT_SECRET is unset or shorter than 24 characters'
+      { configured: secret.length > 0 || backupSecret.length > 0 },
+      '[cutover] refused: CUTOVER_IMPORT_SECRET and BACKUP_EXPORT_SECRET are unset or shorter than 24 characters'
     );
     return json({ ok: false, error: 'cutover disabled' }, 503);
   }
-  if (!authorizeCutover(request, secret)) {
+  const m = /^\/cutover\/stores\/([^/]+)\/(__[a-z]+)$/.exec(url.pathname);
+  const action = m?.[2];
+  const fullAccess = authorizeCutover(request, secret);
+  const readOnlyAccess =
+    !fullAccess && BACKUP_READ_ACTIONS.has(action ?? '') && authorizeCutover(request, backupSecret);
+  if (!fullAccess && !readOnlyAccess) {
     logger.warn({ path: url.pathname }, '[cutover] refused: bad or missing bearer');
     return json({ ok: false, error: 'unauthorized' }, 401, { 'www-authenticate': 'Bearer' });
   }
 
-  const m = /^\/cutover\/stores\/([^/]+)\/(__[a-z]+)$/.exec(url.pathname);
-  const action = m?.[2];
   if (!m || !action || !Object.hasOwn(ACTIONS, action))
     return json({ ok: false, error: 'not found' }, 404);
   const id = StoreId.safeParse(m[1]);

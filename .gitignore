@@ -203,3 +203,6 @@ apps/web/public/__lamma-demo/
 scripts/dahab-demo/img-src/
 apps/web/public/__dahab-demo/
 .cutover-stash/
+
+# restore drill (scripts/ops/restore-drill.mjs)
+apps/api/.wrangler.drill.jsonc
