@@ -127,14 +127,86 @@ export function assertPlatformTables(tables) {
   return tables;
 }
 
-export const EXPORT_PAGE_ROWS = 2000;
+export const EXPORT_PAGE_ROWS = 500;
+export const REQUEST_TIMEOUT_MS = 60_000;
+export const MAX_ATTEMPTS = 3;
+
+const TRANSIENT_CODES =
+  /ECONNRESET|ETIMEDOUT|ECONNREFUSED|EPIPE|EAI_AGAIN|UND_ERR|TimeoutError|AbortError|socket hang up/i;
+/** A network reset/timeout (fetch wraps it as "fetch failed" with a cause), a 429, or a 5xx is worth another try; a 4xx is not. */
+export function isTransient(err) {
+  if (typeof err?.status === 'number') return err.status === 429 || err.status >= 500;
+  const text = `${err?.name ?? ''} ${err?.message ?? ''} ${err?.cause?.code ?? ''} ${err?.cause?.message ?? ''}`;
+  return err?.message === 'fetch failed' || TRANSIENT_CODES.test(text);
+}
+
+/** fn(attempt) with up to MAX_ATTEMPTS tries and exponential backoff on transient errors; the final error names `label`. */
+export async function withRetry(
+  label,
+  fn,
+  {
+    tries = MAX_ATTEMPTS,
+    baseMs = 1000,
+    sleep = ms => new Promise(r => setTimeout(r, ms)),
+    log = () => {},
+  } = {}
+) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn(attempt);
+    } catch (e) {
+      const why = `${e?.message ?? e}${e?.cause?.code ? ` (${e.cause.code})` : ''}`;
+      if (!isTransient(e) || attempt >= tries)
+        throw new Error(`${label}: failed after ${attempt} attempt(s): ${why}`, { cause: e });
+      log(`retry ${attempt}/${tries - 1} ${label}: ${why}`);
+      await sleep(baseMs * 2 ** (attempt - 1));
+    }
+  }
+}
+
+/** The authenticated call into /cutover/...: per-request timeout, retry with backoff, errors that name the target. */
+export function makeApiCall({
+  apiUrl,
+  secret,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+  sleep,
+  baseMs,
+  log = () => {},
+}) {
+  return (p, body) =>
+    withRetry(
+      `${body?.table ? `${p} [${body.table}@${body.offset ?? 0}]` : p}`,
+      async () => {
+        const res = await fetchImpl(apiUrl + p, {
+          method: body ? 'POST' : 'GET',
+          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+          body: body ? JSON.stringify(body) : undefined,
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || j.ok === false) {
+          const e = new Error(`HTTP ${res.status} ${j.error ?? ''}`.trim());
+          e.status = res.status;
+          throw e;
+        }
+        return j;
+      },
+      { sleep, baseMs, log }
+    );
+}
 
 /**
  * Export one StoreDO through the bearer-checked, read-only `__tables` + `__export` actions. `call(path, body?)` returns parsed JSON
  * or throws. Output: an NDJSON text (one header object per table, then its rows as arrays, in `__import` shape) plus the per-table
  * count + digest the restore must reproduce. Nothing is written back to the DO.
  */
-export async function exportStoreOverHttp(call, storeId) {
+export async function exportStoreOverHttp(
+  call,
+  storeId,
+  { log = () => {}, pageRows = EXPORT_PAGE_ROWS } = {}
+) {
+  const t0 = Date.now();
   const base = `/cutover/stores/${storeId}`;
   const { tables: names } = await call(`${base}/__tables`);
   const lines = [];
@@ -147,7 +219,7 @@ export async function exportStoreOverHttp(call, storeId) {
     let head = null;
     const rows = [];
     while (offset < total) {
-      const page = await call(`${base}/__export`, { table, offset, limit: EXPORT_PAGE_ROWS });
+      const page = await call(`${base}/__export`, { table, offset, limit: pageRows });
       if (!head) head = { table, columns: page.columns, pk: page.pk };
       total = page.total;
       if (page.rows.length === 0) break;
@@ -159,10 +231,15 @@ export async function exportStoreOverHttp(call, storeId) {
     }
     if (rows.length !== total)
       throw new Error(`${storeId}.${table}: exported ${rows.length} rows, the table said ${total}`);
+    log(`store ${storeId} ${table}: ${rows.length} rows`);
     lines.push(JSON.stringify({ ...head, total }), ...rows);
     tables[table] = await d.finish();
   }
-  return { raw: Buffer.from(lines.join('\n') + '\n'), tables };
+  const raw = Buffer.from(lines.join('\n') + '\n');
+  log(
+    `store ${storeId} export done: ${Object.keys(tables).length} tables, ${raw.length} bytes, ${Date.now() - t0} ms`
+  );
+  return { raw, tables };
 }
 
 /** Parse the NDJSON written by exportStoreOverHttp back into [{table, columns, pk, total, rows}]. */
@@ -183,8 +260,10 @@ async function r2Json(io, key) {
   return b ? JSON.parse(b.toString('utf8')) : null;
 }
 
-async function putVerified(io, key, buf) {
+async function putVerified(io, key, buf, log = () => {}) {
+  log(`R2 put ${key} (${buf.length} bytes)`);
   await io.r2Put(key, buf);
+  log(`R2 read-back ${key}`);
   const back = await io.r2Get(key);
   if (!back || sha256(back) !== sha256(buf)) throw new Error(`read-back sha256 differs for ${key}`);
 }
@@ -193,16 +272,22 @@ async function putVerified(io, key, buf) {
  * The nightly run. Returns the report; throws if anything could not be stored and read back. A size-guard breach does NOT throw
  * (the data is safe): it sets report.ok = false and lists `problems`, and the CLI turns that into a failing workflow.
  */
-export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES }) {
+export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES, log = () => {} }) {
   const day = dayOf(now);
   const tiers = tiersFor(now);
   const ledger = (await r2Json(io, LEDGER_KEY)) ?? emptyLedger();
 
   const artifacts = [];
+  log('D1 export start');
   const d1 = await io.exportD1();
+  log(`D1 export done: ${Object.keys(d1.tables).length} tables, ${d1.raw.length} bytes`);
   artifacts.push({ name: 'd1-ebda-platform', ext: 'sql', ...d1 });
-  for (const id of await io.listStoreIds())
+  const ids = await io.listStoreIds();
+  log(`${ids.length} StoreDO store(s) to export`);
+  for (const id of ids) {
+    log(`store ${id} export start`);
     artifacts.push({ name: `do-${id}`, ext: 'ndjson', ...(await io.exportStore(id)) });
+  }
 
   let uploaded = 0;
   let rawTotal = 0;
@@ -211,6 +296,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES 
   for (const a of artifacts) {
     const rawSha256 = sha256(a.raw);
     const gz = compress(a.raw);
+    log(`${a.name}: compress ${a.raw.length} -> ${gz.length} bytes`);
     rawTotal += a.raw.length;
     gzTotal += gz.length;
     let enc = null;
@@ -238,9 +324,12 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES 
         };
         continue;
       }
-      enc ??= await io.encrypt(gz);
+      if (!enc) {
+        enc = await io.encrypt(gz);
+        log(`${a.name}: encrypt ${gz.length} -> ${enc.length} bytes`);
+      }
       const key = objectKey(tier, day, `${a.name}.${a.ext}.gz.age`);
-      await putVerified(io, key, enc);
+      await putVerified(io, key, enc, log);
       ledger.objects[key] = { bytes: enc.length, tier, day };
       uploaded += enc.length;
       const entry = { ...base, key, reused: false, encBytes: enc.length, encSha256: sha256(enc) };
@@ -265,7 +354,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES 
       )
     );
     const key = manifestKey(tier, day);
-    await putVerified(io, key, body);
+    await putVerified(io, key, body, log);
     ledger.objects[key] = { bytes: body.length, tier, day };
     uploaded += body.length;
   }

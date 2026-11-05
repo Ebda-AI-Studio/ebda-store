@@ -8,6 +8,7 @@ import {
   assertPlatformTables,
   digestSqlite,
   exportStoreOverHttp,
+  makeApiCall,
   decodeKeychainSecret,
 } from './cf-backup.mjs';
 
@@ -103,9 +104,28 @@ export async function d1Digests(sqlText) {
   }
 }
 
-export function realBackupIo({ recipient, apiUrl, secret, d1Name = 'ebda-platform', r2 }) {
+export function realBackupIo({
+  recipient,
+  apiUrl,
+  secret,
+  d1Name = 'ebda-platform',
+  r2,
+  log = () => {},
+}) {
   const tmp = mkdtempSync(path.join(tmpdir(), 'cfbk-'));
-  const wr = args => run('npx', ['wrangler', ...args]);
+  // wrangler can fail on a network blip too: up to 3 tries, every attempt logged (never the arguments after --command).
+  const wr = args => {
+    let r;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const t0 = Date.now();
+      r = run('npx', ['wrangler', ...args]);
+      log(
+        `wrangler ${args.slice(0, 2).join(' ')} attempt ${attempt}: exit ${r.status} in ${Date.now() - t0} ms`
+      );
+      if (r.status === 0) break;
+    }
+    return r;
+  };
   return {
     ...r2,
     encrypt: ageEncrypt(recipient),
@@ -114,6 +134,7 @@ export function realBackupIo({ recipient, apiUrl, secret, d1Name = 'ebda-platfor
       const r = wr(['d1', 'export', d1Name, '--remote', '--output', out]);
       if (r.status !== 0) throw new Error(`d1 export failed: ${r.stderr || r.stdout}`);
       const raw = readFileSync(out);
+      log(`D1 ${d1Name} exported: ${raw.length} bytes`);
       return { raw, tables: assertPlatformTables(await d1Digests(raw.toString('utf8'))) };
     },
     async listStoreIds() {
@@ -131,18 +152,7 @@ export function realBackupIo({ recipient, apiUrl, secret, d1Name = 'ebda-platfor
       return (j[0]?.results ?? []).map(x => x.id);
     },
     async exportStore(id) {
-      const call = async (p, body) => {
-        const res = await fetch(apiUrl + p, {
-          method: body ? 'POST' : 'GET',
-          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-          body: body ? JSON.stringify(body) : undefined,
-          signal: AbortSignal.timeout(120_000),
-        });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok || j.ok === false) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
-        return j;
-      };
-      return exportStoreOverHttp(call, id);
+      return exportStoreOverHttp(makeApiCall({ apiUrl, secret, log }), id, { log });
     },
   };
 }
