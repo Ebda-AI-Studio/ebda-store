@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { runBackup, exportStoreOverHttp, digestSqlite } from './lib/cf-backup.mjs';
 import { ageEncrypt, dirR2 } from './lib/cf-backup-io.mjs';
-import { assertLoopback } from './lib/cf-drill.mjs';
+import { assertLoopback, replayOrder } from './lib/cf-drill.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const out = process.argv[2];
@@ -77,8 +77,18 @@ for (let i = 0; ; i++) {
 }
 const sql = (s, params = []) => call(`/cutover/stores/${storeId}/__sql`, { sql: s, params });
 
-// Generic rows for every application table; a table whose constraints a blind row cannot satisfy is skipped (and named).
-const { tables } = await call(`/cutover/stores/${storeId}/__tables`);
+// A stray table an older StoreDO still holds (the real onesignal_subscriptions case): the backup must leave it out and say so.
+await sql('CREATE TABLE IF NOT EXISTS onesignal_subscriptions (id TEXT PRIMARY KEY)');
+await sql("INSERT OR IGNORE INTO onesignal_subscriptions VALUES ('stale-1')");
+
+// Generic rows for every application table, parents first, foreign-key columns pointing at a real parent row (so the restore has
+// real child-after-parent data to order). A table whose constraints a blind row cannot satisfy is skipped (and named).
+const { tables: allTables } = await call(`/cutover/stores/${storeId}/__tables`);
+const { tables: fks } = await call(`/cutover/stores/${storeId}/__fks`);
+const tables = replayOrder(
+  allTables.filter(t => /^[a-z]/.test(t) && t !== 'onesignal_subscriptions'),
+  fks
+);
 const seeded = [];
 for (const t of tables) {
   const cols = (
@@ -86,10 +96,22 @@ for (const t of tables) {
       `SELECT name, type, "notnull" AS nn, dflt_value AS d, pk FROM pragma_table_info('${t}')`
     )
   ).rows;
+  const fkc = (
+    await sql(
+      `SELECT "table" AS parent, "from" AS fcol, "to" AS tcol FROM pragma_foreign_key_list('${t}')`
+    )
+  ).rows;
+  const ref = {};
+  for (const f of fkc.filter(f => f.parent !== t)) {
+    const r = (await sql(`SELECT "${f.tcol}" AS v FROM "${f.parent}" LIMIT 1`)).rows[0];
+    if (r) ref[f.fcol] = r.v;
+  }
   let ok = 0;
   for (let n = 1; n <= 3; n++) {
-    const use = cols.filter(c => c.nn || c.pk);
-    const vals = use.map(c => (/INT|REAL|NUM/i.test(c.type) ? n : `fx-${t}-${c.name}-${n}`));
+    const use = cols.filter(c => c.nn || c.pk || c.name in ref);
+    const vals = use.map(c =>
+      c.name in ref ? ref[c.name] : /INT|REAL|NUM/i.test(c.type) ? n : `fx-${t}-${c.name}-${n}`
+    );
     try {
       await sql(
         `INSERT INTO "${t}" (${use.map(c => `"${c.name}"`).join(',')}) VALUES (${use.map(() => '?').join(',')})`,

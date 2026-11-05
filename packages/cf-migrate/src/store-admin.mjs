@@ -18,6 +18,7 @@
 // __export  READ-ONLY {table, offset?, limit?} -> {columns, pk, total, offset, rows:[[...]]} ordered by pk (nightly backup,
 //           Ruling NZ-BACKUP-1). Same table/column validation as __import; rows come back in the exact shape __import takes,
 //           so a dump replays through the production import path. A value JSON cannot carry (BLOB) is a 422, never a silent loss.
+// __fks     READ-ONLY: per application table its parent tables and self-references, so a restore can replay parents first.
 // __unseal  {confirm:'wipe-and-unseal'}: wipes the DO so a retried cutover can re-import.
 import { PK_SEP, TableDigest, canonRow, canonValue, sha256Hex } from './canon.mjs';
 import { DO_DERIVED_TABLE } from './coverage.mjs';
@@ -168,14 +169,17 @@ async function doImport(request, { sql, transactionSync }) {
       ? `ON CONFLICT (${info.pk.map(q).join(', ')}) DO UPDATE SET ${nonPk.map(c => `${q(c)} = excluded.${q(c)}`).join(', ')}`
       : `ON CONFLICT (${info.pk.map(q).join(', ')}) DO NOTHING`);
 
-  // Foreign keys are checked once at the end (__verify fk:true): categories/parent_id and friends are
-  // cyclic, and a page boundary would otherwise reject a child that precedes its parent.
+  // Foreign keys are checked once at the end (__verify fk:true). MEASURED 2026-11-05 on workerd: `PRAGMA foreign_keys = OFF` does NOT
+  // take effect on a StoreDO (a child row whose parent is absent fails with SQLITE_CONSTRAINT_FOREIGNKEY), so the cutover only worked
+  // because the plan imports parents first. `defer_foreign_keys` inside the transaction covers a self-referencing table
+  // (categories.parent_id) within one page; ACROSS tables the caller must send parents first: GET __fks gives the dependency order.
   sql.exec('PRAGMA foreign_keys = OFF');
   try {
     const gold =
       GOLD_GUARDED.has(table) &&
       sql.exec(`SELECT 1 FROM pragma_table_info('do_flags')`).toArray().length > 0;
     transactionSync(() => {
+      sql.exec('PRAGMA defer_foreign_keys = ON');
       if (gold)
         sql.exec(
           `INSERT INTO do_flags (name, value) VALUES ('gold_reprice', 1) ON CONFLICT (name) DO UPDATE SET value = 1`
@@ -425,6 +429,24 @@ function doUnseal(request, { sql, transactionSync }, body) {
 }
 
 // TABLES: the names of every application table the DO holds, so verify can prove it looked at all of them.
+/** READ-ONLY foreign-key map of every application table: {parents: [table...], self: [{from, to}]} (restore order, Ruling NZ-BACKUP-1). */
+function doFks({ sql }) {
+  const tables = {};
+  for (const t of appTables(sql)) {
+    const fks = sql
+      .exec(
+        `SELECT "table" AS parent, "from" AS fcol, "to" AS tcol FROM pragma_foreign_key_list(?)`,
+        t.table
+      )
+      .toArray();
+    tables[t.table] = {
+      parents: [...new Set(fks.filter(f => f.parent !== t.table).map(f => f.parent))].sort(),
+      self: fks.filter(f => f.parent === t.table).map(f => ({ from: f.fcol, to: f.tcol })),
+    };
+  }
+  return json({ ok: true, tables });
+}
+
 function doTables({ sql }) {
   return json({ ok: true, tables: appTables(sql).map(t => t.table) });
 }
@@ -518,6 +540,7 @@ export async function handleStoreAdmin(request, ctx) {
       return doUnseal(request, ctx, await request.json().catch(() => null));
     if (request.method === 'GET' && path.endsWith('/__status')) return doStatus(ctx);
     if (request.method === 'GET' && path.endsWith('/__tables')) return doTables(ctx);
+    if (request.method === 'GET' && path.endsWith('/__fks')) return doFks(ctx);
     return json({ ok: false, error: 'not found' }, 404);
   } catch (e) {
     if (e instanceof HttpError) return json({ ok: false, error: e.message, ...e.extra }, e.status);

@@ -33,13 +33,15 @@ const ACTIONS = {
   // verify-store.mjs asks every DO for its table list (the DO must hold no table the cutover did not look at); without this
   // entry the Worker answered 404 and verify refused every store on the deployed API (found live 2026-10-31).
   __tables: 'GET',
+  // Ruling NZ-BACKUP-1: read-only foreign-key map, so a restore replays parent tables first.
+  __fks: 'GET',
 } as const;
 
 /** The only customer-auth operations the cutover channel may run (never login / refresh / reset). */
 const AUTH_CUTOVER_OPS = new Set(['importRows', 'exportRowsPage', 'counts', 'markLive', 'isLive']);
 
 /** The only actions BACKUP_EXPORT_SECRET opens (Ruling NZ-BACKUP-1): reads, never a write. */
-export const BACKUP_READ_ACTIONS = new Set(['__export', '__tables', '__status']);
+export const BACKUP_READ_ACTIONS = new Set(['__export', '__tables', '__status', '__fks']);
 
 /** Store ids are UUIDs (lowercase); the DO instance name IS the id (lib/store-backend.ts storeDo()). */
 const StoreId = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);

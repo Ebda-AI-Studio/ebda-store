@@ -52,7 +52,13 @@ if (a.wipe)
     'application/json'
   );
 const dump = parseStoreDump(readFileSync(path.join(a.dir, `do-${a.store}.${entry.ext}`), 'utf8'));
-const res = await restoreStoreOverHttp(post, a.store, dump, `restore-${manifest.day}`);
+const get = async p => {
+  const res = await fetch(a['api-url'] + p, { headers: { authorization: `Bearer ${secret}` } });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
+  return j;
+};
+const res = await restoreStoreOverHttp(post, a.store, dump, `restore-${manifest.day}`, get);
 const bad = compareTables(entry.tables, res.tables).filter(c => !c.ok);
 console.log(
   bad.length || res.fk?.violations
