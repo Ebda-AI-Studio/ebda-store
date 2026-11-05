@@ -36,6 +36,21 @@ vi.mock('@ebda/database', () => ({
   runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
   onClosedTenantTxAccess: vi.fn(),
 }));
+// The autofill core reads through storeDb and writes through storeWriter/storeRepo (CF-JOBS-4): a Postgres store, faked.
+const fakeDb = () => ({
+  product: {
+    findFirst: async () => productRow,
+    update: (...a: unknown[]) => updateSpy(...(a as [])),
+  },
+  store: { findUnique: async () => ({ name: 'Shop', nameAr: 'متجر', theme: {} }) },
+  category: { findMany: (...a: unknown[]) => categoryFindMany(...a) },
+  productCategory: { createMany: vi.fn() },
+});
+vi.mock('../../apps/api/src/lib/repo-factory', () => ({
+  storeDb: async () => fakeDb(),
+  storeWriter: async () => fakeDb(),
+  storeRepo: async () => ({ backend: 'pg' }),
+}));
 vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 
