@@ -326,9 +326,10 @@ export async function runTestForStore(
   if (!entry || entry.manual)
     throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
   if (entry.kind === 'payments') {
-    const row = await (
-      await storeDb(storeId)
-    ).paymentConfig.findFirst({ where: { provider, storeId } });
+    // `withStore`: the tenant scope of a Postgres store (the guard refuses an unscoped read) and no transaction for a DO store.
+    const row = await withStore(storeId, async () =>
+      (await storeDb(storeId)).paymentConfig.findFirst({ where: { provider, storeId } })
+    );
     if (!row)
       throw new AppError(404, 'NOT_FOUND', 'The store has not saved credentials for this provider');
     // The gateway call holds no transaction: read, call, then a short write.

@@ -38,6 +38,7 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   afterTenantTxCommit,
   afterTxCommit,
+  currentStoreId,
   prisma,
   withStore,
   type AppPrismaClient,
@@ -1584,8 +1585,72 @@ function withStoreDelegate(base: StoreReads, store: object): StoreReads {
   }) as StoreReads;
 }
 
-/** pg writer: the `prisma` proxy, minus the DO-only second argument of `$transaction`. */
-function pgWriter(): StoreWrites {
+/**
+ * True ONLY when there is definitely no ambient store scope (no request transaction, `withStore` or `runInStoreScope`): then a
+ * Postgres store's model call must open its own. With an ambient scope the call is made as-is: for the same store it is the
+ * request's own atomic scope, for ANOTHER store the tenant guard must still refuse it (a service handed a foreign store id from
+ * inside store B's scope is a cross-tenant call, never silently re-scoped). Any other answer (the helper unavailable, a mocked
+ * module) also means "call as-is", which is the behaviour before the scoped client existed.
+ */
+const STORE_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function needsOwnScope(): boolean {
+  try {
+    currentStoreId();
+    return false;
+  } catch (e) {
+    return e instanceof Error && /no ambient store/.test(e.message);
+  }
+}
+
+/**
+ * One model call made with no ambient store scope. It stays UNSTARTED (like a PrismaPromise): awaited, it runs in its own short
+ * `withStore(storeId, ...)`; handed to `$transaction([ ...ops ])`, the whole array is built and run inside ONE `withStore` so the
+ * batch is still atomic and still tenant-scoped.
+ */
+class ScopedCall implements PromiseLike<unknown> {
+  private started?: Promise<unknown>;
+  constructor(
+    readonly storeId: string,
+    readonly call: () => unknown
+  ) {}
+  then<R1 = unknown, R2 = never>(
+    onfulfilled?: ((v: unknown) => R1 | PromiseLike<R1>) | null,
+    onrejected?: ((e: unknown) => R2 | PromiseLike<R2>) | null
+  ): Promise<R1 | R2> {
+    this.started ??= withStore(this.storeId, async () => this.call());
+    return this.started.then(onfulfilled, onrejected);
+  }
+  catch<R = never>(onrejected?: ((e: unknown) => R | PromiseLike<R>) | null): Promise<unknown> {
+    return this.then(undefined, onrejected);
+  }
+  finally(f?: (() => void) | null): Promise<unknown> {
+    return Promise.resolve(this).finally(f);
+  }
+}
+
+function scopedTransaction(storeId: string, args: unknown[]): unknown {
+  const ops = args[0];
+  if (Array.isArray(ops) && ops.some(o => o instanceof ScopedCall)) {
+    return withStore(storeId, async () =>
+      (prisma as any).$transaction(
+        ops.map(o => (o instanceof ScopedCall ? o.call() : o)),
+        ...args.slice(1)
+      )
+    );
+  }
+  return (prisma as any).$transaction(...args);
+}
+
+/**
+ * The Postgres client of ONE store, tenant-scoped on its own (Ruling NZ-INTEG-1). Services moved to `storeDb(id)` /
+ * `storeWriter(id)` read through it from places with no request transaction (MCP, jobs, webhooks, the hub), and the tenant guard
+ * REFUSES an unscoped model call, so for a Postgres store every call made with no ambient store scope runs in a short
+ * `withStore(storeId, ...)` (BEGIN + set_config, as before the port). Inside a scope it is the plain, LAZY `prisma` delegate call,
+ * so request atomicity and `$transaction([ ...ops ])` arrays are unchanged. `$`-methods other than `$transaction` stay the raw
+ * proxy's. A Durable Object store never comes through here.
+ */
+function scopedPg(storeId: string, singleArgTransaction = false): object {
   return new Proxy({} as object, {
     get(_t, prop) {
       if (prop === '$proc')
@@ -1594,10 +1659,30 @@ function pgWriter(): StoreWrites {
             '$proc exists on the Durable Object writer only (the service keeps its Postgres statement)'
           );
         };
-      if (prop === '$transaction') return (ops: unknown) => (prisma as any).$transaction(ops);
-      return (prisma as any)[prop];
+      if (prop === '$transaction')
+        return singleArgTransaction
+          ? (ops: unknown) => scopedTransaction(storeId, [ops])
+          : (...a: unknown[]) => scopedTransaction(storeId, a);
+      if (typeof prop !== 'string' || prop.startsWith('$')) return (prisma as any)[prop];
+      return new Proxy({} as object, {
+        get(_d, method) {
+          if (typeof method !== 'string') return undefined;
+          return (...args: unknown[]) => {
+            const call = () => (prisma as any)[prop][method](...args);
+            // an id that is not a UUID can never be scoped (`withStore` refuses it); the call goes as-is and the guard decides
+            return STORE_ID_SHAPE.test(storeId) && needsOwnScope()
+              ? new ScopedCall(storeId, call)
+              : call();
+          };
+        },
+      });
     },
-  }) as unknown as StoreWrites;
+  });
+}
+
+/** pg writer: the store-scoped `prisma` client, minus the DO-only second argument of `$transaction`. */
+function pgWriter(storeId: string): StoreWrites {
+  return scopedPg(storeId, true) as unknown as StoreWrites;
 }
 
 async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
@@ -1605,7 +1690,12 @@ async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
   if (backend === 'do') {
     return { storeId, backend, ...(await doClients(storeId)) };
   }
-  return { storeId, backend: 'pg', db: prisma as unknown as StoreReads, writer: pgWriter() };
+  return {
+    storeId,
+    backend: 'pg',
+    db: scopedPg(storeId) as unknown as StoreReads,
+    writer: pgWriter(storeId),
+  };
 }
 
 /** The repo for a store: pg (default) or its Durable Object, per the store's flag. Memoised per request. */

@@ -26,6 +26,7 @@ import { InventoryService } from '../../apps/api/src/services/inventory.service'
 import { ProductService } from '../../apps/api/src/services/product.service';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { CodReconciliationService } from '../../apps/api/src/services/cod-reconciliation.service';
+import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 const sfx = Date.now().toString(36);
 let STORE = '';
@@ -40,7 +41,12 @@ function doRepo() {
     q => runReads(lite, q),
     m => runWrites(lite, sql, m)
   ) as never;
-  return { storeId: STORE, backend: 'do' as const, db: c as StoreReads, writer: c as StoreWrites };
+  return {
+    storeId: STORE,
+    backend: 'do' as const,
+    db: withPgStoreDelegate(c) as StoreReads,
+    writer: c as StoreWrites,
+  };
 }
 const pgRepo = () => ({
   storeId: STORE,

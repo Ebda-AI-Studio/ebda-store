@@ -33,6 +33,7 @@ import { hasDb } from '../helpers/bundle-fixtures';
 import { GoldRateService } from '../../apps/api/src/services/gold-rate/gold-rate.service';
 import { featureService } from '../../apps/api/src/services/feature.service';
 import { BulkService } from '../../apps/api/src/services/bulk.service';
+import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 const sfx = Date.now().toString(36);
 let STORE = '';
@@ -57,7 +58,7 @@ function doRepo() {
   return {
     storeId: STORE,
     backend: 'do' as const,
-    db: c as StoreReads,
+    db: withPgStoreDelegate(c) as StoreReads,
     writer: c as StoreWrites,
     money,
   };

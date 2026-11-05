@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runReads } from '@ebda-src/repo';
 
 const { PG, state } = vi.hoisted(() => ({
-  PG: { marker: 'prisma-proxy' },
+  PG: { $marker: 'prisma-proxy', product: { findMany: async () => ['row-from-prisma'] } },
   state: {
     backend: 'pg' as 'pg' | 'do',
     backendCalls: [] as string[],
@@ -57,11 +57,18 @@ const inScope = <T>(fn: () => Promise<T>): Promise<T> =>
   );
 
 describe('repo factory', () => {
-  it('Postgres is the default: a store on pg gets the very same prisma proxy services use today', async () => {
+  it('Postgres is the default: a store on pg reads and writes through the very same prisma proxy services use today', async () => {
     const repo = await storeRepo('s1');
     expect(repo).toMatchObject({ storeId: 's1', backend: 'pg' });
-    expect(repo.db).toBe(PG);
-    expect(await storeDb('s1')).toBe(PG);
+    // Ruling NZ-INTEG-1: the pg client is the prisma proxy plus a per-store tenant scope for a call with no ambient one, so it is
+    // no longer the SAME object: `$`-members are the proxy's own and a model call reaches it (an id that is not a UUID can never
+    // be scoped, so this one goes as-is).
+    const db = (await storeDb('s1')) as unknown as {
+      $marker: string;
+      product: { findMany(): Promise<string[]> };
+    };
+    expect(db.$marker).toBe('prisma-proxy');
+    expect(await db.product.findMany()).toEqual(['row-from-prisma']);
     expect(state.queries).toEqual([]); // no Durable Object was touched
   });
 
