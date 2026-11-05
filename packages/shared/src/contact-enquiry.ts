@@ -4,7 +4,7 @@
  * (the API validates with zod against these same constants). Ruling CONTACT-FORM-1.
  */
 import { BRAND } from './brand';
-import { toAsciiDigits } from './instapay-receipt';
+import { toAsciiDigits } from './ascii-digits';
 
 /** What the visitor needs: the two products' support, each of the seven studio services (ids from BRAND.services), other. */
 export const CONTACT_TOPIC_IDS = [
