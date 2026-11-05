@@ -112,11 +112,8 @@ const WORKER_ROOT =
 
 const DOCS_ONLY = /^(docs\/|.*\.md$|\.github\/ISSUE_TEMPLATE\/|\.vscode\/|\.editorconfig$)/;
 
-/** Integration tests that have their own CI jobs (and are excluded from the shared integration run). */
-const OWN_JOB_INTEGRATION = new Set([
-  'tests/integration/rls-ebda-app.test.ts',
-  'tests/integration/rls-pooler-isolation.test.ts',
-]);
+/** Integration tests that have their own CI jobs (and are excluded from the shared integration run). None since NZ-17-RLS-1. */
+const OWN_JOB_INTEGRATION = new Set([]);
 /** More affected test files than this and the whole tier runs (a list that long is "everything" anyway). */
 const INTEGRATION_ALL_ABOVE = 40;
 const SRC_EXT = ['.ts', '.tsx', '.mts', '/index.ts'];

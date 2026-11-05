@@ -45,6 +45,9 @@ export const RESIDUE_EXEMPT = [
   'packages/cf-schema/',
   'graphify-out/',
   'scripts/backup-db.sh',
+  // NZ-17 Ruling NZ-17-EX-1: the applied Postgres migration history is an archive (kept for the restore drill and
+  // to rebuild the Prisma schema's history); nothing executes it in production.
+  'packages/database/prisma/migrations/',
 ];
 
 const { positionals, values: v } = parseArgs({

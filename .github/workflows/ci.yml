@@ -10,10 +10,9 @@ name: CI
 #     changed. gitleaks.yml and blast-radius.yml run beside it.
 #   Push to main: the repo guards only (migration-order post-merge arm, action
 #     pins, secret scan), because the merge commit already passed the PR lane.
-#   Nightly (Mon-Sat 01:17 UTC): the ebda_app strict-RLS proof.
 #   Weekly (Sunday 01:17 UTC) and manual dispatch: the full lane. Build + full
 #     lint/typecheck, full unit with coverage, orphan-test check, integration,
-#     RLS proof, payload parity, e2e, dependency/secret audit, and the mutation
+#     e2e, dependency/secret audit, and the mutation
 #     tests (stryker + defence mutations). semgrep.yml runs on the same
 #     Sunday cron. A manual dispatch runs everything except mutation, which
 #     needs its `mutation` input ticked.
@@ -48,10 +47,9 @@ on:
     # The `changes` job gates the expensive jobs instead.
     branches: [main]
   schedule:
-    # 01:17 UTC (off the :00 mark, where scheduled runs queue). Two entries so a
-    # job can tell the Sunday full run (`github.event.schedule`) from the
-    # Mon-Sat nightly. Keep the strings in sync with the `if:` conditions below.
-    - cron: '17 1 * * 1-6'
+    # 01:17 UTC Sunday (off the :00 mark, where scheduled runs queue). The Mon-Sat nightly existed only for the
+    # ebda_app strict-RLS proof, removed with Postgres (Ruling NZ-17-RLS-1). Keep the string in sync with the
+    # `if:` conditions below.
     - cron: '17 1 * * 0'
   workflow_dispatch:
     inputs:
@@ -894,7 +892,7 @@ jobs:
 
       - name: Diff vitest's full test universe against CI job coverage
         # KEEP THE PATH LIST BELOW IN SYNC with what test-unit / test-integration /
-        # test-rls-ebda-app / test-e2e actually pass to `vitest run` (this is
+        # test-e2e actually pass to `vitest run` (this is
         # intentionally a hand-copied list, not derived from the other jobs, so a
         # change to one without the other shows up as a visible diff in review).
         # --json=<file> (NOT bare --json, which vitest treats as an optional
@@ -1139,10 +1137,6 @@ jobs:
         # 4xx-gate were dead weight. They run HERE (not the unit job) because the
         # shared test setup connects to Postgres + Redis, which only this job has.
         #
-        # --exclude rls-ebda-app / rls-pooler-isolation: they build their OWN ebda_app login
-        # connections and (the pooler one) their own pgbouncer, so they run ONLY under the
-        # dedicated `test-rls-ebda-app` job below, with no API server sharing the database and
-        # no shared fixture reset between files.
         # --retry=1 (#1248): this tier makes real network/DB calls against the
         # service containers above, unlike the unit tier which is retry:0 by
         # default (vitest.config.ts) to stop retry masking state pollution.
@@ -1158,7 +1152,7 @@ jobs:
           fi
           echo "integration targets: $targets"
           PLANNER_EXCLUDES="$(bash scripts/ci/planner-lane.sh excludes)"
-          npx vitest run $targets --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts $PLANNER_EXCLUDES --reporter=verbose --retry=1
+          npx vitest run $targets $PLANNER_EXCLUDES --reporter=verbose --retry=1
           # serial planner pass: the whole lane on a full run, only the selected planner files on a narrowed PR run
           lane="$(bash scripts/ci/planner-lane.sh list)"
           if [ "$targets" != "tests/integration apps/api/src" ]; then
@@ -1194,213 +1188,6 @@ jobs:
             echo '--- api server log tail ---'
             tail -100 /tmp/api-server.log
           fi
-
-  # Strict-RLS proof — THE GATE (R-EBDA-001, docs/ebda/design/cloudflare-backend.md §3).
-  # Every other job connects to Postgres as the `test` superuser, which BYPASSES
-  # row-level security entirely, so none of them evaluates a policy on its own. This job
-  # runs the two files that connect as the REAL `ebda_app` login (never the superuser, which
-  # is used only for fixtures and to create the LOGIN):
-  #   - tests/integration/rls-ebda-app.test.ts: EVERY table with a store_id column,
-  #     enumerated from information_schema at test time, must have RLS forced, a strict
-  #     policy, a contextless SELECT returning 0 rows and a contextless INSERT rejected; plus
-  #     cross-tenant read/write denial and the SECURITY DEFINER functions.
-  #   - tests/integration/rls-pooler-isolation.test.ts: interleaved requests for two stores
-  #     through a real pgbouncer in transaction mode leak 0 rows (needs the pgbouncer binary).
-  # If a migration predicate is wrong or a table ships without a policy, THIS job fails.
-
-  test-rls-ebda-app:
-    name: RLS ebda_app Strict-Policy Proof
-    # NIGHTLY lane (every cron) and manual dispatch; independent of `build`.
-    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && (github.event_name != 'schedule' || vars.EBDA_RUNS_ON != '')
-    # Ruling CI-HOSTED-1 (2026-11-02): a scheduled run is a no-op unless a self-hosted runner is configured
-    # (EBDA_RUNS_ON set); manual dispatch still runs on hosted.
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: pgvector/pgvector:0.8.0-pg17
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: force_test
-        ports:
-          - 5432
-        options: >-
-          --tmpfs /var/lib/postgresql/data:rw,size=1500m
-          --health-cmd "pg_isready -U test -d force_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 30s
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Private TMPDIR per runner
-        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
-        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
-        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
-        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
-        run: |
-          mkdir -p "$RUNNER_TEMP/tmp"
-          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
-          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-
-      - name: Generate Prisma Client
-        run: npm run db:generate
-
-      - name: Build database package
-        run: npm run build -w packages/database
-
-      - name: Build shared package
-        # the proof now imports WalletService (erasure across stores), which
-        # pulls @ebda/shared; without its dist the test cannot even load
-        run: npm run build -w packages/shared
-
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          for i in {1..30}; do
-            if npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin <<< 'SELECT 1' 2>/dev/null; then
-              echo "PostgreSQL is ready"
-              break
-            fi
-            echo "Waiting for PostgreSQL... (attempt $i/30)"
-            sleep 2
-          done
-
-      - name: Run database migrations (as the ephemeral Postgres superuser)
-        # Migrations need DDL + role-creation privileges (CREATE ROLE, GRANT,
-        # ALTER TABLE ... ENABLE/FORCE ROW LEVEL SECURITY) so they run as the
-        # container superuser `test`. This creates the `ebda_app` role (NOLOGIN,
-        # NOBYPASSRLS) + its DML grants and every strict RLS policy
-        # (20261004000000_ebda_strict_rls).
-        run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-
-      - name: Install pgbouncer (transaction-mode pooler for the isolation test)
-        run: |
-          if ! command -v pgbouncer >/dev/null 2>&1 && [ ! -x /usr/sbin/pgbouncer ]; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq pgbouncer
-          fi
-          (command -v pgbouncer || ls /usr/sbin/pgbouncer)
-
-      - name: Run ebda_app strict-RLS proof + pooler isolation
-        # --retry=0, DELIBERATELY (issue 2101) — the one DB-backed tier that
-        # does NOT opt into the integration/e2e `--retry=1`. This is a security
-        # assertion against a local Postgres service container, not a
-        # network-flaky HTTP suite: an RLS proof that passes only on its second
-        # attempt is a real signal (an order-dependent GUC leak, a policy that
-        # holds only on a warm connection), and a retry would turn it green.
-        # Explicit so it cannot drift silently; pinned by
-        # tests/unit/vitest-retry-by-tier.test.ts.
-        #
-        # DATABASE_URL/DIRECT_URL are the ephemeral SUPERUSER: the tests use it only to give
-        # `ebda_app` a CI-only login (ALTER ROLE ... LOGIN PASSWORD; the migration creates
-        # it NOLOGIN) and to write fixtures. Every ASSERTION runs on an ebda_app connection.
-        # REQUIRE_PGBOUNCER makes a missing pgbouncer a failure instead of a skip.
-        run: npx vitest run tests/integration/rls-ebda-app.test.ts tests/integration/rls-pooler-isolation.test.ts tests/integration/rls-wa-consent-erasure.test.ts tests/integration/subscription-past-due-since.test.ts --reporter=verbose --retry=0
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-          REQUIRE_PGBOUNCER: '1'
-          NODE_ENV: test
-
-  # RLS payload parity — the gate that would have caught the 2026-09-25
-  # cutover rollback. The jobs above prove ebda_app can run the code
-  # paths without ERRORING; neither compares what comes BACK. A STRICT RLS
-  # policy read with no tenant context does not error, it returns fewer rows
-  # (store_faqs/store_howtos came back `[]` on every public store payload).
-  # This job boots the built API twice against one database — as the owner
-  # (RLS bypassed) and as ebda_app (RLS enforced) —
-  # calls the storefront endpoints for every store, and fails on any array
-  # that shrank or field that vanished. scripts/rls-payload-parity.mjs.
-
-  test-rls-payload-parity:
-    name: RLS Payload Parity (owner vs ebda_app)
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 10
-    needs: [build]
-    services:
-      postgres:
-        image: pgvector/pgvector:0.8.0-pg17
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: force_test
-        ports:
-          # Dynamic host port, same reasoning as the jobs above.
-          - 5432
-        options: >-
-          --tmpfs /var/lib/postgresql/data:rw,size=1500m
-          --health-cmd "pg_isready -U test -d force_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 30s
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Private TMPDIR per runner
-        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
-        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
-        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
-        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
-        run: |
-          mkdir -p "$RUNNER_TEMP/tmp"
-          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
-          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-
-      - name: Generate Prisma Client
-        run: npm run db:generate
-
-      - name: Build database + shared + API
-        run: |
-          npm run build -w packages/database
-          npm run build -w packages/shared
-          npm run build -w apps/api
-
-      - name: Run database migrations + seed (as the ephemeral Postgres superuser)
-        run: |
-          npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
-          npm run db:seed --if-present
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-          ADMIN_PASSWORD: test-admin-password-ci
-          ADMIN_EMAIL: admin@ebda.app
-
-      - name: Give ebda_app a CI-only login
-        # Same disposable per-job password as the jobs above; never exists
-        # outside this container.
-        run: |
-          cat <<'SQL' | npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin
-          ALTER ROLE ebda_app WITH PASSWORD 'ci-only-app-pw' LOGIN;
-          SQL
-
-      - name: Compare owner vs ebda_app storefront payloads
-        # --seed adds two realistic fixture stores (FAQs, how-tos, locations,
-        # bundles, blog posts, pages, AI recommendations) so every strict
-        # table the storefront reads has rows to lose. The script refuses to
-        # pass if the ebda_app URL can bypass RLS or nothing was compared.
-        run: node scripts/rls-payload-parity.mjs --seed
-        env:
-          PARITY_OWNER_DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
-          PARITY_APP_DATABASE_URL: postgresql://ebda_app:ci-only-app-pw@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
 
   test-e2e:
     name: E2E Tests
@@ -1613,8 +1400,6 @@ jobs:
         test-unit,
         orphan-tests,
         test-integration,
-        test-rls-ebda-app,
-        test-rls-payload-parity,
         test-e2e,
         builder-e2e,
         mutation,
@@ -1638,8 +1423,6 @@ jobs:
           UNIT_RES: ${{ needs.test-unit.result }}
           ORPHAN_RES: ${{ needs.orphan-tests.result }}
           INT_RES: ${{ needs.test-integration.result }}
-          RLS_EBDA_APP_RES: ${{ needs.test-rls-ebda-app.result }}
-          RLS_PARITY_RES: ${{ needs.test-rls-payload-parity.result }}
           E2E_RES: ${{ needs.test-e2e.result }}
           MUTATION_RES: ${{ needs.mutation.result }}
         run: |
@@ -1651,7 +1434,7 @@ jobs:
           # Collect which jobs failed (vs which skipped vs passed) so Ahmad
           # can see what to look at without clicking through.
           FAILED_JOBS=""
-          for entry in "guards:$GUARDS_RES" "build:$BUILD_RES" "security:$SECURITY_RES" "unit:$UNIT_RES" "orphan-tests:$ORPHAN_RES" "integration:$INT_RES" "rls-ebda-app:$RLS_EBDA_APP_RES" "rls-payload-parity:$RLS_PARITY_RES" "e2e:$E2E_RES" "mutation:$MUTATION_RES"; do
+          for entry in "guards:$GUARDS_RES" "build:$BUILD_RES" "security:$SECURITY_RES" "unit:$UNIT_RES" "orphan-tests:$ORPHAN_RES" "integration:$INT_RES" "e2e:$E2E_RES" "mutation:$MUTATION_RES"; do
             name="${entry%:*}"
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then

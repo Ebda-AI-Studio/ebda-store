@@ -28,7 +28,7 @@ describe('workflow wiring', () => {
     const bare = ci.split('\n').filter(l => /^\s*(-\s+)?run:\s*npm ci\b/.test(l));
     expect(bare).toEqual([]);
     expect((ci.match(/uses: \.\/\.github\/actions\/npm-ci/g) ?? []).length).toBeGreaterThanOrEqual(
-      18
+      16
     );
   });
   it('the action passes EBDA_RUNS_ON and calls the script', () => {
