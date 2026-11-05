@@ -139,7 +139,7 @@ export function usePwaSettings(storeId: string) {
   );
 
   const saveSettings = useCallback(
-    async (successText: string, errorText: string) => {
+    async (successText: string, errorText: string): Promise<boolean> => {
       setSaving(true);
       setMessage(null);
       try {
@@ -147,11 +147,13 @@ export function usePwaSettings(storeId: string) {
         if (!error) {
           setMessage({ type: 'success', text: successText });
           setHasExistingSettings(true);
-        } else {
-          setMessage({ type: 'error', text: errorText });
+          return true;
         }
+        setMessage({ type: 'error', text: errorText });
+        return false;
       } catch {
         setMessage({ type: 'error', text: errorText });
+        return false;
       } finally {
         setSaving(false);
       }

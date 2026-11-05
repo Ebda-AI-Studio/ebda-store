@@ -14,6 +14,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [CHANGELOG-2026-10-16-followups-b0-46.md](CHANGELOG-2026-10-16-followups-b0-46.md) - Changelog — B0-46 follow-up fixes (branch `fix/followups-b0-46`)
 - [CHANGELOG-2026-11-04-admin-fix-t2-api-domain.md](CHANGELOG-2026-11-04-admin-fix-t2-api-domain.md) - Admin fix pass, T2 (API domain), 2026-11-04
 - [CHANGELOG-2026-11-04-admin-fix-pass-t3.md](CHANGELOG-2026-11-04-admin-fix-pass-t3.md) - Admin fix pass, T3 UI foundation (2026-11-04)
+- [CHANGELOG-2026-11-04-admin-fix-pass-t4.md](CHANGELOG-2026-11-04-admin-fix-pass-t4.md) - Admin fix pass, T4 store setup pages (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t5.md](CHANGELOG-2026-11-04-admin-fix-pass-t5.md) - Admin fix pass, T5 UI catalog + sales (2026-11-04)
 - [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) - Database backup, restore & disaster recovery

@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  forwardRef,
+  useState,
+  useEffect,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from 'react';
 import { useToast } from '@ebda/ui';
 import { EGYPT_GOVERNORATES, minorToDecimalString, REGION } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut, apiDelete, apiFetch } from '../../../../../lib/api';
+import { RowActions } from '../../../../../components/RowActions';
 import { majorToMinor, getIncompleteNewRows } from './areaRateValidation';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -49,6 +58,16 @@ interface CustomRow {
 
 interface Props {
   storeId: string;
+  /** Tells the page whether the grid has edits that are not saved yet (it owns the one sticky Save bar). */
+  onDirtyChange?: (dirty: boolean) => void;
+}
+
+/** What the page calls from its sticky save bar. */
+export interface AreaRateEditorHandle {
+  /** Saves every rate in one request. Resolves true when it saved. */
+  save: () => Promise<boolean>;
+  /** Drops the unsaved edits (reloads the saved rates). */
+  reset: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -142,7 +161,7 @@ function FeeInputs({
           value={feeMajor}
           onChange={e => onFeeChange(e.target.value)}
           aria-label={feeLabel}
-          className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+          className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
         />
         <span className="text-xs text-muted-foreground">{currencyLabel}</span>
       </div>
@@ -158,7 +177,7 @@ function FeeInputs({
           value={thresholdMajor}
           onChange={e => onThresholdChange(e.target.value)}
           aria-label={freeOverLabel}
-          className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+          className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
         />
         <span className="text-xs text-muted-foreground">{currencyLabel}</span>
       </div>
@@ -168,7 +187,10 @@ function FeeInputs({
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function AreaRateEditor({ storeId }: Props) {
+export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function AreaRateEditor(
+  { storeId, onDirtyChange },
+  ref
+) {
   const t = useT('shipping.areaRates');
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -177,6 +199,11 @@ export function AreaRateEditor({ storeId }: Props) {
 
   // Static Egypt area state (same structure as before)
   const [areaState, setAreaState] = useState<AreaStateMap>({});
+  // The grid as last loaded/saved; the sticky Save bar shows only while the grid differs from it.
+  const [baseline, setBaseline] = useState<string | null>(null);
+  // First-run card ("one price for all of Egypt"): fee + free-over, saved in one click.
+  const [oneFee, setOneFee] = useState('');
+  const [oneThreshold, setOneThreshold] = useState('');
 
   // Custom (non-static) rows — country/province/area added by the merchant
   const [customRows, setCustomRows] = useState<CustomRow[]>([]);
@@ -274,6 +301,7 @@ export function AreaRateEditor({ storeId }: Props) {
 
       setAreaState(map);
       setCustomRows(custom);
+      setBaseline(JSON.stringify({ areaState: map, customRows: custom }));
     } catch {
       toastError(t('errorTitle'), t('fetchFailed'));
     } finally {
@@ -460,16 +488,21 @@ export function AreaRateEditor({ storeId }: Props) {
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
-  async function handleSave() {
+  async function handleSave(override?: {
+    areaState: AreaStateMap;
+    customRows: CustomRow[];
+  }): Promise<boolean> {
+    const stateNow = override?.areaState ?? areaState;
+    const rowsNow = override?.customRows ?? customRows;
     // Guard against silently dropping brand-new zones/areas the merchant just
     // added but left inactive with no fee. These rows would otherwise be
     // filtered out of the bulk payload below while `handleSave` still shows a
     // success toast — telling the merchant it saved when it didn't.
-    const incompleteNewRows = getIncompleteNewRows(customRows);
+    const incompleteNewRows = getIncompleteNewRows(rowsNow);
     if (incompleteNewRows.length > 0) {
       const names = incompleteNewRows.map(r => r.area).join(', ');
       toastError(t('errorTitle'), t('incompleteRowsError', { areas: names }));
-      return;
+      return false;
     }
 
     setSaving(true);
@@ -493,7 +526,7 @@ export function AreaRateEditor({ storeId }: Props) {
       for (const gov of EGYPT_GOVERNORATES) {
         for (const area of gov.areas) {
           const k = rowKey(gov.en, area.en);
-          const row = areaState[k];
+          const row = stateNow[k];
           if (!row) continue;
           const fee = majorToMinor(row.feeMajor);
           if (!row.isActive && fee === 0) continue;
@@ -516,7 +549,7 @@ export function AreaRateEditor({ storeId }: Props) {
       }
 
       // 2. Custom rows (includes custom Egypt areas AND other countries)
-      for (const row of customRows) {
+      for (const row of rowsNow) {
         const fee = majorToMinor(row.feeMajor);
         if (!row.isActive && fee === 0) continue;
         const entry: (typeof rates)[number] = {
@@ -542,16 +575,55 @@ export function AreaRateEditor({ storeId }: Props) {
 
       if (error) {
         toastError(t('errorTitle'), t('saveFailed'));
-      } else {
-        toastSuccess(t('savedTitle'), t('savedDescription'));
-        fetchRates();
+        return false;
       }
+      toastSuccess(t('savedTitle'), t('savedDescription'));
+      await fetchRates();
+      return true;
     } catch {
       toastError(t('errorTitle'), t('saveFailed'));
+      return false;
     } finally {
       setSaving(false);
     }
   }
+
+  // The first-run card: one fee (and an optional free-over amount) for every area in Egypt, saved in one click.
+  async function saveOnePrice() {
+    const feeMajor = oneFee.trim();
+    if (feeMajor === '') return;
+    const thresholdMajor = oneThreshold.trim();
+    const next: AreaStateMap = { ...areaState };
+    for (const gov of EGYPT_GOVERNORATES) {
+      for (const area of gov.areas) {
+        const k = rowKey(gov.en, area.en);
+        next[k] = {
+          ...next[k],
+          feeMajor,
+          isActive: true,
+          ...(thresholdMajor !== '' ? { thresholdMajor } : {}),
+        };
+      }
+    }
+    setAreaState(next);
+    await handleSave({ areaState: next, customRows });
+  }
+
+  const currentSnapshot = useMemo(
+    () => JSON.stringify({ areaState, customRows }),
+    [areaState, customRows]
+  );
+  const dirty = baseline !== null && currentSnapshot !== baseline;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  useImperativeHandle(ref, () => ({ save: () => handleSave(), reset: () => void fetchRates() }));
+
+  // Nothing priced yet and nothing typed: the merchant's first useful click is one price for all of Egypt.
+  const hasAnyRate =
+    customRows.length > 0 ||
+    Object.values(areaState).some(r => r.isActive || majorToMinor(r.feeMajor) > 0);
 
   // ── Export ────────────────────────────────────────────────────────────────
 
@@ -737,41 +809,86 @@ export function AreaRateEditor({ storeId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Import / Export toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground max-w-md">{t('importHint')}</p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={exporting}
-            className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {exporting && (
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            )}
-            {exporting ? t('exporting') : t('exportBtn')}
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {importing && !preview && (
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            )}
-            {t('importBtn')}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx"
-            onChange={handleFileSelected}
-            className="hidden"
-          />
-        </div>
+      {/* Export / import live in the overflow menu (rule 2): they are rare, one-time jobs. */}
+      <div className="flex justify-end">
+        <RowActions
+          menuLabel={t('moreMenu')}
+          items={[
+            {
+              label: exporting ? t('exporting') : t('exportBtn'),
+              onSelect: handleExport,
+              disabled: exporting,
+            },
+            {
+              label: t('importBtn'),
+              onSelect: () => fileInputRef.current?.click(),
+              disabled: importing,
+            },
+          ]}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.xlsx"
+          onChange={handleFileSelected}
+          className="hidden"
+        />
       </div>
+
+      {/* First run: the common case is ONE price for all of Egypt, so offer it before 27 governorates. */}
+      {!hasAnyRate && (
+        <section
+          data-testid="shipping-first-run"
+          className="space-y-3 rounded-xl border border-primary/30 bg-card p-5"
+        >
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{t('firstRunTitle')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('firstRunHint')}</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              {t('firstRunFee')}
+              <span className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder={t('firstRunFeePlaceholder')}
+                  value={oneFee}
+                  onChange={e => setOneFee(e.target.value)}
+                  className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                />
+                <span>{t('currency')}</span>
+              </span>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              {t('firstRunFreeOver')}
+              <span className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder={t('firstRunFreeOverPlaceholder')}
+                  value={oneThreshold}
+                  onChange={e => setOneThreshold(e.target.value)}
+                  className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                />
+                <span>{t('currency')}</span>
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={saveOnePrice}
+              disabled={oneFee.trim() === '' || saving}
+              className="min-h-11 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saving ? t('saving') : t('firstRunSave')}
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Import preview modal */}
       {preview && (
@@ -829,62 +946,71 @@ export function AreaRateEditor({ storeId }: Props) {
       )}
 
       {/* ── Global apply-to-all-areas control ───────────────────────────── */}
-      <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
-        <p className="text-sm font-medium text-foreground mb-3">{t('applyAllGlobal')}</p>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">{t('applyAllGlobalFee')}</label>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={globalBulkFeeMajor}
-                onChange={e => setGlobalBulkFeeMajor(e.target.value)}
-                aria-label={t('applyAllGlobalFee')}
-                className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
-              />
-              <span className="text-xs text-muted-foreground">{t('currency')}</span>
+      <details className="rounded-xl border border-border bg-muted/20 px-4 py-3" open={false}>
+        <summary className="cursor-pointer text-sm font-medium text-foreground">
+          {t('applyAllGlobal')}
+        </summary>
+        <div className="mt-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">{t('applyAllGlobalFee')}</label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={globalBulkFeeMajor}
+                  onChange={e => setGlobalBulkFeeMajor(e.target.value)}
+                  aria-label={t('applyAllGlobalFee')}
+                  className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                />
+                <span className="text-xs text-muted-foreground">{t('currency')}</span>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">{t('applyAllGlobalThreshold')}</label>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
-                {t('freeOver')}
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder={t('optional')}
-                value={globalBulkThresholdMajor}
-                onChange={e => setGlobalBulkThresholdMajor(e.target.value)}
-                aria-label={t('applyAllGlobalThreshold')}
-                className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
-              />
-              <span className="text-xs text-muted-foreground">{t('currency')}</span>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">
+                {t('applyAllGlobalThreshold')}
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
+                  {t('freeOver')}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder={t('optional')}
+                  value={globalBulkThresholdMajor}
+                  onChange={e => setGlobalBulkThresholdMajor(e.target.value)}
+                  aria-label={t('applyAllGlobalThreshold')}
+                  className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                />
+                <span className="text-xs text-muted-foreground">{t('currency')}</span>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={applyGlobalFee}
+              disabled={globalBulkFeeMajor.trim() === ''}
+              className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('applyAllGlobalFeeBtn')}
+            </button>
+            <button
+              type="button"
+              onClick={applyGlobalThreshold}
+              disabled={globalBulkThresholdMajor.trim() === ''}
+              className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('applyAllGlobalThresholdBtn')}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={applyGlobalFee}
-            disabled={globalBulkFeeMajor.trim() === ''}
-            className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t('applyAllGlobalFeeBtn')}
-          </button>
-          <button
-            type="button"
-            onClick={applyGlobalThreshold}
-            disabled={globalBulkThresholdMajor.trim() === ''}
-            className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t('applyAllGlobalThresholdBtn')}
-          </button>
         </div>
-      </div>
+      </details>
+
+      <h2 className="pt-2 text-base font-semibold text-foreground">{t('perGovernorateTitle')}</h2>
+      <p className="-mt-3 text-sm text-muted-foreground">{t('perGovernorateHint')}</p>
 
       {/* ── Static Egypt governorate accordion ─────────────────────────── */}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
@@ -939,7 +1065,7 @@ export function AreaRateEditor({ storeId }: Props) {
                         setBulkFeeMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('applyAll')}
-                      className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
                     <button
@@ -963,7 +1089,7 @@ export function AreaRateEditor({ storeId }: Props) {
                         setBulkThresholdMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('freeOver')}
-                      className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
                     <button
@@ -1116,7 +1242,7 @@ export function AreaRateEditor({ storeId }: Props) {
                                 [addKey]: { ...addForm, area: e.target.value },
                               }))
                             }
-                            className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -1132,7 +1258,7 @@ export function AreaRateEditor({ storeId }: Props) {
                                 [addKey]: { ...addForm, areaAr: e.target.value },
                               }))
                             }
-                            className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                            className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -1331,7 +1457,7 @@ export function AreaRateEditor({ storeId }: Props) {
                                     [govAddKey]: { ...govAddForm, area: e.target.value },
                                   }))
                                 }
-                                className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1347,7 +1473,7 @@ export function AreaRateEditor({ storeId }: Props) {
                                     [govAddKey]: { ...govAddForm, areaAr: e.target.value },
                                   }))
                                 }
-                                className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                                className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1442,7 +1568,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   placeholder={t('countryEnSample')}
                   value={addLocForm.country}
                   onChange={e => setAddLocForm(prev => ({ ...prev, country: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Country AR */}
@@ -1454,7 +1580,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   dir="rtl"
                   value={addLocForm.countryAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, countryAr: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                 />
               </div>
               {/* Governorate EN */}
@@ -1467,7 +1593,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   placeholder={t('cityEnSample')}
                   value={addLocForm.governorate}
                   onChange={e => setAddLocForm(prev => ({ ...prev, governorate: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Governorate AR */}
@@ -1481,7 +1607,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   onChange={e =>
                     setAddLocForm(prev => ({ ...prev, governorateAr: e.target.value }))
                   }
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                 />
               </div>
               {/* Area EN */}
@@ -1492,7 +1618,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   placeholder={t('districtEnSample')}
                   value={addLocForm.area}
                   onChange={e => setAddLocForm(prev => ({ ...prev, area: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Area AR */}
@@ -1504,7 +1630,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   dir="rtl"
                   value={addLocForm.areaAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, areaAr: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
                 />
               </div>
               {/* Fee */}
@@ -1518,7 +1644,7 @@ export function AreaRateEditor({ storeId }: Props) {
                     placeholder="0.00"
                     value={addLocForm.feeMajor}
                     onChange={e => setAddLocForm(prev => ({ ...prev, feeMajor: e.target.value }))}
-                    className="w-28 px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                    className="w-28 px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
                   />
                   <span className="text-xs text-muted-foreground">{t('currency')}</span>
                 </div>
@@ -1560,21 +1686,6 @@ export function AreaRateEditor({ storeId }: Props) {
           </div>
         )}
       </div>
-
-      {/* Save button */}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saving && (
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          )}
-          {saving ? t('saving') : t('save')}
-        </button>
-      </div>
     </div>
   );
-}
+});

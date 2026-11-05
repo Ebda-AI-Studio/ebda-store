@@ -96,7 +96,7 @@ export function TargetPicker({ storeId, target, onChange, hasWhatsapp, link }: P
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder={t('productPlaceholder')}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
               />
               {results.length > 0 && (
                 <ul className="max-h-56 overflow-auto rounded-lg border border-border divide-y divide-border">
@@ -133,7 +133,7 @@ export function TargetPicker({ storeId, target, onChange, hasWhatsapp, link }: P
               c ? { kind: 'category', slug: c.slug, label: nameOf(c) } : { kind: 'category' }
             );
           }}
-          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+          className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
         >
           <option value="">{t('categoryPlaceholder')}</option>
           {categories.map(c => (

@@ -33,7 +33,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.email || ''}
             onChange={e => onChange({ ...branding, email: e.target.value })}
             placeholder={t('emailPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
         <div>
@@ -45,7 +45,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             placeholder={t('phonePlaceholder')}
             aria-invalid={waInvalid}
             dir="ltr"
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           <p
             className={`mt-1 text-xs ${waInvalid ? 'text-destructive-ink' : 'text-muted-foreground'}`}
@@ -92,7 +92,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.phone || ''}
             onChange={e => onChange({ ...branding, phone: e.target.value })}
             placeholder={t('phonePlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
         <div>
@@ -104,7 +104,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.phoneAr || ''}
             onChange={e => onChange({ ...branding, phoneAr: e.target.value })}
             placeholder={t('phoneArPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
       </div>
@@ -117,7 +117,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             onChange={e => onChange({ ...branding, address: e.target.value })}
             rows={3}
             placeholder={t('addressPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
           />
         </div>
         <div>
@@ -129,7 +129,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             onChange={e => onChange({ ...branding, addressAr: e.target.value })}
             rows={3}
             placeholder={t('addressArPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
           />
         </div>
       </div>
@@ -153,7 +153,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.addressUrl || ''}
             onChange={e => onChange({ ...branding, addressUrl: e.target.value })}
             placeholder={t('addressUrlPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('addressUrlHint')}</p>
         </div>
@@ -162,7 +162,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             type="checkbox"
             checked={branding.addressLink !== false}
             onChange={e => onChange({ ...branding, addressLink: e.target.checked })}
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
+            className="h-4 w-4 rounded border-input text-primary focus:ring-primary/40"
           />
           <span className="text-sm text-foreground">{t('addressClickable')}</span>
         </label>

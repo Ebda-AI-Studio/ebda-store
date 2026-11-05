@@ -1,0 +1,314 @@
+{
+  "shippingHub": {
+    "title": "الشحن والتوصيل",
+    "subtitle": "حدد بتشحن بكام، ومع مين، وإمتى بيوصل الطلب",
+    "tabs": {
+      "label": "أقسام الشحن والتوصيل",
+      "rates": "الأسعار",
+      "carriers": "شركات الشحن",
+      "delivery": "وقت التوصيل",
+      "cod": "تحصيل الدفع عند الاستلام"
+    },
+    "savedTitle": "اتحفظ الشحن",
+    "savedBody": "سياسة الإرجاع اتحدّثت.",
+    "saveLabel": "احفظ الشحن"
+  },
+  "shipping": {
+    "areaRates": {
+      "moreMenu": "خيارات تانية للأسعار",
+      "firstRunTitle": "سعر واحد لكل مصر؟",
+      "firstRunHint": "اكتب سعر الشحن مرة واحدة وهنطبّقه على كل المحافظات. تقدر تغيّر سعر محافظة معينة بعدين.",
+      "firstRunFee": "سعر الشحن",
+      "firstRunFeePlaceholder": "مثلًا 50",
+      "firstRunFreeOver": "الشحن ببلاش لو الطلب فوق (اختياري)",
+      "firstRunFreeOverPlaceholder": "مثلًا 1000",
+      "firstRunSave": "احفظ السعر ده لكل مصر",
+      "perGovernorateTitle": "أسعار مختلفة لكل محافظة",
+      "perGovernorateHint": "افتح المحافظة وحدد سعر كل منطقة فيها.",
+      "applyAllGlobal": "طبّق سعر واحد على كل المحافظات"
+    }
+  },
+  "checkoutDelivery": {
+    "page": {
+      "errorTitle": "مقدرناش نحفظ",
+      "save": "احفظ وقت التوصيل",
+      "successMessage": "اتحفظ وقت التوصيل",
+      "failedMessage": "مقدرناش نحفظ إعدادات التوصيل. جرّب تاني.",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
+      "noteSectionHint": "بتظهر للعميل وهو بيدفع، فوق زرار الدفع.",
+      "minOrderSectionHint": "العميل مش هيقدر يكمّل الطلب لو إجمالي المنتجات أقل من المبلغ ده. سيبه فاضي أو اكتب 0 لو مش عايز حد أدنى.",
+      "minOrderPlaceholder": "مثلًا 500",
+      "addWindow": "ضيف ميعاد",
+      "noWindowsYet": "لسه مفيش مواعيد توصيل. ضيف أول ميعاد."
+    }
+  },
+  "branding": {
+    "page": {
+      "subtitle": "الاسم واللوجو والألوان وبيانات التواصل لـ {name}"
+    },
+    "actions": {
+      "save": "احفظ الهوية"
+    },
+    "messages": {
+      "saveFailedPrefix": "مقدرناش نحفظ الهوية",
+      "saveSuccessTitle": "اتحفظت الهوية",
+      "saveSuccessBody": "كل التغييرات اتحفظت مرة واحدة."
+    },
+    "theme": {
+      "elsewhere": {
+        "title": "إعدادات تانية بتلاقيها في مكانها",
+        "blog": "تشغيل المدونة بيتم من صفحة المدونة.",
+        "blogLink": "افتح المدونة",
+        "webPush": "إشعارات المتصفح للعملاء بتتشغل من صفحة الإشعارات.",
+        "webPushLink": "افتح الإشعارات"
+      },
+      "advanced": {
+        "title": "متقدم: شكل الأيقونات والفوتر",
+        "hint": "إعدادات بتتغير نادرًا. باقي تفاصيل الشكل بتلاقيها في المحرر."
+      },
+      "logoSize": {
+        "title": "حجم اللوجو",
+        "hint": "اختار حجم اللوجو في أعلى المتجر.",
+        "auto": "تلقائي",
+        "sm": "صغير",
+        "md": "وسط",
+        "lg": "كبير"
+      }
+    }
+  },
+  "blog": {
+    "page": {
+      "disabledTitle": "المدونة مقفولة دلوقتي",
+      "disabledBody": "المقالات اللي بتكتبها مش هتظهر للعملاء غير لما تشغّل المدونة.",
+      "enableBlog": "شغّل المدونة",
+      "enabledToast": "المدونة اشتغلت",
+      "enableFailedTitle": "مقدرناش نشغّل المدونة",
+      "enableFailed": "جرّب تاني بعد شوية.",
+      "postDeleteObject": "المقال «{title}»",
+      "postDeleteConsequence": "المقال هيتمسح نهائيًا ومش هتقدر ترجّعه.",
+      "postDeleteLabel": "امسح المقال",
+      "postDeleted": "اتمسح المقال",
+      "postDeleteFailedTitle": "مقدرناش نمسح المقال",
+      "postDeleteFailed": "جرّب تاني بعد شوية.",
+      "postMenu": "خيارات المقال",
+      "newPost": "اكتب مقال جديد"
+    }
+  },
+  "seo": {
+    "page": {
+      "redirectsPrompt": "عايز تحوّل رابط قديم لرابط جديد؟",
+      "manageRedirects": "افتح التحويلات",
+      "faqsMovedLink": "الأسئلة والأجوبة بقت في المحتوى",
+      "generateWithAi": "اكتب لي العنوان والوصف",
+      "generating": "بكتب...",
+      "aiGenerateTooltip": "الذكاء الاصطناعي بيكتب عنوان ووصف للمتجر بالعربي والإنجليزي، وبيملأ الحقول الفاضية بس.",
+      "aiFailedTitle": "مقدرناش نكتب النص",
+      "aiFailedBody": "جرّب تاني بعد شوية.",
+      "aiFilledTitle": "النص اتكتب",
+      "aiFilledBody": "ملينا: {fields}. راجعهم وبعدين احفظ.",
+      "aiNothingToFillTitle": "مفيش حقول فاضية",
+      "aiNothingToFillBody": "كل الحقول متملية. امسح اللي عايز تغيّره وجرّب تاني.",
+      "aiField": {
+        "metaTitle": "العنوان بالإنجليزي",
+        "metaTitleAr": "العنوان بالعربي",
+        "metaDescription": "الوصف بالإنجليزي",
+        "metaDescriptionAr": "الوصف بالعربي"
+      },
+      "languageGuardTitle": "في حقل إنجليزي فيه كلام عربي",
+      "languageGuardBody": "اكتب الإنجليزي في: {fields}. الكلام العربي مكانه الحقول العربي.",
+      "languageGuardField": {
+        "metaTitle": "العنوان بالإنجليزي",
+        "metaDescription": "الوصف بالإنجليزي",
+        "metaDescriptionAeo": "إجابة الذكاء الاصطناعي بالإنجليزي"
+      },
+      "advancedGroup": "متقدم",
+      "aeoTitle": "الإجابات اللي بتظهر في ChatGPT",
+      "aeoHint": "جملتين بسيطتين بتشرح بيهم متجرك، علشان مساعدات الذكاء الاصطناعي تقتبسهم لما حد يسأل عنك.",
+      "saveChanges": "احفظ إعدادات البحث",
+      "successMessage": "اتحفظت إعدادات البحث",
+      "failedMessage": "مقدرناش نحفظ إعدادات البحث",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
+      "socialSaveError": "رابط ويكيبيديا أو ويكي داتا مش صحيح",
+      "redirectsDeleteObject": "التحويل ده",
+      "redirectsDeleteConsequence": "الرابط القديم هيبطل يوديك للرابط الجديد، واللي بيفتحه هيلاقي صفحة مش موجودة.",
+      "redirectsDeleteLabel": "امسح التحويل"
+    }
+  },
+  "content": {
+    "faqsPage": {
+      "title": "أسئلة وأجوبة",
+      "subtitle": "الأسئلة اللي عملاءك بيسألوها وأدلة الخطوات. بتظهر في المتجر وفي نتايج البحث وإجابات الذكاء الاصطناعي."
+    },
+    "list": {
+      "faqsLink": "الأسئلة والأجوبة الشائعة بتلاقيها هنا.",
+      "newPage": "ضيف صفحة"
+    }
+  },
+  "paymentSettings": {
+    "page": {
+      "title": "وسائل الدفع",
+      "subtitle": "اختار العملاء يدفعوا بإيه، وفعّل أو أقفل كل وسيلة",
+      "intro": "شغّل أي وسيلة دفع علشان تظهر للعميل في الدفع. البوابات محتاجة بيانات الربط من لوحة المزوّد. الدفع عند الاستلام مش محتاج ربط، كفاية تشغّله.",
+      "testModeNote": "جرّب الربط على الوضع التجريبي الأول، وبعدين حوّل للوضع الفعلي قبل ما تفتح للعملاء."
+    },
+    "strip": {
+      "title": "شغّال دلوقتي",
+      "none": "مفيش وسيلة دفع شغّالة. شغّل واحدة من هنا أو ضيف وسيلة تحت.",
+      "count": "{count} وسيلة شغّالة",
+      "on": "شغّال",
+      "off": "مقفول",
+      "addTitle": "ضيف وسيلة دفع",
+      "addHint": "افتح الوسيلة، حط بيانات الربط، وجرّب الاتصال قبل ما تشغّلها."
+    },
+    "cod": {
+      "displayNamePlaceholder": "مثلًا: Cash on Delivery",
+      "displayNameArPlaceholder": "مثلًا: الدفع عند الاستلام"
+    },
+    "actions": {
+      "retry": "حاول تاني"
+    }
+  },
+  "notifications": {
+    "page": {
+      "title": "الإشعارات",
+      "subtitle": "اختار العميل يتبلّغ بإيه وعلى أنهي قناة",
+      "channelsTitle": "إعداد القنوات",
+      "channelsHint": "بيانات الربط بتتحط مرة واحدة. بعدها مش هتحتاج ترجعلها.",
+      "broadcastTitle": "ابعت إشعار لكل عملاءك دلوقتي",
+      "broadcastHint": "للرسائل اللي بتتبعت مرة واحدة زي العروض، الأفضل تستخدم الحملات.",
+      "campaignsLink": "افتح الحملات"
+    },
+    "sms": {
+      "fields": {
+        "appSid": "مفتاح التطبيق من Unifonic",
+        "senderId": "اسم المرسل اللي هيظهر للعميل"
+      },
+      "placeholders": {
+        "appSid": "المفتاح اللي هتلاقيه في حسابك على Unifonic",
+        "senderId": "مثلًا: MyStore"
+      }
+    },
+    "webPush": {
+      "title": "إشعارات المتصفح للعملاء",
+      "hint": "مقفولة في الأول. لما تشغّلها العميل يقدر يشترك ويستلم إشعارات على المتصفح (محتاجة إن باقتك فيها إشعارات الدفع).",
+      "onToast": "إشعارات المتصفح اشتغلت",
+      "offToast": "إشعارات المتصفح اتقفلت",
+      "failedTitle": "مقدرناش نغيّر إشعارات المتصفح",
+      "failedBody": "جرّب تاني بعد شوية."
+    }
+  },
+  "tax": {
+    "steps": {
+      "label": "خطوات إعداد الضريبة",
+      "register": "سجّل الرقم الضريبي",
+      "eta": "اربط الفاتورة الإلكترونية",
+      "rates": "حدد النسب",
+      "done": "خلصت"
+    },
+    "page": {
+      "rateSaveFailed": "مقدرناش نحفظ النسبة",
+      "rateToggleFailed": "مقدرناش نغيّر حالة النسبة",
+      "rateDeleteFailed": "مقدرناش نمسح النسبة",
+      "rateDeleteObject": "نسبة الضريبة «{name}»",
+      "rateDeleteConsequence": "النسبة هتتشال من المتجر ومش هتتطبق على أي طلب جديد.",
+      "rateDeleteLabel": "امسح النسبة"
+    }
+  },
+  "taxVerification": {
+    "documents": {
+      "deleteObject": "المستند «{name}»",
+      "deleteConsequence": "المستند هيتمسح نهائيًا من ملف الضريبة بتاعك.",
+      "deleteLabel": "امسح المستند"
+    }
+  },
+  "language": {
+    "page": {
+      "title": "اللغة",
+      "subtitle": "لغة المتجر اللي بتظهر للعميل أول ما يفتحه",
+      "save": "احفظ اللغة",
+      "successMessage": "اتحفظت لغة المتجر",
+      "failedMessage": "مقدرناش نحفظ اللغة",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني."
+    }
+  },
+  "domain": {
+    "page": {
+      "dnsPointingTitle": "الدومين لسه مش موجّه لمتجرك",
+      "dnsPointingMessage": "اتأكدنا إن الدومين بتاعك، بس سجلات الـ DNS لسه بتوديه لمكان تاني. اللي يفتح دومينك دلوقتي مش هيوصل لمتجرك. غيّر السجلات اللي تحت عند مزوّد الدومين.",
+      "dnsWaitingTitle": "مستنيين الـ DNS يتحدّث",
+      "dnsWaitingMessage": "ضيف السجلات اللي تحت عند مزوّد الدومين. التحديث ممكن ياخد لحد 48 ساعة، وإحنا هنتأكد تلقائيًا.",
+      "dnsEmailTitle": "فاضل سجلات الإيميل",
+      "dnsInstructions": "ضيف سجلات الـ DNS دي عند مزوّد الدومين:",
+      "copyAll": "انسخ كل السجلات",
+      "copiedAll": "اتنسخت السجلات",
+      "emailInstructions": "ابعت التعليمات بالإيميل لمين بيدير الدومين",
+      "emailSubject": "سجلات DNS لربط دومين المتجر",
+      "emailBody": "محتاج تضيف سجلات الـ DNS دي عند مزوّد الدومين (النوع، الاسم، القيمة):",
+      "dnsPropagation": "تغييرات الـ DNS ممكن تاخد لحد 48 ساعة.",
+      "removeObject": "الدومين {domain}",
+      "removeConsequence": "المتجر هيرجع للرابط الأساسي بتاعه، والرابط ده مش هيفتح متجرك تاني.",
+      "removeLabel": "شيل الدومين"
+    }
+  },
+  "codes": {
+    "crossLink": {
+      "labels": {
+        "text": "استيكرات المنتجات بتستخدمها وانت بتجرد المخزون.",
+        "link": "افتح المخزون"
+      },
+      "receipt": {
+        "text": "باركود الإيصال بيظهر على الأوردرات اللي بتطبعها.",
+        "link": "افتح الطلبات"
+      }
+    }
+  },
+  "pwa": {
+    "page": {
+      "title": "تطبيق على موبايل العميل",
+      "subtitle": "العميل يثبّت متجرك على شاشة موبايله زي أي تطبيق",
+      "advanced": "متقدم: ملف التطبيق (manifest)",
+      "advancedHint": "ده اللي المتصفح بيقراه علشان يثبّت التطبيق. غالبًا مش هتحتاج تغيّر فيه حاجة."
+    },
+    "actions": {
+      "switchTitle": "شغّل التطبيق لعملاءك",
+      "enabled": "شغّال",
+      "disabled": "مقفول",
+      "save": "احفظ التطبيق"
+    }
+  },
+  "announcement": {
+    "page": {
+      "title": "شريط الإعلان",
+      "subtitle": "جملة قصيرة فوق المتجر كله، زي عرض أو شحن ببلاش",
+      "saveChanges": "احفظ الإعلان",
+      "successMessage": "اتحفظ الإعلان",
+      "failedMessage": "مقدرناش نحفظ الإعلان",
+      "connectionError": "مفيش اتصال بالسيرفر دلوقتي. جرّب تاني.",
+      "textEnglishPlaceholder": "Free shipping on orders over 500 EGP!",
+      "textArabicPlaceholder": "شحن ببلاش للطلبات فوق 500 جنيه!",
+      "linkTextEnglishPlaceholder": "Shop now",
+      "linkTextArabicPlaceholder": "اشتري دلوقتي"
+    }
+  },
+  "floatingWidget": {
+    "pageTitle": "زرار الواتساب العايم",
+    "premiumSubtitle": "ميزة إضافية",
+    "mainSubtitle": "أزرار ثابتة بيشوفها عميلك في كل صفحة، زي الواتساب والاتصال",
+    "saveChanges": "احفظ الأزرار",
+    "savedToast": "اتحفظت الأزرار",
+    "tooltipEnPlaceholder": "النص بالإنجليزي",
+    "tooltipArPlaceholder": "النص بالعربي"
+  },
+  "sizeCharts": {
+    "page": {
+      "deleteObject": "جدول المقاسات «{name}»",
+      "deleteConsequence": "المنتجات والأقسام المربوطة بيه هتظهر من غير جدول مقاسات.",
+      "deleteLabel": "امسح الجدول"
+    },
+    "editor": {
+      "templateReplaceObject": "القالب الجاهز",
+      "templateReplace": "القالب هيستبدل الجدول اللي بتكتبه دلوقتي.",
+      "templateReplaceLabel": "استبدل بالقالب"
+    }
+  }
+}

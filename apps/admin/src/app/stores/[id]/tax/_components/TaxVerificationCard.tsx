@@ -16,6 +16,7 @@ import {
 import { useT } from '@/i18n/useT';
 import { apiDelete, apiFetch, apiGet, apiPost, apiPut } from '@/lib/api';
 import { openProtectedDocument } from '@/lib/open-document';
+import { useConfirm } from '@/hooks/useConfirm';
 
 export interface TaxDocument {
   id: string;
@@ -65,6 +66,7 @@ function formatSize(bytes: number): string {
  */
 export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
   const t = useT('taxVerification');
+  const askConfirm = useConfirm();
   const locale = useLocale();
   const base = `/api/v1/stores/${storeId}/tax/profile`;
 
@@ -213,7 +215,13 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
   };
 
   const removeDoc = async (doc: TaxDocument) => {
-    if (!window.confirm(t('documents.deleteConfirm'))) return;
+    const ok = await askConfirm({
+      object: t('documents.deleteObject', { name: doc.fileName ?? '' }),
+      consequence: t('documents.deleteConsequence'),
+      confirmLabel: t('documents.deleteLabel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
     setMessage(null);
     const { error } = await apiDelete(`${base}/documents/${doc.id}`);
     if (error) return setMessage({ tone: 'error', text: errorText(error.code, error.message) });

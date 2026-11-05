@@ -55,7 +55,7 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
             type="text"
             value={branding.name}
             onChange={e => onChange({ ...branding, name: e.target.value })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
         <div>
@@ -68,7 +68,7 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
             dir="rtl"
             value={branding.nameAr || ''}
             onChange={e => onChange({ ...branding, nameAr: e.target.value })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
       </div>
@@ -84,7 +84,7 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
             value={branding.description || ''}
             onChange={e => onChange({ ...branding, description: e.target.value })}
             rows={3}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
           />
         </div>
         <div>
@@ -97,7 +97,7 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
             value={branding.descriptionAr || ''}
             onChange={e => onChange({ ...branding, descriptionAr: e.target.value })}
             rows={3}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
           />
         </div>
       </div>

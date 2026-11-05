@@ -1,0 +1,314 @@
+{
+  "shippingHub": {
+    "title": "Shipping and delivery",
+    "subtitle": "Set what you charge for shipping, who delivers, and when orders arrive",
+    "tabs": {
+      "label": "Shipping and delivery sections",
+      "rates": "Rates",
+      "carriers": "Carriers",
+      "delivery": "Delivery times",
+      "cod": "Cash-on-delivery collection"
+    },
+    "savedTitle": "Shipping saved",
+    "savedBody": "The return policy was updated.",
+    "saveLabel": "Save shipping"
+  },
+  "shipping": {
+    "areaRates": {
+      "moreMenu": "More rate options",
+      "firstRunTitle": "One price for all of Egypt?",
+      "firstRunHint": "Enter the shipping fee once and it applies to every governorate. You can change a single governorate later.",
+      "firstRunFee": "Shipping fee",
+      "firstRunFeePlaceholder": "e.g. 50",
+      "firstRunFreeOver": "Free shipping when the order is over (optional)",
+      "firstRunFreeOverPlaceholder": "e.g. 1000",
+      "firstRunSave": "Save this price for all of Egypt",
+      "perGovernorateTitle": "Different prices per governorate",
+      "perGovernorateHint": "Open a governorate and set the price of each area in it.",
+      "applyAllGlobal": "Apply one price to all governorates"
+    }
+  },
+  "checkoutDelivery": {
+    "page": {
+      "errorTitle": "Could not save",
+      "save": "Save delivery times",
+      "successMessage": "Delivery times saved",
+      "failedMessage": "Could not save the delivery settings. Try again.",
+      "connectionError": "Cannot reach the server right now. Try again.",
+      "noteSectionHint": "Shown to the customer at checkout, above the pay button.",
+      "minOrderSectionHint": "The customer cannot check out if the items total is below this amount. Leave empty or enter 0 for no minimum.",
+      "minOrderPlaceholder": "e.g. 500",
+      "addWindow": "Add a time slot",
+      "noWindowsYet": "No delivery time slots yet. Add the first one."
+    }
+  },
+  "branding": {
+    "page": {
+      "subtitle": "Name, logo, colors and contact details for {name}"
+    },
+    "actions": {
+      "save": "Save branding"
+    },
+    "messages": {
+      "saveFailedPrefix": "Could not save the branding",
+      "saveSuccessTitle": "Branding saved",
+      "saveSuccessBody": "All the changes were saved together."
+    },
+    "theme": {
+      "elsewhere": {
+        "title": "Other settings live where they belong",
+        "blog": "Turning the blog on is done from the blog page.",
+        "blogLink": "Open the blog",
+        "webPush": "Browser notifications for customers are turned on from the notifications page.",
+        "webPushLink": "Open notifications"
+      },
+      "advanced": {
+        "title": "Advanced: icon and footer looks",
+        "hint": "Rarely changed. The rest of the look details are in the editor."
+      },
+      "logoSize": {
+        "title": "Logo size",
+        "hint": "Pick the size of the logo at the top of the store.",
+        "auto": "Automatic",
+        "sm": "Small",
+        "md": "Medium",
+        "lg": "Large"
+      }
+    }
+  },
+  "blog": {
+    "page": {
+      "disabledTitle": "The blog is off right now",
+      "disabledBody": "Posts you write will not show to customers until you turn the blog on.",
+      "enableBlog": "Turn on the blog",
+      "enabledToast": "The blog is on",
+      "enableFailedTitle": "Could not turn on the blog",
+      "enableFailed": "Try again in a moment.",
+      "postDeleteObject": "The post \"{title}\"",
+      "postDeleteConsequence": "The post will be deleted for good and cannot be brought back.",
+      "postDeleteLabel": "Delete the post",
+      "postDeleted": "Post deleted",
+      "postDeleteFailedTitle": "Could not delete the post",
+      "postDeleteFailed": "Try again in a moment.",
+      "postMenu": "Post options",
+      "newPost": "Write a new post"
+    }
+  },
+  "seo": {
+    "page": {
+      "redirectsPrompt": "Want to send an old link to a new one?",
+      "manageRedirects": "Open redirects",
+      "faqsMovedLink": "Questions and answers are now under Content",
+      "generateWithAi": "Write the title and description for me",
+      "generating": "Writing...",
+      "aiGenerateTooltip": "AI writes a store title and description in Arabic and English, and only fills the empty fields.",
+      "aiFailedTitle": "Could not write the text",
+      "aiFailedBody": "Try again in a moment.",
+      "aiFilledTitle": "Text written",
+      "aiFilledBody": "Filled: {fields}. Review them, then save.",
+      "aiNothingToFillTitle": "No empty fields",
+      "aiNothingToFillBody": "Every field is filled. Clear the one you want to change and try again.",
+      "aiField": {
+        "metaTitle": "English title",
+        "metaTitleAr": "Arabic title",
+        "metaDescription": "English description",
+        "metaDescriptionAr": "Arabic description"
+      },
+      "languageGuardTitle": "An English field contains Arabic",
+      "languageGuardBody": "Write English in: {fields}. Arabic text belongs in the Arabic fields.",
+      "languageGuardField": {
+        "metaTitle": "English title",
+        "metaDescription": "English description",
+        "metaDescriptionAeo": "English AI answer"
+      },
+      "advancedGroup": "Advanced",
+      "aeoTitle": "The answers shown in ChatGPT",
+      "aeoHint": "Two plain sentences that describe your store, so AI assistants quote them when someone asks about you.",
+      "saveChanges": "Save search settings",
+      "successMessage": "Search settings saved",
+      "failedMessage": "Could not save the search settings",
+      "connectionError": "Cannot reach the server right now. Try again.",
+      "socialSaveError": "The Wikipedia or Wikidata link is not valid",
+      "redirectsDeleteObject": "This redirect",
+      "redirectsDeleteConsequence": "The old link stops sending visitors to the new one, and they will land on a page that does not exist.",
+      "redirectsDeleteLabel": "Delete the redirect"
+    }
+  },
+  "content": {
+    "faqsPage": {
+      "title": "Questions and answers",
+      "subtitle": "The questions your customers ask and step-by-step guides. They show in the store, in search results and in AI answers."
+    },
+    "list": {
+      "faqsLink": "Frequently asked questions live here.",
+      "newPage": "Add a page"
+    }
+  },
+  "paymentSettings": {
+    "page": {
+      "title": "Payment methods",
+      "subtitle": "Choose how customers pay, and turn each method on or off",
+      "intro": "Turn on any payment method to show it at checkout. Gateways need connection details from the provider's dashboard. Cash on delivery needs no connection, just turn it on.",
+      "testModeNote": "Try the connection in test mode first, then switch to live before you open to customers."
+    },
+    "strip": {
+      "title": "On right now",
+      "none": "No payment method is on. Turn one on here or add one below.",
+      "count": "{count} methods on",
+      "on": "On",
+      "off": "Off",
+      "addTitle": "Add a payment method",
+      "addHint": "Open a method, enter the connection details and test the connection before you turn it on."
+    },
+    "cod": {
+      "displayNamePlaceholder": "e.g. Cash on Delivery",
+      "displayNameArPlaceholder": "e.g. الدفع عند الاستلام"
+    },
+    "actions": {
+      "retry": "Try again"
+    }
+  },
+  "notifications": {
+    "page": {
+      "title": "Notifications",
+      "subtitle": "Choose what the customer is told and on which channel",
+      "channelsTitle": "Channel setup",
+      "channelsHint": "Connection details are entered once. You will not need to come back to them.",
+      "broadcastTitle": "Send a notification to all your customers now",
+      "broadcastHint": "For one-off messages such as offers, campaigns are the better tool.",
+      "campaignsLink": "Open campaigns"
+    },
+    "sms": {
+      "fields": {
+        "appSid": "App key from Unifonic",
+        "senderId": "Sender name the customer sees"
+      },
+      "placeholders": {
+        "appSid": "The key in your Unifonic account",
+        "senderId": "e.g. MyStore"
+      }
+    },
+    "webPush": {
+      "title": "Browser notifications for customers",
+      "hint": "Off by default. When on, customers can subscribe and get notifications in their browser (needs push notifications in your plan).",
+      "onToast": "Browser notifications are on",
+      "offToast": "Browser notifications are off",
+      "failedTitle": "Could not change browser notifications",
+      "failedBody": "Try again in a moment."
+    }
+  },
+  "tax": {
+    "steps": {
+      "label": "Tax setup steps",
+      "register": "Register the tax number",
+      "eta": "Connect e-invoicing",
+      "rates": "Set the rates",
+      "done": "done"
+    },
+    "page": {
+      "rateSaveFailed": "Could not save the rate",
+      "rateToggleFailed": "Could not change the rate status",
+      "rateDeleteFailed": "Could not delete the rate",
+      "rateDeleteObject": "The tax rate \"{name}\"",
+      "rateDeleteConsequence": "The rate is removed from the store and will not apply to any new order.",
+      "rateDeleteLabel": "Delete the rate"
+    }
+  },
+  "taxVerification": {
+    "documents": {
+      "deleteObject": "The document \"{name}\"",
+      "deleteConsequence": "The document is deleted for good from your tax file.",
+      "deleteLabel": "Delete the document"
+    }
+  },
+  "language": {
+    "page": {
+      "title": "Language",
+      "subtitle": "The language customers see first",
+      "save": "Save language",
+      "successMessage": "Store language saved",
+      "failedMessage": "Could not save the language",
+      "connectionError": "Cannot reach the server right now. Try again."
+    }
+  },
+  "domain": {
+    "page": {
+      "dnsPointingTitle": "The domain does not point to your store yet",
+      "dnsPointingMessage": "We confirmed the domain is yours, but its DNS records still point somewhere else. Anyone opening your domain now will not reach your store. Change the records below at your domain provider.",
+      "dnsWaitingTitle": "Waiting for DNS to update",
+      "dnsWaitingMessage": "Add the records below at your domain provider. The update can take up to 48 hours and we check automatically.",
+      "dnsEmailTitle": "Email records are still missing",
+      "dnsInstructions": "Add these DNS records at your domain provider:",
+      "copyAll": "Copy all records",
+      "copiedAll": "Records copied",
+      "emailInstructions": "Email these instructions to whoever manages the domain",
+      "emailSubject": "DNS records to connect the store domain",
+      "emailBody": "Please add these DNS records at the domain provider (type, name, value):",
+      "dnsPropagation": "DNS changes can take up to 48 hours.",
+      "removeObject": "The domain {domain}",
+      "removeConsequence": "The store goes back to its default link and this link will no longer open your store.",
+      "removeLabel": "Remove the domain"
+    }
+  },
+  "codes": {
+    "crossLink": {
+      "labels": {
+        "text": "Product labels are used while you count stock.",
+        "link": "Open stock"
+      },
+      "receipt": {
+        "text": "The receipt barcode shows on the orders you print.",
+        "link": "Open orders"
+      }
+    }
+  },
+  "pwa": {
+    "page": {
+      "title": "App on the customer's phone",
+      "subtitle": "Customers install your store on their phone screen like any app",
+      "advanced": "Advanced: the app file (manifest)",
+      "advancedHint": "This is what the browser reads to install the app. You rarely need to change anything here."
+    },
+    "actions": {
+      "switchTitle": "Turn the app on for your customers",
+      "enabled": "On",
+      "disabled": "Off",
+      "save": "Save the app"
+    }
+  },
+  "announcement": {
+    "page": {
+      "title": "Announcement bar",
+      "subtitle": "A short line above the whole store, like an offer or free shipping",
+      "saveChanges": "Save the announcement",
+      "successMessage": "Announcement saved",
+      "failedMessage": "Could not save the announcement",
+      "connectionError": "Cannot reach the server right now. Try again.",
+      "textEnglishPlaceholder": "Free shipping on orders over 500 EGP!",
+      "textArabicPlaceholder": "شحن ببلاش للطلبات فوق 500 جنيه!",
+      "linkTextEnglishPlaceholder": "Shop now",
+      "linkTextArabicPlaceholder": "اشتري دلوقتي"
+    }
+  },
+  "floatingWidget": {
+    "pageTitle": "Floating WhatsApp button",
+    "premiumSubtitle": "Extra feature",
+    "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
+    "saveChanges": "Save the buttons",
+    "savedToast": "Buttons saved",
+    "tooltipEnPlaceholder": "Text in English",
+    "tooltipArPlaceholder": "Text in Arabic"
+  },
+  "sizeCharts": {
+    "page": {
+      "deleteObject": "The size chart \"{name}\"",
+      "deleteConsequence": "Products and categories linked to it will show without a size chart.",
+      "deleteLabel": "Delete the chart"
+    },
+    "editor": {
+      "templateReplaceObject": "The ready-made template",
+      "templateReplace": "The template replaces the chart you are writing now.",
+      "templateReplaceLabel": "Replace with the template"
+    }
+  }
+}
