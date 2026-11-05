@@ -29,6 +29,7 @@ import { cli, fmtMs } from './lib/cli.mjs';
 import pg from 'pg';
 import { connectReadOnly } from './lib/pg.mjs';
 import { loadPlan } from './lib/plan.mjs';
+import { countsByTable } from './lib/counts.mjs';
 import { bindPlan, droppedColumnLoss, sourceDigest, sourcePages } from './lib/source.mjs';
 import { d1Query, d1QueryMany, d1Statements, lit } from './lib/d1.mjs';
 import { TableDigest } from '../../packages/cf-migrate/src/canon.mjs';
@@ -270,15 +271,18 @@ async function main() {
 
   const have = await marker();
   if (args.status) {
-    const counts = await d1QueryMany(
-      d,
-      tables.map(t => `SELECT count(*) AS n FROM ${q(t)}`)
+    const counts = countsByTable(
+      tables,
+      await d1QueryMany(
+        d,
+        tables.map(t => `SELECT count(*) AS n FROM ${q(t)}`)
+      )
     );
     const fr = await d1Query(d, `SELECT 1 AS n FROM system_settings WHERE key = ${lit(fkey)}`);
     console.log(
       `marker: ${have ? `PRESENT ${have.value} (${have.created_at})` : 'absent'}   freeze: ${fr.length ? 'ON' : 'off'}`
     );
-    tables.forEach((t, i) => console.log(`  ${t.padEnd(28)} D1 ${counts[i][0].n}`));
+    tables.forEach(t => console.log(`  ${t.padEnd(28)} D1 ${counts[t]}`));
     return;
   }
   if (args.commit && have)
@@ -352,9 +356,12 @@ async function main() {
       pgCounts[bt.name] = Number(
         (await client.query(`SELECT count(*) AS n FROM "${bt.origin}"`)).rows[0].n
       );
-    const d1Counts = await d1QueryMany(
-      d,
-      tables.map(t => `SELECT count(*) AS n FROM ${q(t)}`)
+    const d1Counts = countsByTable(
+      tables,
+      await d1QueryMany(
+        d,
+        tables.map(t => `SELECT count(*) AS n FROM ${q(t)}`)
+      )
     );
     let skippedDoReceipts = 0;
     if (args.family === 'payments' && doStores.size) {
@@ -375,9 +382,9 @@ async function main() {
         );
     }
     console.log(`family ${args.family}  marker: ${have ? 'PRESENT' : 'absent'}`);
-    fam.forEach((bt, i) =>
+    fam.forEach(bt =>
       console.log(
-        `  ${bt.name.padEnd(28)} PG ${String(pgCounts[bt.name]).padStart(7)}   D1 ${String(d1Counts[i][0].n).padStart(7)}`
+        `  ${bt.name.padEnd(28)} PG ${String(pgCounts[bt.name]).padStart(7)}   D1 ${String(d1Counts[bt.name]).padStart(7)}`
       )
     );
     const storeCols = fam

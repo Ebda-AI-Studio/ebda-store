@@ -55,7 +55,7 @@ CI job, can decrypt.
 ```bash
 # restore the newest dump into a scratch Postgres
 npx wrangler r2 object get ebda-db-backups/db/<YYYY>/<MM>/<file>.dump.age --file /tmp/x.dump.age --remote
-security find-generic-password -s ebda-db-backup-age-key -w > /tmp/k && age -d -i /tmp/k -o /tmp/x.dump /tmp/x.dump.age && rm -f /tmp/k
+node scripts/cf/lib/keychain.mjs ebda-db-backup-age-key --age > /tmp/k && age -d -i /tmp/k -o /tmp/x.dump /tmp/x.dump.age && rm -f /tmp/k
 pg_restore --no-owner --dbname "$SCRATCH_URL" /tmp/x.dump
 ```
 
