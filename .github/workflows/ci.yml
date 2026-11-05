@@ -974,7 +974,9 @@ jobs:
         (github.event_name != 'pull_request' && needs.build.result == 'success') ||
         (github.event_name == 'pull_request' && needs.changes.outputs.integration == 'true'))
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 25
+    # 40, not 25: the full suite (305 files + serial lane) reached its last lane and was cancelled at 25:01 on a
+    # hosted runner (run 42046806700, PR 437); a wide PR runs every integration file.
+    timeout-minutes: 40
     needs: [build, changes]
     services:
       postgres:
