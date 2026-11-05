@@ -52,38 +52,7 @@ fi
 # `lockf -k ~/.claude/locks/heavy-test.lock <cmd>`. The advisory AI/blast-radius steps below run AFTER the lock is released.
 bash scripts/ci/host-lock.sh bash scripts/ci/pre-push-gate.sh
 
-# --- Blast-radius + AI review: ALSO run locally before push (still run in CI too) ---
-# Corrected 2026-09-02 (adversarial audit): this used to claim blast-radius.yml /
-# scoped-audit.yml / ai-review.yml "moved OUT of CI" — false, verified all three still
-# trigger on `pull_request` in .github/workflows/. They run TWICE per PR: once here
-# (advisory, local) and once in CI (none of the three are required branch-protection
-# checks). This local pass is a fast local preview, not a CI replacement. Advisory +
-# non-blocking. Skip: SKIP_AI_GATE=1.
-if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
-  git fetch origin main -q 2>/dev/null || true
-  RANGE="origin/main...HEAD"
-
-  echo "-> AI-OS gate: blast-radius (graphify dependents of this diff, advisory)..."
-  if [ -x scripts/blast-radius.sh ]; then
-    bash scripts/blast-radius.sh ebda "$RANGE" . || echo "! blast-radius advisory failed (non-blocking)"
-  else
-    echo "! scripts/blast-radius.sh missing; skipping blast-radius"
-  fi
-
-  # AI review (advisory, never blocks, never silent): reviews only the commits being pushed (remote ref..HEAD), in chunks under
-  # a size cap, Opus for chunks touching critical paths (money, auth/identity, secrets, consent/erasure, tenancy, migrations,
-  # CI/hooks), Sonnet otherwise (AI_REVIEW_MODEL=opus|sonnet forces one). Unreviewed files get a LOUD warning + a log.
-  # Logic lives in scripts/ci/pre-push-ai-review.sh.
-  review_range="$RANGE"
-  push_line=$(printf '%s\n' "$PUSH_REFS" | awk -v b="refs/heads/$current_branch" '$3==b {print; exit}')
-  if [ -n "$push_line" ]; then
-    local_sha=$(printf '%s' "$push_line" | awk '{print $2}')
-    remote_sha=$(printf '%s' "$push_line" | awk '{print $4}')
-    case "$remote_sha" in *[!0]*) [ -n "$remote_sha" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null && review_range="$remote_sha..$local_sha" ;; esac
-    # New branch (remote sha all zeros) or unknown remote sha: commits not already on origin/main.
-    [ "$review_range" = "$RANGE" ] && review_range="origin/main..$local_sha"
-  fi
-  bash scripts/ci/pre-push-ai-review.sh "$review_range" "$current_branch" || echo "! AI review script errored (non-blocking)"
-fi
+# Local blast-radius + AI review REMOVED (Ahmad 2026-11-05, Ruling PREPUSH-AI-OFF-1): both run in CI on every PR
+# (blast-radius.yml, ai-review.yml); the local copies only duplicated them and queued every push 30-60 min.
 
 echo "OK pre-push CI gate passed -- push proceeding"
