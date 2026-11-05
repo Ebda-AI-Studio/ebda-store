@@ -844,10 +844,10 @@ router.get(
       const { storeId, orderId } = req.params;
       const user = req.user;
 
-      const { prisma } = await import('@ebda/database');
-
-      // Fetch order to verify ownership
-      const order = await prisma.order.findFirst({
+      // Fetch order to verify ownership (store DO; Postgres is gone)
+      const order = await (
+        await storeDb(storeId)
+      ).order.findFirst({
         where: { id: orderId, storeId },
         select: { id: true, customerId: true, orderNumber: true },
       });

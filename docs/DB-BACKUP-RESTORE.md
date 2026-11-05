@@ -44,6 +44,8 @@ node scripts/ops/restore-drill.mjs --extract ./restore --tier monthly --day 2026
 
 **A. D1 into a NEW database (provider-loss or "I do not trust the old one")**
 
+The D1 artifact is **order-safe**: `wrangler d1 export` writes tables alphabetically with rows interleaved, so a child row can precede its parent table and a plain `wrangler d1 execute --file` fails with `no such table: main.stores` (the first real drill, 2026-11-05). The backup now rewrites the artifact (`normalizeD1Sql`: `defer_foreign_keys`, all CREATE TABLEs parents-first, then rows, then indexes/triggers) and the drill and `--extract` normalize older artifacts too, so the extracted `.sql` always loads with the plain command below. Verified with real `wrangler d1 execute --local`: raw failed, normalized ran 131 commands.
+
 ```bash
 npx wrangler d1 create ebda-platform-restore
 npx wrangler d1 execute ebda-platform-restore --remote --file ./restore/d1-ebda-platform.sql
