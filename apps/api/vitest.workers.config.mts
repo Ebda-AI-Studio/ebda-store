@@ -106,6 +106,8 @@ export default defineConfig(async () => {
             STORE_SCHEDULE: { className: 'StoreSchedule', scriptName: 'api', useSQLite: true },
           },
           kvNamespaces: { KV_CACHE: 'kv-cache' },
+          // the same bucket the API Worker's backup sweep writes (route-sweep.test.ts reads its report)
+          r2Buckets: { STORE_BACKUPS: 'store-backups' },
           // Background jobs (G5): the Workflow class and the gate DO live in the built `api` Worker.
           workflows: {
             JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow', scriptName: 'api' },

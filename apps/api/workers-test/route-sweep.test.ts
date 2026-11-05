@@ -597,6 +597,29 @@ describe.skipIf(e.E2E_DB === '1')(
               })
             ).json()) as { reaches: Array<{ label: string; stack: string }> }
           ).reaches;
+        // The nightly backup sweep reports a store with no manifest from YESTERDAY as missing. Every store in this run is minutes
+        // old, so give each one yesterday's manifest: the sweep then measures the job, not the age of the fixture.
+        const bucket = (
+          env as unknown as {
+            STORE_BACKUPS: {
+              put(k: string, v: string): Promise<unknown>;
+              get(k: string): Promise<{ text(): Promise<string> } | null>;
+            };
+          }
+        ).STORE_BACKUPS;
+        const day = (d: Date) => d.toISOString().slice(0, 10);
+        const yesterday = day(new Date(Date.now() - 86_400_000));
+        const stores = (
+          await (
+            e.PLATFORM_DB as unknown as {
+              prepare(s: string): { all<T>(): Promise<{ results: T[] }> };
+            }
+          )
+            .prepare("SELECT id FROM stores WHERE storage_backend = 'do'")
+            .all<{ id: string }>()
+        ).results;
+        for (const s of stores)
+          await bucket.put(`store-do-backups/${s.id}/${yesterday}/manifest.json`, '{}');
         await pgReaches(true);
         for (const cron of crons) {
           const t0 = Date.now();
@@ -620,6 +643,18 @@ describe.skipIf(e.E2E_DB === '1')(
           // eslint-disable-next-line no-console
           console.log('SWEEP_RESULT ' + JSON.stringify(r));
         }
+        const report = await bucket.get(`ops-reports/backup-sweep/${day(new Date())}.json`);
+        const backup = report
+          ? (JSON.parse(await report.text()) as {
+              ok: boolean;
+              stores: { errors: string[]; missingYesterday: string[] };
+              d1: Record<string, { ok: boolean; error?: string }>;
+            })
+          : null;
+        // eslint-disable-next-line no-console
+        console.log('SWEEP_BACKUP_REPORT ' + JSON.stringify(backup));
+        expect(backup, 'the 03:00 cron wrote the backup sweep report').not.toBeNull();
+        expect(backup!.ok, JSON.stringify(backup)).toBe(true);
         // Postgres is dead for a DO store: NO cron job may reach it. The allowlist is EMPTY (Ruling NZ-PG-8); an entry would
         // have to name the job and a reason a DO store still needs Postgres, which is a defect to port, not to allow.
         const reached = (await pgReaches(false)).filter(
