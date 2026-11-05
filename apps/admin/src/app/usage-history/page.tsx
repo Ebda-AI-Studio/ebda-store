@@ -135,7 +135,7 @@ function UsageHistoryInner() {
       cell: r => (
         <div>
           <div className="font-medium text-foreground">{r.name}</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {r.slug} · {r.plan}
           </div>
         </div>
@@ -199,11 +199,9 @@ function UsageHistoryInner() {
       cell: r => (
         <div className="tabular-nums">
           <div>{r.aiCalls.toLocaleString(undefined, withNumerals())}</div>
-          <div className="text-[11px] text-muted-foreground">
-            {formatSpend(Number(r.aiCostMicros))}
-          </div>
+          <div className="text-xs text-muted-foreground">{formatSpend(Number(r.aiCostMicros))}</div>
           {r.aiUnpricedCalls > 0 && (
-            <div className="text-[11px] text-amber-600 dark:text-amber-500">
+            <div className="text-xs text-warning-ink">
               {t('table.aiUnpriced', {
                 count: r.aiUnpricedCalls.toLocaleString(undefined, withNumerals()),
               })}

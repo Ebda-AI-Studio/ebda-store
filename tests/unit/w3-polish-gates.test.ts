@@ -39,7 +39,9 @@ describe('M-04: no transition-all in the storefront (it animates layout and ever
   it('storefront sources and globals.css name the properties they animate', () => {
     const hits = [...files(), path.join(WEB, 'styles/globals.css')]
       .filter(
-        f => !f.includes(`${path.sep}landing${path.sep}`) && !f.endsWith('liquid-glass-button.tsx')
+        f =>
+          !path.relative(WEB, f).split(path.sep).includes('landing') &&
+          !f.endsWith('liquid-glass-button.tsx')
       )
       .filter(f => /\btransition-all\b/.test(readFileSync(f, 'utf8').replace(/\/\/.*$/gm, '')))
       .map(f => path.relative(WEB, f));

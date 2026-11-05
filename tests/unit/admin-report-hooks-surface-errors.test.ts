@@ -54,8 +54,9 @@ const cases: Array<{
   loadingKey: string;
 }> = [
   {
+    // /cashflow is excluded on purpose: its 402/403 is a LOCKED card (BE:S-4), covered in useAnalytics.test.ts.
     name: 'useAnalytics (one of six calls fails)',
-    needle: '/cashflow',
+    needle: '/top-products',
     run: () =>
       renderHook(() => useAnalytics({ storeId: 's1', period: 'this_month' })).result as never,
     loadingKey: 'isLoading',

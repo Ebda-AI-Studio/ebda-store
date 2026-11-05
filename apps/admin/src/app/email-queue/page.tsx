@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { withNumerals } from '@ebda/shared';
 
 /**
@@ -29,6 +30,7 @@ interface FailedEmail {
 
 export default function EmailQueuePage() {
   const t = useT('emailQueue');
+  const askConfirm = useConfirm();
   const [emails, setEmails] = useState<FailedEmail[]>([]);
   const [stats, setStats] = useState<{ pending: number; failed: number; corrupt?: number } | null>(
     null
@@ -50,7 +52,7 @@ export default function EmailQueuePage() {
         emails: FailedEmail[];
         stats: { pending: number; failed: number; corrupt?: number };
         corrupt?: Array<{ position: number; bytes: number }>;
-      }>('/admin/email-queue/failed?limit=100');
+      }>('/api/v1/admin/email-queue/failed?limit=100');
       setLoadError(!!error);
       setEmails(data?.emails || []);
       setStats(data?.stats ?? null);
@@ -68,12 +70,18 @@ export default function EmailQueuePage() {
   }, [fetchFailed]);
 
   const retryAll = async () => {
-    if (!window.confirm(t('confirmRetry'))) return;
+    const ok = await askConfirm({
+      object: t('confirmRetryObject'),
+      consequence: t('confirmRetry'),
+      confirmLabel: t('retryAll'),
+      tone: 'default',
+    });
+    if (!ok) return;
     setRetrying(true);
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
     const res = await apiPost<{ retried: number; skipped?: number; kept?: number }>(
-      '/admin/email-queue/failed/retry',
+      '/api/v1/admin/email-queue/failed/retry',
       {}
     );
     if (res.error) {
@@ -95,10 +103,18 @@ export default function EmailQueuePage() {
   // Issue 2353: unreadable entries set aside by "Retry all" — they cannot be
   // replayed, so the only actions are to see how many there are and discard.
   const discardCorrupt = async () => {
-    if (!window.confirm(t('corrupt.confirmDiscard'))) return;
+    const ok = await askConfirm({
+      object: t('corrupt.discardObject'),
+      consequence: t('corrupt.confirmDiscard'),
+      confirmLabel: t('corrupt.discard'),
+    });
+    if (!ok) return;
     setDiscarding(true);
     setMessage(null);
-    const res = await apiPost<{ discarded: number }>('/admin/email-queue/corrupt/discard', {});
+    const res = await apiPost<{ discarded: number }>(
+      '/api/v1/admin/email-queue/corrupt/discard',
+      {}
+    );
     if (res.error) {
       setMessage(t('retryFailed', { message: res.error.message || 'error' }));
     } else {

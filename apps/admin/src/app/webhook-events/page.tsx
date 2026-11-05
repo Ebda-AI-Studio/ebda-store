@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { withNumerals } from '@ebda/shared';
 
@@ -41,6 +42,7 @@ function statusVariant(status: string): 'success' | 'warning' | 'destructive' | 
 
 export default function WebhookEventsPage() {
   const t = useT('webhookEvents');
+  const askConfirm = useConfirm();
   const [events, setEvents] = useState<WebhookEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -61,7 +63,7 @@ export default function WebhookEventsPage() {
     try {
       const qs = status ? `?status=${encodeURIComponent(status)}&limit=100` : '?limit=100';
       const { data, error } = await apiGet<{ events: WebhookEvent[] }>(
-        `/admin/webhook-events${qs}`
+        `/api/v1/admin/webhook-events${qs}`
       );
       if (!isLatest()) return;
       setLoadError(!!error);
@@ -84,13 +86,22 @@ export default function WebhookEventsPage() {
     setReplaying(id);
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
-    const res = await apiPost(`/admin/webhook-events/${id}/replay`, force ? { force: true } : {});
+    const res = await apiPost(
+      `/api/v1/admin/webhook-events/${id}/replay`,
+      force ? { force: true } : {}
+    );
     if (res.error) {
       // Money-path guard: an already-processed webhook needs explicit confirm
       // before re-firing the payment event (idempotency-safe, but deliberate).
       if (!force && res.error.code === 'WEBHOOK_ALREADY_PROCESSED') {
         setReplaying(null);
-        if (window.confirm(t('confirmAlreadyProcessed'))) {
+        const ok = await askConfirm({
+          object: t('replayObject'),
+          consequence: t('confirmAlreadyProcessed'),
+          confirmLabel: t('replayAction'),
+          tone: 'default',
+        });
+        if (ok) {
           return replay(id, true);
         }
         setMessage(t('replayCancelled'));

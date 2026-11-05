@@ -113,3 +113,34 @@ describe('useAnalytics sends the selected range', () => {
     expect(result.current.stats?.totalRevenue).toBe(222);
   });
 });
+
+describe('useAnalytics: owner + accounting-only cashflow (BE:S-4)', () => {
+  const refusal = (status: number, code: string) => ({
+    data: null,
+    error: { code, message: 'raw api text', status },
+  });
+
+  it.each([
+    ['plan refusal', 402, 'PLAN_REQUIRED'],
+    ['feature off', 403, 'FEATURE_DISABLED'],
+    ['role refusal', 403, 'FORBIDDEN'],
+  ])('a cashflow %s is a locked card, not an error banner', async (_n, status, code) => {
+    apiGet.mockImplementation(async (url: string) =>
+      url.includes('/cashflow') ? refusal(status, code) : ok(url)
+    );
+    const { result } = renderHook(() => useAnalytics({ storeId: 's1', period: 'this_month' }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.cashflowLocked).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('a server error on cashflow is still an error, not a lock', async () => {
+    apiGet.mockImplementation(async (url: string) =>
+      url.includes('/cashflow') ? refusal(500, 'SERVER_ERROR') : ok(url)
+    );
+    const { result } = renderHook(() => useAnalytics({ storeId: 's1', period: 'this_month' }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.cashflowLocked).toBe(false);
+    expect(result.current.error).toBe('raw api text');
+  });
+});

@@ -22,7 +22,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ebda-web-isr-cache" }],
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Launch traffic: Workers Logs head-sample 10% (cost). Logpush below is the full archive; Sentry catches 100% of errors.
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
   "logpush": true,
   "routes": [
     // Store subdomains only — the apex belongs to ebda-marketing (scripts/cf-routes.cjs).

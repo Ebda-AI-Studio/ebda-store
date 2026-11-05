@@ -1,0 +1,7 @@
+# PERF-TIMEOUTS-1
+
+> Section: pre-launch performance, queued item PERF-TIMEOUTS
+
+**Ruling PERF-TIMEOUTS-1 - every outbound HTTP or SDK call from `apps/api` has a deadline: `fetchWithTimeout` (`apps/api/src/lib/fetch-timeout.ts`, default 15 s, `timeoutMs` per call, 60 s `LLM_FETCH_TIMEOUT_MS` for model calls), or an explicit `signal` / `AbortSignal.timeout` in the init.**
+Evidence: of ~50 global `fetch(` sites, payments (`callProvider`), carriers (`carrier-http`), OneSignal, Cloudflare domains, ad pixels, SMS account-info and webhooks already had deadlines; 11 did not (`safeFetch` for every merchant-supplied URL, the ETA client, the three answer-engine model providers, Search Console, Unifonic send, the image-variant backfill, PostHog erasure, the realtime access check), and every Gemini SDK call went through `GeminiFailoverClient` without a request timeout. All now time out; the SDK gets `{ timeout: LLM_FETCH_TIMEOUT_MS }` in the one place it is constructed. `tests/unit/external-fetch-has-timeout.test.ts` fails a bare `fetch(` in `apps/api/src` unless it is in a short, justified allow-list (callers that inject their own signal), and fails an allow-list entry that stopped needing its exemption. Meta/WhatsApp calls no longer live in the API (Ebda Chat owns them).
+Cost if wrong: a slow-but-healthy provider answering after 15 s (60 s for models) is reported as a timeout and retried or surfaced as a failure; raise `timeoutMs` at that one call.

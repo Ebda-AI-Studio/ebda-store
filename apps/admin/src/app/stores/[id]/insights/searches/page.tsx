@@ -114,7 +114,7 @@ export default function InsightsSearchesPage() {
       alignEnd: true,
       cell: row => (
         <span
-          className={`font-mono tabular-nums ${row.zeroResults > 0 ? 'text-amber-700 dark:text-amber-500 font-semibold' : 'text-muted-foreground'}`}
+          className={`font-mono tabular-nums ${row.zeroResults > 0 ? 'text-warning-ink font-semibold' : 'text-muted-foreground'}`}
         >
           {row.zeroResults}
         </span>
@@ -160,7 +160,7 @@ export default function InsightsSearchesPage() {
               })}
             </span>
             {data.index.failed > 0 && (
-              <span className="tabular-nums text-amber-700 dark:text-amber-500">
+              <span className="tabular-nums text-warning-ink">
                 {' · '}
                 {t('indexFailed', { failed: String(data.index.failed) })}
               </span>

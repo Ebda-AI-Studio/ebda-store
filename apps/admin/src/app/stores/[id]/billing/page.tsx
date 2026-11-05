@@ -27,6 +27,8 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
+import { DataTable } from '@/components/mobile/DataTable';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
 import { SupportLink } from '../../../../components/billing/SupportLink';
 import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
@@ -127,7 +129,7 @@ function UsageBar({
   const pct =
     limit === null ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
   const tone =
-    limit !== null && used > limit ? 'bg-destructive' : pct >= 80 ? 'bg-amber-500' : 'bg-primary';
+    limit !== null && used > limit ? 'bg-destructive' : pct >= 80 ? 'bg-warning' : 'bg-primary';
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
@@ -158,6 +160,7 @@ export default function StoreBillingPage() {
   const storeId = params?.id as string;
   const t = useT('billing');
   const tCommon = useT('common');
+  const askConfirm = useConfirm();
   const tLimits = useT('plans.limits');
   const tNotice = useT('billing.notice');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
@@ -338,7 +341,12 @@ export default function StoreBillingPage() {
   }
 
   async function cancelPlan() {
-    if (!window.confirm(t('confirmCancel'))) return;
+    const ok = await askConfirm({
+      object: t('cancelObject'),
+      consequence: t('confirmCancel'),
+      confirmLabel: t('cancelAction'),
+    });
+    if (!ok) return;
     setBusy('cancel');
     try {
       const { data: d, error: e } = await apiPost<{ mode: 'at_period_end' | 'immediate' }>(
@@ -539,7 +547,7 @@ export default function StoreBillingPage() {
           {payOnOtherStore && (
             <div
               role="alert"
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+              className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
             >
               <p className="font-semibold">
                 {t(data.payOnStoreIncluded ? 'payOnStoreIncludedTitle' : 'payOnStoreTitle')}
@@ -562,7 +570,7 @@ export default function StoreBillingPage() {
               className={`rounded-xl border p-4 text-sm ${
                 noticeUrgent
                   ? 'border-destructive/40 bg-destructive/10 text-destructive-ink'
-                  : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200'
+                  : 'border-warning/30 bg-warning/10 text-warning-ink'
               }`}
             >
               <p className="font-semibold">{noticeCopy.title}</p>
@@ -624,7 +632,7 @@ export default function StoreBillingPage() {
           {overOrders && (
             <div
               role="alert"
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+              className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
             >
               <p className="font-semibold">{t('overLimit.title')}</p>
               <p className="mt-1">
@@ -1182,80 +1190,83 @@ export default function StoreBillingPage() {
             {charges.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('invoicesEmpty')}</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-start text-xs text-muted-foreground">
-                      <th className="py-2 pe-3 text-start font-medium">{t('invoiceCols.date')}</th>
-                      <th className="py-2 pe-3 text-start font-medium">
-                        {t('invoiceCols.description')}
-                      </th>
-                      <th className="py-2 pe-3 text-start font-medium">
-                        {t('invoiceCols.amount')}
-                      </th>
-                      <th className="py-2 pe-3 text-start font-medium">
-                        {t('invoiceCols.status')}
-                      </th>
-                      <th className="hidden py-2 text-start font-medium sm:table-cell">
-                        {t('invoiceCols.reason')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {charges.map(c => (
-                      <tr key={c.id} className="border-b last:border-0">
-                        <td className="py-2 pe-3 text-muted-foreground">{fmtDate(c.createdAt)}</td>
-                        <td className="py-2 pe-3">
-                          {t(`invoiceTypes.${c.type}`)}
-                          {c.planCode ? ` · ${c.planCode}` : ''}
-                          {c.type === 'renewal' && c.attempt > 0
-                            ? ` · ${t('retryN', { n: c.attempt })}`
-                            : ''}
-                        </td>
-                        <td className="py-2 pe-3 tabular-nums">
-                          {c.type === 'refund' ? '−' : ''}
-                          {formatMoney(c.amountMinor, locale, { fixedDecimals: true })}
-                          {c.vat && (c.vatMinor ?? 0) > 0 && (
-                            <span className="block text-xs text-muted-foreground">
-                              {t('invoiceVat', {
-                                rate: c.vat.rateBps / 100,
-                                vat: formatMoney(c.vatMinor ?? 0, locale, { fixedDecimals: true }),
-                              })}
-                              {c.vat.trn ? ` · ${t('invoiceTrn', { trn: c.vat.trn })}` : ''}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2 pe-3">
-                          <Badge
-                            variant={
-                              c.status === 'succeeded'
-                                ? 'success'
-                                : c.status === 'failed'
-                                  ? 'destructive'
-                                  : 'secondary'
-                            }
-                          >
-                            {t(`invoiceStatuses.${c.status}`)}
-                          </Badge>
-                        </td>
-                        <td className="hidden py-2 text-muted-foreground sm:table-cell">
-                          {c.status === 'succeeded' && c.type !== 'refund' ? (
-                            <button
-                              type="button"
-                              onClick={() => setReceiptFor(receiptFor === c.id ? null : c.id)}
-                              className="text-xs font-medium text-primary-ink underline"
-                            >
-                              {t('viewReceipt')}
-                            </button>
-                          ) : (
-                            (c.failureReason ?? '—')
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<Charge>
+                ariaLabel={t('invoicesTitle')}
+                columns={[
+                  {
+                    header: t('invoiceCols.date'),
+                    primaryOnMobile: true,
+                    cell: c => (
+                      <span className="text-muted-foreground">{fmtDate(c.createdAt)}</span>
+                    ),
+                  },
+                  {
+                    header: t('invoiceCols.description'),
+                    cell: c => (
+                      <span>
+                        {t(`invoiceTypes.${c.type}`)}
+                        {c.planCode ? ` · ${c.planCode}` : ''}
+                        {c.type === 'renewal' && c.attempt > 0
+                          ? ` · ${t('retryN', { n: c.attempt })}`
+                          : ''}
+                      </span>
+                    ),
+                  },
+                  {
+                    header: t('invoiceCols.amount'),
+                    cell: c => (
+                      <span className="tabular-nums">
+                        {c.type === 'refund' ? '−' : ''}
+                        {formatMoney(c.amountMinor, locale, { fixedDecimals: true })}
+                        {c.vat && (c.vatMinor ?? 0) > 0 && (
+                          <span className="block text-xs text-muted-foreground">
+                            {t('invoiceVat', {
+                              rate: c.vat.rateBps / 100,
+                              vat: formatMoney(c.vatMinor ?? 0, locale, { fixedDecimals: true }),
+                            })}
+                            {c.vat.trn ? ` · ${t('invoiceTrn', { trn: c.vat.trn })}` : ''}
+                          </span>
+                        )}
+                      </span>
+                    ),
+                  },
+                  {
+                    header: t('invoiceCols.status'),
+                    mobileBadge: true,
+                    cell: c => (
+                      <Badge
+                        variant={
+                          c.status === 'succeeded'
+                            ? 'success'
+                            : c.status === 'failed'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {t(`invoiceStatuses.${c.status}`)}
+                      </Badge>
+                    ),
+                  },
+                  {
+                    header: t('invoiceCols.reason'),
+                    mobileActions: true,
+                    cell: c =>
+                      c.status === 'succeeded' && c.type !== 'refund' ? (
+                        <button
+                          type="button"
+                          onClick={() => setReceiptFor(receiptFor === c.id ? null : c.id)}
+                          className="inline-flex min-h-11 items-center text-xs font-medium text-primary-ink underline"
+                        >
+                          {t('viewReceipt')}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">{c.failureReason ?? '—'}</span>
+                      ),
+                  },
+                ]}
+                rows={charges}
+                rowKey={c => c.id}
+              />
             )}
           </section>
 

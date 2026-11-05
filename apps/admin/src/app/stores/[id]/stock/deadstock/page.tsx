@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
@@ -113,7 +114,7 @@ function FlagCard({
         </div>
         <div>
           <span className="text-muted-foreground">{t('card.suggestedDiscount')}: </span>
-          <span className="font-medium text-amber-700">{discountPct}%</span>
+          <span className="font-medium text-warning-ink">{discountPct}%</span>
         </div>
       </div>
 
@@ -286,8 +287,9 @@ export default function DeadstockPage() {
               disabled={meta.page === 1}
               onClick={() => load(meta.page - 1)}
               className="px-3 py-1 rounded border border-border disabled:opacity-40"
+              aria-label={t('pagePrev')}
             >
-              ←
+              <ArrowStart />
             </button>
             <span className="text-muted-foreground">
               {meta.page} / {meta.totalPages}
@@ -297,8 +299,9 @@ export default function DeadstockPage() {
               disabled={meta.page >= meta.totalPages}
               onClick={() => load(meta.page + 1)}
               className="px-3 py-1 rounded border border-border disabled:opacity-40"
+              aria-label={t('pageNext')}
             >
-              →
+              <ArrowEnd />
             </button>
           </div>
         )}

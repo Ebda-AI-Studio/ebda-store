@@ -184,7 +184,7 @@ function PlansInner() {
       cell: p => (
         <div>
           <div className="font-medium text-foreground">{locale === 'ar' ? p.nameAr : p.nameEn}</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {p.code} · {p.featureTier}
           </div>
         </div>

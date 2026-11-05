@@ -12,7 +12,7 @@
  * Mount below the SEO section in the product edit page.
  */
 
-import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button, Input, Textarea, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
@@ -61,12 +61,18 @@ export interface ProductFaqSectionHandle {
   generateWithAi: () => Promise<boolean>;
 }
 
+const UNDO_WINDOW_MS = 6000;
+
 export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
   function ProductFaqSection({ storeId, productId }, ref) {
     const t = useT('products.edit.faqs');
     const tBadge = useT('products.aiFieldBadge');
     const tCommon = useT('common');
-    const { success: toastSuccess, error: toastError } = useToast();
+    const { success: toastSuccess, error: toastError, addToast } = useToast();
+    // Delete = undo window, not a native confirm (rule 7: reversible actions offer undo).
+    const pendingDeletes = useRef(
+      new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }>()
+    );
 
     const [faqs, setFaqs] = useState<ProductFaq[]>([]);
     const [loading, setLoading] = useState(true);
@@ -163,17 +169,55 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
 
     // ── Delete ────────────────────────────────────────────────────────────
 
-    async function deleteFaq(id: string) {
-      if (!confirm(t('deleteConfirm'))) return;
+    async function commitDelete(id: string) {
       const { error } = await apiDelete(
         `/api/v1/stores/${storeId}/products/${productId}/faqs/${id}`
       );
-      if (error) {
-        toastError(t('deleteError'), '');
-        return;
-      }
-      setFaqs(prev => prev.filter(f => f.id !== id));
+      if (error) toastError(t('deleteError'), '');
     }
+
+    function deleteFaq(id: string) {
+      const index = faqs.findIndex(f => f.id === id);
+      const removed = faqs[index];
+      if (!removed || pendingDeletes.current.has(id)) return;
+      setFaqs(prev => prev.filter(f => f.id !== id));
+      const run = async () => {
+        pendingDeletes.current.delete(id);
+        await commitDelete(id);
+      };
+      const timer = setTimeout(() => void run(), UNDO_WINDOW_MS);
+      pendingDeletes.current.set(id, { timer, run });
+      addToast({
+        type: 'info',
+        title: t('deletedToast'),
+        duration: UNDO_WINDOW_MS,
+        action: {
+          label: t('undo'),
+          onClick: () => {
+            const pending = pendingDeletes.current.get(id);
+            if (!pending) return;
+            clearTimeout(pending.timer);
+            pendingDeletes.current.delete(id);
+            setFaqs(prev => {
+              const next = [...prev];
+              next.splice(Math.min(index, next.length), 0, removed);
+              return next;
+            });
+          },
+        },
+      });
+    }
+
+    // Leaving the page inside the undo window must not silently keep a row the merchant deleted.
+    useEffect(() => {
+      const pending = pendingDeletes.current;
+      return () => {
+        pending.forEach(p => {
+          clearTimeout(p.timer);
+          void p.run();
+        });
+      };
+    }, []);
 
     // ── AI generation ─────────────────────────────────────────────────────
 

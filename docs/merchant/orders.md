@@ -103,3 +103,13 @@ When accounting is on, every refund is recorded in your ledger the way the money
 - **إرجاع جزء من الطلب** — تُخصم الأصناف المرتجعة من مبيعاتك. ويُسجَّل ما استرده العميل حيث ذهب: إلى **بطاقته / بوابة الدفع**، أو إلى **محفظته** (رصيد أصبحت مدينًا له به)، أو كـ**رصيد متجر** تمنحه بنفسك (رصيد مستحق أيضًا). والمبلغ المسجّل هو المبلغ المسترد فعلًا.
 - **طلب دُفع جزء منه من المحفظة** — عند استرداد جزء منه إلى "طريقة الدفع الأصلية" يعود بالطريقة نفسها التي دُفع بها: حصة المحفظة إلى المحفظة، والباقي إلى البطاقة. تعرض نافذة التأكيد المبلغين قبل إرسال أي شيء.
 - **استرداد جزئي بدون إرجاع** (مثل استرداد أجريته من لوحة مزوّد الدفع، أو مبلغ جزئي من صفحة الطلب) — يُسجَّل كاسترداد من الإيرادات بالمبلغ نفسه تمامًا. لا يتحرك المخزون. ولا يُسجَّل الاسترداد نفسه مرتين مهما كرّر المزوّد الإبلاغ عنه.
+
+---
+
+## Where the buttons are (admin fix pass) — مكان الأزرار
+
+- **Orders list:** one main button, **طلب تليفون جديد**. Export to Excel (owners only) is in the **...** menu next to it. There is no "back to store" button; use the Sales tab strip.
+- **Order page:** reading order is the items and totals, then the customer and delivery, then payment, shipment, notes and documents. The bottom bar has the next step (for example **علّم الطلب مدفوع** or the next status). **Cancel the order**, the refund buttons, "refresh payment" and print live in the **...** menu, and cancelling asks you to confirm by naming the order.
+
+- **قائمة الطلبات:** زرار رئيسي واحد **طلب تليفون جديد**. تنزيل Excel (للمالك بس) في قايمة **...** جنبه. مفيش زرار "رجوع للمتجر"، استخدم تبويبات المبيعات.
+- **صفحة الطلب:** الترتيب: المنتجات والإجمالي، بعدين العميل والتوصيل، بعدين الدفع والشحن والملاحظات والمستندات. الشريط اللي تحت فيه الخطوة الجاية. **ألغي الطلب** وأزرار الاسترداد والطباعة جوه قايمة **...**، والإلغاء بيسألك وبيذكر اسم الطلب.

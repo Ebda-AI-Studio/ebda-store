@@ -22,6 +22,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => () => Promise.resolve(true) }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/lib/format', () => ({ minorToMajor: (n: number) => String(n) }));
 vi.mock('@/components/AdminLayout', () => ({

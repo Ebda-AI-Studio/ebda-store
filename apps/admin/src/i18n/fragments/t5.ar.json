@@ -1,0 +1,310 @@
+{
+  "products": {
+    "new": {
+      "title": "منتج جديد",
+      "subtitle": "ابدأ بالأساسيات، وكمّل الباقي بعد ما تضيف المنتج",
+      "sections": {
+        "essentials": "الأساسيات",
+        "moreDetails": "تفاصيل أكتر",
+        "moreDetailsHint": "الوصف، الخصم، التكلفة، كلمات البحث والشارة. مش لازمين دلوقتي.",
+        "englishCopy": "نسخة إنجليزية (اختياري)",
+        "arabicCopy": "نسخة عربية (اختياري)",
+        "badge": "شارة على بطاقة المنتج",
+        "pricing": "الخصم والتكلفة",
+        "inventory": "المخزون"
+      },
+      "fields": {
+        "nameArOptional": "اسم المنتج بالعربي (اختياري)",
+        "nameOptional": "اسم المنتج بالإنجليزي (اختياري)",
+        "nameAr": "اسم المنتج",
+        "name": "اسم المنتج",
+        "nameArPlaceholder": "مثلاً: قميص قطن أبيض",
+        "namePlaceholder": "e.g. White cotton shirt",
+        "descriptionArPlaceholder": "اكتب وصف المنتج",
+        "descriptionPlaceholder": "Describe the product",
+        "mediaHint": "اسحب الصور هنا أو اضغط عشان تختارها",
+        "badgeLabel": "الشارة بالإنجليزي",
+        "badgeLabelAr": "الشارة بالعربي",
+        "badgeLabelHint": "كلمة قصيرة تظهر على بطاقة المنتج وصفحته. سيبها فاضية لو مش عايز شارة. 32 حرف بحد أقصى.",
+        "descriptionAr": "الوصف بالعربي",
+        "description": "الوصف بالإنجليزي",
+        "pricingHint": "الأسعار بالجنيه المصري. لو حطيت خصم، المتجر هيعرض السعر قبل الخصم مشطوب تلقائي.",
+        "category": "القسم",
+        "noCategory": "من غير قسم",
+        "productStatus": "الحالة"
+      },
+      "statusOptions": {
+        "draft": "مسودة (مش ظاهر في المتجر)",
+        "active": "ظاهر في المتجر",
+        "archived": "مؤرشف"
+      },
+      "actions": {
+        "create": "ضيف المنتج",
+        "cancel": "إلغاء"
+      },
+      "errors": {
+        "createFailed": "معرفناش نضيف المنتج. جرّب تاني.",
+        "priceMin": "السعر لازم يكون أكتر من صفر."
+      },
+      "toast": {
+        "created": "اتضاف المنتج"
+      }
+    },
+    "edit": {
+      "manageVariants": "ضيف المتغيرات",
+      "recommendations": "المنتجات المقترحة معاه",
+      "viewInStore": "شوف في المتجر",
+      "moreMenu": "خيارات تانية للمنتج",
+      "updateFailed": "معرفناش نحفظ التعديلات. جرّب تاني.",
+      "createdBanner": "اتضاف المنتج. الخطوة الجاية: لو ليه مقاسات أو ألوان ضيفها.",
+      "addVariants": "ضيف المتغيرات",
+      "toast": {
+        "saved": "اتحفظ المنتج"
+      },
+      "actions": {
+        "saveProduct": "احفظ المنتج",
+        "saveChanges": "احفظ التعديلات",
+        "cancel": "إلغاء"
+      },
+      "fields": {
+        "priceMinError": "السعر لازم يكون أكتر من صفر."
+      },
+      "faqs": {
+        "deletedToast": "اتمسح السؤال",
+        "undo": "تراجع"
+      },
+      "tabs": {
+        "label": "أقسام صفحة المنتج",
+        "edit": "تعديل",
+        "overview": "نظرة عامة"
+      },
+      "deleteDialog": {
+        "object": "المنتج «{name}»",
+        "consequence": "هيتشال من المتجر ومن الطلبات الجديدة، ومش هتقدر ترجّعه.",
+        "confirmLabel": "امسح المنتج",
+        "done": "اتمسح المنتج",
+        "failed": "معرفناش نمسح المنتج. جرّب تاني."
+      }
+    },
+    "variants": {
+      "simpleForm": {
+        "deleteDialog": {
+          "object": "المتغير «{name}»",
+          "consequence": "هيتمسح من المنتج ومش هتقدر ترجّعه.",
+          "confirmLabel": "امسح المتغير"
+        }
+      }
+    },
+    "recommendations": {
+      "aiSuggestions": {
+        "demoteDialog": {
+          "object": "{count} منتج مقترح بالذكاء الاصطناعي",
+          "consequence": "هيتشالوا من قايمة البيع المتقاطع اليدوية، والمتجر هيرجع يعرض اقتراحات الذكاء الاصطناعي.",
+          "confirmLabel": "شيل الاقتراحات"
+        }
+      }
+    },
+    "model3d": {
+      "removeDialog": {
+        "object": "المجسم ثلاثي الأبعاد للمنتج",
+        "consequence": "العملاء هيشوفوا صور المنتج بس.",
+        "confirmLabel": "شيل المجسم"
+      }
+    },
+    "list": {
+      "toolbar": {
+        "addProduct": "ضيف منتج",
+        "bulkImport": "استورد منتجات من ملف",
+        "orderNewArrivals": "رتّب وصل حديثًا",
+        "orderBestSellers": "رتّب الأكتر مبيعًا",
+        "more": "خيارات تانية للمنتجات"
+      },
+      "actions": {
+        "edit": "عدّل",
+        "variants": "المتغيرات",
+        "overview": "نظرة عامة",
+        "delete": "امسح المنتج",
+        "menu": "خيارات المنتج {name}"
+      }
+    }
+  },
+  "customerGroups": {
+    "page": {
+      "deleteDialog": {
+        "object": "المجموعة «{name}»",
+        "consequence": "{count} عميل هيفضلوا من غير مجموعة. العملاء نفسهم مش هيتمسحوا.",
+        "confirmLabel": "امسح المجموعة"
+      }
+    }
+  },
+  "promotions": {
+    "page": {
+      "deleteDialog": {
+        "object": "العرض «{name}»",
+        "consequence": "هيقف فورًا ومش هتقدر ترجّعه.",
+        "confirmLabel": "امسح العرض"
+      },
+      "subtitle": "خصومات بتتطبق لوحدها عند الدفع من غير كود.",
+      "addNew": "ضيف عرض",
+      "addFirst": "ضيف أول عرض",
+      "rowMenu": "خيارات العرض {name}",
+      "emptyBody": "العرض بيطبّق خصم تلقائي من غير ما العميل يكتب كود.",
+      "createTitle": "عرض جديد",
+      "editTitle": "تعديل العرض",
+      "save": "احفظ العرض",
+      "saving": "بنحفظ...",
+      "delete": "امسح العرض",
+      "loadFailed": "معرفناش نجيب العروض. جرّب تاني.",
+      "saveFailed": "معرفناش نحفظ العرض. جرّب تاني.",
+      "deleteFailed": "معرفناش نمسح العرض. جرّب تاني.",
+      "scopeRemove": "شيل",
+      "allCustomers": "كل العملاء"
+    }
+  },
+  "bundles": {
+    "page": {
+      "deactivateDialog": {
+        "object": "المجموعة «{name}»",
+        "consequence": "هتبطل تتباع، لكن الطلبات والسلات الحالية هتفضل محتفظة بيها.",
+        "confirmLabel": "وقّف المجموعة"
+      },
+      "title": "مجموعات المنتجات",
+      "subtitle": "بيع مجموعة منتجات ثابتة كأنها قطعة واحدة بسعر واحد.",
+      "addNew": "ضيف مجموعة",
+      "addFirst": "ضيف أول مجموعة",
+      "rowMenu": "خيارات المجموعة {name}",
+      "uploadImage": "ارفع صورة المجموعة",
+      "pricingValueLabelFixedPrice": "سعر المجموعة (ج.م)",
+      "activeLabel": "المجموعة شغالة",
+      "derivedPrice": "سعر المجموعة",
+      "availableCount": "{count} مجموعة",
+      "discountAboveComponentSum": "خصم بقيمة {sum} أو أكتر هيخلّي المجموعة ببلاش. خلّيه أقل من إجمالي المنتجات.",
+      "zeroPriceWillNotSell": "المجموعة مش هتتباع بسعر 0 وقيمة منتجاتها {sum}. حط سعر أكبر من 0 أو خلّي المنتجات نفسها ببلاش.",
+      "priceAboveComponentSum": "سعر المجموعة مينفعش يكون أكتر من مجموع منتجاتها ({sum}). قلّل السعر أو ضيف منتجات.",
+      "notPurchasableHint": "(مش متاحة للشراء دلوقتي)",
+      "emptyTitle": "مفيش مجموعات منتجات لسه",
+      "emptyBody": "المجموعة بتبيع كذا منتج مع بعض بسعر واحد، زي طقم أو هدية.",
+      "createTitle": "مجموعة جديدة",
+      "editTitle": "تعديل المجموعة",
+      "save": "احفظ المجموعة",
+      "saving": "بنحفظ...",
+      "deactivate": "وقّف المجموعة",
+      "statusActive": "شغالة",
+      "statusInactive": "واقفة",
+      "loadFailed": "معرفناش نجيب المجموعات. جرّب تاني.",
+      "saveFailed": "معرفناش نحفظ المجموعة. جرّب تاني.",
+      "deactivateFailed": "معرفناش نوقّف المجموعة. جرّب تاني."
+    },
+    "itemPicker": {
+      "limitReached": "وصلت للحد الأقصى: {max} منتج في المجموعة.",
+      "empty": "لسه مفيش منتجات. دوّر فوق وضيف أول منتج.",
+      "removeLabel": "شيل"
+    }
+  },
+  "coupons": {
+    "page": {
+      "subtitle": "أكواد الخصم اللي العملاء بيكتبوها عند الدفع",
+      "loadFailed": "معرفناش نجيب الكوبونات. اتأكد من النت وجرّب تاني.",
+      "deleteFailed": "معرفناش نمسح الكوبون. جرّب تاني.",
+      "toggleFailed": "معرفناش نغيّر حالة الكوبون. جرّب تاني."
+    },
+    "actions": {
+      "create": "ضيف كوبون",
+      "update": "احفظ الكوبون",
+      "delete": "امسح الكوبون",
+      "activate": "فعّل الكوبون",
+      "deactivate": "وقّف الكوبون",
+      "menu": "خيارات الكوبون {code}",
+      "deleteDialog": {
+        "object": "الكوبون {code}",
+        "consequence": "العملاء مش هيقدروا يستخدموه تاني، ومش هتقدر ترجّعه.",
+        "confirmLabel": "امسح الكوبون"
+      }
+    },
+    "modal": {
+      "createTitle": "كوبون جديد",
+      "editTitle": "تعديل الكوبون",
+      "valueInvalid": "اكتب قيمة الخصم، لازم تكون أكبر من صفر.",
+      "valuePercentMax": "نسبة الخصم لازم تكون من 1 لـ 100.",
+      "saveFailed": "معرفناش نحفظ الكوبون. جرّب تاني."
+    },
+    "empty": {
+      "description": "الكوبون بيدّي العميل خصم بنسبة أو بمبلغ ثابت لما يكتبه عند الدفع. ابدأ بكوبون لحملة أو لعميل بيرجعلك.",
+      "createFirst": "ضيف أول كوبون"
+    }
+  },
+  "orders": {
+    "list": {
+      "title": "الطلبات",
+      "subtitle": "كل طلبات المتجر، من الجديد للمستلم",
+      "newOrder": "طلب تليفون جديد",
+      "moreMenu": "خيارات تانية للطلبات",
+      "export": {
+        "button": "نزّل الطلبات Excel",
+        "exporting": "بنجهّز الملف...",
+        "failed": "معرفناش نجهّز ملف الطلبات. جرّب تاني."
+      },
+      "errors": {
+        "invoiceLoad": "معرفناش نفتح الفاتورة",
+        "invoiceLoadHttp": "السيرفر رجّع خطأ {status}. جرّب تاني.",
+        "connection": "معرفناش نتصل بالسيرفر. اتأكد من النت وجرّب تاني."
+      },
+      "confirm": {
+        "markPaidLabel": "علّم الطلب مدفوع",
+        "bulkMarkPaidLabel": "علّم الطلبات مدفوعة",
+        "markPaid": "استلمت فلوس الطلب ده كاش؟",
+        "markPaidDescription": "هنسجّل إنك استلمت المبلغ كاش للطلب ده، ومش هتقدر ترجّع الخطوة دي.",
+        "bulkMarkPaidDescription": "هنعلّم {count} طلب كمدفوع، ومش هتقدر ترجّع الخطوة دي.",
+        "instapayLabel": "أيوه، الفلوس وصلت"
+      }
+    },
+    "detail": {
+      "cancelDialog": {
+        "object": "الطلب {number}",
+        "consequence": "الطلب هيتلغي ومش هتقدر ترجّع حالته.",
+        "confirmLabel": "ألغي الطلب"
+      },
+      "actions": {
+        "cancel": "ألغي الطلب",
+        "more": "خيارات تانية للطلب",
+        "markPaid": "علّم الطلب مدفوع",
+        "printInvoice": "اطبع الفاتورة",
+        "confirmInstapay": "الفلوس وصلت"
+      }
+    }
+  },
+  "categories": {
+    "page": {
+      "subtitle": "الأقسام اللي بتقسّم بيها منتجاتك في المتجر",
+      "addCategory": "ضيف قسم",
+      "moreMenu": "خيارات تانية للأقسام",
+      "deleteTitle": "امسح القسم",
+      "deleteConfirm": "هتمسح القسم «{name}». المنتجات نفسها مش هتتمسح.",
+      "delete": "امسح القسم",
+      "deleting": "بنمسح..."
+    },
+    "table": {
+      "missingArabicName": "ناقص الاسم بالعربي",
+      "rowMenu": "خيارات القسم {name}"
+    }
+  },
+  "customers": {
+    "page": {
+      "moreMenu": "خيارات تانية للعملاء"
+    }
+  },
+  "tags": {
+    "page": {
+      "emptyAction": "روح للمنتجات"
+    }
+  },
+  "wallet": {
+    "emptyAction": "روح للعملاء"
+  },
+  "loyalty": {
+    "transactions": {
+      "loadFailed": "معرفناش نجيب حركات النقط.",
+      "retry": "جرّب تاني"
+    }
+  }
+}
