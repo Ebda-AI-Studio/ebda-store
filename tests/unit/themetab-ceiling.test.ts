@@ -20,9 +20,12 @@ describe('ThemeTab toggle ceiling', () => {
   });
 
   it('every checkbox sits in a counted card or is one of the two footer-logo options', () => {
-    // 5 cards hold 6 checkboxes (the social-icon card has two); the footer logo uploader holds 2 options.
+    // T4 moved the blog and web-push switches to their own pages and dropped the uppercase switch. What is left:
+    // the social-icon card (2) and the card-frame card (1), all inside the counted cards of the collapsed
+    // "advanced" group (itself a counted card, data-theme-toggle="advanced"), plus the footer logo's 2 options.
+    expect(cards).toContain('advanced');
     const checkboxes = (src.match(/type="checkbox"/g) ?? []).length;
-    expect(checkboxes).toBe(8);
+    expect(checkboxes).toBe(5);
     expect(src).toContain('footerLogoInvert');
     expect(src).toContain('hideFooterLogoMobile');
   });

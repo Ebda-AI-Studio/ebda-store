@@ -79,6 +79,7 @@ export type StoreReads = {
 /** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
 export type WritableModel =
   | 'paymentConfig'
+  | 'shippingCarrierConfig'
   | 'storeTaxProfile'
   | 'taxRate'
   | 'storeTaxDocument'
@@ -152,9 +153,6 @@ export type WritableModel =
   | 'customerAddress'
   | 'coupon'
   | 'promotion'
-  | 'taxRate'
-  | 'storeTaxProfile'
-  | 'storeTaxDocument'
   | 'wholesaleApplication'
   | 'productModel'
   | 'productModelBinding'
@@ -438,6 +436,18 @@ export interface MoneyClient {
     a: { customerId: string; productId: string; reviewId: string; featureEnabled: boolean },
     key?: string
   ): Promise<{ awarded: boolean; points: number }>;
+  loyaltyBirthdays(a: {
+    month: number;
+    day: number;
+    yearStart: number;
+    featureEnabled: boolean;
+  }): Promise<{ awarded: number; points: number }>;
+  loyaltyExpire(a: { after?: string | null; limit?: number }): Promise<{
+    members: number;
+    expired: number;
+    last: string | null;
+    more: boolean;
+  }>;
   loyaltyCustomerPoints(a: {
     customerId: string;
     featureEnabled: boolean;
@@ -880,6 +890,12 @@ export interface MoneyClient {
   }): Promise<{ done: true; tables: Record<string, number> }>;
   /** True while any indexable product still needs a vector. */
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
+  vectorStatus(a: Record<string, never>): Promise<{
+    products: number;
+    indexed: number;
+    stale: number;
+    failed: number;
+  }>;
   /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
   vectorVisible(a: { ids: string[] }): Promise<{ ids: string[] }>;
   /** An expense's status step: approve (draft/pending), post (approved) or reject, one conditional UPDATE (Ruling CF-EXP-1). */
@@ -1331,6 +1347,8 @@ export function makeMoneyClient(
     loyaltyAward: (a, key) => call('loyaltyAward', a, key),
     loyaltyInit: (a, key) => call('loyaltyInit', a, key),
     loyaltyReviewBonus: (a, key) => call('loyaltyReviewBonus', a, key),
+    loyaltyBirthdays: a => call('loyaltyBirthdays', a),
+    loyaltyExpire: a => call('loyaltyExpire', a),
     loyaltyCustomerPoints: a => call('loyaltyCustomerPoints', a),
     loyaltyHistory: a => call('loyaltyHistory', a),
     loyaltyMembers: a => call('loyaltyMembers', a),
@@ -1399,6 +1417,7 @@ export function makeMoneyClient(
     analyticsCashflow: a => call('analyticsCashflow', a),
     analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
+    vectorStatus: a => call('vectorStatus', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),
     vectorCommit: a => call('vectorCommit', a),

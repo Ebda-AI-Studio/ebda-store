@@ -18,6 +18,7 @@ import {
   revokeIdentityUser,
   setAccountRole,
   setAccountStatus,
+  updateIdentityProfile,
 } from '../lib/identity-client';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
@@ -85,6 +86,7 @@ import {
   isReservedSlug,
 } from '@ebda/shared';
 import { platformUserContext } from '../middleware/tenant-context';
+import { impersonationTargetD1 } from '../lib/impersonation-target';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
 import { revokeUserMerchantKeysD1 } from '../services/platform/platform-d1';
@@ -102,6 +104,7 @@ import {
   hubOwnedStores,
   hubOwners,
   hubStorePage,
+  hubSearchCustomers,
   hubStoresById,
   hubUsers,
 } from '../lib/platform-hub';
@@ -1025,12 +1028,33 @@ router.get(
         );
         const pageRows = filtered ? kept.slice(skip, skip + limit) : kept;
         const total = filtered ? kept.length : ids.length;
+        // Customers live in their store's DO: a search (>= 3 chars) also fans out over the stores' customer directories.
+        const wantsCustomers =
+          typeof search === 'string' &&
+          search.trim().length >= 3 &&
+          (!role || role === 'all' || role === 'customer');
+        const customerSearch = wantsCustomers
+          ? await hubSearchCustomers(search as string)
+          : { hits: [], truncated: false };
         res.json({
           success: true,
           data: {
-            users: await hubUsers(pageRows),
-            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-            ...(truncated ? { truncated: true, cap: HUB_FANOUT_CAP } : {}),
+            users: [
+              ...(await hubUsers(role === 'customer' ? [] : pageRows)),
+              ...customerSearch.hits.map(c => ({
+                ...c,
+                stores: [{ id: c.storeId, name: c.storeName, slug: '' }],
+              })),
+            ],
+            pagination: {
+              page,
+              limit,
+              total: total + customerSearch.hits.length,
+              totalPages: Math.ceil((total + customerSearch.hits.length) / limit),
+            },
+            ...(truncated || customerSearch.truncated
+              ? { truncated: true, cap: HUB_FANOUT_CAP }
+              : {}),
           },
         });
         return;
@@ -1404,31 +1428,34 @@ router.put(
       // change a profile row the identity service ignores); status and role go to the identity service first.
       const identityManaged = existing.storeId === null && existing.role !== 'customer';
       if (
-        onHub &&
-        (data.firstName !== undefined || data.lastName !== undefined || data.phone !== undefined)
-      ) {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'MANAGED_BY_IDENTITY',
-            message:
-              'Name and phone of this account are managed by the sign-in service; only status and role can be changed here.',
-          },
-        });
-        return;
-      }
-      if (
         identityManaged &&
         (data.password ||
           data.role === 'customer' ||
           (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
       ) {
+        // An e-mail is the recovery channel: changing another account's e-mail from an admin session (or a stolen one) and then
+        // resetting the password is an account takeover. Only the verified self-service flow may change it (security review).
+        if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'EMAIL_CHANGE_SELF_SERVICE',
+              message:
+                'An account e-mail is changed by its owner through the verified flow that confirms the new address and notifies the old one.',
+              messageEn:
+                'An account e-mail is changed by its owner through the verified flow that confirms the new address and notifies the old one.',
+              messageAr:
+                'صاحب الحساب هو اللي بيغيّر بريده بنفسه من خطوات التحقق، وبتأكد البريد الجديد وتبلّغ البريد القديم.',
+            },
+          });
+          return;
+        }
         res.status(409).json({
           success: false,
           error: {
             code: 'MANAGED_BY_IDENTITY',
             message:
-              'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password and email.',
+              'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password.',
           },
         });
         return;
@@ -1443,6 +1470,43 @@ router.put(
           },
         });
         return;
+      }
+      // Name and phone of an identity-managed account are the identity service's rows (never the e-mail, see above). A
+      // super_admin target is editable only by that same user (the identity service enforces it too).
+      if (
+        onHub &&
+        (data.firstName !== undefined || data.lastName !== undefined || data.phone !== undefined)
+      ) {
+        if (existing.role === 'super_admin' && id !== req.user!.userId) {
+          res.status(403).json({
+            success: false,
+            error: {
+              code: 'SUPER_ADMIN_SELF_ONLY',
+              message: 'A platform administrator profile can only be edited by that administrator.',
+            },
+          });
+          return;
+        }
+        const r = await updateIdentityProfile(
+          id,
+          { firstName: data.firstName, lastName: data.lastName, phone: data.phone },
+          'admin-update',
+          req.user!.userId
+        );
+        if (!r.ok) {
+          const forbidden = r.code === 'FORBIDDEN_TARGET';
+          res.status(forbidden ? 403 : 404).json({
+            success: false,
+            error: forbidden
+              ? {
+                  code: 'SUPER_ADMIN_SELF_ONLY',
+                  message:
+                    'A platform administrator profile can only be edited by that administrator.',
+                }
+              : { code: 'NOT_FOUND', message: 'User not found' },
+          });
+          return;
+        }
       }
       if (identityManaged && data.status !== undefined && data.status !== existing.status) {
         await setAccountStatus(id, data.status, 'admin-update');
@@ -1874,7 +1938,7 @@ router.get(
                 orderBy: { createdAt: 'desc' },
                 include: {
                   ...(HUB_ON
-                    ? { customerId: true }
+                    ? {}
                     : { customer: { select: { email: true, firstName: true, lastName: true } } }),
                   ...(HUB_ON ? {} : { store: { select: { name: true } } }),
                 },
@@ -2098,7 +2162,7 @@ router.get(
               include: {
                 ...(HUB_ON ? {} : { store: { select: { id: true, name: true } } }),
                 ...(HUB_ON
-                  ? { customerId: true }
+                  ? {}
                   : {
                       customer: {
                         select: { id: true, email: true, firstName: true, lastName: true },
@@ -2853,7 +2917,12 @@ router.get(
                   : { customer: { select: { email: true, firstName: true, lastName: true } } }),
               },
             }),
-          { storeIds: storeIdsFromFilter(storeId) ?? (await boundedFanoutStoreIds()) }
+          {
+            // the cap is the hub's (D1 list); off the hub no filter still means every store, as before
+            storeIds:
+              storeIdsFromFilter(storeId) ??
+              ((await hubOnD1()) ? await boundedFanoutStoreIds() : undefined),
+          }
         )
       )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
@@ -2978,20 +3047,24 @@ router.post(
       // users table has no RLS — plain lookup works under ebda_app without bypass.
       // We intentionally leave this as-is: adding withRlsBypass here would be
       // over-engineering (the policy doesn't exist) and would waste a tx slot.
-      const target = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            storeId: true,
-            deletedAt: true,
-            tokenVersion: true,
-            status: true,
-          },
-        })
-      );
+      // Ruling NZ-PG-2: once the `access` family is on D1 the account is the identity service's (or its store's DO for a
+      // customer); the Postgres `users` row no longer exists.
+      const target = (await onAccessD1())
+        ? await impersonationTargetD1(userId)
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.findUnique({
+              where: { id: userId },
+              select: {
+                id: true,
+                email: true,
+                role: true,
+                storeId: true,
+                deletedAt: true,
+                tokenVersion: true,
+                status: true,
+              },
+            })
+          );
 
       if (!target) {
         res.status(404).json({

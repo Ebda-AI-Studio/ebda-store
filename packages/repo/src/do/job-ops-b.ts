@@ -6,6 +6,7 @@ import {
   commitVectorWork,
   embedUsageToday,
   hasStaleVectors,
+  vectorStatus,
   planVectorWork,
   quarantineVectorFailure,
   reserveEmbedTexts,
@@ -486,6 +487,10 @@ export function vectorVisibleOp(
   if (!Array.isArray(a.ids) || a.ids.some(x => typeof x !== 'string' || x.length > 128))
     throw new MoneyError('BAD_ARGS', 'ids', 400);
   return { ids: visibleVectorProductIds(db, storeId, a.ids as string[]) };
+}
+
+export function vectorStatusOp(db: SyncSql, storeId: string) {
+  return vectorStatus(db, storeId);
 }
 
 export function vectorStaleOp(db: SyncSql, storeId: string): { stale: boolean } {

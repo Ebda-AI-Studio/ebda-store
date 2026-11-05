@@ -37,6 +37,9 @@ const e = env as unknown as {
 const FILTER = e.SWEEP_FILTER ? new RegExp(e.SWEEP_FILTER) : undefined;
 const inSubset = (line: string) => !e.SWEEP_FILTER || new RegExp(e.SWEEP_FILTER).test(line);
 
+/** Cron job names whose Postgres reaches are tolerated. MUST stay empty for DO stores (Ruling NZ-PG-8). */
+const CRON_PG_ALLOWLIST: RegExp[] = [];
+
 const BASE = 'https://api.ebda.app/api/v1';
 const ZERO = '00000000-0000-4000-8000-000000000001';
 const MARKER_KEYS = [
@@ -153,7 +156,7 @@ describe.skipIf(e.E2E_DB === '1')(
       await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
       for (const p of DEFAULT_PLAN_SEEDS)
         await e.PLATFORM_DB.prepare(
-          'INSERT OR IGNORE INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+          'INSERT OR IGNORE INTO plans (id, code, name_en, name_ar, feature_tier, limits, price_monthly_minor, price_yearly_minor) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)'
         )
           .bind(
             `plan-${p.code}`,
@@ -161,7 +164,9 @@ describe.skipIf(e.E2E_DB === '1')(
             p.nameEn,
             p.nameAr,
             p.featureTier,
-            JSON.stringify(p.limits)
+            JSON.stringify(p.limits),
+            p.priceMonthlyMinor,
+            p.priceYearlyMinor
           )
           .run();
       for (const [i, k] of MARKER_KEYS.entries())
@@ -287,6 +292,137 @@ describe.skipIf(e.E2E_DB === '1')(
       },
       120_000
     );
+
+    it('SEEDED hub writes: valid bodies reach past validation with Postgres dead (stores, plans, billing, users, store delete)', async () => {
+      const adm = { authorization: `Bearer ${su}`, 'x-store-id': storeId };
+      const seeded: Array<[string, string, string, Record<string, string>, unknown]> = [
+        [
+          'PUT',
+          '/admin/stores/:id',
+          `/admin/stores/${storeId}`,
+          adm,
+          { name: 'Sweep Shop Renamed' },
+        ],
+        [
+          'PATCH',
+          '/admin/stores/:id/status',
+          `/admin/stores/${storeId}/status`,
+          adm,
+          { status: 'active' },
+        ],
+        [
+          'PUT',
+          '/admin/stores/:id/plan',
+          `/admin/stores/${storeId}/plan`,
+          adm,
+          { plan: 'starter' },
+        ],
+        [
+          'PUT',
+          '/admin/stores/:id/subscription',
+          `/admin/stores/${storeId}/subscription`,
+          adm,
+          { planCode: 'basic' },
+        ],
+        [
+          'POST',
+          '/admin/stores/:id/manual-payment',
+          `/admin/stores/${storeId}/manual-payment`,
+          adm,
+          {
+            planCode: 'basic',
+            interval: 'monthly',
+            amountMinor: 49900,
+            method: 'instapay',
+            reference: 'SWEEP-REF-001',
+            paidAt: new Date().toISOString(),
+          },
+        ],
+        [
+          'POST',
+          '/admin/stores',
+          '/admin/stores',
+          adm,
+          {
+            storeName: 'Sweep Provisioned',
+            storeSlug: 'sweep-provisioned',
+            ownerEmail: 'prov-owner@exit-test.invalid',
+            ownerName: 'Prov Owner',
+          },
+        ],
+        [
+          'POST',
+          '/admin/users',
+          '/admin/users',
+          adm,
+          {
+            email: 'invitee@exit-test.invalid',
+            firstName: 'In',
+            lastName: 'Vitee',
+            role: 'store_admin',
+          },
+        ],
+        ['PUT', '/admin/users/:id', `/admin/users/${owner}`, adm, { status: 'active' }],
+        [
+          'PUT',
+          '/admin/users/:id (email)',
+          `/admin/users/${owner}`,
+          adm,
+          { email: 'takeover@exit-test.invalid' },
+        ],
+        [
+          'PUT',
+          '/admin/users/:id (super_admin target)',
+          '/admin/users/00000000-0000-4000-8000-0000000000aa',
+          adm,
+          { firstName: 'Mallory' },
+        ],
+        ['GET', '/admin/users?search=sweep', '/admin/users?search=sweep', adm, undefined],
+        // Ruling NZ-PG-2: with Postgres dead the account is the identity service's and the event is found by a probe of the
+        // stores' DOs: an answer, never the 500 of a Postgres definer.
+        [
+          'POST',
+          '/admin/impersonate (unknown user)',
+          '/admin/impersonate',
+          adm,
+          { userId: '00000000-0000-4000-8000-0000000000bb' },
+        ],
+        [
+          'GET',
+          '/payments/events/:eventId/payload (unknown event)',
+          '/payments/events/00000000-0000-4000-8000-0000000000cc/payload',
+          adm,
+          undefined,
+        ],
+      ];
+      for (const [m, route, path, headers, body] of seeded) {
+        if (!inSubset(`${m} ${route}`)) continue;
+        const res = await hit('SEEDED', m, route, BASE + path, headers, body);
+        // The admin route never edits an e-mail (account takeover) and never edits ANOTHER super_admin's profile.
+        if (route === '/admin/users/:id (email)') expect(res?.status).toBe(409);
+        if (route === '/admin/users/:id (super_admin target)') expect(res?.status).toBe(403);
+        // the accounts stub answers a state for every id, so the unknown user may be a 200 here; the point is: not a 5xx
+        if (route.endsWith('(unknown user)')) expect([200, 404]).toContain(res?.status);
+        if (route.endsWith('(unknown event)')) expect(res?.status).toBe(404);
+      }
+      // A second store, created like the first (D1 + DO), deleted by its owner: the DO delete path (close, finish, directory).
+      const extra = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
+        method: 'POST',
+        body: JSON.stringify({
+          ownerId: owner,
+          name: 'Doomed',
+          slug: 'sweep-doomed',
+          operator: true,
+        }),
+      });
+      if (extra.status === 200 && inSubset('DELETE /stores/:id')) {
+        const doomedId = ((await extra.json()) as { id: string }).id;
+        await hit('SEEDED', 'DELETE', '/stores/:id (DO store)', `${BASE}/stores/${doomedId}`, {
+          authorization: `Bearer ${su}`,
+          'x-store-id': doomedId,
+        });
+      }
+    }, 180_000);
 
     it.skipIf(!!FILTER)(
       'storefront flow: home, category, search, PDP, cart, checkout quote, order create (up to payment)',
@@ -451,6 +587,40 @@ describe.skipIf(e.E2E_DB === '1')(
           scheduled?(o: { cron: string; scheduledTime?: Date }): Promise<{ outcome: string }>;
         };
         const crons = ['0 * * * *', '*/15 * * * *', '*/30 * * * *', '0 */12 * * *', '0 3 * * *'];
+        // Every access to the Postgres client from here on is counted by the Worker (DEV_STATS=1; packages/database
+        // request-db.ts `postgresReaches`). A job that catches its own error still shows up here.
+        const pgReaches = async (reset: boolean) =>
+          (
+            (await (
+              await e.API.fetch(`https://api.ebda.app/__dev/pg-reaches${reset ? '?reset=1' : ''}`, {
+                headers: { 'x-forwarded-for': freshIp() },
+              })
+            ).json()) as { reaches: Array<{ label: string; stack: string }> }
+          ).reaches;
+        // The nightly backup sweep reports a store with no manifest from YESTERDAY as missing. Every store in this run is minutes
+        // old, so give each one yesterday's manifest: the sweep then measures the job, not the age of the fixture.
+        const bucket = (
+          env as unknown as {
+            STORE_BACKUPS: {
+              put(k: string, v: string): Promise<unknown>;
+              get(k: string): Promise<{ text(): Promise<string> } | null>;
+            };
+          }
+        ).STORE_BACKUPS;
+        const day = (d: Date) => d.toISOString().slice(0, 10);
+        const yesterday = day(new Date(Date.now() - 86_400_000));
+        const stores = (
+          await (
+            e.PLATFORM_DB as unknown as {
+              prepare(s: string): { all<T>(): Promise<{ results: T[] }> };
+            }
+          )
+            .prepare("SELECT id FROM stores WHERE storage_backend = 'do'")
+            .all<{ id: string }>()
+        ).results;
+        for (const s of stores)
+          await bucket.put(`store-do-backups/${s.id}/${yesterday}/manifest.json`, '{}');
+        await pgReaches(true);
         for (const cron of crons) {
           const t0 = Date.now();
           let outcome = 'ran (job outcomes: Worker log lines "[cron] job done|failed")';
@@ -473,6 +643,31 @@ describe.skipIf(e.E2E_DB === '1')(
           // eslint-disable-next-line no-console
           console.log('SWEEP_RESULT ' + JSON.stringify(r));
         }
+        const report = await bucket.get(`ops-reports/backup-sweep/${day(new Date())}.json`);
+        const backup = report
+          ? (JSON.parse(await report.text()) as {
+              ok: boolean;
+              stores: { errors: string[]; missingYesterday: string[] };
+              d1: Record<string, { ok: boolean; error?: string }>;
+            })
+          : null;
+        // eslint-disable-next-line no-console
+        console.log('SWEEP_BACKUP_REPORT ' + JSON.stringify(backup));
+        expect(backup, 'the 03:00 cron wrote the backup sweep report').not.toBeNull();
+        expect(backup!.ok, JSON.stringify(backup)).toBe(true);
+        // Postgres is dead for a DO store: NO cron job may reach it. The allowlist is EMPTY (Ruling NZ-PG-8); an entry would
+        // have to name the job and a reason a DO store still needs Postgres, which is a defect to port, not to allow.
+        const reached = (await pgReaches(false)).filter(
+          x => !CRON_PG_ALLOWLIST.some(re => re.test(x.label))
+        );
+        for (const x of reached)
+          // eslint-disable-next-line no-console
+          console.log('SWEEP_CRON_PG_REACH ' + JSON.stringify(x));
+        if (e.SWEEP_STRICT === '1')
+          expect(
+            reached.map(x => x.label),
+            'cron jobs that reached the Postgres client'
+          ).toEqual([]);
       },
       300_000
     );

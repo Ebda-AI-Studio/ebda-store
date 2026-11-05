@@ -180,7 +180,7 @@ export default function BlogPostEditorPage({
                 type="text"
                 value={form.title}
                 onChange={e => update('title', e.target.value)}
-                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder={t('titleEnPlaceholder')}
               />
             </div>
@@ -194,7 +194,7 @@ export default function BlogPostEditorPage({
                 dir="rtl"
                 value={form.titleAr}
                 onChange={e => update('titleAr', e.target.value)}
-                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder={t('titleArPlaceholder')}
               />
             </div>
@@ -208,7 +208,7 @@ export default function BlogPostEditorPage({
               type="text"
               value={form.slug}
               onChange={e => update('slug', slugify(e.target.value))}
-              className="w-full rounded-lg border border-border px-4 py-2 font-mono text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-input px-4 py-2 font-mono text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               placeholder={t('slugPlaceholder')}
             />
             <p className="mt-1 text-xs text-muted-foreground">
@@ -225,7 +225,7 @@ export default function BlogPostEditorPage({
                 value={form.excerpt}
                 onChange={e => update('excerpt', e.target.value)}
                 rows={3}
-                className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full resize-none rounded-lg border border-input px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder={t('excerptEnPlaceholder')}
               />
             </div>
@@ -239,7 +239,7 @@ export default function BlogPostEditorPage({
                 value={form.excerptAr}
                 onChange={e => update('excerptAr', e.target.value)}
                 rows={3}
-                className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full resize-none rounded-lg border border-input px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder={t('excerptArPlaceholder')}
               />
             </div>
@@ -270,7 +270,7 @@ export default function BlogPostEditorPage({
                 value={form.content}
                 onChange={e => update('content', e.target.value)}
                 rows={14}
-                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder={t('contentEnPlaceholder')}
               />
             </div>
@@ -284,7 +284,7 @@ export default function BlogPostEditorPage({
                 value={form.contentAr}
                 onChange={e => update('contentAr', e.target.value)}
                 rows={14}
-                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder={t('bodyArPlaceholder')}
               />
             </div>

@@ -44,8 +44,10 @@ import {
   listDeferredBillingWebhooksD1,
   onD1,
   planTierDriftD1,
+  staleDeferredBillingWebhooksD1,
 } from '../platform/billing-d1';
 import { isFamilyFrozen } from '../platform/cutover';
+import { cfBindings } from '../../cf/bindings';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -1807,6 +1809,44 @@ export async function handleBillingWebhook(
   return confirmAndApplyWebhook(provider, event);
 }
 
+/** A deferred webhook older than this with no marker is an aborted cutover, not a freeze in progress (the freeze TTL is 15 min). */
+export const ORPHANED_DEFERRED_AFTER_MS = 30 * 60_000;
+const ORPHAN_ALERT_EVERY_MS = 6 * 60 * 60_000;
+let lastOrphanAlert = 0;
+/** Test seam. */
+export const resetOrphanedDeferredAlert = (): void => {
+  lastOrphanAlert = 0;
+};
+
+/**
+ * P1 when deferred billing webhooks older than 30 minutes exist and the `billing` marker does not (called only without the
+ * marker). At most once per 6 hours per isolate; a D1 outage is logged, never thrown (the cron must not die on its monitor).
+ */
+export async function alertOrphanedDeferredWebhooks(now = Date.now()): Promise<boolean> {
+  if (!cfBindings()?.PLATFORM_DB) return false;
+  try {
+    const { count, oldestMs } = await staleDeferredBillingWebhooksD1(
+      now - ORPHANED_DEFERRED_AFTER_MS
+    );
+    if (count === 0 || now - lastOrphanAlert < ORPHAN_ALERT_EVERY_MS) return false;
+    lastOrphanAlert = now;
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'billing.deferred_webhooks_orphaned',
+      title: 'Deferred billing webhooks are waiting for a marker that does not exist',
+      body:
+        `${count} authenticated billing webhook(s) stored during a cutover freeze are older than 30 minutes (oldest ` +
+        `${oldestMs ? new Date(oldestMs).toISOString() : 'unknown'}) and platform_cutover.billing is not set, so nothing applies them. ` +
+        'Re-run `node scripts/cf/cutover-platform-family.mjs --family billing ... --commit` (runbook: docs/runbooks/platform-family-cutover.md, "Deferred webhooks with no marker").',
+    });
+    return true;
+  } catch (err) {
+    logger.error({ err }, '[billing] orphaned deferred webhook check failed');
+    return false;
+  }
+}
+
 let lastDeferredDrain = 0;
 /** Opportunistic: the first webhook after the freeze drains the queue (at most every 30 s per isolate). */
 function drainDeferredSoon(): Promise<void> {
@@ -1823,7 +1863,13 @@ function drainDeferredSoon(): Promise<void> {
  * that also arrives live is applied once. A row that cannot be applied stays deferred.
  */
 export async function processDeferredBillingWebhooks(limit = 50): Promise<number> {
-  if (!(await onD1()) || (await isFamilyFrozen('billing'))) return 0;
+  if (!(await onD1())) {
+    // Ruling NZ-PG-6: no marker = nothing is applied. After a `--commit` that aborted and was not re-run, the events stored
+    // during its freeze would wait for a marker that never comes: the gateway got its 200, the payment is not booked.
+    await alertOrphanedDeferredWebhooks();
+    return 0;
+  }
+  if (await isFamilyFrozen('billing')) return 0;
   let applied = 0;
   for (const row of await listDeferredBillingWebhooksD1(limit)) {
     try {

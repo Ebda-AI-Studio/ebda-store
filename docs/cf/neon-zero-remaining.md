@@ -4,14 +4,7 @@ Input for the final PRs N-15 (workers-test sweep with PG dead), N-16 (delete dea
 
 ## N-15 runtime route sweep (Postgres dead, all markers set)
 
-Last run (`SWEEP_STRICT=1`) on `integ/neon-zero` d2565d820, after #435, #436 and the customer-auth routes: **909 requests, 242 2xx, 663 expected 4xx, 2 failing (5xx)**. History: 269 -> 26 -> 11 -> 2. The three optional-provider 503s (`PUSH_NOT_CONFIGURED` OneSignal broadcasts, `STORAGE_NOT_CONFIGURED` upload list, `alerts_not_configured`) are the correct answer of a Worker without those services and are not counted.
-
-### SWEEP_FAILING
-
-| Route                                                     | Status | Owner   | Cause                                                                                                                                                                                                         |
-| --------------------------------------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /admin/notifications/onesignal/devices`              | 500    | unowned | `OneSignalService.listSubscriptions`: the merchant/admin push-device registry (`onesignal_subscriptions`, keyed by an identity user) is still a Postgres table; it needs a D1 table (or the identity service) |
-| `DELETE /admin/notifications/onesignal/devices/:playerId` | 500    | unowned | same table                                                                                                                                                                                                    |
+Last run (`SWEEP_STRICT=1`) on `integ/neon-zero` after #439, #441 and `origin/main`: **923 requests, 255 2xx, 666 expected 4xx, 0 failing (5xx)**; the cron group runs every expression against a DO store with no Postgres reach (allowlist empty) and the 03:00 backup sweep report is `ok` (each fixture store is given yesterday's manifest, so the job is measured, not the age of the fixture). History: 269 -> 26 -> 11 -> 2 -> 0. The optional-provider 503s (`PUSH_NOT_CONFIGURED`, `STORAGE_NOT_CONFIGURED`, `alerts_not_configured`) are the correct answer of a Worker without those services and are not counted.
 
 Reproduce: `cd apps/api && npm run cf:dry-run && SWEEP_STRICT=1 EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`.
 

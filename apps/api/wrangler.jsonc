@@ -23,7 +23,8 @@
   // `fn.name` / `constructor.name` (grepped); DO and entrypoint exports keep their export names; stack traces never used it.
   "keep_names": false,
   "upload_source_maps": true,
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Launch traffic: Workers Logs head-sample 10% (cost). Logpush below is the full archive; Sentry catches 100% of errors.
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
   // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
   "logpush": true,
   // Queue-run background jobs (src/lib/jobs) hold one database context for a whole sweep; the default

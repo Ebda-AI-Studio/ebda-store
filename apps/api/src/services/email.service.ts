@@ -495,8 +495,8 @@ export class EmailService {
    * Replay a queued email that already has a storeId — ships via
    * StoreMailer so the store's verified sender is used.
    */
-  static async sendRaw(storeId: string, options: EmailOptions): Promise<void> {
-    await StoreMailer.sendBrandedEmail(storeId, {
+  static async sendRaw(storeId: string, options: EmailOptions): Promise<{ id: string }> {
+    return StoreMailer.sendBrandedEmail(storeId, {
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -507,8 +507,8 @@ export class EmailService {
   /**
    * Replay a queued email with no store context — platform sender.
    */
-  static async sendPlatformRaw(options: EmailOptions): Promise<void> {
-    await sendMail({
+  static async sendPlatformRaw(options: EmailOptions): Promise<{ id: string }> {
+    return sendMail({
       from: brandFrom(options.fromName),
       to: options.to,
       subject: options.subject,

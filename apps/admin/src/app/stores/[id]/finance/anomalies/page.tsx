@@ -54,7 +54,7 @@ function SeverityBadge({ severity, t }: { severity: AnomalySeverity; t: (k: stri
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning-ink">
       {t('severity.warning')}
     </span>
   );

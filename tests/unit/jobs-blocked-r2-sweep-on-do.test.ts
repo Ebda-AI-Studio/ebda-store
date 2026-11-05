@@ -14,6 +14,8 @@ const h = vi.hoisted(() => ({
   doFails: false,
   doMissing: false,
   alerts: [] as unknown[],
+  d1Bound: false,
+  pgCalls: [] as string[],
 }));
 vi.mock('@api/config', () => ({
   config: {
@@ -47,14 +49,26 @@ vi.mock('@api/lib/lazy-modules', () => ({
 }));
 vi.mock('@ebda/database', async () => ({
   prisma: {},
-  isOwnerRole: async () => true,
-  withOwnerTx: async (fn: (tx: unknown) => unknown) => fn({ $queryRawUnsafe: async () => [] }),
+  isOwnerRole: async () => {
+    h.pgCalls.push('isOwnerRole');
+    return !h.d1Bound;
+  },
+  withOwnerTx: async (fn: (tx: unknown) => unknown) => {
+    h.pgCalls.push('withOwnerTx');
+    return fn({ $queryRawUnsafe: async () => [] });
+  },
   storeDirectory: async () => [{ id: DO_STORE }],
   withoutHiddenStores: <T>(fn: () => T) => fn(),
 }));
 vi.mock('@api/lib/r2-references', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/lib/r2-references')>()),
-  assertStrictTablesVisible: async () => undefined,
+  assertStrictTablesVisible: async () => {
+    h.pgCalls.push('assertStrictTablesVisible');
+  },
+}));
+vi.mock('@api/lib/platform-directory', () => ({ platformDb: () => (h.d1Bound ? {} : undefined) }));
+vi.mock('@api/lib/r2-platform-d1-references', () => ({
+  platformD1ReferencedKeys: async () => new Set<string>(),
 }));
 vi.mock('@api/services/r2-cleanup.service', () => ({
   urlToR2Key: (u: string) => (u.startsWith('https://r2/') ? u.slice('https://r2/'.length) : null),
@@ -98,6 +112,8 @@ beforeEach(() => {
   h.alerts.length = 0;
   h.doFails = false;
   h.doMissing = false;
+  h.d1Bound = false;
+  h.pgCalls.length = 0;
   h.doRows = {
     product_images: [{ id: 'i1', url: 'https://r2/stores/x/product-live.jpg' }],
     store_pages: [
@@ -138,5 +154,13 @@ describe('r2-orphan-sweep with a DO store', () => {
     h.doMissing = true;
     await expect(run()).rejects.toThrow(/has no /);
     expect(h.deleted).toEqual([]);
+  });
+
+  it('Ruling NZ-PG-2: with the platform D1 bound Postgres is never touched (no owner-role check, no reference scan, no visibility assertion) and the DO references still decide', async () => {
+    h.d1Bound = true;
+    const out = await run();
+    expect(out).toMatchObject({ orphanCount: 1, deleted: 1 });
+    expect(h.deleted).toEqual(['stores/x/orphan.jpg']);
+    expect(h.pgCalls).toEqual([]);
   });
 });

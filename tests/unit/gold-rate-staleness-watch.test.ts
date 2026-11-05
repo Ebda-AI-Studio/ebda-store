@@ -56,22 +56,19 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
     return {};
   },
 }));
-vi.mock('@ebda/database', async importOriginal => {
-  const real = await importOriginal<Record<string, unknown>>();
-  return {
-    ...real,
-    withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
-      fn({
-        store: {
-          findUnique: async () => ({
-            name: 'Dahab',
-            slug: 'dahab',
-            owner: { email: 'owner@example.com' },
-          }),
-        },
-      }),
-  };
-});
+// The notice reads the store's name and owner through its own backend (CF-JOBS-4): `withStoreDb`, faked as a Postgres store.
+vi.mock('../../apps/api/src/lib/jobs/store-db', () => ({
+  withStoreDb: async (_id: string, fn: (db: unknown) => unknown) =>
+    fn({
+      store: {
+        findUnique: async () => ({
+          name: 'Dahab',
+          slug: 'dahab',
+          owner: { email: 'owner@example.com' },
+        }),
+      },
+    }),
+}));
 
 const { handleGoldRateStalenessWatch } =
   await import('../../apps/api/src/lib/inngest/functions/gold-rate-staleness-watch');

@@ -4,15 +4,18 @@ import Link from 'next/link';
 import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { getStoreDisplayUrl } from '@/lib/store-url';
+import { RowActions } from '@/components/RowActions';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { StoreAvatar } from './StoreAvatar';
 import { formatDate, statusConfig, type Store } from './types';
 
 interface StoresTableProps {
   stores: Store[];
+  /** Present only for super_admin: adds "Delete store" as the last item of the row menu. */
+  onDelete?: (store: Store) => void;
 }
 
-export function StoresTable({ stores }: StoresTableProps) {
+export function StoresTable({ stores, onDelete }: StoresTableProps) {
   const t = useT('stores.list');
 
   const columns: DataTableColumn<Store>[] = [
@@ -80,11 +83,21 @@ export function StoresTable({ stores }: StoresTableProps) {
       alignEnd: true,
       mobileActions: true,
       cell: store => (
-        <Link href={`/stores/${store.id}`}>
-          <Button variant="outline" size="sm" className="rounded-xl">
-            {t('view')}
-          </Button>
-        </Link>
+        <RowActions
+          menuLabel={t('rowMenuLabel', { name: store.name })}
+          primary={
+            <Link href={`/stores/${store.id}`}>
+              <Button variant="outline" size="sm" className="rounded-xl">
+                {t('view')}
+              </Button>
+            </Link>
+          }
+          items={
+            onDelete
+              ? [{ label: t('deleteStore'), destructive: true, onSelect: () => onDelete(store) }]
+              : []
+          }
+        />
       ),
     },
   ];

@@ -9,6 +9,7 @@ import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
@@ -95,6 +96,7 @@ export default function CodReconciliationPage() {
   const params = useParams();
   const storeId = params.id as string;
   const t = useT('codReconciliation');
+  const tHub = useT('shippingHub');
   const tStatus = useT('shipping.carriers.shipments');
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
@@ -176,7 +178,8 @@ export default function CodReconciliationPage() {
   );
 
   return (
-    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+    <AdminLayout title={tHub('title')} subtitle={t('subtitle')}>
+      <ShippingTabs />
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -211,7 +214,7 @@ export default function CodReconciliationPage() {
                 <select
                   value={importCarrier}
                   onChange={e => setImportCarrier(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+                  className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm"
                 >
                   {CARRIERS.map(c => (
                     <option key={c} value={c}>
@@ -236,7 +239,7 @@ export default function CodReconciliationPage() {
               rows={4}
               placeholder={t('pastePlaceholder')}
               aria-label={t('paste')}
-              className="mt-3 w-full px-3 py-2 border border-border rounded-lg text-xs font-mono"
+              className="mt-3 w-full px-3 py-2 border border-input rounded-lg text-xs font-mono"
             />
             <button
               type="button"
@@ -277,7 +280,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterStatus')}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg"
+                className="px-3 py-1.5 text-sm border border-input rounded-lg"
               >
                 <option value="">{t('allStatuses')}</option>
                 <option value="flagged">{t('statuses.flagged')}</option>
@@ -296,7 +299,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterCarrier')}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg"
+                className="px-3 py-1.5 text-sm border border-input rounded-lg"
               >
                 <option value="">{t('allCarriers')}</option>
                 {CARRIERS.map(c => (

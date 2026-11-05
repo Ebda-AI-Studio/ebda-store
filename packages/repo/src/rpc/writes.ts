@@ -30,6 +30,7 @@ export type WriteOp = (typeof WRITE_OPS)[number];
 export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   // a store's payment gateway configuration; `credentials` is ciphertext written by the route (Ruling NEON-ZERO-2)
   'PaymentConfig',
+  'ShippingCarrierConfig', // the provider connection-test result lives on this row (Test connection re-run for a DO store)
   // the store's VAT registration profile and its evidence rows (Ruling NEON-ZERO-2; status transitions stay in TaxProfileService)
   'StoreTaxProfile',
   // the VAT rates the order tax sums (ruling TAX-1); the admin CRUD writes the table checkout reads (Ruling NEON-ZERO-2)

@@ -18,6 +18,7 @@ import {
   buyerFromMerchantShopperSelection,
 } from '../lib/buyer-identity';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   OrderService,
@@ -575,57 +576,62 @@ const getSessionId = (req: Request): string => {
 // Without this branch, ANY store_admin token used to be able to read
 // any other tenant's orders by changing :storeId in the URL. Staff must
 // be in the viewer set or the Orders PWA (staff-only) shows zero orders.
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { page, limit, confirmedOnly } = req.query;
-    const role = req.user?.role;
-    const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
+router.get(
+  '/',
+  authenticate,
+  requireCustomerStoreMatch,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { page, limit, confirmedOnly } = req.query;
+      const role = req.user?.role;
+      const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
 
-    if (isStoreViewer) {
-      const access = await checkStoreAccess(storeId, req.user!);
-      if (!access.ok) {
-        res
-          .status(access.status)
-          .json({ success: false, error: { code: access.code, message: access.message } });
-        return;
+      if (isStoreViewer) {
+        const access = await checkStoreAccess(storeId, req.user!);
+        if (!access.ok) {
+          res
+            .status(access.status)
+            .json({ success: false, error: { code: access.code, message: access.message } });
+          return;
+        }
+        // The store-wide order/customer search lookups answer for the whole store: only a role that
+        // may read orders asks them (Ruling SEARCH-T14-7).
+        if (!hasPermission(role as Role, 'orders:read')) {
+          res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Missing required permission: orders:read' },
+          });
+          return;
+        }
       }
-      // The store-wide order/customer search lookups answer for the whole store: only a role that
-      // may read orders asks them (Ruling SEARCH-T14-7).
-      if (!hasPermission(role as Role, 'orders:read')) {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Missing required permission: orders:read' },
-        });
-        return;
-      }
+
+      const filters = parseOrderListFilters(req, res);
+      if (!filters) return;
+
+      const result = await OrderService.list(storeId, {
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        ...filters,
+        customerId: isStoreViewer ? undefined : req.user?.userId,
+        // Orders PWA passes confirmedOnly=1 to show only confirmed/COD orders.
+        // Only honoured for store viewers (staff / admins); customer queries
+        // are already scoped to their own orders and never need this filter.
+        confirmedOnly: isStoreViewer && confirmedOnly === '1',
+      });
+
+      res.json({
+        success: true,
+        // A customer's own list never carries the platform's CI columns (buyerKey, areaKey).
+        data: isStoreViewer
+          ? result
+          : { ...result, orders: result.orders.map(redactOrderForCustomer) },
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const filters = parseOrderListFilters(req, res);
-    if (!filters) return;
-
-    const result = await OrderService.list(storeId, {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      ...filters,
-      customerId: isStoreViewer ? undefined : req.user?.userId,
-      // Orders PWA passes confirmedOnly=1 to show only confirmed/COD orders.
-      // Only honoured for store viewers (staff / admins); customer queries
-      // are already scoped to their own orders and never need this filter.
-      confirmedOnly: isStoreViewer && confirmedOnly === '1',
-    });
-
-    res.json({
-      success: true,
-      // A customer's own list never carries the platform's CI columns (buyerKey, areaKey).
-      data: isStoreViewer
-        ? result
-        : { ...result, orders: result.orders.map(redactOrderForCustomer) },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // GET /stores/:storeId/orders/:id - Get order. Mixed-audience like the
 // list above: a store viewer (super_admin / store_admin / staff) needs
@@ -633,41 +639,43 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 // store-access check, ANY store_admin token used to read any other
 // tenant's individual orders. Staff must be in the viewer set or the
 // Orders PWA returns 403 on every order detail.
-router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId, id } = req.params;
-    const role = req.user?.role;
-    const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
+router.get(
+  '/:id',
+  authenticate,
+  requireCustomerStoreMatch,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+      const role = req.user?.role;
+      const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
 
-    if (isStoreViewer) {
-      const access = await checkStoreAccess(storeId, req.user!);
-      if (!access.ok) {
-        res
-          .status(access.status)
-          .json({ success: false, error: { code: access.code, message: access.message } });
-        return;
+      if (isStoreViewer) {
+        const access = await checkStoreAccess(storeId, req.user!);
+        if (!access.ok) {
+          res
+            .status(access.status)
+            .json({ success: false, error: { code: access.code, message: access.message } });
+          return;
+        }
       }
-    }
 
-    const order = await OrderService.getById(storeId, id);
+      const order = await OrderService.getById(storeId, id);
 
-    if (!isStoreViewer && order.customerId !== req.user?.userId) {
-      res.status(403).json({
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'Not authorized to view this order' },
+      // Another customer's order answers exactly like a missing one: no existence oracle.
+      if (!isStoreViewer && order.customerId !== req.user?.userId) {
+        throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      }
+
+      res.json({
+        success: true,
+        // A customer sees the order without the merchant's cost and the gold margin (Ruling B5-13).
+        data: { order: isStoreViewer ? order : redactOrderForCustomer(order) },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    res.json({
-      success: true,
-      // A customer sees the order without the merchant's cost and the gold margin (Ruling B5-13).
-      data: { order: isStoreViewer ? order : redactOrderForCustomer(order) },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /stores/:storeId/orders - Create order (checkout, signed-in customers)
 //
@@ -684,6 +692,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 router.post(
   '/',
   authenticate,
+  requireCustomerStoreMatch,
   rejectImpersonated,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -883,24 +892,29 @@ router.post(
 );
 
 // GET /stores/:storeId/orders/my - Get customer's own orders
-router.get('/my/list', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
+router.get(
+  '/my/list',
+  authenticate,
+  requireCustomerStoreMatch,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
 
-    const { page, limit } = req.query;
-    const result = await OrderService.getCustomerOrders(storeId, getAuthUser(req).userId, {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-    });
+      const { page, limit } = req.query;
+      const result = await OrderService.getCustomerOrders(storeId, getAuthUser(req).userId, {
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
 
-    res.json({
-      success: true,
-      data: { ...result, orders: result.orders.map(redactOrderForCustomer) },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { ...result, orders: result.orders.map(redactOrderForCustomer) },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // ==========================================
 // COD Mark as Paid
@@ -2428,6 +2442,7 @@ interface ShipmentHistoryEntry {
 router.get(
   '/:orderId/timeline',
   authenticate,
+  requireCustomerStoreMatch,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
@@ -2472,7 +2487,7 @@ router.get(
       // For non-viewer callers verify ownership
       if (!isStoreViewer) {
         if (!user || order.customerId !== user.userId) {
-          res.status(403).json({ success: false, error: { message: 'Forbidden' } });
+          res.status(404).json({ success: false, error: { message: 'Order not found' } });
           return;
         }
       }

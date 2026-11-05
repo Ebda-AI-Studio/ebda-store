@@ -72,6 +72,20 @@ export async function customerRows(
   return out;
 }
 
+/**
+ * Super-admin search inside ONE store's customer directory (Ruling NZ-C-12): email / phone contains `q` (>= 3 chars), newest first.
+ * `null` when the store is not DO-served (the Postgres path is the caller's).
+ */
+export async function searchCustomerRows(
+  storeId: string,
+  q: string,
+  limit = 10
+): Promise<CustomerRow[] | null> {
+  const route = await customerAuthRoute(storeId, { write: false });
+  if (route.kind !== 'do') return null;
+  return (await route.client.call<Wire[]>('search', { q, limit })).map(toRow);
+}
+
 /** One customer, `undefined` when the store is not DO-served (run the Postgres query), `null` when the DO does not know it. */
 export async function customerRow(
   storeId: string,

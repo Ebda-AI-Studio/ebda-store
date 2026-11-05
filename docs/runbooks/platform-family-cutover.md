@@ -13,7 +13,7 @@ NEON-ZERO-1 item N-10. Run by the CONTROLLER (this repo never holds production c
 | `inbox`    | webhook_events                                                                                                                                                                                                       | N-10b; callbacks are recorded into D1 during the freeze, never refused |
 
 | `payments` | instapay_receipts, manual_payment_claims | N-10d, MONEY; run AFTER `billing` (the script and the router refuse otherwise). Order receipts of DO stores are not copied: pass `--accept-skipped-do-receipts <count the dry run prints>` |
-| `ops` | answer_engine_provider_configs, store_usage_snapshots, ci_insights | N-10d; no money coupling |
+| `ops` | answer_engine_provider_configs, store_usage_snapshots, ci_insights, onesignal_subscriptions | N-10d (+ onesignal_subscriptions, NZ-C-11: apply D1 migration `0006_onesignal_subscriptions.sql` first; if the `ops` marker is ALREADY set, copy this table by hand before relying on it, it reads empty until then); no money coupling |
 | `audit` | Postgres `audit_logs` rows with no store -> D1 `platform_audit_log` | N-10d; NEVER refuses a write: the freeze only redirects new store-less rows to D1 (see below) |
 
 Each family: `node scripts/cf/cutover-platform-family.mjs --family <name> --d1 ebda-platform --d1-target remote --d1-config apps/api/wrangler.jsonc --pg-url "$CUTOVER_PG_URL"` (dry run), then the same plus `--commit`. One family at a time; `--status` shows marker and freeze.
@@ -53,6 +53,7 @@ node scripts/cf/cutover-platform-family.mjs $F --status   # 3. marker + D1 count
 
 ## Secrets in the cutover
 
+- **Deferred webhooks with no marker (Ruling NZ-PG-6).** `processDeferredBillingWebhooks` applies nothing until `platform_cutover.billing` exists. If a `--commit` run aborts (no marker) and is not re-run, the webhooks stored during its freeze stay `deferred`: the gateway was answered 200, so it will not retry, and the payment is not booked. The `*/15` cron job `billing-deferred-webhooks` raises a P1 (`billing.deferred_webhooks_orphaned`, at most once per 6 hours per isolate) when deferred rows older than 30 minutes exist and the marker does not. Response: re-run `--commit` (it copies the deferred rows aside and applies them after the flip), or, if the cutover is abandoned, apply them by hand from D1 `billing_webhook_events WHERE outcome = 'deferred'` before touching anything else.
 - Deferred billing webhooks are stored with the raw body DROPPED and the parsed event (card token included) ENCRYPTED with the app's encryption key; `detail` is set to NULL the moment the event is applied.
 - Rows the script sets aside are written to `.cutover-stash/<family>-<time>.ndjson` BEFORE they are deleted: AES-256-GCM per line with the key in `CUTOVER_STASH_KEY` (>= 32 chars; the run refuses to set rows aside without it), mode 0600, deleted once the rows are back in D1. If a run dies, `--restore-stash <file>` puts them back (same key, same `--d1` flags).
 
@@ -135,3 +136,7 @@ Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
   `TaxProfileService.review`; the Postgres trigger `tax_profile_review_guard` has no DO twin, the route (`authorize('super_admin')`
   - MFA) is the only caller. Cost if wrong: a future second caller of `review` would not be refused at the data layer.
 - Residual: none for these routes.
+
+## `STORE_CREATE_ON_DO` is a separate step (Ruling NZ-PG-9)
+
+The code deploy does NOT set `STORE_CREATE_ON_DO`. Set it to `"1"` in `apps/api/wrangler.jsonc` and deploy only AFTER every platform-family copy has finished (a store created on the DO inside a copy window could be removed by the copy's "delete D1 rows Postgres lacks" step). Once all `platform_cutover.*` markers exist and the Worker has no Hyperdrive, an unset value shows as `store_create: "misconfigured"` on `GET /health` and pages P1 `api.store_create_on_do_unset`.

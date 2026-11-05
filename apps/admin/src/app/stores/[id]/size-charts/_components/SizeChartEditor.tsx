@@ -21,6 +21,7 @@ import {
   type SizeChart,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useLocale } from 'next-intl';
 
 export type SizeChartDraft = SizeChart;
@@ -253,6 +254,7 @@ export function SizeChartEditor({
   onCancel,
 }: Props) {
   const t = useT('sizeCharts.editor');
+  const askConfirm = useConfirm();
   const locale = useLocale();
   const [previewLang, setPreviewLang] = useState<'ar' | 'en'>(locale === 'en' ? 'en' : 'ar');
   const [dirty, setDirty] = useState(false);
@@ -269,8 +271,17 @@ export function SizeChartEditor({
       rows: c.rows.map((row, j) => (j === r ? row.map((x, k) => (k === i ? v : x)) : row)),
     });
 
-  const applyTemplate = (key: TemplateKey) => {
-    if (dirty && !window.confirm(t('templateReplace'))) return;
+  const applyTemplate = async (key: TemplateKey) => {
+    if (
+      dirty &&
+      !(await askConfirm({
+        object: t('templateReplaceObject'),
+        consequence: t('templateReplace'),
+        confirmLabel: t('templateReplaceLabel'),
+        tone: 'default',
+      }))
+    )
+      return;
     onChange(structuredClone(SIZE_CHART_TEMPLATES[key]));
     setDirty(false);
   };

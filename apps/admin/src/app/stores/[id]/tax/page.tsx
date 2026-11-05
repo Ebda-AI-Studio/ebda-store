@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 import { textFieldValue } from '../../../../lib/form-text';
 import { useLatestRequest } from '../../../../hooks/useLatestRequest';
+import { useConfirm } from '../../../../hooks/useConfirm';
 import { TaxGeneralSettings } from './_components/TaxGeneralSettings';
+import { TaxSteps } from './_components/TaxSteps';
 import { TaxTimeZoneCard } from './_components/TaxTimeZoneCard';
 import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
@@ -34,6 +37,9 @@ export default function TaxSettingsPage() {
   const storeId = params.id as string;
   const tPage = useT('tax.page');
   const tEnable = useT('tax.settings.enable');
+  const tSteps = useT('tax.steps');
+  const askConfirm = useConfirm();
+  const { error: toastError } = useToast();
   const { isEnabled, isLoading: featuresLoading } = useFeatures();
 
   const [settings, setSettings] = useState<TaxSettings>({
@@ -201,9 +207,12 @@ export default function TaxSettingsPage() {
       if (!error) {
         handleCloseModal();
         setRefreshKey(k => k + 1);
+      } else {
+        toastError(tPage('rateSaveFailed'), error.message || '');
       }
     } catch (err) {
       console.error('Failed to save tax rate:', err);
+      toastError(tPage('rateSaveFailed'), '');
     } finally {
       setSaving(false);
     }
@@ -211,19 +220,30 @@ export default function TaxSettingsPage() {
 
   const handleToggle = async (rate: TaxRate) => {
     try {
-      await apiPatch(`/api/v1/stores/${storeId}/tax/rates/${rate.id}/toggle`);
+      const { error } = await apiPatch(`/api/v1/stores/${storeId}/tax/rates/${rate.id}/toggle`);
+      if (error) toastError(tPage('rateToggleFailed'), error.message || '');
       setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to toggle tax rate:', err);
+      toastError(tPage('rateToggleFailed'), '');
     }
   };
 
   const handleDelete = async (rate: TaxRate) => {
+    const ok = await askConfirm({
+      object: tPage('rateDeleteObject', { name: rate.nameAr || rate.name }),
+      consequence: tPage('rateDeleteConsequence'),
+      confirmLabel: tPage('rateDeleteLabel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
-      await apiDelete(`/api/v1/stores/${storeId}/tax/rates/${rate.id}`);
+      const { error } = await apiDelete(`/api/v1/stores/${storeId}/tax/rates/${rate.id}`);
+      if (error) toastError(tPage('rateDeleteFailed'), error.message || '');
       setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to delete tax rate:', err);
+      toastError(tPage('rateDeleteFailed'), '');
     }
   };
 
@@ -236,6 +256,18 @@ export default function TaxSettingsPage() {
     }));
   };
 
+  const etaStep = !featuresLoading && isEnabled('eta_ereceipt');
+  const taxSteps = [
+    {
+      id: 'register',
+      label: tSteps('register'),
+      done: vatStatus === 'verified',
+      href: '#tax-register',
+    },
+    ...(etaStep ? [{ id: 'eta', label: tSteps('eta'), done: false, href: '#tax-eta' }] : []),
+    { id: 'rates', label: tSteps('rates'), done: activeRates.length > 0, href: '#tax-rates' },
+  ];
+
   const updateForm = (patch: Partial<RateFormData>) => setFormData(prev => ({ ...prev, ...patch }));
 
   return (
@@ -247,9 +279,14 @@ export default function TaxSettingsPage() {
           </div>
         ) : (
           <>
-            <TaxVerificationCard storeId={storeId} onStatusChange={handleVatStatus} />
+            <TaxSteps steps={taxSteps} />
+            <div id="tax-register" className="scroll-mt-24">
+              <TaxVerificationCard storeId={storeId} onStatusChange={handleVatStatus} />
+            </div>
             {!featuresLoading && isEnabled('eta_ereceipt') && vatStatus === 'verified' ? (
-              <EtaConnectionCard storeId={storeId} />
+              <div id="tax-eta" className="scroll-mt-24">
+                <EtaConnectionCard storeId={storeId} />
+              </div>
             ) : null}
             <TaxGeneralSettings
               vatVerified={vatStatus === 'verified'}
@@ -260,16 +297,18 @@ export default function TaxSettingsPage() {
               onSaveSettings={handleSaveSettings}
             />
             <TaxTimeZoneCard storeId={storeId} />
-            <TaxRatesTable
-              rates={rates}
-              filter={filter}
-              taxEnabled={settings.taxEnabled}
-              onFilterChange={setFilter}
-              onAdd={() => handleOpenModal()}
-              onEdit={rate => handleOpenModal(rate)}
-              onToggle={handleToggle}
-              onDelete={handleDelete}
-            />
+            <div id="tax-rates" className="scroll-mt-24">
+              <TaxRatesTable
+                rates={rates}
+                filter={filter}
+                taxEnabled={settings.taxEnabled}
+                onFilterChange={setFilter}
+                onAdd={() => handleOpenModal()}
+                onEdit={rate => handleOpenModal(rate)}
+                onToggle={handleToggle}
+                onDelete={handleDelete}
+              />
+            </div>
             <TaxInfoBox taxEnabled={settings.taxEnabled} activeRates={activeRates} />
           </>
         )}

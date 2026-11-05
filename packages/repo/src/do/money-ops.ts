@@ -12,6 +12,8 @@ import {
   initializeCustomerPoints,
   listMembers,
   loyaltyStoreConfig,
+  expirePoints,
+  awardBirthdays,
   listStoreTransactions,
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
@@ -123,6 +125,7 @@ import {
   vectorCommitOp,
   vectorPlanOp,
   vectorStaleOp,
+  vectorStatusOp,
   vectorVisibleOp,
   webhookEndpointCreateOp,
 } from './job-ops-b';
@@ -170,6 +173,8 @@ export type MoneyOpName =
   | 'loyaltyInit'
   | 'loyaltyReviewBonus'
   | 'loyaltyCustomerPoints'
+  | 'loyaltyExpire'
+  | 'loyaltyBirthdays'
   | 'loyaltyHistory'
   | 'loyaltyMembers'
   | 'loyaltyStats'
@@ -263,6 +268,7 @@ export type MoneyOpName =
   | 'vectorPlan'
   | 'vectorCommit'
   | 'vectorStale'
+  | 'vectorStatus'
   | 'vectorVisible'
   | 'expenseTransition'
   | 'searchLogRecord'
@@ -282,6 +288,11 @@ export type MoneyOpName =
   | 'analyticsStock'
   | 'analyticsCashflow'
   | 'analyticsImportReset';
+function boundedInt(v: unknown, name: string, min: number, max: number): number {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
+    throw new MoneyError('BAD_ARGS', name, 400);
+  return v;
+}
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -290,6 +301,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyInit',
   'loyaltyReviewBonus',
   'loyaltyCustomerPoints',
+  'loyaltyExpire',
+  'loyaltyBirthdays',
   'loyaltyHistory',
   'loyaltyMembers',
   'loyaltyStats',
@@ -383,6 +396,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'vectorPlan',
   'vectorCommit',
   'vectorStale',
+  'vectorStatus',
   'vectorVisible',
   'expenseTransition',
   'searchLogRecord',
@@ -457,6 +471,22 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       productId: id(a.productId, 'productId'),
       reviewId: id(a.reviewId, 'reviewId'),
       featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyBirthdays: (db, storeId, a) =>
+    awardBirthdays(db, {
+      storeId,
+      now: Date.now(),
+      month: boundedInt(a.month, 'month', 1, 12),
+      day: boundedInt(a.day, 'day', 1, 31),
+      yearStart: boundedInt(a.yearStart, 'yearStart', 0, Number.MAX_SAFE_INTEGER),
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyExpire: (db, storeId, a) =>
+    expirePoints(db, {
+      storeId,
+      now: Date.now(),
+      after: typeof a.after === 'string' ? a.after : null,
+      limit: typeof a.limit === 'number' ? a.limit : undefined,
     }),
   loyaltyCustomerPoints: (db, storeId, a) =>
     getCustomerPoints(db, {
@@ -816,6 +846,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),
   analyticsImportReset: (db, storeId, a) => analyticsImportResetOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
+  vectorStatus: (db, storeId) => vectorStatusOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),
   vectorCommit: (db, storeId, a) => vectorCommitOp(db, storeId, a),

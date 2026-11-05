@@ -8,6 +8,7 @@ import { LoyaltyTransactionType } from '@ebda/database';
 import { tenantContext } from '../middleware/tenant-context';
 import { rangeOrLegacyDays } from '../lib/report-range';
 import { assertStoreCustomer } from '../lib/store-customer';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 
 // TWO routers, deliberately. The admin half is mounted ONLY at the bare
 // '/stores' prefix; the customer half is the only thing mounted at '/public'
@@ -338,6 +339,7 @@ router.post(
 publicRouter.get(
   '/:storeId/loyalty/my-points',
   authenticate,
+  requireCustomerStoreMatch,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -370,6 +372,7 @@ publicRouter.get(
 publicRouter.get(
   '/:storeId/loyalty/my-transactions',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('loyalty'), // BE:S-29 / D7
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -403,6 +406,7 @@ publicRouter.get(
 publicRouter.post(
   '/:storeId/loyalty/join',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('loyalty'), // BE:S-29 / D7
   async (req: Request, res: Response, next: NextFunction) => {
     try {

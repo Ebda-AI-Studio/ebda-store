@@ -3,6 +3,7 @@ import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-direc
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, customerUserId } from '../middleware/auth';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { tenantContext } from '../middleware/tenant-context';
@@ -190,6 +191,7 @@ function requireCustomer(req: Request, res: Response): string | null {
 router.get(
   '/public/:storeId/wallet',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('customer_wallet'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -214,6 +216,7 @@ router.get(
 router.get(
   '/public/:storeId/wallet/transactions',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('customer_wallet'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

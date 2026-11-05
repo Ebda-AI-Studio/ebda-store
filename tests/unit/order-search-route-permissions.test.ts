@@ -35,7 +35,7 @@ describe('order / customer search routes enforce orders:read', () => {
   it('orders list: a store viewer needs orders:read', () => {
     const src = read('apps/api/src/routes/order.routes.ts');
     const list = src.slice(
-      src.indexOf("router.get('/', authenticate"),
+      src.search(/router\.get\(\s*'\/',\s*authenticate/),
       src.indexOf('OrderService.list(')
     );
     expect(list).toContain("hasPermission(role as Role, 'orders:read')");

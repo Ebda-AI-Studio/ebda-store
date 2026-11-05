@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, useToast } from '@ebda/ui';
+import { useConfirm } from '@/hooks/useConfirm';
 import {
   recommendedSizeTextForTemplate,
   type TemplateId,
@@ -126,6 +127,7 @@ export function SimpleVariantsForm({
 }: SimpleVariantsFormProps) {
   const t = useT('products.variants.simpleForm');
   const { success: toastSuccess, error: toastError } = useToast();
+  const askConfirm = useConfirm();
 
   const primaryOption = options[0] ?? null;
   // Multi-axis: 2+ option axes (Size × Color etc.). Locks the name
@@ -189,7 +191,11 @@ export function SimpleVariantsForm({
     // Existing variant: delete on the server immediately so the row
     // doesn't reappear after a save round-trip.
     if (target.variantId) {
-      const ok = window.confirm(t('confirmDelete', { name: target.value || target.variantId }));
+      const ok = await askConfirm({
+        object: t('deleteDialog.object', { name: target.value || target.variantId }),
+        consequence: t('deleteDialog.consequence'),
+        confirmLabel: t('deleteDialog.confirmLabel'),
+      });
       if (!ok) return;
       setDeletingRows(prev => new Set(prev).add(rowId));
       // Optimistically remove the row from the visible list so a

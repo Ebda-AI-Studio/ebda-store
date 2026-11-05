@@ -15,6 +15,8 @@
 
 import { withStore, withUser } from '@ebda/database';
 import { adminPushPlayerIds } from '../lib/definer';
+import { prisma } from '@ebda/database';
+import { platformFamilyOnD1 } from './platform/cutover';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -1001,14 +1003,18 @@ export class OneSignalService {
     // definer returns device ids only; a store_admin audience is answered only for
     // the store the transaction is scoped to, hence `withStore` (it reuses the
     // caller's transaction when it is already that store's).
+    // Devices on D1 (family `ops`): no Postgres tenant scope to open (NZ-C-11); the definer wrapper answers from D1.
+    const onD1 = await platformFamilyOnD1('ops');
     if (criteria.role === 'store_admin') {
       if (!criteria.ownsStoreId) return [];
       const storeId = criteria.ownsStoreId;
+      if (onD1) return adminPushPlayerIds('store_admin', storeId);
       return withStore(storeId, () => adminPushPlayerIds('store_admin', storeId));
     }
     // The super_admin audience is answered only to a scoped caller: run it in the
     // notification's store scope (reused when the caller is already in it).
     if (!criteria.ownsStoreId) return [];
+    if (onD1) return adminPushPlayerIds('super_admin', null);
     return withStore(criteria.ownsStoreId, () => adminPushPlayerIds('super_admin', null));
   }
 
@@ -1023,7 +1029,16 @@ export class OneSignalService {
     playerId: string,
     deviceLabel?: string
   ): Promise<void> {
-    // User-keyed rows (RLS on app.current_user_id): written AS the user.
+    // User-keyed rows. On D1 (family `ops`, NZ-C-11) the routed model answers with no Postgres transaction; the caller's
+    // route `authorize` has already pinned `userId` to the acting user. Before the marker: written AS the user (RLS).
+    if (await platformFamilyOnD1('ops')) {
+      await prisma.oneSignalSubscription.upsert({
+        where: { userId_playerId: { userId, playerId } },
+        create: { userId, playerId, deviceLabel },
+        update: { deviceLabel },
+      });
+      return;
+    }
     await withUser(userId, tx =>
       tx.oneSignalSubscription.upsert({
         where: { userId_playerId: { userId, playerId } },
@@ -1034,18 +1049,23 @@ export class OneSignalService {
   }
 
   static async listSubscriptions(userId: string) {
-    return withUser(userId, tx =>
-      tx.oneSignalSubscription.findMany({
-        where: { userId },
-        orderBy: { updatedAt: 'desc' },
-      })
-    );
+    const q = { where: { userId }, orderBy: { updatedAt: 'desc' as const }, take: 100 };
+    if (await platformFamilyOnD1('ops')) return prisma.oneSignalSubscription.findMany(q);
+    return withUser(userId, tx => tx.oneSignalSubscription.findMany(q));
   }
 
   static async deleteSubscription(userId: string, playerId: string): Promise<void> {
-    await withUser(userId, tx =>
-      tx.oneSignalSubscription.delete({ where: { userId_playerId: { userId, playerId } } })
-    ).catch(err => {
+    const run = () =>
+      platformFamilyOnD1('ops').then(d1 =>
+        d1
+          ? prisma.oneSignalSubscription.delete({
+              where: { userId_playerId: { userId, playerId } },
+            })
+          : withUser(userId, tx =>
+              tx.oneSignalSubscription.delete({ where: { userId_playerId: { userId, playerId } } })
+            )
+      );
+    await run().catch(err => {
       // not-found is fine — the user may have already removed it elsewhere
       if (err?.code !== 'P2025') throw err;
     });

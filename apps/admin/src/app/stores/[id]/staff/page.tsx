@@ -191,7 +191,7 @@ export default function StoreStaffPage() {
       primaryOnMobile: true,
       cell: member => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/10 text-warning-ink">
             <span className="text-sm font-bold">
               {member.firstName[0]}
               {member.lastName[0]}

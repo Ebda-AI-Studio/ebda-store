@@ -10,6 +10,8 @@ import {
   prisma,
   runWithRequestDb,
   setScopeResolver,
+  storeDirectory,
+  withHiddenStores,
   withStore,
   withUser,
   type ScopeResolver,
@@ -106,12 +108,81 @@ describe('scope resolver (one implementation)', () => {
     expect(pg.log.gucs.join('|')).toContain(USER);
   });
 
-  it('acrossStores decides per store with the same rule, and uses the hub lister when unfiltered', async () => {
-    setScopeResolver(resolver({ hubStoreIds: async () => [DO_STORE, PG_STORE] }));
+  it('acrossStores decides per store with the same rule and lists the FULL directory when unfiltered (no cap)', async () => {
+    const entry = (id: string) => ({
+      id,
+      slug: id,
+      name: id,
+      status: 'active',
+      plan: 'starter',
+      accountingEnabled: true,
+      aiFeaturesEnabled: true,
+      loyaltyEnabled: false,
+      hasDomain: false,
+      hasPendingDomain: false,
+    });
+    const many = Array.from(
+      { length: 1203 },
+      (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
+    );
+    setScopeResolver(
+      resolver({
+        lazyForStore: async () => true,
+        directory: async () => [entry(DO_STORE), entry(PG_STORE), ...many.map(entry)],
+      })
+    );
     const { value, log } = await run(() => acrossStores(async id => id, {}));
-    expect(value.map(v => v.value).sort()).toEqual([DO_STORE, PG_STORE].sort());
-    expect(log.transactions).toBe(1); // the Postgres store only
-    expect(log.gucs.join('|')).toContain(PG_STORE);
+    expect(value).toHaveLength(1205); // > the old 500 hub cap: nothing is cut
+    expect(value.map(v => v.value)).toContain(many[1202]);
+    expect(log.transactions).toBe(0); // every store lazy (no pg transaction)
+  });
+
+  it('storeDirectory reads the registered D1 directory (no Postgres query), applies the filter and the hidden-store drop', async () => {
+    const e = (id: string, accountingEnabled: boolean) => ({
+      id,
+      slug: id,
+      name: id,
+      status: 'active',
+      plan: 'starter',
+      accountingEnabled,
+      aiFeaturesEnabled: true,
+      loyaltyEnabled: false,
+      hasDomain: false,
+      hasPendingDomain: false,
+    });
+    const directory = vi.fn(async () => [e(DO_STORE, true), e(PG_STORE, false)]);
+    setScopeResolver(resolver({ directory }));
+    const fake = fakeClient();
+    const queryRaw = vi.fn(async () => {
+      throw new Error('POSTGRES_REMOVED');
+    });
+    (fake.client as unknown as { $queryRaw: unknown }).$queryRaw = queryRaw;
+    const out = await runWithRequestDb(
+      () => fake.client,
+      () => storeDirectory(s => s.accountingEnabled)
+    );
+    expect(out.map(s => s.id)).toEqual([DO_STORE]);
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(directory).toHaveBeenCalledWith(expect.objectContaining({ includeDeleted: false }));
+    const hidden = await runWithRequestDb(
+      () => fake.client,
+      () => withHiddenStores({ hidden: new Set([DO_STORE]) }, () => storeDirectory())
+    );
+    expect(hidden.map(s => s.id)).toEqual([PG_STORE]);
+  });
+
+  it('storeDirectory({ postgresOnly }) skips the D1 resolver (the drift reconcile reads the Postgres side as Postgres says it)', async () => {
+    const directory = vi.fn(async () => []);
+    setScopeResolver(resolver({ directory }));
+    const fake = fakeClient();
+    const queryRaw = vi.fn(async () => []);
+    (fake.client as unknown as { $queryRaw: unknown }).$queryRaw = queryRaw;
+    await runWithRequestDb(
+      () => fake.client,
+      () => storeDirectory(undefined, { postgresOnly: true })
+    );
+    expect(directory).not.toHaveBeenCalled();
+    expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it('an unreadable decision throws: never a silent Postgres fallback', async () => {

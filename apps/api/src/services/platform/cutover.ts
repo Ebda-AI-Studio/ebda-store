@@ -69,7 +69,8 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   // marker may already exist in production: adding models to a flipped family would serve them empty).
   payments: ['instapayReceipt', 'manualPaymentClaim'],
   // N-10d. Non-money platform tables: per-store monthly usage snapshots, platform CI findings, answer-engine provider keys.
-  ops: ['answerEngineProviderConfig', 'storeUsageSnapshot', 'ciInsight'],
+  // NZ-C-11: + oneSignalSubscription, the admin / staff / super_admin push devices (user-keyed, no store).
+  ops: ['answerEngineProviderConfig', 'storeUsageSnapshot', 'ciInsight', 'oneSignalSubscription'],
   // N-10d. The audit trail has no Prisma model on D1 (it is written through `services/audit-sink.ts`, never the router);
   // the marker only says "store-less audit rows go to D1 platform_audit_log and DO-store rows to their StoreDO".
   audit: [],
@@ -219,10 +220,11 @@ export async function platformFamilyOnD1(family: PlatformFamily): Promise<boolea
 }
 
 /**
- * WRITE path: where this write goes, never from a stale "off". While a freeze exists EVERY write is refused (retryable
- * 503), marker or not: with the marker present but the freeze still up, isolates that have not seen the marker would
- * otherwise write Postgres while others write D1 (mixed backends). Only after the script lifts the freeze do writes
- * flow, and by then every isolate resolves the marker.
+ * WRITE path: where this write goes, never from a stale "off". While a freeze exists an isolate that has NOT cached the
+ * marker refuses the write (retryable 503), marker or not: otherwise it would write Postgres while others write D1 (mixed
+ * backends). An isolate that HAS seen the marker ("on" is cached for the isolate's life, the first line below) writes D1 even
+ * while the freeze row still exists: marker + freeze coexisting does NOT refuse every write (Ruling NZ-PG-5). Nothing writes
+ * Postgres after the flip: the isolates that cannot decide refuse, they never fall back.
  */
 export async function platformFamilyOnD1ForWrite(family: PlatformFamily): Promise<boolean> {
   if (on.has(family)) return true;

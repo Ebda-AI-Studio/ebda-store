@@ -69,13 +69,13 @@ Merged: #430 (`fix/nz-routes-b`), #431 (`fix/nz-analytics-routes`), #432 (`fix/n
 
 ### ONE scope resolver (the rule all three PRs and #429 now share)
 
-`packages/database/src/index.ts` has a single `ScopeResolver { lazyForStore, lazyForUser, hubStoreIds? }` (`setScopeResolver`), registered once in `apps/api/src/lib/store-scope-resolver.ts`. `setStoreScopeResolver` / `setHubStoreLister` (group C) and the second `setScopeResolver` registration in `services/platform/router.ts` (#432) are gone. A `withStore` / `withUser` / `acrossStores` call with no ambient transaction:
+`packages/database/src/index.ts` has a single `ScopeResolver { lazyForStore, lazyForUser, directory? }` (`setScopeResolver`), registered once in `apps/api/src/lib/store-scope-resolver.ts`. `setStoreScopeResolver` / `setHubStoreLister` (group C) and the second `setScopeResolver` registration in `services/platform/router.ts` (#432) are gone. A `withStore` / `withUser` / `acrossStores` call with no ambient transaction:
 
 - store served by its Durable Object: `runInStoreScope` (no Postgres transaction; each Postgres query a handler still makes runs in its own short transaction WITH the store GUC, user carried);
 - Postgres store: `runInTenantContext` (BEGIN + `set_config`, atomic): tenant scoping is never skipped;
 - an unknown store id is a 404 `STORE_NOT_FOUND` once the directory is authoritative (group C; #432's "unknown id is lazy" was looser and is dropped); an unreadable flag or marker throws (503), never a Postgres guess;
 - user scope without a store (`withUser(user)`, `userContext`, `platformUserContext`): lazy only when `platformUserScopeIsLazy()` (cutover.ts): the platform D1 bound AND the billing, access and platform families all on it (#432 only tested the binding; group C's three markers are the stricter and kept). `platformUserContext` is now `userContext`.
-- `acrossStores` takes its store list from `hubStoreIds` when unfiltered (D1, capped), else the directory definer.
+- `acrossStores` takes its store list from `storeDirectory` (the resolver's `directory` hook: D1 `stores`, paged and NEVER capped, where the platform D1 is bound; the Postgres definer only where no D1 is bound). The old `hubStoreIds` hook (D1, capped at 500, `truncated` lost) is gone (Ruling NZ-PG-3).
 
 Pinned by `packages/database/src/__tests__/scope-resolver.test.ts` (7 cases).
 
@@ -118,3 +118,23 @@ Unit tests still red on the integrated tree, owners to fix in their own PR (mock
 ### #437-class merge: `fix/nz-customer-auth-routes` (customer login / passkeys / refresh)
 
 Merged without conflicts (35 files). Integration follow-ups: the DO erase engine now deletes `notification_logs` by the shopper's buyer keys (registry action `delete`; the parity test has its verdict), and `packages/repo/test/do-shipping-tax.test.ts` mocks `@ebda/shared` as a partial (`config` now reads `REGION`).
+
+## Refresh 4 (Ruling NZ-INTEG-1): `origin/main` merged into integ (final #401, #403-#405, #412, #420-#426)
+
+Main's security and money behaviour wins; integ's backend routing (`storeDb` / `storeWriter` / D1, no Postgres for a DO store) is kept; one implementation per function.
+
+| #   | File                                                                                | Resolution                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 42  | `lib/customer-group-scope.ts`                                                       | integ's `storeDb` read (main's `prisma` read dropped); same 404 `CUSTOMER_GROUP_NOT_FOUND` no-oracle.                                                                                                                            |
+| 43  | `routes/loyalty.routes.ts`                                                          | main's order: `authenticate`, `requireCustomerStoreMatch`, THEN `requireFeature('loyalty')` on `my-transactions` and `join` (#424: a customer of another store gets the 404 before any feature answer reveals the store's plan). |
+| 44  | `services/coupon.service.ts`, `services/promotion.service.ts`                       | integ's `storeDb` / `storeWriter` (the DO-writable coupon and promotion models); main's `prisma` imports dropped; main's validation and customer-group assertion untouched.                                                      |
+| 45  | `routes/admin.routes.ts`                                                            | integ's hub imports (`platform-hub`, `customerRows`); main had removed none of them.                                                                                                                                             |
+| 46  | `services/provisioning.service.ts`                                                  | already carried the BE:F-5 `nameAr` / `descriptionAr` default category in BOTH create paths (row 2); no change.                                                                                                                  |
+| 47  | `docs/README.md`, `docs/rulings/README.md`                                          | union; `PERF-TIMEOUTS-1` row added, the duplicate `JOBS-ORPHAN-1` row kept once; count regenerated (1666 = files = rows).                                                                                                        |
+| 48  | `tests/unit/queue-depth-watch-queued.test.ts`, `tests/unit/t2-tenant-scope.test.ts` | integ's mocks (`withStoreDb`; `storeDb` mocked to the prisma mock).                                                                                                                                                              |
+
+Verified: `tsc` clean for shared, database, repo, api, admin; the 40 test files main touched pass (the one failure, `tests/integration/repo-factory-money-contract`, needs a live Postgres).
+
+### Blocker B1 (final review): `platform` family copy vs D1-only `system_settings` keys
+
+`scripts/cf/cutover-platform-family.mjs` removed D1 rows Postgres lacks (step 3b) and verified `system_settings` with a predicate that excluded only `platform_cutover.%` / `platform_freeze.%`, so `--family platform --commit` would have deleted every `customer_auth_cutover.*` / `customer_auth_freeze.*` row (and any other cutover bookkeeping), sending every DO store's customers back to Postgres. `SYSTEM_SETTINGS_DATA_WHERE` (exported, used by the stray delete AND the verify digest) now leaves out everything the cutover scripts write: `category = 'cutover'`, `platform_*`, `customer_auth_*`, and any `*_cutover.*` / `*_freeze.*` key (the analytics marker included). The only D1-only `system_settings` writers in the tree (`lib/customer-auth.ts`, the three cutover scripts) all set `category = 'cutover'`. Pinned by `tests/unit/cutover-platform-family-system-settings.test.ts` (D1 holds `customer_auth_cutover.<store>` and `.__all` plus freezes: the predicate does not select them and the stray delete leaves them; a genuine stray setting is still removed). The test exercises the shared predicate on node:sqlite; the script's `--commit` needs a live Postgres and was not run.

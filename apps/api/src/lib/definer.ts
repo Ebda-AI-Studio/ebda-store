@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { adminPushPlayerIdsD1 } from '../services/platform/push-d1';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { requirePlatformDb } from './platform-db';
 import {
@@ -76,6 +77,23 @@ export interface UserState {
 
 /** The facts an access-token check needs about one user, by exact id. */
 export async function getUserState(userId: string): Promise<UserState | null> {
+  // Ruling NZ-PG-2: once the `access` family is on D1 the identity service is the only source of an account's facts and
+  // Postgres is gone. A non-customer account is answered from it (token version: the cached one, else 0); anyone it does not know (a customer, whose state is the store's DO, or a stranger) is
+  // UNKNOWN = blocked, never a Postgres read.
+  if (await onAccessD1()) {
+    const { getAccountState } = await import('./identity-client.js');
+    const acc = await getAccountState(userId);
+    if (!acc || acc.role === 'customer') return null;
+    const { redis } = await import('../services/redis.service.js');
+    return {
+      id: acc.id,
+      role: acc.role,
+      status: acc.status,
+      tokenVersion: (await redis.getUserTokenVersion(userId)) ?? 0,
+      storeId: null,
+      deletedAt: null,
+    };
+  }
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -110,6 +128,9 @@ export async function findUserIdByEmail(
   storeId: string | null,
   opts: { includeDeleted?: boolean; caseInsensitive?: boolean } = {}
 ): Promise<string | null> {
+  // Ruling NZ-PG-2: no Postgres user namespace once `access` is on D1 (admin accounts: the identity service; customers: their
+  // store's DO). Unknown here = not found.
+  if (await onAccessD1()) return null;
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_auth_find_user_id(
       ${email}, ${storeId}, ${opts.includeDeleted === true}, ${opts.caseInsensitive === true}) AS id`;
@@ -172,6 +193,13 @@ export async function ensureAdminUser(
   /** A transaction the caller already opened (provisioning); defaults to the ambient `prisma`. */
   db: Pick<Prisma.TransactionClient, '$queryRaw'> = prisma
 ): Promise<AdminUser> {
+  // Ruling NZ-PG-2: the admin namespace is the identity service's (`inviteIdentity`); this Postgres definer cannot run.
+  if (await onAccessD1())
+    throw new AppError(
+      410,
+      'PG_ACCOUNTS_REMOVED',
+      'Postgres accounts were removed; accounts are created through the identity service'
+    );
   const rows = await db.$queryRaw<
     Array<{ user_id: string; created: boolean; role: string; status: string }>
   >`SELECT * FROM public.ebda_admin_user_ensure(
@@ -297,7 +325,10 @@ export async function findOrderByIdempotencyKey(
  * Only a store the flag lists as `do` is returned (an index row of a store that went back to Postgres is stale; the definer
  * owns it). Null when D1 is unbound (Node / tests / local dev) or the id is not indexed.
  */
-async function doStoreFromIndex(kind: 'order' | 'payment', id: string): Promise<string | null> {
+async function doStoreFromIndex(
+  kind: 'order' | 'payment' | 'customer',
+  id: string
+): Promise<string | null> {
   const d1 = platformDb();
   if (!d1) return null;
   let storeId: string | null;
@@ -671,6 +702,15 @@ export async function getShipmentStoreIdByTracking(trackingNumber: string): Prom
  * user does not exist (the `update` it replaces threw P2025).
  */
 export async function revokeUserSessionsRow(userId: string): Promise<{ tokenVersion: number }> {
+  if (await onAccessD1()) {
+    // Ruling NZ-PG-2: sessions live at the identity service (`revokeIdentityUser`, called by the same path); here only the
+    // legacy token version moves on (cached, the middleware's tv) and the live merchant keys are revoked in D1.
+    const { redis } = await import('../services/redis.service.js');
+    const next = ((await redis.getUserTokenVersion(userId)) ?? 0) + 1;
+    await redis.setUserTokenVersion(userId, next);
+    await revokeUserMerchantKeysD1(userId, new Date());
+    return { tokenVersion: next };
+  }
   await assertNotFrozen('platform'); // the definer also revokes the merchant keys in Postgres: not during the copy
   const rows = await prisma.$queryRaw<Array<{ tv: number | null }>>`
     SELECT public.ebda_user_revoke_sessions(${userId}) AS tv`;
@@ -685,6 +725,7 @@ export async function revokeUserSessionsRow(userId: string): Promise<{ tokenVers
 
 /** Delete every `addresses` row of a user (erasure). Runs in the caller's transaction. */
 export async function deleteUserAddresses(userId: string): Promise<number> {
+  if (await onAccessD1()) return 0; // Ruling NZ-PG-2: no Postgres `addresses` rows exist any more
   const rows = await prisma.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_user_addresses_delete(${userId}) AS n`;
   return Number(rows[0]?.n ?? 0);
@@ -709,6 +750,23 @@ export async function getEntityStoreId(
   // NEON-ZERO-1 (N-10): the billing family answers from D1 once its cutover marker exists.
   if ((kind === 'billing_event' || kind === 'store_subscription') && (await onBillingD1()))
     return entityStoreIdD1(kind, id);
+  // Ruling NZ-PG-2: with the platform D1 bound a DO store is found WITHOUT Postgres: order / customer from the D1 entity
+  // index; a product, journal entry or bulk-import job is not indexed, so each DO store is probed by primary key. Only an id
+  // no DO store claims reaches the definer, and only while a `pg` store exists (pgStoreFallback; none after the cutover).
+  if (platformDb()) {
+    const onDo =
+      kind === 'order' || kind === 'customer'
+        ? await doStoreFromIndex(kind, id)
+        : kind === 'product' || kind === 'journal_entry' || kind === 'bulk_import_job'
+          ? await (await import('./entity-store-fanout.js')).entityStoreByFanout(kind, id)
+          : null;
+    if (onDo) return onDo;
+    return pgStoreFallback(async () => {
+      const r = await prisma.$queryRaw<Array<{ id: string | null }>>`
+        SELECT public.ebda_entity_store_id(${kind}, ${id}) AS id`;
+      return r[0]?.id ?? null;
+    });
+  }
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_entity_store_id(${kind}, ${id}) AS id`;
   return rows[0]?.id ?? null;
@@ -1100,6 +1158,7 @@ const asRetentionJob = <T>(fn: () => Promise<T>): Promise<T> =>
  */
 export const auditRetention = {
   async count(cutoff: Date): Promise<number> {
+    if (await auditStoreLessOnD1()) return 0; // Ruling NZ-PG-2: audit moved off Postgres; the D1 / DO legs archive in the job
     const rows = await asRetentionJob(
       () =>
         prisma.$queryRaw<Array<{ n: bigint }>>`
@@ -1109,6 +1168,7 @@ export const auditRetention = {
   },
   /** A page of rows (as the JSON an archive line holds), ascending by id after `afterId`. */
   async page(cutoff: Date, afterId: string | null, limit: number): Promise<Array<{ id: string }>> {
+    if (await auditStoreLessOnD1()) return [];
     const rows = await asRetentionJob(
       () =>
         prisma.$queryRaw<Array<Record<string, unknown>>>`
@@ -1128,6 +1188,7 @@ export const auditRetention = {
     }));
   },
   async purge(cutoff: Date, limit: number): Promise<number> {
+    if (await auditStoreLessOnD1()) return 0;
     const rows = await asRetentionJob(
       () =>
         prisma.$queryRaw<Array<{ n: number }>>`
@@ -1299,6 +1360,8 @@ export async function adminPushPlayerIds(
   role: 'store_admin' | 'super_admin',
   storeId: string | null
 ): Promise<string[]> {
+  // NZ-C-11: once `ops` (devices) is on D1 the audience is D1 + identity (same predicate as the SQL function below).
+  if (await platformFamilyOnD1('ops')) return adminPushPlayerIdsD1(role, storeId);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT ebda_admin_push_player_ids AS id FROM public.ebda_admin_push_player_ids(${role}, ${storeId})`;
   return rows.map(r => r.id).filter(Boolean);
@@ -1329,6 +1392,7 @@ export async function publicStorePage(
 
 /** The user a stored refresh / reset token (its stored form, e.g. sha256 or `reset:<sha256>`) belongs to. */
 export async function refreshTokenUser(storedToken: string): Promise<string | null> {
+  if (await onAccessD1()) return null; // Ruling NZ-PG-2: sessions are the identity service's / the store DO's, not Postgres rows
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_refresh_token_user(${storedToken}) AS id`;
   return rows[0]?.id ?? null;
@@ -1336,6 +1400,7 @@ export async function refreshTokenUser(storedToken: string): Promise<string | nu
 
 /** The user a stored verification token (its sha256) belongs to. */
 export async function verificationTokenUser(storedToken: string): Promise<string | null> {
+  if (await onAccessD1()) return null; // Ruling NZ-PG-2
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_verification_token_user(${storedToken}) AS id`;
   return rows[0]?.id ?? null;
@@ -1357,6 +1422,7 @@ export interface PasskeyLookupRow {
  * still has to produce a valid signature over a server-issued challenge.
  */
 export async function passkeyLookup(credentialId: string): Promise<PasskeyLookupRow | null> {
+  if (await onAccessD1()) return null; // Ruling NZ-PG-2: passkeys are the identity service's / the store DO's
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -1381,6 +1447,7 @@ export async function passkeyLookup(credentialId: string): Promise<PasskeyLookup
 
 /** Delete every passkey of a user inside the CURRENT transaction (erasure). Guarded in SQL like `deleteUserTokens`. */
 export async function deleteUserPasskeys(userId: string): Promise<number> {
+  if (await onAccessD1()) return 0; // Ruling NZ-PG-2
   const rows = await prisma.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_passkeys_delete(${userId}) AS n`;
   return Number(rows[0]?.n ?? 0);
@@ -1388,6 +1455,7 @@ export async function deleteUserPasskeys(userId: string): Promise<number> {
 
 /** Delete refresh tokens that expired before `now` or were revoked before `revokedBefore`. */
 export async function purgeRefreshTokens(now: Date, revokedBefore: Date): Promise<number> {
+  if (await onAccessD1()) return 0; // Ruling NZ-PG-2: no Postgres refresh_tokens table to purge
   return withSystemJob('token-retention', async () => {
     const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT public.ebda_refresh_tokens_purge(${now}::timestamp, ${revokedBefore}::timestamp) AS n`;
@@ -1401,6 +1469,7 @@ export async function purgeRefreshTokens(now: Date, revokedBefore: Date): Promis
  * `deleteUserAddresses`: the user, a super_admin, or the merchant of the user's store.
  */
 export async function deleteUserTokens(userId: string): Promise<number> {
+  if (await onAccessD1()) return 0; // Ruling NZ-PG-2
   const rows = await prisma.$queryRaw<Array<{ n: number }>>`
     SELECT public.ebda_user_tokens_delete(${userId}) AS n`;
   return Number(rows[0]?.n ?? 0);

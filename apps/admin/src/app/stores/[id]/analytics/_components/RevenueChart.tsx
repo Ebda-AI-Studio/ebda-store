@@ -65,7 +65,7 @@ export function SimpleBarChart({
                 title={`${formatDate(item.date, granularity)}: ${dataKey === 'revenue' ? formatCurrency(item[dataKey]) : item[dataKey]}`}
               />
               {i % Math.ceil(data.length / 7) === 0 && (
-                <span className="text-[10px] text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
+                <span className="text-xs text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
                   {formatDate(item.date, granularity)}
                 </span>
               )}

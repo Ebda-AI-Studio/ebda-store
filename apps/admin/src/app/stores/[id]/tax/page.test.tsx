@@ -25,6 +25,15 @@ vi.mock('@/lib/api', () => ({
   apiDelete: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

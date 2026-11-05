@@ -13,6 +13,7 @@ import { d1All } from '../services/platform/billing-d1';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { getAccountsBrief } from './identity-client';
 import type { AccountBrief } from '../cf/bindings';
+import { searchCustomerRows } from './customer-directory';
 
 export const HUB_FANOUT_CAP = 500;
 export const HUB_FANOUT_CONCURRENCY = 8;
@@ -241,4 +242,60 @@ export async function hubUsers(briefs: AccountBrief[]): Promise<HubUser[]> {
     lastLoginAt: b.lastLoginAt ? new Date(b.lastLoginAt) : null,
     stores: owned.get(b.id) ?? [],
   }));
+}
+
+export type HubCustomerHit = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  status: string;
+  role: 'customer';
+  storeId: string;
+  storeName: string;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+};
+
+/**
+ * Ruling NZ-C-12 - customers live in their store's StoreDO, so a super-admin customer search is a CAPPED FAN-OUT, not an index:
+ * the newest `HUB_FANOUT_CAP` stores from D1, `HUB_FANOUT_CONCURRENCY` at once, each answering `search` (email / phone contains
+ * `q`, >= 3 chars, 10 hits) from its own DO; hits are merged newest first and cut to `limit`. `truncated` is true when the
+ * store list was cut, so "not found" never reads as "does not exist". A store that fails is skipped. A Postgres-backed
+ * store is not searched here (it has no D1 customer directory). Cost if wrong: a customer of a store outside the newest 500 is
+ * not found by search - widen with a D1 email-hash index (`customer_index`) if that is hit.
+ */
+export async function hubSearchCustomers(
+  q: string,
+  limit = 25
+): Promise<{ hits: HubCustomerHit[]; truncated: boolean }> {
+  const needle = q.trim();
+  if (needle.length < 3) return { hits: [], truncated: false };
+  const { ids, truncated } = await hubFanoutStoreIds();
+  const names = new Map((await hubStoresById(ids)).map(s => [s.id, s.name]));
+  const parts = await hubFanout(
+    ids,
+    async storeId => (await searchCustomerRows(storeId, needle, 10)) ?? [],
+    () => undefined
+  );
+  const hits = parts
+    .flatMap(p =>
+      p.value.map(c => ({
+        id: c.id,
+        email: c.email,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        phone: c.phone,
+        status: c.status,
+        role: 'customer' as const,
+        storeId: p.storeId,
+        storeName: names.get(p.storeId) ?? '',
+        createdAt: c.createdAt,
+        lastLoginAt: c.lastLoginAt,
+      }))
+    )
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+  return { hits, truncated };
 }

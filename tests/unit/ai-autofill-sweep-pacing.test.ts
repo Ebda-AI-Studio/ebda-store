@@ -21,13 +21,24 @@ const products = [
   { id: 'p3', updatedAt: new Date() },
   { id: 'p4', updatedAt: new Date() },
 ];
+// One list fake for both the legacy prisma handle and storeDb, so a test's mockResolvedValueOnce reaches the sweep.
+const listProducts = vi.fn(async () => products);
 vi.mock('@ebda/database', () => ({
-  prisma: { product: { findMany: vi.fn(async () => products) } },
+  prisma: { product: { findMany: listProducts } },
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({ store: { findUnique: async () => ({ theme: {} }) } }),
   hasTenantContext: () => false,
   runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
   onClosedTenantTxAccess: vi.fn(),
+}));
+// The sweep reads through storeDb (CF-JOBS-4): a Postgres store, faked.
+vi.mock('../../apps/api/src/lib/repo-factory', () => ({
+  storeDb: async () => ({
+    product: { findMany: (...a: unknown[]) => listProducts(...(a as [])) },
+    store: { findUnique: async () => ({ theme: {} }) },
+  }),
+  storeWriter: async () => ({}),
+  storeRepo: async () => ({ backend: 'pg' }),
 }));
 vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
