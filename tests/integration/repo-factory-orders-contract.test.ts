@@ -39,7 +39,8 @@ import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
 import { GoldRateService } from '../../apps/api/src/services/gold-rate/gold-rate.service';
 import { InstapayService } from '../../apps/api/src/services/payment-providers/instapay.service';
-import { createProduct, ownerPool } from '../helpers/gold-sql';
+import { OWNER_URL, createProduct, ownerPool } from '../helpers/gold-sql';
+import { reportAndEndStaleTransactions } from '../helpers/teardown-diagnostics';
 import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 const sfx = Date.now().toString(36);
@@ -299,12 +300,26 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.spyOn(featureService, 'isFeatureEnabled').mockResolvedValue(false);
 });
-// Teardown only closes connections; on a busy hosted runner closing the pool after the full suite took over 30 s
-// (run 42051542716, every test passed). Close both in parallel and give the hook its own budget.
+// Teardown only closes connections and takes milliseconds when nothing is left open (measured: ownerPg.end 0 ms,
+// prisma.$disconnect 1-2 ms, against Postgres 17 locally, alone and inside the full tier, node 22 and 26). On the hosted runner
+// it hung for 30 s and then 90 s (PR 437 runs 42051542716, 42056044397) with every test green, and `pool.end()` /
+// `$disconnect()` wait for exactly one thing: a connection that is still checked out, i.e. a transaction that never finished.
+// So after 8 s the hook names it (pool counters and the live pg_stat_activity rows, from a fresh connection) and ends any
+// backend left inside an open transaction doing nothing, then lets the close finish; the evidence lands in the CI log.
 afterAll(async () => {
   vi.restoreAllMocks();
-  await Promise.all([ownerPg.end(), prisma.$disconnect()]);
-}, 90_000);
+  const timer = setTimeout(() => {
+    reportAndEndStaleTransactions(OWNER_URL, ownerPg).then(
+      r => console.error('[orders-contract teardown] still closing after 8 s; open work:', r),
+      e => console.error('[orders-contract teardown] could not inspect pg_stat_activity:', e)
+    );
+  }, 8_000);
+  try {
+    await Promise.all([ownerPg.end(), prisma.$disconnect()]);
+  } finally {
+    clearTimeout(timer);
+  }
+});
 
 /** Gold: a product priced by rate (raw SQL, the price guard needs it) mirrored into the DO, and the store's rates mirrored. */
 const ownerPg = ownerPool();
