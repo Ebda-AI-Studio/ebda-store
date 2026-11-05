@@ -35,7 +35,7 @@ export function PwaIosSettings({ settings, pwaEnabled, onChange, theme }: PwaIos
                 iosStatusBarStyle: e.target.value as PWASettings['iosStatusBarStyle'],
               })
             }
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             disabled={!pwaEnabled}
           >
             {IOS_STATUS_OPTIONS.map(opt => (

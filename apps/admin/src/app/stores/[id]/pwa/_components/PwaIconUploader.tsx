@@ -262,7 +262,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
               value={settings.icon192 || ''}
               onChange={e => onChange({ ...settings, icon192: e.target.value })}
               placeholder={t('urlPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!pwaEnabled}
             />
             {settings.icon192 && (
@@ -285,7 +285,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
               value={settings.icon512 || ''}
               onChange={e => onChange({ ...settings, icon512: e.target.value })}
               placeholder={t('urlPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!pwaEnabled}
             />
             {settings.icon512 && (
@@ -308,7 +308,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
               value={settings.maskableIcon || ''}
               onChange={e => onChange({ ...settings, maskableIcon: e.target.value })}
               placeholder={t('urlPlaceholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!pwaEnabled}
             />
             {settings.maskableIcon && (

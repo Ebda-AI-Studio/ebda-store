@@ -7,8 +7,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
-vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
+const { apiGet, apiPut, toastError } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPut: vi.fn(),
+  toastError: vi.fn(),
+}));
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
+  useToast: () => ({ success: vi.fn(), error: toastError }),
+}));
+vi.mock('../shipping/_components/ShippingTabs', () => ({ ShippingTabs: () => null }));
+vi.mock('next/navigation', () => ({
+  useParams: () => ({ id: 'store-1' }),
+  usePathname: () => '/stores/store-1/delivery',
+}));
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
@@ -42,6 +54,9 @@ const pressed = () =>
     .filter(b => b.getAttribute('aria-pressed') === 'true')
     .map(b => b.textContent);
 const saveButton = () => screen.getByText('save') as HTMLButtonElement;
+// The sticky bar renders only while the form is dirty: type a minimum order to make it so.
+const makeDirty = () =>
+  fireEvent.change(screen.getByPlaceholderText('minOrderPlaceholder'), { target: { value: '50' } });
 const savedSettings = () => apiPut.mock.calls[0][1].settings as Record<string, unknown>;
 
 afterEach(() => {
@@ -57,15 +72,20 @@ describe('delivery page: days with no delivery', () => {
     expect(pressed()).toEqual(['deliveryOffDay6', 'deliveryOffDay5']);
   });
 
-  it('disables Save once all seven days are selected, and re-enables it below seven', async () => {
+  it('refuses to save when all seven days are selected, and saves again below seven', async () => {
     load({ deliveryOffDays: [5] });
     render(<CheckoutDeliveryPage />);
     await screen.findByText('deliveryOffDay5');
-    expect(saveButton().disabled).toBe(false);
     for (const d of [6, 0, 1, 2, 3, 4]) fireEvent.click(chip(d));
-    expect(saveButton().disabled).toBe(true);
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith('errorTitle', 'deliveryOffDaysAllOff')
+    );
+    expect(apiPut).not.toHaveBeenCalled();
     fireEvent.click(chip(0));
-    expect(saveButton().disabled).toBe(false);
+    apiPut.mockResolvedValue({ error: null });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
   });
 
   it('sends the chosen days, sorted, in settings.deliveryOffDays', async () => {
@@ -85,6 +105,7 @@ describe('delivery page: days with no delivery', () => {
     render(<CheckoutDeliveryPage />);
     await screen.findByText('deliveryOffDay5');
     expect(pressed()).toEqual(['deliveryOffDay5']);
+    makeDirty();
     apiPut.mockResolvedValue({ error: null });
     fireEvent.click(saveButton());
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
@@ -95,6 +116,7 @@ describe('delivery page: days with no delivery', () => {
     load({ deliveryOffDays: [5] });
     render(<CheckoutDeliveryPage />);
     await screen.findByText('deliveryOffDay5');
+    makeDirty();
     apiPut.mockResolvedValue({ error: null });
     fireEvent.click(saveButton());
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));

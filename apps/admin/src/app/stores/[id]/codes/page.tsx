@@ -53,6 +53,17 @@ function CodesBody() {
           </Link>
         ))}
       </div>
+      {tab !== 'qr' && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          {t(`crossLink.${tab}.text`)}{' '}
+          <Link
+            href={`/stores/${storeId}/${tab === 'labels' ? 'stock/inventory' : 'orders'}`}
+            className="font-medium text-primary-ink underline underline-offset-2"
+          >
+            {t(`crossLink.${tab}.link`)}
+          </Link>
+        </p>
+      )}
       <div role="tabpanel" id="codes-panel" aria-labelledby={`codes-tab-${tab}`}>
         {tab === 'qr' && <QrTab storeId={storeId} />}
         {tab === 'labels' && <LabelsGate storeId={storeId} />}

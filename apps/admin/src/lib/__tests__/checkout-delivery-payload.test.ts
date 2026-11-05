@@ -49,7 +49,6 @@ function serverMerge(stored: Record<string, unknown>, body: Record<string, unkno
 describe('buildCheckoutDeliverySettings — the emptied order-invoice address clears', () => {
   it('serializes an explicit null when the merchant empties the field', () => {
     const body = serialize({
-      existingSettings: STORED,
       config: CONFIG,
       minimumOrderMajor: '5.000',
       orderInvoiceEmail: '',
@@ -62,7 +61,6 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
 
   it('a whitespace-only address clears too', () => {
     const body = serialize({
-      existingSettings: STORED,
       config: CONFIG,
       minimumOrderMajor: '',
       orderInvoiceEmail: '   ',
@@ -72,7 +70,6 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
 
   it("the server's shallow merge no longer resurrects the removed address", () => {
     const body = serialize({
-      existingSettings: STORED,
       config: CONFIG,
       minimumOrderMajor: '5.000',
       orderInvoiceEmail: '',
@@ -85,7 +82,6 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
 
   it('sends a real address trimmed and unchanged — behaviour is otherwise identical', () => {
     const body = serialize({
-      existingSettings: STORED,
       config: CONFIG,
       minimumOrderMajor: '5.000',
       orderInvoiceEmail: '  owner@store.com  ',
@@ -94,17 +90,17 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
     expect(serverMerge(STORED, body).orderInvoiceEmail).toBe('owner@store.com');
   });
 
-  it('passes every other stored settings key through untouched', () => {
+  it('sends only its own keys (no stored key is spread back)', () => {
     const body = serialize({
-      existingSettings: { ...STORED, floatingWidget: { enabled: true }, navMenu: [] },
       config: CONFIG,
       minimumOrderMajor: '25.00',
       orderInvoiceEmail: 'owner@store.com',
     });
-    expect(body.currency).toBe('EGP');
-    expect(body.floatingWidget).toEqual({ enabled: true });
-    expect(body.navMenu).toEqual([]);
-    expect(body.checkoutDelivery).toEqual(CONFIG);
+    expect(Object.keys(body).sort()).toEqual([
+      'checkoutDelivery',
+      'minimumOrderFils',
+      'orderInvoiceEmail',
+    ]);
     expect(body.minimumOrderFils).toBe(2500); // 25.00 EGP in piastres
   });
 });
@@ -130,18 +126,19 @@ describe('store-wide deliveryDays (business days)', () => {
 
   it('serializes an explicit null when cleared, so the shallow merge drops the stored value', () => {
     const stored = { ...STORED, deliveryDays: { min: 2, max: 4 } };
-    const body = serialize({ ...base, existingSettings: stored, deliveryDays: null });
+    const body = serialize({ ...base, deliveryDays: null });
     expect(body).toHaveProperty('deliveryDays', null);
     expect(serverMerge(stored, body).deliveryDays).toBeNull();
   });
 
   it('sends the range when set and leaves the stored value alone when undefined', () => {
-    expect(
-      serialize({ ...base, existingSettings: STORED, deliveryDays: { min: 1, max: 3 } })
-        .deliveryDays
-    ).toEqual({ min: 1, max: 3 });
+    expect(serialize({ ...base, deliveryDays: { min: 1, max: 3 } }).deliveryDays).toEqual({
+      min: 1,
+      max: 3,
+    });
     const keep = { ...STORED, deliveryDays: { min: 2, max: 4 } };
-    expect(serialize({ ...base, existingSettings: keep }).deliveryDays).toEqual({ min: 2, max: 4 });
+    expect(serialize({ ...base })).not.toHaveProperty('deliveryDays');
+    expect(serverMerge(keep, serialize({ ...base })).deliveryDays).toEqual({ min: 2, max: 4 });
   });
 });
 
@@ -170,20 +167,16 @@ describe('store deliveryOffDays (days with no delivery)', () => {
   const base = { config: CONFIG, minimumOrderMajor: '', orderInvoiceEmail: '' };
 
   it('serializes [] (delivers every day) and the chosen days, never dropping the key', () => {
-    expect(serialize({ ...base, existingSettings: STORED, deliveryOffDays: [] })).toHaveProperty(
-      'deliveryOffDays',
-      []
-    );
-    expect(
-      serialize({ ...base, existingSettings: STORED, deliveryOffDays: [5, 6] }).deliveryOffDays
-    ).toEqual([5, 6]);
+    expect(serialize({ ...base, deliveryOffDays: [] })).toHaveProperty('deliveryOffDays', []);
+    expect(serialize({ ...base, deliveryOffDays: [5, 6] }).deliveryOffDays).toEqual([5, 6]);
   });
 
   it('sends an explicit null to clear and leaves the stored value on undefined', () => {
     const stored = { ...STORED, deliveryOffDays: [6] };
-    const cleared = serialize({ ...base, existingSettings: stored, deliveryOffDays: null });
+    const cleared = serialize({ ...base, deliveryOffDays: null });
     expect(serverMerge(stored, cleared).deliveryOffDays).toBeNull();
-    expect(serialize({ ...base, existingSettings: stored }).deliveryOffDays).toEqual([6]);
+    expect(serialize({ ...base })).not.toHaveProperty('deliveryOffDays');
+    expect(serverMerge(stored, serialize({ ...base })).deliveryOffDays).toEqual([6]);
   });
 
   it('reads unset, null and malformed as the Friday default', () => {
@@ -225,7 +218,6 @@ describe('offDaysForSave (the default is not pinned)', () => {
     expect(offDaysForSave([6], false, true)).toEqual({ ok: true, value: [6] });
     expect(
       buildCheckoutDeliverySettings({
-        existingSettings: { deliveryOffDays: 'friday' },
         config: {} as never,
         minimumOrderMajor: '',
         orderInvoiceEmail: '',

@@ -187,7 +187,7 @@ function CodFields({
             value={form.displayName || ''}
             onChange={e => onUpdateField('displayName', e.target.value)}
             placeholder={t('displayNamePlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
@@ -201,7 +201,7 @@ function CodFields({
             value={form.displayNameAr || ''}
             onChange={e => onUpdateField('displayNameAr', e.target.value)}
             placeholder={t('displayNameArPlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div className="sm:col-span-2">

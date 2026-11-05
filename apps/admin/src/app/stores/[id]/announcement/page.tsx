@@ -2,16 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 // NOTE (2026-06-09 overlap audit #4/#5): announcement-bar VISIBILITY (`enabled`)
 // and BACKGROUND color (`bgColor`) are now owned by the visual editor
 // (layout.announcement.*), which wins at render (ShopChrome resolves
 // `layout.announcement.enabled ?? announcementBar.enabled` and the same for
 // bgColor). This page is now content-only: it edits text/link/textColor and
 // no longer sends `enabled`/`bgColor`, so the two surfaces can't diverge.
-import { Button } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { Alert } from '../../../../components/Alert';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { ColorField } from '../../../../components/ColorField';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -56,7 +55,8 @@ export default function AnnouncementPage() {
   const [storeTheme, setStoreTheme] = useState<StoreTheme | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [baseline, setBaseline] = useState<string | null>(null);
 
   const fetchAnnouncement = useCallback(async () => {
     if (!storeId) return;
@@ -72,9 +72,9 @@ export default function AnnouncementPage() {
         (announcementRes.data && 'announcement' in announcementRes.data
           ? announcementRes.data.announcement
           : announcementRes.data) || null;
-      if (announcement) {
-        setSettings({ ...DEFAULT_SETTINGS, ...announcement });
-      }
+      const loaded = announcement ? { ...DEFAULT_SETTINGS, ...announcement } : DEFAULT_SETTINGS;
+      setSettings(loaded);
+      setBaseline(JSON.stringify(loaded));
       if (storeRes.data?.store?.theme) {
         setStoreTheme(storeRes.data.store.theme);
       }
@@ -92,7 +92,6 @@ export default function AnnouncementPage() {
 
   async function handleSave() {
     setIsSaving(true);
-    setMessage(null);
     try {
       // Send content only. `enabled` + `bgColor` are owned by the visual editor
       // (layout.announcement.*) and intentionally omitted — the API merges, so
@@ -104,15 +103,13 @@ export default function AnnouncementPage() {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/announcement`, content);
 
       if (!error) {
-        setMessage({ type: 'success', text: t('successMessage') });
+        setBaseline(JSON.stringify(settings));
+        toastSuccess(t('successMessage'), '');
       } else {
-        setMessage({
-          type: 'error',
-          text: error.message || t('failedMessage'),
-        });
+        toastError(t('failedMessage'), error.message || '');
       }
     } catch {
-      setMessage({ type: 'error', text: t('connectionError') });
+      toastError(t('connectionError'), '');
     } finally {
       setIsSaving(false);
     }
@@ -130,27 +127,7 @@ export default function AnnouncementPage() {
   }
 
   return (
-    <AdminLayout
-      title={t('title')}
-      subtitle={t('subtitle')}
-      actions={
-        <div className="flex gap-2">
-          <Link href={`/stores/${storeId}/settings`}>
-            <Button type="button" variant="outline">
-              {t('backToSettings')}
-            </Button>
-          </Link>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-          >
-            {isSaving ? t('saving') : t('saveChanges')}
-          </button>
-        </div>
-      }
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {/* Live Preview */}
       {settings.text && (
         <div className="mb-6">
@@ -173,7 +150,7 @@ export default function AnnouncementPage() {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-6 pb-24">
         {/* Content */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('content')}</h2>
@@ -188,7 +165,7 @@ export default function AnnouncementPage() {
                 value={settings.text}
                 onChange={e => setSettings(prev => ({ ...prev, text: e.target.value }))}
                 placeholder={t('textEnglishPlaceholder')}
-                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
@@ -202,7 +179,7 @@ export default function AnnouncementPage() {
                 value={settings.textAr}
                 onChange={e => setSettings(prev => ({ ...prev, textAr: e.target.value }))}
                 placeholder={t('textArabicPlaceholder')}
-                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
@@ -214,7 +191,7 @@ export default function AnnouncementPage() {
               value={settings.link}
               onChange={e => setSettings(prev => ({ ...prev, link: e.target.value }))}
               placeholder={t('linkUrlPlaceholder')}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <p className="mt-1 text-xs text-muted-foreground">{t('linkUrlHint')}</p>
           </div>
@@ -229,7 +206,7 @@ export default function AnnouncementPage() {
                 value={settings.linkText}
                 onChange={e => setSettings(prev => ({ ...prev, linkText: e.target.value }))}
                 placeholder={t('linkTextEnglishPlaceholder')}
-                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
@@ -243,7 +220,7 @@ export default function AnnouncementPage() {
                 value={settings.linkTextAr}
                 onChange={e => setSettings(prev => ({ ...prev, linkTextAr: e.target.value }))}
                 placeholder={t('linkTextArabicPlaceholder')}
-                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
@@ -264,15 +241,14 @@ export default function AnnouncementPage() {
             />
           </div>
         </div>
-
-        {/* Save message */}
-        {message && (
-          <Alert
-            variant={message.type === 'success' ? 'success' : 'destructive'}
-            description={message.text}
-          />
-        )}
       </div>
+      <StickySaveBar
+        dirty={baseline !== null && JSON.stringify(settings) !== baseline}
+        onSave={handleSave}
+        onReset={() => baseline && setSettings(JSON.parse(baseline))}
+        saving={isSaving}
+        saveLabel={t('saveChanges')}
+      />
     </AdminLayout>
   );
 }

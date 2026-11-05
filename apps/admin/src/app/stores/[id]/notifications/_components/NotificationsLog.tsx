@@ -135,7 +135,7 @@ export function NotificationsLog({
               value={channelFilter}
               onChange={e => onChannelFilterChange(e.target.value)}
               aria-label={t('filters.channelLabel')}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="all">{t('filters.allChannels')}</option>
               {smsEnabled && <option value="sms">{tShared('channelNames.sms')}</option>}
@@ -147,7 +147,7 @@ export function NotificationsLog({
               value={statusFilter}
               onChange={e => onStatusFilterChange(e.target.value)}
               aria-label={t('filters.statusLabel')}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="all">{t('filters.allStatuses')}</option>
               <option value="sent">{t('status.sent')}</option>

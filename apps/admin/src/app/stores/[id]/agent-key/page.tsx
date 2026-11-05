@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Button, Modal, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
@@ -145,17 +144,7 @@ export default function AgentKeyPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout
-      title={t('page.title')}
-      subtitle={t('page.subtitle')}
-      actions={
-        <Link href={`/stores/${storeId}/settings`}>
-          <Button type="button" variant="outline" size="sm">
-            {t('page.backToSettings')}
-          </Button>
-        </Link>
-      }
-    >
+    <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       <div className="max-w-2xl">
         <AgentKeyPanel
           status={status}

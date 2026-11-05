@@ -1,22 +1,6 @@
 {
-  "backTo": [
-    "app/stores/[id]/agent-key/page.tsx",
-    "app/stores/[id]/announcement/page.tsx",
-    "app/stores/[id]/blog/page.tsx",
-    "app/stores/[id]/delivery/page.tsx",
-    "app/stores/[id]/language/page.tsx",
-    "app/stores/[id]/merchant-keys/page.tsx",
-    "app/stores/[id]/payment-settings/page.tsx",
-    "app/stores/[id]/seo/page.tsx",
-    "app/stores/[id]/seo/redirects/page.tsx",
-    "app/stores/[id]/webhooks/page.tsx"
-  ],
+  "backTo": [],
   "nativeDialog": [
-    "app/stores/[id]/blog/page.tsx",
-    "app/stores/[id]/seo/redirects/page.tsx",
-    "app/stores/[id]/size-charts/_components/SizeChartEditor.tsx",
-    "app/stores/[id]/size-charts/page.tsx",
-    "app/stores/[id]/tax/_components/TaxVerificationCard.tsx",
     "components/ProviderVerificationSection.tsx",
     "components/SmartPaletteModal.tsx",
     "components/ZoneEditor.tsx"

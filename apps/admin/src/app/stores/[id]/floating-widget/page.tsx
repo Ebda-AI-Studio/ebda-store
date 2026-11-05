@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { ColorField } from '../../../../components/ColorField';
 import { useFeatures } from '../../../../hooks/useFeatures';
@@ -89,6 +90,8 @@ export default function FloatingWidgetPage() {
   const [config, setConfig] = useState<FloatingWidgetConfig>(DEFAULT_FLOATING_WIDGET_CONFIG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // The config as last loaded/saved: the sticky bar shows while the form differs from it.
+  const [baseline, setBaseline] = useState<string | null>(null);
 
   useEffect(() => {
     if (!storeId) return;
@@ -99,7 +102,9 @@ export default function FloatingWidgetPage() {
           const existing = res.data.store.settings?.floatingWidget as
             | FloatingWidgetConfig
             | undefined;
-          setConfig({ ...DEFAULT_FLOATING_WIDGET_CONFIG, ...(existing ?? {}) });
+          const loaded = { ...DEFAULT_FLOATING_WIDGET_CONFIG, ...(existing ?? {}) };
+          setConfig(loaded);
+          setBaseline(JSON.stringify(loaded));
         }
       })
       .finally(() => setLoading(false));
@@ -121,6 +126,7 @@ export default function FloatingWidgetPage() {
     if (res.error) {
       toastError(res.error.message || t('saveFailedFallback'));
     } else {
+      setBaseline(JSON.stringify(config));
       toastSuccess(t('savedToast'));
     }
   }, [store, storeId, config, toastSuccess, toastError, t]);
@@ -158,8 +164,11 @@ export default function FloatingWidgetPage() {
 
   if (loading || featuresLoading) {
     return (
-      <AdminLayout title={t('pageTitle')} subtitle={t('common.loading')}>
-        <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
+      <AdminLayout title={t('pageTitle')}>
+        <div className="animate-pulse space-y-4">
+          <div className="h-24 rounded-2xl bg-muted" />
+          <div className="h-48 rounded-2xl bg-muted" />
+        </div>
       </AdminLayout>
     );
   }
@@ -215,7 +224,7 @@ export default function FloatingWidgetPage() {
             <select
               value={config.position ?? 'br'}
               onChange={e => patch({ position: e.target.value as FloatingPosition })}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
             >
               {ALL_POSITIONS.map(k => (
                 <option key={k} value={k}>
@@ -234,7 +243,7 @@ export default function FloatingWidgetPage() {
             <select
               value={config.expandDirection ?? 'up'}
               onChange={e => patch({ expandDirection: e.target.value as FloatingExpandDirection })}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
             >
               {ALL_EXPAND_DIRECTIONS.map(k => (
                 <option key={k} value={k}>
@@ -296,7 +305,7 @@ export default function FloatingWidgetPage() {
                 value={config.toggleLabel ?? ''}
                 onChange={e => patch({ toggleLabel: e.target.value })}
                 placeholder={t('menuLabelEnSample')}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -309,7 +318,7 @@ export default function FloatingWidgetPage() {
                 onChange={e => patch({ toggleLabelAr: e.target.value })}
                 placeholder={t('menuLabelArSample')}
                 dir="rtl"
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
               />
             </label>
           </div>
@@ -322,7 +331,7 @@ export default function FloatingWidgetPage() {
               value={config.toggleIconUrl ?? ''}
               onChange={e => patch({ toggleIconUrl: e.target.value })}
               placeholder="https://…/icon.png"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className="h-5 w-9 cursor-pointer accent-primary"
             />
           </label>
         </section>
@@ -380,7 +389,7 @@ export default function FloatingWidgetPage() {
                             onChange={e =>
                               updateButton(b.id, { kind: e.target.value as FloatingButtonKind })
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           >
                             {ALL_BUTTON_KINDS.map(k => (
                               <option key={k} value={k}>
@@ -395,7 +404,7 @@ export default function FloatingWidgetPage() {
                             value={b.label ?? ''}
                             onChange={e => updateButton(b.id, { label: e.target.value })}
                             placeholder={t('tooltipEnPlaceholder')}
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                           <input
                             type="text"
@@ -403,7 +412,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { labelAr: e.target.value })}
                             placeholder={t('tooltipArPlaceholder')}
                             dir="rtl"
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </div>
                       </div>
@@ -424,7 +433,7 @@ export default function FloatingWidgetPage() {
                                   ? t('usingStoreWhatsapp', { value: store.whatsapp })
                                   : '201001234567'
                               }
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                           <label className="flex flex-col gap-1">
@@ -438,7 +447,7 @@ export default function FloatingWidgetPage() {
                                 updateButton(b.id, { whatsappMessage: e.target.value })
                               }
                               placeholder={t('prefillExample')}
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                         </div>
@@ -457,7 +466,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreInstagram', { value: store.socialLinks.instagram })
                                 : t('handleSampleDemoShop')
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -475,7 +484,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStorePhone', { value: store.phone })
                                 : '+201001234567'
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -493,7 +502,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreTiktok', { value: store.socialLinks.tiktok })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -511,7 +520,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreSnapchat', { value: store.socialLinks.snapchat })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -529,7 +538,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreYoutube', { value: store.socialLinks.youtube })
                                 : 'https://youtube.com/@mystore'
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -547,7 +556,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreFacebook', { value: store.socialLinks.facebook })
                                 : 'https://facebook.com/mystore'
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -565,7 +574,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreX', { value: store.socialLinks.twitter })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -583,7 +592,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreTelegram', { value: store.socialLinks.telegram })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                           />
                         </label>
                       )}
@@ -598,7 +607,7 @@ export default function FloatingWidgetPage() {
                               value={b.emailAddress ?? ''}
                               onChange={e => updateButton(b.id, { emailAddress: e.target.value })}
                               placeholder="info@store.com"
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                           <label className="flex flex-col gap-1">
@@ -610,7 +619,7 @@ export default function FloatingWidgetPage() {
                               value={b.emailSubject ?? ''}
                               onChange={e => updateButton(b.id, { emailSubject: e.target.value })}
                               placeholder={t('emailSubjectExample')}
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                         </div>
@@ -626,7 +635,7 @@ export default function FloatingWidgetPage() {
                               value={b.musicUrl ?? ''}
                               onChange={e => updateButton(b.id, { musicUrl: e.target.value })}
                               placeholder="https://r2.dev/.../track.mp3"
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -651,7 +660,7 @@ export default function FloatingWidgetPage() {
                               value={b.customHref ?? ''}
                               onChange={e => updateButton(b.id, { customHref: e.target.value })}
                               placeholder="https://…"
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                           <label className="flex flex-col gap-1">
@@ -663,7 +672,7 @@ export default function FloatingWidgetPage() {
                               value={b.iconUrl ?? ''}
                               onChange={e => updateButton(b.id, { iconUrl: e.target.value })}
                               placeholder="https://…/icon.svg"
-                              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
                             />
                           </label>
                         </div>
@@ -700,23 +709,13 @@ export default function FloatingWidgetPage() {
         </section>
       </div>
 
-      {/* Sticky save bar — lifted above the fixed MobileBottomNav (h-14 =
-          56px) + safe-area on mobile so it isn't hidden behind it; rule 6
-          "fixed-bottom UI" recipe. md:bottom-0 because the nav is
-          md:hidden (desktop = sidebar). */}
-      <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur md:left-64">
-        <div className="flex items-center justify-between gap-4 px-6 py-4">
-          <span className="text-xs text-muted-foreground">{t('saveHint')}</span>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleSave}
-            className="rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-          >
-            {saving ? t('saving') : t('saveChanges')}
-          </button>
-        </div>
-      </div>
+      <StickySaveBar
+        dirty={baseline !== null && JSON.stringify(config) !== baseline}
+        onSave={handleSave}
+        onReset={() => baseline && setConfig(JSON.parse(baseline))}
+        saving={saving}
+        saveLabel={t('saveChanges')}
+      />
     </AdminLayout>
   );
 }
