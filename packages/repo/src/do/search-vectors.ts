@@ -542,6 +542,43 @@ export async function backfillProductVectors(
   return total;
 }
 
+/**
+ * The index line of the search-insights page ("N of M ready / N failed"), counts only. `products` = indexable products with a
+ * document; `stale` = those whose vectors are missing or out of date and that are not quarantined; `failed` = those quarantined
+ * (their text set could not be embedded). Same staleness rules as `planVectorWork`; read-only (the DO twin of `storeIndexStatus`).
+ */
+export function vectorStatus(
+  db: SyncSql,
+  storeId: string,
+  now = Date.now()
+): { products: number; indexed: number; stale: number; failed: number } {
+  const state = new Map(
+    db
+      .all('SELECT * FROM product_vector_state WHERE store_id = ?', [storeId])
+      .map(r => [r.product_id as string, r])
+  );
+  let products = 0;
+  let stale = 0;
+  let failed = 0;
+  for (const p of loadProducts(db, storeId)) {
+    if (!p.indexable) continue;
+    products++;
+    const st = state.get(p.id);
+    const sameModel = st?.model === EMBED_MODEL;
+    const needDoc = !st || !sameModel || st.doc_hash !== (p.doc ? textHash(p.doc) : null);
+    const needWords =
+      p.words !== null && (!st || !sameModel || st.words_hash !== textHash(p.words));
+    const clearWords = !!st && sameModel && p.words === null && st.words_hash !== null;
+    if (!needDoc && !needWords && !clearWords) continue;
+    const key = textHash(`${p.doc ?? ''}\u001f${p.words ?? ''}`);
+    const quarantined =
+      !!st && st.fail_key === key && (st.fail_until === null || (st.fail_until as number) > now);
+    if (quarantined) failed++;
+    else stale++;
+  }
+  return { products, indexed: products - stale - failed, stale, failed };
+}
+
 /** True while any indexable product still needs a vector (the cheap probe behind a retry alarm). */
 export const hasStaleVectors = (db: SyncSql, storeId: string, now = Date.now()): boolean => {
   const p = planVectorWork(db, storeId, 1, now);

@@ -1,0 +1,5 @@
+# NZ-PG-5
+
+> Section: NEON-ZERO Postgres remnants (2026-11-05)
+
+**Ruling NZ-PG-5 - while a cutover marker and its freeze row coexist, an isolate that has NOT cached the marker refuses writes with a retryable 503, and an isolate that HAS cached it ("on" is cached for the isolate's life) writes to D1 or the DO.** `platformFamilyOnD1ForWrite` and `customerAuthRoute` return before reading the freeze once "on" is cached, so the earlier wording "writes are refused while marker + freeze coexist" (NZ-10-3, NZ-A2, NZ-N9-8, the code comments) was wrong. The safety property is unchanged and is the one that matters: no write reaches Postgres after the flip, because the isolates that cannot decide refuse instead of falling back. Corrected in `docs/plans/2026-11-02-neon-zero.md`, `services/platform/cutover.ts`, `lib/customer-auth.ts`. Cost if wrong: a write accepted in the settle window by an isolate that saw the marker lands in D1 / the DO, where the copy's drift check (exit 2) and the digest already look.

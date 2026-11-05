@@ -17,6 +17,8 @@ export interface DirectoryStore {
   isDemo: boolean;
   storageBackend: 'pg' | 'do';
   deletedAt: Date | null;
+  hasDomain: boolean;
+  hasPendingDomain: boolean;
 }
 
 interface Raw {
@@ -30,23 +32,36 @@ interface Raw {
   is_demo: number;
   storage_backend: string;
   deleted_at: number | null;
+  has_domain: number;
+  has_pending_domain: number;
 }
+
+/** Rows per D1 read of the full directory (keyset on `id`): a sweep pages through ALL stores, never one unbounded read, never a cap. */
+export const DIRECTORY_PAGE = 1000;
 
 /** Every store in the directory, id order; soft-deleted ones only with `includeDeleted`. A D1 outage is a 503. */
 export async function listDirectoryStores(
   opts: { includeDeleted?: boolean } = {}
 ): Promise<DirectoryStore[]> {
-  let rows: Raw[];
+  const out: Raw[] = [];
   try {
-    rows = await d1All<Raw>(
-      `SELECT id, name, name_ar, slug, status, plan, owner_id, is_demo, storage_backend, deleted_at
-         FROM stores ${opts.includeDeleted ? '' : 'WHERE deleted_at IS NULL'} ORDER BY id`
-    );
+    let after = '';
+    for (;;) {
+      const page = await d1All<Raw>(
+        `SELECT id, name, name_ar, slug, status, plan, owner_id, is_demo, storage_backend, deleted_at,
+                (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain
+           FROM stores WHERE id > ?1 ${opts.includeDeleted ? '' : 'AND deleted_at IS NULL'} ORDER BY id LIMIT ${DIRECTORY_PAGE}`,
+        after
+      );
+      out.push(...page);
+      if (page.length < DIRECTORY_PAGE) break;
+      after = page[page.length - 1].id;
+    }
   } catch (e) {
     if (e instanceof AppError) throw e;
     throw new AppError(503, 'PLATFORM_DIRECTORY_UNAVAILABLE', 'Store directory is unavailable');
   }
-  return rows.map(r => ({
+  return out.map(r => ({
     id: r.id,
     name: r.name,
     nameAr: r.name_ar,
@@ -57,6 +72,8 @@ export async function listDirectoryStores(
     isDemo: Number(r.is_demo) === 1,
     storageBackend: r.storage_backend === 'do' ? 'do' : 'pg',
     deletedAt: fromMs(r.deleted_at),
+    hasDomain: Number(r.has_domain) === 1,
+    hasPendingDomain: Number(r.has_pending_domain) === 1,
   }));
 }
 

@@ -4,9 +4,10 @@
  * A store on its Durable Object is read from its own tables on its alarm: the alarm run is scoped to that one store.
  */
 import { withStoreDb } from './store-db';
-import { dropHiddenStores } from '@ebda/database';
+import { dropHiddenStores, storeDirectory } from '@ebda/database';
 import { goldFeedStores, goldRateWatch } from '../definer';
 import { storeRepo } from '../repo-factory';
+import { platformDb } from '../platform-directory';
 import { alarmStoreId } from './store-scope';
 
 type Ev = { data?: unknown } | undefined;
@@ -23,81 +24,111 @@ async function storeIsActive(storeId: string): Promise<boolean> {
   return !!s && s.deletedAt === null && String(s.status) === 'active';
 }
 
-export async function goldFeedStoresFor(
-  event: Ev
-): Promise<Array<{ storeId: string; premiumBps: number }>> {
+type Feed = { storeId: string; premiumBps: number };
+type Watch = {
+  storeId: string;
+  karat: number;
+  rateId: string;
+  appliedAt: Date;
+  maxAgeMinutes: number;
+};
+
+/** One DO store's feed opt-in (empty when it has not opted in, is inactive, or is not on its DO). */
+async function feedForDoStore(storeId: string): Promise<Feed[] | undefined> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return undefined;
+  const g = await repo.db.goldRateSettings.findUnique({
+    where: { storeId },
+    select: { enabled: true, feedEnabled: true, feedPremiumBps: true },
+  });
+  if (!g || !g.enabled || !g.feedEnabled || !(await storeIsActive(storeId))) return [];
+  return [{ storeId, premiumBps: g.feedPremiumBps }];
+}
+
+/**
+ * The cron run (no alarm store) once the platform D1 is bound (Ruling NZ-PG-2): the stores come from the D1 directory
+ * (hidden-store scope applied, exactly as for the definer) and each is read from its own DO; the Postgres definers are not
+ * called (Postgres is gone after the cutover, a Postgres store no longer exists).
+ */
+async function cronStoresOnD1<T>(
+  read: (storeId: string) => Promise<T[] | undefined>
+): Promise<T[]> {
+  const stores = await storeDirectory(s => s.status === 'active');
+  const out: T[] = [];
+  for (const s of stores) out.push(...((await read(s.id)) ?? []));
+  return out;
+}
+
+export async function goldFeedStoresFor(event: Ev): Promise<Feed[]> {
   const only = alarmStoreId(event);
   if (only) {
-    const repo = await storeRepo(only);
-    if (repo.backend === 'do') {
-      const g = await repo.db.goldRateSettings.findUnique({
-        where: { storeId: only },
-        select: { enabled: true, feedEnabled: true, feedPremiumBps: true },
-      });
-      if (!g || !g.enabled || !g.feedEnabled || !(await storeIsActive(only))) return [];
-      return [{ storeId: only, premiumBps: g.feedPremiumBps }];
-    }
+    const rows = await feedForDoStore(only);
+    if (rows) return rows;
+  } else if (platformDb()) {
+    return cronStoresOnD1(feedForDoStore);
   }
   const rows = dropHiddenStores(await goldFeedStores(), r => r.storeId, 'goldFeedStores');
   return only ? rows.filter(r => r.storeId === only) : rows;
 }
 
-export async function goldRateWatchFor(
-  event: Ev,
-  now: Date = new Date()
-): Promise<
-  Array<{ storeId: string; karat: number; rateId: string; appliedAt: Date; maxAgeMinutes: number }>
-> {
+/** One DO store's (karat) pairs whose applied rate is inside the warn window or past max age (undefined: not on its DO). */
+async function watchForDoStore(storeId: string, now: Date): Promise<Watch[] | undefined> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return undefined;
+  const db = repo.db;
+  const settings = await db.goldRateSettings.findUnique({
+    where: { storeId },
+    select: { maxAgeMinutes: true },
+  });
+  const maxAge = settings?.maxAgeMinutes ?? DEFAULT_MAX_AGE_MIN;
+  const since = new Date(now.getTime() - Math.max(maxAge - WARN_WINDOW_MIN, 0) * 60_000);
+  const current = await db.goldRateCurrent.findMany({
+    where: { storeId, appliedAt: { lte: since } },
+    orderBy: { karat: 'asc' },
+  });
+  if (current.length === 0 || !(await storeIsActive(storeId))) return [];
+  const out: Watch[] = [];
+  for (const c of current) {
+    // the store sells at least one gold-priced piece of this karat (a variant may carry its own karat)
+    const sells = await db.product.findFirst({
+      where: {
+        storeId,
+        pricingMode: 'gold_rate',
+        deletedAt: null,
+        status: 'active',
+        OR: [
+          { goldKarat: c.karat },
+          {
+            variants: {
+              some: {
+                goldKarat: c.karat,
+                OR: [{ pricingMode: null }, { pricingMode: { not: 'fixed' } }],
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (sells)
+      out.push({
+        storeId,
+        karat: c.karat,
+        rateId: c.rateId,
+        appliedAt: c.appliedAt,
+        maxAgeMinutes: maxAge,
+      });
+  }
+  return out;
+}
+
+export async function goldRateWatchFor(event: Ev, now: Date = new Date()): Promise<Watch[]> {
   const only = alarmStoreId(event);
   if (only) {
-    const repo = await storeRepo(only);
-    if (repo.backend === 'do') {
-      const db = repo.db;
-      const settings = await db.goldRateSettings.findUnique({
-        where: { storeId: only },
-        select: { maxAgeMinutes: true },
-      });
-      const maxAge = settings?.maxAgeMinutes ?? DEFAULT_MAX_AGE_MIN;
-      const since = new Date(now.getTime() - Math.max(maxAge - WARN_WINDOW_MIN, 0) * 60_000);
-      const current = await db.goldRateCurrent.findMany({
-        where: { storeId: only, appliedAt: { lte: since } },
-        orderBy: { karat: 'asc' },
-      });
-      if (current.length === 0 || !(await storeIsActive(only))) return [];
-      const out = [];
-      for (const c of current) {
-        // the store sells at least one gold-priced piece of this karat (a variant may carry its own karat)
-        const sells = await db.product.findFirst({
-          where: {
-            storeId: only,
-            pricingMode: 'gold_rate',
-            deletedAt: null,
-            status: 'active',
-            OR: [
-              { goldKarat: c.karat },
-              {
-                variants: {
-                  some: {
-                    goldKarat: c.karat,
-                    OR: [{ pricingMode: null }, { pricingMode: { not: 'fixed' } }],
-                  },
-                },
-              },
-            ],
-          },
-          select: { id: true },
-        });
-        if (sells)
-          out.push({
-            storeId: only,
-            karat: c.karat,
-            rateId: c.rateId,
-            appliedAt: c.appliedAt,
-            maxAgeMinutes: maxAge,
-          });
-      }
-      return out;
-    }
+    const rows = await watchForDoStore(only, now);
+    if (rows) return rows;
+  } else if (platformDb()) {
+    return cronStoresOnD1(id => watchForDoStore(id, now));
   }
   const rows = dropHiddenStores(await goldRateWatch(), r => r.storeId, 'goldRateWatch');
   return only ? rows.filter(r => r.storeId === only) : rows;

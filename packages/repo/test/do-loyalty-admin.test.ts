@@ -417,3 +417,67 @@ describe('loyalty on the DO: manual award, members, stats, history', () => {
     });
   });
 });
+
+describe('loyalty automation on the DO (Ruling NZ-PG-7): point expiry and birthday bonus', () => {
+  const NOW = Date.now();
+  const seed = (r: ReturnType<typeof rig>) => {
+    r.raw.exec(`
+      INSERT INTO loyalty_points (id, store_id, customer_id, points, total_earned, total_redeemed, tier, created_at, updated_at)
+        VALUES ('lp1','s1','c1',80,200,120,'bronze',1,1), ('lp2','s1','c2',500,500,0,'bronze',1,1);
+      INSERT INTO loyalty_transactions (id, store_id, customer_id, type, points, expires_at, created_at)
+        VALUES ('t1','s1','c1','earn_manual',60,${NOW - 1000},1), ('t2','s1','c1','earn_manual',60,${NOW - 500},1),
+               ('t3','s1','c2','earn_manual',90,${NOW + 86400000},1), ('t4','s1','c3','earn_manual',10,${NOW - 1000},1);
+    `);
+  };
+
+  it('expires the lapsed earn rows once: deducts (floored at the balance), writes one expire row, clears expires_at, a rerun is a no-op', () => {
+    const r = rig();
+    seed(r);
+    const first = r.op('loyaltyExpire', {});
+    expect(first).toMatchObject({ members: 1, expired: 80, more: false });
+    expect(
+      r.q("SELECT points, total_redeemed FROM loyalty_points WHERE customer_id='c1'")[0]
+    ).toEqual({
+      points: 0,
+      total_redeemed: 200,
+    });
+    expect(r.q("SELECT points, description FROM loyalty_transactions WHERE type='expire'")).toEqual(
+      [{ points: -80, description: '80 points expired' }]
+    );
+    // c3 has no balance row (skipped like Postgres), c2's row has not lapsed
+    expect(
+      r
+        .q('SELECT id FROM loyalty_transactions WHERE expires_at IS NOT NULL ORDER BY id')
+        .map(x => x.id)
+    ).toEqual(['t3', 't4']);
+    expect(r.op('loyaltyExpire', {})).toMatchObject({ members: 0, expired: 0 });
+  });
+
+  it('pages with a cursor', () => {
+    const r = rig();
+    seed(r);
+    const p1 = r.op('loyaltyExpire', { limit: 1 });
+    expect(p1.more).toBe(true);
+    const p2 = r.op('loyaltyExpire', { limit: 1, after: p1.last });
+    expect(p2.last).not.toBe(p1.last);
+  });
+
+  it('awards the birthday bonus to members born today, once a year, only when loyalty is on', () => {
+    const r = rig();
+    const dob = Date.UTC(1990, 10, 5);
+    r.raw.exec(`
+      CREATE TABLE IF NOT EXISTS _cauth_users (id TEXT PRIMARY KEY, date_of_birth INTEGER);
+      INSERT INTO _cauth_users VALUES ('c1', ${dob}), ('c2', ${Date.UTC(1990, 0, 2)});
+      INSERT INTO loyalty_points (id, store_id, customer_id, points, total_earned, total_redeemed, tier, created_at, updated_at)
+        VALUES ('lp1','s1','c1',10,10,0,'bronze',1,1), ('lp2','s1','c2',10,10,0,'bronze',1,1);
+    `);
+    const args = { month: 11, day: 5, yearStart: Date.UTC(2026, 0, 1), ...feature };
+    const out = r.op('loyaltyBirthdays', args);
+    expect(out.awarded).toBe(1);
+    expect(
+      r.q("SELECT customer_id, type FROM loyalty_transactions WHERE type='earn_birthday'")
+    ).toEqual([{ customer_id: 'c1', type: 'earn_birthday' }]);
+    expect(r.op('loyaltyBirthdays', args).awarded).toBe(0); // already awarded this year
+    expect(r.op('loyaltyBirthdays', { ...args, featureEnabled: false }).awarded).toBe(0);
+  });
+});

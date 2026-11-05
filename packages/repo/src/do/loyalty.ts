@@ -1182,3 +1182,146 @@ export function listStoreTransactions(
     total,
   };
 }
+
+// ---- point expiry (the daily automation, port of LoyaltyAutomationService.processStorePointExpiration) ----------------
+
+const EARN_TYPES = [
+  'earn_purchase',
+  'earn_signup',
+  'earn_referral',
+  'earn_review',
+  'earn_birthday',
+  'earn_manual',
+];
+
+/**
+ * One page (<= `limit` earn rows, id order, after the `after` cursor) of expired earn transactions. Per member: the expired
+ * points are deducted from the balance (never below 0), ONE `expire` row is written, and the earn rows lose their `expires_at`
+ * (the idempotency mark: a second run finds nothing). A member with no balance row is skipped, exactly as Postgres does, and the
+ * cursor moves past it. All in one section. `more` = the page was full: call again with `last`.
+ */
+export function expirePoints(
+  db: SyncSql,
+  a: { storeId: string; now: number; after?: string | null; limit?: number }
+): { members: number; expired: number; last: string | null; more: boolean } {
+  const limit = Math.min(Math.max(a.limit ?? 500, 1), 500);
+  const rows = db.all(
+    `SELECT id, customer_id, points FROM loyalty_transactions
+      WHERE store_id = ?1 AND expires_at IS NOT NULL AND expires_at < ?2 AND points > 0
+        AND type IN (${EARN_TYPES.map(t => `'${t}'`).join(',')}) ${a.after ? 'AND id > ?4' : ''}
+      ORDER BY id LIMIT ?3`,
+    a.after ? [a.storeId, a.now, limit, a.after] : [a.storeId, a.now, limit]
+  );
+  const groups = new Map<string, { total: number; ids: string[] }>();
+  for (const r of rows) {
+    const g = groups.get(r.customer_id as string) ?? { total: 0, ids: [] };
+    g.total += Number(r.points);
+    g.ids.push(r.id as string);
+    groups.set(r.customer_id as string, g);
+  }
+  let members = 0;
+  let expired = 0;
+  db.transactionSync(() => {
+    for (const [customerId, g] of groups) {
+      const lp = db.all(
+        'SELECT points FROM loyalty_points WHERE store_id = ? AND customer_id = ?',
+        [a.storeId, customerId]
+      )[0];
+      if (!lp) continue;
+      const deduction = Math.min(g.total, Number(lp.points));
+      const marks = g.ids.map(() => '?').join(',');
+      if (deduction > 0) {
+        db.run(
+          `UPDATE loyalty_points SET points = points - ?1, total_redeemed = total_redeemed + ?1, updated_at = ?4
+            WHERE store_id = ?2 AND customer_id = ?3`,
+          [deduction, a.storeId, customerId, a.now]
+        );
+        db.run(
+          `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, expires_at, created_at)
+           VALUES (?, ?, ?, NULL, 'expire', ?, ?, NULL, ?)`,
+          [
+            crypto.randomUUID(),
+            a.storeId,
+            customerId,
+            -deduction,
+            `${deduction} points expired`,
+            a.now,
+          ]
+        );
+        expired += deduction;
+      }
+      db.run(
+        `UPDATE loyalty_transactions SET expires_at = NULL WHERE store_id = ? AND id IN (${marks})`,
+        [a.storeId, ...g.ids]
+      );
+      members++;
+    }
+  });
+  const last = rows.length ? (rows[rows.length - 1].id as string) : null;
+  return { members, expired, last, more: rows.length === limit };
+}
+
+/**
+ * The daily birthday bonus for ONE store (port of LoyaltyAutomationService.processBirthdayBonuses): every loyalty member whose
+ * date of birth (the store's customer directory, UTC month/day like the Worker's clock) is `month`/`day` and who has no
+ * `earn_birthday` row since `yearStart` gets `settings.birthdayBonus` points (no tier recalculation, as in Postgres). One section,
+ * so a member is never half-awarded; the existing-row check makes a second run a no-op. Off (store switch or platform feature)
+ * or a store without a customer directory table: nothing.
+ */
+export function awardBirthdays(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    now: number;
+    month: number;
+    day: number;
+    yearStart: number;
+    featureEnabled: boolean;
+  }
+): { awarded: number; points: number } {
+  const cfg = loadLoyaltyConfig(db, a.storeId);
+  if (!cfg || !cfg.enabled || a.featureEnabled !== true) return { awarded: 0, points: 0 };
+  const bonus = cfg.settings.birthdayBonus;
+  if (!(bonus > 0)) return { awarded: 0, points: 0 };
+  const mmdd = `${String(a.month).padStart(2, '0')}-${String(a.day).padStart(2, '0')}`;
+  let members: Array<Record<string, unknown>>;
+  try {
+    members = db.all(
+      `SELECT lp.customer_id AS customer_id FROM loyalty_points lp
+         JOIN _cauth_users u ON u.id = lp.customer_id
+        WHERE lp.store_id = ?1 AND u.date_of_birth IS NOT NULL
+          AND strftime('%m-%d', u.date_of_birth / 1000, 'unixepoch') = ?2
+          AND NOT EXISTS (SELECT 1 FROM loyalty_transactions t WHERE t.store_id = ?1 AND t.customer_id = lp.customer_id
+                            AND t.type = 'earn_birthday' AND t.created_at >= ?3)
+        ORDER BY lp.customer_id LIMIT 500`,
+      [a.storeId, mmdd, a.yearStart]
+    );
+  } catch {
+    return { awarded: 0, points: 0 }; // no customer directory in this DO yet
+  }
+  const expiresAt =
+    cfg.settings.expirationMonths > 0 ? a.now + cfg.settings.expirationMonths * MONTH_MS : null;
+  db.transactionSync(() => {
+    for (const m of members) {
+      db.run(
+        `UPDATE loyalty_points SET points = points + ?1, total_earned = total_earned + ?1, updated_at = ?4
+          WHERE store_id = ?2 AND customer_id = ?3`,
+        [bonus, a.storeId, m.customer_id, a.now]
+      );
+      db.run(
+        `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, expires_at, created_at)
+         VALUES (?, ?, ?, NULL, 'earn_birthday', ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          a.storeId,
+          m.customer_id,
+          bonus,
+          `Happy Birthday! ${bonus} bonus points`,
+          expiresAt,
+          a.now,
+        ]
+      );
+    }
+  });
+  return { awarded: members.length, points: members.length * bonus };
+}

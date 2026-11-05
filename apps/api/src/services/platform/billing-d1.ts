@@ -455,6 +455,18 @@ export async function deferBillingWebhookD1(a: {
   return changes === 1;
 }
 
+/** Deferred billing webhooks received before `olderThanMs` (epoch ms): how many and the oldest receipt time. */
+export async function staleDeferredBillingWebhooksD1(
+  olderThanMs: number
+): Promise<{ count: number; oldestMs: number | null }> {
+  const rows = await d1All<{ n: number; oldest: number | null }>(
+    `SELECT COUNT(*) AS n, MIN(received_at) AS oldest FROM billing_webhook_events
+      WHERE outcome = 'deferred' AND received_at < ?1`,
+    olderThanMs
+  );
+  return { count: Number(rows[0]?.n ?? 0), oldestMs: rows[0]?.oldest ?? null };
+}
+
 export async function listDeferredBillingWebhooksD1(
   limit: number
 ): Promise<Array<{ provider: string; eventId: string; detail: string }>> {

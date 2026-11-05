@@ -341,6 +341,14 @@ describe('vectorPlan / vectorCommit / vectorStale (Ruling CF-JOBS-4B)', () => {
     return r;
   }
 
+  it('vectorStatus counts indexable / ready / stale / failed (Ruling NZ-PG-7)', async () => {
+    const { op } = await vrig();
+    expect(op('vectorStatus', {})).toEqual({ products: 1, indexed: 0, stale: 1, failed: 0 });
+    const plan = op('vectorPlan', { limit: 10 });
+    op('vectorCommit', { ready: plan.work, failures: [], forget: [], texts: 1 });
+    expect(op('vectorStatus', {})).toEqual({ products: 1, indexed: 1, stale: 0, failed: 0 });
+  });
+
   it('plans the stale product, commits it against the current text, then has nothing left', async () => {
     const { op } = await vrig();
     expect(op('vectorStale', {})).toEqual({ stale: true });

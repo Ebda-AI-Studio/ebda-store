@@ -8,7 +8,7 @@
  * before (Ruling NEON-ZERO-2: one marker, one source of truth, no dual read).
  *
  * ONE freeze mechanism: platform/cutover.ts `readCutoverKeys` (#407's), keyed per store here. The freeze row
- * carries an expiry, "off" is never cached while frozen, a write is refused while marker + freeze coexist, and the script
+ * carries an expiry, "off" is never cached while frozen, a write is refused 503 by an isolate that has not yet seen the marker while the freeze exists (one that has seen it writes to the DO; Ruling NZ-PG-5), and the script
  * follows freeze -> drain -> snapshot -> copy -> verify -> flip -> settle -> drift check on a NEW connection -> lift.
  * Marker unreadable -> 503 (fail closed).
  */
@@ -29,7 +29,7 @@ const d1 = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATF
 
 // Freeze + marker semantics are platform/cutover.ts's `readCutoverKeys` (ONE mechanism, Ruling NZ-INTEG-1); only the keys
 // are per store here. "off" is never cached while a freeze exists; a WRITE never trusts a cached "off" and is refused
-// (retryable 503) while a freeze exists, marker or not.
+// (retryable 503) while a freeze exists, unless this isolate already cached the marker as "on" (then it writes the DO; NZ-PG-5).
 const on = new Set<string>();
 const offUntil = new Map<string, number>();
 /** Test seam. */
@@ -73,7 +73,7 @@ export async function customerAuthOnDo(storeId: string): Promise<boolean> {
   return false;
 }
 
-/** WRITE path: never from a stale "off"; refused (503) while a freeze exists, marker or not (no mixed backends). */
+/** WRITE path: never from a stale "off"; refused (503) while a freeze exists and this isolate has not cached the marker (Ruling NZ-PG-5). */
 async function customerAuthOnDoForWrite(storeId: string): Promise<boolean> {
   if (on.has(storeId)) return true;
   const db = d1();

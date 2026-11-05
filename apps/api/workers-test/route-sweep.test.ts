@@ -37,6 +37,9 @@ const e = env as unknown as {
 const FILTER = e.SWEEP_FILTER ? new RegExp(e.SWEEP_FILTER) : undefined;
 const inSubset = (line: string) => !e.SWEEP_FILTER || new RegExp(e.SWEEP_FILTER).test(line);
 
+/** Cron job names whose Postgres reaches are tolerated. MUST stay empty for DO stores (Ruling NZ-PG-8). */
+const CRON_PG_ALLOWLIST: RegExp[] = [];
+
 const BASE = 'https://api.ebda.app/api/v1';
 const ZERO = '00000000-0000-4000-8000-000000000001';
 const MARKER_KEYS = [
@@ -375,6 +378,22 @@ describe.skipIf(e.E2E_DB === '1')(
           { firstName: 'Mallory' },
         ],
         ['GET', '/admin/users?search=sweep', '/admin/users?search=sweep', adm, undefined],
+        // Ruling NZ-PG-2: with Postgres dead the account is the identity service's and the event is found by a probe of the
+        // stores' DOs: an answer, never the 500 of a Postgres definer.
+        [
+          'POST',
+          '/admin/impersonate (unknown user)',
+          '/admin/impersonate',
+          adm,
+          { userId: '00000000-0000-4000-8000-0000000000bb' },
+        ],
+        [
+          'GET',
+          '/payments/events/:eventId/payload (unknown event)',
+          '/payments/events/00000000-0000-4000-8000-0000000000cc/payload',
+          adm,
+          undefined,
+        ],
       ];
       for (const [m, route, path, headers, body] of seeded) {
         if (!inSubset(`${m} ${route}`)) continue;
@@ -382,6 +401,9 @@ describe.skipIf(e.E2E_DB === '1')(
         // The admin route never edits an e-mail (account takeover) and never edits ANOTHER super_admin's profile.
         if (route === '/admin/users/:id (email)') expect(res?.status).toBe(409);
         if (route === '/admin/users/:id (super_admin target)') expect(res?.status).toBe(403);
+        // the accounts stub answers a state for every id, so the unknown user may be a 200 here; the point is: not a 5xx
+        if (route.endsWith('(unknown user)')) expect([200, 404]).toContain(res?.status);
+        if (route.endsWith('(unknown event)')) expect(res?.status).toBe(404);
       }
       // A second store, created like the first (D1 + DO), deleted by its owner: the DO delete path (close, finish, directory).
       const extra = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
@@ -565,6 +587,17 @@ describe.skipIf(e.E2E_DB === '1')(
           scheduled?(o: { cron: string; scheduledTime?: Date }): Promise<{ outcome: string }>;
         };
         const crons = ['0 * * * *', '*/15 * * * *', '*/30 * * * *', '0 */12 * * *', '0 3 * * *'];
+        // Every access to the Postgres client from here on is counted by the Worker (DEV_STATS=1; packages/database
+        // request-db.ts `postgresReaches`). A job that catches its own error still shows up here.
+        const pgReaches = async (reset: boolean) =>
+          (
+            (await (
+              await e.API.fetch(`https://api.ebda.app/__dev/pg-reaches${reset ? '?reset=1' : ''}`, {
+                headers: { 'x-forwarded-for': freshIp() },
+              })
+            ).json()) as { reaches: Array<{ label: string; stack: string }> }
+          ).reaches;
+        await pgReaches(true);
         for (const cron of crons) {
           const t0 = Date.now();
           let outcome = 'ran (job outcomes: Worker log lines "[cron] job done|failed")';
@@ -587,6 +620,19 @@ describe.skipIf(e.E2E_DB === '1')(
           // eslint-disable-next-line no-console
           console.log('SWEEP_RESULT ' + JSON.stringify(r));
         }
+        // Postgres is dead for a DO store: NO cron job may reach it. The allowlist is EMPTY (Ruling NZ-PG-8); an entry would
+        // have to name the job and a reason a DO store still needs Postgres, which is a defect to port, not to allow.
+        const reached = (await pgReaches(false)).filter(
+          x => !CRON_PG_ALLOWLIST.some(re => re.test(x.label))
+        );
+        for (const x of reached)
+          // eslint-disable-next-line no-console
+          console.log('SWEEP_CRON_PG_REACH ' + JSON.stringify(x));
+        if (e.SWEEP_STRICT === '1')
+          expect(
+            reached.map(x => x.label),
+            'cron jobs that reached the Postgres client'
+          ).toEqual([]);
       },
       300_000
     );

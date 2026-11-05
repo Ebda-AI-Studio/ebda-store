@@ -23,6 +23,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
 import { withStore } from '@ebda/database';
 import { getSearchInsights } from '../services/search-log.service';
+import { storeMoney } from '../lib/repo-factory';
 import { storeIndexStatus } from '../services/product-index.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 import { withSavepoint } from '../lib/savepoint';
@@ -55,9 +56,12 @@ router.get(
       // the savepoint keeps a failed statement from aborting the request transaction.
       let index: SearchInsightsResponse['index'];
       try {
-        const status = await withSavepoint(() =>
-          withStore(storeId, () => storeIndexStatus(storeId))
-        );
+        // Ruling NZ-PG-7: a DO store's index state is in its DO (no Postgres scope, no savepoint); a Postgres store keeps the
+        // savepointed tenant read.
+        const money = await storeMoney(storeId);
+        const status = money
+          ? await money.vectorStatus({})
+          : await withSavepoint(() => withStore(storeId, () => storeIndexStatus(storeId)));
         index = { ...status, semanticEnabled: semanticSearchEnabled() };
       } catch (err) {
         logger.warn(

@@ -69,13 +69,13 @@ Merged: #430 (`fix/nz-routes-b`), #431 (`fix/nz-analytics-routes`), #432 (`fix/n
 
 ### ONE scope resolver (the rule all three PRs and #429 now share)
 
-`packages/database/src/index.ts` has a single `ScopeResolver { lazyForStore, lazyForUser, hubStoreIds? }` (`setScopeResolver`), registered once in `apps/api/src/lib/store-scope-resolver.ts`. `setStoreScopeResolver` / `setHubStoreLister` (group C) and the second `setScopeResolver` registration in `services/platform/router.ts` (#432) are gone. A `withStore` / `withUser` / `acrossStores` call with no ambient transaction:
+`packages/database/src/index.ts` has a single `ScopeResolver { lazyForStore, lazyForUser, directory? }` (`setScopeResolver`), registered once in `apps/api/src/lib/store-scope-resolver.ts`. `setStoreScopeResolver` / `setHubStoreLister` (group C) and the second `setScopeResolver` registration in `services/platform/router.ts` (#432) are gone. A `withStore` / `withUser` / `acrossStores` call with no ambient transaction:
 
 - store served by its Durable Object: `runInStoreScope` (no Postgres transaction; each Postgres query a handler still makes runs in its own short transaction WITH the store GUC, user carried);
 - Postgres store: `runInTenantContext` (BEGIN + `set_config`, atomic): tenant scoping is never skipped;
 - an unknown store id is a 404 `STORE_NOT_FOUND` once the directory is authoritative (group C; #432's "unknown id is lazy" was looser and is dropped); an unreadable flag or marker throws (503), never a Postgres guess;
 - user scope without a store (`withUser(user)`, `userContext`, `platformUserContext`): lazy only when `platformUserScopeIsLazy()` (cutover.ts): the platform D1 bound AND the billing, access and platform families all on it (#432 only tested the binding; group C's three markers are the stricter and kept). `platformUserContext` is now `userContext`.
-- `acrossStores` takes its store list from `hubStoreIds` when unfiltered (D1, capped), else the directory definer.
+- `acrossStores` takes its store list from `storeDirectory` (the resolver's `directory` hook: D1 `stores`, paged and NEVER capped, where the platform D1 is bound; the Postgres definer only where no D1 is bound). The old `hubStoreIds` hook (D1, capped at 500, `truncated` lost) is gone (Ruling NZ-PG-3).
 
 Pinned by `packages/database/src/__tests__/scope-resolver.test.ts` (7 cases).
 

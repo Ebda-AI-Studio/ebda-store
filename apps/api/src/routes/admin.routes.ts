@@ -86,6 +86,7 @@ import {
   isReservedSlug,
 } from '@ebda/shared';
 import { platformUserContext } from '../middleware/tenant-context';
+import { impersonationTargetD1 } from '../lib/impersonation-target';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
 import { revokeUserMerchantKeysD1 } from '../services/platform/platform-d1';
@@ -3046,20 +3047,24 @@ router.post(
       // users table has no RLS — plain lookup works under ebda_app without bypass.
       // We intentionally leave this as-is: adding withRlsBypass here would be
       // over-engineering (the policy doesn't exist) and would waste a tx slot.
-      const target = await asPlatformOperator(req.user!.userId, () =>
-        prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            storeId: true,
-            deletedAt: true,
-            tokenVersion: true,
-            status: true,
-          },
-        })
-      );
+      // Ruling NZ-PG-2: once the `access` family is on D1 the account is the identity service's (or its store's DO for a
+      // customer); the Postgres `users` row no longer exists.
+      const target = (await onAccessD1())
+        ? await impersonationTargetD1(userId)
+        : await asPlatformOperator(req.user!.userId, () =>
+            prisma.user.findUnique({
+              where: { id: userId },
+              select: {
+                id: true,
+                email: true,
+                role: true,
+                storeId: true,
+                deletedAt: true,
+                tokenVersion: true,
+                status: true,
+              },
+            })
+          );
 
       if (!target) {
         res.status(404).json({
