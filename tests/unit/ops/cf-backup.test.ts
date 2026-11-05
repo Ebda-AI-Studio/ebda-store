@@ -285,3 +285,224 @@ describe('D1 export loading (first real nightly failed: "no such table: main.sto
     );
   });
 });
+
+describe('export robustness (first real run: ECONNRESET after ~2 min, no output)', () => {
+  const reset = () =>
+    Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } });
+  const okRes = (j: unknown) => ({ ok: true, status: 200, json: async () => j });
+  const mk = (fetchImpl: any, logs: string[] = []) =>
+    B.makeApiCall({
+      apiUrl: 'https://x',
+      secret: 's'.repeat(24),
+      fetchImpl,
+      sleep: async () => {},
+      log: (m: string) => logs.push(m),
+    });
+
+  it('retries a connection reset once and then succeeds, logging the retry', async () => {
+    let n = 0;
+    const logs: string[] = [];
+    const call = mk(
+      async () => (++n === 1 ? Promise.reject(reset()) : okRes({ ok: true, tables: ['a'] })),
+      logs
+    );
+    expect((await call('/cutover/stores/s1/__tables')).tables).toEqual(['a']);
+    expect(n).toBe(2);
+    expect(logs[0]).toMatch(/retry 1\/2 .*__tables.*ECONNRESET/);
+  });
+  it('retries 5xx and 429 but never a 4xx', async () => {
+    let n = 0;
+    const call = mk(async () =>
+      ++n < 3
+        ? { ok: false, status: n === 1 ? 503 : 429, json: async () => ({}) }
+        : okRes({ ok: true })
+    );
+    await call('/p');
+    expect(n).toBe(3);
+    let m = 0;
+    const c4 = mk(
+      async () => (m++, { ok: false, status: 401, json: async () => ({ error: 'unauthorized' }) })
+    );
+    await expect(c4('/p')).rejects.toThrow(/failed after 1 attempt/);
+    expect(m).toBe(1);
+  });
+  it('always resetting: fails after 3 attempts with a message naming the target, table and offset', async () => {
+    let n = 0;
+    const call = mk(async () => (n++, Promise.reject(reset())));
+    await expect(
+      call('/cutover/stores/s1/__export', { table: 'orders', offset: 1500, limit: 500 })
+    ).rejects.toThrow(
+      /__export \[orders@1500\]: failed after 3 attempt\(s\): fetch failed \(ECONNRESET\)/
+    );
+    expect(n).toBe(3);
+  });
+  it('pages a table in chunks, advancing by the rows actually returned (the server may stop early on bytes)', async () => {
+    const all = Array.from({ length: 7 }, (_, i) => [`id${i}`]);
+    const offsets: number[] = [];
+    const call = async (p: string, body?: any) => {
+      if (p.endsWith('__tables')) return { tables: ['things'] };
+      offsets.push(body.offset);
+      const take = Math.min(body.limit, 3, all.length - body.offset); // server returns at most 3 rows
+      return {
+        columns: ['id'],
+        pk: ['id'],
+        total: all.length,
+        offset: body.offset,
+        rows: all.slice(body.offset, body.offset + take),
+      };
+    };
+    const logs: string[] = [];
+    const r = await B.exportStoreOverHttp(call, 's1', {
+      pageRows: 500,
+      log: (m: string) => logs.push(m),
+    });
+    expect(offsets).toEqual([0, 3, 6]);
+    expect(r.tables.things.count).toBe(7);
+    expect(logs.some(l => /things: 7 rows/.test(l))).toBe(true);
+    expect(logs.some(l => /export done/.test(l))).toBe(true);
+  });
+  it('runBackup logs every phase', async () => {
+    const logs: string[] = [];
+    await B.runBackup({
+      io: mkIo(bucket(), { d1: 'a'.repeat(100), store: 'b' }),
+      now: at('2026-11-04'),
+      log: (m: string) => logs.push(m),
+    });
+    for (const re of [
+      /D1 export start/,
+      /D1 export done/,
+      /store s1 export start/,
+      /compress/,
+      /encrypt/,
+      /R2 put/,
+      /R2 read-back/,
+    ])
+      expect(
+        logs.some(l => re.test(l)),
+        String(re)
+      ).toBe(true);
+  });
+  it('the notify job names the production environment so its secrets are visible, and warns when they are missing', async () => {
+    const wf = (await import('node:fs')).readFileSync('.github/workflows/cf-backup.yml', 'utf8');
+    const notify = wf.slice(wf.indexOf('notify-failure:'));
+    expect(notify).toMatch(/environment: production/);
+    expect(notify).toMatch(/NO ALERT SENT/);
+  });
+});
+
+describe('D1 export is restorable in any order (first real drill: "no such table: main.stores")', () => {
+  // A real-shaped wrangler export: the REAL platform schema, tables alphabetical with their rows interleaved, so children come first.
+  async function realShapedExport() {
+    const fs = await import('node:fs');
+    const { DatabaseSync } = await import('node:sqlite');
+    const dir = 'packages/cf-schema/migrations/platform';
+    const src = new DatabaseSync(':memory:');
+    for (const f of fs
+      .readdirSync(dir)
+      .filter(n => n.endsWith('.sql'))
+      .sort())
+      src.exec(fs.readFileSync(`${dir}/${f}`, 'utf8'));
+    src.exec(
+      "INSERT INTO stores (id, name, slug, owner_id, storage_backend) VALUES ('s1','S','s','o','do')"
+    );
+    const q = (v: any) =>
+      v === null
+        ? 'NULL'
+        : typeof v === 'number'
+          ? String(v)
+          : `'${String(v).replace(/'/g, "''")}'`;
+    const tables = src
+      .prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+      )
+      .all() as any[];
+    const out: string[] = ['PRAGMA defer_foreign_keys=TRUE;'];
+    for (const t of tables) {
+      out.push(t.sql + ';');
+      for (const r of src.prepare(`SELECT * FROM "${t.name}"`).all() as any[])
+        out.push(
+          `INSERT INTO "${t.name}" (${Object.keys(r)
+            .map(k => `"${k}"`)
+            .join(',')}) VALUES (${Object.values(r).map(q).join(',')});`
+        );
+    }
+    for (const o of src
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type IN ('index','trigger','view') AND sql IS NOT NULL"
+      )
+      .all() as any[])
+      out.push(o.sql + ';');
+    return out.join('\n') + '\n';
+  }
+  it('the raw alphabetical export does not load into a database that enforces foreign keys; the normalized artifact does', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const raw = await realShapedExport();
+    const norm = io.normalizeD1Sql(raw);
+    expect(norm.startsWith('PRAGMA defer_foreign_keys=TRUE;')).toBe(true);
+    // schema first, then rows, then indexes/triggers; parents before children
+    expect(norm.indexOf('CREATE TABLE')).toBeLessThan(norm.indexOf('INSERT INTO'));
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON'); // a restore target that enforces constraints
+    db.exec(norm);
+    expect((db.prepare('SELECT count(*) AS n FROM stores').get() as any).n).toBe(1);
+    // content is preserved and the artifact is stable
+    expect(await io.d1Digests(norm)).toEqual(await io.d1Digests(raw));
+    expect(io.normalizeD1Sql(norm)).toBe(norm);
+  });
+  it('orders parents before children even when the child sorts first, and keeps BLOBs and floats exact', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const raw =
+      "CREATE TABLE a_child (id TEXT PRIMARY KEY, s TEXT REFERENCES stores(id), n REAL, b BLOB);\nINSERT INTO a_child VALUES ('1','x',0.1,X'ff00');\n" +
+      "CREATE TABLE stores (id TEXT PRIMARY KEY);\nINSERT INTO stores VALUES ('x');\n";
+    expect(() => {
+      const d = new DatabaseSync(':memory:');
+      d.exec('PRAGMA foreign_keys = ON');
+      d.exec(raw);
+    }).toThrow(/no such table: main.stores/);
+    const norm = io.normalizeD1Sql(raw);
+    expect(norm.indexOf('CREATE TABLE stores')).toBeLessThan(norm.indexOf('CREATE TABLE a_child'));
+    const d = new DatabaseSync(':memory:');
+    d.exec('PRAGMA foreign_keys = ON');
+    d.exec(norm);
+    const row = d.prepare('SELECT n, hex(b) AS h FROM a_child').get() as any;
+    expect(row.n).toBe(0.1);
+    expect(row.h).toBe('FF00');
+  });
+});
+
+describe('a foreign key that targets a column made unique by a SEPARATE index (drill 2: "foreign key mismatch")', () => {
+  // store_subscriptions.plan_code REFERENCES plans(code); plans.code is unique only through CREATE UNIQUE INDEX.
+  const raw =
+    "CREATE TABLE plans (id TEXT PRIMARY KEY, code TEXT NOT NULL);\nINSERT INTO plans VALUES ('p1','pro');\n" +
+    "CREATE TABLE store_subscriptions (id TEXT PRIMARY KEY, plan_code TEXT REFERENCES plans(code));\nINSERT INTO store_subscriptions VALUES ('s1','pro');\n" +
+    'CREATE UNIQUE INDEX plans_code_key ON plans(code);\nCREATE INDEX subs_plan ON store_subscriptions(plan_code);\n' +
+    'CREATE TRIGGER t AFTER INSERT ON plans BEGIN SELECT 1; END;\n';
+  it('the unique index precedes every row; plain indexes and triggers stay last; it loads with foreign keys enforced', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const norm: string = io.normalizeD1Sql(raw);
+    const at = (needle: string) => norm.indexOf(needle);
+    expect(at('CREATE UNIQUE INDEX')).toBeGreaterThan(at('CREATE TABLE store_subscriptions'));
+    expect(at('CREATE UNIQUE INDEX')).toBeLessThan(at('INSERT INTO'));
+    expect(at('CREATE INDEX subs_plan')).toBeGreaterThan(at('INSERT INTO "store_subscriptions"'));
+    expect(at('CREATE TRIGGER')).toBeGreaterThan(at('INSERT INTO "store_subscriptions"'));
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec(norm);
+    expect((db.prepare('SELECT count(*) AS n FROM store_subscriptions').get() as any).n).toBe(1);
+    // the shape the previous rewrite produced (all indexes last) is exactly what fails
+    const bad =
+      norm
+        .split('\n')
+        .filter(l => !/UNIQUE INDEX/.test(l))
+        .join('\n') + '\nCREATE UNIQUE INDEX plans_code_key ON plans(code);\n';
+    const d2 = new DatabaseSync(':memory:');
+    d2.exec('PRAGMA foreign_keys = ON');
+    expect(() => d2.exec(bad)).toThrow(/foreign key mismatch/);
+  });
+});

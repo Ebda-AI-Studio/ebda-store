@@ -541,7 +541,17 @@ describe.skipIf(e.E2E_DB === '1')(
         } catch {
           /* register failed: the steps below run anonymously and are recorded */
         }
-        const ch = bearer ? { ...h, authorization: `Bearer ${bearer}` } : h;
+        // register returns no tokens (enumeration close), so the customer-owned order the tracking cases need uses a minted bearer
+        if (!bearer) {
+          await authState('user:tv:cust-track', [['set', 'user:tv:cust-track', '0', {}]]);
+          bearer = await accessToken({
+            userId: 'cust-track',
+            jti: 'j-cust-track',
+            role: 'customer',
+            storeId,
+          });
+        }
+        const ch = { ...h, authorization: `Bearer ${bearer}` };
         await hit('FLOW', 'GET', '/public/cart', `${BASE}/public/cart`, ch);
         await hit('FLOW', 'POST', '/public/cart/items', `${BASE}/public/cart/items`, ch, {
           productId,
@@ -560,7 +570,67 @@ describe.skipIf(e.E2E_DB === '1')(
           paymentMethod: 'cod',
         };
         await hit('FLOW', 'POST', '/public/orders/quote', `${BASE}/public/orders/quote`, ch, order);
-        await hit('FLOW', 'POST', '/public/orders', `${BASE}/public/orders`, ch, order);
+        const placed = await hit(
+          'FLOW',
+          'POST',
+          '/public/orders',
+          `${BASE}/public/orders`,
+          ch,
+          order
+        );
+        // Public order tracking on a DO store (was prisma.order.findFirst -> 500 PostgresRemovedError). The shopper's own
+        // bearer sees the order; every other proof answers like a missing order (404) or is refused (401), never 5xx.
+        let placedId = '';
+        try {
+          const j = (await placed?.clone().json()) as {
+            data?: { id?: string; order?: { id?: string } };
+          };
+          placedId = j.data?.id ?? j.data?.order?.id ?? '';
+        } catch {
+          /* order create failed: the tracking assertions below then fail loudly */
+        }
+        const trackUrl = (sid: string, oid: string) =>
+          `${BASE}/stores/public/${sid}/orders/${oid}/tracking`;
+        const track = async (
+          label: string,
+          sid: string,
+          oid: string,
+          hdr: Record<string, string>
+        ) =>
+          hit(
+            'TRACKING',
+            'GET',
+            `/stores/public/:storeId/orders/:orderId/tracking (${label})`,
+            trackUrl(sid, oid),
+            hdr
+          );
+        expect(placedId, 'order id from POST /public/orders').not.toBe('');
+        const ok = await track('own order', storeId, placedId, ch);
+        expect(ok?.status).toBe(200);
+        const okBody = (await ok!.json()) as {
+          data: { orderNumber: string; shipment: unknown };
+        };
+        expect(okBody.data.orderNumber).toBeTruthy();
+        expect(okBody.data.shipment).toBeNull();
+        const missing = await track('unknown order', storeId, ZERO, ch);
+        expect(missing?.status).toBe(404);
+        const otherStore = await track('wrong store', ZERO, placedId, ch);
+        expect(otherStore?.status).toBe(404);
+        // another customer of the same store: same 404 as a missing order (no existence oracle)
+        const other = await accessToken({
+          userId: 'cust-other',
+          jti: 'j-cust-other',
+          role: 'customer',
+          storeId,
+        });
+        await authState('user:tv:cust-other', [['set', 'user:tv:cust-other', '0', {}]]);
+        const stranger = await track('other customer', storeId, placedId, {
+          ...h,
+          authorization: `Bearer ${other}`,
+        });
+        expect(stranger?.status).toBe(404);
+        const anon = await track('anonymous', storeId, placedId, h);
+        expect(anon?.status).toBe(401);
         await hit('FLOW', 'POST', '/auth/login', `${BASE}/auth/login`, h, {
           email: 'sweep-customer@exit-test.invalid',
           password: 'Sweep-Passw0rd!x',

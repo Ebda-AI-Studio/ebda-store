@@ -11,6 +11,7 @@
 //        [--workdir d] [--port 8798] [--report out.txt]
 // Exit 0 = DRILL PASS (every check), 1 = FAIL.
 import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
   existsSync,
   mkdirSync,
@@ -35,6 +36,7 @@ import {
   identityFromKeychain,
   wranglerR2,
   d1Digests,
+  normalizeD1Sql,
 } from './lib/cf-backup-io.mjs';
 import { stripAiBinding, stripImagesBinding } from '../ci/workerd-smoke.mjs';
 
@@ -76,9 +78,13 @@ if (a.extract) {
   });
   mkdirSync(a.extract, { recursive: true });
   for (const [name, buf] of Object.entries(files))
-    writeFileSync(path.join(a.extract, `${name}.${manifest.artifacts[name].ext}`), buf, {
-      mode: 0o600,
-    });
+    writeFileSync(
+      path.join(a.extract, `${name}.${manifest.artifacts[name].ext}`),
+      name === 'd1-ebda-platform' ? Buffer.from(normalizeD1Sql(buf.toString('utf8'))) : buf,
+      {
+        mode: 0o600,
+      }
+    );
   writeFileSync(path.join(a.extract, 'manifest.json'), JSON.stringify(manifest, null, 2));
   console.log(
     `extracted ${Object.keys(files).length} artifact(s) of ${manifest.tier}/${manifest.day} into ${a.extract} (checksums verified)`
@@ -87,6 +93,25 @@ if (a.extract) {
 }
 
 let child = null;
+let bootError = null;
+const logAll = () => {
+  try {
+    return readFileSync(path.join(work, 'wrangler.log'), 'utf8');
+  } catch {
+    return '';
+  }
+};
+const logTail = () => {
+  try {
+    return readFileSync(path.join(work, 'wrangler.log'), 'utf8')
+      .split('\n')
+      .slice(-12)
+      .join(' | ')
+      .slice(-900);
+  } catch {
+    return '(no log)';
+  }
+};
 const cleanups = [];
 const stop = () => {
   try {
@@ -100,8 +125,33 @@ const stop = () => {
 process.on('exit', stop);
 process.on('SIGINT', () => process.exit(130));
 
+/** The API Worker bundle needs the workspace's installed + built packages; say so in one line instead of waiting 3 minutes. */
+function preflight() {
+  const need = [
+    [
+      'zod/v3',
+      'dependencies are not installed here (run `bash ~/.claude/scripts/wt-deps.sh <worktree>` or `npm ci`)',
+    ],
+    [
+      '@ebda/shared',
+      'packages are not built (run `npm run db:generate && npm run build -w packages/shared -w packages/database`)',
+    ],
+  ];
+  const req = createRequire(path.join(API, 'package.json'));
+  for (const [id, fix] of need) {
+    try {
+      req.resolve(id);
+    } catch {
+      throw new Error(`preflight: cannot resolve "${id}" from apps/api: ${fix}`);
+    }
+  }
+}
+
 async function waitUp(pathname) {
   for (let i = 0; i < 90; i++) {
+    // `wrangler dev` keeps listening after a failed bundle: a logged build error is the answer, not a reason to wait.
+    if (/\[ERROR\]|Build failed|Could not resolve/.test(logAll().replace(/\x1b\[[0-9;]*m/g, '')))
+      throw new Error('wrangler dev logged a build/boot error');
     try {
       if ((await fetch(base + pathname, { signal: AbortSignal.timeout(3000) })).status) return;
     } catch {}
@@ -135,11 +185,26 @@ function boot(args, cwd, pathname) {
 }
 
 const post = async (p, body, ctype) => {
-  const res = await fetch(base + p, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
-    body,
-  });
+  let res;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      res = await fetch(base + p, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
+        body,
+      });
+      break;
+    } catch (e) {
+      // an import page is idempotent (batch, table, page), so a dropped connection is retried; the final error says why
+      if (attempt < 3 && /ECONNRESET|UND_ERR|socket/i.test(`${e.cause?.code} ${e.message}`)) {
+        await new Promise(r => setTimeout(r, 500 * attempt));
+        continue;
+      }
+      throw new Error(
+        `${p}: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''} after ${attempt} attempt(s) - the local worker is not answering${bootError ? `; it never came up: ${bootError}` : `; worker log tail: ${logTail()}`}`
+      );
+    }
+  }
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
   return j;
@@ -194,7 +259,7 @@ if (a.target === 'harness') {
   );
   targets.loadD1 = async sql => {
     const f = path.join(work, 'd1.sql');
-    writeFileSync(f, sql);
+    writeFileSync(f, normalizeD1Sql(sql)); // old artifacts (alphabetical, rows interleaved) are made order-safe here too
     const r = spawnSync(
       'npx',
       [
@@ -241,10 +306,23 @@ if (a.target === 'harness') {
     return apiChecksForStore(http, { store, productCount });
   };
   // D1 must exist before the worker boots against it, and DO import needs the worker: load D1 first via a lazy boot hook.
+  // The worker boots whatever the D1 load did: a failed load must not hide every later stage. The load error is rethrown after.
   const loadD1 = targets.loadD1;
   targets.loadD1 = async sql => {
-    const r = await loadD1(sql);
-    await boot(['--config', '.wrangler.drill.jsonc'], API, '/health');
+    let loadErr = null;
+    let r = null;
+    try {
+      r = await loadD1(sql);
+    } catch (e) {
+      loadErr = e;
+    }
+    try {
+      preflight();
+      await boot(['--config', '.wrangler.drill.jsonc'], API, '/health');
+    } catch (e) {
+      bootError = `${e.message}; wrangler log tail: ${logTail()}`;
+    }
+    if (loadErr) throw loadErr;
     return r;
   };
 }

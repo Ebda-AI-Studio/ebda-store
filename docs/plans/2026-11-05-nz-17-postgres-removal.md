@@ -44,6 +44,11 @@ the unit tier. Assertions with NO DO/D1 equivalent yet (must be ported before th
 1. Tenant isolation as a property: StoreDO.bind refuses another store (spike-level only in `store-do-spike`), but there is
    no sweep-style test that every route with a `:storeId` returns 404/403 for a foreign store on the DO. (Replaces RLS
    "cross-tenant read/write denial". This is why NZ-17-RLS-1 names it as the residual.)
+   **Status (slice 2, track A): DONE.** `workers-test/tenant-isolation.test.ts`: 606 privileged store-naming routes (A's owner with
+   B's id and B's entity ids: 401/403/404, no B data, B's StoreDO digest unchanged), 105 shopper-surface routes (no B-private data,
+   no 5xx, B unchanged), 39 `x-store-id`-scoped routes, 711 non-public routes answer 401 unauthenticated. Fail-proof recorded in
+   the PR. Reported, not fixed here: `GET /stores/public/:storeId/orders/:orderId/tracking` still calls `prisma.order.findFirst`
+   (500 PostgresRemovedError for any authenticated caller), listed in `KNOWN_UNPORTED`.
 2. Search ranking/lexical + trigram index behaviour (`search-lexical-rls-index`, `order-customer-search-rls-index`):
    Postgres planner assertions, no FTS5 equivalent test; `palette-search` covers only the palette.
 3. Accounting reports on large ledgers (journal/period close SQL aggregates) vs the DO SQLite path: only money/books
@@ -52,6 +57,11 @@ the unit tier. Assertions with NO DO/D1 equivalent yet (must be ported before th
    the invariants differ, so these tests are deleted with category A, not ported.
 5. Super-admin cross-store reads (`acrossStores`, definers): D1 directory covers listing (`store-directory-d1`), not the
    per-store fan-out of analytics.
+   **Status (slice 2, track A): DONE.** `workers-do/hub-fanout.test.ts` (D1 directory + real StoreDOs: every store visited, pages
+   complete and disjoint, the 500-store bound reported as `truncated`, a failing store skipped, pool bounded) and
+   `workers-test/admin-cross-store.test.ts` (four DO stores through the built Worker: `/admin/products` and `/admin/stores` see all
+   of them at every page size, `/admin/dashboard` aggregates them, a store admin gets 403 on the super-admin list and only their own
+   store on the shared ones).
 6. Impersonation + audit sink to Postgres (`audit-sink` targets `pg`): D1 target is covered by `impersonation.test.ts`.
 
 Slice 2 ports 1, 3 and 5 into `workers-do`; 2 and 6 are decided there (port or accept loss as a Ruling).

@@ -199,6 +199,9 @@ async function doImport(request, { sql, transactionSync }) {
 }
 
 const EXPORT_MAX_ROWS = 2000;
+// A response stops growing at about this many bytes of row JSON (always at least one row), so one wide table can never become a single
+// multi-MB response that a proxy or the DO stream resets; the caller advances by the rows it actually received.
+const EXPORT_MAX_BYTES = 512 * 1024;
 /** One page of a table, ordered by primary key, in the shape __import accepts (backup + restore drill). */
 async function doExport(request, { sql }) {
   const body = await request.json().catch(() => null);
@@ -221,7 +224,9 @@ async function doExport(request, { sql }) {
       limit,
       offset
     );
+    let bytes = 0;
     for (const r of cur) {
+      if (rows.length > 0 && bytes > EXPORT_MAX_BYTES) break;
       const vals = columns.map(c => r[c]);
       for (const v of vals)
         if (!(v === null || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))))
@@ -229,6 +234,7 @@ async function doExport(request, { sql }) {
             422,
             `${body.table}: a value of type ${typeof v} cannot be exported as JSON`
           );
+      bytes += JSON.stringify(vals).length;
       rows.push(vals);
     }
   }

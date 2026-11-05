@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { fileURLToPath } from 'node:url';
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -10,34 +10,48 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
  * (CI job `workerd-integration`). The lane that DOES need Postgres + the built Worker stays
  * vitest.workers.config.mts (`cf:test`).
  */
-export default defineConfig({
-  plugins: [
-    cloudflareTest({
-      main: here('./workers-do/entry.ts'),
-      miniflare: {
-        compatibilityDate: '2026-08-01',
-        compatibilityFlags: ['nodejs_compat'],
-        // N-9: envelope key for the encrypted customer-credential backup (test value only)
-        bindings: { CUSTOMER_AUTH_BACKUP_KEY: Buffer.alloc(32, 7).toString('base64') },
-        durableObjects: { STORE_DO: { className: 'StoreDO', useSQLite: true } },
-        r2Buckets: ['STORE_BACKUPS', 'MEDIA_BUCKET', 'CI_BUCKET'],
-        d1Databases: ['PLATFORM_DB', 'IDENTITY_DB', 'RESTORE_DB'],
-        kvNamespaces: ['KV_CACHE'],
+export default defineConfig(async () => {
+  // hub-fanout.test.ts: the REAL platform D1 schema (the directory the super-admin fan-out reads), applied by the test.
+  const platformMigrations = await readD1Migrations(
+    here('../../packages/cf-schema/migrations/platform')
+  );
+  return {
+    plugins: [
+      cloudflareTest({
+        main: here('./workers-do/entry.ts'),
+        miniflare: {
+          compatibilityDate: '2026-08-01',
+          compatibilityFlags: ['nodejs_compat'],
+          // N-9: envelope key for the encrypted customer-credential backup (test value only)
+          bindings: {
+            CUSTOMER_AUTH_BACKUP_KEY: Buffer.alloc(32, 7).toString('base64'),
+            TEST_PLATFORM_MIGRATIONS: platformMigrations,
+          },
+          durableObjects: { STORE_DO: { className: 'StoreDO', useSQLite: true } },
+          r2Buckets: ['STORE_BACKUPS', 'MEDIA_BUCKET', 'CI_BUCKET'],
+          d1Databases: ['PLATFORM_DB', 'IDENTITY_DB', 'RESTORE_DB'],
+          kvNamespaces: ['KV_CACHE'],
+        },
+      }),
+    ],
+    resolve: {
+      // Workspace packages bundle from source, as in wrangler.jsonc's alias block.
+      alias: {
+        '@ebda/shared': here('../../packages/shared/src/index.ts'),
+        // hub-fanout.test.ts imports lib/platform-hub (-> billing-d1 -> @ebda/database): from SOURCE, as wrangler.jsonc does,
+        // never the CommonJS dist (whose `pg` cannot load on workerd).
+        ioredis: here('./src/cf/stubs/ioredis.ts'),
+        pg: here('./workers-do/stubs/pg.ts'),
+        '@ebda/database': here('../../packages/database/src/index.ts'),
+        '@ebda-src/repo': here('../../packages/repo/src/index.ts'),
+        '@ebda-src/cf-schema': here('../../packages/cf-schema/src/store/migrations.generated.ts'),
+        '@ebda-src/prisma-meta': here('../../packages/cf-schema/generated/prisma-meta.json'),
       },
-    }),
-  ],
-  resolve: {
-    // Workspace packages bundle from source, as in wrangler.jsonc's alias block.
-    alias: {
-      '@ebda/shared': here('../../packages/shared/src/index.ts'),
-      '@ebda-src/repo': here('../../packages/repo/src/index.ts'),
-      '@ebda-src/cf-schema': here('../../packages/cf-schema/src/store/migrations.generated.ts'),
-      '@ebda-src/prisma-meta': here('../../packages/cf-schema/generated/prisma-meta.json'),
     },
-  },
-  test: {
-    include: ['workers-do/**/*.test.ts'],
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
-  },
+    test: {
+      include: ['workers-do/**/*.test.ts'],
+      testTimeout: 30_000,
+      hookTimeout: 30_000,
+    },
+  };
 });

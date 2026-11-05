@@ -21,14 +21,25 @@ if (secret.length < 24) {
 }
 need('CLOUDFLARE_API_TOKEN');
 need('CLOUDFLARE_ACCOUNT_ID');
+const log = m => console.log(`[${new Date().toISOString().slice(11, 19)}] ${m}`);
 const io = realBackupIo({
+  log,
   recipient: need('EBDA_BACKUP_AGE_PUBLIC_KEY'),
   apiUrl: process.env.EBDA_API_URL || 'https://api.ebda.app',
   secret,
   r2: wranglerR2(),
 });
 const cap = Number(process.env.EBDA_BACKUP_CF_CAP_BYTES) || DEFAULT_CAP_BYTES;
-const report = await runBackup({ io, cap });
+let report;
+try {
+  report = await runBackup({ io, cap, log });
+} catch (e) {
+  const msg = `### cf backup FAILED\n- ${e?.message ?? e}${e?.cause?.code ? ` (${e.cause.code})` : ''}`;
+  console.error(`::error::${(e?.message ?? String(e)).split('\n')[0]}`);
+  console.error(msg);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, msg + '\n');
+  process.exit(1);
+}
 const mib = n => (n / 1048576).toFixed(2);
 const md = [
   `### cf backup ${report.day} (${report.tiers.join(', ')}): ${report.ok ? 'OK' : 'SIZE GUARD FAILED'}`,
