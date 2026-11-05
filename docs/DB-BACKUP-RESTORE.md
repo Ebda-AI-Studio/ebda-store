@@ -72,7 +72,7 @@ Rehearse C against local workerd first (`--api-url http://127.0.0.1:8798`, no ex
 ## Controller runbook: turning the nightly backup on (production changes; the build session ran none)
 
 1. Pick the Worker secret: `openssl rand -hex 32`; `cd apps/api && npx wrangler secret put BACKUP_EXPORT_SECRET`; the same value into GitHub environment `production`: `gh secret set BACKUP_EXPORT_SECRET --env production --repo Ebda-AI-Studio/ebda-store`.
-2. Confirm vars `EBDA_BACKUP_AGE_PUBLIC_KEY` and `CLOUDFLARE_ACCOUNT_ID` and secret `CLOUDFLARE_API_TOKEN` (R2 write + D1 read) exist in environment `production` (the old `db-backup.yml` used them). Optional var `EBDA_BACKUP_CF_CAP_BYTES`.
+2. Confirm vars `EBDA_BACKUP_AGE_PUBLIC_KEY` and `CLOUDFLARE_ACCOUNT_ID` and secret `CLOUDFLARE_API_TOKEN` (R2 write + D1 read) exist in environment `production` (the deleted `db-backup.yml` used them too). Optional var `EBDA_BACKUP_CF_CAP_BYTES`.
 3. Deploy the API (`gh workflow run cf-api-deploy.yml`; the `__export` action ships in this PR). Check `/health` commit equals main.
 4. Set retention: `bash scripts/ops/r2-lifecycle-cf.sh` (prints), then `--apply`, then `npx wrangler r2 bucket lifecycle list ebda-db-backups` and confirm `final/` has NO rule.
 5. `gh workflow run cf-backup.yml`; read the step summary (sizes) and confirm `cf/latest.json` exists.
@@ -134,7 +134,7 @@ mass-deleted rows, a bug corrupted data 20 minutes ago).
 
 ### Off-machine encrypted dump (the answer to "older than 6 hours")
 
-`.github/workflows/db-backup.yml` runs nightly (02:43 UTC, GitHub-hosted, so it survives the Mac and the CI guest being
+`.github/workflows/db-backup.yml` (DELETED 2026-11-05, Ruling NZ-17-BACKUP-1; history only) ran nightly (02:43 UTC, GitHub-hosted, so it survives the Mac and the CI guest being
 down): `pg_dump` 17 (custom format) of production, `scripts/ops/verify-db-dump.sh` (refuses an empty-ish dump), `age`
 encryption to the public key in repo variable `EBDA_BACKUP_AGE_PUBLIC_KEY`, upload to the R2 bucket **`ebda-db-backups`**
 (key `db/YYYY/MM/ebda-<ts>-<sha>.dump.age`; object lock 7 days; expires after 35 days), read-back compare, Telegram alert
@@ -200,7 +200,7 @@ Central script `~/.claude/scripts/backup-all-neon.sh` (launchd `com.ebda.neon-ba
 
 ## Layer 2 — off-machine encrypted (GitHub Actions → private R2)
 
-`.github/workflows/db-backup.yml` runs daily 03:50 UTC (+ `workflow_dispatch`): `pg_dump 17`
+`.github/workflows/db-backup.yml` (DELETED, history only) ran daily 03:50 UTC (+ `workflow_dispatch`): `pg_dump 17`
 → gzip → **verify** → AES-256-CBC (openssl, pbkdf2) → upload to `s3://databasebackup/<project>/`.
 Prunes objects >30 days (bucket also has a 30-day lifecycle rule). Mac-independent — this is
 what survives the laptop dying.

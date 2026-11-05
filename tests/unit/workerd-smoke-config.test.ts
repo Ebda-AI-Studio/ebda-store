@@ -73,6 +73,6 @@ it('every shell/node script that runs `wrangler dev` uses a config without the A
     )
       offenders.push(`${f}: uses .wrangler.local.jsonc without generating it`);
   }
-  expect(invocations).toBeGreaterThanOrEqual(4); // smoke, stage1 exit runner, dev-api, parity
+  expect(invocations).toBeGreaterThanOrEqual(3); // smoke, stage1 exit runner, cf:dev (dev-api MODE=worker and parity-as-app went in NZ-17 slice 2)
   expect(offenders).toEqual([]);
 });

@@ -51,8 +51,9 @@ describe('deploy secrets are unreachable from a pull request', () => {
     expect(triggers(raw).sort()).toEqual(['push', 'workflow_dispatch']);
     expect(raw).toMatch(/push:\s*\n\s+branches:\s*\[main\]|push:\s*\n\s+branches:\s*\n\s+- main/);
   });
-  it('db-backup.yml (holds the dump URL) is schedule or dispatch only', () => {
-    expect(triggers(text('db-backup.yml')).sort()).toEqual(['schedule', 'workflow_dispatch']);
+  it('db-backup.yml stays deleted (Ruling NZ-17-BACKUP-1); cf-backup.yml replaced it', () => {
+    expect(files).not.toContain('db-backup.yml');
+    expect(files).toContain('cf-backup.yml');
   });
 });
 

@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { parseArgs } from 'node:util';
+import { residueFilesOf } from './residue-exempt.mjs';
 
 export const NEON_PROJECT = 'lucky-truth-54548746';
 // one backup scheme: the ops agent's nightly db-backup.yml (age to EBDA_BACKUP_AGE_PUBLIC_KEY, bucket ebda-db-backups,
@@ -136,12 +137,11 @@ async function preflight() {
 
 // ---------------------------------------------------------------- residue
 function residue() {
-  const exempt = f => RESIDUE_EXEMPT.some(e => f.startsWith(e)) || f.endsWith('.md');
   const r = spawnSync(
     'git',
     [
       'grep',
-      '-l',
+      '-n',
       '-E',
       RESIDUE_PATTERN,
       '--',
@@ -157,10 +157,10 @@ function residue() {
     ],
     { encoding: 'utf8' }
   );
-  const files = (r.stdout ?? '')
-    .split('\n')
-    .filter(Boolean)
-    .filter(f => !exempt(f));
+  const files = residueFilesOf(
+    (r.stdout ?? '').split('\n').filter(Boolean),
+    f => RESIDUE_EXEMPT.some(e => f.startsWith(e)) || f.endsWith('.md')
+  );
   const byDir = {};
   for (const f of files)
     byDir[f.split('/').slice(0, 2).join('/')] =
