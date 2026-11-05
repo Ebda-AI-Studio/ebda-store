@@ -14,7 +14,7 @@
 ## What is backed up (nightly 02:17 UTC, `.github/workflows/cf-backup.yml`)
 
 1. **D1 `ebda-platform`**: `wrangler d1 export --remote` (SQL).
-2. **Every StoreDO store** (`stores.storage_backend = 'do'`): the read-only, bearer-checked `POST /cutover/stores/<id>/__export` (paged by primary key, 2000 rows a page, same row shape `__import` takes) after `GET .../__tables`. The bearer is `BACKUP_EXPORT_SECRET`, which opens only `__export`/`__tables`/`__status`.
+2. **Every StoreDO store** (`stores.storage_backend = 'do'`): the read-only, bearer-checked `POST /cutover/stores/<id>/__export` (paged by primary key, 2000 rows a page, same row shape `__import` takes) after `GET .../__tables`. The bearer is `BACKUP_EXPORT_SECRET`, which opens only `__export`/`__tables`/`__fks`/`__status`.
 3. Each artifact is **gzip -9, then age-encrypted** (public key only on the runner), uploaded, **read back and sha256-compared**, and listed in a **manifest** with raw, compressed and encrypted sizes, row counts and a content digest per table.
 4. Layout in bucket `ebda-db-backups`:
 
@@ -68,6 +68,8 @@ export CUTOVER_IMPORT_SECRET=<24+ chars, set as a Worker secret for the window, 
 node scripts/ops/restore-store-do.mjs --dir ./restore --store <store uuid> \
   --api-url https://api.ebda.app --wipe --i-understand-this-writes-production
 ```
+
+The replay goes **parents first** (order from the target's own schema, `GET __fks`) because a StoreDO enforces foreign keys while importing (measured 2026-11-05: `PRAGMA foreign_keys = OFF` has no effect there, drill 3 failed `FOREIGN KEY constraint failed`); a self-referencing table (`categories`, `accounts`, `journal_entries`) is sent parent-row-first in one page. A table in the backup that the target schema lacks is named, all at once, before any write. The backup leaves out `onesignal_subscriptions` (moved to D1, Ruling NZ-C-11; older StoreDOs still hold a stale copy) and records its row count under `skippedTables` in the manifest.
 
 Rehearse C against local workerd first (`--api-url http://127.0.0.1:8798`, no extra flag). After C: `GET /cutover/stores/<id>/__status` and a storefront read; re-seal if the store was sealed.
 

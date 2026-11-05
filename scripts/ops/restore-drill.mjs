@@ -210,7 +210,13 @@ const post = async (p, body, ctype) => {
   return j;
 };
 
-const targets = { decrypt: ageDecrypt(identity), post };
+const get = async p => {
+  const res = await fetch(base + p, { headers: { authorization: `Bearer ${cutoverSecret}` } });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
+  return j;
+};
+const targets = { decrypt: ageDecrypt(identity), post, get };
 if (a.target === 'harness') {
   targets.loadD1 = async sql => {
     const tables = assertPlatformTables(await d1Digests(sql));

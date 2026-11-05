@@ -128,6 +128,12 @@ export function assertPlatformTables(tables) {
 }
 
 export const EXPORT_PAGE_ROWS = 500;
+/**
+ * Tables an older StoreDO still holds that the current store schema no longer has (a fresh DO rejects them: "unknown table").
+ * onesignal_subscriptions moved to D1 (platform migration 0006, Ruling NZ-C-11). They are NOT dumped, but each is listed in the manifest
+ * with its row count (`skippedTables`) so nothing disappears silently.
+ */
+export const DO_MOVED_TABLES = new Set(['onesignal_subscriptions']);
 export const REQUEST_TIMEOUT_MS = 60_000;
 export const MAX_ATTEMPTS = 3;
 
@@ -211,8 +217,16 @@ export async function exportStoreOverHttp(
   const { tables: names } = await call(`${base}/__tables`);
   const lines = [];
   const tables = {};
+  const skipped = {};
+  for (const t of names.filter(n => DO_MOVED_TABLES.has(n))) {
+    const probe = await call(`${base}/__export`, { table: t, offset: 0, limit: 0 });
+    skipped[t] = probe.total;
+    log(
+      `store ${storeId} ${t}: SKIPPED (moved out of the StoreDO schema), ${probe.total} stale row(s) left out`
+    );
+  }
   // `__miniflare_*` exists only on local workerd; __export refuses any name that is not [a-z][a-z0-9_]* (never a production table).
-  for (const table of names.filter(n => /^[a-z]/.test(n))) {
+  for (const table of names.filter(n => /^[a-z]/.test(n) && !DO_MOVED_TABLES.has(n))) {
     let offset = 0;
     let total = Infinity;
     const d = new TableDigest();
@@ -239,7 +253,7 @@ export async function exportStoreOverHttp(
   log(
     `store ${storeId} export done: ${Object.keys(tables).length} tables, ${raw.length} bytes, ${Date.now() - t0} ms`
   );
-  return { raw, tables };
+  return { raw, tables, ...(Object.keys(skipped).length ? { skipped } : {}) };
 }
 
 /** Parse the NDJSON written by exportStoreOverHttp back into [{table, columns, pk, total, rows}]. */
@@ -306,6 +320,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
       rawSha256,
       tables: a.tables,
       ext: a.ext,
+      ...(a.skipped ? { skippedTables: a.skipped } : {}),
     };
     for (const tier of tiers) {
       const prev = tier === 'daily' ? ledger.last[a.name] : null;
