@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  stores: [] as Array<{ storeId: string; premiumBps: number }>,
+  stores: [] as Array<{ storeId: string; premiumBps: number; demo?: boolean }>,
   applied: [] as Array<{
     storeId: string;
     rates: Array<{ karat: number; ratePerGram: number }>;
@@ -187,6 +187,16 @@ describe('gold-rate feed cron', () => {
       forcePending: false,
     });
     expect(h.alerts).toEqual([]);
+  });
+
+  it('a demo store is applied past the jump gate; a real store is not', async () => {
+    h.stores = [
+      { storeId: 'demo', premiumBps: 0, demo: true },
+      { storeId: 'real', premiumBps: 0 },
+    ];
+    await handleGoldRateFeedFetch({ step }, adapter({ kind: 'ok', quote: quote(713_800) }));
+    expect(h.applied.find(x => x.storeId === 'demo')!.actor).toMatchObject({ skipJumpGate: true });
+    expect(h.applied.find(x => x.storeId === 'real')!.actor).not.toHaveProperty('skipJumpGate');
   });
 
   it('feeds DISAGREE: every opted-in store gets a PENDING rate, nothing is applied, the operator gets a P1 and the owner an email', async () => {
