@@ -81,6 +81,16 @@ that still passes a Hyperdrive string (slice 2 removes that branch). Slice 3 ret
 2. Port coverage gaps 1/3/5, delete `db-backup.yml`, pattern exemption for prisma-lite types (G), scripts (I).
 3. Retire the Node server + category A/B/C/E/F, collapse `backendFor` to constant `do` (N-14b), docker-compose, `.env.example`.
 
+## Slice 2 (track B, this PR: ledgers + cleanup)
+
+Done: gap 3 ported (`apps/api/workers-do/books-large-ledger.test.ts`: 3,000+ journal lines over six months, trial balance, P&L per
+month, balance sheet per month end, daily close and period reconciliation, replay idempotency, reversal, drafts); `db-backup.yml`
+deleted (Ruling NZ-17-BACKUP-1; `cf-backup.yml` still needs a green run); category G exemption (Ruling NZ-17-EX-2); category I:
+seven dead scripts deleted, the rest kept with a reason (Ruling NZ-17-SCRIPTS-1); `ebda-dev-api.sh` MODE=worker removed. There is
+no period-close or re-open feature in the ledger (revenue and expense accounts are never closed into equity; see
+`reports.service.ts`), so "close" means the nightly trial-balance drift scan and the period GL reconciliation, and "adjust"
+means `reverseEntry`. Gaps 1 and 5 are track A.
+
 ## Footprint (CI minutes and runner time; Ahmad's standing rule 2026-11-05)
 
 Basis, measured with `gh` on 2026-11-05: 100 PRs merged 2026-10-27 to 2026-11-05 (about 11 per day, about 330 per month).
@@ -95,7 +105,7 @@ when the planner selects integration files.
 | Their Postgres + pgbouncer service containers | 0                                                   | disk and RAM on the Umbra VM during those nights                                                                                                                | saved                                                                                                          |
 | `Integration Tests` (kept, NZ-17-INT-1)       | about 24 min when selected                          | unchanged                                                                                                                                                       | slice 3 target: the largest single saving left, about 24 min x the share of the 330 PRs that touch integration |
 | `E2E Tests` (kept)                            | main/Sunday lane only                               | unchanged                                                                                                                                                       | slice 3                                                                                                        |
-| `db-backup.yml` (kept, fails nightly)         | 0                                                   | about 30 nightly runs of 7 s to 90 s on hosted ubuntu-24.04, pure noise today                                                                                   | slice 2, saves about 15-45 hosted min/month plus the red notifications                                         |
+| `db-backup.yml` (DELETED in slice 2)          | 0                                                   | about 30 nightly runs of 7 s to 90 s on hosted ubuntu-24.04, pure noise today                                                                                   | slice 2, saves about 15-45 hosted min/month plus the red notifications                                         |
 
 Total slice 1: 0 min per PR (the removed jobs never ran on PRs); at most 430 min/month on the nightly/Sunday lanes, unmeasured
 exact. Gets more expensive: nothing (no new job, no new matrix, no cache added; the residue gate costs one `git grep`).

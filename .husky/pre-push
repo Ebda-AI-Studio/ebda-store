@@ -20,7 +20,7 @@ if [ "$current_branch" = "main" ]; then
     if ! bash scripts/backup-db.sh; then
       echo "! pre-push: local backup FAILED -- pushing anyway. NO snapshot covers this push:"
       echo "  neon-snapshot.yml's push trigger was retired 2026-06-08. Cover is the nightly"
-      echo "  db-backup.yml (R2) + Neon PITR. Read the error above; do not ignore it."
+      echo "  cf-backup.yml (R2) + D1 Time Travel / StoreDO PITR. Read the error above; do not ignore it."
     fi
   else
     echo "! pre-push: scripts/backup-db.sh not executable; skipping local DB backup"

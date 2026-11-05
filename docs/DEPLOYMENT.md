@@ -707,7 +707,7 @@ enforced CODEOWNERS here, so the controls are in code. They are enforced by test
 - **A pull request can never reach a deploy secret.** `tests/unit/deploy-secrets-never-on-pr.test.ts` fails the build if any
   workflow triggered by `pull_request`, `pull_request_target` or `workflow_run` references `secrets.CLOUDFLARE_*`,
   `EBDA_MIGRATE_DATABASE_URL`, `SENTRY_AUTH_TOKEN`, `secrets: inherit` or `toJSON(secrets)`; every `cf-*-deploy.yml` must trigger
-  only on push to `main` or manual dispatch; `db-backup.yml` only on schedule or dispatch.
+  only on push to `main` or manual dispatch; `db-backup.yml` no longer exists (Ruling NZ-17-BACKUP-1).
 - **A change to how production deploys needs a human label.** The required check "Deploy workflow changes need the
   deploy-change label" (`.github/workflows/deploy-change-label.yml`, `scripts/ci/deploy-change-label.mjs`) fails a PR that edits
   `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/deploy-plan.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
@@ -722,7 +722,7 @@ enforced CODEOWNERS here, so the controls are in code. They are enforced by test
   | Account · Workers Scripts    | account         | `wrangler deploy` for the 9 Workers; `wrangler secret list` in the secret gate                                                     |
   | Account · Workers KV Storage | account         | the cache namespace binding (`EBDA_KV_CACHE_ID`)                                                                                   |
   | Account · D1                 | account         | `Apply D1 migrations (ebda-identity)` and the D1 bindings                                                                          |
-  | Account · Workers R2 Storage | account         | the nightly `db-backup.yml` upload to `ebda-db-backups`, and R2 bindings (cache, uploads)                                          |
+  | Account · Workers R2 Storage | account         | the nightly `cf-backup.yml` upload to `ebda-db-backups`, and R2 bindings (cache, uploads)                                          |
   | Account · Queues             | account         | the queue producer/consumer bindings on the API Worker                                                                             |
   | Account · Hyperdrive         | account         | retired (NEON-ZERO N-17): the API Worker has no Hyperdrive binding; delete the config with the Neon project                        |
   | Account · Account Settings   | account         | wrangler resolves the account and its subdomain on deploy (the broadest line here: review it first if the token is ever tightened) |

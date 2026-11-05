@@ -297,7 +297,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       // match NO scan unit, so their open quantity counts as on order for no
       // variant and the scan can over-suggest. How to count them is an owner
       // decision; until then the transition is made observable, never silent.
-      // `scripts/list-variantless-po-lines.ts` lists them.
+      // (The one-off lister script was removed in NZ-17 slice 2; the count below is the live signal.)
       const [variantless] = await tx.$queryRaw<Array<{ n: bigint | null }>>`
         SELECT COUNT(*)::bigint AS n
         FROM public.purchase_order_items i
