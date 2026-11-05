@@ -1523,7 +1523,16 @@ router.get(
         return;
       }
       const { eventId } = req.params;
-      const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
+      // Ruling NZ-PG-2: after the `access` cutover the Postgres definer is gone; the caller is already a verified super_admin
+      // (the role gate above), so the event's store is found by a primary-key probe of the stores' own DOs.
+      const owner = (await onAccessD1())
+        ? await (async () => {
+            const storeId = await (
+              await import('../lib/entity-store-fanout.js')
+            ).entityStoreByFanout('payment_event', eventId);
+            return storeId ? { storeId } : null;
+          })()
+        : await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
       const event = owner
         ? await withStore(owner.storeId, () =>
             prisma.paymentEvent.findUnique({

@@ -375,6 +375,22 @@ describe.skipIf(e.E2E_DB === '1')(
           { firstName: 'Mallory' },
         ],
         ['GET', '/admin/users?search=sweep', '/admin/users?search=sweep', adm, undefined],
+        // Ruling NZ-PG-2: with Postgres dead the account is the identity service's and the event is found by a probe of the
+        // stores' DOs: an answer, never the 500 of a Postgres definer.
+        [
+          'POST',
+          '/admin/impersonate (unknown user)',
+          '/admin/impersonate',
+          adm,
+          { userId: '00000000-0000-4000-8000-0000000000bb' },
+        ],
+        [
+          'GET',
+          '/payments/events/:eventId/payload (unknown event)',
+          '/payments/events/00000000-0000-4000-8000-0000000000cc/payload',
+          adm,
+          undefined,
+        ],
       ];
       for (const [m, route, path, headers, body] of seeded) {
         if (!inSubset(`${m} ${route}`)) continue;
@@ -382,6 +398,9 @@ describe.skipIf(e.E2E_DB === '1')(
         // The admin route never edits an e-mail (account takeover) and never edits ANOTHER super_admin's profile.
         if (route === '/admin/users/:id (email)') expect(res?.status).toBe(409);
         if (route === '/admin/users/:id (super_admin target)') expect(res?.status).toBe(403);
+        // the accounts stub answers a state for every id, so the unknown user may be a 200 here; the point is: not a 5xx
+        if (route.endsWith('(unknown user)')) expect([200, 404]).toContain(res?.status);
+        if (route.endsWith('(unknown event)')) expect(res?.status).toBe(404);
       }
       // A second store, created like the first (D1 + DO), deleted by its owner: the DO delete path (close, finish, directory).
       const extra = await e.API.fetch('https://api.ebda.app/__dev/create-store', {

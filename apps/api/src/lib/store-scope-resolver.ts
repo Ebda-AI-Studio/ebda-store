@@ -8,7 +8,8 @@
  * flag (503) propagates: never a guess. Import once at boot (app.ts).
  */
 import { setScopeResolver } from '@ebda/database';
-import { hubFanoutStoreIds, hubOnD1 } from './platform-hub';
+import { hubOnD1 } from './platform-hub';
+import { d1DirectoryEntries } from '../services/platform/directory-entries';
 import { platformUserScopeIsLazy } from '../services/platform/cutover';
 import { backendFor } from './store-backend';
 import { AppError } from '../middleware/error-handler';
@@ -32,5 +33,5 @@ export async function resolveStoreScope(storeId: string): Promise<'pg' | 'no-pg'
 setScopeResolver({
   lazyForStore: async storeId => (await resolveStoreScope(storeId)) === 'no-pg',
   lazyForUser: platformUserScopeIsLazy,
-  hubStoreIds: async () => ((await hubOnD1()) ? (await hubFanoutStoreIds()).ids : undefined),
+  directory: d1DirectoryEntries,
 });

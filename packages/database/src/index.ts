@@ -798,12 +798,16 @@ export async function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promis
  * unregistered (Node scripts, unit tests) = every call keeps the Postgres transaction.
  *  - `lazyForStore`: true for a store served by its Durable Object. An unreadable flag THROWS (never a guess).
  *  - `lazyForUser`: true when the platform data (billing, access, platform families) is on D1, so the user scope needs no BEGIN.
- *  - `hubStoreIds`: the store ids a hub (user-scope) cross-store view covers, or undefined to use the directory definer.
+ *  - `directory`: the store DIRECTORY (every store, never capped) read from D1 where the platform D1 is bound, or undefined
+ *    to use the Postgres `ebda_store_directory()` definer (Node, tests, local dev). Once D1 is bound there is NO Postgres fallback.
  */
 export interface ScopeResolver {
   lazyForStore(storeId: string): Promise<boolean>;
   lazyForUser(): boolean | Promise<boolean>;
-  hubStoreIds?(): Promise<string[] | undefined>;
+  directory?(opts: {
+    includeDeleted: boolean;
+    filter?: (s: StoreDirectoryEntry) => boolean;
+  }): Promise<StoreDirectoryEntry[] | undefined>;
 }
 let scopeResolver: ScopeResolver | undefined;
 export function setScopeResolver(r: ScopeResolver | undefined): void {
@@ -866,8 +870,18 @@ export interface StoreDirectoryEntry {
 /** Every store that is not soft-deleted (id order), optionally filtered. See `StoreDirectoryEntry`. */
 export async function storeDirectory(
   filter?: (s: StoreDirectoryEntry) => boolean,
-  opts: { includeDeleted?: boolean } = {}
+  opts: { includeDeleted?: boolean; postgresOnly?: boolean } = {}
 ): Promise<StoreDirectoryEntry[]> {
+  // NEON-ZERO (Ruling NZ-PG-1): where the platform D1 is bound the directory IS D1 `stores` (status, deleted, hidden are applied
+  // below exactly as for the definer); the Postgres definer is only the answer where no D1 is bound (Node, tests, local dev).
+  // `postgresOnly`: the D1-vs-Postgres drift reconcile needs the Postgres side as Postgres says it (it is skipped when Postgres is gone).
+  const fromD1 = opts.postgresOnly
+    ? undefined
+    : await scopeResolver?.directory?.({ includeDeleted: opts.includeDeleted === true, filter });
+  if (fromD1) {
+    const kept = dropHiddenStores(fromD1, s => s.id, 'storeDirectory');
+    return filter ? kept.filter(filter) : kept;
+  }
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -981,20 +995,11 @@ export async function acrossStores<T>(
   fn: (storeId: string) => Promise<T>,
   opts: AcrossStoresOptions = {}
 ): Promise<Array<{ storeId: string; value: T }>> {
-  // NEON-ZERO (Ruling NZ-C-4): inside the platform user scope (`runInUserScope`, the super-admin hub) with no filter, the store
-  // list is the registered lister's (D1, capped), not the Postgres directory definer.
-  const listed =
-    !opts.storeIds &&
-    !opts.filter &&
-    !tenantStorage.getStore() &&
-    storeScope.getStore()?.storeId === undefined
-      ? await scopeResolver?.hubStoreIds?.()
-      : undefined;
+  // The list is the FULL directory (`storeDirectory`: D1 where bound, never capped, paged inside the resolver): a cron that
+  // visits "every store" must not silently stop at a hub cap (Ruling NZ-PG-3).
   const storeIds = opts.storeIds
     ? dropHiddenStores(opts.storeIds, id => id, 'acrossStores')
-    : listed
-      ? dropHiddenStores(listed, id => id, 'acrossStores')
-      : (await storeDirectory(opts.filter)).map(s => s.id);
+    : (await storeDirectory(opts.filter)).map(s => s.id);
 
   const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
   let next = 0;

@@ -170,7 +170,7 @@ export async function reconcileStoreDirectory(
   const pgAll =
     deps.pgAll ??
     (async () =>
-      (await storeDirectory(undefined, { includeDeleted: true })).map(s => ({
+      (await storeDirectory(undefined, { includeDeleted: true, postgresOnly: true })).map(s => ({
         id: s.id,
         slug: s.slug,
         status: s.status,
@@ -193,7 +193,7 @@ export async function reconcileStoreDirectory(
     const pd = await pgDomains(id);
     return lc(pd.domain) !== lc(row.domain) || lc(pd.pendingDomain) !== lc(row.pending_domain);
   };
-  const pgLive = deps.pgLive ?? (async () => storeDirectory());
+  const pgLive = deps.pgLive ?? (async () => storeDirectory(undefined, { postgresOnly: true }));
   const d1Select = `SELECT id, slug, status, plan, lower(domain) AS domain, lower(pending_domain) AS pending_domain, (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain,
               (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend FROM stores`;
   let all: Awaited<ReturnType<typeof pgAll>>;
