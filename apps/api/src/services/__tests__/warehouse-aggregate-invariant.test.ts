@@ -41,6 +41,8 @@ vi.mock('@ebda/database', () => ({
   },
   Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
   withMoneyTx: (_c: unknown, fn: (tx: unknown) => unknown) => fn(fakeTx),
+  // fakeTx has no commit-hook registry: false makes notifyAfterCommit notify immediately (the no-tx path).
+  afterTxCommit: () => false,
 }));
 vi.mock('../../lib/public-cache', () => ({
   invalidateStoreProductCaches: (...a: unknown[]) => bustMock(...(a as [])),

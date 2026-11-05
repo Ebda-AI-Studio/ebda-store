@@ -17,6 +17,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import type { SqlDriverAdapterFactory } from '@prisma/driver-adapter-utils';
 import { tenantGuardExtension } from './tenant-guard';
+import { guardOrphanTransactionsFactory } from './orphan-tx-guard';
 
 // Options are extracted so the client's TYPE can be derived from them. A global
 // `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation
@@ -252,8 +253,11 @@ export function createPrismaClient(opts: CreatePrismaClientOptions): AppPrismaCl
         console.error(`[database] idle pool client error: ${err.message}`);
       }),
   });
-  if (opts.role === 'owner') return createOwnerClient(adapter, opts.log);
-  return createPrismaClientWithAdapter(adapter, opts.log);
+  // Node path: a transaction Prisma starts but never closes (a `$disconnect()` racing a start) is rolled back and
+  // released instead of stranding `BEGIN` and hanging `pool.end()`. See orphan-tx-guard.ts.
+  const guarded = guardOrphanTransactionsFactory(adapter);
+  if (opts.role === 'owner') return createOwnerClient(guarded, opts.log);
+  return createPrismaClientWithAdapter(guarded, opts.log);
 }
 
 /**
@@ -280,7 +284,7 @@ export function createPrismaClientWithAdapter(
  * strict-RLS app role it throws instead of silently reading zero rows.
  */
 function createOwnerClient(
-  adapter: PrismaPg,
+  adapter: PrismaPg | SqlDriverAdapterFactory,
   log?: CreatePrismaClientOptions['log']
 ): AppPrismaClient {
   const base = new PrismaClient({ ...prismaOptions, ...(log ? { log } : {}), adapter });

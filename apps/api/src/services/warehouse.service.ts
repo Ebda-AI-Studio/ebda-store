@@ -13,8 +13,22 @@
  */
 
 import { notifyCatalogChanged } from '../lib/wa/catalog-state';
+
+/**
+ * Tell Ebda Chat the stock changed AFTER the surrounding transaction commits. `notifyCatalogChanged` may read the
+ * store's link row on a SECOND pooled connection; doing that while this transaction still holds its own lease let N
+ * concurrent writers (N > pool size) each hold a lease while waiting for another: pool starvation, "timeout exceeded when
+ * trying to connect" (tests/integration/warehouse/stock-race, PR 446). It also meant the event could announce a
+ * rolled-back write. Falls back to an immediate call only when `tx` has no hook registry.
+ */
+async function notifyAfterCommit(
+  tx: Prisma.TransactionClient,
+  change: { storeId: string; productIds: string[] }
+): Promise<void> {
+  if (!afterTxCommit(tx, () => notifyCatalogChanged(change))) await notifyCatalogChanged(change);
+}
 import { randomUUID } from 'node:crypto';
-import { prisma, Prisma, withMoneyTx } from '@ebda/database';
+import { prisma, Prisma, withMoneyTx, afterTxCommit } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
@@ -749,7 +763,7 @@ export class WarehouseService {
           `;
 
     // Stock changed: Ebda Chat must see availability (raw SQL bypasses the db write observer).
-    await notifyCatalogChanged({ storeId: args.storeId, productIds: [args.productId] });
+    await notifyAfterCommit(tx, { storeId: args.storeId, productIds: [args.productId] });
     return rows[0].quantity;
   }
 
@@ -833,7 +847,7 @@ export class WarehouseService {
       `;
     }
     // The stock a shopper can buy changed (raw SQL bypasses the db write observer).
-    await notifyCatalogChanged({ storeId, productIds: [productId] });
+    await notifyAfterCommit(tx, { storeId, productIds: [productId] });
   }
 
   // ─── Reconciliation (shadow WarehouseStock → authoritative aggregate) ───────

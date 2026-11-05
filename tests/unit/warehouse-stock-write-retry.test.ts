@@ -38,6 +38,7 @@ vi.mock('@ebda/database', () => ({
   Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
   withRlsBypass: vi.fn(),
   withMoneyTx: h.withMoneyTx,
+  afterTxCommit: () => false, // no hook registry: notifyAfterCommit notifies immediately
 }));
 vi.mock('@api/lib/public-cache', () => ({ invalidateStoreProductCaches: vi.fn(async () => {}) }));
 vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));

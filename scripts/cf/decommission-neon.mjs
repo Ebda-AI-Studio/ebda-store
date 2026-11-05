@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { parseArgs } from 'node:util';
+import { readKeychainSecret } from './lib/keychain.mjs';
 
 export const NEON_PROJECT = 'lucky-truth-54548746';
 // one backup scheme: the ops agent's nightly db-backup.yml (age to EBDA_BACKUP_AGE_PUBLIC_KEY, bucket ebda-db-backups,
@@ -350,7 +351,7 @@ function restoreDrill() {
     const keyFile = path.join(tmp, 'k');
     fs.writeFileSync(
       keyFile,
-      run('security', ['find-generic-password', '-s', AGE_KEY_KEYCHAIN, '-w']) + '\n',
+      readKeychainSecret(AGE_KEY_KEYCHAIN, { expect: /^AGE-SECRET-KEY-1|\n/ }) + '\n',
       { flag: 'wx', mode: 0o600 }
     );
     const dec = path.join(tmp, 'x.dump');
