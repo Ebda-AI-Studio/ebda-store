@@ -314,8 +314,25 @@ afterAll(async () => {
       e => console.error('[orders-contract teardown] could not inspect pg_stat_activity:', e)
     );
   }, 8_000);
+  // CI run 42067641601 named it: an `idle in transaction` BEGIN left by Prisma's driver adapter when startTransaction
+  // failed with "Unknown transaction status" under the concurrent-submit case (noteOrderCreated, logged and swallowed).
+  // Ending that backend frees Postgres, but Prisma still counts the lost client, so $disconnect would wait forever:
+  // bound it at 20 s and say so. Ruling NZ-TEARDOWN-DIAG-1; the adapter defect is tracked, not hidden.
+  const settle = (p: Promise<unknown>, what: string) =>
+    Promise.race([
+      p,
+      new Promise(resolve =>
+        setTimeout(() => {
+          console.error(`[orders-contract teardown] ${what} did not finish in 20 s; moving on`);
+          resolve(undefined);
+        }, 20_000)
+      ),
+    ]);
   try {
-    await Promise.all([ownerPg.end(), prisma.$disconnect()]);
+    await Promise.all([
+      settle(ownerPg.end(), 'ownerPg.end'),
+      settle(prisma.$disconnect(), 'prisma.$disconnect'),
+    ]);
   } finally {
     clearTimeout(timer);
   }
