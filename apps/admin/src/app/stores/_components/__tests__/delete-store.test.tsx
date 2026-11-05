@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
 import { deleteStoreErrorKey } from '@/lib/delete-store-error';
 import ar from '@/i18n/messages/ar.json';
@@ -63,7 +64,7 @@ const store: Store = {
 
 /** Mirrors stores/page.tsx: the row is removed from local state in onDeleted. */
 function ListHarness({ isSuperAdmin, table }: { isSuperAdmin: boolean; table?: boolean }) {
-  const [rows, setRows] = (require('react') as typeof import('react')).useState([store]);
+  const [rows, setRows] = useState([store]);
   const { requestDelete, dialog } = useDeleteStore(d =>
     setRows(prev => prev.filter(s => s.id !== d.id))
   );
@@ -214,8 +215,9 @@ describe('deleteStoreErrorKey + i18n', () => {
     expect(deleteStoreErrorKey({ code: 'SERVER_ERROR', status: 500 })).toBeNull();
   });
   it('has matching keys in both languages, Western digits only', () => {
-    const a = (ar as any).stores.deleteStore;
-    const e = (en as any).stores.deleteStore;
+    type DeleteCopy = { stores: { deleteStore: Record<string, string> } };
+    const a = (ar as unknown as DeleteCopy).stores.deleteStore;
+    const e = (en as unknown as DeleteCopy).stores.deleteStore;
     expect(Object.keys(a)).toEqual(Object.keys(e));
     for (const v of [...Object.values<string>(a), ...Object.values<string>(e)])
       expect(v).not.toMatch(/[٠-٩]/);
