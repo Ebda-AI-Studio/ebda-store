@@ -15,8 +15,26 @@ import { startJob } from './start';
 import type { JobEvent } from './types';
 import { cfBindings } from '../../cf/bindings';
 
+/**
+ * Test/diagnostic only (the Worker turns it on under DEV_STATS=1, never on a deployed Worker): every event dispatched, with
+ * its order id, so a workers-test can assert an event fired EXACTLY once (money-path.test.ts: a retried keyed checkout).
+ */
+let trackDispatch = false;
+const dispatched: Array<{ name: string; orderId: string | null }> = [];
+export function trackDispatches(on: boolean): void {
+  trackDispatch = on;
+}
+export function dispatchedEvents(): Array<{ name: string; orderId: string | null }> {
+  return dispatched.slice();
+}
+
 export async function dispatchEvents(payload: JobEvent | JobEvent[]): Promise<{ ids: string[] }> {
   const events = Array.isArray(payload) ? payload : [payload];
+  if (trackDispatch && dispatched.length < 2000)
+    for (const ev of events) {
+      const orderId = (ev.data as { orderId?: unknown } | undefined)?.orderId;
+      dispatched.push({ name: ev.name, orderId: typeof orderId === 'string' ? orderId : null });
+    }
   if (!cfBindings()) return { ids: [] };
   const failures: unknown[] = [];
 

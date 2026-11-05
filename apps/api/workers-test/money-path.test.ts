@@ -276,6 +276,36 @@ describe.skipIf(e.E2E_DB === '1')(
       return { id, total: row.total };
     }
 
+    /** A Fawry checkout (the gateway needs the shopper's email + mobile), through the storefront API. */
+    async function placeFawryOrder(): Promise<string> {
+      session = `sess-fawry-ref-${++nSession}`;
+      const cart = await api('/public/cart/items', {
+        method: 'POST',
+        headers: shopperHeaders(),
+        body: JSON.stringify({ productId, quantity: 1 }),
+      });
+      expect(cart.status).toBeLessThan(300);
+      const placed = await api('/public/orders', {
+        method: 'POST',
+        headers: shopperHeaders(),
+        body: JSON.stringify({
+          paymentMethod: 'fawry',
+          shippingAddress: {
+            firstName: 'Fawry',
+            lastName: 'Shopper',
+            address1: '1 Test St',
+            city: 'Cairo',
+            phone: `+2010${String(3_000_000 + nSession).padStart(8, '0')}`,
+            email: 'fawry-shopper@exit-test.invalid',
+            country: 'EG',
+          },
+        }),
+      });
+      expect(placed.status, await placed.clone().text()).toBeLessThan(300);
+      const pj = (await placed.json()) as { data: { id?: string; order?: { id: string } } };
+      return pj.data.order?.id ?? pj.data.id!;
+    }
+
     /** An online payment as recordProviderPayment writes it after the gateway accepted (the gateway call itself is not ours to test). */
     async function gatewayPayment(orderId: string, provider: string, ref: string, amount: number) {
       const r = unwrap<{ paymentId: string }>(
@@ -721,6 +751,14 @@ describe.skipIf(e.E2E_DB === '1')(
         const id2 = ((JSON.parse(at) as { data: { id?: string; order?: { id: string } } }).data
           .order?.id ?? (JSON.parse(at) as { data: { id: string } }).data.id) as string;
         expect(id2).toBe(id);
+        // the post-commit fan-out ran on the FIRST answer only: order/created for this order exactly once (review NEW-2)
+        await new Promise(r => setTimeout(r, 1500));
+        const events = (
+          (await (await e.API.fetch('https://api.ebda.app/__dev/dispatched')).json()) as {
+            events: Array<{ name: string; orderId: string | null }>;
+          }
+        ).events.filter(ev => ev.name === 'order/created' && ev.orderId === id);
+        expect(events).toHaveLength(1);
       } finally {
         await e.PLATFORM_DB.prepare('DROP TRIGGER IF EXISTS money_test_order_outage').run();
       }
@@ -770,6 +808,67 @@ describe.skipIf(e.E2E_DB === '1')(
       expect(second.instruction?.code).toBe(first.instruction!.code);
       expect(await payments(storeId, orderId)).toHaveLength(1);
     }, 60_000);
+
+    it('review NEW-3: 25 Fawry creates during a D1 write outage are all 503 and never dead-letter the index rows; once D1 is back the next create is 200 with the same reference, both rows in D1, and the signed webhook for it settles the payment', async () => {
+      const orderId = await placeFawryOrder();
+      await e.PLATFORM_DB.prepare(
+        "CREATE TRIGGER money_test_gateway_outage BEFORE INSERT ON entity_index WHEN NEW.kind IN ('payment', 'webhook') BEGIN SELECT RAISE(ABORT, 'test outage'); END"
+      ).run();
+      const create = () =>
+        api('/payments/create', {
+          method: 'POST',
+          headers: shopperHeaders(),
+          body: JSON.stringify({ orderId, provider: 'fawry', method: 'payatfawry' }),
+        });
+      try {
+        for (let i = 0; i < 25; i++) {
+          const r = await create();
+          const j = (await r.json()) as { error?: { code?: string } };
+          expect(r.status, `attempt ${i + 1}: ${JSON.stringify(j)}`).toBe(503);
+          expect(j.error?.code).toBe('ENTITY_INDEX_UNAVAILABLE');
+        }
+      } finally {
+        await e.PLATFORM_DB.prepare('DROP TRIGGER IF EXISTS money_test_gateway_outage').run();
+      }
+      // one live invoice, minted once (every retry was the replay path of the SAME gateway payment)
+      const rows = (await payments(storeId, orderId)) as Array<{
+        id: string;
+        status: string;
+        amount: number;
+        transactionId: string | null;
+        invoiceId?: string | null;
+      }>;
+      expect(rows).toHaveLength(1);
+      const ok = await create();
+      const ot = await ok.text();
+      expect(ok.status, ot).toBe(200);
+      const code = (JSON.parse(ot) as { data: { instruction?: { code: string } } }).data.instruction
+        ?.code;
+      expect(code).toBe(rows[0]!.invoiceId);
+      for (const [kind, id] of [
+        ['payment', rows[0]!.id],
+        ['webhook', `fawry:${rows[0]!.transactionId}`],
+        ['webhook', `fawry:${rows[0]!.invoiceId}`],
+      ]) {
+        const row = await e.PLATFORM_DB.prepare(
+          'SELECT store_id FROM entity_index WHERE kind = ?1 AND id = ?2'
+        )
+          .bind(kind, id)
+          .first<{ store_id: string }>();
+        expect(row?.store_id, `${kind} ${id}`).toBe(storeId);
+      }
+      // the webhook for that reference routes to this store and settles the payment
+      const hook = await api('/webhooks/payment/fawry', {
+        method: 'POST',
+        body: fawryBody(rows[0]!.transactionId!, rows[0]!.invoiceId!, rows[0]!.amount),
+      });
+      expect(hook.status, await hook.clone().text()).toBe(200);
+      const paid = await until(async () => {
+        const p = (await payments(storeId, orderId))[0]!;
+        return p.status === 'completed' ? p : null;
+      });
+      expect(paid?.id).toBe(rows[0]!.id);
+    }, 120_000);
 
     it('refund and retry entry points resolve and read the payment on the DO (no Postgres reach)', async () => {
       const o = await placeOrder('paymob');

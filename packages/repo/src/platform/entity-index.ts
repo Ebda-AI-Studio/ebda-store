@@ -38,8 +38,10 @@ export const backoffMs = (attempts: number): number =>
 export interface DrainResult {
   written: number;
   failed: number;
-  /** rows that failed MAX_ATTEMPTS times: no longer retried, need a human (alert on this) */
+  /** rows that failed MAX_ATTEMPTS times: off the fast path; the alarm still retries them hourly (`includeDead`); alert */
   deadLettered: number;
+  /** rows that crossed MAX_ATTEMPTS in THIS drain: the caller alerts once (Ruling NZ-MONEY-2) */
+  newlyDead: number;
   /** an id already points at ANOTHER store: not applied, needs a human */
   conflicts: Array<{ kind: string; id: string; existing: string; attempted: string }>;
 }
@@ -48,22 +50,37 @@ export interface DrainResult {
 export async function drainEntityIndexOutbox(
   db: SyncSql,
   d1: D1Like,
-  opts: { now?: number; limit?: number; afterId?: number; onlyIds?: readonly string[] } = {}
+  opts: {
+    now?: number;
+    limit?: number;
+    afterId?: number;
+    onlyIds?: readonly string[];
+    /** the alarm: dead-lettered rows are retried too (on their capped 1 h backoff); a money row is never abandoned */
+    includeDead?: boolean;
+  } = {}
 ): Promise<DrainResult> {
   const now = opts.now ?? Date.now();
   // `afterId`: only the rows queued after that outbox id (a money op drains ITS OWN rows first, ahead of any backlog).
-  // `onlyIds`: only the rows of these entity ids, due or not (a reference about to be handed out is written NOW).
+  // `onlyIds`: a FORCED drain of these entity ids (a reference about to be handed out is written NOW): due or not,
+  // dead-lettered or not (revived on demand), and a failure does NOT count toward the dead-letter limit, so shopper retries
+  // during an outage can never dead-letter the row (review NEW-3 of PR 455). Only the paced drains count attempts.
   const only = opts.onlyIds && opts.onlyIds.length > 0 ? opts.onlyIds.slice(0, 50) : null;
   const rows = only
     ? db.all(
-        `SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND json_extract(payload, '$.id') IN (${only.map(() => '?').join(', ')}) ORDER BY id`,
-        [MAX_ATTEMPTS, ...only]
+        `SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND json_extract(payload, '$.id') IN (${only.map(() => '?').join(', ')}) ORDER BY id`,
+        [...only]
       )
     : db.all(
-        "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
-        [MAX_ATTEMPTS, now, opts.afterId ?? 0, Math.min(opts.limit ?? 100, 500)]
+        "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND (attempts < ? OR ?) AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
+        [
+          MAX_ATTEMPTS,
+          opts.includeDead ? 1 : 0,
+          now,
+          opts.afterId ?? 0,
+          Math.min(opts.limit ?? 100, 500),
+        ]
       );
-  const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, conflicts: [] };
+  const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, newlyDead: 0, conflicts: [] };
   for (const r of rows) {
     const rowId = r.id as number;
     try {
@@ -91,14 +108,16 @@ export async function drainEntityIndexOutbox(
       db.run('UPDATE d1_outbox SET done_at = ? WHERE id = ?', [now, rowId]);
       out.written++;
     } catch {
+      out.failed++;
+      if (only) continue; // a forced drain neither counts nor reschedules (see above)
       const attempts = (r.attempts as number) + 1;
       db.run('UPDATE d1_outbox SET attempts = ?, next_attempt_at = ? WHERE id = ?', [
         attempts,
         now + backoffMs(attempts),
         rowId,
       ]);
-      out.failed++;
       if (attempts >= MAX_ATTEMPTS) out.deadLettered++;
+      if (attempts === MAX_ATTEMPTS) out.newlyDead++;
     }
   }
   return out;
@@ -149,8 +168,9 @@ export function outboxRowsAfter(
 /** When the next undone, not dead-lettered row is due (epoch ms), or null when the outbox is drained. */
 export function nextOutboxAttempt(db: SyncSql): number | null {
   const r = db.all(
-    "SELECT MIN(next_attempt_at) AS t FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ?",
-    [MAX_ATTEMPTS]
+    // dead-lettered rows included: the alarm keeps retrying them on their capped (1 h) backoff
+    "SELECT MIN(next_attempt_at) AS t FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL",
+    []
   )[0];
   return (r?.t as number | null) ?? null;
 }

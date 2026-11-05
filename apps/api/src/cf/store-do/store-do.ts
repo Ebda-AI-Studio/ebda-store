@@ -408,7 +408,8 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       await Promise.race([
         (async () => {
           await drainEntityIndexOutbox(this.sync, d1, { onlyIds: ids.map(i => i.id) });
-          await awaitEntityIndexed(this.sync, d1, storeId, ids, { limit: 1 });
+          // limit 0: only the read-back (the forced drain above did the writing, without counting attempts)
+          await awaitEntityIndexed(this.sync, d1, storeId, ids, { limit: 0 });
         })(),
         new Promise((_, reject) => {
           timer = setTimeout(
@@ -463,13 +464,18 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /** Write up to `limit` due `d1_outbox` entity-index rows to D1 (idempotent; nothing due = no D1 call). Never throws. */
-  private async drainIndex(limit = 100): Promise<void> {
+  private async drainIndex(limit = 100, includeDead = false): Promise<void> {
     const d1 = this.env.PLATFORM_DB;
     if (!d1) return;
     try {
-      const r = await drainEntityIndexOutbox(this.sync, d1, { limit });
-      if (r.failed > 0 || r.deadLettered > 0 || r.conflicts.length > 0)
-        console.error('[P1] entity index drain incomplete', JSON.stringify(r));
+      const r = await drainEntityIndexOutbox(this.sync, d1, { limit, includeDead });
+      // once per row, when it crosses the dead-letter limit (~hours of failed paced attempts): a human must look
+      if (r.newlyDead > 0)
+        console.error(
+          `[P1] entity index rows dead-lettered: ${r.newlyDead} (still retried hourly by the alarm)`
+        );
+      if (r.failed > 0 || r.conflicts.length > 0)
+        console.error('entity index drain incomplete', JSON.stringify(r));
     } catch (err) {
       console.error('[P1] entity index drain failed', err);
     }
@@ -703,8 +709,9 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   async alarm(): Promise<void> {
-    // The index retry (Ruling NZ-MONEY-2): the rows a money op could not write wait in the outbox with backoff.
-    await this.drainIndex();
+    // The index retry (Ruling NZ-MONEY-2): the rows a money op could not write wait in the outbox with backoff; dead-lettered
+    // rows are retried too, on their capped hourly backoff (a money row is never abandoned, review NEW-3).
+    await this.drainIndex(100, true);
     const now = Date.now();
     const due = this.backupDueAt();
     // The nightly work runs only when it is due: an earlier alarm armed for an index retry must not back the store up.

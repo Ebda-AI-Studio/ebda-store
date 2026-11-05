@@ -144,11 +144,18 @@ declare module '@ebda-src/repo' {
   export function drainEntityIndexOutbox(
     db: SyncSql,
     d1: unknown,
-    opts?: { now?: number; limit?: number; afterId?: number; onlyIds?: readonly string[] }
+    opts?: {
+      now?: number;
+      limit?: number;
+      afterId?: number;
+      onlyIds?: readonly string[];
+      includeDead?: boolean;
+    }
   ): Promise<{
     written: number;
     failed: number;
     deadLettered: number;
+    newlyDead: number;
     conflicts: Array<{ kind: string; id: string; existing: string; attempted: string }>;
   }>;
   export function awaitEntityIndexed(
