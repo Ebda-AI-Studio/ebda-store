@@ -15,6 +15,9 @@
 // __diff    rows added / changed / deleted since the seal (the data a rollback would otherwise lose).
 // __rebase  baseline := current state, after a verified rollback replay.
 // __tables  every application table of the DO (verify checks each is mapped, a CF-only rule or a runtime table).
+// __export  READ-ONLY {table, offset?, limit?} -> {columns, pk, total, offset, rows:[[...]]} ordered by pk (nightly backup,
+//           Ruling NZ-BACKUP-1). Same table/column validation as __import; rows come back in the exact shape __import takes,
+//           so a dump replays through the production import path. A value JSON cannot carry (BLOB) is a 422, never a silent loss.
 // __unseal  {confirm:'wipe-and-unseal'}: wipes the DO so a retried cutover can re-import.
 import { PK_SEP, TableDigest, canonRow, canonValue, sha256Hex } from './canon.mjs';
 import { DO_DERIVED_TABLE } from './coverage.mjs';
@@ -193,6 +196,43 @@ async function doImport(request, { sql, transactionSync }) {
     sql.exec('PRAGMA foreign_keys = ON');
   }
   return json({ ok: true, table, page, rows: rows.length, skipped: false });
+}
+
+const EXPORT_MAX_ROWS = 2000;
+/** One page of a table, ordered by primary key, in the shape __import accepts (backup + restore drill). */
+async function doExport(request, { sql }) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.table !== 'string') throw new HttpError(400, 'table required');
+  const info = tableInfo(sql, body.table);
+  const meta = sql.exec(`SELECT name FROM pragma_table_info(?) ORDER BY cid`, body.table).toArray();
+  const columns = meta.map(r => r.name);
+  const offset = Number.isInteger(body.offset) && body.offset >= 0 ? body.offset : 0;
+  const limit = Number.isInteger(body.limit)
+    ? Math.min(Math.max(body.limit, 0), EXPORT_MAX_ROWS)
+    : EXPORT_MAX_ROWS;
+  const total = sql.exec(`SELECT count(*) AS n FROM ${q(body.table)}`).toArray()[0].n;
+  const order = (info.pk.length ? info.pk : ['rowid'])
+    .map(c => (c === 'rowid' ? c : q(c)))
+    .join(', ');
+  const rows = [];
+  if (limit > 0) {
+    const cur = sql.exec(
+      `SELECT ${columns.map(q).join(', ')} FROM ${q(body.table)} ORDER BY ${order} LIMIT ? OFFSET ?`,
+      limit,
+      offset
+    );
+    for (const r of cur) {
+      const vals = columns.map(c => r[c]);
+      for (const v of vals)
+        if (!(v === null || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))))
+          throw new HttpError(
+            422,
+            `${body.table}: a value of type ${typeof v} cannot be exported as JSON`
+          );
+      rows.push(vals);
+    }
+  }
+  return json({ ok: true, table: body.table, columns, pk: info.pk, total, offset, rows });
 }
 
 async function doVerify(request, { sql }) {
@@ -459,6 +499,8 @@ export async function handleStoreAdmin(request, ctx) {
   try {
     if (request.method === 'POST' && path.endsWith('/__import'))
       return await doImport(request, ctx);
+    if (request.method === 'POST' && path.endsWith('/__export'))
+      return await doExport(request, ctx);
     if (request.method === 'POST' && path.endsWith('/__verify'))
       return await doVerify(request, ctx);
     if (request.method === 'POST' && path.endsWith('/__auditimport'))

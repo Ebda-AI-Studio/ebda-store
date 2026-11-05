@@ -1,5 +1,94 @@
 # Database backup, restore & disaster recovery
 
+> **2026-11-05: Postgres/Neon is GONE** (API `/health` `postgres: removed`; Neon project deleted; `db-backup.yml` disabled). Production data now lives in **D1 `ebda-platform`** and **one StoreDO (SQLite Durable Object) per store**. Everything below the line "Legacy Neon runbook" describes the retired Postgres layers and is kept only as history. Ruling NZ-BACKUP-1. The Neon **final dump** under `ebda-db-backups/final/` has no expiry and is not touched by anything here.
+
+## Which path do I use? (Cloudflare era)
+
+| Situation                                                                         | Use                                                      | RPO        | Notes                                                                                                                                                         |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bad migration / bad write in D1, within 30 days                                   | **D1 Time Travel** (`wrangler d1 time-travel restore`)   | seconds    | in place; prints the bookmark to undo it                                                                                                                      |
+| Bad write in one store's DO, within 30 days                                       | **DO point-in-time recovery** (SQLite storage bookmarks) | seconds    | platform feature; NOT VERIFIED here: no operator route in this repo calls `storage.onNextSessionRestoreBookmark` yet, so it needs a one-off admin route first |
+| Older than 30 days, Cloudflare account/provider lost, or both D1 and a DO damaged | **R2 dumps** `cf/` (this document, "Real recovery")      | up to 24 h | needs the age private key (Ahmad's Keychain, `ebda-db-backup-age-key`)                                                                                        |
+| "Does the backup actually work?"                                                  | the restore drill                                        | n/a        | weekly fixture in CI; real one by the controller                                                                                                              |
+
+## What is backed up (nightly 02:17 UTC, `.github/workflows/cf-backup.yml`)
+
+1. **D1 `ebda-platform`**: `wrangler d1 export --remote` (SQL).
+2. **Every StoreDO store** (`stores.storage_backend = 'do'`): the read-only, bearer-checked `POST /cutover/stores/<id>/__export` (paged by primary key, 2000 rows a page, same row shape `__import` takes) after `GET .../__tables`. The bearer is `BACKUP_EXPORT_SECRET`, which opens only `__export`/`__tables`/`__status`.
+3. Each artifact is **gzip -9, then age-encrypted** (public key only on the runner), uploaded, **read back and sha256-compared**, and listed in a **manifest** with raw, compressed and encrypted sizes, row counts and a content digest per table.
+4. Layout in bucket `ebda-db-backups`:
+
+| Prefix                             | Written       | Kept             | Lifecycle rule              |
+| ---------------------------------- | ------------- | ---------------- | --------------------------- |
+| `cf/daily/<YYYY-MM-DD>/`           | every night   | 7 days           | `cf-daily-7d`               |
+| `cf/weekly/<YYYY-MM-DD>/`          | Sundays (UTC) | 4 weeks          | `cf-weekly-28d`             |
+| `cf/monthly/<YYYY-MM-DD>/`         | the 1st       | 3 months         | `cf-monthly-93d`            |
+| `cf/ledger.json`, `cf/latest.json` | every night   | overwritten      | none (outside the prefixes) |
+| `final/`, `db/`                    | legacy Neon   | `final/` forever | untouched                   |
+
+Each folder holds `d1-ebda-platform.sql.gz.age`, `do-<storeId>.ndjson.gz.age` and `manifest.json`. **Skip-if-unchanged**: when an artifact's raw sha256 equals the last daily's, the daily manifest points at the earlier object (`reused: true`) and nothing is uploaded; that reference is used only while the target is at most 4 days old, so it can never outlive its own expiry. Weekly and monthly folders are always full uploads of their own.
+
+**Size guard** (fails the run, so `notify-failure` pages Telegram): one run uploading more than 2x the median of the last 7 runs (ignored below 1 MiB), or the estimated `cf/` total (from `cf/ledger.json`, an estimate because wrangler cannot list a bucket) above `EBDA_BACKUP_CF_CAP_BYTES` (default 1 GiB). The step summary prints raw, compressed, uploaded and cf/ total sizes every night.
+
+**Footprint**: worst case is about 14 times the compressed size of one night (7 daily + 4 weekly + 3 monthly), fewer when nothing changes. Fixture measurement (measured, a small synthetic store): 82 KB raw to 15 KB gzip, 5.5x. Production raw sizes are NOT measured yet (no production access in the build session); the first nightly summary and the first drill print them. R2 costs $0.015 per GB-month after the first 10 GB, so a 700 MB compressed night is about 10 GB at worst and costs $0. The default 1 GiB cap therefore alarms when one compressed night passes roughly 75 MB: raise the variable if the real number is larger and still cheap.
+
+## Real recovery (restore production from these backups)
+
+Prerequisites: the age private key (`security find-generic-password -s ebda-db-backup-age-key -w`; a multi-line secret comes back as **hex**: the scripts decode it, by hand it is `... | xxd -r -p`), `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` with R2 read, `wrangler`. Timings below are from the fixture drill (3.6 s for a 132-table store plus the D1 schema on a laptop); real timings for the full data set go in the drill log below after the first real drill.
+
+**Step 0 - prove the backup first (read-only on production).** `node scripts/ops/restore-drill.mjs` (newest daily; `--tier weekly|monthly --day YYYY-MM-DD` for older). It fetches, decrypts, checks every sha256, restores D1 into a local D1 and every store into a local StoreDO through `__import`, boots the real API Worker on workerd and calls the public endpoints, and prints one PASS/FAIL report. Then `--extract <dir>` writes the verified plaintext artifacts for the steps below:
+
+```bash
+node scripts/ops/restore-drill.mjs --extract ./restore --tier monthly --day 2026-11-01
+```
+
+**A. D1 into a NEW database (provider-loss or "I do not trust the old one")**
+
+```bash
+npx wrangler d1 create ebda-platform-restore
+npx wrangler d1 execute ebda-platform-restore --remote --file ./restore/d1-ebda-platform.sql
+# point the API at it: set repo variable EBDA_PLATFORM_D1_ID to the new id, then
+gh workflow run cf-api-deploy.yml
+# verify: GET https://api.ebda.app/health (storage_backend counts) and one public store
+```
+
+**B. D1 in place (within 30 days, no dump needed)**
+
+```bash
+npx wrangler d1 time-travel info ebda-platform --timestamp <ISO time before the damage>
+npx wrangler d1 time-travel restore ebda-platform --timestamp <ISO time>   # prints the bookmark that undoes it
+```
+
+**C. A StoreDO from its dump** (the DO is emptied and re-imported through the same path the cutover used, then verified against the manifest; a new namespace is the same command against a Worker that has the new class):
+
+```bash
+export CUTOVER_IMPORT_SECRET=<24+ chars, set as a Worker secret for the window, deleted afterwards>
+node scripts/ops/restore-store-do.mjs --dir ./restore --store <store uuid> \
+  --api-url https://api.ebda.app --wipe --i-understand-this-writes-production
+```
+
+Rehearse C against local workerd first (`--api-url http://127.0.0.1:8798`, no extra flag). After C: `GET /cutover/stores/<id>/__status` and a storefront read; re-seal if the store was sealed.
+
+## Controller runbook: turning the nightly backup on (production changes; the build session ran none)
+
+1. Pick the Worker secret: `openssl rand -hex 32`; `cd apps/api && npx wrangler secret put BACKUP_EXPORT_SECRET`; the same value into GitHub environment `production`: `gh secret set BACKUP_EXPORT_SECRET --env production --repo Ebda-AI-Studio/ebda-store`.
+2. Confirm vars `EBDA_BACKUP_AGE_PUBLIC_KEY` and `CLOUDFLARE_ACCOUNT_ID` and secret `CLOUDFLARE_API_TOKEN` (R2 write + D1 read) exist in environment `production` (the old `db-backup.yml` used them). Optional var `EBDA_BACKUP_CF_CAP_BYTES`.
+3. Deploy the API (`gh workflow run cf-api-deploy.yml`; the `__export` action ships in this PR). Check `/health` commit equals main.
+4. Set retention: `bash scripts/ops/r2-lifecycle-cf.sh` (prints), then `--apply`, then `npx wrangler r2 bucket lifecycle list ebda-db-backups` and confirm `final/` has NO rule.
+5. `gh workflow run cf-backup.yml`; read the step summary (sizes) and confirm `cf/latest.json` exists.
+6. First real drill on that backup: `node scripts/ops/restore-drill.mjs --target api` (about 1 minute plus the API build step). Record the result and timings in the log below. Fix whatever the API checks report before trusting them.
+7. Workflow files changed: the PR needs the `deploy-change` label (the controller adds it).
+
+## Drill log
+
+| Date       | Backup                                                         | Result                                                                                                                                         | Time  |
+| ---------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 2026-11-05 | local fixture (workerd, 132-table store, real platform schema) | D1 31/31 tables and DO 132/132 tables equal; replay through the real API Worker passed; public API checks not green on the fixture (see below) | 3.6 s |
+
+Fixture API result, stated plainly: against the fixture the real Worker answered `categories` 200, but `store resolve` 404 and `products` 500 (`POSTGRES_REMOVED: store.findUnique / storeFeature.findMany`: a path in this branch's API still reaches Prisma for that request), and the admin read is skipped by design. Whether that is a fixture artifact or a real unported path is NOT settled; the first real drill answers it. Do not call the API stage proven until it passes on real data.
+
+## Legacy Neon runbook (retired 2026-11-05, history only)
+
 Canonical DR runbook for the Ebda Store Neon Postgres database. Three independent layers,
 all **$0**. Every restore path below has been **drilled end-to-end** — see the drill log
 at the bottom. When something goes wrong, start at the decision table.

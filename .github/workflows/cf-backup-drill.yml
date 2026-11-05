@@ -1,0 +1,57 @@
+name: Cloudflare backup restore drill (fixture)
+# Ruling NZ-BACKUP-1: weekly proof that the backup code can still be turned back into a verified restore. It needs NO production
+# access: scripts/ops/drill-fixture.mjs builds a local bucket with the real backup pipeline over a local StoreDO (workerd), then
+# restore-drill.mjs decrypts it and replays it into a fresh StoreDO through the production __import path, comparing per-table counts
+# and content digests. The drill against the REAL R2 backups is a controller step (docs/DB-BACKUP-RESTORE.md "Real recovery").
+on:
+  schedule:
+    - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ebda-cf-backup-drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+      - uses: ./.github/actions/npm-ci
+      - name: Install age
+        run: command -v age-keygen >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null; }
+      - name: Build the fixture backup with the real pipeline
+        run: node scripts/ops/drill-fixture.mjs "$RUNNER_TEMP/fixture"
+      - name: Restore it and compare
+        run: >
+          node scripts/ops/restore-drill.mjs --dir "$RUNNER_TEMP/fixture" --identity-file "$RUNNER_TEMP/fixture/identity.txt"
+          --target harness --workdir "$RUNNER_TEMP/drill" --report "$RUNNER_TEMP/drill-report.txt"
+      - name: Report
+        if: always()
+        run: test -f "$RUNNER_TEMP/drill-report.txt" && cat "$RUNNER_TEMP/drill-report.txt" >> "$GITHUB_STEP_SUMMARY" || true
+
+  notify-failure:
+    name: Notify on drill failure
+    needs: [drill]
+    if: always() && needs.drill.result == 'failure'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 2
+    steps:
+      - name: Send Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_ALERT_CHAT_ID:-}" ] || { echo "no telegram secrets - skip"; exit 0; }
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+            --data-urlencode text="CF BACKUP RESTORE DRILL FAILED (fixture). The backup/restore code no longer round-trips. ${RUN_URL}" >/dev/null || true
