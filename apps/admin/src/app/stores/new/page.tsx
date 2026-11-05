@@ -158,17 +158,7 @@ export default function CreateStorePage() {
   }
 
   return (
-    <AdminLayout
-      title={t('title')}
-      subtitle={t('subtitle')}
-      actions={
-        <Link href="/stores">
-          <Button variant="outline" size="sm">
-            {t('cancel')}
-          </Button>
-        </Link>
-      }
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="mx-auto max-w-3xl">
         <StepIndicator currentStep={currentStep} onJumpTo={setCurrentStep} />
 
@@ -196,17 +186,21 @@ export default function CreateStorePage() {
 
           {/* Navigation Buttons */}
           <div className="flex justify-between border-t bg-muted px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStepIndex === 0}
-            >
-              {t('back')}
-            </Button>
+            {currentStepIndex === 0 ? (
+              <Link
+                href="/stores"
+                className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+              >
+                {t('cancel')}
+              </Link>
+            ) : (
+              <Button type="button" variant="outline" className="min-h-11" onClick={prevStep}>
+                {t('back')}
+              </Button>
+            )}
 
             {currentStep === 'review' ? (
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
+              <Button className="min-h-11" onClick={handleSubmit} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <svg className="me-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -231,7 +225,9 @@ export default function CreateStorePage() {
                 )}
               </Button>
             ) : (
-              <Button onClick={nextStep}>{t('continueBtn')}</Button>
+              <Button className="min-h-11" onClick={nextStep}>
+                {t('continueBtn')}
+              </Button>
             )}
           </div>
         </div>

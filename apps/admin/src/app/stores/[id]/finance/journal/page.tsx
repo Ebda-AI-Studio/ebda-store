@@ -7,6 +7,8 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, type PageMeta } from '@/lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { Button } from '@ebda/ui';
 import { PageControls } from '../../../../../components/PageControls';
 import { minorToMajor } from '@/lib/format';
 import { useRouter } from 'next/navigation';
@@ -111,12 +113,99 @@ export default function JournalListPage() {
         }
       })
       .catch(() => {
-        if (isLatest()) setError('Failed to load journal entries');
+        if (isLatest()) setError(t('loadFailed'));
       });
   }, [storeId, refreshKey, period, customRange, page, beginRequest]);
 
+  const columns: DataTableColumn<JournalEntry>[] = [
+    {
+      header: t('entryNumber'),
+      primaryOnMobile: true,
+      cell: entry => (
+        <span
+          className={`font-mono text-xs ${entry.status === 'reversed' ? 'line-through opacity-60' : ''}`}
+        >
+          {entry.entryNumber}
+        </span>
+      ),
+    },
+    {
+      header: t('postedAt'),
+      cell: entry => (
+        <span className="text-muted-foreground">
+          {new Date(entry.postedAt).toLocaleDateString(undefined, withNumerals())}
+        </span>
+      ),
+    },
+    {
+      header: t('source'),
+      hideOnMobile: true,
+      cell: entry => (
+        <span className="text-muted-foreground capitalize">{entry.source.replace(/_/g, ' ')}</span>
+      ),
+    },
+    {
+      header: t('memo'),
+      hideOnMobile: true,
+      cell: entry => (
+        <span
+          className="block max-w-[12rem] truncate text-muted-foreground"
+          title={entry.memo ?? undefined}
+        >
+          {entry.memo ?? '—'}
+        </span>
+      ),
+    },
+    {
+      header: t('debit'),
+      alignEnd: true,
+      cell: entry => (
+        <span className="font-mono text-xs">
+          {minorToMajor(entry.lines.reduce((s, l) => s + l.debit, 0))}
+        </span>
+      ),
+    },
+    {
+      header: t('credit'),
+      alignEnd: true,
+      hideOnMobile: true,
+      cell: entry => (
+        <span className="font-mono text-xs">
+          {minorToMajor(entry.lines.reduce((s, l) => s + l.credit, 0))}
+        </span>
+      ),
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileActions: true,
+      cell: entry => (
+        <Link
+          href={`/stores/${storeId}/finance/journal/${entry.id}`}
+          className="inline-flex min-h-11 items-center text-xs font-medium text-primary-ink underline underline-offset-2"
+        >
+          {t('viewDetail')}
+        </Link>
+      ),
+    },
+  ];
+
   return (
-    <AdminLayout title={t('title')} subtitle={t('description')}>
+    <AdminLayout
+      title={t('title')}
+      subtitle={t('description')}
+      actions={
+        // Only super_admin can post manual journal entries.
+        isSuperAdmin ? (
+          <Button
+            className="min-h-11"
+            onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}
+          >
+            {tNew('addNew')}
+          </Button>
+        ) : undefined
+      }
+    >
       <DateRangePicker
         period={period}
         custom={customRange}
@@ -141,18 +230,6 @@ export default function JournalListPage() {
 
       {entries && (
         <div className="max-w-5xl space-y-4">
-          {/* New Entry button: only super_admin can post manual journal entries. */}
-          {isSuperAdmin && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}
-                className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
-              >
-                {tNew('addNew')}
-              </button>
-            </div>
-          )}
           {entries.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('noEntries')}</p>
           ) : (
@@ -162,78 +239,12 @@ export default function JournalListPage() {
                   {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
                 </p>
               )}
-              {/* Journal entries list — genuine accounting ledger (columns are
-               the point); kept as an isolated horizontal-scroll container
-               per the B1 mobile-table exception rather than card-stacked. */}
-              <div className="rounded-xl border border-border overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                        {t('entryNumber')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground w-40">
-                        {t('postedAt')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
-                        {t('source')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                        {t('memo')}
-                      </th>
-                      <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                        {t('debit')}
-                      </th>
-                      <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                        {t('credit')}
-                      </th>
-                      <th className="px-3 py-2 w-16" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map(entry => {
-                      const dr = entry.lines.reduce((s, l) => s + l.debit, 0);
-                      const cr = entry.lines.reduce((s, l) => s + l.credit, 0);
-                      const isReversed = entry.status === 'reversed';
-                      return (
-                        <tr
-                          key={entry.id}
-                          className={`border-t border-border/40 ${isReversed ? 'opacity-60' : ''}`}
-                        >
-                          <td
-                            className={`px-3 py-2 font-mono text-xs ${isReversed ? 'line-through' : ''}`}
-                          >
-                            {entry.entryNumber}
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {new Date(entry.postedAt).toLocaleDateString(undefined, withNumerals())}
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground capitalize">
-                            {entry.source.replace(/_/g, ' ')}
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground truncate max-w-[12rem]">
-                            {entry.memo ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-end font-mono text-xs">
-                            {minorToMajor(dr)}
-                          </td>
-                          <td className="px-3 py-2 text-end font-mono text-xs">
-                            {minorToMajor(cr)}
-                          </td>
-                          <td className="px-3 py-2 text-end">
-                            <Link
-                              href={`/stores/${storeId}/finance/journal/${entry.id}`}
-                              className="text-primary text-xs underline underline-offset-2"
-                            >
-                              {t('viewDetail')}
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<JournalEntry>
+                ariaLabel={t('title')}
+                columns={columns}
+                rows={entries}
+                rowKey={entry => entry.id}
+              />
               <PageControls meta={meta} onPageChange={setPage} />
             </>
           )}

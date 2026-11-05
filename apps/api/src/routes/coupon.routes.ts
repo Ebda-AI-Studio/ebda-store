@@ -3,6 +3,7 @@ import { z } from 'zod/v3';
 import { storeDb } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import {
@@ -324,6 +325,7 @@ router.post(
   // order-create; the quote must see the same verified identity (never a
   // body-supplied one). Guests pass through untouched.
   optionalAuthenticate,
+  requireCustomerStoreMatch,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

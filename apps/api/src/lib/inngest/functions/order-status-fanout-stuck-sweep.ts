@@ -236,7 +236,7 @@ export async function handleOrderStatusFanoutStuckSweep(
           `${veryStale.length} order status change(s) still have no fanout after ` +
           `> ${3 * ORDER_STATUS_FANOUT_STUCK_MINUTES}m — customer emails/WhatsApp, affiliate ` +
           `commission and loyalty award have NOT run. Re-send isn't landing; ` +
-          `investigate Inngest delivery.`,
+          `check the Cloudflare job dispatch (Worker logs, JOBS_WORKFLOW / JOBS_QUEUE).`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
           oldestRequestedAt: veryStale[0]?.statusFanoutRequestedAt
@@ -316,7 +316,7 @@ async function reportFailedAfterClaim(
         `${fresh.length} order status change(s) started their fanout but never finished it ` +
         `(a step failed on every retry): the customer email/WhatsApp, affiliate commission or ` +
         `loyalty award for that transition may not have run. Not re-sent automatically — ` +
-        `steps that DID succeed would repeat. Check the failed run in Inngest and replay it, ` +
+        `steps that DID succeed would repeat. Check the failed Workflow run in the Cloudflare dashboard and replay it, ` +
         `or apply the missing effect by hand.`,
       context: {
         orders: fresh.slice(0, 20).map(o => ({

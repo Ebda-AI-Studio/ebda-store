@@ -8,6 +8,8 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import { textFieldValue, numericFieldValue } from '@/lib/form-text';
 import { Button, useToast } from '@ebda/ui';
+import { RowActions } from '@/components/RowActions';
+import { useConfirm } from '@/hooks/useConfirm';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ export default function WarehousesPage() {
   const router = useRouter();
   const t = useT('stock.warehouses');
   const tc = useT('common');
+  const askConfirm = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [warehouses, setWarehouses] = useState<Warehouse[] | null>(null);
@@ -130,16 +133,21 @@ export default function WarehousesPage() {
       };
 
       if (editTarget) {
-        await apiPut(`/api/v1/stores/${storeId}/warehouses/${editTarget.id}`, payload);
+        const { error: putError } = await apiPut(
+          `/api/v1/stores/${storeId}/warehouses/${editTarget.id}`,
+          payload
+        );
+        if (putError) throw new Error(putError.message);
         toastSuccess(t('updated'));
       } else {
-        await apiPost(`/api/v1/stores/${storeId}/warehouses`, payload);
+        const { error: postError } = await apiPost(`/api/v1/stores/${storeId}/warehouses`, payload);
+        if (postError) throw new Error(postError.message);
         toastSuccess(t('created'));
       }
       setModalOpen(false);
       await load();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Save failed';
+      const msg = e instanceof Error ? e.message : t('saveFailed');
       toastError(msg);
     } finally {
       setSaving(false);
@@ -147,24 +155,33 @@ export default function WarehousesPage() {
   }
 
   async function handleDeactivate(w: Warehouse) {
-    if (!confirm(t('deactivateConfirm', { name: w.name }))) return;
+    const ok = await askConfirm({
+      object: t('deactivateObject', { name: w.name }),
+      consequence: t('deactivateConsequence'),
+      confirmLabel: t('deactivateAction'),
+    });
+    if (!ok) return;
     try {
-      await apiDelete(`/api/v1/stores/${storeId}/warehouses/${w.id}`);
+      const { error: delError } = await apiDelete(`/api/v1/stores/${storeId}/warehouses/${w.id}`);
+      if (delError) throw new Error(delError.message);
       toastSuccess(t('deactivated'));
       await load();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to deactivate';
+      const msg = e instanceof Error ? e.message : t('deactivateFailed');
       toastError(msg);
     }
   }
 
   async function handleSetDefault(w: Warehouse) {
     try {
-      await apiPut(`/api/v1/stores/${storeId}/warehouses/${w.id}`, { isDefault: true });
+      const { error: defError } = await apiPut(`/api/v1/stores/${storeId}/warehouses/${w.id}`, {
+        isDefault: true,
+      });
+      if (defError) throw new Error(defError.message);
       toastSuccess(t('defaultSet'));
       await load();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to set default';
+      const msg = e instanceof Error ? e.message : t('defaultFailed');
       toastError(msg);
     }
   }
@@ -265,27 +282,28 @@ export default function WarehousesPage() {
               alignEnd: true,
               mobileActions: true,
               cell: w => (
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1">
                   <button
                     onClick={() => router.push(`/stores/${storeId}/stock/warehouses/${w.id}`)}
-                    className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10"
+                    className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary-ink hover:bg-primary/10"
                   >
                     {t('viewStock')}
                   </button>
-                  <button
-                    onClick={() => openEdit(w)}
-                    className="min-h-[44px] rounded-md px-3 text-xs font-medium hover:bg-muted"
-                  >
-                    {tc('edit')}
-                  </button>
-                  {!w.isDefault && (
-                    <button
-                      onClick={() => handleDeactivate(w)}
-                      className="min-h-[44px] rounded-md px-3 text-xs font-medium text-destructive-ink hover:bg-destructive/10"
-                    >
-                      {tc('deactivate')}
-                    </button>
-                  )}
+                  <RowActions
+                    menuLabel={t('rowMenu', { name: w.name })}
+                    items={[
+                      { label: tc('edit'), onSelect: () => openEdit(w) },
+                      ...(w.isDefault
+                        ? []
+                        : [
+                            {
+                              label: tc('deactivate'),
+                              destructive: true,
+                              onSelect: () => handleDeactivate(w),
+                            },
+                          ]),
+                    ]}
+                  />
                 </div>
               ),
             },

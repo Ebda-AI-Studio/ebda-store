@@ -23,9 +23,11 @@ import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { Toggle } from '../../components/Toggle';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 
 function PlatformSettingsInner() {
   const t = useT('platformSettings');
+  const askConfirm = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const [saved, setSaved] = useState<PlatformVat | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,15 @@ function PlatformSettingsInner() {
       return setFormError(t('vat.requiredToEnable'));
     }
     // Confirm only on the OFF -> ON transition.
-    if (enabled && !saved?.enabled && !window.confirm(t('vat.confirmEnable'))) return;
+    if (enabled && !saved?.enabled) {
+      const ok = await askConfirm({
+        object: t('vat.enableObject'),
+        consequence: t('vat.confirmEnable'),
+        confirmLabel: t('vat.enableAction'),
+        tone: 'default',
+      });
+      if (!ok) return;
+    }
 
     setSaving(true);
     const { data, error } = await apiPut<{ vat: PlatformVat }>('/api/v1/admin/platform-vat', {

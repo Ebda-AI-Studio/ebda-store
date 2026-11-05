@@ -150,10 +150,7 @@ export default function AiUsagePage() {
       alignEnd: true,
       cell: row =>
         row.costMicros == null ? (
-          <span
-            className="text-[11px] text-amber-600 dark:text-amber-500"
-            title={t('table.unpricedHint')}
-          >
+          <span className="text-xs text-warning-ink" title={t('table.unpricedHint')}>
             {t('table.unpriced')}
           </span>
         ) : (

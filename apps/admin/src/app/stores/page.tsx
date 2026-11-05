@@ -7,7 +7,9 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet } from '../../lib/api';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useAuth } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
+import { useDeleteStore } from './_components/useDeleteStore';
 import { StoresFilters } from './_components/StoresFilters';
 import { StoresGrid } from './_components/StoresGrid';
 import { StoresTable } from './_components/StoresTable';
@@ -18,6 +20,8 @@ import type { Pagination, Store } from './_components/types';
 
 export default function StoresPage() {
   const t = useT('stores.list');
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
   const [stores, setStores] = useState<Store[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -65,6 +69,14 @@ export default function StoresPage() {
     fetchStores();
   }, [fetchStores]);
 
+  const { requestDelete, dialog: deleteDialog } = useDeleteStore(
+    useCallback(deleted => {
+      setStores(prev => prev.filter(s => s.id !== deleted.id));
+      setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+    }, [])
+  );
+  const onDelete = isSuperAdmin ? requestDelete : undefined;
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setPagination(prev => ({ ...prev, page: 1 }));
@@ -110,7 +122,11 @@ export default function StoresPage() {
         <StoresSkeleton viewMode={viewMode} />
       ) : !error && stores.length > 0 ? (
         <>
-          {viewMode === 'grid' ? <StoresGrid stores={stores} /> : <StoresTable stores={stores} />}
+          {viewMode === 'grid' ? (
+            <StoresGrid stores={stores} onDelete={onDelete} />
+          ) : (
+            <StoresTable stores={stores} onDelete={onDelete} />
+          )}
           <StoresPagination
             pagination={pagination}
             onPageChange={page => setPagination(prev => ({ ...prev, page }))}
@@ -119,6 +135,7 @@ export default function StoresPage() {
       ) : !error ? (
         <StoresEmpty search={search} statusFilter={statusFilter} />
       ) : null}
+      {isSuperAdmin && deleteDialog}
     </AdminLayout>
   );
 }
