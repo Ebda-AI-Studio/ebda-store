@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   settings: {} as Record<string, Record<string, unknown> | null>,
   current: {} as Record<string, Array<Record<string, unknown>>>,
   activeIds: new Set<string>(),
+  demo: new Set<string>(),
 }));
 vi.mock('@api/lib/definer', () => ({
   goldFeedStores: async () => {
@@ -49,6 +50,7 @@ vi.mock('@api/lib/repo-factory', () => ({
     backend: 'do',
     db: {
       goldRateSettings: { findUnique: async () => h.settings[id] ?? null },
+      store: { findUnique: async () => ({ isDemo: h.demo.has(id) }) },
       goldRateCurrent: { findMany: async () => h.current[id] ?? [] },
       product: { findFirst: async () => ({ id: 'p' }) },
     },
@@ -62,6 +64,7 @@ beforeEach(() => {
   h.settings = {};
   h.current = {};
   h.activeIds = new Set([A, B]);
+  h.demo = new Set();
 });
 
 describe('gold crons on D1 (no Postgres)', () => {
@@ -71,6 +74,23 @@ describe('gold crons on D1 (no Postgres)', () => {
       [B]: { enabled: true, feedEnabled: false, feedPremiumBps: 0 },
     };
     expect(await goldFeedStoresFor(undefined)).toEqual([{ storeId: A, premiumBps: 150 }]);
+  });
+
+  it('a demo store is always fed (no opt-in, premium 0, flagged demo); a real store without one is not', async () => {
+    h.demo = new Set([A]);
+    h.settings = { [A]: { enabled: true, feedEnabled: false, feedPremiumBps: 300 }, [B]: null };
+    expect(await goldFeedStoresFor(undefined)).toEqual([{ storeId: A, premiumBps: 0, demo: true }]);
+  });
+
+  it('a demo store with no settings row at all is still fed', async () => {
+    h.demo = new Set([A]);
+    expect(await goldFeedStoresFor(undefined)).toEqual([{ storeId: A, premiumBps: 0, demo: true }]);
+  });
+
+  it('an inactive demo store is not fed', async () => {
+    h.demo = new Set([A]);
+    h.activeIds = new Set([B]);
+    expect(await goldFeedStoresFor(undefined)).toEqual([]);
   });
 
   it('an inactive store is not fed', async () => {

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { BRAND } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { isDemoStore } from '../lib/demo-store';
 import { redis } from './redis.service';
 
 /**
@@ -247,6 +248,18 @@ async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
   if (!isConfigured()) {
     emitBootWarningOnce('TELEGRAM_BOT_TOKEN or TELEGRAM_ALERT_CHAT_ID missing');
     return 'skipped';
+  }
+
+  // A demo store (the looks showroom) has no merchant and no revenue: its store-scoped alerts are noise (2026-11-05: the Dahab
+  // showroom paged "selling paused"). Log at info, send nothing. Platform-scoped alerts are never affected.
+  if (opts.scope === 'store' && opts.store) {
+    if (await isDemoStore(opts.store.id)) {
+      logger.info(
+        { storeId: opts.store.id, source: opts.source, level: opts.level },
+        'store alert skipped: demo store'
+      );
+      return 'skipped';
+    }
   }
 
   // Caller-side scope/store sanity. We log + degrade rather than throw
