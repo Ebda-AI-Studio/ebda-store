@@ -189,6 +189,7 @@ export type MoneyOpName =
   | 'cancel'
   | 'expireHold'
   | 'instapayInitiate'
+  | 'paymentIndexCheck'
   | 'paymentCreate'
   | 'paymentWebhook'
   | 'refundBegin'
@@ -319,6 +320,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'cancel',
   'expireHold',
   'instapayInitiate',
+  'paymentIndexCheck',
   'paymentCreate',
   'paymentWebhook',
   'refundBegin',
@@ -618,6 +620,19 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       orderId: id(a.orderId, 'orderId'),
       proofSubmitted: a.proofSubmitted === true,
     }),
+  /**
+   * The payment exists in this store (Ruling NZ-MONEY-2): `StoreDO.moneyOp` then makes its index rows routable in D1 before it
+   * answers, or answers 503. Called by every path that hands an EXISTING payment's reference out again (a replayed create).
+   */
+  paymentIndexCheck: (db, storeId, a) => {
+    const paymentId = id(a.paymentId, 'paymentId');
+    const found = db.all(
+      'SELECT p.id FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ? AND o.store_id = ?',
+      [paymentId, storeId]
+    )[0];
+    if (!found) throw new MoneyError('PAYMENT_NOT_FOUND', 'payment not found', 404);
+    return { paymentId };
+  },
   /** InstaPay hold + its pending payment (InstapayService.initiate); a replay while awaiting returns the same payment. */
   instapayInitiate: (db, storeId, a) =>
     initiateInstapay(db, {

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeMoney } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
@@ -157,6 +157,16 @@ async function readOrderForPayment(storeId: string, where: Prisma.OrderWhereInpu
     });
     return { ...order, customer, store };
   });
+}
+
+/**
+ * Ruling NZ-MONEY-2 (review NEW-1 of PR 455): an EXISTING payment's reference is handed out again only when D1 routes it. A
+ * store on its Durable Object writes the payment's still-queued index rows now and reads them back, else 503
+ * ENTITY_INDEX_UNAVAILABLE (retryable: the next call returns the same payment). A Postgres store has no index to wait for.
+ */
+async function assertPaymentRoutable(storeId: string, paymentId: string): Promise<void> {
+  const money = await storeMoney(storeId);
+  if (money) await money.paymentIndexCheck({ paymentId });
 }
 
 /** A payment row of `storeId` through the store's own backend (see `readOrderForPayment`). */
@@ -428,6 +438,7 @@ router.post(
           return;
         }
         if (existingPayment.provider === 'cod' && data.provider === 'cod') {
+          await assertPaymentRoutable(order.storeId, existingPayment.id);
           // Replay the original COD response — the fee was applied on the
           // first call and must not stack. (A Durable Object COD row carries the same metadata.)
           const meta = (existingPayment.metadata ?? {}) as Record<string, unknown>;
@@ -443,6 +454,7 @@ router.post(
           return;
         }
         if (existingPayment.provider === 'instapay' && data.provider === 'instapay') {
+          await assertPaymentRoutable(order.storeId, existingPayment.id);
           // Same InstaPay hold, same instructions: nothing is created twice.
           const view = await InstapayService.getInstructions(order.storeId, order.id);
           res.json({
@@ -462,6 +474,8 @@ router.post(
           existingPayment.provider === data.provider &&
           (existingPayment.paymentUrl || existingInstruction)
         ) {
+          // the live invoice is handed out again only when its gateway reference routes (a webhook must find this store)
+          await assertPaymentRoutable(order.storeId, existingPayment.id);
           // Same provider, live invoice already minted — hand back the
           // existing paymentUrl (or Fawry reference code) instead of creating a second invoice.
           res.json({

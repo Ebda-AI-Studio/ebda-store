@@ -61,10 +61,7 @@ const RATCHET: Record<string, { max: number; reason: string }> = {
   'payment-settings.routes.ts': { max: 6, reason: `store: ${D1}` },
   'provider-activation.routes.ts': { max: 1, reason: `store: ${D1}` },
   'public.routes.ts': { max: 2, reason: `$queryRaw definers: ${UNPORTED}` },
-  'shipping-carrier.routes.ts': {
-    max: 2,
-    reason: `order (tracking, fixed by the order-tracking PR) / user: ${UNPORTED}`,
-  },
+  'shipping-carrier.routes.ts': { max: 1, reason: `user: ${UNPORTED}` },
   'store.routes.ts': { max: 8, reason: `store: ${D1}; auditLog: ${UNPORTED}` },
   'wallet.routes.ts': {
     max: 1,

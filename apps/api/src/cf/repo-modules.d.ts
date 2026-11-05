@@ -144,7 +144,7 @@ declare module '@ebda-src/repo' {
   export function drainEntityIndexOutbox(
     db: SyncSql,
     d1: unknown,
-    opts?: { now?: number; limit?: number; afterId?: number }
+    opts?: { now?: number; limit?: number; afterId?: number; onlyIds?: readonly string[] }
   ): Promise<{
     written: number;
     failed: number;
@@ -159,6 +159,11 @@ declare module '@ebda-src/repo' {
     opts?: { now?: number; afterId?: number; limit?: number }
   ): Promise<void>;
   export function outboxHighWater(db: SyncSql): number;
+  export function paymentIndexIds(
+    db: SyncSql,
+    storeId: string,
+    paymentId: string
+  ): Array<{ kind: string; id: string }>;
   export function outboxRowsAfter(
     db: SyncSql,
     afterId: number

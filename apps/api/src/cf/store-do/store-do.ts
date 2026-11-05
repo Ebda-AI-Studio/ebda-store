@@ -33,6 +33,7 @@ import {
   drainEntityIndexOutbox,
   awaitEntityIndexed,
   outboxHighWater,
+  paymentIndexIds,
   outboxRowsAfter,
   nextOutboxAttempt,
   ensureMoneyOpsSchema,
@@ -123,18 +124,12 @@ const INDEX_RETRY_FLOOR_MS = 30_000;
 /** An alarm this close to the backup due date runs the backup (an alarm fires a little early or late). */
 const BACKUP_DUE_SLACK_MS = 60_000;
 
-/** Ops that hand a reference out and whose retry replays the committed section (see `moneyOp`). */
-function handsOutReference(op: string, argsJson: string): boolean {
-  if (op === 'paymentCreate' || op === 'instapayInitiate') return true;
-  if (op !== 'createOrder') return false;
-  // checkout replays by its Idempotency-Key; without one a retry would place a SECOND order, so no 503 then
-  try {
-    const a = decodeRpc(argsJson) as { idempotencyKey?: unknown };
-    return typeof a.idempotencyKey === 'string' && a.idempotencyKey.length > 0;
-  } catch {
-    return false;
-  }
-}
+/** Ops whose answer hands a payment reference out (see `moneyOp`): each answers `{ paymentId }`. */
+const PAYMENT_REFERENCE_OPS: ReadonlySet<string> = new Set([
+  'paymentCreate',
+  'instapayInitiate',
+  'paymentIndexCheck',
+]);
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export class StoreDO extends DurableObject<Record<string, unknown>> {
@@ -371,24 +366,66 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     // and the gateway's webhook (by reference) resolve this store (Ruling NZ-MONEY-2).
     const own = outboxRowsAfter(this.sync, before);
     let indexed = true;
-    if (own.length > 0) indexed = await this.indexOwnRows(storeId, own, before);
-    // An op that hands a reference out (a payment row, an InstaPay hold, a checkout order) and whose retry REPLAYS the
-    // committed section (COD / InstaPay reuse the open row, the route returns an existing invoice, checkout replays by its
-    // Idempotency-Key) answers 503 when its own rows are not in D1: the reference is never handed out unroutable (the
-    // contract of `awaitEntityIndexed`). Any other op keeps its answer (a refund claim must not look failed after it
-    // committed); its rows wait for the short alarm.
-    // the backlog of earlier failures, bounded so it never weighs on this op (review M-2), then the retry alarm for whatever
-    // is still queued (this op's rows included)
+    // (a payment op's own rows ARE its payment's rows: `paymentRoutable` below writes and checks them)
+    if (own.length > 0 && !PAYMENT_REFERENCE_OPS.has(op))
+      indexed = await this.indexOwnRows(storeId, own, before);
+    // The backlog of earlier failures, bounded so it never weighs on this op (review M-2), then the retry alarm for whatever is
+    // still queued (this op's rows included).
     if (indexed) await this.drainIndex(10);
+    // A PAYMENT reference is handed out only when D1 can route it (review I-2 / NEW-1): the first create, every replay that
+    // returns the same row (COD reuse, InstaPay hold reuse) and every route that hands an existing payment out again
+    // (`paymentIndexCheck`) must find the payment's rows IN D1, written now if they are still queued; else 503
+    // ENTITY_INDEX_UNAVAILABLE (replay-safe: the row is committed and every retry returns it). The check reads D1, not
+    // "did this call write rows", so a retry inside the backoff window is refused too. Any other op (a checkout order, a refund
+    // claim) keeps its answer: its retry would not re-run its post-commit work (review NEW-2); its rows wait for the alarm.
+    if (answer.ok && PAYMENT_REFERENCE_OPS.has(op)) {
+      const paymentId = (decodeRpc(answer.json) as { paymentId?: unknown }).paymentId;
+      if (typeof paymentId === 'string' && !(await this.paymentRoutable(storeId, paymentId))) {
+        await this.armIndexRetry();
+        return {
+          ok: false,
+          code: 'ENTITY_INDEX_UNAVAILABLE',
+          status: 503,
+          message: 'the store directory could not be updated; try again',
+        };
+      }
+    }
     await this.armIndexRetry();
-    if (answer.ok && !indexed && handsOutReference(op, argsJson))
-      return {
-        ok: false,
-        code: 'ENTITY_INDEX_UNAVAILABLE',
-        status: 503,
-        message: 'the store directory could not be updated; try again',
-      };
     return answer;
+  }
+
+  /**
+   * The payment's index rows (payment id + gateway references) are in D1 and name THIS store: its still-queued rows are written
+   * NOW (backoff ignored), then every id is read back (`awaitEntityIndexed`, fail closed). Bounded to 3 s. Never throws.
+   */
+  private async paymentRoutable(storeId: string, paymentId: string): Promise<boolean> {
+    const d1 = this.env.PLATFORM_DB;
+    if (!d1) return true; // no D1 bound (Node / local dev): nothing to route through
+    const ids = paymentIndexIds(this.sync, storeId, paymentId);
+    if (ids.length === 0) return true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        (async () => {
+          await drainEntityIndexOutbox(this.sync, d1, { onlyIds: ids.map(i => i.id) });
+          await awaitEntityIndexed(this.sync, d1, storeId, ids, { limit: 1 });
+        })(),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('entity index check timed out')),
+            INDEX_DRAIN_TIMEOUT_MS
+          );
+        }),
+      ]);
+      return true;
+    } catch (err) {
+      console.error(
+        `[P1] payment ${paymentId} not routable in D1: ${(err as Error)?.message ?? err}`
+      );
+      return false;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**

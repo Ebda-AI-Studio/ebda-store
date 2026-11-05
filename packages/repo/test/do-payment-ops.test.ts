@@ -629,3 +629,20 @@ describe('wallet-split order end to end, keyed payout (review minors)', () => {
     );
   });
 });
+
+describe('paymentIndexCheck (Ruling NZ-MONEY-2, review NEW-1)', () => {
+  it('answers the payment of THIS store and names its index ids; an unknown payment is 404', async () => {
+    const r = rig();
+    const p = r.paid();
+    expect(r.op('paymentIndexCheck', { paymentId: p.paymentId })).toEqual({
+      paymentId: p.paymentId,
+    });
+    expect(r.code('paymentIndexCheck', { paymentId: 'nope' })).toBe('PAYMENT_NOT_FOUND/404');
+    const { paymentIndexIds } = await import('../src/platform/entity-index');
+    expect(paymentIndexIds(r.db, 's1', p.paymentId)).toEqual([
+      { kind: 'payment', id: p.paymentId },
+      { kind: 'webhook', id: `paymob:${p.ref}` },
+    ]);
+    expect(paymentIndexIds(r.db, 'other-store', p.paymentId)).toEqual([]);
+  });
+});

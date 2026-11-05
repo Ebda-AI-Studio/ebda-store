@@ -61,6 +61,7 @@ export {
   drainEntityIndexOutbox,
   awaitEntityIndexed,
   outboxHighWater,
+  paymentIndexIds,
   outboxRowsAfter,
   nextOutboxAttempt,
 } from './platform/entity-index';

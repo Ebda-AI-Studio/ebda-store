@@ -641,45 +641,89 @@ describe.skipIf(e.E2E_DB === '1')(
       expect(await pgReaches(true)).toEqual([]);
     }, 60_000);
 
-    it('review I-2: the D1 index write fails once -> 503 (no unroutable reference); the retry answers the same payment; the short alarm drains the row', async () => {
+    it('review I-2 / NEW-1: while D1 refuses the payment index row every create (first and retry) is 503; once it is back the retry is 200 and the row is in D1 BEFORE the answer', async () => {
       const o = await placeOrder('cod');
       // D1 refuses every new `payment` index row (an outage of the write, reads still work)
       await e.PLATFORM_DB.prepare(
         "CREATE TRIGGER money_test_index_outage BEFORE INSERT ON entity_index WHEN NEW.kind = 'payment' BEGIN SELECT RAISE(ABORT, 'test outage'); END"
       ).run();
-      const first = await api('/payments/create', {
-        method: 'POST',
-        headers: shopperHeaders(),
-        body: JSON.stringify({ orderId: o.id, provider: 'cod' }),
-      });
-      const fj = (await first.json()) as { error?: { code?: string } };
-      expect(first.status, JSON.stringify(fj)).toBe(503);
-      expect(fj.error?.code).toBe('ENTITY_INDEX_UNAVAILABLE');
+      const create = () =>
+        api('/payments/create', {
+          method: 'POST',
+          headers: shopperHeaders(),
+          body: JSON.stringify({ orderId: o.id, provider: 'cod' }),
+        });
+      for (const attempt of ['first', 'retry while D1 is still down']) {
+        const r = await create();
+        const j = (await r.json()) as { error?: { code?: string } };
+        expect(r.status, `${attempt}: ${JSON.stringify(j)}`).toBe(503);
+        expect(j.error?.code).toBe('ENTITY_INDEX_UNAVAILABLE');
+      }
       const rows = await payments(storeId, o.id);
-      expect(rows).toHaveLength(1); // the section committed; the reference was not handed out
+      expect(rows).toHaveLength(1); // the section committed once; the reference was never handed out
       expect((await orderRow(storeId, o.id)).status).toBe('pending'); // not rolled back under the shopper
       await e.PLATFORM_DB.prepare('DROP TRIGGER money_test_index_outage').run();
-      const retry = await api('/payments/create', {
-        method: 'POST',
-        headers: shopperHeaders(),
-        body: JSON.stringify({ orderId: o.id, provider: 'cod' }),
-      });
-      expect(retry.status, await retry.clone().text()).toBe(200);
-      expect(((await retry.json()) as { data: { transactionId: string } }).data.transactionId).toBe(
+      const ok = await create();
+      expect(ok.status, await ok.clone().text()).toBe(200);
+      expect(((await ok.json()) as { data: { transactionId: string } }).data.transactionId).toBe(
         rows[0]!.id
       );
-      expect(await payments(storeId, o.id)).toHaveLength(1);
-      // nobody calls the DO again: the index-retry alarm (STORE_DO_INDEX_RETRY_MS=500 here, 30 s in production) writes it
-      const indexed = await until(
-        async () =>
-          e.PLATFORM_DB.prepare(
-            "SELECT store_id FROM entity_index WHERE kind = 'payment' AND id = ?1"
-          )
-            .bind(rows[0]!.id)
-            .first<{ store_id: string }>(),
-        15_000
-      );
+      // routable at the moment the reference was handed out: no polling
+      const indexed = await e.PLATFORM_DB.prepare(
+        "SELECT store_id FROM entity_index WHERE kind = 'payment' AND id = ?1"
+      )
+        .bind(rows[0]!.id)
+        .first<{ store_id: string }>();
       expect(indexed?.store_id).toBe(storeId);
+      expect(await payments(storeId, o.id)).toHaveLength(1);
+    }, 60_000);
+
+    it('review NEW-2: a D1 outage of the ORDER index does not fail a committed checkout (its post-commit work runs on the first answer); a keyed retry replays the same order', async () => {
+      await e.PLATFORM_DB.prepare(
+        "CREATE TRIGGER money_test_order_outage BEFORE INSERT ON entity_index WHEN NEW.kind = 'order' BEGIN SELECT RAISE(ABORT, 'test outage'); END"
+      ).run();
+      try {
+        session = `sess-money-${++nSession}`;
+        const add = await api('/public/cart/items', {
+          method: 'POST',
+          headers: shopperHeaders(),
+          body: JSON.stringify({ productId, quantity: 1 }),
+        });
+        expect(add.status).toBeLessThan(300);
+        const key = `checkout-${crypto.randomUUID()}`;
+        const body = JSON.stringify({
+          paymentMethod: 'cod',
+          shippingAddress: {
+            firstName: 'Keyed',
+            lastName: 'Checkout',
+            address1: '1 Test St',
+            city: 'Cairo',
+            phone: `+2010${String(2_000_000 + nSession).padStart(8, '0')}`,
+            country: 'EG',
+          },
+        });
+        const first = await api('/public/orders', {
+          method: 'POST',
+          headers: { ...shopperHeaders(), 'idempotency-key': key },
+          body,
+        });
+        const ft = await first.text();
+        expect(first.status, ft).toBeLessThan(300);
+        const id = ((JSON.parse(ft) as { data: { id?: string; order?: { id: string } } }).data.order
+          ?.id ?? (JSON.parse(ft) as { data: { id: string } }).data.id) as string;
+        const again = await api('/public/orders', {
+          method: 'POST',
+          headers: { ...shopperHeaders(), 'idempotency-key': key },
+          body,
+        });
+        const at = await again.text();
+        expect(again.status, at).toBeLessThan(300);
+        const id2 = ((JSON.parse(at) as { data: { id?: string; order?: { id: string } } }).data
+          .order?.id ?? (JSON.parse(at) as { data: { id: string } }).data.id) as string;
+        expect(id2).toBe(id);
+      } finally {
+        await e.PLATFORM_DB.prepare('DROP TRIGGER IF EXISTS money_test_order_outage').run();
+      }
     }, 60_000);
 
     it('review I-3: a Fawry reference-code payment keeps its instruction; a second create hands back the SAME reference', async () => {

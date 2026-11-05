@@ -48,14 +48,21 @@ export interface DrainResult {
 export async function drainEntityIndexOutbox(
   db: SyncSql,
   d1: D1Like,
-  opts: { now?: number; limit?: number; afterId?: number } = {}
+  opts: { now?: number; limit?: number; afterId?: number; onlyIds?: readonly string[] } = {}
 ): Promise<DrainResult> {
   const now = opts.now ?? Date.now();
-  // `afterId`: only the rows queued after that outbox id (a money op drains ITS OWN rows first, ahead of any backlog)
-  const rows = db.all(
-    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
-    [MAX_ATTEMPTS, now, opts.afterId ?? 0, Math.min(opts.limit ?? 100, 500)]
-  );
+  // `afterId`: only the rows queued after that outbox id (a money op drains ITS OWN rows first, ahead of any backlog).
+  // `onlyIds`: only the rows of these entity ids, due or not (a reference about to be handed out is written NOW).
+  const only = opts.onlyIds && opts.onlyIds.length > 0 ? opts.onlyIds.slice(0, 50) : null;
+  const rows = only
+    ? db.all(
+        `SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND json_extract(payload, '$.id') IN (${only.map(() => '?').join(', ')}) ORDER BY id`,
+        [MAX_ATTEMPTS, ...only]
+      )
+    : db.all(
+        "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
+        [MAX_ATTEMPTS, now, opts.afterId ?? 0, Math.min(opts.limit ?? 100, 500)]
+      );
   const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, conflicts: [] };
   for (const r of rows) {
     const rowId = r.id as number;
@@ -95,6 +102,30 @@ export async function drainEntityIndexOutbox(
     }
   }
   return out;
+}
+
+/**
+ * The entity-index ids a payment must have in D1 before its reference is handed out: the payment id and each gateway reference
+ * (`<provider>:<ref>`). Empty when the payment is not this store's.
+ */
+export function paymentIndexIds(
+  db: SyncSql,
+  storeId: string,
+  paymentId: string
+): Array<{ kind: EntityKind; id: string }> {
+  const p = db.all(
+    'SELECT p.id, p.provider, p.transaction_id, p.invoice_id FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ? AND o.store_id = ?',
+    [paymentId, storeId]
+  )[0];
+  if (!p) return [];
+  const ids: Array<{ kind: EntityKind; id: string }> = [{ kind: 'payment', id: p.id as string }];
+  // only a GATEWAY payment has webhook references (cod has none; an InstaPay transfer is confirmed by the merchant, its
+  // reference is never routed by a webhook and never indexed)
+  if (p.provider !== 'cod' && p.provider !== 'instapay')
+    for (const ref of [p.transaction_id, p.invoice_id])
+      if (typeof ref === 'string' && ref)
+        ids.push({ kind: 'webhook', id: `${p.provider as string}:${ref}` });
+  return ids;
 }
 
 /** The highest outbox id so far (0 when empty): a money op's OWN index rows are the ones queued after it. */

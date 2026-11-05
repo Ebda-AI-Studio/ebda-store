@@ -609,6 +609,8 @@ export interface MoneyClient {
     a: { orderId: string; proofSubmitted?: boolean },
     key?: string
   ): Promise<'expired' | 'skipped'>;
+  /** The payment's index rows are in D1 (written now if queued), else a 503 ENTITY_INDEX_UNAVAILABLE (Ruling NZ-MONEY-2). */
+  paymentIndexCheck(a: { paymentId: string }): Promise<{ paymentId: string }>;
   /** InstapayService.initiate on the DO: the hold + its pending payment, one section; a replay returns the same payment. */
   instapayInitiate(
     a: {
@@ -1407,6 +1409,7 @@ export function makeMoneyClient(
     cancel: (a, key) => call('cancel', a, key),
     expireHold: (a, key) => call('expireHold', a, key),
     instapayInitiate: (a, key) => call('instapayInitiate', a, key),
+    paymentIndexCheck: a => call('paymentIndexCheck', a),
     paymentCreate: (a, key) => call('paymentCreate', a, key),
     paymentWebhook: (a, key) => call('paymentWebhook', a, key),
     refundBegin: (a, key) => call('refundBegin', a, key),
