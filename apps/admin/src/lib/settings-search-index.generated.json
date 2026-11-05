@@ -24,8 +24,8 @@
     "kind": "page",
     "route": "/products/new",
     "access": "staff",
-    "en": "Add New Product",
-    "ar": "إضافة منتج جديد",
+    "en": "New product",
+    "ar": "منتج جديد",
     "synEn": "create product new item",
     "synAr": "اضافة منتج جديد"
   },
@@ -279,8 +279,8 @@
     "kind": "page",
     "route": "/bundles",
     "access": "staff",
-    "en": "Bundles",
-    "ar": "الباقات",
+    "en": "Product bundles",
+    "ar": "مجموعات المنتجات",
     "synEn": "kits combos sets",
     "synAr": "باقات عروض مجمعة",
     "feature": "bundles"
@@ -363,7 +363,7 @@
     "route": "/stock/adjustments",
     "access": "staff",
     "en": "Stock Adjustments",
-    "ar": "تسويات المخزون",
+    "ar": "تعديلات المخزون",
     "synEn": "stock correction damaged lost",
     "synAr": "تسوية تالف مفقود"
   },
@@ -373,7 +373,7 @@
     "route": "/stock/adjustments/new",
     "access": "staff",
     "en": "New Stock Adjustment",
-    "ar": "تسوية مخزون جديدة",
+    "ar": "تعديل مخزون جديد",
     "synEn": "add stock remove stock",
     "synAr": "اضافة مخزون خصم مخزون"
   },
@@ -463,7 +463,7 @@
     "route": "/finance/dashboard",
     "access": "owner",
     "en": "Accounting Overview",
-    "ar": "نظرة عامة على المحاسبة",
+    "ar": "الأرباح والمصروفات",
     "synEn": "accounting profit overview",
     "synAr": "محاسبة ارباح نظرة عامة"
   },
@@ -584,7 +584,7 @@
     "route": "/insights/dashboard",
     "access": "staff",
     "en": "Insights",
-    "ar": "الإحصاءات",
+    "ar": "نظرة سريعة على متجرك",
     "synEn": "insights ai narrative",
     "synAr": "احصاءات رؤى"
   },
@@ -594,7 +594,7 @@
     "route": "/insights/cohorts",
     "access": "staff",
     "en": "Customer Cohorts",
-    "ar": "شرائح العملاء الزمنية",
+    "ar": "العملاء اللي بيرجعوا",
     "synEn": "retention repeat customers",
     "synAr": "احتفاظ عملاء متكررين"
   },
@@ -604,7 +604,7 @@
     "route": "/insights/funnel",
     "access": "staff",
     "en": "Funnel",
-    "ar": "قمع الشراء",
+    "ar": "فين بنخسر الزباين",
     "synEn": "conversion checkout drop off",
     "synAr": "تحويل قمع مبيعات"
   },
@@ -614,7 +614,7 @@
     "route": "/insights/products",
     "access": "staff",
     "en": "Product Velocity",
-    "ar": "سرعة بيع المنتجات",
+    "ar": "إيه اللي بيتباع بسرعة",
     "synEn": "best sellers velocity",
     "synAr": "الاكثر مبيعا سرعة بيع"
   },
@@ -624,7 +624,7 @@
     "route": "/insights/searches",
     "access": "staff",
     "en": "What shoppers searched",
-    "ar": "عمليات البحث",
+    "ar": "الزباين بيدوّروا على إيه",
     "synEn": "search terms zero results what shoppers search",
     "synAr": "كلمات بحث بدون نتائج بحث العملاء"
   },
@@ -634,7 +634,7 @@
     "route": "/insights/segments",
     "access": "staff",
     "en": "Customer Segments (RFM)",
-    "ar": "شرائح العملاء (RFM)",
+    "ar": "أحسن عملاءك",
     "synEn": "rfm vip loyal at risk",
     "synAr": "شرائح عملاء مميزين"
   },
@@ -780,8 +780,8 @@
     "kind": "page",
     "route": "/announcement",
     "access": "owner",
-    "en": "Announcement Bar",
-    "ar": "شريط الإعلانات",
+    "en": "Announcement bar",
+    "ar": "شريط الإعلان",
     "synEn": "banner top bar message strip",
     "synAr": "شريط اعلان رسالة علوي"
   },
@@ -822,8 +822,8 @@
     "kind": "page",
     "route": "/payment-settings",
     "access": "owner",
-    "en": "Payment Settings",
-    "ar": "إعدادات الدفع",
+    "en": "Payment methods",
+    "ar": "وسائل الدفع",
     "synEn": "payment gateway paymob kashier fawry instapay cod cash on delivery card wallet",
     "synAr": "دفع بوابة باي موب كاشير فوري انستاباي الدفع عند الاستلام بطاقة محفظة"
   },
@@ -884,8 +884,8 @@
     "kind": "page",
     "route": "/pwa",
     "access": "owner",
-    "en": "Progressive Web App",
-    "ar": "تطبيق ويب تقدمي",
+    "en": "App on the customer's phone",
+    "ar": "تطبيق على موبايل العميل",
     "synEn": "app install home screen mobile icon",
     "synAr": "تطبيق تثبيت شاشة رئيسية جوال ايقونة",
     "feature": "pwa"
@@ -905,8 +905,8 @@
     "kind": "page",
     "route": "/language",
     "access": "owner",
-    "en": "Language Settings",
-    "ar": "إعدادات اللغة",
+    "en": "Language",
+    "ar": "اللغة",
     "synEn": "arabic english default language rtl translation",
     "synAr": "عربي انجليزي لغة افتراضية ترجمة"
   },
@@ -1030,7 +1030,7 @@
     "route": "/branding",
     "access": "owner",
     "en": "Logo size",
-    "ar": "حجم الشعار",
+    "ar": "حجم اللوجو",
     "synEn": "logo size bigger smaller header logo",
     "synAr": "حجم الشعار تكبير تصغير",
     "query": "tab=theme",
@@ -1217,8 +1217,8 @@
     "ar": "رسوم إضافية (ج.م)",
     "synEn": "cash on delivery fee cod surcharge extra fee",
     "synAr": "رسوم الدفع عند الاستلام رسوم اضافية",
-    "pageEn": "Payment Settings",
-    "pageAr": "إعدادات الدفع"
+    "pageEn": "Payment methods",
+    "pageAr": "وسائل الدفع"
   },
   {
     "id": "payment.instapay-handle",
@@ -1229,8 +1229,8 @@
     "ar": "عنوان إنستاباي (IPA)",
     "synEn": "instapay address ipa bank transfer account",
     "synAr": "انستاباي عنوان تحويل بنكي حساب",
-    "pageEn": "Payment Settings",
-    "pageAr": "إعدادات الدفع"
+    "pageEn": "Payment methods",
+    "pageAr": "وسائل الدفع"
   },
   {
     "id": "payment.instapay-expiry",
@@ -1241,8 +1241,8 @@
     "ar": "احتفظ بالطلب لمدة (ساعات)",
     "synEn": "hold order hours payment deadline expire instapay",
     "synAr": "مدة الاحتفاظ بالطلب ساعات انتهاء الدفع",
-    "pageEn": "Payment Settings",
-    "pageAr": "إعدادات الدفع"
+    "pageEn": "Payment methods",
+    "pageAr": "وسائل الدفع"
   },
   {
     "id": "payment.instalments",
@@ -1253,8 +1253,8 @@
     "ar": "سطر التقسيط في صفحة المنتج",
     "synEn": "instalment installments monthly payment months estimate tagseet product page",
     "synAr": "تقسيط قسط شهري شهور تقريبي صفحة المنتج",
-    "pageEn": "Payment Settings",
-    "pageAr": "إعدادات الدفع"
+    "pageEn": "Payment methods",
+    "pageAr": "وسائل الدفع"
   },
   {
     "id": "tax.enable",
@@ -1327,8 +1327,8 @@
     "synEn": "app name home screen name install name",
     "synAr": "اسم التطبيق اسم الشاشة الرئيسية",
     "feature": "pwa",
-    "pageEn": "Progressive Web App",
-    "pageAr": "تطبيق ويب تقدمي"
+    "pageEn": "App on the customer's phone",
+    "pageAr": "تطبيق على موبايل العميل"
   },
   {
     "id": "pwa.short-name",
@@ -1340,8 +1340,8 @@
     "synEn": "short name icon label",
     "synAr": "الاسم المختصر اسم الايقونة",
     "feature": "pwa",
-    "pageEn": "Progressive Web App",
-    "pageAr": "تطبيق ويب تقدمي"
+    "pageEn": "App on the customer's phone",
+    "pageAr": "تطبيق على موبايل العميل"
   },
   {
     "id": "language.default",
@@ -1352,8 +1352,8 @@
     "ar": "اللغة الافتراضية لواجهة المتجر",
     "synEn": "default language arabic english switch language store language",
     "synAr": "اللغة الافتراضية تغيير اللغة عربي انجليزي",
-    "pageEn": "Language Settings",
-    "pageAr": "إعدادات اللغة"
+    "pageEn": "Language",
+    "pageAr": "اللغة"
   },
   {
     "id": "domain.email-sender",
@@ -1385,8 +1385,8 @@
     "kind": "setting",
     "route": "/seo",
     "access": "owner",
-    "en": "Answer Engine Optimization",
-    "ar": "تحسين نتائج محركات البحث الذكية",
+    "en": "The answers shown in ChatGPT",
+    "ar": "الإجابات اللي بتظهر في ChatGPT",
     "synEn": "ai search chatgpt answer engine optimization description",
     "synAr": "محركات الذكاء الاصطناعي تحسين الاجابة وصف",
     "feature": "seo",
