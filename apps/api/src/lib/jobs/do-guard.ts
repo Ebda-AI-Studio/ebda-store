@@ -56,7 +56,10 @@ export const EVENT_STORE_RESOLVERS: Record<
 
 /** True when the run's store must be looked up (JOBS_ON_DO on, the event carries none, the job has a resolver). */
 export async function needsStoreLookup(def: JobDef, event: JobEvent): Promise<boolean> {
-  return (await doStoreIds()).size > 0 && !jobTargetStore(event) && def.id in EVENT_STORE_RESOLVERS;
+  // The cheap, local questions first: a job with no resolver (EVERY job today) must not cost a D1 read of the store directory
+  // per run, and a directory outage must not fail a run that never needed it (the Workers jobs harness has an unmigrated D1).
+  if (jobTargetStore(event) || !(def.id in EVENT_STORE_RESOLVERS)) return false;
+  return (await doStoreIds()).size > 0;
 }
 
 /** The store a run is about, resolving it from a reference when the event does not carry it. Never throws. */
@@ -81,8 +84,10 @@ export async function decideRunForStore(
   def: JobDef,
   storeId: string | undefined
 ): Promise<RunDecision> {
+  // the job's own data class is a local fact: only an unported job can be refused, so only it needs the store list
+  if (jobDataClass(def.id) !== 'unported') return { run: true };
   const dos = await doStoreIds();
-  if (dos.size === 0 || jobDataClass(def.id) !== 'unported') return { run: true };
+  if (dos.size === 0) return { run: true };
   if (storeId && dos.has(storeId)) return { run: false, storeId, money: MONEY_JOBS.has(def.id) };
   return { run: true };
 }
@@ -120,9 +125,10 @@ export function guardedRun<T>(def: JobDef, event: JobEvent, fn: () => Promise<T>
 }
 
 async function guardedRunInner<T>(def: JobDef, event: JobEvent, fn: () => Promise<T>): Promise<T> {
-  const dos = await doStoreIds();
   const cls = jobDataClass(def.id);
-  if (dos.size === 0 || cls === 'none') return fn();
+  if (cls === 'none') return fn();
+  const dos = await doStoreIds();
+  if (dos.size === 0) return fn();
   const only = alarmStoreId(event);
   // A ported alarm run for store S must still be able to LIST S; every other DO store stays hidden.
   const hidden = new Set([...dos].filter(id => !(cls === 'ported' && id === only)));
