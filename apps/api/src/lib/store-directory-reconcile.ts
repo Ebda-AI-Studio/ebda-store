@@ -23,6 +23,7 @@
  * drift repair for that tick (it runs again the next hour).
  */
 import { storeDirectory, withStore } from '@ebda/database';
+import { hasStoresOnBackend } from './store-backend';
 import logger from './logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from '../cf/bindings';
@@ -56,6 +57,8 @@ const restrictiveness = (status: string, deleted: boolean): number =>
   deleted ? 99 : (RANK[status] ?? 99);
 
 /** Close a `do` row in the restrictive direction only: status and deleted_at, nothing else. */
+class NoPostgresStores extends Error {}
+
 async function closeDoRow(
   d1: D1Like,
   id: string,
@@ -199,13 +202,19 @@ export async function reconcileStoreDirectory(
   let all: Awaited<ReturnType<typeof pgAll>>;
   let live: Awaited<ReturnType<typeof pgLive>>;
   try {
+    // Ruling NZ-PG-8: no `pg` store in the D1 directory = there is no Postgres side to compare, and Postgres may be gone:
+    // the cron must not open a connection for it.
+    if (!deps.pgAll && !(await hasStoresOnBackend('pg'))) throw new NoPostgresStores();
     [all, live] = await Promise.all([pgAll(), pgLive()]);
   } catch (err) {
     // No Postgres: reconcile D1 against the StoreDOs and never throw (see the header).
-    logger.warn(
-      { err },
-      '[store-directory] Postgres directory unavailable: reconciling D1 against the StoreDOs only'
-    );
+    if (err instanceof NoPostgresStores)
+      logger.info('[store-directory] no Postgres store: reconciling D1 against the StoreDOs only');
+    else
+      logger.warn(
+        { err },
+        '[store-directory] Postgres directory unavailable: reconciling D1 against the StoreDOs only'
+      );
     report.postgresSkipped = true;
     const { results: d1Rows } = await d1.prepare(d1Select).bind().all<D1Row>();
     await reconcileDoSide(d1, d1Rows ?? [], report, deps.doRecord ?? readDoRecord);

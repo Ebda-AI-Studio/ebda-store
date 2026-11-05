@@ -22,7 +22,13 @@ import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
 import { createServer } from 'node:http';
 import app from './app';
-import { ClientPoolTimeout, createIsolateDb, type IsolateDb } from '@ebda/database';
+import {
+  ClientPoolTimeout,
+  createIsolateDb,
+  postgresReaches,
+  trackPostgresReaches,
+  type IsolateDb,
+} from '@ebda/database';
 import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
@@ -149,6 +155,8 @@ let whatsAppConfigChecked = false;
 
 function prepare(env: CfBindings): void {
   setCfBindings(env);
+  // Test only (workers-test route sweep): count every access to the Postgres client. Never set on a deployed Worker.
+  if (env.DEV_STATS === '1') trackPostgresReaches(true);
   // Fail loud on a semantic-search config with no provider (cached on success only, like the
   // role guard: a throwing isolate 500s every request until the config is fixed or rolled back).
   if (!embeddingConfigChecked) {
@@ -333,6 +341,11 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
   // The backend of a store is server-side state only (Ruling CF-BACKEND-1): the retired Phase 0 opt-in header never gets in.
   const request = stripBackendHeader(incoming);
   const path = new URL(request.url).pathname;
+  // Test only: the Postgres-client accesses since the last reset (workers-test/route-sweep.test.ts, cron group).
+  if (path === '/__dev/pg-reaches' && env.DEV_STATS === '1') {
+    const reset = new URL(request.url).searchParams.get('reset') === '1';
+    return Response.json({ reaches: postgresReaches(reset) });
+  }
   if (path === '/__dev/stats') {
     const res = devStats(env, isolateDb);
     if (res) return res;

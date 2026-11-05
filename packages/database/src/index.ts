@@ -38,6 +38,7 @@ export {
   type IsolateDb,
   type IsolateDbOptions,
 } from './request-db';
+export { trackPostgresReaches, postgresReaches, withReachLabel } from './request-db';
 export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
 export {
   TenantScopeViolation,

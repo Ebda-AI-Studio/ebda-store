@@ -13,6 +13,7 @@
 
 import { prisma, runInStoreScope, storeDirectory } from '@ebda/database';
 import { featureService } from './feature.service';
+import { storeMoney } from '../lib/repo-factory';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 
@@ -102,6 +103,23 @@ class LoyaltyAutomationService {
           // Check feature flag
           const loyaltyEnabled = await featureService.isFeatureEnabled(store.id, 'loyalty');
           if (!loyaltyEnabled) return;
+
+          // Ruling NZ-PG-7: a store on its Durable Object awards in its DO (one section); no Postgres read or write.
+          const money = await storeMoney(store.id);
+          if (money) {
+            const r = await money.loyaltyBirthdays({
+              month: todayMonth,
+              day: todayDay,
+              yearStart: new Date(thisYear, 0, 1).getTime(),
+              featureEnabled: true,
+            });
+            if (r.awarded > 0)
+              logger.info(
+                { storeId: store.id, awarded: r.awarded, points: r.points },
+                '[LoyaltyAutomation] Birthday bonuses awarded (DO)'
+              );
+            return;
+          }
 
           const row = await prisma.store.findUnique({
             where: { id: store.id },
@@ -269,7 +287,28 @@ class LoyaltyAutomationService {
     // `stores` is under RLS: the cron lists stores through the directory definer.
     const stores = await storeDirectory();
     for (const store of stores) {
-      await runInStoreScope(store.id, () => this.processStorePointExpiration(store.id));
+      // one store failing (a DO that cannot be read) never stops the sweep over the others
+      try {
+        await runInStoreScope(store.id, async () => {
+          // Ruling NZ-PG-7: a store on its Durable Object expires points in its DO, a page at a time; no Postgres.
+          const money = await storeMoney(store.id);
+          if (!money) return this.processStorePointExpiration(store.id);
+          let after: string | null = null;
+          for (let page = 0; page < 200; page++) {
+            const r: { members: number; expired: number; last: string | null; more: boolean } =
+              await money.loyaltyExpire({ after });
+            if (r.members > 0)
+              logger.info(
+                { storeId: store.id, members: r.members, expired: r.expired },
+                '[LoyaltyAutomation] Points expired (DO)'
+              );
+            if (!r.more || !r.last) break;
+            after = r.last;
+          }
+        });
+      } catch (err) {
+        logger.error({ err, storeId: store.id }, '[LoyaltyAutomation] point expiration failed');
+      }
     }
   }
 

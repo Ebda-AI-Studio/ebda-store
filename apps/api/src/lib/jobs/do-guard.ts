@@ -13,7 +13,7 @@
  *     is alerted once per run for an `unported` job (it is being skipped) and silently for a `ported` one (its alarm owns it).
  * `none` jobs (platform tables, logs) are never touched.
  */
-import { withHiddenStores } from '@ebda/database';
+import { withHiddenStores, withReachLabel } from '@ebda/database';
 import logger from '../logger';
 import { sendAlert } from '../../services/alerts.service';
 import { doStoreIdSet } from '../store-backend';
@@ -114,11 +114,12 @@ export async function reportRefusal(
 }
 
 /** Run a job body (a whole queue handler, or one Workflow step) inside the DO-aware scope. */
-export async function guardedRun<T>(
-  def: JobDef,
-  event: JobEvent,
-  fn: () => Promise<T>
-): Promise<T> {
+export function guardedRun<T>(def: JobDef, event: JobEvent, fn: () => Promise<T>): Promise<T> {
+  // names the job in the Postgres-reach log of a dead-Postgres sweep (packages/database request-db.ts)
+  return withReachLabel(def.id, () => guardedRunInner(def, event, fn));
+}
+
+async function guardedRunInner<T>(def: JobDef, event: JobEvent, fn: () => Promise<T>): Promise<T> {
   const dos = await doStoreIds();
   const cls = jobDataClass(def.id);
   if (dos.size === 0 || cls === 'none') return fn();

@@ -136,3 +136,7 @@ Same script, `--family access` (Rulings NZ-A1, NZ-A5, NZ-A6). Differences:
   `TaxProfileService.review`; the Postgres trigger `tax_profile_review_guard` has no DO twin, the route (`authorize('super_admin')`
   - MFA) is the only caller. Cost if wrong: a future second caller of `review` would not be refused at the data layer.
 - Residual: none for these routes.
+
+## `STORE_CREATE_ON_DO` is a separate step (Ruling NZ-PG-9)
+
+The code deploy does NOT set `STORE_CREATE_ON_DO`. Set it to `"1"` in `apps/api/wrangler.jsonc` and deploy only AFTER every platform-family copy has finished (a store created on the DO inside a copy window could be removed by the copy's "delete D1 rows Postgres lacks" step). Once all `platform_cutover.*` markers exist and the Worker has no Hyperdrive, an unset value shows as `store_create: "misconfigured"` on `GET /health` and pages P1 `api.store_create_on_do_unset`.
