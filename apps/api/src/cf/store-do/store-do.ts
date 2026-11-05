@@ -31,6 +31,10 @@ import {
   answerStockOp,
   answerMoneyOp,
   drainEntityIndexOutbox,
+  awaitEntityIndexed,
+  outboxHighWater,
+  outboxRowsAfter,
+  nextOutboxAttempt,
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
@@ -112,6 +116,25 @@ export interface R2Like {
   get(key: string): Promise<{ text(): Promise<string> } | null>;
 }
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Ruling NZ-MONEY-2: how long a money op waits for its own D1 index rows before answering 503 (review M-1). */
+const INDEX_DRAIN_TIMEOUT_MS = 3000;
+/** Ruling NZ-MONEY-2: the earliest index-retry alarm after a failed write (env STORE_DO_INDEX_RETRY_MS overrides it). */
+const INDEX_RETRY_FLOOR_MS = 30_000;
+/** An alarm this close to the backup due date runs the backup (an alarm fires a little early or late). */
+const BACKUP_DUE_SLACK_MS = 60_000;
+
+/** Ops that hand a reference out and whose retry replays the committed section (see `moneyOp`). */
+function handsOutReference(op: string, argsJson: string): boolean {
+  if (op === 'paymentCreate' || op === 'instapayInitiate') return true;
+  if (op !== 'createOrder') return false;
+  // checkout replays by its Idempotency-Key; without one a retry would place a SECOND order, so no 503 then
+  try {
+    const a = decodeRpc(argsJson) as { idempotencyKey?: unknown };
+    return typeof a.idempotencyKey === 'string' && a.idempotencyKey.length > 0;
+  } catch {
+    return false;
+  }
+}
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export class StoreDO extends DurableObject<Record<string, unknown>> {
@@ -341,30 +364,113 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       message: 'store is closed',
     });
     if (closed) return closed;
+    const before = outboxHighWater(this.sync);
     const answer = answerMoneyOp(this.sync, storeId, op, argsJson, key);
-    // The section above queued the id -> store rows of what it created (orders, payments, gateway references) in `d1_outbox`;
-    // write them to D1 `entity_index` BEFORE answering, so the shopper's next call (POST /payments/create by order id) and the
-    // gateway's webhook (by reference) resolve this store. A D1 failure never fails the money op: the row stays queued and is
-    // retried on the next money op and by the alarm (backoff in the outbox).
-    await this.drainIndex();
+    // The section above queued the id -> store rows of what it created (orders, payments, gateway references) in `d1_outbox`.
+    // They are written to D1 `entity_index` BEFORE the answer, so the shopper's next call (POST /payments/create by order id)
+    // and the gateway's webhook (by reference) resolve this store (Ruling NZ-MONEY-2).
+    const own = outboxRowsAfter(this.sync, before);
+    let indexed = true;
+    if (own.length > 0) indexed = await this.indexOwnRows(storeId, own, before);
+    // An op that hands a reference out (a payment row, an InstaPay hold, a checkout order) and whose retry REPLAYS the
+    // committed section (COD / InstaPay reuse the open row, the route returns an existing invoice, checkout replays by its
+    // Idempotency-Key) answers 503 when its own rows are not in D1: the reference is never handed out unroutable (the
+    // contract of `awaitEntityIndexed`). Any other op keeps its answer (a refund claim must not look failed after it
+    // committed); its rows wait for the short alarm.
+    // the backlog of earlier failures, bounded so it never weighs on this op (review M-2), then the retry alarm for whatever
+    // is still queued (this op's rows included)
+    if (indexed) await this.drainIndex(10);
+    await this.armIndexRetry();
+    if (answer.ok && !indexed && handsOutReference(op, argsJson))
+      return {
+        ok: false,
+        code: 'ENTITY_INDEX_UNAVAILABLE',
+        status: 503,
+        message: 'the store directory could not be updated; try again',
+      };
     return answer;
   }
 
-  /** Write the due `d1_outbox` entity-index rows to D1 (idempotent; nothing queued = no D1 call). Never throws. */
-  private async drainIndex(): Promise<void> {
+  /**
+   * Write THIS op's index rows and read them back from D1 (`awaitEntityIndexed`: fail closed on a missing row or another store's
+   * row). Bounded in time (review M-1): a slow D1 is a "not indexed", never a hung money op. Never throws.
+   */
+  private async indexOwnRows(
+    storeId: string,
+    own: Array<{ kind: string; id: string }>,
+    afterId: number
+  ): Promise<boolean> {
+    const d1 = this.env.PLATFORM_DB;
+    if (!d1) return true; // no D1 bound (Node / local dev): nothing to route through
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        awaitEntityIndexed(this.sync, d1, storeId, own, { afterId, limit: own.length }),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('entity index write timed out')),
+            INDEX_DRAIN_TIMEOUT_MS
+          );
+        }),
+      ]);
+      return true;
+    } catch (err) {
+      // a conflict (the id is another store's) is a P1 for a human: the Worker's log drain alerts on this line
+      console.error(
+        `[P1] entity index not written for ${JSON.stringify(own)}: ${(err as Error)?.message ?? err}`
+      );
+      return false;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /** Write up to `limit` due `d1_outbox` entity-index rows to D1 (idempotent; nothing due = no D1 call). Never throws. */
+  private async drainIndex(limit = 100): Promise<void> {
     const d1 = this.env.PLATFORM_DB;
     if (!d1) return;
     try {
-      const r = (await drainEntityIndexOutbox(this.sync, d1)) as {
-        failed: number;
-        deadLettered: number;
-        conflicts: unknown[];
-      };
+      const r = await drainEntityIndexOutbox(this.sync, d1, { limit });
       if (r.failed > 0 || r.deadLettered > 0 || r.conflicts.length > 0)
-        console.error('entity index drain incomplete', JSON.stringify(r));
+        console.error('[P1] entity index drain incomplete', JSON.stringify(r));
     } catch (err) {
-      console.error('entity index drain failed', err);
+      console.error('[P1] entity index drain failed', err);
     }
+  }
+
+  /**
+   * Rows still queued: arm the alarm for their next attempt (never earlier than the retry floor, default 30 s; the outbox backoff
+   * spaces later attempts), unless an earlier alarm is already set. The backup is not disturbed: `alarm()` backs up only when
+   * the backup is due.
+   */
+  private async armIndexRetry(): Promise<void> {
+    const next = nextOutboxAttempt(this.sync);
+    if (next === null) return;
+    const floor = Number(this.env.STORE_DO_INDEX_RETRY_MS ?? INDEX_RETRY_FLOOR_MS);
+    const at = Math.max(next, Date.now() + (Number.isFinite(floor) ? floor : INDEX_RETRY_FLOOR_MS));
+    await this.ensureBackupDue();
+    const cur = await this.ctx.storage.getAlarm();
+    if (!cur || cur > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  /** When the next nightly backup is due (epoch ms) or null when never recorded (a DO armed before the due date existed). */
+  private backupDueAt(): number | null {
+    const row = this.ctx.storage.sql
+      .exec("SELECT v FROM _identity WHERE k = 'backup_due_at'")
+      .toArray()[0] as { v: string } | undefined;
+    return row ? Number(row.v) : null;
+  }
+  private setBackupDueAt(at: number): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO _identity (k, v) VALUES ('backup_due_at', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v",
+      String(at)
+    );
+  }
+  /** Record the due date of the backup the CURRENT alarm stands for, before an earlier retry alarm replaces it. */
+  private async ensureBackupDue(): Promise<void> {
+    if (this.backupDueAt() !== null) return;
+    const cur = await this.ctx.storage.getAlarm();
+    this.setBackupDueAt(cur ?? Date.now() + DAY_MS);
   }
 
   /**
@@ -519,8 +625,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   /** Arm the nightly alarm if none is pending. Idempotent; called from the loader and after each alarm. */
   async ensureBackupAlarm(): Promise<number> {
     const cur = await this.ctx.storage.getAlarm();
-    if (cur) return cur;
+    if (cur) {
+      await this.ensureBackupDue();
+      return cur;
+    }
     const at = Date.now() + DAY_MS;
+    this.setBackupDueAt(at);
     await this.ctx.storage.setAlarm(at);
     return at;
   }
@@ -556,9 +666,15 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   async alarm(): Promise<void> {
+    // The index retry (Ruling NZ-MONEY-2): the rows a money op could not write wait in the outbox with backoff.
+    await this.drainIndex();
+    const now = Date.now();
+    const due = this.backupDueAt();
+    // The nightly work runs only when it is due: an earlier alarm armed for an index retry must not back the store up.
+    // `null` = a DO armed before the due date was recorded: its alarm IS the nightly one.
+    const backupDue = due === null || due <= now + BACKUP_DUE_SLACK_MS;
     try {
-      // the backstop of a money op whose index drain failed (the rows wait in the outbox with backoff)
-      await this.drainIndex();
+      // Retention purges on every alarm (cheap, idempotent).
       // The saved scope of a half-finished shopper erasure never outlives its TTL (Ruling CF-R6A-3).
       try {
         purgeErasureLedger(this.sync);
@@ -571,12 +687,17 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       } catch (err) {
         console.error('customer auth purge failed', err);
       }
-      const storeId = this.boundStoreId();
-      if (storeId) await this.backupNow(storeId);
+      if (backupDue) {
+        const storeId = this.boundStoreId();
+        if (storeId) await this.backupNow(storeId);
+      }
     } finally {
       // Re-arm even when the export threw: a failed night must not stop the next one (alerting: a missing
       // manifest for yesterday is the signal, see docs/plans/2026-10-29-cf-phase0-go-no-go.md).
-      await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
+      if (backupDue) this.setBackupDueAt(now + DAY_MS);
+      await this.ctx.storage.setAlarm(this.backupDueAt() ?? now + DAY_MS);
+      // and the index retry, when rows are still queued (it only ever moves the alarm EARLIER)
+      await this.armIndexRetry();
     }
   }
 

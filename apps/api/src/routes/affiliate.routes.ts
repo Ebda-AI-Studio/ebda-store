@@ -7,6 +7,7 @@ import { refuseDemoStore } from '../middleware/demo-store';
 import { affiliateService } from '../services/affiliate.service';
 import { listAffiliateEvents } from '../services/affiliate-event.service';
 import { storeDb } from '../lib/repo-factory';
+import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { tenantContext } from '../middleware/tenant-context';
 
 // TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
@@ -428,7 +429,12 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = payoutSchema.parse(req.body);
-      const payout = await affiliateService.createPayout(req.params.storeId, req.params.id, data);
+      const payout = await affiliateService.createPayout(
+        req.params.storeId,
+        req.params.id,
+        data,
+        idempotencyKeyOf(req.header('idempotency-key'))
+      );
       res.status(201).json({ success: true, data: { payout } });
     } catch (error) {
       next(error);

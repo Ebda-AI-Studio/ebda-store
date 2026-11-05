@@ -61,6 +61,8 @@ import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/pro
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
+import { idempotencyKeyOf, withIdempotencyKey } from '../lib/money-idempotency';
+import { refundMayHaveExecuted } from '../services/payment-providers/refund-outcome';
 const router = Router();
 
 // ==========================================
@@ -731,22 +733,24 @@ router.post(
             userId: req.user?.userId ?? null,
           });
 
-          await auditLog({
-            action: 'payment.created',
-            // Guest checkout: req.user is undefined, audit log accepts that.
-            userId: req.user?.userId,
-            resourceType: 'payment',
-            resourceId: payment.id,
-            details: {
-              orderId: order.id,
-              amount: collectAmount,
-              codFee,
-              provider: 'cod',
-              ...(walletAmount > 0 ? { walletAmount } : {}),
-            },
-            ip: req.ip,
-            userAgent: req.headers['user-agent'],
-          });
+          // a COD replay that raced past the read above got the SAME row back: no second "created" audit row (review M-5)
+          if (!payment.replayed)
+            await auditLog({
+              action: 'payment.created',
+              // Guest checkout: req.user is undefined, audit log accepts that.
+              userId: req.user?.userId,
+              resourceType: 'payment',
+              resourceId: payment.id,
+              details: {
+                orderId: order.id,
+                amount: collectAmount,
+                codFee,
+                provider: 'cod',
+                ...(walletAmount > 0 ? { walletAmount } : {}),
+              },
+              ip: req.ip,
+              userAgent: req.headers['user-agent'],
+            });
 
           return {
             status: 200,
@@ -1205,138 +1209,140 @@ router.post(
     try {
       const data = refundSchema.parse(req.body);
       const user = getAuthUser(req);
-
-      // Bootstrap lookup OUTSIDE runInTenantContext: the store is not known yet and a
-      // contextless read shows nothing under strict RLS, so the definer maps the provider
-      // reference to its store and the payment is read inside that store. Ownership follows.
-      const resolvedRefundStore = await resolveStoreFromWebhookRef({
-        transactionId: data.transactionId,
-        provider: data.provider,
-      });
-      // the store's own backend (NEON-ZERO); the payment's store IS the resolved one
-      const paymentRow = resolvedRefundStore
-        ? await readPayment(resolvedRefundStore, db =>
-            db.payment.findFirst({
-              where: { transactionId: data.transactionId },
-              include: { order: { select: { id: true, storeId: true } } },
-            })
-          )
-        : null;
-      if (paymentRow && paymentRow.order.storeId !== resolvedRefundStore) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment not found' },
-        });
-        return;
-      }
-      if (!paymentRow) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment not found' },
-        });
-        return;
-      }
-      // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
-      // `orders:refund` (on any store) passed with no membership check at all.
-      if (user.role !== 'super_admin') {
-        const access = await checkStoreAccess(paymentRow.order.storeId, user);
-        if (!access.ok) {
-          res.status(404).json({
-            success: false,
-            error: { code: 'NOT_FOUND', message: 'Payment not found' },
-          });
-          return;
-        }
-      }
-
-      const refundStoreId = paymentRow.order.storeId;
-
-      // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
-      // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
-      const refund = await runInStoreCtx(refundStoreId, () =>
-        // The store is named (and the provider when the caller gave one): a Durable Object store's refund is the claim /
-        // completion sections on its DO (`refundOnDo`); without it the service would look the payment up in Postgres.
-        PaymentService.refund(
-          {
-            transactionId: data.transactionId,
-            amount: data.amount,
-            reason: data.reason,
-          },
-          data.provider,
-          refundStoreId
-        )
+      // Same Idempotency-Key -> the first answer again, never a second refund (review M-8, Ruling NZ-MONEY-3). The key is
+      // scoped to the caller and the transaction, so another payment or another user never collides with it.
+      const idem = idempotencyKeyOf(req.header('idempotency-key'));
+      const out = await withIdempotencyKey(
+        `refund:${user.userId}:${data.transactionId}`,
+        idem,
+        () => refundOnce(data, user, req),
+        refundMayHaveExecuted
       );
-
-      // The audit trail, on its OWN transaction after the money moved, best effort + alert: a failing audit write
-      // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
-      // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
-      // a pre-refund snapshot.
-      await runInStoreCtx(refundStoreId, async () => {
-        await auditLog({
-          action: 'payment.refunded',
-          userId: user.userId,
-          resourceType: 'payment',
-          resourceId: refund.transactionId,
-          details: {
-            refundId: refund.refundId,
-            amount: refund.amount,
-            reason: data.reason || null,
-          },
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-        });
-        const after = await (
-          await storeDb(refundStoreId)
-        ).payment.findUnique({
-          where: { id: paymentRow.id },
-          select: { status: true },
-        });
-        // on a Durable Object store the row is appended there (`paymentEventRecord`); Postgres joins this scope
-        await recordPaymentEventForStore({
-          paymentId: paymentRow.id,
-          storeId: refundStoreId,
-          orderId: paymentRow.orderId,
-          eventType: 'refund',
-          fromStatus: paymentRow.status,
-          toStatus:
-            after?.status ??
-            ((paymentRow.refundedAmount ?? 0) + refund.amount >= paymentRow.amount
-              ? 'refunded'
-              : 'partially_refunded'),
-          provider: paymentRow.provider,
-          triggeredByUserId: user.userId,
-          details: {
-            refundId: refund.refundId,
-            amount: refund.amount,
-            reason: data.reason ?? null,
-            initiatedBy: user.role,
-          },
-        });
-      }).catch(err => {
-        logger.error(
-          { err, paymentId: paymentRow.id, refundId: refund.refundId },
-          '[payments] refund committed but its audit rows failed'
-        );
-        void sendAlert({
-          level: 'p1',
-          scope: 'store',
-          store: { id: refundStoreId, name: refundStoreId },
-          source: 'payment.refund.audit_failed',
-          title: 'payment.refund.audit_failed',
-          body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made, but its audit rows could not be written. Add them by hand.`,
-          context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount },
-        }).catch(() => undefined);
-      });
-
-      res.json({
-        success: true,
-        data: { refund },
-      });
+      res.json({ success: true, data: { refund: out.value } });
     } catch (error) {
       next(error);
     }
   }
 );
+
+/** The body of POST /payments/refund: the refund the provider made (a not-found is a thrown 404, which frees the key). */
+async function refundOnce(
+  data: z.infer<typeof refundSchema>,
+  user: ReturnType<typeof getAuthUser>,
+  req: Request
+) {
+  // Bootstrap lookup OUTSIDE runInTenantContext: the store is not known yet and a
+  // contextless read shows nothing under strict RLS, so the definer maps the provider
+  // reference to its store and the payment is read inside that store. Ownership follows.
+  const resolvedRefundStore = await resolveStoreFromWebhookRef({
+    transactionId: data.transactionId,
+    provider: data.provider,
+  });
+  // the store's own backend (NEON-ZERO); the payment's store IS the resolved one
+  const paymentRow = resolvedRefundStore
+    ? await readPayment(resolvedRefundStore, db =>
+        db.payment.findFirst({
+          where: { transactionId: data.transactionId },
+          include: { order: { select: { id: true, storeId: true } } },
+        })
+      )
+    : null;
+  if (paymentRow && paymentRow.order.storeId !== resolvedRefundStore) {
+    throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+  }
+  if (!paymentRow) {
+    throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+  }
+  // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
+  // `orders:refund` (on any store) passed with no membership check at all.
+  if (user.role !== 'super_admin') {
+    const access = await checkStoreAccess(paymentRow.order.storeId, user);
+    if (!access.ok) {
+      throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+    }
+  }
+
+  const refundStoreId = paymentRow.order.storeId;
+
+  // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
+  // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
+  const refund = await runInStoreCtx(refundStoreId, () =>
+    // The store is named (and the provider when the caller gave one): a Durable Object store's refund is the claim /
+    // completion sections on its DO (`refundOnDo`); without it the service would look the payment up in Postgres.
+    PaymentService.refund(
+      {
+        transactionId: data.transactionId,
+        amount: data.amount,
+        reason: data.reason,
+      },
+      data.provider,
+      refundStoreId
+    )
+  );
+
+  // The audit trail, on its OWN transaction after the money moved, best effort + alert: a failing audit write
+  // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
+  // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
+  // a pre-refund snapshot.
+  await runInStoreCtx(refundStoreId, async () => {
+    await auditLog({
+      action: 'payment.refunded',
+      userId: user.userId,
+      resourceType: 'payment',
+      resourceId: refund.transactionId,
+      details: {
+        refundId: refund.refundId,
+        amount: refund.amount,
+        reason: data.reason || null,
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    const after = await (
+      await storeDb(refundStoreId)
+    ).payment.findUnique({
+      where: { id: paymentRow.id },
+      select: { status: true },
+    });
+    // on a Durable Object store the row is appended there (`paymentEventRecord`); Postgres joins this scope
+    await recordPaymentEventForStore({
+      paymentId: paymentRow.id,
+      storeId: refundStoreId,
+      orderId: paymentRow.orderId,
+      eventType: 'refund',
+      fromStatus: paymentRow.status,
+      toStatus:
+        after?.status ??
+        ((paymentRow.refundedAmount ?? 0) + refund.amount >= paymentRow.amount
+          ? 'refunded'
+          : 'partially_refunded'),
+      provider: paymentRow.provider,
+      triggeredByUserId: user.userId,
+      details: {
+        refundId: refund.refundId,
+        amount: refund.amount,
+        reason: data.reason ?? null,
+        initiatedBy: user.role,
+      },
+    });
+  }).catch(err => {
+    logger.error(
+      { err, paymentId: paymentRow.id, refundId: refund.refundId },
+      '[payments] refund committed but its audit rows failed'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'store',
+      store: { id: refundStoreId, name: refundStoreId },
+      source: 'payment.refund.audit_failed',
+      title: 'payment.refund.audit_failed',
+      body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made, but its audit rows could not be written. Add them by hand.`,
+      context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount },
+    }).catch(() => undefined);
+  });
+
+  return refund;
+}
 
 /**
  * POST /payments/retry/:paymentId

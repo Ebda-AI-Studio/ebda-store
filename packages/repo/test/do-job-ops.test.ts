@@ -123,6 +123,7 @@ describe('job operations on the DO (Ruling CF-JOBS-4)', () => {
         kind: 'payment',
         status: 'completed',
         amount: paid.total,
+        currency: 'EGP',
       },
       confirmed: null,
     });
@@ -143,6 +144,7 @@ describe('job operations on the DO (Ruling CF-JOBS-4)', () => {
         kind: 'payment',
         status: 'completed',
         amount: o.total,
+        currency: 'EGP',
       },
       confirmed: null,
     });
@@ -169,6 +171,7 @@ describe('job operations on the DO (Ruling CF-JOBS-4)', () => {
         kind: 'payment',
         status: 'completed',
         amount: p.total,
+        currency: 'EGP',
       },
       confirmed: null,
     });

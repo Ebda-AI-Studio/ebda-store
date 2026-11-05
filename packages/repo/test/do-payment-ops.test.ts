@@ -67,6 +67,7 @@ function rig() {
           kind: 'payment',
           status: 'completed',
           amount: o.total,
+          currency: 'EGP',
           ...extra,
         },
         confirmed: provider === 'kashier' ? { kind: 'payment', status: 'SUCCESS' } : null,
@@ -286,6 +287,7 @@ describe('refunds', () => {
           providerRef: 'tx-w7',
           kind: 'payment',
           amount: gateway,
+          currency: 'EGP',
           ...extra,
         },
         confirmed: null,
@@ -529,5 +531,101 @@ describe('payment creation on the DO: amount due, COD once, InstaPay hold, affil
     expect(
       r.q("SELECT COUNT(*) AS n FROM affiliate_events WHERE event_type = 'payout_initiated'")[0].n
     ).toBe(1);
+  });
+});
+
+// Review I-4 of PR 455: a signed `completed` delivery confirms the order only with the amount due in the payment's currency.
+describe('a completed webhook is bound to the amount due and the currency', () => {
+  it.each([
+    ['an overpayment', { amount: 99_999 }, 'paid_amount_mismatch'],
+    ['a short payment', { amount: 1 }, 'paid_amount_mismatch'],
+    ['another currency', { currency: 'USD' }, 'paid_currency_mismatch'],
+    ['no amount', { amount: undefined }, 'paid_amount_missing'],
+    ['no currency', { currency: undefined }, 'paid_currency_mismatch'],
+  ] as const)('%s: held, recorded in full, order not paid, alert raised', (_n, extra, reason) => {
+    const r = rig();
+    const p = r.paid();
+    const out = p.hook('evt-mm', { status: 'completed', ...extra });
+    expect(out.outcome).toBe('held');
+    expect(out.alerts.map((a: { kind: string }) => a.kind)).toContain('amount_mismatch');
+    expect(r.q('SELECT payment_status, status FROM orders WHERE id = ?', p.o.orderId)[0]).toEqual({
+      payment_status: 'unpaid',
+      status: 'pending',
+    });
+    expect(r.q('SELECT status FROM payments WHERE id = ?', p.paymentId)[0].status).toBe('pending');
+    const ev = r.q(
+      "SELECT details FROM payment_events WHERE payment_id = ? AND event_type = 'reconciliation'",
+      p.paymentId
+    );
+    expect(JSON.parse(ev[0].details).reason).toBe(reason);
+    // the right delivery afterwards still confirms it
+    expect(p.hook('evt-ok', { status: 'completed' }).outcome).toBe('applied');
+    expect(
+      r.q('SELECT payment_status FROM orders WHERE id = ?', p.o.orderId)[0].payment_status
+    ).toBe('paid');
+  });
+});
+
+describe('wallet-split order end to end, keyed payout (review minors)', () => {
+  it('a wallet-part-paid order: the gateway charges the due, a webhook for the due confirms it, one for the full total is held', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w9','s1','u9',2000)`
+    );
+    const mk = (phone: string) =>
+      r.op('createOrder', {
+        lines: [{ productId: 'sku', quantity: 2 }],
+        shippingAddress: { phone },
+        customerId: 'u9',
+        walletAmount: 500,
+      });
+    const o = mk('01000000091');
+    const due = o.total - o.walletAmount;
+    expect(o.walletAmount).toBe(500);
+    expect(
+      r.code('paymentCreate', { orderId: o.orderId, provider: 'paymob', amount: o.total })
+    ).toBe('PAYMENT_AMOUNT_MISMATCH/409');
+    r.op('paymentCreate', {
+      orderId: o.orderId,
+      provider: 'paymob',
+      amount: due,
+      transactionId: 'tx-w9',
+    });
+    const hook = (eventId: string, amount: number) =>
+      r.op('paymentWebhook', {
+        input: {
+          provider: 'paymob',
+          eventId,
+          providerRef: 'tx-w9',
+          kind: 'payment',
+          status: 'completed',
+          amount,
+          currency: 'EGP',
+        },
+        confirmed: null,
+      });
+    expect(hook('e-full', o.total).outcome).toBe('held');
+    expect(r.q('SELECT payment_status FROM orders WHERE id = ?', o.orderId)[0].payment_status).toBe(
+      'unpaid'
+    );
+    expect(hook('e-due', due).outcome).toBe('applied');
+    expect(r.q('SELECT payment_status FROM orders WHERE id = ?', o.orderId)[0].payment_status).toBe(
+      'paid'
+    );
+    expect(r.q("SELECT balance FROM customer_wallets WHERE id = 'w9'")[0].balance).toBe(1500);
+  });
+
+  it('a keyed payout replays its first answer and debits once', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO affiliates (id, store_id, name, email, referral_code, status, pending_balance) VALUES ('af2', 's1', 'B', 'b@x', 'RC2', 'approved', 1000)`
+    );
+    const a = r.op('affiliatePayout', { affiliateId: 'af2', amount: 300 }, 'payout:s1:af2:k1');
+    const b = r.op('affiliatePayout', { affiliateId: 'af2', amount: 300 }, 'payout:s1:af2:k1');
+    expect(b.payout.id).toBe(a.payout.id);
+    expect(r.q("SELECT pending_balance AS p FROM affiliates WHERE id = 'af2'")[0].p).toBe(700);
+    expect(r.q("SELECT COUNT(*) AS n FROM affiliate_payouts WHERE affiliate_id = 'af2'")[0].n).toBe(
+      1
+    );
   });
 });

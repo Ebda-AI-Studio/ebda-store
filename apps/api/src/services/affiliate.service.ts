@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { storeDb, storeMoney } from '../lib/repo-factory';
+import { opKey } from '../lib/money-idempotency';
 import logger from '../lib/logger';
 import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';
 
@@ -713,7 +714,13 @@ class AffiliateService {
     };
   }
 
-  async createPayout(storeId: string, affiliateId: string, data: CreatePayoutData) {
+  async createPayout(
+    storeId: string,
+    affiliateId: string,
+    data: CreatePayoutData,
+    /** The client's Idempotency-Key, already validated: same key -> the same payout, never a second (review M-6). */
+    idempotencyKey?: string
+  ) {
     // A store on its Durable Object (NEON-ZERO): the affiliate row, the debit, the payout and its event are ONE section there;
     // the balance is re-checked inside it, so the refusals are the same (404 / INVALID_AMOUNT / INSUFFICIENT_BALANCE).
     const money = await storeMoney(storeId);
@@ -721,16 +728,21 @@ class AffiliateService {
       if (data.amount <= 0) {
         throw new AppError(400, 'INVALID_AMOUNT', 'Payout amount must be greater than zero');
       }
-      const payoutId = randomUUID();
-      const { payout } = await money.affiliatePayout({
-        affiliateId,
-        amount: data.amount,
-        method: data.method ?? 'manual',
-        notes: data.notes ?? null,
-        payoutId,
-      });
+      // keyed: the DO mints the id inside the section (an id minted here would differ per retry and the replay would refuse
+      // it as a reused key); unkeyed: the id is minted here, as on Postgres
+      const { payout } = await money.affiliatePayout(
+        {
+          affiliateId,
+          amount: data.amount,
+          method: data.method ?? 'manual',
+          notes: data.notes ?? null,
+          ...(idempotencyKey ? {} : { payoutId: randomUUID() }),
+        },
+        // a keyed section replays its first answer (the first payout), whatever this call's body says
+        idempotencyKey ? opKey(`payout:${storeId}:${affiliateId}`, idempotencyKey) : undefined
+      );
       logger.info(
-        { storeId, affiliateId, payoutId, amount: data.amount },
+        { storeId, affiliateId, payoutId: payout.id, amount: data.amount },
         '[AffiliateService] Payout created'
       );
       return payout;

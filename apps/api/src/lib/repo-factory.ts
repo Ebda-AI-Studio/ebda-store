@@ -1016,13 +1016,16 @@ export interface MoneyClient {
   }): Promise<{ claimed: boolean }>;
   affiliateReverse(a: { orderId: string }): Promise<{ amount: number | null }>;
   /** AffiliateService.createPayout: balance debit + payout row + event, one section (INSUFFICIENT_BALANCE when it does not cover). */
-  affiliatePayout(a: {
-    affiliateId: string;
-    amount: number;
-    method?: string;
-    notes?: string | null;
-    payoutId?: string;
-  }): Promise<{ payout: Record<string, unknown> }>;
+  affiliatePayout(
+    a: {
+      affiliateId: string;
+      amount: number;
+      method?: string;
+      notes?: string | null;
+      payoutId?: string;
+    },
+    key?: string
+  ): Promise<{ payout: Record<string, unknown> }>;
   /** Reorder scan phase 1: expire stale / unit-gone suggestions (Ruling CF-JOBS-4). */
   reorderExpire(a: {
     thresholdMs: number;
@@ -1471,7 +1474,7 @@ export function makeMoneyClient(
     reversalClaim: a => call('reversalClaim', a),
     affiliateCommission: a => call('affiliateCommission', a),
     affiliateReverse: a => call('affiliateReverse', a),
-    affiliatePayout: a => call('affiliatePayout', a),
+    affiliatePayout: (a, key) => call('affiliatePayout', a, key),
     reorderExpire: a => call('reorderExpire', a),
     reorderUpsert: a => call('reorderUpsert', a),
     orderStatus: (a, key) => call('orderStatus', a, key),

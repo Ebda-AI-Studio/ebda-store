@@ -48,12 +48,13 @@ export interface DrainResult {
 export async function drainEntityIndexOutbox(
   db: SyncSql,
   d1: D1Like,
-  opts: { now?: number; limit?: number } = {}
+  opts: { now?: number; limit?: number; afterId?: number } = {}
 ): Promise<DrainResult> {
   const now = opts.now ?? Date.now();
+  // `afterId`: only the rows queued after that outbox id (a money op drains ITS OWN rows first, ahead of any backlog)
   const rows = db.all(
-    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? ORDER BY id LIMIT ?",
-    [MAX_ATTEMPTS, now, Math.min(opts.limit ?? 100, 500)]
+    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
+    [MAX_ATTEMPTS, now, opts.afterId ?? 0, Math.min(opts.limit ?? 100, 500)]
   );
   const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, conflicts: [] };
   for (const r of rows) {
@@ -94,6 +95,33 @@ export async function drainEntityIndexOutbox(
     }
   }
   return out;
+}
+
+/** The highest outbox id so far (0 when empty): a money op's OWN index rows are the ones queued after it. */
+export function outboxHighWater(db: SyncSql): number {
+  return (db.all('SELECT COALESCE(MAX(id), 0) AS m FROM d1_outbox', [])[0]?.m as number) ?? 0;
+}
+
+/** The {kind, id} of the entity-index rows queued after `afterId` (a money op's own rows). */
+export function outboxRowsAfter(
+  db: SyncSql,
+  afterId: number
+): Array<{ kind: EntityKind; id: string }> {
+  return db
+    .all("SELECT payload FROM d1_outbox WHERE kind = 'entity_index' AND id > ? ORDER BY id", [
+      afterId,
+    ])
+    .map(r => JSON.parse(r.payload as string) as { kind: EntityKind; id: string })
+    .map(p => ({ kind: p.kind, id: p.id }));
+}
+
+/** When the next undone, not dead-lettered row is due (epoch ms), or null when the outbox is drained. */
+export function nextOutboxAttempt(db: SyncSql): number | null {
+  const r = db.all(
+    "SELECT MIN(next_attempt_at) AS t FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ?",
+    [MAX_ATTEMPTS]
+  )[0];
+  return (r?.t as number | null) ?? null;
 }
 
 /** The store that owns an entity, or null (unknown id). */
@@ -167,11 +195,15 @@ export async function awaitEntityIndexed(
   d1: D1Like,
   storeId: string,
   ids: ReadonlyArray<{ kind: EntityKind; id: string }>,
-  opts: { now?: number } = {}
+  opts: { now?: number; afterId?: number; limit?: number } = {}
 ): Promise<void> {
   if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
   const now = opts.now ?? Date.now();
-  const drained = await drainEntityIndexOutbox(db, d1, { now: now + 1 });
+  const drained = await drainEntityIndexOutbox(db, d1, {
+    now: now + 1,
+    afterId: opts.afterId,
+    limit: opts.limit,
+  });
   // an id already owned by ANOTHER store is a conflict, not "done": routing it would deliver this payment to the wrong tenant
   const conflicted = ids.filter(w =>
     drained.conflicts.some(c => c.kind === w.kind && c.id === w.id)

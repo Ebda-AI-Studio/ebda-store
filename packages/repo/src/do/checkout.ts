@@ -1004,8 +1004,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         featureEnabled: input.loyaltyFeatureEnabled === true,
         now,
       });
-    // entity index (audit DB-2): queued in the SAME section as the order; the Worker awaits it (awaitEntityIndexed) before
-    // it hands the order reference to a provider or a shopper
+    // entity index (audit DB-2): queued in the SAME section as the order; `StoreDO.moneyOp` writes it to D1 (awaitEntityIndexed)
+    // before it answers, and refuses 503 when a keyed checkout's row did not land (Ruling NZ-MONEY-2)
     indexEntity(db, input.storeId, 'order', orderId, now);
     // The sale's fiscal document (tax invoice or receipt) with its gapless serial, in THIS section: the order and its number
     // commit or roll back together (Ruling MONEYB-1, CF-R2-1).

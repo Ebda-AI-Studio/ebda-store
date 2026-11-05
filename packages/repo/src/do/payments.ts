@@ -1062,15 +1062,22 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
     });
     return finish('ignored', 'no downgrade');
   }
-  // Paid-amount reconciliation (money-integrity F3): a short payment never confirms the order.
-  const under =
-    status === 'completed' &&
-    typeof input.amount === 'number' &&
-    Number.isFinite(input.amount) &&
-    input.currency === p.currency &&
-    Math.abs(p.amount - input.amount) > AMOUNT_TOLERANCE_FILS &&
-    input.amount < p.amount;
-  if (under) {
+  // Paid-amount reconciliation (money-integrity F3, review I-4 of PR 455): a `completed` delivery confirms the order ONLY when
+  // it states the amount due (within the tolerance) in the payment's currency. Short, over, a missing amount or another
+  // currency is an external money fact: recorded in full on the payment (never rejected, never lost), the order NOT marked
+  // paid, a P1 raised for a human.
+  const amountGiven = typeof input.amount === 'number' && Number.isFinite(input.amount);
+  const mismatch: null | 'paid_amount_missing' | 'paid_currency_mismatch' | 'paid_amount_mismatch' =
+    status !== 'completed'
+      ? null
+      : !amountGiven
+        ? 'paid_amount_missing'
+        : input.currency !== p.currency
+          ? 'paid_currency_mismatch'
+          : Math.abs(p.amount - (input.amount as number)) > AMOUNT_TOLERANCE_FILS
+            ? 'paid_amount_mismatch'
+            : null;
+  if (mismatch) {
     addPaymentEvent(db, {
       storeId: input.storeId,
       paymentId: p.id,
@@ -1080,9 +1087,11 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
       provider: input.provider,
       payload: input.rawPayload,
       details: {
-        reason: 'paid_amount_mismatch',
+        reason: mismatch,
         expectedFils: p.amount,
-        paidAmountFils: input.amount,
+        expectedCurrency: p.currency,
+        paidAmountFils: amountGiven ? input.amount : null,
+        paidCurrency: input.currency ?? null,
         webhookEvent: input.event ?? null,
       },
       now,
@@ -1092,9 +1101,10 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
         ...meta,
         webhookEvent: input.event ?? null,
         paymentMethod: input.paymentMethod ?? null,
-        paidCurrency: input.currency,
-        paidAmount: input.amount,
+        paidCurrency: input.currency ?? null,
+        paidAmount: amountGiven ? input.amount : null,
         amountMismatch: true,
+        mismatchReason: mismatch,
       }),
       now,
       p.id,
@@ -1103,10 +1113,16 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
       kind: 'amount_mismatch',
       paymentId: p.id,
       orderId: p.order_id,
-      body: `Order ${o.order_number}: ${input.provider} webhook reports paid ${input.amount} piastres but the order total is ${p.amount}. NOT marked paid.`,
-      context: { expected: p.amount, paid: input.amount },
+      body: `Order ${o.order_number}: ${input.provider} webhook reports paid ${amountGiven ? input.amount : 'no amount'} ${input.currency ?? '(no currency)'} but the amount due is ${p.amount} ${p.currency} (${mismatch}). NOT marked paid.`,
+      context: {
+        expected: p.amount,
+        expectedCurrency: p.currency,
+        paid: amountGiven ? input.amount : null,
+        paidCurrency: input.currency ?? null,
+        reason: mismatch,
+      },
     });
-    return finish('held', 'underpaid');
+    return finish('held', mismatch);
   }
   let orderStatus: 'pending' | 'confirmed' = 'pending';
   let orderPay: 'unpaid' | 'paid' | 'failed' | 'refunded' = 'unpaid';

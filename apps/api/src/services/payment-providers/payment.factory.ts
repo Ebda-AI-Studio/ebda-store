@@ -925,6 +925,9 @@ export class PaymentService {
         transactionId: response.transactionId ?? null,
         invoiceId: response.invoiceId ?? null,
         paymentUrl: response.paymentUrl || null,
+        // The Postgres twin's metadata: above all the `instruction` (a Fawry reference code has no URL), which is what lets a
+        // replayed POST /payments/create hand back the SAME reference instead of minting a second live one (review I-3).
+        metadata: doPaymentMetadata(providerName, response),
       });
       return;
     }
@@ -979,7 +982,7 @@ export class PaymentService {
     currency: string;
     metadata: Record<string, unknown>;
     userId: string | null;
-  }): Promise<{ id: string }> {
+  }): Promise<{ id: string; replayed: boolean }> {
     const money = await storeMoney(a.storeId);
     if (money) {
       const r = await money.paymentCreate({
@@ -990,7 +993,7 @@ export class PaymentService {
         currency: a.currency,
         metadata: a.metadata,
       });
-      return { id: r.paymentId };
+      return { id: r.paymentId, replayed: r.replayed === true };
     }
     const payment = await prisma.payment.create({
       data: {
@@ -1013,7 +1016,7 @@ export class PaymentService {
       triggeredByUserId: a.userId,
       details: { amount: a.amount, ...a.metadata } as Prisma.InputJsonValue,
     });
-    return { id: payment.id };
+    return { id: payment.id, replayed: false };
   }
 
   /**
@@ -3206,6 +3209,31 @@ export class PaymentService {
   static clearCache(storeId?: string): void {
     factory.clearCache(storeId);
   }
+}
+
+/**
+ * The metadata a Durable Object payment row keeps for an accepted invoice (the Postgres row's
+ * `{provider, invoiceId, paymentUrl, ...response.metadata}`), bounded to what the DO accepts (4 KB): when the adapter's own
+ * metadata is larger, only the fields a replay needs (the instruction and its expiry) are kept.
+ */
+export function doPaymentMetadata(
+  providerName: string,
+  response: Pick<PaymentResponse, 'invoiceId' | 'paymentUrl' | 'metadata'>
+): Record<string, unknown> {
+  const full: Record<string, unknown> = {
+    provider: providerName,
+    invoiceId: response.invoiceId ?? null,
+    paymentUrl: response.paymentUrl || null,
+    ...(response.metadata ?? {}),
+  };
+  if (JSON.stringify(full).length <= 3800) return full;
+  const m = (response.metadata ?? {}) as Record<string, unknown>;
+  return {
+    provider: providerName,
+    invoiceId: response.invoiceId ?? null,
+    paymentUrl: response.paymentUrl || null,
+    instruction: m.instruction ?? null,
+  };
 }
 
 /** The ambient store id, or null outside a store scope (never throws). */

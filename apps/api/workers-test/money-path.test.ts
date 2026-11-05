@@ -260,7 +260,8 @@ describe.skipIf(e.E2E_DB === '1')(
             lastName: 'Path',
             address1: '1 Test St',
             city: 'Cairo',
-            phone: '+201000000000',
+            // one buyer per order: the open-hold caps count per buyer, and this file places many unpaid orders
+            phone: `+2010${String(1_000_000 + nSession).padStart(8, '0')}`,
             country: 'EG',
           },
         }),
@@ -478,15 +479,16 @@ describe.skipIf(e.E2E_DB === '1')(
 
     const gateways: Array<{
       provider: 'paymob' | 'fawry' | 'kashier';
-      deliver: (ref: string, amount: number, forged?: boolean) => Promise<Response>;
+      /** `txn`: another gateway transaction for the same reference (a different signed event) */
+      deliver: (ref: string, amount: number, forged?: boolean, txn?: string) => Promise<Response>;
     }> = [
       {
         provider: 'paymob',
-        deliver: (ref, amount, forged) => {
+        deliver: (ref, amount, forged, txn) => {
           // one gateway transaction per reference: a redelivery is the same signed transaction
           const { body, hmac } = paymobBody(
             ref,
-            900_000 + (parseInt(ref.slice(-6), 16) % 99_999),
+            900_000 + (parseInt(ref.slice(-6), 16) % 99_999) + (txn ? 100_000 : 0),
             amount
           );
           return api(
@@ -500,16 +502,21 @@ describe.skipIf(e.E2E_DB === '1')(
       },
       {
         provider: 'fawry',
-        deliver: (ref, amount, forged) =>
+        deliver: (ref, amount, forged, txn) =>
           api('/webhooks/payment/fawry', {
             method: 'POST',
-            body: fawryBody(ref, `FR-${ref}`, amount, forged ? 'not-the-key' : FAWRY_KEY),
+            body: fawryBody(
+              ref,
+              `FR${txn ?? ''}-${ref}`,
+              amount,
+              forged ? 'not-the-key' : FAWRY_KEY
+            ),
           }),
       },
       {
         provider: 'kashier',
-        deliver: (ref, amount, forged) => {
-          const { body, sig } = kashierBody(ref, `KTX-${ref}`, amount);
+        deliver: (ref, amount, forged, txn) => {
+          const { body, sig } = kashierBody(ref, `KTX${txn ?? ''}-${ref}`, amount);
           return api('/webhooks/payment/kashier', {
             method: 'POST',
             headers: { 'x-kashier-signature': forged ? '0'.repeat(64) : sig },
@@ -530,6 +537,21 @@ describe.skipIf(e.E2E_DB === '1')(
         expect(forged.status, await forged.clone().text()).toBeGreaterThanOrEqual(400);
         expect(forged.status).toBeLessThan(500);
         expect((await payments(storeId, o.id))[0]!.status).toBe('pending');
+
+        // review I-4: a VALIDLY signed `completed` for another amount is recorded, never confirms the order
+        const wrong = await g.deliver(ref, o.total + 1000, false, 'X');
+        expect(wrong.status, await wrong.clone().text()).toBe(200);
+        const held = await until(async () => {
+          const ev = await doRead<Array<{ details: { reason?: string } | string }>>(
+            storeId,
+            'PaymentEvent',
+            { where: { paymentId, eventType: 'reconciliation' } }
+          );
+          return ev.length > 0 ? ev : null;
+        });
+        expect(JSON.stringify(held)).toContain('paid_amount_mismatch');
+        expect((await payments(storeId, o.id))[0]!.status).toBe('pending');
+        expect((await orderRow(storeId, o.id)).paymentStatus).toBe('unpaid');
 
         const res = await g.deliver(ref, o.total);
         expect(res.status, await res.clone().text()).toBe(200);
@@ -617,6 +639,92 @@ describe.skipIf(e.E2E_DB === '1')(
       });
       expect(payout.status, await payout.clone().text()).toBe(404);
       expect(await pgReaches(true)).toEqual([]);
+    }, 60_000);
+
+    it('review I-2: the D1 index write fails once -> 503 (no unroutable reference); the retry answers the same payment; the short alarm drains the row', async () => {
+      const o = await placeOrder('cod');
+      // D1 refuses every new `payment` index row (an outage of the write, reads still work)
+      await e.PLATFORM_DB.prepare(
+        "CREATE TRIGGER money_test_index_outage BEFORE INSERT ON entity_index WHEN NEW.kind = 'payment' BEGIN SELECT RAISE(ABORT, 'test outage'); END"
+      ).run();
+      const first = await api('/payments/create', {
+        method: 'POST',
+        headers: shopperHeaders(),
+        body: JSON.stringify({ orderId: o.id, provider: 'cod' }),
+      });
+      const fj = (await first.json()) as { error?: { code?: string } };
+      expect(first.status, JSON.stringify(fj)).toBe(503);
+      expect(fj.error?.code).toBe('ENTITY_INDEX_UNAVAILABLE');
+      const rows = await payments(storeId, o.id);
+      expect(rows).toHaveLength(1); // the section committed; the reference was not handed out
+      expect((await orderRow(storeId, o.id)).status).toBe('pending'); // not rolled back under the shopper
+      await e.PLATFORM_DB.prepare('DROP TRIGGER money_test_index_outage').run();
+      const retry = await api('/payments/create', {
+        method: 'POST',
+        headers: shopperHeaders(),
+        body: JSON.stringify({ orderId: o.id, provider: 'cod' }),
+      });
+      expect(retry.status, await retry.clone().text()).toBe(200);
+      expect(((await retry.json()) as { data: { transactionId: string } }).data.transactionId).toBe(
+        rows[0]!.id
+      );
+      expect(await payments(storeId, o.id)).toHaveLength(1);
+      // nobody calls the DO again: the index-retry alarm (STORE_DO_INDEX_RETRY_MS=500 here, 30 s in production) writes it
+      const indexed = await until(
+        async () =>
+          e.PLATFORM_DB.prepare(
+            "SELECT store_id FROM entity_index WHERE kind = 'payment' AND id = ?1"
+          )
+            .bind(rows[0]!.id)
+            .first<{ store_id: string }>(),
+        15_000
+      );
+      expect(indexed?.store_id).toBe(storeId);
+    }, 60_000);
+
+    it('review I-3: a Fawry reference-code payment keeps its instruction; a second create hands back the SAME reference', async () => {
+      session = `sess-fawry-ref-${++nSession}`;
+      const cart = await api('/public/cart/items', {
+        method: 'POST',
+        headers: shopperHeaders(),
+        body: JSON.stringify({ productId, quantity: 1 }),
+      });
+      expect(cart.status).toBeLessThan(300);
+      const placed = await api('/public/orders', {
+        method: 'POST',
+        headers: shopperHeaders(),
+        body: JSON.stringify({
+          paymentMethod: 'fawry',
+          shippingAddress: {
+            firstName: 'Fawry',
+            lastName: 'Shopper',
+            address1: '1 Test St',
+            city: 'Cairo',
+            phone: '+201000000001',
+            email: 'fawry-shopper@exit-test.invalid',
+            country: 'EG',
+          },
+        }),
+      });
+      expect(placed.status, await placed.clone().text()).toBeLessThan(300);
+      const pj = (await placed.json()) as { data: { id?: string; order?: { id: string } } };
+      const orderId = pj.data.order?.id ?? pj.data.id!;
+      const create = () =>
+        api('/payments/create', {
+          method: 'POST',
+          headers: shopperHeaders(),
+          body: JSON.stringify({ orderId, provider: 'fawry', method: 'payatfawry' }),
+        });
+      const a = await create();
+      const at = await a.text();
+      expect(a.status, at).toBe(200);
+      const first = JSON.parse(at).data as { instruction?: { kind: string; code: string } };
+      expect(first.instruction?.kind).toBe('reference-code');
+      const b = await create();
+      expect(b.status, await b.clone().text()).toBe(200);
+      const second = ((await b.json()) as { data: { instruction?: { code: string } } }).data;
+      expect(second.instruction?.code).toBe(first.instruction!.code);
+      expect(await payments(storeId, orderId)).toHaveLength(1);
     }, 60_000);
 
     it('refund and retry entry points resolve and read the payment on the DO (no Postgres reach)', async () => {
