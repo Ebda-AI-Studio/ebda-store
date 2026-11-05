@@ -9,6 +9,7 @@
  *
  * The credentials never leave the server: every result here is a status, a code and a time.
  */
+import { isDemoStore } from '../lib/demo-store';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { onD1 } from './platform/billing-d1';
 import {
@@ -463,6 +464,7 @@ async function notifyMerchant(
   actor: ActivationActor
 ): Promise<void> {
   try {
+    if (await isDemoStore(storeId)) return; // a showroom has no merchant to tell
     const store = await asOperator(actor.userId, async () => {
       if (await platformHubOnD1()) {
         // directory facts from D1, the owner's address from the identity service

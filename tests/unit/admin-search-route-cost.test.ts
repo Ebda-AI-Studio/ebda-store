@@ -24,6 +24,9 @@ vi.mock('@ebda/database', async importOriginal => {
   };
   return {
     ...actual,
+    // `storeDb(id)` scopes a Postgres store's model call in a short `withStore` when no scope is ambient (Ruling NZ-INTEG-SCOPE-1);
+    // the real one would open a transaction on a database this unit test does not have (it passed only where one listens on 5432).
+    withStore: async (_id: string, fn: () => unknown) => fn(),
     prisma: {
       product: { findMany: find('product') },
       order: { findMany: find('order') },

@@ -26,6 +26,7 @@ import { META, canon, insertSqlite, openSqlite } from '../../packages/repo/test/
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
 import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 const { captured, sendMarketingEmail, send } = vi.hoisted(() => {
   process.env.API_URL = 'https://api.test';
@@ -108,7 +109,7 @@ function buildDoRepo(storeId: string) {
     if (!r.ok) throw new AppError(r.status, r.code, r.message);
     return decodeRpc(r.json);
   });
-  return { storeId, backend: 'do' as const, db: c, writer: c, money };
+  return { storeId, backend: 'do' as const, db: withPgStoreDelegate(c), writer: c, money };
 }
 
 function buildApp(): Express {

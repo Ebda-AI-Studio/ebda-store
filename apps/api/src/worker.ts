@@ -315,6 +315,25 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
     });
     return res;
   }
+  // Dev/test only (DEV_STATS=1, never set in wrangler.jsonc): create a store through StoreService.create (N-18's pg-unreachable test).
+  if (path === '/__dev/create-store' && request.method === 'POST' && env.DEV_STATS === '1') {
+    const body = (await request.json()) as {
+      ownerId: string;
+      name: string;
+      slug?: string;
+      operator?: boolean;
+    };
+    const res = await withWorkerContext(env, ctx, async () => {
+      const { StoreService } = await import('./services/store.service.js');
+      const store = await StoreService.create(
+        body.ownerId,
+        { name: body.name, slug: body.slug },
+        { platformOperator: body.operator === true }
+      );
+      return Response.json({ id: (store as { id: string }).id });
+    });
+    return res;
+  }
   // Cutover admin surface (docs/runbooks/cutover-cf.md): bearer-checked before the StoreDO sees it.
   const cutover = await routeCutover(request, env);
   if (cutover) return cutover;

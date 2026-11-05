@@ -24,7 +24,7 @@ const RATE_MAX = 10_000_000;
 
 export type RateActor =
   | { userId: string }
-  | { feed: Record<string, unknown>; forcePending?: boolean };
+  | { feed: Record<string, unknown>; forcePending?: boolean; skipJumpGate?: boolean };
 export interface RateRow {
   id: string;
   karat: GoldKarat;
@@ -118,8 +118,8 @@ export function applyGoldRates(
     const pending: RateRow[] = [];
     const newRates = new Map<GoldKarat, { id: string; ratePerGram: number }>();
     for (const v of verdicts) {
-      const isPending =
-        isFeed && (v.over || (actor as { forcePending?: boolean }).forcePending === true);
+      const a = actor as { forcePending?: boolean; skipJumpGate?: boolean };
+      const isPending = isFeed && ((v.over && a.skipJumpGate !== true) || a.forcePending === true);
       if (isPending)
         db.run(
           `UPDATE gold_rates SET status = 'rejected', decided_by = 'system:superseded' WHERE store_id = ? AND karat = ? AND status = 'pending'`,

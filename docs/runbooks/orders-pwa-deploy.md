@@ -20,7 +20,7 @@ It is an internal staff tool: every route is `noindex` (next.config.js headers +
 Mirror the `force-admin` / `force-web` project setup:
 
 1. Vercel dashboard → **Add New… → Project** → import the
-   `Whisky-11/ebda-store` repo.
+   `Ebda-AI-Studio/ebda-store` repo.
 2. **Project name:** `force-orders`.
 3. **Root Directory:** `apps/orders` (so Vercel builds only this app).
    Vercel auto-detects Next.js + the npm-workspaces monorepo and installs from

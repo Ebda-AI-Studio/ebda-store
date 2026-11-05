@@ -14,14 +14,14 @@
 # A failed/cancelled check or a moved head ends the run at once (exit 1). Pending checks are waited on, up to
 # --max-wait-min (default 180); running out of time exits 2 and merges nothing.
 #
-# options: --repo OWNER/NAME (default Whisky-11/ebda-store)  --polls N (3)  --interval S (30)  --max-wait-min M (180)
+# options: --repo OWNER/NAME (default Ebda-AI-Studio/ebda-store)  --polls N (3)  --interval S (30)  --max-wait-min M (180)
 #          --dry-run (evaluate, never merge)
 # test seams: MERGE_GATE_VIEW_CMD (prints the `gh pr view --json headRefOid,mergeable,statusCheckRollup` JSON),
 #             MERGE_GATE_MERGE_CMD (replaces the final gh pr merge), MERGE_GATE_REQUIRED_JSON, MERGE_GATE_MAX_WAIT_S.
 set -uo pipefail
 pr="${1:?usage: merge-gate.sh <pr> <expected-head-sha> [--repo R] [--polls N] [--interval S] [--max-wait-min M] [--dry-run]}"
 want="${2:?expected head sha required}"; shift 2
-repo="Whisky-11/ebda-store"; polls=3; interval=30; maxmin=180; dry=0
+repo="Ebda-AI-Studio/ebda-store"; polls=3; interval=30; maxmin=180; dry=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo) repo="$2"; shift 2 ;; --polls) polls="$2"; shift 2 ;; --interval) interval="$2"; shift 2 ;;

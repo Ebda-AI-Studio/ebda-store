@@ -115,7 +115,7 @@ export async function handleGoldRateFeedFetch(
             GoldRateService.applyRates(
               s.storeId,
               { rates: GOLD_KARATS.map(k => ({ karat: k, ratePerGram: candidates.get(k)! })) },
-              { feed: reference, forcePending: disagree }
+              { feed: reference, forcePending: disagree, ...(s.demo ? { skipJumpGate: true } : {}) }
             )
           );
           return {

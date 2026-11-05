@@ -2,6 +2,9 @@
 // Exports types, utilities, and constants used across all apps
 
 export * from './brand';
+// NOT re-exported from brand/index.ts: that file is the raw-TypeScript `@ebda/shared/brand` entry loaded by Node/site-kit with no
+// loader, so it must stay free of extensionless relative imports (the API integration job failed on exactly that).
+export * from './brand/billing-vat';
 export * from './buyer-key';
 export * from './whatsapp-optin-wording';
 export * from './server-owned-settings';

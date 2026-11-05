@@ -24,7 +24,8 @@ async function storeIsActive(storeId: string): Promise<boolean> {
   return !!s && s.deletedAt === null && String(s.status) === 'active';
 }
 
-type Feed = { storeId: string; premiumBps: number };
+/** `demo`: a showroom store; the feed applies to it with no opt-in and no jump gate (nobody is there to confirm a pending rate). */
+type Feed = { storeId: string; premiumBps: number; demo?: boolean };
 type Watch = {
   storeId: string;
   karat: number;
@@ -41,8 +42,16 @@ async function feedForDoStore(storeId: string): Promise<Feed[] | undefined> {
     where: { storeId },
     select: { enabled: true, feedEnabled: true, feedPremiumBps: true },
   });
-  if (!g || !g.enabled || !g.feedEnabled || !(await storeIsActive(storeId))) return [];
-  return [{ storeId, premiumBps: g.feedPremiumBps }];
+  // A demo store ALWAYS rides the automatic rate (Ruling DEMO-GOLD-2): its settings row may be missing, manual or switched off
+  // (a manual rate ages out after 26 h and pauses selling on the showroom), so the feed does not wait for an opt-in.
+  const demo =
+    (await repo.db.store.findUnique({ where: { id: storeId }, select: { isDemo: true } }))
+      ?.isDemo === true;
+  if (!demo && (!g || !g.enabled || !g.feedEnabled)) return [];
+  if (!(await storeIsActive(storeId))) return [];
+  return [
+    { storeId, premiumBps: demo ? 0 : (g?.feedPremiumBps ?? 0), ...(demo ? { demo: true } : {}) },
+  ];
 }
 
 /**

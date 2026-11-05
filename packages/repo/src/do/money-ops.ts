@@ -795,7 +795,11 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       storeId,
       a.input as ApplyRatesInput,
       a.feed
-        ? { feed: a.feed as Record<string, unknown>, forcePending: a.forcePending === true }
+        ? {
+            feed: a.feed as Record<string, unknown>,
+            forcePending: a.forcePending === true,
+            skipJumpGate: a.skipJumpGate === true,
+          }
         : { userId: id(a.userId, 'userId') }
     ),
   goldDecidePending: (db, storeId, a) =>

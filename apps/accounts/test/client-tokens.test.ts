@@ -1,6 +1,6 @@
 /**
  * Identity contract v1.3: integrator client tokens (client_credentials). docs: business/ebda/plans/2026-10-24-ebda-identity-token-contract.md
- * and Whisky-11/ebda-whatsapp docs/contracts/identity-v1.3-integrator-tokens.md (r2).
+ * and Ebda-AI-Studio/ebda-whatsapp docs/contracts/identity-v1.3-integrator-tokens.md (r2).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
