@@ -151,7 +151,8 @@ export function integrationPlan(files, root = ROOT) {
 
   for (const f of changed) {
     if (/^tests\/integration\/.*\.test\.ts$/.test(f)) {
-      if (!OWN_JOB_INTEGRATION.has(f)) run.add(f);
+      // a test the change DELETES is in `git diff --name-only` but not in the PR head: never emit it (vitest exits 1 on "No test files found")
+      if (!OWN_JOB_INTEGRATION.has(f) && existsSync(path.join(root, f))) run.add(f);
     } else if (
       f.startsWith('tests/integration/') || // fixtures, snapshots, golden files, stubs
       f.startsWith('tests/helpers/') ||

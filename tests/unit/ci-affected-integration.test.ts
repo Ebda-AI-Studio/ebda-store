@@ -84,6 +84,19 @@ describe('integrationPlan', () => {
     });
   });
 
+  it('a deleted integration test is never selected; an all-deleted change plans nothing (job skips)', () => {
+    // standalone.test.ts exists in the fixture tree; gone.test.ts does not (the PR deleted it)
+    expect(
+      integrationPlan(
+        ['tests/integration/gone.test.ts', 'tests/integration/standalone.test.ts'],
+        root
+      )
+    ).toEqual({ integration: true, paths: ['tests/integration/standalone.test.ts'] });
+    expect(
+      integrationPlan(['tests/integration/gone.test.ts', 'tests/integration/gone2.test.ts'], root)
+    ).toEqual({ integration: false, paths: [] });
+  });
+
   it('a shared fixture/helper, snapshot, or anything under packages/database runs the whole tier', () => {
     for (const f of [
       'tests/integration/helpers/fixture.ts',
