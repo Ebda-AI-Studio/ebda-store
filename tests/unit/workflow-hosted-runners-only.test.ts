@@ -63,14 +63,8 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
   // Push-to-main deploy workflows (cf-*-deploy.yml) keep the plain selector: no PR label can reach them.
   const PLAIN = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
   it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-24.04 fallback', () => {
-    // Ruling OFFMACHINE-1: the off-machine database backup must NOT depend on the Umbra fleet (the Mac and the CI guest are
-    // exactly what it protects against), so db-backup.yml alone pins the literal GitHub-hosted runner.
-    const bad = runsOnValues().filter(
-      r =>
-        r.value !== ROUTED &&
-        r.value !== PLAIN &&
-        !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
-    );
+    // The literal-runner exception db-backup.yml had (Ruling OFFMACHINE-1) went with that workflow (Ruling NZ-17-BACKUP-1).
+    const bad = runsOnValues().filter(r => r.value !== ROUTED && r.value !== PLAIN);
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
       'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-24.04)'

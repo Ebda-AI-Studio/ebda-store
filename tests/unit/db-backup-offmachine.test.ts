@@ -1,16 +1,15 @@
 /**
- * OPS-7 / M-011: the off-machine database backup. The verifier must refuse a dump that restores nothing (2026-09-17: valid gzip
- * around zero bytes), and the workflow must never upload plaintext.
+ * OPS-7 / M-011: the verifier must refuse a dump that restores nothing (2026-09-17: valid gzip around zero bytes). The
+ * db-backup.yml workflow assertions went with the workflow (Ruling NZ-17-BACKUP-1).
  */
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const VERIFY = path.join(ROOT, 'scripts/ops/verify-db-dump.sh');
-const wf = readFileSync(path.join(ROOT, '.github/workflows/db-backup.yml'), 'utf8');
 
 function verify(opts: { bytes: number; toc: string[]; env?: Record<string, string> }) {
   const dir = mkdtempSync(path.join(tmpdir(), 'dbv-'));
@@ -59,20 +58,5 @@ describe('verify-db-dump.sh', () => {
       encoding: 'utf8',
     });
     expect(r.status).toBe(1);
-  });
-});
-
-describe('db-backup.yml', () => {
-  it('encrypts before upload, uploads only the .age file, and reads it back', () => {
-    expect(wf).toMatch(/age -r "\$AGE_PUBLIC_KEY" -o "\$DUMP\.age" "\$DUMP"/);
-    expect(wf).toMatch(/r2 object put "ebda-db-backups\/\$KEY" --file "\$DUMP\.age"/);
-    expect(wf).not.toMatch(/r2 object put[^\n]*--file "\$DUMP"/);
-    expect(wf).toContain('cmp "$DUMP.age"');
-  });
-  it('runs nightly on a GitHub-hosted runner (survives the Mac and the CI guest) and alerts on failure', () => {
-    expect(wf).toMatch(/schedule:\s*\n\s*- cron: '\d+ \d+ \* \* \*'/);
-    expect(wf).toContain('runs-on: ubuntu-24.04');
-    expect(wf).toContain('notify-failure');
-    expect(wf).toContain('scripts/ops/verify-db-dump.sh');
   });
 });

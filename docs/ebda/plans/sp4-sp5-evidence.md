@@ -15,7 +15,7 @@ That run is discarded; the numbers below are from a clean rebuild.
 
 ## 1. Parity, Node (base) vs workerd (head), both as `ebda_app`
 
-`bash scripts/ebda-parity-as-app.sh` (base = `node apps/api/dist/index.js` on :4811 -> `ev_base` direct; head = `wrangler dev` of
+`bash scripts/ebda-parity-as-app.sh` (REMOVED in NZ-17 slice 2, Ruling NZ-17-SCRIPTS-1: it needed a Postgres/Hyperdrive head; kept here as evidence history) (base = `node apps/api/dist/index.js` on :4811 -> `ev_base` direct; head = `wrangler dev` of
 `apps/api` on :4812 -> `ev_head` through pgbouncer :6491 via the Hyperdrive local connection string; harness stub :4813; Paymob stub via
 `PAYMOB_BASE_URL` + `PAYMENT_PROVIDER_STUB=1`; the four `PAYMENT_*` card-testing budgets raised; Worker started with a fresh `--persist-to`).
 The harness truncates and seeds each side as the owner (`parity`) and the APIs never see the owner role.
@@ -135,7 +135,7 @@ redis-server --port 56411 --daemonize yes --dir /tmp
 # pgbouncer 1.22, transaction mode, pool 8, :6491, [databases] ev_head and ev_sp, auth file = apps/api/pgbouncer/userlist.txt (ebda_app / ci-only-app-pw)
 rm -rf apps/api/dist && npm run build -w apps/api
 bash scripts/ebda-parity-as-app.sh                                   # section 1
-MODE=worker PORT=4816 DB=ev_sp INSPECTOR_PORT=4819 INNGEST_PORT=4818 LOG=/tmp/ev-worker-sp.log bash scripts/ebda-dev-api.sh &
+# (MODE=worker was removed from ebda-dev-api.sh in NZ-17 slice 2; the Worker needs no Postgres)
 MODE=node   PORT=4815 DB=ev_spn INNGEST_PORT=4817 LOG=/tmp/ev-node-sp.log bash scripts/ebda-dev-api.sh &
 DATABASE_URL=$EBDA_APP_URL_EV_SP npx tsx scripts/ebda-seed-amelia.mjs   # section 2
 node scripts/ebda-amelia-http-check.mjs --api http://127.0.0.1:4816/api/v1

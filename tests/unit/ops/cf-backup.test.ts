@@ -506,3 +506,120 @@ describe('a foreign key that targets a column made unique by a SEPARATE index (d
     expect(() => d2.exec(bad)).toThrow(/foreign key mismatch/);
   });
 });
+
+describe('StoreDO replay order + stray tables (drill 3: FOREIGN KEY constraint failed / unknown table)', () => {
+  const dump = [
+    { table: 'a_child', columns: ['id', 'p'], pk: ['id'], rows: [['c1', 'p1']] }, // sorts before its parent
+    {
+      table: 'categories',
+      columns: ['id', 'parent_id'],
+      pk: ['id'],
+      rows: [
+        ['k2', 'k1'],
+        ['k1', null],
+        ['k3', 'k2'],
+      ],
+    },
+    { table: 'z_parent', columns: ['id'], pk: ['id'], rows: [['p1']] },
+  ];
+  const fks = {
+    a_child: { parents: ['z_parent'], self: [] },
+    categories: { parents: [], self: [{ from: 'parent_id', to: 'id' }] },
+    z_parent: { parents: [], self: [] },
+  };
+  it('replayOrder puts parents first even when the child sorts earlier', () => {
+    const o = D.replayOrder(['a_child', 'categories', 'z_parent'], fks);
+    expect(o.indexOf('z_parent')).toBeLessThan(o.indexOf('a_child'));
+    expect(D.replayOrder(['b', 'a'], {})).toEqual(['a', 'b']);
+    // a cycle between tables does not hang: it is broken deterministically
+    expect(
+      D.replayOrder(['x', 'y'], { x: { parents: ['y'] }, y: { parents: ['x'] } })
+    ).toHaveLength(2);
+  });
+  it('orderSelfRefRows emits a parent row before its children', () => {
+    const rows = D.orderSelfRefRows(['id', 'parent_id'], ['id'], dump[1].rows, [
+      { from: 'parent_id', to: 'id' },
+    ]);
+    expect(rows.map((r: any) => r[0])).toEqual(['k1', 'k2', 'k3']);
+  });
+  it('the replay imports z_parent before a_child, categories parent-first in one page, then verifies', async () => {
+    const seen: string[] = [];
+    const bodies: Record<string, string> = {};
+    const post = async (p: string, body: string) => {
+      if (p.endsWith('__import')) {
+        const h = JSON.parse(body.split('\n')[0]);
+        seen.push(h.table);
+        bodies[h.table] = body;
+      }
+      return { tables: {}, fk: { violations: 0 } };
+    };
+    const get = async (p: string) =>
+      p.endsWith('__tables') ? { tables: ['a_child', 'categories', 'z_parent'] } : { tables: fks };
+    await D.restoreStoreOverHttp(post, 's1', dump, 'b-test-1', get);
+    expect(seen.indexOf('z_parent')).toBeLessThan(seen.indexOf('a_child'));
+    expect(
+      bodies.categories
+        .split('\n')
+        .filter(Boolean)
+        .slice(1)
+        .map((l: string) => JSON.parse(l)[0])
+    ).toEqual(['k1', 'k2', 'k3']);
+  });
+  it('a table the target does not have is named (all of them) before anything is written', async () => {
+    const writes: string[] = [];
+    const post = async (p: string) => (writes.push(p), {});
+    const get = async (p: string) =>
+      p.endsWith('__tables') ? { tables: ['categories'] } : { tables: {} };
+    await expect(D.restoreStoreOverHttp(post, 's1', dump, 'b-test-2', get)).rejects.toThrow(
+      /no table a_child, z_parent/
+    );
+    expect(writes).toEqual([]);
+  });
+  it('the export leaves out a table that moved out of the StoreDO schema and records it in the manifest', async () => {
+    const calls: any[] = [];
+    const call = async (p: string, body?: any) => {
+      calls.push({ p, body });
+      if (p.endsWith('__tables')) return { tables: ['things', 'onesignal_subscriptions'] };
+      if (body.table === 'onesignal_subscriptions')
+        return { columns: ['id'], pk: ['id'], total: 4, offset: 0, rows: [] };
+      return { columns: ['id'], pk: ['id'], total: 1, offset: 0, rows: [['t1']] };
+    };
+    const r = await B.exportStoreOverHttp(call, 's1', { log: () => {} });
+    expect(Object.keys(r.tables)).toEqual(['things']);
+    expect(r.raw.toString()).not.toMatch(/onesignal/);
+    expect(r.skipped).toEqual({ onesignal_subscriptions: 4 });
+    // and the manifest carries it
+    const b = bucket();
+    const io = { ...mkIo(b, { d1: 'x', store: 'y' }), exportStore: async () => ({ ...r }) };
+    await B.runBackup({ io, now: at('2026-11-04') });
+    const man = JSON.parse(b.m.get('cf/daily/2026-11-04/manifest.json')!.toString());
+    expect(man.artifacts['do-s1'].skippedTables).toEqual({ onesignal_subscriptions: 4 });
+  });
+  it('BACKUP_EXPORT_SECRET also opens the read-only __fks', async () => {
+    const secret = 'b'.repeat(32);
+    const id = '11111111-1111-4111-8111-111111111111';
+    const res = await routeCutover(
+      new Request(`https://x/cutover/stores/${id}/__fks`, {
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+      { BACKUP_EXPORT_SECRET: secret } as any
+    );
+    expect(res!.status).toBe(503); // past auth: STORE_DO is not bound in this test
+  });
+});
+
+describe('local worker boot verdict (drill 4: every replay "fetch failed" in 1 ms, no boot output)', () => {
+  it('a benign [ERROR] log line is not a failed boot; a bundle or runtime failure is', () => {
+    const benign =
+      '\u001b[31m✘ [ERROR]\u001b[0m {"err":"POSTGRES_REMOVED: Postgres was removed from the Worker"}';
+    expect(D.fatalBootLine(benign)).toBeNull();
+    expect(D.fatalBootLine('[ERROR] Could not resolve "zod/v3"')).toBe('Could not resolve');
+    expect(D.fatalBootLine('\u001b[31mThe Workers runtime failed to start.\u001b[0m')).toBe(
+      'The Workers runtime failed to start'
+    );
+    expect(D.fatalBootLine('Error: listen EADDRINUSE: address already in use 127.0.0.1:8798')).toBe(
+      'EADDRINUSE'
+    );
+    expect(D.fatalBootLine('')).toBeNull();
+  });
+});

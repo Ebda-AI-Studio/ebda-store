@@ -4,6 +4,17 @@ import { fetchBackupSet, parseStoreDump, compareTables } from './cf-backup.mjs';
 
 export const IMPORT_PAGE_ROWS = 1000;
 
+const ANSI = /\x1b\[[0-9;]*m/g;
+// Only these end the wait for the local worker early. A bare "[ERROR]" line is NOT one of them: wrangler logs benign errors (a request
+// that reaches a removed Postgres path, optional bindings) while the Worker still serves.
+const FATAL_BOOT =
+  /Build failed|Could not resolve|The Workers runtime failed to start|Uncaught \w*Error|EADDRINUSE|address already in use/;
+/** The fatal boot line in a wrangler dev log, or null. */
+export function fatalBootLine(logText) {
+  const m = FATAL_BOOT.exec(String(logText).replace(ANSI, ''));
+  return m ? m[0] : null;
+}
+
 /** The drill only ever writes to a loopback worker. A remote URL is a misuse, not an option. */
 export function assertLoopback(url) {
   const h = new URL(url).hostname;
@@ -11,16 +22,78 @@ export function assertLoopback(url) {
     throw new Error(`refusing ${url}: the restore drill writes only to a local worker`);
 }
 
-/** Replay a store dump through the production __import path, then __verify it. `post(path, body, contentType)` -> parsed JSON. */
-export async function restoreStoreOverHttp(post, storeId, dump, batch) {
+/**
+ * Table replay order, parents first, from the target's own schema (GET __fks). Ties by name. A self-referencing table is no
+ * obstacle between tables (its parent is itself); a cycle between tables would be replayed last and reported by __verify.
+ */
+export function replayOrder(names, fks) {
+  const set = new Set(names);
+  const done = new Set();
+  const order = [];
+  while (order.length < names.length) {
+    const rest = names.filter(n => !done.has(n)).sort();
+    const ready = rest.filter(n =>
+      (fks?.[n]?.parents ?? []).filter(p => set.has(p)).every(p => done.has(p))
+    );
+    for (const n of ready.length ? ready : rest.slice(0, 1)) (done.add(n), order.push(n));
+  }
+  return order;
+}
+
+/** Rows of a self-referencing table so that a row's parent row precedes it (page boundaries cannot defer a foreign key). */
+export function orderSelfRefRows(columns, pk, rows, self) {
+  if (!self?.length || pk.length !== 1) return rows;
+  const idx = c => columns.indexOf(c);
+  const keyAt = idx(pk[0]);
+  const byKey = new Map(rows.map(r => [String(r[keyAt]), r]));
+  const emitted = new Set();
+  const out = [];
+  const visit = r => {
+    const k = String(r[keyAt]);
+    if (emitted.has(k)) return;
+    emitted.add(k); // before recursing: a cycle among rows ends here, __verify reports it
+    for (const f of self) {
+      const parent = r[idx(f.from)];
+      if (parent !== null && parent !== undefined && byKey.has(String(parent)))
+        visit(byKey.get(String(parent)));
+    }
+    out.push(r);
+  };
+  for (const r of rows) visit(r);
+  return out;
+}
+
+/**
+ * Replay a store dump through the production __import path (parents first), then __verify it. `post(path, body, contentType)` and
+ * the optional `get(path)` return parsed JSON. Tables the target does not have are reported ALL AT ONCE by name, before any write.
+ */
+export async function restoreStoreOverHttp(post, storeId, dump, batch, get) {
   const base = `/cutover/stores/${storeId}`;
-  for (const t of dump) {
-    for (let page = 0, i = 0; i < t.rows.length; page++, i += IMPORT_PAGE_ROWS) {
+  let fks = null;
+  if (get) {
+    const have = new Set((await get(`${base}/__tables`)).tables);
+    const missing = dump.filter(t => !have.has(t.table)).map(t => t.table);
+    if (missing.length)
+      throw new Error(
+        `the target has no table ${missing.join(', ')} (in the backup, not in the current StoreDO schema)`
+      );
+    fks = (await get(`${base}/__fks`)).tables;
+  }
+  const byName = new Map(dump.map(t => [t.table, t]));
+  for (const name of replayOrder([...byName.keys()], fks)) {
+    const t = byName.get(name);
+    const self = fks?.[name]?.self ?? [];
+    const rows = orderSelfRefRows(t.columns, t.pk, t.rows, self);
+    // a self-referencing table goes in as few pages as possible: defer_foreign_keys only spans one page
+    const size = self.length ? 2000 : IMPORT_PAGE_ROWS;
+    for (let page = 0, i = 0; i < rows.length; page++, i += size) {
       const head = JSON.stringify({ batch, table: t.table, page, columns: t.columns, pk: t.pk });
-      const body =
-        [head, ...t.rows.slice(i, i + IMPORT_PAGE_ROWS).map(r => JSON.stringify(r))].join('\n') +
-        '\n';
-      await post(`${base}/__import`, body, 'application/x-ndjson');
+      const body = [head, ...rows.slice(i, i + size).map(r => JSON.stringify(r))].join('\n') + '\n';
+      try {
+        await post(`${base}/__import`, body, 'application/x-ndjson');
+      } catch (e) {
+        throw new Error(`table ${t.table} page ${page}: ${e.message}`, { cause: e });
+      }
     }
   }
   const res = await post(
@@ -172,7 +245,7 @@ export async function runDrill({ io, targets, tier = 'daily', day, now = () => D
     const id = name.slice(3);
     const dump = parseStoreDump(files[name].toString('utf8'));
     const res = await step(`store ${id}: replay ${dump.length} tables through __import`, () =>
-      restoreStoreOverHttp(targets.post, id, dump, batch)
+      restoreStoreOverHttp(targets.post, id, dump, batch, targets.get)
     );
     if (!res) continue;
     const cmp = compareTables(entry.tables, res.tables);
