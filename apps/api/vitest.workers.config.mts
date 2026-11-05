@@ -49,6 +49,8 @@ const apiVars = {
   TAP_SECRET_KEY: 's',
   TAP_WEBHOOK_SECRET: 'dev-only-tap-webhook-secret',
   BUILD_COMMIT_SHA: 'test-sha',
+  // configured so the route sweep measures the routes, not the "not configured" 503 of the alert bridge
+  ALERTS_WEBHOOK_TOKEN: 'workers-test-alerts-token',
   WEB_URL: 'http://localhost:3000',
   ADMIN_URL: 'http://localhost:3001',
   API_URL: 'http://localhost:8787',
@@ -69,9 +71,6 @@ const apiVars = {
 // worker, which reaches it through the `API` service binding and shares its Durable Objects / KV by
 // binding them with `scriptName: 'api'`. The bundle is never sent through Vite (an 11 MB module cannot
 // travel over the pool's websocket, and 143k lines of Express / Prisma CJS should not be re-transformed).
-// The route sweep (workers-test/route-sweep.test.ts) runs with a stand-in identity service behind `ACCOUNTS`; no other test does.
-const WITH_ACCOUNTS = process.argv.some(a => a.includes('route-sweep'));
-
 export default defineConfig(async () => {
   // D1 `ebda-platform` (task 2.4): the REAL cf-schema platform migrations, applied by the test, shared by both workers.
   const platformMigrations = await readD1Migrations(
@@ -113,22 +112,6 @@ export default defineConfig(async () => {
             EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
           },
           workers: [
-            ...(WITH_ACCOUNTS
-              ? [
-                  {
-                    name: 'accounts',
-                    modulesRoot: here('./workers-test/fakes'),
-                    modules: [
-                      {
-                        type: 'ESModule' as const,
-                        path: here('./workers-test/fakes/accounts.mjs'),
-                      },
-                    ],
-                    compatibilityDate: '2026-08-01',
-                    compatibilityFlags: ['nodejs_compat'],
-                  },
-                ]
-              : []),
             {
               name: 'accounts-stub',
               modules: true,
@@ -143,13 +126,19 @@ export default defineConfig(async () => {
                   }
                   async getAccountsBrief(ids) {
                     return ids.map(id => ({ id, email: id + '@exit-test.invalid', firstName: 'T', lastName: 'T', status: 'active',
-                      role: id.startsWith('super-') ? 'super_admin' : 'store_admin', lastLoginAt: null, createdAt: new Date(0).toISOString() }));
+                      role: id.startsWith('super-') || id.startsWith('00000000-0000-4000-8000-0000000000aa') ? 'super_admin' : 'store_admin', lastLoginAt: null, createdAt: new Date(0).toISOString() }));
                   }
                   async isRevoked() { return false; }
                   async revokeSession() {}
                   async revokeUser() {}
                   async setStatus() {}
                   async setRole() { return true; }
+                  async inviteUser(i) { return { id: i.id, created: true }; }
+                  async updateProfile(id, _i, _r, actor) {
+                    // an id with this prefix is a super_admin: only that user may edit it (security tests of the admin user edit)
+                    if (id.startsWith('00000000-0000-4000-8000-0000000000aa') && actor !== id) return { ok: false, code: 'FORBIDDEN_TARGET' };
+                    return { ok: true };
+                  }
                   async deleteStoreClients() { return { clients: 0 }; }
                   async eraseUser() { return { erased: true, remaining: 0 }; }
                   async exportUser() { return {}; }
@@ -172,7 +161,6 @@ export default defineConfig(async () => {
               // The private bucket of the nightly backup sweep (cf/ops/backup-sweep.ts, G8).
               r2Buckets: { STORE_BACKUPS: 'store-backups' },
               d1Databases: { PLATFORM_DB: 'platform-db' },
-              ...(WITH_ACCOUNTS ? { serviceBindings: { ACCOUNTS: 'accounts' } } : {}),
               durableObjects: {
                 AUTH_STATE: { className: 'AuthState', useSQLite: true },
                 STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },

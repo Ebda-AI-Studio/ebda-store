@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { adminPushPlayerIdsD1 } from '../services/platform/push-d1';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { requirePlatformDb } from './platform-db';
 import {
@@ -1299,6 +1300,8 @@ export async function adminPushPlayerIds(
   role: 'store_admin' | 'super_admin',
   storeId: string | null
 ): Promise<string[]> {
+  // NZ-C-11: once `ops` (devices) is on D1 the audience is D1 + identity (same predicate as the SQL function below).
+  if (await platformFamilyOnD1('ops')) return adminPushPlayerIdsD1(role, storeId);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT ebda_admin_push_player_ids AS id FROM public.ebda_admin_push_player_ids(${role}, ${storeId})`;
   return rows.map(r => r.id).filter(Boolean);

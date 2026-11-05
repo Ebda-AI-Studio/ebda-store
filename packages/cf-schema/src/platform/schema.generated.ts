@@ -331,6 +331,22 @@ export const merchantApiKeys = sqliteTable('merchant_api_keys', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const onesignalSubscriptions = sqliteTable('onesignal_subscriptions', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull(),
+  playerId: text('player_id').notNull(),
+  deviceLabel: text('device_label'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const plans = sqliteTable('plans', {
   id: text('id')
     .primaryKey()

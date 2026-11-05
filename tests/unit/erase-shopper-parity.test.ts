@@ -31,11 +31,6 @@ const PARITY: Record<string, Verdict> = {
     do: 'same',
   },
   push_subscriptions: { how: 'handled', pg: 'delete', do: 'delete' },
-  onesignal_subscriptions: {
-    how: 'handled',
-    pg: 'delete (third-party propagation as well)',
-    do: 'delete',
-  },
   abandoned_carts: { how: 'handled', pg: 'delete', do: 'delete' },
   addresses: { how: 'handled', pg: 'delete', do: 'delete' },
   wishlists: { how: 'handled', pg: 'delete (items cascade)', do: 'delete (items cascade)' },
@@ -79,6 +74,11 @@ const PARITY: Record<string, Verdict> = {
     how: 'handled',
     pg: 'n/a (DO-only table): buyer key to NULL',
     do: 'buyer key to NULL under the erasure flag',
+  },
+  notification_logs: {
+    how: 'handled',
+    pg: 'n/a (DO-only table, Ruling NZ-AN-1)',
+    do: 'delete by the shopper buyer keys (recipient_phone_hash)',
   },
   customer_wallets: {
     how: 'kept',

@@ -318,13 +318,6 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
     },
     action: 'delete',
   },
-  onesignal_subscriptions: {
-    kind: 'customer-pii',
-    match: {
-      userId: 'user_id',
-    },
-    action: 'delete',
-  },
   order_events: {
     kind: 'store-owned',
   },

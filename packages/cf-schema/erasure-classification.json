@@ -368,8 +368,8 @@
     "subjectKeys": ["customerId"],
     "note": ""
   },
-  "store-do:onesignal_subscriptions": {
-    "db": "store-do",
+  "d1:onesignal_subscriptions": {
+    "db": "d1",
     "class": "customer-pii",
     "action": "delete",
     "piiColumns": ["user_id", "player_id"],

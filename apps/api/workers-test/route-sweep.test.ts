@@ -153,7 +153,7 @@ describe.skipIf(e.E2E_DB === '1')(
       await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
       for (const p of DEFAULT_PLAN_SEEDS)
         await e.PLATFORM_DB.prepare(
-          'INSERT OR IGNORE INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+          'INSERT OR IGNORE INTO plans (id, code, name_en, name_ar, feature_tier, limits, price_monthly_minor, price_yearly_minor) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)'
         )
           .bind(
             `plan-${p.code}`,
@@ -161,7 +161,9 @@ describe.skipIf(e.E2E_DB === '1')(
             p.nameEn,
             p.nameAr,
             p.featureTier,
-            JSON.stringify(p.limits)
+            JSON.stringify(p.limits),
+            p.priceMonthlyMinor,
+            p.priceYearlyMinor
           )
           .run();
       for (const [i, k] of MARKER_KEYS.entries())
@@ -287,6 +289,118 @@ describe.skipIf(e.E2E_DB === '1')(
       },
       120_000
     );
+
+    it('SEEDED hub writes: valid bodies reach past validation with Postgres dead (stores, plans, billing, users, store delete)', async () => {
+      const adm = { authorization: `Bearer ${su}`, 'x-store-id': storeId };
+      const seeded: Array<[string, string, string, Record<string, string>, unknown]> = [
+        [
+          'PUT',
+          '/admin/stores/:id',
+          `/admin/stores/${storeId}`,
+          adm,
+          { name: 'Sweep Shop Renamed' },
+        ],
+        [
+          'PATCH',
+          '/admin/stores/:id/status',
+          `/admin/stores/${storeId}/status`,
+          adm,
+          { status: 'active' },
+        ],
+        [
+          'PUT',
+          '/admin/stores/:id/plan',
+          `/admin/stores/${storeId}/plan`,
+          adm,
+          { plan: 'starter' },
+        ],
+        [
+          'PUT',
+          '/admin/stores/:id/subscription',
+          `/admin/stores/${storeId}/subscription`,
+          adm,
+          { planCode: 'basic' },
+        ],
+        [
+          'POST',
+          '/admin/stores/:id/manual-payment',
+          `/admin/stores/${storeId}/manual-payment`,
+          adm,
+          {
+            planCode: 'basic',
+            interval: 'monthly',
+            amountMinor: 49900,
+            method: 'instapay',
+            reference: 'SWEEP-REF-001',
+            paidAt: new Date().toISOString(),
+          },
+        ],
+        [
+          'POST',
+          '/admin/stores',
+          '/admin/stores',
+          adm,
+          {
+            storeName: 'Sweep Provisioned',
+            storeSlug: 'sweep-provisioned',
+            ownerEmail: 'prov-owner@exit-test.invalid',
+            ownerName: 'Prov Owner',
+          },
+        ],
+        [
+          'POST',
+          '/admin/users',
+          '/admin/users',
+          adm,
+          {
+            email: 'invitee@exit-test.invalid',
+            firstName: 'In',
+            lastName: 'Vitee',
+            role: 'store_admin',
+          },
+        ],
+        ['PUT', '/admin/users/:id', `/admin/users/${owner}`, adm, { status: 'active' }],
+        [
+          'PUT',
+          '/admin/users/:id (email)',
+          `/admin/users/${owner}`,
+          adm,
+          { email: 'takeover@exit-test.invalid' },
+        ],
+        [
+          'PUT',
+          '/admin/users/:id (super_admin target)',
+          '/admin/users/00000000-0000-4000-8000-0000000000aa',
+          adm,
+          { firstName: 'Mallory' },
+        ],
+        ['GET', '/admin/users?search=sweep', '/admin/users?search=sweep', adm, undefined],
+      ];
+      for (const [m, route, path, headers, body] of seeded) {
+        if (!inSubset(`${m} ${route}`)) continue;
+        const res = await hit('SEEDED', m, route, BASE + path, headers, body);
+        // The admin route never edits an e-mail (account takeover) and never edits ANOTHER super_admin's profile.
+        if (route === '/admin/users/:id (email)') expect(res?.status).toBe(409);
+        if (route === '/admin/users/:id (super_admin target)') expect(res?.status).toBe(403);
+      }
+      // A second store, created like the first (D1 + DO), deleted by its owner: the DO delete path (close, finish, directory).
+      const extra = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
+        method: 'POST',
+        body: JSON.stringify({
+          ownerId: owner,
+          name: 'Doomed',
+          slug: 'sweep-doomed',
+          operator: true,
+        }),
+      });
+      if (extra.status === 200 && inSubset('DELETE /stores/:id')) {
+        const doomedId = ((await extra.json()) as { id: string }).id;
+        await hit('SEEDED', 'DELETE', '/stores/:id (DO store)', `${BASE}/stores/${doomedId}`, {
+          authorization: `Bearer ${su}`,
+          'x-store-id': doomedId,
+        });
+      }
+    }, 180_000);
 
     it.skipIf(!!FILTER)(
       'storefront flow: home, category, search, PDP, cart, checkout quote, order create (up to payment)',

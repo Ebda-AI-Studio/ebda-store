@@ -325,15 +325,6 @@ export async function runTestForStore(
   const entry = getProviderEntry(provider);
   if (!entry || entry.manual)
     throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
-  if ((await storeRepo(storeId)).backend === 'do') {
-    // The connection test is stored on the provider's config row, and a Durable Object store's payment / carrier config is not a
-    // DO-writable model yet: refuse loudly rather than run a gateway call whose result cannot be recorded.
-    throw new AppError(
-      501,
-      'PROVIDER_TEST_UNSUPPORTED_ON_DO',
-      'Re-running the connection test is not available for this store yet'
-    );
-  }
   if (entry.kind === 'payments') {
     const row = await (
       await storeDb(storeId)

@@ -200,6 +200,20 @@
         "productCategory": 1
       }
     },
+    "apps/api/src/services/provider-verification.service.ts": {
+      "kind": "platform",
+      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
+      "models": {
+        "shippingCarrierConfig": 1
+      }
+    },
+    "apps/api/src/services/shipping-carrier.service.ts": {
+      "kind": "platform",
+      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
+      "models": {
+        "shippingCarrierConfig": 3
+      }
+    },
     "apps/api/src/services/sms-queue.service.ts": {
       "kind": "pg-branch",
       "guardFile": "apps/api/src/lib/analytics-backend.ts",
