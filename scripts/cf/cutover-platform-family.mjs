@@ -1060,13 +1060,22 @@ async function auditCutover(args) {
   );
 }
 
+/**
+ * `system_settings` holds D1-ONLY bookkeeping next to the Postgres-copied settings: every family's marker and freeze
+ * (`platform_cutover.*`, `platform_freeze.*`), the per-store / global customer-auth markers and freezes
+ * (`customer_auth_cutover.*`, `customer_auth_freeze.*`), the analytics marker, and anything else the cutover scripts write
+ * with `category = 'cutover'`. NONE of it is in Postgres, so the stray-row delete (step 3b) and the verify digest must never
+ * see it: a row matched here would be DELETED as a "stray" (wiping a live customer-auth marker flips every store's customers
+ * back to Postgres). Exported for the test that pins it.
+ */
+export const SYSTEM_SETTINGS_DATA_WHERE = ` WHERE COALESCE(category, '') <> 'cutover' AND key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%' AND key NOT LIKE 'customer_auth_%' AND key NOT LIKE '%_cutover.%' AND key NOT LIKE '%_freeze.%'`;
+
 /** D1 rows to compare: the cutover bookkeeping rows live in system_settings and are not part of the copied data. */
 let freezeStartMs = 0;
-function verifyWhere(table, doStores = new Set()) {
+export function verifyWhere(table, doStores = new Set()) {
   if (table === 'instapay_receipts' && doStores.size)
     return ` WHERE NOT (kind = 'order' AND store_id IN (${[...doStores].map(lit).join(', ')}))`;
-  if (table === 'system_settings')
-    return ` WHERE key NOT LIKE 'platform_cutover.%' AND key NOT LIKE 'platform_freeze.%'`;
+  if (table === 'system_settings') return SYSTEM_SETTINGS_DATA_WHERE;
   // webhooks that arrived during the freeze are stored here as `deferred` (D1 only); they are not part of the copy
   if (table === 'billing_webhook_events') return ` WHERE outcome <> 'deferred'`;
   // callbacks recorded into D1 during the freeze are D1-only rows, not part of the copied data
