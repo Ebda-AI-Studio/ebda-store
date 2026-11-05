@@ -148,6 +148,12 @@ export function normalizeD1Sql(sqlText) {
     }
     const out = ['PRAGMA defer_foreign_keys=TRUE;'];
     for (const t of order) out.push(objs.find(o => o.name === t && o.type === 'table').sql + ';');
+    // A foreign key may target a column that is unique only through a SEPARATE `CREATE UNIQUE INDEX` (store_subscriptions.plan_code ->
+    // plans.code). Without that index SQLite reports "foreign key mismatch" on the child's first row, so every UNIQUE index is created
+    // right after the tables, before any row. Plain indexes, triggers and views stay last (faster load, no trigger firing on restore).
+    const isUniqueIndex = o => o.type === 'index' && /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(o.sql);
+    for (const o of objs.filter(isUniqueIndex)) out.push(o.sql + ';');
+    const rest = objs.filter(o => o.type !== 'table' && !isUniqueIndex(o));
     for (const t of order) {
       const info = db
         .prepare(
@@ -169,7 +175,7 @@ export function normalizeD1Sql(sqlText) {
           `INSERT INTO ${qi(t)} (${cols.map(qi).join(', ')}) VALUES (${cols.map(c => r[c]).join(', ')});`
         );
     }
-    for (const o of objs.filter(o => o.type !== 'table')) out.push(o.sql + ';');
+    for (const o of rest) out.push(o.sql + ';');
     return out.join('\n') + '\n';
   } finally {
     db.close();
