@@ -104,6 +104,78 @@ export async function d1Digests(sqlText) {
   }
 }
 
+const qi = n => `"${String(n).replace(/"/g, '""')}"`;
+
+/**
+ * Make a D1 SQL export restorable with a plain `wrangler d1 execute --file` (first real drill: "no such table: main.stores").
+ * `wrangler d1 export` lists tables alphabetically with their rows interleaved, so a child's INSERT can precede its parent's
+ * CREATE TABLE; neither a local D1 nor a new remote one accepts that. The artifact is rewritten as: defer_foreign_keys, every
+ * CREATE TABLE (parents before children, ties by name), every row (tables in the same order, rows by primary key / rowid, values
+ * as SQLite's own quote() literals so BLOBs and floats are exact), then indexes, triggers and views. Idempotent (a normalized dump
+ * normalizes to itself) and deterministic, so skip-if-unchanged still works. Old artifacts are normalized on restore.
+ */
+export function normalizeD1Sql(sqlText) {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec(sqlText);
+    const objs = db
+      .prepare(
+        "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\' ORDER BY name"
+      )
+      .all();
+    const tables = objs.filter(o => o.type === 'table').map(o => o.name);
+    const deps = new Map(
+      tables.map(t => [
+        t,
+        new Set(
+          db
+            .prepare(
+              `SELECT "table" AS parent FROM pragma_foreign_key_list(${JSON.stringify(t).replace(/"/g, "'")})`
+            )
+            .all()
+            .map(r => r.parent)
+            .filter(p => p !== t && tables.includes(p))
+        ),
+      ])
+    );
+    const order = [];
+    const done = new Set();
+    while (order.length < tables.length) {
+      const ready = tables.filter(t => !done.has(t) && [...deps.get(t)].every(d => done.has(d)));
+      const next = ready.length ? ready : tables.filter(t => !done.has(t)).slice(0, 1); // a cycle: break it deterministically
+      for (const t of next) (done.add(t), order.push(t));
+    }
+    const out = ['PRAGMA defer_foreign_keys=TRUE;'];
+    for (const t of order) out.push(objs.find(o => o.name === t && o.type === 'table').sql + ';');
+    for (const t of order) {
+      const info = db
+        .prepare(
+          `SELECT name, pk FROM pragma_table_info(${JSON.stringify(t).replace(/"/g, "'")}) ORDER BY cid`
+        )
+        .all();
+      const cols = info.map(c => c.name);
+      const pk = info
+        .filter(c => c.pk > 0)
+        .sort((a, b) => a.pk - b.pk)
+        .map(c => qi(c.name));
+      const rows = db
+        .prepare(
+          `SELECT ${cols.map(c => `quote(${qi(c)}) AS ${qi(c)}`).join(', ')} FROM ${qi(t)} ORDER BY ${pk.length ? pk.join(', ') : 'rowid'}`
+        )
+        .all();
+      for (const r of rows)
+        out.push(
+          `INSERT INTO ${qi(t)} (${cols.map(qi).join(', ')}) VALUES (${cols.map(c => r[c]).join(', ')});`
+        );
+    }
+    for (const o of objs.filter(o => o.type !== 'table')) out.push(o.sql + ';');
+    return out.join('\n') + '\n';
+  } finally {
+    db.close();
+  }
+}
+
 export function realBackupIo({
   recipient,
   apiUrl,
@@ -133,9 +205,12 @@ export function realBackupIo({
       const out = path.join(tmp, 'd1.sql');
       const r = wr(['d1', 'export', d1Name, '--remote', '--output', out]);
       if (r.status !== 0) throw new Error(`d1 export failed: ${r.stderr || r.stdout}`);
-      const raw = readFileSync(out);
-      log(`D1 ${d1Name} exported: ${raw.length} bytes`);
-      return { raw, tables: assertPlatformTables(await d1Digests(raw.toString('utf8'))) };
+      const exported = readFileSync(out);
+      log(`D1 ${d1Name} exported: ${exported.length} bytes`);
+      const tables = assertPlatformTables(await d1Digests(exported.toString('utf8')));
+      const raw = Buffer.from(normalizeD1Sql(exported.toString('utf8')));
+      log(`D1 export normalized (parents before children, schema first): ${raw.length} bytes`);
+      return { raw, tables };
     },
     async listStoreIds() {
       const r = wr([

@@ -35,6 +35,7 @@ import {
   identityFromKeychain,
   wranglerR2,
   d1Digests,
+  normalizeD1Sql,
 } from './lib/cf-backup-io.mjs';
 import { stripAiBinding, stripImagesBinding } from '../ci/workerd-smoke.mjs';
 
@@ -76,9 +77,13 @@ if (a.extract) {
   });
   mkdirSync(a.extract, { recursive: true });
   for (const [name, buf] of Object.entries(files))
-    writeFileSync(path.join(a.extract, `${name}.${manifest.artifacts[name].ext}`), buf, {
-      mode: 0o600,
-    });
+    writeFileSync(
+      path.join(a.extract, `${name}.${manifest.artifacts[name].ext}`),
+      name === 'd1-ebda-platform' ? Buffer.from(normalizeD1Sql(buf.toString('utf8'))) : buf,
+      {
+        mode: 0o600,
+      }
+    );
   writeFileSync(path.join(a.extract, 'manifest.json'), JSON.stringify(manifest, null, 2));
   console.log(
     `extracted ${Object.keys(files).length} artifact(s) of ${manifest.tier}/${manifest.day} into ${a.extract} (checksums verified)`
@@ -87,6 +92,18 @@ if (a.extract) {
 }
 
 let child = null;
+let bootError = null;
+const logTail = () => {
+  try {
+    return readFileSync(path.join(work, 'wrangler.log'), 'utf8')
+      .split('\n')
+      .slice(-12)
+      .join(' | ')
+      .slice(-900);
+  } catch {
+    return '(no log)';
+  }
+};
 const cleanups = [];
 const stop = () => {
   try {
@@ -135,11 +152,18 @@ function boot(args, cwd, pathname) {
 }
 
 const post = async (p, body, ctype) => {
-  const res = await fetch(base + p, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
-    body,
-  });
+  let res;
+  try {
+    res = await fetch(base + p, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
+      body,
+    });
+  } catch (e) {
+    throw new Error(
+      `${p}: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''} - the local worker is not answering${bootError ? `; it never came up: ${bootError}` : ' (it was never started or has died)'}`
+    );
+  }
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
   return j;
@@ -194,7 +218,7 @@ if (a.target === 'harness') {
   );
   targets.loadD1 = async sql => {
     const f = path.join(work, 'd1.sql');
-    writeFileSync(f, sql);
+    writeFileSync(f, normalizeD1Sql(sql)); // old artifacts (alphabetical, rows interleaved) are made order-safe here too
     const r = spawnSync(
       'npx',
       [
@@ -241,10 +265,22 @@ if (a.target === 'harness') {
     return apiChecksForStore(http, { store, productCount });
   };
   // D1 must exist before the worker boots against it, and DO import needs the worker: load D1 first via a lazy boot hook.
+  // The worker boots whatever the D1 load did: a failed load must not hide every later stage. The load error is rethrown after.
   const loadD1 = targets.loadD1;
   targets.loadD1 = async sql => {
-    const r = await loadD1(sql);
-    await boot(['--config', '.wrangler.drill.jsonc'], API, '/health');
+    let loadErr = null;
+    let r = null;
+    try {
+      r = await loadD1(sql);
+    } catch (e) {
+      loadErr = e;
+    }
+    try {
+      await boot(['--config', '.wrangler.drill.jsonc'], API, '/health');
+    } catch (e) {
+      bootError = `${e.message}; wrangler log tail: ${logTail()}`;
+    }
+    if (loadErr) throw loadErr;
     return r;
   };
 }

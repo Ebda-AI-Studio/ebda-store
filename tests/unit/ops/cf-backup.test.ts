@@ -389,3 +389,87 @@ describe('export robustness (first real run: ECONNRESET after ~2 min, no output)
     expect(notify).toMatch(/NO ALERT SENT/);
   });
 });
+
+describe('D1 export is restorable in any order (first real drill: "no such table: main.stores")', () => {
+  // A real-shaped wrangler export: the REAL platform schema, tables alphabetical with their rows interleaved, so children come first.
+  async function realShapedExport() {
+    const fs = await import('node:fs');
+    const { DatabaseSync } = await import('node:sqlite');
+    const dir = 'packages/cf-schema/migrations/platform';
+    const src = new DatabaseSync(':memory:');
+    for (const f of fs
+      .readdirSync(dir)
+      .filter(n => n.endsWith('.sql'))
+      .sort())
+      src.exec(fs.readFileSync(`${dir}/${f}`, 'utf8'));
+    src.exec(
+      "INSERT INTO stores (id, name, slug, owner_id, storage_backend) VALUES ('s1','S','s','o','do')"
+    );
+    const q = (v: any) =>
+      v === null
+        ? 'NULL'
+        : typeof v === 'number'
+          ? String(v)
+          : `'${String(v).replace(/'/g, "''")}'`;
+    const tables = src
+      .prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+      )
+      .all() as any[];
+    const out: string[] = ['PRAGMA defer_foreign_keys=TRUE;'];
+    for (const t of tables) {
+      out.push(t.sql + ';');
+      for (const r of src.prepare(`SELECT * FROM "${t.name}"`).all() as any[])
+        out.push(
+          `INSERT INTO "${t.name}" (${Object.keys(r)
+            .map(k => `"${k}"`)
+            .join(',')}) VALUES (${Object.values(r).map(q).join(',')});`
+        );
+    }
+    for (const o of src
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type IN ('index','trigger','view') AND sql IS NOT NULL"
+      )
+      .all() as any[])
+      out.push(o.sql + ';');
+    return out.join('\n') + '\n';
+  }
+  it('the raw alphabetical export does not load into a database that enforces foreign keys; the normalized artifact does', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const raw = await realShapedExport();
+    const norm = io.normalizeD1Sql(raw);
+    expect(norm.startsWith('PRAGMA defer_foreign_keys=TRUE;')).toBe(true);
+    // schema first, then rows, then indexes/triggers; parents before children
+    expect(norm.indexOf('CREATE TABLE')).toBeLessThan(norm.indexOf('INSERT INTO'));
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON'); // a restore target that enforces constraints
+    db.exec(norm);
+    expect((db.prepare('SELECT count(*) AS n FROM stores').get() as any).n).toBe(1);
+    // content is preserved and the artifact is stable
+    expect(await io.d1Digests(norm)).toEqual(await io.d1Digests(raw));
+    expect(io.normalizeD1Sql(norm)).toBe(norm);
+  });
+  it('orders parents before children even when the child sorts first, and keeps BLOBs and floats exact', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const raw =
+      "CREATE TABLE a_child (id TEXT PRIMARY KEY, s TEXT REFERENCES stores(id), n REAL, b BLOB);\nINSERT INTO a_child VALUES ('1','x',0.1,X'ff00');\n" +
+      "CREATE TABLE stores (id TEXT PRIMARY KEY);\nINSERT INTO stores VALUES ('x');\n";
+    expect(() => {
+      const d = new DatabaseSync(':memory:');
+      d.exec('PRAGMA foreign_keys = ON');
+      d.exec(raw);
+    }).toThrow(/no such table: main.stores/);
+    const norm = io.normalizeD1Sql(raw);
+    expect(norm.indexOf('CREATE TABLE stores')).toBeLessThan(norm.indexOf('CREATE TABLE a_child'));
+    const d = new DatabaseSync(':memory:');
+    d.exec('PRAGMA foreign_keys = ON');
+    d.exec(norm);
+    const row = d.prepare('SELECT n, hex(b) AS h FROM a_child').get() as any;
+    expect(row.n).toBe(0.1);
+    expect(row.h).toBe('FF00');
+  });
+});
