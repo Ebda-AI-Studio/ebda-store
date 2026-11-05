@@ -264,3 +264,24 @@ describe('BACKUP_EXPORT_SECRET opens only the read-only actions', () => {
     expect((await call('__export', 'POST', secret, {}))!.status).toBe(503);
   });
 });
+
+describe('D1 export loading (first real nightly failed: "no such table: main.stores")', () => {
+  // wrangler d1 export order: tables alphabetical, rows interleaved - a child INSERT before its parent's CREATE TABLE.
+  const dump =
+    "CREATE TABLE a_child (id TEXT PRIMARY KEY, s TEXT REFERENCES stores(id));\nINSERT INTO a_child VALUES ('1','x');\n" +
+    "CREATE TABLE stores (id TEXT PRIMARY KEY);\nINSERT INTO stores VALUES ('x');\n";
+  it('loads a dump whose child rows precede the parent table, and digests both tables', async () => {
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const t = await io.d1Digests(dump);
+    expect(Object.keys(t).sort()).toEqual(['a_child', 'stores']);
+    expect(t.stores.count).toBe(1);
+    expect(() => B.assertPlatformTables(t)).not.toThrow();
+  });
+  it('the guard fails loudly on zero tables or a database without stores', () => {
+    expect(() => B.assertPlatformTables({})).toThrow(/ZERO tables/);
+    expect(() => B.assertPlatformTables({ users: { count: 1, digest: 'd' } })).toThrow(
+      /no `stores` table/
+    );
+  });
+});

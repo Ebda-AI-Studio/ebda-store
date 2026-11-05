@@ -4,7 +4,12 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { digestSqlite, exportStoreOverHttp, decodeKeychainSecret } from './cf-backup.mjs';
+import {
+  assertPlatformTables,
+  digestSqlite,
+  exportStoreOverHttp,
+  decodeKeychainSecret,
+} from './cf-backup.mjs';
 
 export const BUCKET = 'ebda-db-backups';
 
@@ -87,6 +92,10 @@ export function dirR2(root) {
 export async function d1Digests(sqlText) {
   const db = new DatabaseSync(':memory:');
   try {
+    // `wrangler d1 export` writes tables alphabetically with their rows interleaved, so a child's INSERT can precede its parent's
+    // CREATE TABLE. D1 itself defers foreign keys while importing; node:sqlite enforces them by default and fails with
+    // "no such table: main.stores" (the first real nightly run, 2026-11-05). Constraints are a property of the source, not of this read.
+    db.exec('PRAGMA foreign_keys = OFF');
     db.exec(sqlText);
     return await digestSqlite(db);
   } finally {
@@ -105,7 +114,7 @@ export function realBackupIo({ recipient, apiUrl, secret, d1Name = 'ebda-platfor
       const r = wr(['d1', 'export', d1Name, '--remote', '--output', out]);
       if (r.status !== 0) throw new Error(`d1 export failed: ${r.stderr || r.stdout}`);
       const raw = readFileSync(out);
-      return { raw, tables: await d1Digests(raw.toString('utf8')) };
+      return { raw, tables: assertPlatformTables(await d1Digests(raw.toString('utf8'))) };
     },
     async listStoreIds() {
       const r = wr([

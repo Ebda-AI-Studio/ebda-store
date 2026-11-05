@@ -112,6 +112,21 @@ export async function digestSqlite(db) {
   return out;
 }
 
+/**
+ * Guard on the D1 export (a backup of nothing is not a backup): it must hold tables, and `stores`, the directory every store hangs off.
+ * Throws loudly instead of uploading an empty or wrong database.
+ */
+export function assertPlatformTables(tables) {
+  const names = Object.keys(tables ?? {});
+  if (names.length === 0)
+    throw new Error('D1 export has ZERO tables: refusing to back up an empty database');
+  if (!tables.stores)
+    throw new Error(
+      `D1 export has no \`stores\` table (found: ${names.slice(0, 8).join(', ')}): wrong or empty database`
+    );
+  return tables;
+}
+
 export const EXPORT_PAGE_ROWS = 2000;
 
 /**
