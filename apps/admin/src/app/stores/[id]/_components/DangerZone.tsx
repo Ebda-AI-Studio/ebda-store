@@ -4,7 +4,6 @@ import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 
 interface DangerZoneProps {
-  isDeleting: boolean;
   onRequestDelete: () => void;
   /** Store status; suspend / activate sits here, away from the everyday actions (UX:D-4). */
   status: string;
@@ -16,7 +15,6 @@ interface DangerZoneProps {
 // Visually distinct red-bordered card. Rendered only for super_admin
 // (the parent enforces that), so store admins never see it.
 export function DangerZone({
-  isDeleting,
   onRequestDelete,
   status,
   isChangingStatus,
@@ -61,12 +59,7 @@ export function DangerZone({
             </ul>
           </div>
           <div className="shrink-0">
-            <Button
-              variant="destructive"
-              onClick={onRequestDelete}
-              disabled={isDeleting}
-              aria-disabled={isDeleting}
-            >
+            <Button variant="destructive" className="min-h-11" onClick={onRequestDelete}>
               {t('deleteButton')}
             </Button>
           </div>
