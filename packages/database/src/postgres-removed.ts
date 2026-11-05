@@ -50,3 +50,16 @@ export function createPostgresRemovedClient(
   };
   return new Proxy({}, handler) as unknown as AppPrismaClient;
 }
+
+/** Who reached the removed client: the cron job / queue / job id (reach label) and the first 8 stack frames. */
+export function postgresRemovedWhere(
+  err: Error,
+  label: string | undefined
+): { caller: string; frames: string[] } {
+  const frames = (err.stack ?? '')
+    .split('\n')
+    .filter(l => /^\s+at /.test(l))
+    .slice(0, 8)
+    .map(l => l.trim());
+  return { caller: label ?? '(request or unlabelled path)', frames };
+}

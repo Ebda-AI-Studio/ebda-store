@@ -8,6 +8,7 @@
 import crypto from 'crypto';
 import { Prisma, runInTenantContext, prisma } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
+import { postgresRemovedOnThisWorker } from './postgres-present';
 import { deleteUserPasskeys, deleteUserTokens } from './definer';
 import logger from './logger';
 import { sendAlert } from '../services/alerts.service';
@@ -28,7 +29,14 @@ export const isPgCopyScrub = (v: unknown): v is PgCopyScrubMessage =>
 export async function scrubPgCustomerCopy(
   userId: string,
   storeId: string
-): Promise<{ scrubbed: boolean }> {
+): Promise<{ scrubbed: boolean; skipped?: 'postgres-removed' }> {
+  if (postgresRemovedOnThisWorker()) {
+    logger.info(
+      { userId, storeId },
+      '[customer-erase] no Postgres on this Worker: nothing to scrub'
+    );
+    return { scrubbed: false, skipped: 'postgres-removed' };
+  }
   return runInTenantContext(
     storeId,
     async () => {

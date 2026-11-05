@@ -18,6 +18,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
 import ALL_ROUTES from './route-table.json';
+import ALL_CRONS from './cron-list.json';
 
 const ROUTES: string[] = ALL_ROUTES as string[];
 
@@ -656,7 +657,8 @@ describe.skipIf(e.E2E_DB === '1')(
         const api = e.API as unknown as {
           scheduled?(o: { cron: string; scheduledTime?: Date }): Promise<{ outcome: string }>;
         };
-        const crons = ['0 * * * *', '*/15 * * * *', '*/30 * * * *', '0 */12 * * *', '0 3 * * *'];
+        // EVERY Cron Trigger in wrangler.jsonc (tests/unit/sweep-cron-list.test.ts pins this file to it), not a sample.
+        const crons: string[] = ALL_CRONS;
         // Every access to the Postgres client from here on is counted by the Worker (DEV_STATS=1; packages/database
         // request-db.ts `postgresReaches`). A job that catches its own error still shows up here.
         const pgReaches = async (reset: boolean) =>
@@ -713,6 +715,15 @@ describe.skipIf(e.E2E_DB === '1')(
           // eslint-disable-next-line no-console
           console.log('SWEEP_RESULT ' + JSON.stringify(r));
         }
+        // Every cron-triggered job BODY and the Postgres-adjacent queue messages (pg-copy-scrub), run through the consumers' own
+        // guard: a cron only STARTS most jobs (queue/workflow), so the bodies are driven here. Reaches are counted below.
+        const ran = await e.API.fetch('https://api.ebda.app/__dev/run-jobs', {
+          method: 'POST',
+          headers: { 'x-forwarded-for': freshIp() },
+        });
+        expect(ran.status, 'the dev run-jobs endpoint answered').toBe(200);
+        // eslint-disable-next-line no-console
+        console.log('SWEEP_JOBS_RAN ' + JSON.stringify(await ran.json()));
         const report = await bucket.get(`ops-reports/backup-sweep/${day(new Date())}.json`);
         const backup = report
           ? (JSON.parse(await report.text()) as {
