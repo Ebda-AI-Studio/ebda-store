@@ -9,8 +9,8 @@ import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/secur
 import { PWAService, generatePwaIconSet } from '../services/pwa.service';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { tenantContext } from '../middleware/tenant-context';
-import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import { storeDb } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -195,7 +195,9 @@ router.post(
       if (dims.width !== dims.height) throw iconError('ICON_NOT_SQUARE', dims);
       if (dims.width < MIN_ICON_DIMENSION) throw iconError('ICON_TOO_SMALL', dims);
 
-      const previous = await prisma.store.findUnique({
+      const previous = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { pwaSettings: true },
       });

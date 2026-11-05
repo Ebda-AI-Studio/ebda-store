@@ -80,7 +80,7 @@ Collections: there is no `Collection` model; the storefront's collection surface
 
 ### Settings copy: every Store write is routed (PR D1c, Ruling CF-WRITES-3)
 
-The cutover gate of CF-WRITES-2 is closed. The 39 direct `store.update` / `updateMany` calls and 4 raw `UPDATE stores ... jsonb_set` writes now go through `storeUpdate` / `storeUpdateMany` / `syncStoreFields` (`lib/repo-factory.ts`) or `updateStoreThrough` (`StoreService`). `tests/unit/store-settings-routed.test.ts` walks `apps/api/src` with the TypeScript AST and fails on a new direct write; the only allow-listed file is `lib/repo-factory.ts` (it holds the helpers' own call). A relation write (`credentials`) is directory-only in the copy.
+The cutover gate of CF-WRITES-2 is closed. The 39 direct `store.update` / `updateMany` calls and 4 raw `UPDATE stores ... jsonb_set` writes now go through `storeUpdate` / `storeUpdateMany` (`lib/repo-factory.ts`) or `updateStoreThrough` (`StoreService`). `tests/unit/store-settings-routed.test.ts` walks `apps/api/src` with the TypeScript AST and fails on a new direct write; the only allow-listed file is `lib/repo-factory.ts` (it holds the helpers' own call). A relation write (`credentials`) is directory-only in the copy.
 
 ```ts
 await storeUpdate(tx, { where: { id: storeId }, data: { pwaEnabled } }); // authoritative write on YOUR client, then the DO copy
@@ -88,7 +88,9 @@ await storeUpdateMany(tx, {
   where: { id: storeId, pendingDomain },
   data: { domainStatus: 'failed' },
 }); // copies only if a row matched
-await syncStoreFields(storeId, ['settings']); // after a raw jsonb_set: re-read, copy the whole value
+// a raw jsonb_set on a Postgres store (N-19, `syncStoreFields` is gone): `UPDATE ... RETURNING settings`, then
+await copyStoreSettings(storeId, { settings: returned }); // the whole resulting value, never a re-read
+// a D1 + DO store never runs raw SQL: read-merge at write time, then storeUpdate with the whole `settings` value
 ```
 
 ## Stock and inventory on the DO (PR D2a, Ruling CF-STOCK-1)
@@ -122,15 +124,17 @@ if (money) return doPath(await money.loyaltyEarn({ customerId, orderId, featureE
 
 The twin of the stock operations: `StoreDO.moneyOp` -> `answerMoneyOp` -> `runMoneyOp` (`packages/repo/src/do/money-ops.ts`), one named operation = one `transactionSync` section, optional idempotency key as a marker row in the same section (`_money_ops`, shared discipline `do/keyed-op.ts`), a refusal is an answer. Money never moves through `mutate`. External money facts are recorded in full (a reversal after the customer spent the points reverses what the balance holds and still records the full row); they are never rejected.
 
-| Operation                                                    | Service call that uses it                                                       | Caller                                                      |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `loyaltyEarn`                                                | `LoyaltyService.earnPointsFromPurchase`                                         | `order-status-changed` fanout (delivered)                   |
-| `loyaltyReverseEarned`, `loyaltyReverseRedeemed`             | `LoyaltyService.reverseEarnedPointsFromOrder`, `reverseRedeemedPointsFromOrder` | `order-refunded` fanout                                     |
-| `loyaltyAward`                                               | `LoyaltyService.awardBonusPoints` (manual award)                                | admin `POST .../loyalty/members/:id/award`                  |
-| `loyaltyInit`, `loyaltyReviewBonus`                          | `LoyaltyService.initializeCustomerPoints`, `awardReviewBonus`                   | storefront join, review approval                            |
-| `loyaltyCustomerPoints`, `loyaltyHistory`                    | `LoyaltyService.getCustomerPoints`, `getTransactionHistory`                     | storefront my-points / my-transactions, admin member detail |
-| `loyaltyMembers`, `loyaltyStats`, `loyaltyStoreTransactions` | `LoyaltyService.listMembers`, `getStats`, `listStoreTransactions`               | admin members, stats and transactions pages                 |
-| `loyaltyImport`                                              | one-off migration of Postgres-only ledger rows (Ruling FP-2)                    | `docs/cf/loyalty-do-migration.md`                           |
+| Operation                                                    | Service call that uses it                                                                    | Caller                                                      |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `loyaltyEarn`                                                | `LoyaltyService.earnPointsFromPurchase`                                                      | `order-status-changed` fanout (delivered)                   |
+| `loyaltyReverseEarned`, `loyaltyReverseRedeemed`             | `LoyaltyService.reverseEarnedPointsFromOrder`, `reverseRedeemedPointsFromOrder`              | `order-refunded` fanout                                     |
+| `loyaltyAward`                                               | `LoyaltyService.awardBonusPoints` (manual award)                                             | admin `POST .../loyalty/members/:id/award`                  |
+| `loyaltyInit`, `loyaltyReviewBonus`                          | `LoyaltyService.initializeCustomerPoints`, `awardReviewBonus`                                | storefront join, review approval                            |
+| `loyaltyCustomerPoints`, `loyaltyHistory`                    | `LoyaltyService.getCustomerPoints`, `getTransactionHistory`                                  | storefront my-points / my-transactions, admin member detail |
+| `loyaltyExpire`, `loyaltyBirthdays`                          | `LoyaltyAutomationService.processPointExpiration`, `processBirthdayBonuses` (Ruling NZ-PG-7) | the daily loyalty cron                                      |
+| `vectorStatus`                                               | `storeIndexStatus` (search-insights index line, Ruling NZ-PG-7)                              | `GET /:storeId/search-insights`                             |
+| `loyaltyMembers`, `loyaltyStats`, `loyaltyStoreTransactions` | `LoyaltyService.listMembers`, `getStats`, `listStoreTransactions`                            | admin members, stats and transactions pages                 |
+| `loyaltyImport`                                              | one-off migration of Postgres-only ledger rows (Ruling FP-2)                                 | `docs/cf/loyalty-do-migration.md`                           |
 
 Admin fix pass L-1 (Ruling FP-2): before it, `awardBonusPoints`, `listMembers`, `getCustomerPoints`, `getTransactionHistory`, `getStats` and the admin store-level transaction log read and wrote Postgres only, so on a `storage_backend = 'do'` store the admin pages showed nothing that was earned and a manual award landed where the DO redeem never looked. They now branch on `storeMoney(storeId)` exactly like earn. Response shapes are unchanged (rows keep the Prisma field names; epoch-ms timestamps become `Date`). The customer name and email still come from Postgres `users` (identity is not in the StoreDO), joined in the service and scoped to the store's customer accounts (SEC-CUSTOMER-SCOPE-1). A DO store with no `store_config` row has loyalty off: every op answers `LOYALTY_DISABLED` (400) or empty.
 
@@ -176,3 +180,13 @@ Until D2 lands, flipping a store to `do` would serve its moved reads and writes 
 Eleven models join `DO_WRITABLE_MODELS` / `WritableModel` for the non-money background jobs (Ruling CF-JOBS-4): `BulkAiJob`, `BulkImportJob`, `StoreFaq`, `StoreHowto`, `AiRecommendation`, `FrequentlyBoughtTogether`, `ProfitAnomaly`, `CustomerCohortSnapshot`, `FunnelSnapshot`, `CustomerRfmSnapshot`, `AnswerEngineCheck`. Their routes and services read through `storeDb` and write through `storeWriter` (the bulk job endpoints in `routes/ai.routes.ts` / `routes/bulk.routes.ts`, the FAQ / how-to admin in `routes/store.routes.ts`, the recommendation reads, the insights and answer-engine dashboards). One more in-DO procedure, `guardedAiWrite` (the guarded AI product write: fresh re-read, per-field compare-and-set, `human` stamps kept), and two money-client ops, `accountTotals` and `ciOrderStamp`. `tests/unit/do-writable-direct-readers.test.ts` keeps every direct reader of these models off Postgres.
 
 Five more models join `DO_WRITABLE_MODELS` / `WritableModel` (Ruling INTEG-1): `CatalogImportJob`, `CatalogImportFile`, `CatalogImportItem` (catalogue import) and `CiHintLog`, `CiStoreGate` (Customer Intelligence hints). Their services and jobs read through `storeDb` and write through `storeWriter`; the variants of an imported draft product use the DO op `importBatch`. `tests/unit/integ-1-on-do.test.ts` proves each flow on the DO path with a double-fire case.
+
+## Request scope of a Durable Object store (NEON-ZERO-1, Ruling NZ-SF-1)
+
+`tenantContext` (admin `/stores/:storeId/*` and the storefront GET lane of `publicStoreContext`) and `readInStoreContext` read the
+store's backend through `storeRepo` (the per-request memo) before opening anything. A `do` store runs the request in
+`runInStoreScope`: no Postgres client is leased and no BEGIN is issued, the tenant guard still sees the store, and a model that is
+not ported yet runs as a per-query short transaction (loud when Postgres is down). A `pg` store keeps its one request transaction.
+`inDoStoreScope(storeId, fn)` gives a handler that resolved its own store the same scope for its several reads and is a plain call
+for a Postgres store. With the platform D1 bound, `backendFor` answers 404 `STORE_NOT_FOUND` for an id the directory does not hold
+(Ruling NZ-SF-2) and `resolveStoreId` (host -> store) reads that directory. Proof: `apps/api/workers-test/pg-unreachable.test.ts`.

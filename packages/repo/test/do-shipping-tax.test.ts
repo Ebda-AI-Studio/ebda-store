@@ -29,7 +29,10 @@ vi.mock('@ebda/database', () => ({ prisma: {}, Prisma: {} }));
 vi.mock('../../../apps/api/src/middleware/error-handler', () => ({
   AppError: class extends Error {},
 }));
-vi.mock('@ebda/shared', async () => await import('../../shared/src/commerce/delivery-window'));
+vi.mock('@ebda/shared', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ...(await import('../../shared/src/commerce/delivery-window')),
+}));
 
 function rng(seed: number) {
   let a = seed;

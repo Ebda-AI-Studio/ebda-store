@@ -3,7 +3,10 @@ import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
-import { asPlatformOperator, prisma, withStore } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
+import { asOperator, platformHubOnD1 } from '../lib/platform-scope';
+import { getAccountsBrief } from '../lib/identity-client';
+import { storeDb } from '../lib/repo-factory';
 import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
@@ -56,11 +59,13 @@ router.get(
 
       const users =
         uniqueUserIds.length > 0
-          ? await asPlatformOperator(req.user!.userId, () =>
-              prisma.user.findMany({
-                where: { id: { in: uniqueUserIds } },
-                select: { id: true, firstName: true, lastName: true },
-              })
+          ? await asOperator(req.user!.userId, async () =>
+              (await platformHubOnD1())
+                ? getAccountsBrief(uniqueUserIds)
+                : prisma.user.findMany({
+                    where: { id: { in: uniqueUserIds } },
+                    select: { id: true, firstName: true, lastName: true },
+                  })
             )
           : [];
 
@@ -310,8 +315,11 @@ router.put(
       }
 
       // Capture previous plan so the audit row shows from → to.
-      const prev = await withStore(req.params.id, tx =>
-        tx.store.findUnique({ where: { id: req.params.id }, select: { plan: true } })
+      const prev = await withStore(req.params.id, async () =>
+        (await storeDb(req.params.id)).store.findUnique({
+          where: { id: req.params.id },
+          select: { plan: true },
+        })
       );
 
       const features = await featureService.setStorePlan(

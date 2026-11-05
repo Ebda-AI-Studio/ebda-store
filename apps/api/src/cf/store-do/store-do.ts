@@ -33,11 +33,16 @@ import {
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
+  bootstrapStoreRows,
   readStoreRecord,
   encodeRpc,
   decodeRpc,
   ensureStockOpsSchema,
   type StockAnswer,
+  answerAuthOp,
+  ensureCustomerAuthSchema,
+  purgeCustomerAuth,
+  type AuthAnswer,
   ensureIdempotencySchema,
   ensurePaymentSchema,
   scrubReceiptsForOrders,
@@ -74,6 +79,11 @@ import type { Subject } from '../erasure/types';
 import { eraseMerchantAtomically } from '../erasure/merchant-anonymise';
 import {
   buildBackup,
+  buildCustomerAuthBackup,
+  dumpCustomerAuth,
+  loadCustomerAuth,
+  readCustomerAuthBackup,
+  CUSTOMER_AUTH_FILE,
   dumpTables,
   loadBackup,
   sha256Hex,
@@ -122,6 +132,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureIdempotencySchema(doSqlRunner(ctx.storage));
       ensureStockOpsSchema(this.sync);
       ensureMoneyOpsSchema(this.sync);
+      ensureCustomerAuthSchema(this.sync);
     });
   }
 
@@ -131,15 +142,51 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    */
   async fetch(request: Request): Promise<Response> {
     // A closed store's data is a retained legal record: the cutover surface may not import into it or WIPE it (__unseal).
-    if (isStoreClosed(this.sync) && /\/__(import|unseal)\b/.test(new URL(request.url).pathname))
+    if (
+      isStoreClosed(this.sync) &&
+      /\/__(import|unseal|analytics)\b/.test(new URL(request.url).pathname)
+    )
       return new Response(JSON.stringify({ ok: false, code: 'STORE_CLOSED' }), {
         status: 423,
         headers: { 'content-type': 'application/json' },
       });
+    // Ruling NZ-AN-1: the per-store analytics copy. Three named ops only, never a free op name; bound to the store in the URL.
+    const copy = /^\/cutover\/stores\/([^/]+)\/__analytics$/.exec(new URL(request.url).pathname);
+    if (copy) return this.analyticsCopy(copy[1], request);
     return handleStoreAdmin(request, {
       sql: this.ctx.storage.sql as never,
       transactionSync: fn => this.ctx.storage.transactionSync(fn),
     });
+  }
+
+  /** `__analytics`: {op, args} for analyticsImportStatus / analyticsImport / analyticsImportFinish (bearer-checked in cf/cutover.ts). */
+  private async analyticsCopy(storeId: string, request: Request): Promise<Response> {
+    const reply = (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    let body: { op?: unknown; args?: unknown };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return reply({ ok: false, code: 'BAD_JSON' }, 400);
+    }
+    const ALLOWED = [
+      'analyticsImportStatus',
+      'analyticsImport',
+      'analyticsImportFinish',
+      'analyticsImportReset',
+    ];
+    if (typeof body.op !== 'string' || !ALLOWED.includes(body.op))
+      return reply({ ok: false, code: 'OP_NOT_ALLOWED' }, 400);
+    try {
+      this.bind(storeId);
+    } catch {
+      return reply({ ok: false, code: 'STORE_MISMATCH' }, 403);
+    }
+    const a = answerMoneyOp(this.sync, storeId, body.op, JSON.stringify(body.args ?? {}));
+    return reply(a, a.ok ? 200 : (a.status ?? 400));
   }
 
   /** Schema version this instance runs (the id of the last applied migration). */
@@ -297,6 +344,27 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /**
+   * Storefront CUSTOMER authentication (NEON-ZERO-1 N-9, Ruling NZ-A3): one named operation = one synchronous section over the
+   * `_cauth_*` tables (packages/repo/src/do/customer-auth.ts). The password compare runs in the API Worker (bcrypt cost 12 would starve the single-threaded DO); the DO hands the hash only to that
+   * Worker over this stub. A refusal is an ANSWER. A closed store refuses everything but reads of state.
+   */
+  async authOp(storeId: string, op: string, argsJson: string): Promise<AuthAnswer> {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    if (
+      isStoreClosed(this.sync) &&
+      !/^(userState|getProfile|exportCustomer|exportRowsPage|counts|isLive)$/.test(op)
+    )
+      return { ok: false, code: 'STORE_CLOSED', status: 410, message: 'store is closed' };
+    return answerAuthOp(this.sync, op, argsJson);
+  }
+
+  /**
    * The settings copy (Ruling CF-WRITES-2): the API writes the authoritative `Store` row first, then sends the changed
    * fields here as an RPC JSON string. Applied to `store_profile` / `store_config`; D1-only fields are reported, not stored.
    */
@@ -317,6 +385,35 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
       const err = e as { code?: string };
       return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  /**
+   * First-time bootstrap of a store created on this DO (N-18, Ruling NZ-D11): `store_profile` + `store_config` + the inactive
+   * default VAT rate. Idempotent (a retry converges). The API wrote the D1 directory row first.
+   */
+  async bootstrapStore(
+    storeId: string,
+    inputJson: string
+  ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
+    try {
+      this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const input = decodeRpc<{
+        identity: { name: string; slug: string; ownerId: string };
+        fields: Record<string, unknown>;
+        vat?: { id: string; name: string; nameAr: string; rate: number };
+        cod?: { id: string; name: string; nameAr: string; currency: string };
+      }>(inputJson);
+      return {
+        ok: true,
+        data: bootstrapStoreRows(doSqlRunner(this.ctx.storage), meta, storeId, input),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'BOOTSTRAP_REFUSED', status: 409 };
     }
   }
 
@@ -414,10 +511,19 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     const r2 = this.bucket();
     if (!r2) throw new Error('STORE_BACKUPS binding missing');
     const dump = dumpTables(this.ctx.storage.sql); // sync read: consistent snapshot
+    const authDump = dumpCustomerAuth(this.ctx.storage.sql); // same turn: the same snapshot
     const { manifest, files } = await buildBackup(storeId, dump);
+    // Customer credentials (N-9, Ruling NZ-N9-3): ENCRYPTED, or the backup FAILS (loudly, before a manifest is written).
+    // A plaintext fallback does not exist: a store with customer accounts and no key is a failed night, not a silent skip.
+    const ca = await buildCustomerAuthBackup(
+      authDump,
+      this.env.CUSTOMER_AUTH_BACKUP_KEY as string | undefined
+    );
+    if (ca) manifest.customerAuth = ca.entry;
     const day = manifest.takenAt.slice(0, 10);
     for (const [name, body] of Object.entries(files))
       await r2.put(backupKey(storeId, day, name), body);
+    if (ca) await r2.put(backupKey(storeId, day, CUSTOMER_AUTH_FILE), ca.blob);
     // The manifest goes last: a day folder without one is an incomplete backup and must be ignored.
     await r2.put(backupKey(storeId, day, 'manifest.json'), JSON.stringify(manifest, null, 2));
     // Read-back (rule N11): a backup that is not read back is not a backup.
@@ -432,6 +538,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         purgeErasureLedger(this.sync);
       } catch (err) {
         console.error('erasure ledger purge failed', err);
+      }
+      // Customer-auth retention (N-9): expired / used tokens and long-revoked refresh rows.
+      try {
+        purgeCustomerAuth(this.sync);
+      } catch (err) {
+        console.error('customer auth purge failed', err);
       }
       const storeId = this.boundStoreId();
       if (storeId) await this.backupNow(storeId);
@@ -482,7 +594,20 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     for (const t of live)
       if (this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM "${t}"`).one().n !== 0)
         throw new Error('restore target must be empty');
-    this.ctx.storage.transactionSync(() => loadBackup(this.ctx.storage.sql, files, tables));
+    let authDump: Awaited<ReturnType<typeof readCustomerAuthBackup>> | undefined;
+    if (manifest.customerAuth) {
+      const cf = await r2.get(backupKey(sourceStoreId, day, manifest.customerAuth.file));
+      if (!cf) throw new Error(`missing ${manifest.customerAuth.file}`);
+      authDump = await readCustomerAuthBackup(
+        await cf.text(),
+        manifest.customerAuth,
+        this.env.CUSTOMER_AUTH_BACKUP_KEY as string | undefined
+      );
+    }
+    this.ctx.storage.transactionSync(() => {
+      loadBackup(this.ctx.storage.sql, files, tables);
+      if (authDump) loadCustomerAuth(this.ctx.storage.sql, authDump);
+    });
     // Re-export the restored DO with the same canonical serialization and compare to the manifest.
     const again = await buildBackup(sourceStoreId, dumpTables(this.ctx.storage.sql));
     const out: Record<string, { rows: number; sha256: string; ok: boolean }> = {};

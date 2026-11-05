@@ -32,11 +32,13 @@
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
+import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import {
   afterTenantTxCommit,
   afterTxCommit,
+  currentStoreId,
   prisma,
   withStore,
   type AppPrismaClient,
@@ -77,6 +79,11 @@ export type StoreReads = {
 
 /** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
 export type WritableModel =
+  | 'paymentConfig'
+  | 'shippingCarrierConfig'
+  | 'storeTaxProfile'
+  | 'taxRate'
+  | 'storeTaxDocument'
   | 'product'
   | 'productVariant'
   | 'productOption'
@@ -123,11 +130,35 @@ export type WritableModel =
   | 'customerRfmSnapshot'
   | 'answerEngineCheck'
   | 'shipment'
+  | 'shippingZone'
+  | 'shippingAreaRate'
+  | 'reorderSuggestion'
+  | 'supplier'
   | 'catalogImportJob'
   | 'catalogImportFile'
   | 'catalogImportItem'
   | 'ciHintLog'
-  | 'ciStoreGate';
+  | 'ciStoreGate'
+  | 'searchQueryDaily'
+  | 'productDailyView'
+  | 'qrScanDaily'
+  | 'notificationLog'
+  | 'gscDailyMetric'
+  | 'wishlist'
+  | 'wishlistItem'
+  | 'bundle'
+  | 'bundleItem'
+  | 'auditLog'
+  | 'customerGroup'
+  | 'address'
+  | 'customerAddress'
+  | 'coupon'
+  | 'promotion'
+  | 'wholesaleApplication'
+  | 'productModel'
+  | 'productModelBinding'
+  | 'storeWhatsAppLink'
+  | 'goldRateSettings';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -406,6 +437,18 @@ export interface MoneyClient {
     a: { customerId: string; productId: string; reviewId: string; featureEnabled: boolean },
     key?: string
   ): Promise<{ awarded: boolean; points: number }>;
+  loyaltyBirthdays(a: {
+    month: number;
+    day: number;
+    yearStart: number;
+    featureEnabled: boolean;
+  }): Promise<{ awarded: number; points: number }>;
+  loyaltyExpire(a: { after?: string | null; limit?: number }): Promise<{
+    members: number;
+    expired: number;
+    last: string | null;
+    more: boolean;
+  }>;
   loyaltyCustomerPoints(a: {
     customerId: string;
     featureEnabled: boolean;
@@ -733,12 +776,127 @@ export interface MoneyClient {
   }): Promise<{ recorded: true }>;
   /** The payment-abandonment stamp: once, only while the order is unpaid and unstamped. */
   abandonStamp(a: { orderId: string }): Promise<{ stamped: boolean }>;
+  /** COD mark-paid (single and bulk) in ONE section; skips paid / cancelled / refunded / non-COD orders (Ruling NZ-A-2). */
+  codMarkPaid(a: { orderIds: string[] }): Promise<{
+    updated: Array<{ orderId: string; paymentId: string; fromStatus: string; orderNumber: string }>;
+  }>;
   /** Stamp an order once for a job (`reviewRequestSentAt`): false when an earlier run already did (Ruling CF-JOBS-4). */
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** Per-store analytics counters and reads on the DO (Ruling NZ-AN-1). */
+  searchLogRecord(a: {
+    dayMs: number;
+    term: string;
+    count: number;
+    zero: number;
+    cap: number;
+  }): Promise<{ counted: boolean }>;
+  searchLogPurge(a: { cutoffMs: number }): Promise<{ deleted: number }>;
+  searchInsights(a: {
+    sinceMs: number;
+    minShown: number;
+    zeroOnly: boolean;
+    limit?: number;
+  }): Promise<{
+    totals: { searches: number; zero: number };
+    terms: Array<{
+      term: string;
+      searches: number;
+      zero_results: number;
+      last_result_count: number;
+    }>;
+  }>;
+  qrScanRecord(a: {
+    dayMs: number;
+    kind: string;
+    ref: string;
+    pruneBeforeMs?: number;
+  }): Promise<{ counted: true }>;
+  viewRecord(a: { dayMs: number; productId: string }): Promise<{ counted: true }>;
+  /** Merchant analytics reads on the DO (analytics-reads.ts); the Postgres twins are raw SQL in analytics.service.ts. */
+  analyticsPeriod(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    revenue: number;
+    orders: number;
+    customers: number;
+    profit: number | null;
+    costedLines: number;
+    missingLines: number;
+    missingRevenue: number;
+  }>;
+  analyticsSales(a: {
+    startMs: number;
+    endMs: number;
+    offsetMinutes: number;
+    granularity: 'day' | 'week' | 'month';
+  }): Promise<Array<{ key: string; revenue: number; orders: number }>>;
+  analyticsItems(
+    a:
+      | { by: 'product'; startMs: number; endMs: number; nonRevenue: string[]; limit?: number }
+      | { by: 'priceSource'; startMs: number; endMs: number; nonRevenue: string[] }
+  ): Promise<
+    Array<{
+      productId?: string;
+      priceSource?: string | null;
+      priceGroupApplied?: boolean | null;
+      quantity: number;
+      total: number;
+    }>
+  >;
+  analyticsOrdersBy(a: {
+    by: 'status' | 'paymentStatus';
+    startMs: number;
+    endMs: number;
+    nonRevenue?: string[];
+  }): Promise<Array<{ key: string; count: number; total: number }>>;
+  analyticsCustomers(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    newCustomers: number;
+    returningCustomers: number;
+    top: Array<{ customerId: string | null; total: number; count: number }>;
+  }>;
+  analyticsStock(a: Record<string, never>): Promise<{
+    stockValue: number;
+    backorderCount: number;
+    backorderValue: number;
+  }>;
+  analyticsCashflow(a: {
+    fromMs: number;
+    toMs: number;
+  }): Promise<Array<{ dayMs: number; net: number }>>;
+  analyticsLowStock(a: { threshold: number }): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      sku: string | null;
+      inventory: number;
+      imageUrl: string | null;
+    }>
+  >;
+  analyticsImportStatus(a: Record<string, never>): Promise<{
+    done: boolean;
+    batches: number;
+    tables: Record<string, { rows: number; sums: Record<string, number> }>;
+  }>;
+  analyticsImport(a: {
+    batchId: string;
+    table: string;
+    rows: Array<Record<string, unknown>>;
+  }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportReset(a: {
+    confirm: string;
+  }): Promise<{ reset: true; deleted: Record<string, number> }>;
+  analyticsImportFinish(a: {
+    expect: Record<string, { rows: number; sums: Record<string, number> }>;
+  }): Promise<{ done: true; tables: Record<string, number> }>;
   /** True while any indexable product still needs a vector. */
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
+  vectorStatus(a: Record<string, never>): Promise<{
+    products: number;
+    indexed: number;
+    stale: number;
+    failed: number;
+  }>;
   /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
   vectorVisible(a: { ids: string[] }): Promise<{ ids: string[] }>;
   /** An expense's status step: approve (draft/pending), post (approved) or reject, one conditional UPDATE (Ruling CF-EXP-1). */
@@ -1116,7 +1274,11 @@ interface QueryStub {
   >;
   mutate(
     storeId: string,
-    m: { key?: string; ops: Array<{ model: string; op: string; args?: Record<string, unknown> }> }
+    m: {
+      key?: string;
+      actorRole?: string;
+      ops: Array<{ model: string; op: string; args?: Record<string, unknown> }>;
+    }
   ): Promise<
     { ok: true; json: string } | { ok: false; code: string; message: string; json?: string }
   >;
@@ -1186,6 +1348,8 @@ export function makeMoneyClient(
     loyaltyAward: (a, key) => call('loyaltyAward', a, key),
     loyaltyInit: (a, key) => call('loyaltyInit', a, key),
     loyaltyReviewBonus: (a, key) => call('loyaltyReviewBonus', a, key),
+    loyaltyBirthdays: a => call('loyaltyBirthdays', a),
+    loyaltyExpire: a => call('loyaltyExpire', a),
     loyaltyCustomerPoints: a => call('loyaltyCustomerPoints', a),
     loyaltyHistory: a => call('loyaltyHistory', a),
     loyaltyMembers: a => call('loyaltyMembers', a),
@@ -1230,12 +1394,31 @@ export function makeMoneyClient(
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
     paymentEventRecord: a => call('paymentEventRecord', a),
     abandonStamp: a => call('abandonStamp', a),
+    codMarkPaid: a => call('codMarkPaid', a),
     trialBalance: () => call('trialBalance', {}),
     orderStamp: a => call('orderStamp', a),
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    searchLogRecord: a => call('searchLogRecord', a),
+    searchLogPurge: a => call('searchLogPurge', a),
+    searchInsights: a => call('searchInsights', a),
+    qrScanRecord: a => call('qrScanRecord', a),
+    viewRecord: a => call('viewRecord', a),
+    analyticsImportStatus: a => call('analyticsImportStatus', a),
+    analyticsImport: a => call('analyticsImport', a),
+    analyticsImportFinish: a => call('analyticsImportFinish', a),
+    analyticsPeriod: a => call('analyticsPeriod', a),
+    analyticsSales: a => call('analyticsSales', a),
+    analyticsItems: a => call('analyticsItems', a),
+    analyticsOrdersBy: a => call('analyticsOrdersBy', a),
+    analyticsCustomers: a => call('analyticsCustomers', a),
+    analyticsLowStock: a => call('analyticsLowStock', a),
+    analyticsStock: a => call('analyticsStock', a),
+    analyticsCashflow: a => call('analyticsCashflow', a),
+    analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
+    vectorStatus: a => call('vectorStatus', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),
     vectorCommit: a => call('vectorCommit', a),
@@ -1380,10 +1563,19 @@ async function doClients(
       createDoClient(send as never) as unknown as StoreReads,
       doStoreDelegate(storeId, stub, decodeRpc as never)
     ),
-    writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
+    writer: createDoClient(send as never, m =>
+      // the caller's role, from the verified token of THIS request (the DO's tax-profile review guard reads it)
+      stub.mutate(storeId, { ...m, actorRole: currentActorRole() })
+    ) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
   };
+}
+
+/** The authenticated role of the current request, or undefined outside one (jobs, crons: never a super_admin). */
+function currentActorRole(): string | undefined {
+  const role = (scopes.getStore()?.req as { user?: { role?: unknown } } | undefined)?.user?.role;
+  return typeof role === 'string' ? role : undefined;
 }
 
 /** The DO read client plus the split-aware `store` delegate (the DO tables have no `Store`). */
@@ -1393,8 +1585,72 @@ function withStoreDelegate(base: StoreReads, store: object): StoreReads {
   }) as StoreReads;
 }
 
-/** pg writer: the `prisma` proxy, minus the DO-only second argument of `$transaction`. */
-function pgWriter(): StoreWrites {
+/**
+ * True ONLY when there is definitely no ambient store scope (no request transaction, `withStore` or `runInStoreScope`): then a
+ * Postgres store's model call must open its own. With an ambient scope the call is made as-is: for the same store it is the
+ * request's own atomic scope, for ANOTHER store the tenant guard must still refuse it (a service handed a foreign store id from
+ * inside store B's scope is a cross-tenant call, never silently re-scoped). Any other answer (the helper unavailable, a mocked
+ * module) also means "call as-is", which is the behaviour before the scoped client existed.
+ */
+const STORE_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function needsOwnScope(): boolean {
+  try {
+    currentStoreId();
+    return false;
+  } catch (e) {
+    return e instanceof Error && /no ambient store/.test(e.message);
+  }
+}
+
+/**
+ * One model call made with no ambient store scope. It stays UNSTARTED (like a PrismaPromise): awaited, it runs in its own short
+ * `withStore(storeId, ...)`; handed to `$transaction([ ...ops ])`, the whole array is built and run inside ONE `withStore` so the
+ * batch is still atomic and still tenant-scoped.
+ */
+class ScopedCall implements PromiseLike<unknown> {
+  private started?: Promise<unknown>;
+  constructor(
+    readonly storeId: string,
+    readonly call: () => unknown
+  ) {}
+  then<R1 = unknown, R2 = never>(
+    onfulfilled?: ((v: unknown) => R1 | PromiseLike<R1>) | null,
+    onrejected?: ((e: unknown) => R2 | PromiseLike<R2>) | null
+  ): Promise<R1 | R2> {
+    this.started ??= withStore(this.storeId, async () => this.call());
+    return this.started.then(onfulfilled, onrejected);
+  }
+  catch<R = never>(onrejected?: ((e: unknown) => R | PromiseLike<R>) | null): Promise<unknown> {
+    return this.then(undefined, onrejected);
+  }
+  finally(f?: (() => void) | null): Promise<unknown> {
+    return Promise.resolve(this).finally(f);
+  }
+}
+
+function scopedTransaction(storeId: string, args: unknown[]): unknown {
+  const ops = args[0];
+  if (Array.isArray(ops) && ops.some(o => o instanceof ScopedCall)) {
+    return withStore(storeId, async () =>
+      (prisma as any).$transaction(
+        ops.map(o => (o instanceof ScopedCall ? o.call() : o)),
+        ...args.slice(1)
+      )
+    );
+  }
+  return (prisma as any).$transaction(...args);
+}
+
+/**
+ * The Postgres client of ONE store, tenant-scoped on its own (Ruling NZ-INTEG-1). Services moved to `storeDb(id)` /
+ * `storeWriter(id)` read through it from places with no request transaction (MCP, jobs, webhooks, the hub), and the tenant guard
+ * REFUSES an unscoped model call, so for a Postgres store every call made with no ambient store scope runs in a short
+ * `withStore(storeId, ...)` (BEGIN + set_config, as before the port). Inside a scope it is the plain, LAZY `prisma` delegate call,
+ * so request atomicity and `$transaction([ ...ops ])` arrays are unchanged. `$`-methods other than `$transaction` stay the raw
+ * proxy's. A Durable Object store never comes through here.
+ */
+function scopedPg(storeId: string, singleArgTransaction = false): object {
   return new Proxy({} as object, {
     get(_t, prop) {
       if (prop === '$proc')
@@ -1403,10 +1659,30 @@ function pgWriter(): StoreWrites {
             '$proc exists on the Durable Object writer only (the service keeps its Postgres statement)'
           );
         };
-      if (prop === '$transaction') return (ops: unknown) => (prisma as any).$transaction(ops);
-      return (prisma as any)[prop];
+      if (prop === '$transaction')
+        return singleArgTransaction
+          ? (ops: unknown) => scopedTransaction(storeId, [ops])
+          : (...a: unknown[]) => scopedTransaction(storeId, a);
+      if (typeof prop !== 'string' || prop.startsWith('$')) return (prisma as any)[prop];
+      return new Proxy({} as object, {
+        get(_d, method) {
+          if (typeof method !== 'string') return undefined;
+          return (...args: unknown[]) => {
+            const call = () => (prisma as any)[prop][method](...args);
+            // an id that is not a UUID can never be scoped (`withStore` refuses it); the call goes as-is and the guard decides
+            return STORE_ID_SHAPE.test(storeId) && needsOwnScope()
+              ? new ScopedCall(storeId, call)
+              : call();
+          };
+        },
+      });
     },
-  }) as unknown as StoreWrites;
+  });
+}
+
+/** pg writer: the store-scoped `prisma` client, minus the DO-only second argument of `$transaction`. */
+function pgWriter(storeId: string): StoreWrites {
+  return scopedPg(storeId, true) as unknown as StoreWrites;
 }
 
 async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
@@ -1414,7 +1690,12 @@ async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
   if (backend === 'do') {
     return { storeId, backend, ...(await doClients(storeId)) };
   }
-  return { storeId, backend: 'pg', db: prisma as unknown as StoreReads, writer: pgWriter() };
+  return {
+    storeId,
+    backend: 'pg',
+    db: scopedPg(storeId) as unknown as StoreReads,
+    writer: pgWriter(storeId),
+  };
 }
 
 /** The repo for a store: pg (default) or its Durable Object, per the store's flag. Memoised per request. */
@@ -1608,6 +1889,18 @@ async function d1StoreWrite(
  */
 export async function syncStoreEntitlement(storeId: string): Promise<void> {
   const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
+  if (await platformFamilyOnD1('access')) {
+    // D1 is the source: copy ITS current row to the Durable Object (nothing is read from Postgres, nothing is written to D1).
+    const d1Row = (await (
+      await requirePlatformDb()
+    ).store.findUnique({
+      where: { id: storeId },
+      select,
+    })) as Record<string, unknown> | null;
+    if (!d1Row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+    await copyStoreSettings(storeId, d1Row);
+    return;
+  }
   const row = (await withStore(storeId, tx =>
     tx.store.findUnique({ where: { id: storeId }, select })
   )) as Record<string, unknown> | null;
@@ -1669,6 +1962,8 @@ async function mirrorEntitlementToPg(
     ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
   );
   if (Object.keys(patch).length === 0) return;
+  // The access family is on D1: D1 `stores` IS the record of the entitlement fields, there is no Postgres copy to keep in step.
+  if (await platformFamilyOnD1('access')) return;
   await withStore(storeId, async tx => {
     await (tx as unknown as StoreUpdateManyClient).store.updateMany({
       where: { id: storeId },
@@ -1818,20 +2113,6 @@ export async function storeUpdateMany(
   const res = await db.store.updateMany(args);
   if (res.count > 0) await copyStoreSettings(args.where.id, args.data as Record<string, unknown>);
   return res;
-}
-
-/**
- * For a raw-SQL write to `stores` (jsonb_set on `settings`): re-read the named columns from the authoritative row and copy
- * them, so a partial JSON write reaches the DO as the whole resulting value.
- */
-export async function syncStoreFields(storeId: string, fields: string[]): Promise<void> {
-  if ((await storeRepo(storeId)).backend !== 'do') return;
-  const select = Object.fromEntries(fields.map(f => [f, true]));
-  const row = (await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select })
-  )) as Record<string, unknown> | null;
-  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
-  await copyStoreSettings(storeId, row);
 }
 
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */

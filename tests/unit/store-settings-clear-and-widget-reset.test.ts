@@ -44,8 +44,13 @@ vi.mock('@ebda/database', () => ({
     fn({
       // the transaction client is the same fake client, plus the zero counts
       ...(await import('@ebda/database')).prisma,
-      $queryRaw: async (_s: TemplateStringsArray, ...v: unknown[]) => {
-        rawState.settings = { ...rawState.settings, ...JSON.parse(v[0] as string) };
+      $queryRaw: async (s: TemplateStringsArray, ...v: unknown[]) => {
+        if (s.join('?').includes('jsonb_set'))
+          rawState.settings = {
+            ...rawState.settings,
+            [v[0] as string]: JSON.parse(v[1] as string),
+          };
+        else rawState.settings = { ...rawState.settings, ...JSON.parse(v[0] as string) };
         return [{ settings: rawState.settings }];
       },
       $executeRaw: async (_s: TemplateStringsArray, ...v: unknown[]) => {

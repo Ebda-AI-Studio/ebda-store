@@ -1,5 +1,5 @@
-import { prisma, runInTenantContext } from '@ebda/database';
-import { readStoreDb } from '../jobs/store-db';
+import { readStoreDb, runInStoreCtx } from '../jobs/store-db';
+import { storeWriter } from '../repo-factory';
 import { getAutomationFlags } from '../../services/plan-entitlements';
 
 /**
@@ -102,8 +102,8 @@ export async function canLinkWhatsApp(storeId: string): Promise<boolean> {
  */
 export const WhatsAppLinkService = {
   async setLinked(storeId: string, linked: boolean, ownerUserId?: string): Promise<void> {
-    await runInTenantContext(storeId, () =>
-      prisma.storeWhatsAppLink.upsert({
+    await runInStoreCtx(storeId, async () =>
+      (await storeWriter(storeId)).storeWhatsAppLink.upsert({
         where: { storeId },
         create: {
           storeId,
@@ -135,7 +135,8 @@ export const WhatsAppLinkService = {
       version: number;
     }
   ): Promise<boolean> {
-    return runInTenantContext(storeId, async () => {
+    return runInStoreCtx(storeId, async () => {
+      const w = await storeWriter(storeId);
       const data = {
         entitlementVersion: e.version,
         entitlementPackageId: e.packageId,
@@ -143,18 +144,18 @@ export const WhatsAppLinkService = {
         entitlementStatus: e.status,
         entitlementValidUntil: e.validUntil,
       };
-      const updated = await prisma.storeWhatsAppLink.updateMany({
+      const updated = await w.storeWhatsAppLink.updateMany({
         where: { storeId, entitlementVersion: { lt: e.version } },
         data,
       });
       if (updated.count > 0) return true;
-      const existing = await prisma.storeWhatsAppLink.findUnique({
+      const existing = await w.storeWhatsAppLink.findUnique({
         where: { storeId },
         select: { entitlementVersion: true },
       });
       if (existing) return false; // a newer or equal version is already stored
       // No row yet (the entitlement arrives before the merchant links): create it unlinked.
-      await prisma.storeWhatsAppLink.create({ data: { storeId, linked: false, ...data } });
+      await w.storeWhatsAppLink.create({ data: { storeId, linked: false, ...data } });
       return true;
     });
   },

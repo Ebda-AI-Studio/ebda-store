@@ -91,16 +91,11 @@ describe('no RLS bypass in the API runtime', () => {
     const ALLOWED_PLATFORM_OPERATOR: Record<string, string> = {
       'apps/api/src/routes/admin.routes.ts':
         'super-admin router: platform directory (stores, users)',
-      'apps/api/src/routes/feature.routes.ts': 'super-admin plan change: who enabled a feature',
       'apps/api/src/services/store.service.ts':
         'super-admin store hard-delete: the owner account cleanup',
       'apps/api/src/routes/store.routes.ts': 'super-admin GET /stores: every store with its owner',
-      'apps/api/src/services/provider-activation.service.ts':
-        'super-admin provider activation: the store owner to email the decision to',
-      'apps/api/src/routes/provider-activation.routes.ts':
-        'super-admin provider activation queue: every store, one transaction each',
-      'apps/api/src/services/legal-notice.service.ts':
-        'legal-notice fan-out: every store owner, as the super admin who pressed Send notice',
+      'apps/api/src/lib/platform-scope.ts':
+        'the one wrapper (asOperator) of the hatch: provider activation, legal-notice fan-out and the platform hub call it, and with the platform families on D1 it checks the operator with the identity service instead',
     };
     const offenders: string[] = [];
     const used = new Set<string>();

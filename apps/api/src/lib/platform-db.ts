@@ -10,21 +10,20 @@ import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 
 type PlatformClient = Record<string, any>;
-const clients = new WeakMap<object, Promise<PlatformClient>>();
+// Only the RESOLVED client is cached: a pending promise created in one request must not be awaited by another (workerd).
+const clients = new WeakMap<object, PlatformClient>();
 
 export async function platformDb(): Promise<PlatformClient | undefined> {
   const d1 = (cfBindings() as { PLATFORM_DB?: object } | undefined)?.PLATFORM_DB;
   if (!d1) return undefined;
   let c = clients.get(d1);
   if (!c) {
-    c = (async () => {
-      // Lazy: the 550 KB model metadata is only parsed by an isolate that actually reads the platform tables.
-      const [{ createD1Client }, meta] = await Promise.all([
-        import('@ebda-src/repo'),
-        import('@ebda-src/prisma-meta'),
-      ]);
-      return createD1Client(meta.default as never, d1 as never);
-    })();
+    // Lazy: the 550 KB model metadata is only parsed by an isolate that actually reads the platform tables.
+    const [{ createD1Client }, meta] = await Promise.all([
+      import('@ebda-src/repo'),
+      import('@ebda-src/prisma-meta'),
+    ]);
+    c = createD1Client(meta.default as never, d1 as never) as PlatformClient;
     clients.set(d1, c);
   }
   return c;

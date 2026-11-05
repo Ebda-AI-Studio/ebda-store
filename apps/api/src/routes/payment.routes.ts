@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
@@ -14,7 +15,7 @@ import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
@@ -30,6 +31,8 @@ import {
   resolveStoreFromWebhookRef,
 } from '../lib/definer';
 import { OrderService } from '../services/order.service';
+import { checkStoreAccess } from '../middleware/store-access';
+import { onAccessD1 } from '../services/platform/access-d1';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
@@ -47,7 +50,6 @@ import {
 } from '@ebda/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/error-handler';
-import { checkStoreAccess } from '../middleware/store-access';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
 import {
   codCollectMinor,
@@ -58,6 +60,7 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
 // ==========================================
@@ -146,7 +149,7 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
     // BE:S-22: no resolvable store is a 404, never the platform default (and never "first store").
     if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-    const data = await withStore(storeId, () => loadCheckoutPaymentConfig(storeId));
+    const data = await runInStoreCtx(storeId, () => loadCheckoutPaymentConfig(storeId));
 
     res.json({ success: true, data });
   } catch (error) {
@@ -196,7 +199,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     displayNameAr: string | null;
   } | null = null;
   const codRecord = storeId
-    ? await prisma.paymentConfig.findFirst({
+    ? await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: { storeId, provider: 'cod' as const, isEnabled: true },
       })
     : null;
@@ -242,7 +247,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
   // Ruling SHARIA-GOLD-1: a cart with gold hides COD + installments unless the merchant allowed them. The
   // storefront only hides the options; the API refuses them (assertGoldPaymentAllowed) whatever it shows.
   const goldStore = storeId
-    ? await prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    ? await (
+        await storeDb(storeId)
+      ).store.findUnique({ where: { id: storeId }, select: { settings: true } })
     : null;
   const goldPrepaidOnly = !goldAllowsDeferredPayment(goldStore?.settings);
 
@@ -528,7 +535,7 @@ router.post(
 
       if (data.provider === 'cod' || data.provider === 'instapay') {
         // No network: one short tenant transaction.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -587,7 +594,9 @@ router.post(
           // ==========================================
           // Look up COD config for fee
           // The store's own COD row only (no platform-level row exists for the app role, R-EBDA-007).
-          const codConfig = await prisma.paymentConfig.findFirst({
+          const codConfig = await (
+            await storeDb(order.storeId)
+          ).paymentConfig.findFirst({
             where: { storeId: order.storeId, provider: 'cod', isEnabled: true },
           });
 
@@ -861,7 +870,7 @@ router.post(
         };
 
         // Short transaction to record: the Payment row + its audit event + the audit log.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -927,7 +936,7 @@ router.post(
         // under ebda_app the rollback would read no rows and do nothing
         // (PR 2301 audit, same class as the MCP place_order rollbacks).
         const rb = rollbackContext;
-        await runInTenantContext(rb.storeId, () =>
+        await runInStoreCtx(rb.storeId, () =>
           OrderService.rollbackForPaymentFailure(rb.storeId, rb.orderId, rb.sessionId)
         ).catch(rbErr =>
           logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
@@ -1227,7 +1236,7 @@ router.post(
 
       // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
       // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
-      const refund = await runInTenantContext(refundStoreId, () =>
+      const refund = await runInStoreCtx(refundStoreId, () =>
         PaymentService.refund({
           transactionId: data.transactionId,
           amount: data.amount,
@@ -1239,7 +1248,7 @@ router.post(
       // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
       // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
       // a pre-refund snapshot.
-      await runInTenantContext(refundStoreId, async () => {
+      await runInStoreCtx(refundStoreId, async () => {
         await auditLog({
           action: 'payment.refunded',
           userId: user.userId,
@@ -1433,6 +1442,17 @@ router.get(
  * payment with its store ownerId, then accept the request only when
  * the requester is super_admin or is the store owner.
  */
+/** D1 twin of `resolvePaymentEventsStore`: unknown payment and denied access are the same "not found". */
+async function resolvePaymentEventsStoreD1(
+  user: { userId: string; role: string },
+  paymentId: string
+): Promise<{ storeId: string; paymentId: string } | null> {
+  const storeId = await getPaymentStoreId(paymentId);
+  if (!storeId) return null;
+  const access = await checkStoreAccess(storeId, user);
+  return access.ok ? { storeId, paymentId } : null;
+}
+
 router.get('/:id/events', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = getAuthUser(req);
@@ -1441,7 +1461,11 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
     // The payment's store is found by a GUARDED definer (an active super_admin, or the owner /
     // staff of that payment's store; anyone else sees "not found"), then the events are read
     // inside that store's scope. Under strict RLS a contextless read would see no row at all.
-    const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
+    // After the `access` cutover the Postgres definer's staff branch reads a frozen/emptied copy, so access is decided from
+    // D1 instead: the payment's store by exact id, then the same gate every admin route uses (owner, live staff, super_admin).
+    const owner = (await onAccessD1())
+      ? await resolvePaymentEventsStoreD1(user, paymentId)
+      : await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
     if (!owner) {
       res.status(404).json({
         success: false,
@@ -1499,7 +1523,16 @@ router.get(
         return;
       }
       const { eventId } = req.params;
-      const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
+      // Ruling NZ-PG-2: after the `access` cutover the Postgres definer is gone; the caller is already a verified super_admin
+      // (the role gate above), so the event's store is found by a primary-key probe of the stores' own DOs.
+      const owner = (await onAccessD1())
+        ? await (async () => {
+            const storeId = await (
+              await import('../lib/entity-store-fanout.js')
+            ).entityStoreByFanout('payment_event', eventId);
+            return storeId ? { storeId } : null;
+          })()
+        : await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
       const event = owner
         ? await withStore(owner.storeId, () =>
             prisma.paymentEvent.findUnique({

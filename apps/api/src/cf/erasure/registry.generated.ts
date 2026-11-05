@@ -249,6 +249,9 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
   gold_rates_current: {
     kind: 'no-pii',
   },
+  gsc_daily_metrics: {
+    kind: 'no-pii',
+  },
   instapay_order_receipts: {
     kind: 'customer-pii',
     match: {},
@@ -308,10 +311,10 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
   notification_event_configs: {
     kind: 'no-pii',
   },
-  onesignal_subscriptions: {
+  notification_logs: {
     kind: 'customer-pii',
     match: {
-      userId: 'user_id',
+      buyerKey: 'recipient_phone_hash',
     },
     action: 'delete',
   },
@@ -350,6 +353,9 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
     kind: 'no-pii',
   },
   product_categories: {
+    kind: 'no-pii',
+  },
+  product_daily_views: {
     kind: 'no-pii',
   },
   product_faqs: {
@@ -407,6 +413,9 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
     },
     action: 'delete',
   },
+  qr_scan_daily: {
+    kind: 'no-pii',
+  },
   reorder_rules: {
     kind: 'no-pii',
   },
@@ -437,6 +446,9 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
     scrub: {
       customer_id: null,
     },
+  },
+  search_query_daily: {
+    kind: 'no-pii',
   },
   sequences: {
     kind: 'no-pii',

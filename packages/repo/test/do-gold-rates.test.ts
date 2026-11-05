@@ -256,6 +256,37 @@ describe('applyGoldRates', () => {
     expect(st.map(x => x.status)).toEqual(['rejected', 'pending']);
   });
 
+  it('a demo feed (skipJumpGate) applies a rate over the gate; forcePending still wins', () => {
+    const f = fx();
+    f.product('p1');
+    applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 300_000 }] },
+      { userId: 'u' },
+      { now: T0, newId: ids }
+    );
+    const a = applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 500_000 }] },
+      { feed: { src: 'x' }, skipJumpGate: true },
+      { now: T0 + 1, newId: ids }
+    );
+    expect(a.pending).toHaveLength(0);
+    expect(a.applied).toHaveLength(1);
+    expect(f.rate(21).r).toBe(500_000);
+    const p = applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 510_000 }] },
+      { feed: { src: 'y' }, skipJumpGate: true, forcePending: true },
+      { now: T0 + 2, newId: ids }
+    );
+    expect(p.pending).toHaveLength(1);
+    expect(f.rate(21).r).toBe(500_000);
+  });
+
   it('variants: variant priced by its resolved spec, product = minimum ACTIVE variant price', () => {
     const f = fx();
     f.product('p1');

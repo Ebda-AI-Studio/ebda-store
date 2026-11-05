@@ -383,6 +383,66 @@ function doTables({ sql }) {
   return json({ ok: true, tables: appTables(sql).map(t => t.table) });
 }
 
+// AUDITIMPORT (N-10d): append audit rows into a LIVE (sealed) store. The only write this surface allows after the seal, and it
+// can only INSERT OR IGNORE into audit_logs, by id (idempotent), for THIS store's id. Returns how many of the sent ids the
+// table now holds, so the caller verifies count per store.
+const AUDIT_IMPORT_MAX = 500;
+async function doAuditImport(request, { sql, transactionSync }) {
+  const body = await request.json().catch(() => null);
+  const rows = body?.rows;
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > AUDIT_IMPORT_MAX)
+    throw new HttpError(400, `rows: 1..${AUDIT_IMPORT_MAX} required`);
+  const own = sql.exec(`SELECT v FROM _identity WHERE k = 'store_id'`).toArray()[0]?.v;
+  const str = (v, what, req = false) => {
+    if (v === null || v === undefined) {
+      if (req) throw new HttpError(400, `${what} required`);
+      return null;
+    }
+    if (typeof v !== 'string') throw new HttpError(400, `${what} must be a string`);
+    return v;
+  };
+  const clean = rows.map(r => {
+    if (str(r.store_id, 'store_id', true) !== own)
+      throw new HttpError(400, 'row names another store');
+    const ms = Number(r.created_at);
+    if (!Number.isFinite(ms)) throw new HttpError(400, 'created_at');
+    const details = str(r.details ?? '{}', 'details');
+    JSON.parse(details);
+    return [
+      str(r.id, 'id', true),
+      str(r.action, 'action', true),
+      str(r.user_id, 'user_id'),
+      own,
+      str(r.resource_type, 'resource_type', true),
+      str(r.resource_id, 'resource_id'),
+      details,
+      str(r.ip_address, 'ip_address'),
+      str(r.user_agent, 'user_agent'),
+      ms,
+    ];
+  });
+  let inserted = 0;
+  transactionSync(() => {
+    for (const v of clean) {
+      sql.exec(
+        `INSERT OR IGNORE INTO audit_logs (id, action, user_id, store_id, resource_type, resource_id, details, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ...v
+      );
+      inserted += Number(sql.exec('SELECT changes() AS n').toArray()[0]?.n ?? 0);
+    }
+  });
+  const ids = clean.map(v => v[0]);
+  const present = Number(
+    sql
+      .exec(
+        `SELECT count(*) AS n FROM audit_logs WHERE id IN (${ids.map(() => '?').join(',')})`,
+        ...ids
+      )
+      .toArray()[0]?.n ?? 0
+  );
+  return json({ ok: true, inserted, present, sent: ids.length });
+}
+
 function doStatus({ sql }) {
   ensureLedger(sql);
   const ledger = sql
@@ -401,6 +461,8 @@ export async function handleStoreAdmin(request, ctx) {
       return await doImport(request, ctx);
     if (request.method === 'POST' && path.endsWith('/__verify'))
       return await doVerify(request, ctx);
+    if (request.method === 'POST' && path.endsWith('/__auditimport'))
+      return await doAuditImport(request, ctx);
     if (request.method === 'POST' && path.endsWith('/__seal')) return await doSeal(ctx);
     if (request.method === 'POST' && path.endsWith('/__rebase')) return await doRebase(ctx);
     if (request.method === 'POST' && path.endsWith('/__diff')) return await doDiff(ctx);

@@ -34,7 +34,7 @@ export const CF_ONLY_TABLES = {
   },
   'd1:platform_audit_log': {
     how: 'starts-empty',
-    why: 'platform audit trail starts with the first live admin action; Postgres had no such table',
+    why: 'Postgres has no such table; the audit family copies store-less audit_logs rows in (N-10d), and rows born in D1 after that flip are not in Postgres',
     acceptable: [[]],
   },
 };
@@ -62,6 +62,23 @@ export const DO_RUNTIME_TABLES = {
     erasure: 'ttl',
     why: 'InstaPay order receipts of a DO store (Ruling INSTAPAY-DO-1): payer fields scrubbed 180 days after a decision and on the shopper erasure, screenshots deleted by the retention sweep; imported from the platform table at cutover (PG_SOURCED_DO_TABLES, Ruling CF-R6A-4)',
   },
+  _cauth_users: {
+    erasure: 'ttl',
+    why: 'storefront customer credentials of a DO store (NEON-ZERO-1 N-9, Ruling NZ-A3): internal, excluded from the backup / export; erased by eraseCustomer (anonymise), imported from Postgres by cutover-customer-auth.mjs (not by __import)',
+  },
+  _cauth_refresh: {
+    erasure: 'ttl',
+    why: 'customer refresh tokens (sha256), purged by the DO alarm, deleted by eraseCustomer (N-9)',
+  },
+  _cauth_tokens: {
+    erasure: 'ttl',
+    why: 'customer email-verification / password-reset tokens (sha256), single use, purged by the DO alarm (N-9)',
+  },
+  _cauth_passkeys: {
+    erasure: 'ttl',
+    why: 'customer WebAuthn public keys, deleted by eraseCustomer and on every password change / reset (N-9)',
+  },
+  _cauth_state: { erasure: 'no-pii', why: 'the customer-auth import live flag (N-9)' },
   erasure_ledger: {
     erasure: 'ttl',
     why: 'the saved scope of a shopper erasure (Ruling CF-R6A-3), purged after 30 days and by the subject erasure; never imported, an erasure in flight at the flip is retried',

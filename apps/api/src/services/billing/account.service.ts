@@ -44,6 +44,14 @@ import { getEntityStoreId, lookupStore } from '../../lib/definer';
 import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
+import { sendAlert } from '../alerts.service';
+import {
+  commitManualPaymentD1,
+  idempotencyKeyStoreD1,
+  lockSubscription,
+  onD1,
+} from '../platform/billing-d1';
+import { platformFamilyOnD1 } from '../platform/cutover';
 import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
 import { goLiveVerdict } from './go-live-verdict';
 import {
@@ -54,7 +62,7 @@ import {
   type LedgerVat,
 } from './charge-amount';
 import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
-import { scheduleClaimRelease, withClaimReleases } from '../../lib/instapay-ref-claim';
+import { releaseInstapayReference, withClaimReleases } from '../../lib/instapay-ref-claim';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -582,6 +590,28 @@ export async function suggestManualPeriod(
 // ───────────────────────────── claims ─────────────────────────────────────
 
 /**
+ * Put a receipt this call just submitted back to draft and free its cross-store transfer reference. The reference is
+ * released DIRECTLY, not queued: every caller throws right after, and a queued release is dropped on a throw
+ * (`withClaimReleases`), which left the D1 reference bound to a draft receipt (the re-upload then failed with
+ * DUPLICATE_REFERENCE). The release is idempotent and only frees a claim bound to THIS receipt.
+ */
+export async function undoSubmittedReceipt(
+  tx: Pick<Tx, 'instapayReceipt'>,
+  receipt: { id: string; referenceKey: string | null },
+  storeId: string
+): Promise<void> {
+  await tx.instapayReceipt.updateMany({
+    where: { id: receipt.id, storeId },
+    data: { status: 'draft', referenceKey: null, submittedAt: null },
+  });
+  if (receipt.referenceKey) {
+    await releaseInstapayReference(receipt.referenceKey, storeId, receipt.id).catch(
+      () => undefined
+    );
+  }
+}
+
+/**
  * Merchant: submit the InstaPay receipt for the subscription (the screenshot was
  * uploaded first, the AI pre-filled it, the merchant corrected it). Creates the claim
  * the super-admin reviews. NEVER activates anything (only the super-admin's recorded
@@ -629,6 +659,8 @@ async function submitSubscriptionReceiptInner(args: {
       notBefore,
       now,
     });
+    // The receipt is a draft again: its D1 reference claim (Ruling INSTAPAY-DO-1) is freed once this transaction commits.
+    const undoReceiptSubmit = () => undoSubmittedReceipt(tx, receipt, args.storeId);
     let claim;
     try {
       claim = await withSavepoint(() =>
@@ -646,27 +678,36 @@ async function submitSubscriptionReceiptInner(args: {
         })
       );
     } catch (err) {
-      if ((err as { code?: string }).code !== 'P2002') throw err;
+      if ((err as { code?: string }).code !== 'P2002') {
+        // Postgres rolls the receipt submit back with this transaction; on D1 (Ruling NZ-10D-3) there is no transaction, so the
+        // receipt would stay `submitted` without a claim. Undo it by hand, then surface the original error.
+        if (await platformFamilyOnD1('payments')) await undoReceiptSubmit().catch(() => undefined);
+        throw err;
+      }
       // A legacy claim already holds this transfer reference: undo the receipt claim.
-      await tx.instapayReceipt.updateMany({
-        where: { id: receipt.id, storeId: args.storeId },
-        data: { status: 'draft', referenceKey: null, submittedAt: null },
-      });
-      // The receipt is a draft again: free its D1 reference claim (Ruling INSTAPAY-DO-1) once this transaction commits.
-      if (receipt.referenceKey)
-        scheduleClaimRelease([
-          { referenceKey: receipt.referenceKey, storeId: args.storeId, receiptId: receipt.id },
-        ]);
+      await undoReceiptSubmit();
       throw new AppError(
         409,
         'DUPLICATE_REFERENCE',
         'This transfer reference was already used. Each transfer can pay only once.'
       );
     }
-    const linked = await tx.instapayReceipt.update({
-      where: { id: receipt.id, storeId: args.storeId },
-      data: { claimId: claim.id },
-    });
+    let linked;
+    try {
+      linked = await tx.instapayReceipt.update({
+        where: { id: receipt.id, storeId: args.storeId },
+        data: { claimId: claim.id },
+      });
+    } catch (err) {
+      // D1 has no rollback (see above): remove the claim THIS call made and reopen the receipt.
+      if (await platformFamilyOnD1('payments')) {
+        await tx.manualPaymentClaim
+          .deleteMany({ where: { id: claim.id, storeId: args.storeId, status: 'pending' } })
+          .catch(() => undefined);
+        await undoReceiptSubmit().catch(() => undefined);
+      }
+      throw err;
+    }
     return { claim, receipt: toReceiptView(linked) };
   });
 }
@@ -706,24 +747,23 @@ export async function listStoreClaims(storeId: string) {
 /** Super-admin queue: claims across stores (each read in its own store scope). */
 export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'rejected' = 'pending') {
   const now = new Date();
-  const parts = await acrossStores(async storeId => {
-    const claims = await prisma.manualPaymentClaim.findMany({
-      where: { storeId, status },
-      include: {
-        store: { select: { name: true, slug: true, status: true, billingSuspendedReason: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 200,
-    });
+  type ClaimRow = Prisma.ManualPaymentClaimGetPayload<{
+    include: {
+      store: { select: { name: true; slug: true; status: true; billingSuspendedReason: true } };
+    };
+  }>;
+  const shape = async (storeId: string | undefined, claims: ClaimRow[]) => {
     if (claims.length === 0) return [];
-    const [receipts, sub] = await Promise.all([
+    const ids = [...new Set(claims.map(c => c.storeId))];
+    const [receipts, subs] = await Promise.all([
       prisma.instapayReceipt.findMany({
-        where: { storeId, claimId: { in: claims.map(c => c.id) } },
+        where: { ...(storeId ? { storeId } : {}), claimId: { in: claims.map(c => c.id) } },
       }),
-      prisma.storeSubscription.findUnique({ where: { storeId } }),
+      prisma.storeSubscription.findMany({ where: { storeId: { in: ids } } }),
     ]);
     return claims.map(c => {
       const r = receipts.find(x => x.claimId === c.id);
+      const sub = subs.find(x => x.storeId === c.storeId) ?? null;
       const interval: BillingInterval = isInterval(c.billingInterval)
         ? c.billingInterval
         : 'monthly';
@@ -735,7 +775,36 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
         subStatus: sub?.status ?? null,
       };
     });
-  });
+  };
+  const include = {
+    store: { select: { name: true, slug: true, status: true, billingSuspendedReason: true } },
+  } as const;
+  // D1: ONE query over every store's claims (the oldest 200 of the queue), no Postgres scope per store.
+  const parts = (await platformFamilyOnD1('payments'))
+    ? [
+        {
+          value: await shape(
+            undefined,
+            await prisma.manualPaymentClaim.findMany({
+              where: { status },
+              include,
+              orderBy: { createdAt: 'asc' },
+              take: 200,
+            })
+          ),
+        },
+      ]
+    : await acrossStores(async storeId =>
+        shape(
+          storeId,
+          await prisma.manualPaymentClaim.findMany({
+            where: { storeId, status },
+            include,
+            orderBy: { createdAt: 'asc' },
+            take: 200,
+          })
+        )
+      );
   return parts
     .flatMap(p => p.value)
     .sort((a, b) => a.claim.createdAt.getTime() - b.claim.createdAt.getTime())
@@ -910,93 +979,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await assertPayableStore(input.storeId);
 
-  const result = await withStore(input.storeId, async (tx: Tx) => {
-    const existing = await tx.billingEvent.findUnique({
-      where: { idempotencyKey: key, storeId: input.storeId },
-    });
-    if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
-    // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
-    // period computed below is never from a read a grant is about to change.
-    await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${input.storeId} FOR UPDATE`;
-    const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
-    const { periodStart, periodEnd } = explicit
-      ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
-      : manualPeriodFor(sub, input.interval, now);
-    const eventId = crypto.randomUUID();
-    const { count } = await tx.billingEvent.createMany({
-      data: [
-        {
-          id: eventId,
-          storeId: input.storeId,
-          subscriptionId: sub?.id ?? null,
-          type: 'manual_payment',
-          planCode: plan.code,
-          billingInterval: input.interval,
-          forPeriodEnd: periodEnd,
-          amountMinor: input.amountMinor,
-          currency: 'EGP',
-          provider: 'manual',
-          providerRef: reference,
-          idempotencyKey: key,
-          status: 'succeeded',
-          vatMinor: paidVat.vatMinor,
-          vat: paidVat.vat ? (paidVat.vat as unknown as Prisma.InputJsonValue) : undefined,
-          raw: {
-            method: input.method,
-            paidAt: input.paidAt.toISOString(),
-            periodStart: periodStart.toISOString(),
-            periodEnd: periodEnd.toISOString(),
-            periodRule: explicit ? 'operator_override' : 'max(now, current_end)',
-            previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
-            previousStatus: sub?.status ?? null,
-            recordedBy: input.actorId,
-          },
-        },
-      ],
-      skipDuplicates: true,
-    });
-    if (count === 0) {
-      // The key exists but is not visible in this store's scope: the same
-      // reference was recorded for ANOTHER store (strict RLS hides it). Refuse.
-      const winner = await tx.billingEvent.findUnique({
-        where: { idempotencyKey: key, storeId: input.storeId },
-      });
-      if (!winner) {
-        throw new AppError(
-          409,
-          'REFERENCE_USED_ELSEWHERE',
-          'This reference was recorded for another store'
-        );
-      }
-      return { duplicate: true, billingEventId: winner.id } as ManualPaymentResult;
-    }
-    const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
-    const billingMethod = sub?.billingMethod === 'instapay' || !hasCard ? 'instapay' : 'card';
-    const data = {
-      planCode: plan.code,
-      status: 'active' as const,
-      billingInterval: input.interval,
-      currentPeriodStart: periodStart,
-      currentPeriodEnd: periodEnd,
-      // keep the cycle's anchor day; the first paid period anchors on its own start (M-125)
-      billingAnchorDay:
-        !explicit &&
-        sub?.billingAnchorDay &&
-        sub.currentPeriodEnd?.getTime() === periodStart.getTime()
-          ? sub.billingAnchorDay
-          : periodStart.getUTCDate(),
-      trialEndsAt: null,
-      pendingPlanCode: null,
-      cancelAtPeriodEnd: false,
-      dunningAttempts: 0,
-      nextRetryAt: null,
-      billingMethod,
-    };
-    if (sub) {
-      await tx.storeSubscription.update({ where: { storeId: input.storeId }, data });
-    } else {
-      await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
-    }
+  // The Postgres half of a manual payment: the tier on `stores`, the merchant's claim and the receipt behind it. Every
+  // statement is idempotent on the event id, so a retry (and the heal below) repeats it safely.
+  const pgHalf = async (tx: Tx, eventId: string): Promise<string[]> => {
     await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: plan.featureTier } });
     // Confirm the merchant's claim: the named one, or the pending one with this reference.
     await tx.manualPaymentClaim.updateMany({
@@ -1034,6 +1019,177 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
         now
       );
     }
+    return approvedReceiptIds;
+  };
+
+  const result = await withStore(input.storeId, async (tx: Tx) => {
+    const existing = await tx.billingEvent.findUnique({
+      where: { idempotencyKey: key, storeId: input.storeId },
+    });
+    if (existing) {
+      // D1: the ledger row is committed BEFORE the Postgres half, so a replay may be the retry of a request whose
+      // Postgres half failed. Repeat it (idempotent) while the subscription is still on this payment's plan, never
+      // after the store moved on (a stale replay must not drag stores.plan back).
+      if (await onD1()) {
+        const current = await tx.storeSubscription.findUnique({
+          where: { storeId: input.storeId },
+        });
+        if (current?.planCode === plan.code && current.status === 'active')
+          await pgHalf(tx, existing.id);
+      }
+      return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    }
+    // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
+    // period computed below is never from a read a grant is about to change.
+    await lockSubscription(tx, input.storeId);
+    const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
+    const { periodStart, periodEnd } = explicit
+      ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
+      : manualPeriodFor(sub, input.interval, now);
+    // D1: the event id is derived from the idempotency key, so a retry after a partial run reuses it; the D1 write is the
+    // FIRST change (fail closed), the idempotent Postgres half follows (Ruling NZ-10-2).
+    const d1 = await onD1();
+    const eventId = d1
+      ? deterministicUuid(`manual-payment:${input.storeId}:${key}`)
+      : crypto.randomUUID();
+    const ledgerRaw = {
+      method: input.method,
+      paidAt: input.paidAt.toISOString(),
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      periodRule: explicit ? 'operator_override' : 'max(now, current_end)',
+      previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
+      previousStatus: sub?.status ?? null,
+      recordedBy: input.actorId,
+    };
+    const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
+    const billingMethod = sub?.billingMethod === 'instapay' || !hasCard ? 'instapay' : 'card';
+    const data = {
+      planCode: plan.code,
+      status: 'active' as const,
+      billingInterval: input.interval,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+      // keep the cycle's anchor day; the first paid period anchors on its own start (M-125)
+      billingAnchorDay:
+        !explicit &&
+        sub?.billingAnchorDay &&
+        sub.currentPeriodEnd?.getTime() === periodStart.getTime()
+          ? sub.billingAnchorDay
+          : periodStart.getUTCDate(),
+      trialEndsAt: null,
+      pendingPlanCode: null,
+      cancelAtPeriodEnd: false,
+      dunningAttempts: 0,
+      nextRetryAt: null,
+      billingMethod,
+    };
+    if (d1) {
+      // FAIL CLOSED: the D1 write comes FIRST, before any Postgres change. A reference another store already holds, a
+      // lost compare-and-set or any D1 error is refused here, with stores.plan, the claim and the receipt untouched.
+      const holder = await idempotencyKeyStoreD1(key);
+      if (holder && holder !== input.storeId)
+        throw new AppError(
+          409,
+          'REFERENCE_USED_ELSEWHERE',
+          'This reference was recorded for another store'
+        );
+      const outcome = await commitManualPaymentD1({
+        eventId,
+        idempotencyKey: key,
+        storeId: input.storeId,
+        subscriptionId: sub?.id ?? null,
+        planCode: plan.code,
+        interval: input.interval,
+        periodStart,
+        periodEnd,
+        amountMinor: input.amountMinor,
+        providerRef: reference,
+        vatMinor: paidVat.vatMinor,
+        vat: paidVat.vat ?? null,
+        raw: ledgerRaw,
+        anchorDay: data.billingAnchorDay,
+        billingMethod,
+        expectedSubUpdatedAt: sub?.updatedAt ?? null,
+        now,
+      });
+      if (outcome === 'conflict') {
+        const racer = await idempotencyKeyStoreD1(key);
+        if (racer && racer !== input.storeId)
+          throw new AppError(
+            409,
+            'REFERENCE_USED_ELSEWHERE',
+            'This reference was recorded for another store'
+          );
+        throw new AppError(
+          409,
+          'SUBSCRIPTION_CHANGED',
+          'The subscription changed while this payment was being recorded; retry',
+          { retryable: true }
+        );
+      }
+      if (outcome === 'duplicate') {
+        await pgHalf(tx, eventId);
+        return { duplicate: true, billingEventId: eventId } as ManualPaymentResult;
+      }
+    } else {
+      const { count } = await tx.billingEvent.createMany({
+        data: [
+          {
+            id: eventId,
+            storeId: input.storeId,
+            subscriptionId: sub?.id ?? null,
+            type: 'manual_payment',
+            planCode: plan.code,
+            billingInterval: input.interval,
+            forPeriodEnd: periodEnd,
+            amountMinor: input.amountMinor,
+            currency: 'EGP',
+            provider: 'manual',
+            providerRef: reference,
+            idempotencyKey: key,
+            status: 'succeeded',
+            vatMinor: paidVat.vatMinor,
+            vat: paidVat.vat ? (paidVat.vat as unknown as Prisma.InputJsonValue) : undefined,
+            raw: ledgerRaw,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (count === 0) {
+        // The key exists but is not visible in this store's scope: the same
+        // reference was recorded for ANOTHER store (strict RLS hides it). Refuse.
+        const winner = await tx.billingEvent.findUnique({
+          where: { idempotencyKey: key, storeId: input.storeId },
+        });
+        if (!winner) {
+          throw new AppError(
+            409,
+            'REFERENCE_USED_ELSEWHERE',
+            'This reference was recorded for another store'
+          );
+        }
+        return { duplicate: true, billingEventId: winner.id } as ManualPaymentResult;
+      }
+      if (sub) {
+        await tx.storeSubscription.update({ where: { storeId: input.storeId }, data });
+      } else {
+        await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
+      }
+    }
+    let approvedReceiptIds: string[];
+    try {
+      approvedReceiptIds = await pgHalf(tx, eventId);
+    } catch (err) {
+      // D1 already holds the ledger row + subscription: the retry (same key) repeats this half.
+      if (d1)
+        void sendAlert({
+          level: 'p1',
+          title: 'Billing: manual payment recorded in D1 but the Postgres half failed',
+          body: `store ${input.storeId}, key ${key}, event ${eventId}. Retry the same request (idempotent).`,
+        }).catch(() => undefined);
+      throw err;
+    }
     return {
       duplicate: false,
       billingEventId: eventId,
@@ -1061,6 +1217,13 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   }
   const { approvedReceiptIds: _internal, ...publicResult } = result;
   return publicResult;
+}
+
+/** A stable UUID (v4 shape) derived from `seed`, so a retried operation reuses the id it chose the first time. */
+function deterministicUuid(seed: string): string {
+  const h = crypto.createHash('sha256').update(seed).digest('hex');
+  const variant = ((parseInt(h.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${variant}${h.slice(18, 20)}-${h.slice(20, 32)}`;
 }
 
 // ───────────────────────── manual refund / void ───────────────────────────

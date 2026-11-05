@@ -5,6 +5,25 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
+export const aiUsage = sqliteTable('ai_usage', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  feature: text('feature').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  cachedHit: integer('cached_hit', { mode: 'boolean' }).notNull().default(false),
+  model: text('model'),
+  costMicros: integer('cost_micros'),
+  subjectType: text('subject_type'),
+  subjectId: text('subject_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const answerEngineProviderConfigs = sqliteTable('answer_engine_provider_configs', {
   id: text('id')
     .primaryKey()
@@ -47,6 +66,17 @@ export const billingEvents = sqliteTable('billing_events', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  netMinor: integer('net_minor').notNull().default(0),
+  vatRateBp: integer('vat_rate_bp').notNull().default(0),
+  grossMinor: integer('gross_minor').notNull().default(0),
+  sellerLegalName: text('seller_legal_name'),
+  sellerTaxId: text('seller_tax_id'),
+  buyerTaxId: text('buyer_tax_id'),
+  etaUuid: text('eta_uuid'),
+  etaStatus: text('eta_status', { enum: ['not_submitted', 'submitted', 'accepted', 'rejected'] })
+    .notNull()
+    .default('not_submitted'),
+  etaSubmittedAt: integer('eta_submitted_at', { mode: 'timestamp_ms' }),
 });
 
 export const billingGrants = sqliteTable('billing_grants', {
@@ -293,6 +323,22 @@ export const merchantApiKeys = sqliteTable('merchant_api_keys', {
   lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
   expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
   revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const onesignalSubscriptions = sqliteTable('onesignal_subscriptions', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull(),
+  playerId: text('player_id').notNull(),
+  deviceLabel: text('device_label'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

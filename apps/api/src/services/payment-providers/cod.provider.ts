@@ -8,6 +8,7 @@
  * with. Nothing here adds a fee any more: `/payments/create` only records what
  * the courier collects, `order.total − wallet`.
  */
+import { storeDb } from '../../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { type CodFeeConfig } from '@ebda/shared';
 import { assertChargeable } from './provider-call';
@@ -34,7 +35,9 @@ export function codFeeConfigFromRow(row: {
 
 /** The store's enabled COD fee settings, or null when COD is off. Store-scoped read. */
 export async function loadCodFeeConfig(storeId: string): Promise<Required<CodFeeConfig> | null> {
-  const row = await prisma.paymentConfig.findFirst({
+  const row = await (
+    await storeDb(storeId)
+  ).paymentConfig.findFirst({
     where: { storeId, provider: 'cod', isEnabled: true },
     select: { fixedFee: true, settings: true },
   });

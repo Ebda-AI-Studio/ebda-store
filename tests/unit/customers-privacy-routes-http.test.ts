@@ -149,6 +149,7 @@ describe('POST /stores/:storeId/customers/:customerId/erase — HTTP surface', (
     expect(h.eraseAccount).toHaveBeenCalledWith(CUSTOMER_OF_A, {
       scopeStoreId: STORE_A,
       actorId: 'admin-a',
+      storeHint: STORE_A,
     });
     expect(h.auditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'customer.account.erased_by_merchant' })
@@ -196,7 +197,7 @@ describe('GET /stores/:storeId/customers/:customerId/export — HTTP surface', (
   it('owning admin: 200, exports, audits', async () => {
     const res = await exportRoute(STORE_A, CUSTOMER_OF_A);
     expect(res.status).toBe(200);
-    expect(h.exportAccount).toHaveBeenCalledWith(CUSTOMER_OF_A);
+    expect(h.exportAccount).toHaveBeenCalledWith(CUSTOMER_OF_A, STORE_A);
     expect(h.auditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'customer.data.exported_by_merchant' })
     );

@@ -25,6 +25,7 @@
  * and the UI renders a "Google Search Console not connected" empty state
  * instead of a chart.
  */
+import { analyticsRead } from '../../lib/analytics-backend';
 import { prisma } from '@ebda/database';
 import { getCachedAnalytics } from '../analytics.service';
 
@@ -110,9 +111,9 @@ const EMPTY_DASHBOARD: GscDashboard = {
 async function computeGscDashboard(storeId: string): Promise<GscDashboard> {
   // Fetched date-desc (latest first) so `rows[0]` is the latest row without
   // a second query — reversed below to build the ascending trend.
-  const rows = await prisma.gscDailyMetric.findMany({
+  const findArgs = {
     where: { storeId },
-    orderBy: { date: 'desc' },
+    orderBy: { date: 'desc' as const },
     take: MAX_ROWS,
     select: {
       date: true,
@@ -123,7 +124,13 @@ async function computeGscDashboard(storeId: string): Promise<GscDashboard> {
       topQueries: true,
       updatedAt: true,
     },
-  });
+  };
+  // Ruling NZ-AN-1: the store's DO once its analytics moved, else Postgres
+  const rows = await analyticsRead(
+    storeId,
+    r => r.gscDailyMetric.findMany(findArgs),
+    () => prisma.gscDailyMetric.findMany(findArgs)
+  );
 
   if (rows.length === 0) {
     return EMPTY_DASHBOARD;

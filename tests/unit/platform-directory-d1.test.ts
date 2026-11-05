@@ -26,6 +26,7 @@ import {
   storeIdBySlug,
   storeIdsClaimingDomain,
   publicStorePage,
+  resolveStoreId,
 } from '../../apps/api/src/lib/definer';
 
 const sqlite = new DatabaseSync(':memory:');
@@ -117,6 +118,14 @@ describe('store directory from D1 (no Postgres)', () => {
     expect(await storeIdBySlug('nope')).toBeNull();
     expect(await storeIdByDomain('alpha.com')).toBe('a');
     expect(await storeIdsClaimingDomain('beta.com')).toEqual(['b']);
+  });
+  it('host -> store (the public request resolver) is D1 too: active only, verified domain only, never PG', async () => {
+    expect(await resolveStoreId({ slug: 'alpha' })).toBe('a');
+    expect(await resolveStoreId({ domain: 'alpha.com' })).toBe('a');
+    expect(await resolveStoreId({ domain: 'beta.com' })).toBeNull(); // unverified
+    expect(await resolveStoreId({ slug: 'beta' })).toBeNull(); // suspended is not 'active'
+    expect(await resolveStoreId({ slug: 'nope' })).toBeNull();
+    expect(await resolveStoreId({})).toBeNull();
   });
   it('public page: active + live only, newest first, with the total', async () => {
     expect(await publicStorePage(0, 10)).toEqual({ ids: ['a'], total: 1 });

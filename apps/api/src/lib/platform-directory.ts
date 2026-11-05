@@ -107,3 +107,47 @@ export async function d1PublicStorePage(
   );
   return { ids: (page.results ?? []).map(r => r.id), total: Number(count?.n ?? 0) };
 }
+
+/** Every live (not soft-deleted) store id of the D1 directory, id-ordered: the cross-store pages' store list (no Postgres definer). */
+export async function d1ListStoreIds(db: DirD1): Promise<string[]> {
+  return guarded(async () =>
+    (
+      (
+        await db
+          .prepare('SELECT id FROM stores WHERE deleted_at IS NULL ORDER BY id')
+          .bind()
+          .all<{ id: string }>()
+      ).results ?? []
+    ).map(r => r.id)
+  );
+}
+
+export interface StoreBrief {
+  id: string;
+  slug: string;
+  name: string;
+  plan: string;
+}
+
+/** slug / name / plan of the named stores from the D1 directory (chunked: D1 allows 100 bound values per statement). */
+export async function d1StoreBriefs(db: DirD1, ids: readonly string[]): Promise<StoreBrief[]> {
+  const out: StoreBrief[] = [];
+  const want = [...new Set(ids)];
+  for (let i = 0; i < want.length; i += 90) {
+    const part = want.slice(i, i + 90);
+    out.push(
+      ...(await guarded(
+        async () =>
+          (
+            await db
+              .prepare(
+                `SELECT id, slug, name, plan FROM stores WHERE id IN (${part.map(() => '?').join(', ')})`
+              )
+              .bind(...part)
+              .all<StoreBrief>()
+          ).results ?? []
+      ))
+    );
+  }
+  return out;
+}

@@ -1,0 +1,257 @@
+// Merchant analytics reads on the StoreDO (Ruling NZ-AN-1 follow-up, NZ-INTEG-1). The Postgres twins in
+// apps/api/src/services/analytics.service.ts are raw SQL aggregates (distinct customer keys, profit lines, date_trunc buckets,
+// the on-hand twin); each op here is the SQLite spelling of ONE of them, scoped by the `store_id` the DO holds. All are reads.
+import { MoneyError, type SyncSql } from './sync-sql';
+
+const intArg = (v: unknown, what: string, min = 0, max = Number.MAX_SAFE_INTEGER): number => {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
+    throw new MoneyError('BAD_ARGS', what, 400);
+  return v;
+};
+const statuses = (v: unknown): string[] => {
+  if (!Array.isArray(v) || v.length > 20 || v.some(x => typeof x !== 'string' || x.length > 64))
+    throw new MoneyError('BAD_ARGS', 'nonRevenue', 400);
+  return v as string[];
+};
+const marks = (n: number, from = 1): string =>
+  Array.from({ length: n }, (_, i) => `?${from + i}`).join(', ');
+
+/** SQLite twin of CUSTOMER_KEY_SQL (lib/customer-key-sql.ts); the orders table is aliased `o`. Keep the two in lockstep. */
+const CUSTOMER_KEY = `COALESCE(
+  NULLIF(o.customer_id, ''),
+  NULLIF(LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END), ''),
+  NULLIF(CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END, ''),
+  'guest:' || o.id
+)`;
+
+const num = (v: unknown): number => Number(v ?? 0);
+
+/** getPeriodStats: revenue + order count + distinct customers + profit lines for [start, end]. */
+export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const start = intArg(a.startMs, 'startMs');
+  const end = intArg(a.endMs, 'endMs');
+  const nonRev = statuses(a.nonRevenue);
+  const win = [storeId, start, end, ...nonRev];
+  const notIn = `o.status NOT IN (${marks(nonRev.length, 4)})`;
+  const agg = db.all(
+    `SELECT COALESCE(SUM(o.total), 0) AS revenue, COUNT(*) AS orders FROM orders o
+      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
+        AND ${notIn} AND o.payment_status <> 'failed'`,
+    win
+  )[0] as Record<string, unknown>;
+  const cust = db.all(
+    `SELECT COUNT(DISTINCT ${CUSTOMER_KEY}) AS n FROM orders o
+      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3`,
+    [storeId, start, end]
+  )[0] as Record<string, unknown>;
+  const p = db.all(
+    `SELECT
+        SUM(CASE WHEN oi.cost_price IS NOT NULL THEN (oi.price - oi.cost_price) * oi.quantity END) AS profit,
+        SUM(CASE WHEN oi.cost_price IS NOT NULL THEN 1 ELSE 0 END) AS costed_lines,
+        SUM(CASE WHEN oi.cost_price IS NULL THEN 1 ELSE 0 END) AS missing_lines,
+        SUM(CASE WHEN oi.cost_price IS NULL THEN oi.price * oi.quantity END) AS missing_revenue
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
+        AND ${notIn} AND o.payment_status <> 'failed'`,
+    win
+  )[0] as Record<string, unknown>;
+  return {
+    revenue: num(agg.revenue),
+    orders: num(agg.orders),
+    customers: num(cust.n),
+    profit: p.profit === null || p.profit === undefined ? null : num(p.profit),
+    costedLines: num(p.costed_lines),
+    missingLines: num(p.missing_lines),
+    missingRevenue: num(p.missing_revenue),
+  };
+}
+
+/** getSalesChart: revenue + order count per bucket in the viewer's shifted clock. Keys are YYYY-MM-DD (day, week = Monday) or YYYY-MM. */
+export function analyticsSalesOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const start = intArg(a.startMs, 'startMs');
+  const end = intArg(a.endMs, 'endMs');
+  const offset = intArg(a.offsetMinutes, 'offsetMinutes', -840, 840);
+  const g = a.granularity;
+  if (g !== 'day' && g !== 'week' && g !== 'month')
+    throw new MoneyError('BAD_ARGS', 'granularity', 400);
+  const sec = `((o.created_at + ?4 * 60000) / 1000)`;
+  const key =
+    g === 'day'
+      ? `strftime('%Y-%m-%d', ${sec}, 'unixepoch')`
+      : g === 'month'
+        ? `strftime('%Y-%m', ${sec}, 'unixepoch')`
+        : `date(${sec}, 'unixepoch', '-' || ((CAST(strftime('%w', ${sec}, 'unixepoch') AS INTEGER) + 6) % 7) || ' days')`;
+  const rows = db.all(
+    `SELECT ${key} AS k, COALESCE(SUM(o.total), 0) AS revenue, COUNT(*) AS orders FROM orders o
+      WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
+        AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
+        AND o.payment_status <> 'failed'
+      GROUP BY k ORDER BY k ASC`,
+    [storeId, start, end, offset]
+  );
+  return rows.map(r => ({ key: String(r.k), revenue: num(r.revenue), orders: num(r.orders) }));
+}
+
+/** Order lines of revenue-population orders grouped by product (top products / categories) or by price source. */
+export function analyticsItemsOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const start = intArg(a.startMs, 'startMs');
+  const end = intArg(a.endMs, 'endMs');
+  const nonRev = statuses(a.nonRevenue);
+  const base = `FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
+        AND o.status NOT IN (${marks(nonRev.length, 4)}) AND o.payment_status <> 'failed'`;
+  const params = [storeId, start, end, ...nonRev];
+  if (a.by === 'priceSource') {
+    return db
+      .all(
+        `SELECT oi.price_source AS priceSource, oi.price_group_applied AS priceGroupApplied,
+                COALESCE(SUM(oi.quantity), 0) AS quantity, COALESCE(SUM(oi.total), 0) AS total ${base}
+          GROUP BY oi.price_source, oi.price_group_applied`,
+        params
+      )
+      .map(r => ({
+        priceSource: (r.priceSource as string | null) ?? null,
+        priceGroupApplied: r.priceGroupApplied === null ? null : Boolean(r.priceGroupApplied),
+        quantity: num(r.quantity),
+        total: num(r.total),
+      }));
+  }
+  if (a.by !== 'product') throw new MoneyError('BAD_ARGS', 'by', 400);
+  const limit = a.limit === undefined ? null : intArg(a.limit, 'limit', 1, 1000);
+  return db
+    .all(
+      `SELECT oi.product_id AS productId, COALESCE(SUM(oi.quantity), 0) AS quantity, COALESCE(SUM(oi.total), 0) AS total ${base}
+        GROUP BY oi.product_id ORDER BY total DESC, oi.product_id ASC${limit ? ` LIMIT ${limit}` : ''}`,
+      params
+    )
+    .map(r => ({ productId: String(r.productId), quantity: num(r.quantity), total: num(r.total) }));
+}
+
+/** Orders grouped by `status` (not deleted, window) or by `paymentStatus` (revenue statuses only, failed payments included). */
+export function analyticsOrdersByOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const start = intArg(a.startMs, 'startMs');
+  const end = intArg(a.endMs, 'endMs');
+  if (a.by === 'status')
+    return db
+      .all(
+        `SELECT status AS k, COUNT(*) AS count, 0 AS total FROM orders
+          WHERE store_id = ?1 AND deleted_at IS NULL AND created_at >= ?2 AND created_at <= ?3 GROUP BY status`,
+        [storeId, start, end]
+      )
+      .map(r => ({ key: String(r.k), count: num(r.count), total: 0 }));
+  if (a.by !== 'paymentStatus') throw new MoneyError('BAD_ARGS', 'by', 400);
+  const nonRev = statuses(a.nonRevenue);
+  return db
+    .all(
+      `SELECT payment_status AS k, COUNT(*) AS count, COALESCE(SUM(total), 0) AS total FROM orders
+        WHERE store_id = ?1 AND deleted_at IS NULL AND created_at >= ?2 AND created_at <= ?3
+          AND status NOT IN (${marks(nonRev.length, 4)}) GROUP BY payment_status`,
+      [storeId, start, end, ...nonRev]
+    )
+    .map(r => ({ key: String(r.k), count: num(r.count), total: num(r.total) }));
+}
+
+/** getCustomerStats: first-time and returning buyers of the window, and the top spenders by customer id. */
+export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const start = intArg(a.startMs, 'startMs');
+  const end = intArg(a.endMs, 'endMs');
+  const nonRev = statuses(a.nonRevenue);
+  const one = (sql: string, p: unknown[]): number =>
+    num((db.all(sql, p)[0] as Record<string, unknown>).n);
+  // A DO order's `customer_id` is the platform user id (the same id the Postgres `users` row had), so first-time / returning
+  // buyers are counted over the orders, exactly as the Postgres query counts users that have orders.
+  const inWindow = `o.store_id = ?1 AND o.customer_id IS NOT NULL AND o.created_at >= ?2 AND o.created_at <= ?3`;
+  const earlier = `EXISTS (SELECT 1 FROM orders e WHERE e.store_id = ?1 AND e.customer_id = o.customer_id AND e.created_at < ?2)`;
+  const newCustomers = one(
+    `SELECT COUNT(DISTINCT o.customer_id) AS n FROM orders o WHERE ${inWindow} AND NOT ${earlier}`,
+    [storeId, start, end]
+  );
+  const returningCustomers = one(
+    `SELECT COUNT(DISTINCT o.customer_id) AS n FROM orders o WHERE ${inWindow} AND ${earlier}`,
+    [storeId, start, end]
+  );
+  const top = db
+    .all(
+      `SELECT customer_id AS customerId, COALESCE(SUM(total), 0) AS total, COUNT(*) AS count FROM orders
+        WHERE store_id = ?1 AND deleted_at IS NULL AND status NOT IN (${marks(nonRev.length, 2)}) AND payment_status <> 'failed'
+        GROUP BY customer_id ORDER BY total DESC LIMIT 10`,
+      [storeId, ...nonRev]
+    )
+    .map(r => ({
+      customerId: (r.customerId as string | null) ?? null,
+      total: num(r.total),
+      count: num(r.count),
+    }));
+  return { newCustomers, returningCustomers, top };
+}
+
+/** getLowStockProducts: active, inventory-tracked products whose on-hand (variant-aware, active variants only) is <= threshold. */
+export function analyticsLowStockOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const threshold = intArg(a.threshold, 'threshold', -1_000_000, 1_000_000);
+  const onHand = `CASE
+      WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
+      THEN COALESCE((SELECT SUM(pv.inventory) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1), 0)
+      ELSE p.inventory END`;
+  return db
+    .all(
+      `SELECT p.id AS id, p.name AS name, p.slug AS slug, p.sku AS sku, ${onHand} AS inventory,
+              (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position ASC LIMIT 1) AS imageUrl
+         FROM products p
+        WHERE p.store_id = ?1 AND p.status = 'active' AND p.track_inventory = 1
+          AND ${onHand} <= ?2
+        ORDER BY inventory ASC, p.id ASC LIMIT 20`,
+      [storeId, threshold]
+    )
+    .map(r => ({
+      id: String(r.id),
+      name: String(r.name),
+      slug: String(r.slug),
+      sku: (r.sku as string | null) ?? null,
+      inventory: num(r.inventory),
+      imageUrl: (r.imageUrl as string | null) ?? null,
+    }));
+}
+
+/** stockSnapshot: on-hand stock value (STOCK_VALUE_SQL twin) and the open backorder count + demand value (cost of the backordered qty). */
+export function analyticsStockOp(db: SyncSql, storeId: string) {
+  const value = db.all(
+    `SELECT COALESCE(SUM(CASE
+        WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
+        THEN COALESCE((SELECT SUM(pv.inventory * COALESCE(pv.cost_price, p.cost_price, 0))
+                         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1), 0)
+        ELSE p.inventory * COALESCE(p.cost_price, 0) END), 0) AS total
+       FROM products p WHERE p.store_id = ? AND p.deleted_at IS NULL`,
+    [storeId]
+  )[0] as Record<string, unknown>;
+  const bo = db.all(
+    `SELECT COUNT(*) AS count, COALESCE(SUM(bl.qty * COALESCE(pv.cost_price, p.cost_price, 0)), 0) AS value
+       FROM backorder_lines bl
+       JOIN products p ON p.id = bl.product_id
+       LEFT JOIN product_variants pv ON pv.id = bl.variant_id
+      WHERE bl.store_id = ? AND bl.fulfilled_at IS NULL AND bl.cancelled_at IS NULL`,
+    [storeId]
+  )[0] as Record<string, unknown>;
+  return {
+    stockValue: num(value.total),
+    backorderCount: num(bo.count),
+    backorderValue: num(bo.value),
+  };
+}
+
+/** cashflowTrend: daily (UTC day) net movement of the cash accounts 1000/1010/1020/1030, posted and reversed entries. */
+export function analyticsCashflowOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const from = intArg(a.fromMs, 'fromMs');
+  const to = intArg(a.toMs, 'toMs');
+  return db
+    .all(
+      `SELECT (e.posted_at / 86400000) * 86400000 AS day, COALESCE(SUM(l.debit), 0) - COALESCE(SUM(l.credit), 0) AS net
+         FROM journal_lines l
+         JOIN journal_entries e ON e.id = l.entry_id
+         JOIN accounts a ON a.id = l.account_id
+        WHERE e.store_id = ?1 AND e.status IN ('posted', 'reversed') AND e.posted_at BETWEEN ?2 AND ?3
+          AND a.code IN ('1000', '1010', '1020', '1030')
+        GROUP BY day ORDER BY day ASC`,
+      [storeId, from, to]
+    )
+    .map(r => ({ dayMs: num(r.day), net: num(r.net) }));
+}

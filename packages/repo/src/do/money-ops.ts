@@ -12,6 +12,8 @@ import {
   initializeCustomerPoints,
   listMembers,
   loyaltyStoreConfig,
+  expirePoints,
+  awardBirthdays,
   listStoreTransactions,
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
@@ -91,16 +93,39 @@ import {
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import {
+  analyticsCashflowOp,
+  analyticsCustomersOp,
+  analyticsItemsOp,
+  analyticsLowStockOp,
+  analyticsOrdersByOp,
+  analyticsPeriodOp,
+  analyticsSalesOp,
+  analyticsStockOp,
+} from './analytics-reads';
+import {
+  analyticsImportFinishOp,
+  analyticsImportResetOp,
+  analyticsImportOp,
+  analyticsImportStatusOp,
+  qrScanRecordOp,
+  searchInsightsOp,
+  searchLogPurgeOp,
+  searchLogRecordOp,
+  viewRecordOp,
+} from './analytics-ops';
+import {
   expenseDraftOp,
   expenseTransitionOp,
   lastPaidSalesOp,
   orderAnonymizeOp,
   orderStampOp,
+  codMarkPaidOp,
   r2ReferencesOp,
   usageCountsOp,
   vectorCommitOp,
   vectorPlanOp,
   vectorStaleOp,
+  vectorStatusOp,
   vectorVisibleOp,
   webhookEndpointCreateOp,
 } from './job-ops-b';
@@ -148,6 +173,8 @@ export type MoneyOpName =
   | 'loyaltyInit'
   | 'loyaltyReviewBonus'
   | 'loyaltyCustomerPoints'
+  | 'loyaltyExpire'
+  | 'loyaltyBirthdays'
   | 'loyaltyHistory'
   | 'loyaltyMembers'
   | 'loyaltyStats'
@@ -178,6 +205,7 @@ export type MoneyOpName =
   | 'fanoutDisarm'
   | 'paymentEventRecord'
   | 'abandonStamp'
+  | 'codMarkPaid'
   | 'trialBalance'
   | 'periodGlCredits'
   | 'accountTotals'
@@ -240,8 +268,31 @@ export type MoneyOpName =
   | 'vectorPlan'
   | 'vectorCommit'
   | 'vectorStale'
+  | 'vectorStatus'
   | 'vectorVisible'
-  | 'expenseTransition';
+  | 'expenseTransition'
+  | 'searchLogRecord'
+  | 'searchLogPurge'
+  | 'searchInsights'
+  | 'qrScanRecord'
+  | 'viewRecord'
+  | 'analyticsImportStatus'
+  | 'analyticsImport'
+  | 'analyticsImportFinish'
+  | 'analyticsPeriod'
+  | 'analyticsSales'
+  | 'analyticsItems'
+  | 'analyticsOrdersBy'
+  | 'analyticsCustomers'
+  | 'analyticsLowStock'
+  | 'analyticsStock'
+  | 'analyticsCashflow'
+  | 'analyticsImportReset';
+function boundedInt(v: unknown, name: string, min: number, max: number): number {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
+    throw new MoneyError('BAD_ARGS', name, 400);
+  return v;
+}
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -250,6 +301,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyInit',
   'loyaltyReviewBonus',
   'loyaltyCustomerPoints',
+  'loyaltyExpire',
+  'loyaltyBirthdays',
   'loyaltyHistory',
   'loyaltyMembers',
   'loyaltyStats',
@@ -280,6 +333,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fanoutDisarm',
   'paymentEventRecord',
   'abandonStamp',
+  'codMarkPaid',
   'trialBalance',
   'periodGlCredits',
   'accountTotals',
@@ -342,8 +396,26 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'vectorPlan',
   'vectorCommit',
   'vectorStale',
+  'vectorStatus',
   'vectorVisible',
   'expenseTransition',
+  'searchLogRecord',
+  'searchLogPurge',
+  'searchInsights',
+  'qrScanRecord',
+  'viewRecord',
+  'analyticsImportStatus',
+  'analyticsImport',
+  'analyticsImportFinish',
+  'analyticsPeriod',
+  'analyticsSales',
+  'analyticsItems',
+  'analyticsOrdersBy',
+  'analyticsCustomers',
+  'analyticsLowStock',
+  'analyticsStock',
+  'analyticsCashflow',
+  'analyticsImportReset',
 ];
 
 const TABLE = '_money_ops';
@@ -399,6 +471,22 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       productId: id(a.productId, 'productId'),
       reviewId: id(a.reviewId, 'reviewId'),
       featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyBirthdays: (db, storeId, a) =>
+    awardBirthdays(db, {
+      storeId,
+      now: Date.now(),
+      month: boundedInt(a.month, 'month', 1, 12),
+      day: boundedInt(a.day, 'day', 1, 31),
+      yearStart: boundedInt(a.yearStart, 'yearStart', 0, Number.MAX_SAFE_INTEGER),
+      featureEnabled: a.featureEnabled === true,
+    }),
+  loyaltyExpire: (db, storeId, a) =>
+    expirePoints(db, {
+      storeId,
+      now: Date.now(),
+      after: typeof a.after === 'string' ? a.after : null,
+      limit: typeof a.limit === 'number' ? a.limit : undefined,
     }),
   loyaltyCustomerPoints: (db, storeId, a) =>
     getCustomerPoints(db, {
@@ -707,7 +795,11 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       storeId,
       a.input as ApplyRatesInput,
       a.feed
-        ? { feed: a.feed as Record<string, unknown>, forcePending: a.forcePending === true }
+        ? {
+            feed: a.feed as Record<string, unknown>,
+            forcePending: a.forcePending === true,
+            skipJumpGate: a.skipJumpGate === true,
+          }
         : { userId: id(a.userId, 'userId') }
     ),
   goldDecidePending: (db, storeId, a) =>
@@ -736,8 +828,29 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   trialBalance: (db, storeId) => trialBalanceOp(db, storeId),
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
+  codMarkPaid: (db, storeId, a) => codMarkPaidOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  /** Per-store analytics on the DO (Ruling NZ-AN-1): see `analytics-ops.ts`. */
+  searchLogRecord: (db, storeId, a) => searchLogRecordOp(db, storeId, a),
+  searchLogPurge: (db, storeId, a) => searchLogPurgeOp(db, storeId, a),
+  searchInsights: (db, storeId, a) => searchInsightsOp(db, storeId, a),
+  qrScanRecord: (db, storeId, a) => qrScanRecordOp(db, storeId, a),
+  viewRecord: (db, storeId, a) => viewRecordOp(db, storeId, a),
+  analyticsImportStatus: (db, storeId) => analyticsImportStatusOp(db, storeId),
+  analyticsImport: (db, storeId, a) => analyticsImportOp(db, storeId, a),
+  analyticsImportFinish: (db, storeId, a) => analyticsImportFinishOp(db, storeId, a),
+  /** Merchant analytics reads (analytics-reads.ts): reads, a retry is a fresh read. */
+  analyticsPeriod: (db, storeId, a) => analyticsPeriodOp(db, storeId, a),
+  analyticsSales: (db, storeId, a) => analyticsSalesOp(db, storeId, a),
+  analyticsItems: (db, storeId, a) => analyticsItemsOp(db, storeId, a),
+  analyticsOrdersBy: (db, storeId, a) => analyticsOrdersByOp(db, storeId, a),
+  analyticsCustomers: (db, storeId, a) => analyticsCustomersOp(db, storeId, a),
+  analyticsLowStock: (db, storeId, a) => analyticsLowStockOp(db, storeId, a),
+  analyticsStock: (db, storeId) => analyticsStockOp(db, storeId),
+  analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),
+  analyticsImportReset: (db, storeId, a) => analyticsImportResetOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
+  vectorStatus: (db, storeId) => vectorStatusOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),
   vectorCommit: (db, storeId, a) => vectorCommitOp(db, storeId, a),

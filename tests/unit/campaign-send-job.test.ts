@@ -39,6 +39,7 @@ vi.mock('@ebda/database', () => ({
     return holder.prisma;
   },
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  runInStoreScope: (_storeId: string, fn: () => unknown) => fn(),
   withStore: (_storeId: string, fn: (tx: unknown) => unknown) => fn(holder.prisma),
 }));
 

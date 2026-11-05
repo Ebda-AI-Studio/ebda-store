@@ -28,6 +28,7 @@ const dbMock = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: dbMock,
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  runInStoreScope: (_s: string, fn: () => unknown) => fn(),
   // the cart event reads `Store` (a platform row) with withStore
   withStore: (_s: string, fn: (tx: unknown) => unknown) => fn(dbMock),
 }));

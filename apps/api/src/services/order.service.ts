@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
 import { matchingCustomers, type CustomerMatches } from './admin-search.service';
 export {
@@ -108,6 +109,18 @@ import {
   type CreateOrderArgs,
   type MoneyClient,
 } from '../lib/repo-factory';
+
+/**
+ * The store's `settings` + `timezone` from its own backend (NEON-ZERO-1 N-4): a Durable Object store's record is its DO, a
+ * Postgres store keeps the `withStore` read it always had. Same row, same select.
+ */
+async function readStoreSettings(storeId: string) {
+  const query = { where: { id: storeId }, select: { settings: true, timezone: true } } as const;
+  const repo = await storeRepo(storeId);
+  return repo.backend === 'do'
+    ? repo.db.store.findUnique(query)
+    : withStore(storeId, tx => tx.store.findUnique(query));
+}
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -492,12 +505,15 @@ async function attachCustomers<T extends { customerId: string | null }>(
   select: Prisma.UserSelect
 ): Promise<T[]> {
   const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
-  const users = ids.length
-    ? await prisma.user.findMany({
-        where: { id: { in: ids }, storeId },
-        select: { id: true, ...select },
-      })
-    : [];
+  const doRows = await customerRows(storeId, ids);
+  const users: Array<{ id: string }> = doRows
+    ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
+    : ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids }, storeId },
+          select: { id: true, ...select },
+        })
+      : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => ({
     ...r,
@@ -1302,12 +1318,7 @@ export class OrderService {
     // checkout path; the storefront cart/checkout mirror it for UX only.
     // Deliberately NOT applied to OrderService.createAdminOrder — merchants
     // must be able to override the minimum for phone/manual orders.
-    const storeForMinOrder = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { settings: true, timezone: true },
-      })
-    );
+    const storeForMinOrder = await readStoreSettings(storeId);
     // Ruling SHARIA-GOLD-1: a gold order is prepaid online unless the merchant allowed COD / installments.
     // The check runs here, in the request that creates the order, whatever the checkout showed.
     assertGoldPaymentAllowed({
@@ -2549,9 +2560,8 @@ export class OrderService {
     // A quote never refuses on it.
     let orderNotes: string | undefined = data.notes;
     // ONE primary-key read of the store row, shared by the delivery note and the per-store hold caps (QA-HOLDS-1).
-    const storeRow = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
-    );
+    // From the store's own backend (a Durable Object store's record is its DO, NEON-ZERO-1 N-4); same row, same select.
+    const storeRow = await readStoreSettings(storeId);
     if (!isQuote) {
       const leads = await (
         await storeDb(storeId)
@@ -4050,10 +4060,14 @@ export class OrderService {
     // fabricated order and their name + email read back through the order
     // detail include. Validate it the same way.
     if (data.customerId) {
-      const customer = await prisma.user.findFirst({
-        where: { id: data.customerId, storeId, role: 'customer' },
-        select: { id: true, status: true, deletedAt: true },
-      });
+      const doCustomer = await customerRow(storeId, data.customerId);
+      const customer =
+        doCustomer !== undefined
+          ? doCustomer
+          : await prisma.user.findFirst({
+              where: { id: data.customerId, storeId, role: 'customer' },
+              select: { id: true, status: true, deletedAt: true },
+            });
       if (!customer) {
         throw new AppError(404, 'NOT_FOUND', 'Customer not found for this store');
       }
@@ -4334,7 +4348,9 @@ export class OrderService {
     if (data.couponCode) {
       // Active coupons of THIS store only — an override bypasses the rules,
       // never the merchant's own on/off switch.
-      appliedCoupon = await prisma.coupon.findFirst({
+      appliedCoupon = await (
+        await storeDb(storeId)
+      ).coupon.findFirst({
         where: {
           storeId,
           code: { equals: data.couponCode, mode: 'insensitive' },

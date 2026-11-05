@@ -110,7 +110,6 @@ describe('refusals (nothing ported silently)', () => {
     'Payment',
     'Refund',
     'StockReservation',
-    'Coupon',
     'LedgerEntry',
     'Store',
     'User',
@@ -317,5 +316,137 @@ describe('procedures (PR D1b)', () => {
       })
     ).toMatchObject({ ok: false, code: 'BAD_PROC_ARGS' });
     expect(r.count('products')).toBe(1);
+  });
+});
+
+describe('audit trail is append-only on the DO write path (N-10d security review)', () => {
+  const audit = (id: string, extra: Record<string, unknown> = {}) => ({
+    model: 'AuditLog',
+    op: 'create' as const,
+    args: {
+      data: {
+        id,
+        action: 'a',
+        resourceType: 't',
+        storeId: STORE,
+        userId: 'u1',
+        details: {},
+        ...extra,
+      },
+    },
+  });
+
+  it('create works; update / updateMany / upsert / delete / deleteMany are refused and change nothing', async () => {
+    const r = rig();
+    expect((await r.run({ ops: [audit('r1')] })).ok).toBe(true);
+    for (const op of ['update', 'updateMany', 'upsert', 'delete', 'deleteMany'] as const) {
+      const out = await r.run({
+        ops: [{ model: 'AuditLog', op, args: { where: { id: 'r1' }, data: { action: 'x' } } }],
+      });
+      expect(out, op).toMatchObject({ ok: false, code: 'AUDIT_APPEND_ONLY' });
+    }
+    expect(r.count('audit_logs')).toBe(1);
+  });
+
+  it('the named procedures do the three narrow edits and refuse a young purge', async () => {
+    const r = rig();
+    await r.run({
+      ops: [
+        audit('r1', { action: 'agent.write.denied', details: { count: 1 } }),
+        audit('r2', { userId: 'u2', action: 'agent.write.denied', details: { count: 1 } }),
+        audit('r3'),
+      ],
+    });
+    const proc = (op: string, args: Record<string, unknown>) =>
+      r.run({ ops: [{ model: '$proc', op, args } as never] });
+    expect(
+      await proc('auditSetDetails', { id: 'r1', storeId: STORE, details: { count: 5 } })
+    ).toMatchObject({ ok: true });
+    expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r1'`).get()).toEqual({
+      details: '{"count":5}',
+    });
+    // another store's id changes nothing
+    await proc('auditSetDetails', { id: 'r2', storeId: 'other', details: { count: 9 } });
+    expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r2'`).get()).toEqual({
+      details: '{"count":1}',
+    });
+    // a row that is not a coalesced agent-denial row (r3: other action, no count) is never rewritten; nor is a bad shape
+    await proc('auditSetDetails', { id: 'r3', storeId: STORE, details: { count: 3 } });
+    expect(r.db.prepare(`SELECT details FROM audit_logs WHERE id='r3'`).get()).toEqual({
+      details: '{}',
+    });
+    expect(
+      await proc('auditSetDetails', { id: 'r1', storeId: STORE, details: { x: 1 } })
+    ).toMatchObject({
+      ok: false,
+    });
+    await proc('auditUnlinkUser', { userId: 'u2' });
+    expect(r.db.prepare(`SELECT user_id FROM audit_logs WHERE id='r2'`).get()).toEqual({
+      user_id: null,
+    });
+    expect(await proc('auditPurge', { before: Date.now(), upToId: 'zzz' })).toMatchObject({
+      ok: false,
+    });
+    expect(r.count('audit_logs')).toBe(3);
+    await proc('auditPurge', { before: Date.now() - 40 * 86_400_000, upToId: 'zzz' });
+    expect(r.count('audit_logs')).toBe(3); // nothing is that old
+  });
+
+  it('customerSetGroup / customerCreateInGroup move ONLY the group, inside the store, and roll back with the batch', async () => {
+    const r = rig();
+    const T = Date.now();
+    r.db
+      .prepare(
+        `INSERT INTO customer_groups (id, store_id, name, created_at, updated_at) VALUES ('g1', ?, 'Wholesale', ?, ?), ('gx', 'other', 'Foreign', ?, ?)`
+      )
+      .run(STORE, T, T, T, T);
+    const proc = (op: string, args: Record<string, unknown>) =>
+      r.run({ ops: [{ model: '$proc', op, args } as never] });
+    const made = await proc('customerCreateInGroup', {
+      id: 'c1',
+      storeId: STORE,
+      email: 'a@x.test',
+      firstName: 'A',
+      lastName: 'B',
+      userId: 'u1',
+      groupId: 'g1',
+    });
+    expect(made).toMatchObject({ ok: true });
+    expect(decodeRpc((made as { json: string }).json)).toEqual([
+      { id: 'c1', groupId: 'g1', group: { id: 'g1', name: 'Wholesale', nameAr: null } },
+    ]);
+    // a group of another store is refused and nothing is written
+    expect(
+      await proc('customerCreateInGroup', {
+        id: 'c2',
+        storeId: STORE,
+        email: null,
+        firstName: 'A',
+        lastName: 'B',
+        groupId: 'gx',
+      })
+    ).toMatchObject({ ok: false, message: 'group not found' });
+    expect(r.count('customers')).toBe(1);
+    // the same user twice is a unique violation (P2002), not a second row
+    expect(
+      await proc('customerCreateInGroup', {
+        id: 'c3',
+        storeId: STORE,
+        firstName: 'A',
+        lastName: 'B',
+        userId: 'u1',
+        groupId: 'g1',
+      })
+    ).toMatchObject({ ok: false, code: 'P2002' });
+    // set / clear the group; another store's customer id changes nothing and answers not found
+    expect(
+      await proc('customerSetGroup', { storeId: STORE, customerId: 'c1', groupId: null })
+    ).toMatchObject({ ok: true });
+    expect(r.db.prepare(`SELECT group_id FROM customers WHERE id='c1'`).get()).toEqual({
+      group_id: null,
+    });
+    expect(
+      await proc('customerSetGroup', { storeId: 'other', customerId: 'c1', groupId: null })
+    ).toMatchObject({ ok: false, message: 'customer not found' });
   });
 });

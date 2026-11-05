@@ -3,6 +3,7 @@ import { GeminiFailoverClient } from './gemini-keys';
 import { currentStoreId } from '@ebda/database';
 import { storeDb, storeWriter } from '../repo-factory';
 import { config } from '../../config';
+import { AppError } from '../../middleware/error-handler';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
 import { rethrowAsAppError } from './gemini-errors';
@@ -252,11 +253,15 @@ export async function draftOwnerResponse(
       title: true,
       body: true,
       language: true,
-      store: { select: { name: true, nameAr: true } },
       product: { select: { name: true, nameAr: true } },
     },
   });
-  if (!review) throw new Error(`Review ${reviewId} not found`);
+  if (!review) throw new AppError(404, 'NOT_FOUND', 'Review not found');
+  // `store` lives in the platform database on a Durable Object store (an external relation prisma-lite cannot join): read it flat.
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({ where: { id: storeId }, select: { name: true, nameAr: true } });
+  if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
   const prompt = `You are helping an Egypt merchant draft a professional, warm response to a customer's product review. Match the tone (positive review → thank them genuinely; negative → empathize + offer to make it right). Keep responses concise (1-3 sentences).
 
@@ -266,7 +271,7 @@ Write BOTH versions in JSON: { "en": "...", "ar": "..." }
 
 Sign off with the store name, no other branding.
 
-Store: ${review.store.name}${review.store.nameAr ? ` (${review.store.nameAr})` : ''}
+Store: ${store.name}${store.nameAr ? ` (${store.nameAr})` : ''}
 Product: ${review.product.name}${review.product.nameAr ? ` (${review.product.nameAr})` : ''}
 Review:
 - rating: ${review.rating}/5

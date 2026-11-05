@@ -6,7 +6,7 @@ import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { storefrontOrigin } from '@ebda/shared';
-import { storeDb, storeStock, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeStock, storeWriter } from '../lib/repo-factory';
 import { notifyCatalogChanged } from '../lib/wa/catalog-state';
 
 interface InventoryAdjustment {
@@ -39,11 +39,85 @@ interface ProductInventory {
   stockValue: number;
 }
 
+interface DoStockRow {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  sku: string | null;
+  onHand: number;
+  stockValue: number;
+  lowStockThreshold: number;
+  trackInventory: boolean;
+  costPrice: number | null;
+  status: string;
+}
+
+async function isDoStore(storeId: string): Promise<boolean> {
+  return (await storeRepo(storeId)).backend === 'do';
+}
+
+/**
+ * The variant-aware on-hand and stock value of a Durable Object store's live products: the JS twin of ON_HAND_SQL /
+ * STOCK_VALUE_SQL (effective-inventory-sql.ts). A product with ANY variant row is a variant product: only ACTIVE variants
+ * count, a variant is valued at its own cost, falling back to the parent's, then 0. Without variants: inventory * cost.
+ * `all: false` keeps only the products that track inventory (the stats / alert populations); `all: true` keeps every live
+ * product (the listing).
+ */
+async function doStockRows(storeId: string, opts: { all?: boolean } = {}): Promise<DoStockRow[]> {
+  const db = await storeDb(storeId);
+  const products = await db.product.findMany({
+    where: opts.all
+      ? { storeId, deletedAt: null }
+      : { storeId, deletedAt: null, trackInventory: true },
+    select: {
+      id: true,
+      name: true,
+      nameAr: true,
+      sku: true,
+      inventory: true,
+      lowStockThreshold: true,
+      trackInventory: true,
+      costPrice: true,
+      status: true,
+      variants: { select: { inventory: true, costPrice: true, isActive: true } },
+    },
+  });
+  return products.map(p => {
+    const vs = p.variants ?? [];
+    const active = vs.filter(v => v.isActive !== false);
+    const hasVariants = vs.length > 0;
+    return {
+      id: p.id,
+      name: p.name,
+      nameAr: p.nameAr,
+      sku: p.sku,
+      onHand: hasVariants ? active.reduce((n, v) => n + (v.inventory ?? 0), 0) : p.inventory,
+      stockValue: hasVariants
+        ? active.reduce((n, v) => n + (v.inventory ?? 0) * (v.costPrice ?? p.costPrice ?? 0), 0)
+        : p.inventory * (p.costPrice ?? 0),
+      lowStockThreshold: p.lowStockThreshold,
+      trackInventory: p.trackInventory,
+      costPrice: p.costPrice,
+      status: String(p.status),
+    };
+  });
+}
+
 export class InventoryService {
   /**
    * Get inventory statistics for a store
    */
   static async getStats(storeId: string): Promise<InventoryStats> {
+    if (await isDoStore(storeId)) {
+      const rows = await doStockRows(storeId);
+      return {
+        totalProducts: rows.length,
+        totalStock: rows.reduce((n, r) => n + r.onHand, 0),
+        lowStockCount: rows.filter(r => r.onHand > 0 && r.onHand <= r.lowStockThreshold).length,
+        outOfStockCount: rows.filter(r => r.onHand <= 0).length,
+        totalValue: rows.reduce((n, r) => n + r.stockValue, 0),
+      };
+    }
     // ONE variant-aware pass. This was four separate queries reading
     // `products.inventory` directly, so every variant product contributed its
     // unused parent column (0, or a drifted negative) instead of its real
@@ -107,6 +181,41 @@ export class InventoryService {
     const page = Math.max(1, options?.page || 1);
     const limit = Math.min(500, Math.max(1, options?.limit || 20));
     const skip = (page - 1) * limit;
+
+    if (await isDoStore(storeId)) {
+      // Durable Object store: the same filter/sort/page as the SQL below, over the store's own rows (no raw SQL on the DO).
+      const needle = options?.search?.trim().toLowerCase();
+      let rows = await doStockRows(storeId, { all: true });
+      if (needle)
+        rows = rows.filter(
+          r =>
+            r.name.toLowerCase().includes(needle) ||
+            (r.nameAr ?? '').toLowerCase().includes(needle) ||
+            (r.sku ?? '').toLowerCase().includes(needle)
+        );
+      const f = options?.stockFilter;
+      if (f === 'out_of_stock') rows = rows.filter(r => r.onHand <= 0);
+      else if (f === 'low_stock')
+        rows = rows.filter(
+          r => r.trackInventory && r.onHand > 0 && r.onHand <= r.lowStockThreshold
+        );
+      else if (f === 'in_stock')
+        rows = rows.filter(r => r.trackInventory && r.onHand > r.lowStockThreshold);
+      const dir = options?.sortOrder === 'desc' ? -1 : 1;
+      const key = (r: DoStockRow): string | number =>
+        options?.sortBy === 'name' ? r.name : options?.sortBy === 'sku' ? (r.sku ?? '') : r.onHand;
+      rows.sort((a, b) => {
+        const x = key(a);
+        const y = key(b);
+        const c = typeof x === 'number' ? x - (y as number) : x.localeCompare(y as string);
+        return c * dir || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      });
+      const total = rows.length;
+      return {
+        products: rows.slice(skip, skip + limit).map(r => this.toInventoryRow(r)),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    }
 
     // Raw SQL because every part of this — the stock filter, the sort and the
     // displayed quantity — needs the VARIANT-AWARE on-hand, and two of them
@@ -199,6 +308,12 @@ export class InventoryService {
    * every variant product as out-of-stock and none as low-stock.
    */
   static async getLowStockAlerts(storeId: string): Promise<ProductInventory[]> {
+    if (await isDoStore(storeId)) {
+      const rows = (await doStockRows(storeId)).sort((a, b) => a.onHand - b.onHand);
+      const out = rows.filter(r => r.onHand <= 0).slice(0, 100);
+      const low = rows.filter(r => r.onHand > 0 && r.onHand <= r.lowStockThreshold).slice(0, 100);
+      return [...out, ...low].map(r => this.toInventoryRow(r));
+    }
     // Products that are low on stock (0 < inventory <= low_stock_threshold)
     const lowStockProducts = await prisma.$queryRaw<
       Array<{
@@ -775,18 +890,19 @@ export class InventoryService {
     productId: string,
     options?: { page?: number; limit?: number }
   ) {
+    const db = await storeDb(storeId);
     const page = options?.page || 1;
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
 
     const [history, total] = await Promise.all([
-      prisma.inventoryHistory.findMany({
+      db.inventoryHistory.findMany({
         where: { storeId, productId },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.inventoryHistory.count({
+      db.inventoryHistory.count({
         where: { storeId, productId },
       }),
     ]);
@@ -815,6 +931,7 @@ export class InventoryService {
       endDate?: Date;
     }
   ) {
+    const db = await storeDb(storeId);
     const page = options?.page || 1;
     const limit = options?.limit || 50;
     const skip = (page - 1) * limit;
@@ -836,7 +953,7 @@ export class InventoryService {
     }
 
     const [history, total] = await Promise.all([
-      prisma.inventoryHistory.findMany({
+      db.inventoryHistory.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip,
@@ -852,7 +969,7 @@ export class InventoryService {
           },
         },
       }),
-      prisma.inventoryHistory.count({ where }),
+      db.inventoryHistory.count({ where }),
     ]);
 
     return {
@@ -955,6 +1072,22 @@ export class InventoryService {
   }
 
   // Helper: Determine stock status
+  private static toInventoryRow(r: DoStockRow): ProductInventory {
+    return {
+      id: r.id,
+      name: r.name,
+      nameAr: r.nameAr,
+      sku: r.sku,
+      inventory: r.onHand,
+      lowStockThreshold: r.lowStockThreshold,
+      trackInventory: r.trackInventory,
+      costPrice: r.costPrice,
+      status: r.status,
+      stockStatus: this.getStockStatus(r.onHand, r.lowStockThreshold),
+      stockValue: r.stockValue,
+    };
+  }
+
   private static getStockStatus(
     inventory: number,
     threshold: number

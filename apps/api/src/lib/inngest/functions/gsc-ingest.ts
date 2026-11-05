@@ -26,7 +26,7 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext, storeDirectory, withStore } from '@ebda/database';
+import { allStoresDirectory, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
@@ -79,7 +79,7 @@ export async function ingestStoreGsc(
     // runGscIngest uses bare prisma internally. Wrap in runInTenantContext
     // so FORCE RLS policies see the correct store GUC for the
     // GscDailyMetric read/upsert.
-    const result = await runInTenantContext(storeId, () => runGscIngest(storeId, opts));
+    const result = await runInStoreCtx(storeId, () => runGscIngest(storeId, opts));
     if (result.skipped) {
       return { storeId, skipped: result.skipped, date: result.date };
     }
@@ -111,7 +111,7 @@ const gscIngestCronFn = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 4 * * *' }], // 04:00 UTC daily
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Dormant until credentialed: no service account configured → log +
     // return immediately, BEFORE any store enumeration. Ahmad confirmed
     // Force manages a single Google service account (gsc-client.ts) — until
@@ -126,8 +126,10 @@ const gscIngestCronFn = inngest.createFunction(
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set yet).
     const stores = await step.run('list-stores', () =>
-      // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory(
+      // `stores` is under RLS: a cron lists stores through the directory definer. Durable Object stores are listed too
+      // (Ruling NZ-AN-1): one cron serves every store, the ingest reads each through its own backend.
+      allStoresDirectory(
+        event,
         s =>
           s.status === 'active' &&
           s.hasDomain &&
@@ -200,8 +202,8 @@ export const gscIngestOnDemand: JobDef = inngest.createFunction(
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts` / `answer-engine-citation-scan.ts`'s on-demand
     // plan gate).
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    const store = await withStoreDb(storeId, db =>
+      db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
     );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
@@ -214,7 +216,7 @@ export const gscIngestOnDemand: JobDef = inngest.createFunction(
     // On-demand also runs without HTTP tenant context — wrap so FORCE RLS
     // sees the correct GUC.
     const result = await step.run(`gsc-${storeId}`, () =>
-      runInTenantContext(storeId, () => runGscIngest(storeId))
+      runInStoreCtx(storeId, () => runGscIngest(storeId))
     );
 
     logger.info({ storeId, ...result }, 'gsc-ingest-on-demand completed');

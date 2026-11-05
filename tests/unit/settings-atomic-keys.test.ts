@@ -36,6 +36,11 @@ vi.mock('@ebda/database', () => {
   //   UPDATE stores SET settings = coalesce(settings,'{}') || $patch   (merge)
   //   UPDATE stores SET settings = jsonb_set(..., ARRAY[$key], $value)  (one key)
   const $queryRaw = async (strings: TemplateStringsArray, ...vals: unknown[]) => {
+    if (strings.join('?').includes('jsonb_set')) {
+      // one key (RETURNING the whole value, N-19: the DO copy gets it without a re-read)
+      db.row.settings = { ...db.row.settings, [vals[0] as string]: JSON.parse(vals[1] as string) };
+      return [{ settings: structuredClone(db.row.settings) }];
+    }
     expect(strings.join('?')).toContain('||');
     db.row.settings = { ...db.row.settings, ...JSON.parse(vals[0] as string) };
     return [{ settings: structuredClone(db.row.settings) }];

@@ -6,6 +6,7 @@ import {
 import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { isDemoStore } from '../lib/demo-store';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 import { StoreMailer } from './store-mailer.service';
 import { sendMail } from './mail-transport';
@@ -439,6 +440,24 @@ export class EmailService {
   }
 
   /**
+   * THE choke point for every merchant-facing store mail (owner/staff notices: gold rate, low stock, plan limit, webhook,
+   * billing, wholesale). A demo store (`is_demo`, the looks showroom) has no merchant: nothing is sent and the skip is logged
+   * at info. Customer-facing mail keeps `sendForStore` (a demo refuses every order and customer signup, so none exists).
+   * Add every new merchant notice here, never straight to `sendForStore`.
+   */
+  private static async sendMerchantNotice(
+    storeId: string,
+    args: Parameters<typeof EmailService.sendForStore>[1],
+    opts?: { queue?: boolean }
+  ): Promise<void> {
+    if (await isDemoStore(storeId)) {
+      logger.info({ storeId, subject: args.subject }, 'merchant notice skipped: demo store');
+      return;
+    }
+    await this.sendForStore(storeId, args, opts);
+  }
+
+  /**
    * Platform-level send (Ebda sender, no store branding): a store's refund alert to its own
    * order address (FU46-1a). (The old contact-form fallback to Ebda's inbox is gone — FU46-1c.)
    */
@@ -641,7 +660,11 @@ export class EmailService {
       pendingCount: args.pendingCount,
       adminUrl: args.adminUrl,
     });
-    await this.sendForStore(storeId, { to, subject, content, language: lang }, { queue: true });
+    await this.sendMerchantNotice(
+      storeId,
+      { to, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   static async sendWholesaleNotice(
@@ -1134,7 +1157,7 @@ export class EmailService {
     };
     const subject = lowStockAlertTemplate.subject[lang](alertData);
     const content = lowStockAlertTemplate[lang](alertData);
-    await this.sendForStore(storeId, { to: data.to, subject, content, language: lang });
+    await this.sendMerchantNotice(storeId, { to: data.to, subject, content, language: lang });
   }
 
   /**
@@ -1156,7 +1179,7 @@ export class EmailService {
         (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     const tpl = GOLD_RATE_NOTICES[kind];
-    await this.sendForStore(storeId, {
+    await this.sendMerchantNotice(storeId, {
       to: data.to,
       subject: tpl.subject[lang](),
       content: tpl[lang](data),
@@ -1174,7 +1197,7 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     const lang: 'en' | 'ar' = language ?? 'en';
-    await this.sendForStore(storeId, {
+    await this.sendMerchantNotice(storeId, {
       to: data.to,
       subject: planLimitReachedTemplate.subject[lang](data),
       content: planLimitReachedTemplate[lang](data),
@@ -1189,7 +1212,7 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     const lang: 'en' | 'ar' = language ?? 'ar';
-    await this.sendForStore(
+    await this.sendMerchantNotice(
       storeId,
       {
         to: data.to,
@@ -1211,7 +1234,7 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     const lang: 'en' | 'ar' = language ?? 'en';
-    await this.sendForStore(
+    await this.sendMerchantNotice(
       storeId,
       {
         to: data.to,

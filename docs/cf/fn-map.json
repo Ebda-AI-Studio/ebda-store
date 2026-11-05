@@ -48,9 +48,9 @@
     "test": "identity track"
   },
   "ebda_ai_usage_count": {
-    "target": "analytics",
-    "replacement": "analytics.aiUsageCount(storeId, window) over Analytics Engine SQL",
-    "test": "packages/repo/test/contract/analytics.contract.ts"
+    "target": "d1",
+    "replacement": "countAiUsage(): prisma.aiUsage.count over D1 ai_usage (family ai-usage, Ruling NZ-AN-1); the definer stays only for the Postgres leg until the marker",
+    "test": "tests/unit/ai-usage-on-d1.test.ts"
   },
   "ebda_ar_norm": {
     "target": "store-do",
@@ -323,6 +323,11 @@
   "ebda_wbs_bridge_keys": {
     "target": "deleted-by-construction",
     "replacement": "dropped with the legacy WBS bridge by migration 20261103000100_drop_legacy_wa_bridge (#223); nothing to port, the DO/D1 schema never has it"
+  },
+  "ebda_webhook_inbox_by_key": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.record (unique idempotency_key lookup, services/platform/platform-d1.ts)",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
   },
   "ebda_webhook_inbox_get": {
     "target": "d1",

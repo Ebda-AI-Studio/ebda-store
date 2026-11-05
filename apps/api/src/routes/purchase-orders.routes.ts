@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
-import { runInTenantContext } from '@ebda/database';
+
 import {
   createPurchaseOrder,
   receivePurchaseOrder,
@@ -12,6 +12,7 @@ import {
   getPurchaseOrder,
   cancelPurchaseOrder,
 } from '../services/accounting/purchase-order.service';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router();
 
@@ -70,7 +71,7 @@ router.get(
   async (req, res, next) => {
     try {
       const { status, page, perPage, q } = listQuerySchema.parse(req.query);
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         listPurchaseOrders(req.params.storeId, { status, page, perPage, q })
       );
       res.json({
@@ -96,7 +97,7 @@ router.get(
   requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         getPurchaseOrder(req.params.storeId, req.params.id)
       );
       if (!data) {
@@ -134,7 +135,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         createPurchaseOrder({
           storeId: req.params.storeId,
           ...body.data,
@@ -170,7 +171,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         receivePurchaseOrder({
           storeId: req.params.storeId,
           poId: req.params.id,
@@ -194,7 +195,7 @@ router.post(
   writeLimiter,
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         cancelPurchaseOrder(req.params.storeId, req.params.id)
       );
       res.json({ data });

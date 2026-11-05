@@ -1,4 +1,4 @@
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { EmailService } from '../../../services/email.service';
 import { signReviewToken } from '../../review-token';
 import logger from '../../logger';
@@ -7,7 +7,7 @@ import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { storeOrigin } from '@ebda/shared';
 import { storeDb, storeMoney } from '../../repo-factory';
-import { customersById, runInStoreCtx } from '../../jobs/store-db';
+import { customersById, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 
 /**
  * Post-purchase review request — fires when an order transitions to
@@ -137,8 +137,8 @@ export const reviewRequest: JobDef = inngest.createFunction(
     // ── Resolve store base URL ─────────────────────────────────────────────
     const store = await step.run('load-store', () =>
       // `Store` is a platform row (D1), read for either backend
-      withStore(storeId, tx =>
-        tx.store.findUnique({
+      withStoreDb(storeId, db =>
+        db.store.findUnique({
           where: { id: storeId },
           select: { slug: true, domain: true },
         })

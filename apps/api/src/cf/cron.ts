@@ -10,10 +10,14 @@
  * nothing), the CSRF / view-debounce sweeps (the state is shared and TTL'd), and the
  * email/SMS queue loops (Cloudflare Queues consumers, cf/queues.ts).
  */
+import { withReachLabel } from '@ebda/database';
+import { alertIfStoreCreateMisconfigured } from '../lib/store-create-config';
 import { abandonedCartService } from '../services/abandoned-cart.service';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { loyaltyAutomationService } from '../services/loyalty-automation.service';
 import { AuthService } from '../services/auth.service';
+import { processDeferredBillingWebhooks } from '../services/billing/subscription-billing.service';
+import { reconcilePayments } from '../services/billing/payments-reconcile.service';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
@@ -40,7 +44,18 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
   ],
   // Abandoned-cart reminder emails (was every 15 min).
-  '*/15 * * * *': [{ name: 'abandoned-cart', run: () => abandonedCartService.process() }],
+  '*/15 * * * *': [
+    { name: 'abandoned-cart', run: () => abandonedCartService.process() },
+    // Billing webhooks stored during a cutover freeze (NEON-ZERO N-10): apply them once the freeze is lifted.
+    { name: 'billing-deferred-webhooks', run: () => processDeferredBillingWebhooks() },
+    // InstaPay receipts / manual-payment claims left half-done by a dead Worker (N-10d): complete or roll back, P1 if undecidable.
+    { name: 'payments-reconcile', run: () => reconcilePayments() },
+    // NZ-PG-9: all markers set + no Hyperdrive + STORE_CREATE_ON_DO unset = every store creation fails: P1.
+    {
+      name: 'store-create-config',
+      run: async () => void (await alertIfStoreCreateMisconfigured()),
+    },
+  ],
   // Carrier tracking poll (was every 30 min).
   '*/30 * * * *': [
     { name: 'shipping-tracking', run: () => shippingCarrierService.runTrackingCron() },
@@ -90,7 +105,7 @@ export async function runScheduled(
     jobs.map(async job => {
       if (frozen) return deferLegacyJob(cron, job.name, scheduledTime);
       try {
-        await job.run();
+        await withReachLabel(job.name, () => job.run());
         logger.info({ cron, job: job.name }, '[cron] job done');
         return { name: job.name, ok: true };
       } catch (err) {

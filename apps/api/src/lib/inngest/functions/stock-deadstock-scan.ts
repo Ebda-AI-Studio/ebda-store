@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+import { storeDirectory } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -98,8 +99,8 @@ export const stockDeadstockScanOnDemand: JobDef = inngest.createFunction(
     // One step for both gates: on a Workflow only step bodies hold a database connection.
     const { enabled, store } = await step.run('gates', async () => ({
       enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
-      store: await withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      store: await withStoreDb(storeId, db =>
+        db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
       ),
     }));
     if (!enabled) {

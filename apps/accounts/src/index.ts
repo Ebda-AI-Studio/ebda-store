@@ -177,6 +177,55 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   }
 
   /**
+   * Edit the NAME and PHONE of a merchant / staff / super-admin account (a Store super-admin action). Only the fields passed
+   * change; `phone: null` clears it. The e-mail is NOT editable here and `.strict()` rejects it: an e-mail is the recovery
+   * channel, so only the verified self-service flow (new address confirmed, old one notified) may change it; an admin edit
+   * would be an account-takeover path (security review). A `super_admin` target may be edited only by that same user
+   * (`actorId`); anyone else gets `{ ok:false, code:'FORBIDDEN_TARGET' }` and nothing changes. Customers are not reachable
+   * here (they live in their store). Credentials are never touched.
+   */
+  async updateProfile(
+    userId: string,
+    input: { firstName?: string; lastName?: string; phone?: string | null },
+    reason = 'profile-update',
+    actorId?: string
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'FORBIDDEN_TARGET' }> {
+    z.string().uuid().parse(userId);
+    const v = z
+      .object({
+        firstName: z.string().trim().min(1).max(100).optional(),
+        lastName: z.string().trim().min(1).max(100).optional(),
+        phone: z.string().trim().max(40).nullable().optional(),
+      })
+      .strict()
+      .parse(input);
+    const cur = await this.env.DB.prepare(
+      `SELECT role FROM users WHERE id = ?1 AND role != 'customer' AND deleted_at IS NULL`
+    )
+      .bind(userId)
+      .first<{ role: string }>();
+    if (!cur) return { ok: false, code: 'NOT_FOUND' };
+    if (cur.role === 'super_admin' && actorId !== userId)
+      return { ok: false, code: 'FORBIDDEN_TARGET' };
+    const sets: string[] = [];
+    const args: unknown[] = [];
+    const add = (col: string, val: unknown) => {
+      args.push(val);
+      sets.push(`${col} = ?${args.length + 1}`);
+    };
+    if (v.firstName !== undefined) add('first_name', v.firstName);
+    if (v.lastName !== undefined) add('last_name', v.lastName);
+    if (v.phone !== undefined) add('phone', v.phone === null || v.phone === '' ? null : v.phone);
+    if (sets.length === 0) return { ok: true };
+    add('updated_at', new Date().toISOString());
+    await this.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?1`)
+      .bind(userId, ...args)
+      .run();
+    void reason;
+    return { ok: true };
+  }
+
+  /**
    * Delete an identity (erasure, hard delete). Idempotent. Sessions, refresh tokens, codes and passkeys go with it (foreign
    * keys), so no token or refresh cookie of this user can ever be honoured again, and the Store cannot re-create its profile
    * row from a deleted identity (it reconciles only from an identity that still exists).

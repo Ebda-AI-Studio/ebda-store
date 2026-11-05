@@ -25,6 +25,11 @@
       "code": "STORE_TX_WRITE_UNSUPPORTED",
       "file": "apps/api/src/lib/repo-factory.ts",
       "reason": "NEON-ZERO-1 (Ruling NZ-D18): a Store update for a Durable Object store inside a database transaction has no post-commit hook on this path (storeUpdate) or is a compare-and-set that cannot be deferred (storeUpdateMany); the caller needs its own port (plan N-18/N-19/N-26). Refused loudly, never applied before the commit."
+    },
+    {
+      "code": "CUSTOMER_WRITE_UNSUPPORTED",
+      "file": "apps/api/src/services/customer-group.service.ts",
+      "reason": "NEON-ZERO-1 group B (#430, integration row 33): assigning a customer to a group on a Durable Object store needs the customer directory write (N-9); refused loudly, never a Postgres fallback."
     }
   ],
   "postgresOnly": [],

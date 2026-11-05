@@ -12,8 +12,8 @@ import logger from '../lib/logger';
 import { runWithImpersonation } from '../lib/impersonation-context';
 import { recordTiming } from '../lib/request-timing';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
+import { customerAuthRoute } from '../lib/customer-auth';
 import { isPlatformOrigin } from '../lib/cors-cache';
-import { isIdentityManagedUser } from '../lib/identity-client';
 import {
   isAccountsToken,
   sessionRevoked,
@@ -113,10 +113,28 @@ function extractToken(req: Request): string | undefined {
  * the admin-route call.
  */
 async function resolveTokenVersionAndStatus(
-  userId: string
+  userId: string,
+  customerStoreId?: string | null
 ): Promise<{ tokenVersion: number; blocked: boolean }> {
   const cachedTv = await redis.getUserTokenVersion(userId);
   if (cachedTv !== null) return { tokenVersion: cachedTv, blocked: false };
+
+  // N-9: a customer of a store served by its StoreDO is known to THAT DO only (the HS256 token names the store). Unknown there =
+  // BLOCKED, never "tokenVersion 0", and nothing is cached for it. Postgres is not asked.
+  const route = await customerAuthRoute(customerStoreId, { write: false });
+  if (route.kind === 'do') {
+    const st = await route.client.call<{
+      tokenVersion: number;
+      status: string;
+      deletedAt: number | null;
+    } | null>('userState', { userId });
+    if (!st) return { tokenVersion: 0, blocked: true };
+    await redis.setUserTokenVersion(userId, st.tokenVersion);
+    return {
+      tokenVersion: st.tokenVersion,
+      blocked: st.status !== 'active' || st.deletedAt !== null,
+    };
+  }
 
   // `users` is under strict RLS and the caller is not scoped to anyone yet, so
   // this exact-id read goes through the `ebda_user_state` definer.
@@ -315,7 +333,10 @@ export async function authenticate(
 
     // --- Revocation check 2: per-user token-version (bulk revocation) ---
     // Read tv from Redis cache; fall back to DB + repopulate cache on miss.
-    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(payload.userId);
+    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(
+      payload.userId,
+      payload.role === 'customer' ? payload.storeId : null
+    );
     if ((payload.tv ?? 0) < currentTv) {
       return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
     }
@@ -430,7 +451,10 @@ export async function optionalAuthenticate(
     const decoded = jwt.decode(token) as { jti?: string } | null;
     if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) return next();
 
-    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(payload.userId);
+    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(
+      payload.userId,
+      payload.role === 'customer' ? payload.storeId : null
+    );
     if ((payload.tv ?? 0) < currentTv) return next();
     // S3-1: same defense-in-depth status check as `authenticate` — a
     // suspended user must fall through to "continue as guest", never
@@ -571,11 +595,9 @@ export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: N
  */
 export async function rejectIdentityManaged(req: Request, _res: Response, next: NextFunction) {
   try {
-    if (
-      req.user &&
-      req.user.role !== 'customer' &&
-      (await isIdentityManagedUser(req.user.userId))
-    ) {
+    // Decided from the verified token, not a Postgres read: a non-customer without a store is an admin-namespace account, and
+    // those live in the identity service (a HS256 admin token and an identity ES256 token both carry no storeId).
+    if (req.user && req.user.role !== 'customer' && !req.user.storeId) {
       return next(
         new AppError(
           409,

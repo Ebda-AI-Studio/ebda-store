@@ -46,6 +46,10 @@ vi.mock('@api/services/accounting/expense.service', () => ({}));
 vi.mock('@ebda/database', () => ({
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
+// The route scopes through the backend-aware wrapper (NEON-ZERO-1 group A); a unit test has no store flag to read.
+vi.mock('@api/lib/jobs/store-db', () => ({
+  runInStoreCtx: (_storeId: string, fn: () => unknown) => fn(),
+}));
 
 import { errorHandler } from '@api/middleware/error-handler';
 

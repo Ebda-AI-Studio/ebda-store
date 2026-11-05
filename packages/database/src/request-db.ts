@@ -49,8 +49,34 @@ export function getProcessClient(): AppPrismaClient {
   return client;
 }
 
+// Test/diagnostic only (the Worker enables it under DEV_STATS=1, never in a deployed Worker): every access to the Postgres
+// client is counted with the first frames of its stack, so a dead-Postgres sweep can assert that NOTHING reached it.
+let trackReaches = false;
+const reachLabel = new AsyncLocalStorage<string>();
+/** Name the work running in `fn` (a cron job) in the reach log. */
+export function withReachLabel<T>(label: string, fn: () => T): T {
+  return reachLabel.run(label, fn);
+}
+const reaches: Array<{ at: number; label: string; stack: string }> = [];
+export function trackPostgresReaches(on: boolean): void {
+  trackReaches = on;
+}
+export function postgresReaches(
+  reset = false
+): Array<{ at: number; label: string; stack: string }> {
+  const out = reaches.slice();
+  if (reset) reaches.length = 0;
+  return out;
+}
+
 /** The client the exported `prisma` resolves to right now. */
 export function baseClient(): AppPrismaClient {
+  if (trackReaches && reaches.length < 500)
+    reaches.push({
+      at: Date.now(),
+      label: reachLabel.getStore() ?? '(unlabelled)',
+      stack: (new Error().stack ?? '').split('\n').slice(2, 9).join('\n'),
+    });
   return requestDb.getStore()?.client ?? getProcessClient();
 }
 

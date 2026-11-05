@@ -10,7 +10,7 @@
  * and send need no invalidation.
  */
 import { z } from 'zod/v3';
-import { asPlatformOperator, prisma, withUser } from '@ebda/database';
+import { prisma, type withUser } from '@ebda/database';
 import {
   LEGAL_DOC_KEYS,
   LEGAL_DOC_TITLE,
@@ -32,6 +32,11 @@ import {
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { withdrawLegalNoticeSend } from '../lib/definer';
+import { onD1 } from './platform/billing-d1';
+import { listDirectoryStores } from './platform/directory-d1';
+import { asOperator, platformHubOnD1, withPlatformUser } from '../lib/platform-scope';
+import { getAccountsBrief } from '../lib/identity-client';
+import { legalSendRowD1, sendRowStillExistsD1 } from './platform/platform-d1';
 import { maskEmail, maskIp, scrubEmails } from '../lib/pii-mask';
 import { sendAlert } from './alerts.service';
 import { isP2002 } from '../lib/prisma-errors';
@@ -117,8 +122,13 @@ export const ackItemsSchema = z
   })
   .strict();
 
+type UserTx = Parameters<Parameters<typeof withUser>[1]>[0];
+/** `withUser` that works with Postgres dead (the user-keyed legal rows are D1 once the platform family moved). */
+const inUserScope = <T>(userId: string, fn: (tx: UserTx) => Promise<T>): Promise<T> =>
+  withPlatformUser(userId, () => fn(prisma as unknown as UserTx));
+
 async function sentAndAccepted(
-  tx: Parameters<Parameters<typeof withUser>[1]>[0],
+  tx: UserTx,
   userId: string
 ): Promise<{ sent: LegalDocRef[]; accepted: LegalDocRef[] }> {
   const sent = await tx.legalNoticeSend.findMany({ select: { docKey: true, version: true } });
@@ -139,7 +149,7 @@ export async function pendingNoticesFor(
   role: string
 ): Promise<PendingLegalNotice[]> {
   if (role !== NOTICE_ROLE) return [];
-  return withUser(userId, async tx => {
+  return inUserScope(userId, async tx => {
     const { sent, accepted } = await sentAndAccepted(tx, userId);
     return computePendingNotices(activePolicies, sent, accepted);
   });
@@ -159,7 +169,7 @@ export async function ackNotices(
   if (role !== NOTICE_ROLE) {
     throw new AppError(403, 'FORBIDDEN', 'Only a store owner acknowledges policy notices');
   }
-  return withUser(userId, async tx => {
+  return inUserScope(userId, async tx => {
     const { sent, accepted } = await sentAndAccepted(tx, userId);
     const same = (a: LegalDocRef, b: LegalDocRef) =>
       a.docKey === b.docKey && a.version === b.version;
@@ -193,7 +203,7 @@ export async function ackNotices(
 // ---------------------------------------------------------------------------
 // Email fan-out (Ruling LEGAL-4): run by the `legal-notice-send` Inngest function.
 //
-// Every DB call runs through `asPlatformOperator(operatorId)`, the super admin who pressed
+// Every DB call runs through `asOperator(operatorId)`, the super admin who pressed
 // "Send notice": the deliveries/sends WITH CHECK requires an active super_admin acting user
 // (app.current_user_id), and the code-level tenant guard admits user-keyed rows of OTHER
 // users (LegalNoticeDelivery) only under that hatch. No owner connection, no RLS bypass.
@@ -224,7 +234,18 @@ type DeliveryStatus = 'sent' | 'failed';
  * merchant with several stores is notified once. Read as the operator who pressed send.
  */
 export async function listNoticeRecipients(operatorId: string): Promise<string[]> {
-  return asPlatformOperator(operatorId, async () => {
+  return asOperator(operatorId, async () => {
+    if (await platformHubOnD1()) {
+      // NEON-ZERO (Ruling NZ-C-6): the directory is D1 `stores`, the accounts are the identity service's (an erased account is absent).
+      const owners = [
+        ...new Set((await listDirectoryStores()).filter(s => !s.isDemo).map(s => s.ownerId)),
+      ];
+      const accounts = await getAccountsBrief(owners);
+      return accounts
+        .filter(a => a.role === NOTICE_ROLE)
+        .map(a => a.id)
+        .sort();
+    }
     const stores = await prisma.store.findMany({
       where: { deletedAt: null, isDemo: false },
       select: { ownerId: true },
@@ -260,10 +281,15 @@ export async function materializeDeliveries(
   // (ebda_withdraw_legal_notice_send) takes the same lock, so it either deletes the row before
   // we get here (we abort, nobody is mailed) or waits for us and then sees our deliveries
   // and refuses to delete.
-  return asPlatformOperator(operatorId, async () => {
-    const locked = await prisma.$queryRaw<
-      Array<{ id: string; doc_key: string; version: string; recipient_count: number | null }>
-    >`
+  return asOperator(operatorId, async () => {
+    // D1 has no row lock: read the row, fan out, then re-check it still exists (the withdrawal is one
+    // statement that refuses once a delivery exists, so it either ran first or sees our deliveries).
+    const d1 = await onD1('platform');
+    const locked = d1
+      ? [await legalSendRowD1(sendId)].filter(<T>(r: T | null): r is T => r !== null)
+      : await prisma.$queryRaw<
+          Array<{ id: string; doc_key: string; version: string; recipient_count: number | null }>
+        >`
       SELECT id, doc_key, version, recipient_count FROM public.legal_notice_sends
        WHERE id = ${sendId} FOR UPDATE`;
     const row = locked[0];
@@ -279,6 +305,13 @@ export async function materializeDeliveries(
         });
       }
       recipientCount = userIds.length;
+      if (d1 && !(await sendRowStillExistsD1(sendId))) {
+        // withdrawn between our read and the fan-out: take our deliveries back so nobody is mailed
+        await prisma.legalNoticeDelivery.deleteMany({
+          where: { docKey, version, status: 'queued' },
+        });
+        return { ok: false as const, reason: 'SEND_ROW_MISSING' };
+      }
       await prisma.legalNoticeSend.update({
         where: { id: sendId },
         data: { recipientCount },
@@ -299,7 +332,7 @@ async function markDelivery(
   status: DeliveryStatus,
   error: string | null
 ): Promise<void> {
-  await asPlatformOperator(operatorId, () =>
+  await asOperator(operatorId, () =>
     prisma.legalNoticeDelivery.updateMany({
       where: { userId, docKey, version, status: 'sending' },
       data: { status, error },
@@ -364,7 +397,7 @@ export async function sendNextBatch(
     },
     url: { ar: legalPolicyUrl(docKey, 'ar'), en: legalPolicyUrl(docKey, 'en') },
   };
-  const queued = await asPlatformOperator(operatorId, () =>
+  const queued = await asOperator(operatorId, () =>
     prisma.legalNoticeDelivery.findMany({
       where: { docKey, version, status: 'queued' },
       orderBy: { userId: 'asc' },
@@ -373,7 +406,7 @@ export async function sendNextBatch(
     })
   );
   const claim = (userId: string) =>
-    asPlatformOperator(operatorId, () =>
+    asOperator(operatorId, () =>
       prisma.legalNoticeDelivery.updateMany({
         where: { userId, docKey, version, status: 'queued' },
         data: { status: 'sending' },
@@ -384,12 +417,18 @@ export async function sendNextBatch(
   let failed = 0;
   let deferred = false;
   for (const { userId } of queued) {
-    const user = await asPlatformOperator(operatorId, () =>
-      prisma.user.findUnique({
+    const user = await asOperator(operatorId, async () => {
+      if (await platformHubOnD1()) {
+        const [a] = await getAccountsBrief([userId]);
+        return a
+          ? { email: a.email, firstName: a.firstName, deletedAt: null, role: a.role as string }
+          : null;
+      }
+      return prisma.user.findUnique({
         where: { id: userId },
         select: { email: true, firstName: true, deletedAt: true, role: true },
-      })
-    );
+      });
+    });
     const gone =
       !user || user.deletedAt ? 'USER_GONE' : user.role !== NOTICE_ROLE ? 'NOT_RECIPIENT' : null;
     if (gone) {
@@ -423,7 +462,7 @@ export async function sendNextBatch(
     if (error) failed++;
     else sent++;
   }
-  const remaining = await asPlatformOperator(operatorId, () =>
+  const remaining = await asOperator(operatorId, () =>
     prisma.legalNoticeDelivery.count({ where: { docKey, version, status: 'queued' } })
   );
   return { sent, failed, remaining, deferred };
@@ -442,7 +481,7 @@ export async function failQueuedDeliveries(
   reason: string,
   sendId?: string
 ): Promise<number> {
-  return asPlatformOperator(operatorId, async () => {
+  return asOperator(operatorId, async () => {
     if (sendId) {
       const own = await prisma.legalNoticeSend.findFirst({
         where: { id: sendId, docKey, version },
@@ -514,7 +553,7 @@ export async function policyOverview(
   operatorId: string,
   now: Date = new Date()
 ): Promise<LegalPolicyOverviewRow[]> {
-  return asPlatformOperator(operatorId, async () => {
+  return asOperator(operatorId, async () => {
     const sends = await prisma.legalNoticeSend.findMany({
       select: { docKey: true, version: true, sentAt: true, sentBy: true, recipientCount: true },
     });
@@ -567,10 +606,12 @@ export async function policyOverview(
             take: FAILED_DELIVERIES_LIST_MAX,
             select: { userId: true, error: true, updatedAt: true },
           });
-          const users = await prisma.user.findMany({
-            where: { id: { in: failed.map(f => f.userId) } },
-            select: { id: true, email: true },
-          });
+          const users = (await platformHubOnD1())
+            ? await getAccountsBrief(failed.map(f => f.userId))
+            : await prisma.user.findMany({
+                where: { id: { in: failed.map(f => f.userId) } },
+                select: { id: true, email: true },
+              });
           const emailOf = new Map(users.map(u => [u.id, u.email]));
           const toRow = (f: (typeof failed)[number]): FailedDeliveryRow => ({
             maskedEmail: maskEmail(emailOf.get(f.userId)) ?? '***',
@@ -663,7 +704,7 @@ export async function requestNoticeSend(
   }
   let row: { id: string; sentAt: Date };
   try {
-    row = await asPlatformOperator(operatorId, () =>
+    row = await asOperator(operatorId, () =>
       prisma.legalNoticeSend.create({
         data: { docKey, version, sentBy: operatorId },
         select: { id: true, sentAt: true },
@@ -685,7 +726,7 @@ export async function requestNoticeSend(
     let withdrawn = 0;
     let withdrawError: unknown = null;
     try {
-      withdrawn = await asPlatformOperator(operatorId, () => withdrawLegalNoticeSend(row.id));
+      withdrawn = await asOperator(operatorId, () => withdrawLegalNoticeSend(row.id, operatorId));
     } catch (e) {
       withdrawError = e;
     }
@@ -737,7 +778,7 @@ async function findSendRow(
       'This version is no longer the current version of the document'
     );
   }
-  const send = await asPlatformOperator(operatorId, () =>
+  const send = await asOperator(operatorId, () =>
     prisma.legalNoticeSend.findUnique({
       where: { docKey_version: { docKey, version } },
       select: { id: true },
@@ -780,7 +821,7 @@ export async function retryFailedDeliveries(
   version: string
 ): Promise<{ docKey: string; version: string; requeued: number }> {
   const send = await findSendRow(operatorId, docKey, version);
-  const moved = await asPlatformOperator(operatorId, async () => {
+  const moved = await asOperator(operatorId, async () => {
     const failed = await prisma.legalNoticeDelivery.findMany({
       // TIMEOUT_UNKNOWN rows may have been delivered: never re-sent here. NOT IN would drop
       // NULL errors, hence the explicit OR.
@@ -805,7 +846,7 @@ export async function retryFailedDeliveries(
     await emitSendRequested({ sendId: send.id, docKey, version, sentBy: operatorId });
   } catch (err) {
     logger.error({ err, docKey, version }, '[LEGAL-NOTICE] retry enqueue failed, re-failing rows');
-    await asPlatformOperator(operatorId, () =>
+    await asOperator(operatorId, () =>
       prisma.legalNoticeDelivery.updateMany({
         where: { docKey, version, status: 'queued', userId: { in: moved } },
         data: { status: 'failed', error: 'RETRY_ENQUEUE_FAILED' },
@@ -829,7 +870,7 @@ export interface AcceptanceRecord {
 
 /** The signed-in user's own acceptance rows, newest first (merchant account settings). */
 export async function myAcceptances(userId: string): Promise<AcceptanceRecord[]> {
-  const rows = await withUser(userId, tx =>
+  const rows = await inUserScope(userId, tx =>
     tx.legalAcceptance.findMany({
       where: { userId },
       orderBy: [{ acceptedAt: 'desc' }, { docKey: 'asc' }],
@@ -858,16 +899,15 @@ export async function userLegalRecord(
   operatorId: string,
   userId: string
 ): Promise<UserLegalRecord> {
-  return asPlatformOperator(operatorId, async () => {
+  return asOperator(operatorId, async () => {
     const acceptances = await prisma.legalAcceptance.findMany({
       where: { userId },
       orderBy: [{ acceptedAt: 'desc' }, { docKey: 'asc' }],
       select: { docKey: true, version: true, source: true, acceptedAt: true, ip: true },
     });
-    const account = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
+    const account = (await platformHubOnD1())
+      ? ((await getAccountsBrief([userId]))[0] ?? null)
+      : await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     const deliveries = await prisma.legalNoticeDelivery.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },

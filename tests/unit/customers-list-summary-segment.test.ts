@@ -40,7 +40,11 @@ vi.mock('@ebda/database', async importOriginal => {
 vi.mock('@api/lib/repo-factory', () => ({
   storeDb: async () => ({
     customerRfmSnapshot: { findMany: h.rfmFindMany, groupBy: h.rfmGroupBy },
+    order: { findMany: h.orderFindMany },
+    smsMarketingConsent: { findMany: vi.fn().mockResolvedValue([]) },
+    store: { findUnique: vi.fn() },
   }),
+  storeRepo: async () => ({ backend: 'pg' }),
 }));
 vi.mock('@api/services/admin-search.service', () => ({
   matchingCustomers: (...a: unknown[]) => h.matching(...a),

@@ -9,7 +9,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const h = vi.hoisted(() => ({ updateMany: vi.fn().mockResolvedValue({ count: 1 }) }));
 vi.mock('@ebda/database', () => ({
   prisma: { paymentConfig: { updateMany: (...a: unknown[]) => h.updateMany(...a) } },
-  runInTenantContext: (_s: string, fn: () => Promise<unknown>) => fn(),
+  withStore: (_s: string, fn: () => Promise<unknown>) => fn(),
+}));
+vi.mock('@api/lib/repo-factory', () => ({
+  storeWriter: async () => ({
+    paymentConfig: { updateMany: (...a: unknown[]) => h.updateMany(...a) },
+  }),
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

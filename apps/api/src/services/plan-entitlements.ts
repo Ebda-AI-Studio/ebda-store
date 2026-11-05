@@ -26,6 +26,7 @@
  */
 
 import { withStore, type Prisma } from '@ebda/database';
+import { platformDb } from '../lib/platform-db';
 import {
   DEFAULT_PLAN_SEEDS,
   planIncludesMerchantMcp,
@@ -36,6 +37,7 @@ import {
   type SubscriptionStatus,
 } from '@ebda/shared';
 import logger from '../lib/logger';
+import { readStorePlan } from '../lib/store-plan';
 
 type Tx = Prisma.TransactionClient;
 
@@ -91,19 +93,44 @@ export async function getEntitlements(
   /** The caller already read `stores.plan` (FeatureService does) — skips the second read. */
   known?: { legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE }
 ): Promise<Entitlements | null> {
+  // N-18: a store created on D1 + its DO has no Postgres row. Its plan, subscription and plan row are read from the platform D1
+  // (where `newSubscriptionRow` wrote them, in the store's own D1 batch); a store WITH a Postgres row is unchanged (Postgres stays authoritative for it
+  // until N-10 moves every billing reader and writer together).
   const run = async (db: Tx): Promise<Entitlements | null> => {
     const store =
-      known !== undefined
-        ? { plan: known.legacyPlan }
-        : await db.store.findUnique({ where: { id: storeId }, select: { plan: true } });
-    if (!store) return null;
-    const sub = await db.storeSubscription.findUnique({ where: { storeId } });
-
-    const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[store.plan];
+      known !== undefined ? { plan: known.legacyPlan } : await readStorePlan(db, storeId);
+    let fromD1: Awaited<ReturnType<typeof platformDb>>;
+    if (!store) {
+      fromD1 = await platformDb();
+      if (!fromD1) return null;
+    }
+    const d1Store = fromD1
+      ? await fromD1.store.findUnique({
+          where: { id: storeId },
+          select: { plan: true, deletedAt: true },
+        })
+      : null;
+    if (!store && (!d1Store || d1Store.deletedAt)) return null;
+    const plan0 = (store ?? d1Store) as { plan: keyof typeof STORE_PLAN_TO_PLAN_CODE };
+    let sub = fromD1
+      ? await fromD1.storeSubscription.findUnique({ where: { storeId } })
+      : await db.storeSubscription.findUnique({ where: { storeId } });
+    // A caller that already read the plan (`known`) never saw the Postgres-row check above: a store with no Postgres row has no
+    // Postgres subscription either, so look in D1 (a store WITH a Postgres row and no subscription stays derived from its plan).
+    if (!sub && !fromD1 && known !== undefined) {
+      const platform = await platformDb();
+      if (platform) {
+        sub = await platform.storeSubscription.findUnique({ where: { storeId } });
+        if (sub) fromD1 = platform;
+      }
+    }
+    const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[plan0.plan];
     const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
     const effectiveCode = status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
 
-    const plan = await loadPlan(db, effectiveCode);
+    const plan = fromD1
+      ? await fromD1.plan.findUnique({ where: { code: effectiveCode } })
+      : await loadPlan(db, effectiveCode);
     const seed = seedFor(effectiveCode);
     return {
       storeId,

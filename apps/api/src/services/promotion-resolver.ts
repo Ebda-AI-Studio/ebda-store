@@ -6,6 +6,7 @@
  * layer only queries Prisma and feeds it a fully-resolved context.
  */
 import { prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 import { loadBuyerGroup } from './price-resolver.service';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
@@ -68,7 +69,9 @@ export async function resolveBestPromotion(
   ctx: TargetingCtx
 ): Promise<{ promotionId: string; discount: number } | null> {
   const now = new Date();
-  const promos = await prisma.promotion.findMany({
+  const promos = await (
+    await storeDb(storeId)
+  ).promotion.findMany({
     where: {
       storeId,
       isActive: true,

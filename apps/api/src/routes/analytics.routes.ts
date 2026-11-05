@@ -317,7 +317,8 @@ router.get(
         const productIds = products.map(p => p.id);
 
         // Batch-load open backorder counts per product
-        const backorderGroups = await prisma.backorderLine.groupBy({
+        const sdb = await storeDb(storeId); // the store's backend (DO or Postgres), Ruling NZ-INTEG-1
+        const backorderGroups = await sdb.backorderLine.groupBy({
           by: ['productId'],
           where: {
             storeId,
@@ -330,7 +331,7 @@ router.get(
         const backorderCountById = new Map(backorderGroups.map(g => [g.productId, g._count.id]));
 
         // Batch-load reorder rules for these products
-        const reorderRules = await prisma.reorderRule.findMany({
+        const reorderRules = await sdb.reorderRule.findMany({
           where: { storeId, productId: { in: productIds }, isActive: true },
           select: {
             productId: true,
