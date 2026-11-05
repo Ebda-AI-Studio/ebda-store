@@ -22,6 +22,7 @@ import {
 import { assertMayConfigureCarrier } from '../services/carriers/carrier-connection.service';
 import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 
 const router = Router();
 
@@ -833,6 +834,7 @@ router.post(
 router.get(
   '/public/:storeId/orders/:orderId/tracking',
   authenticate,
+  requireCustomerStoreMatch,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
@@ -859,10 +861,11 @@ router.get(
       // this check a store_admin from Store A could read tracking for
       // any Order under Store B by changing :storeId in the URL.
       if (user?.role === 'customer') {
+        // Another customer's order answers exactly like a missing one: no existence oracle.
         if (order.customerId !== user.userId) {
-          res.status(403).json({
+          res.status(404).json({
             success: false,
-            error: { code: 'FORBIDDEN', message: 'Access denied' },
+            error: { code: 'NOT_FOUND', message: 'Order not found' },
           });
           return;
         }

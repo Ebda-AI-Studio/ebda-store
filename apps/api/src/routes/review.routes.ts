@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireStore } from '../middleware/store';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -120,6 +121,7 @@ router.post(
   '/',
   requireStore,
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
