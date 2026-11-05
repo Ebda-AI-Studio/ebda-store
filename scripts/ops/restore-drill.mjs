@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { parseArgs } from 'node:util';
 import { runDrill, formatReport, assertLoopback, apiChecksForStore } from './lib/cf-drill.mjs';
-import { digestSqlite } from './lib/cf-backup.mjs';
+import { assertPlatformTables, digestSqlite } from './lib/cf-backup.mjs';
 import {
   ageDecrypt,
   dirR2,
@@ -148,7 +148,7 @@ const post = async (p, body, ctype) => {
 const targets = { decrypt: ageDecrypt(identity), post };
 if (a.target === 'harness') {
   targets.loadD1 = async sql => {
-    const tables = await d1Digests(sql);
+    const tables = assertPlatformTables(await d1Digests(sql));
     return { tables, stores: [] };
   };
   await boot(
