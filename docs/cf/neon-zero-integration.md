@@ -118,3 +118,19 @@ Unit tests still red on the integrated tree, owners to fix in their own PR (mock
 ### #437-class merge: `fix/nz-customer-auth-routes` (customer login / passkeys / refresh)
 
 Merged without conflicts (35 files). Integration follow-ups: the DO erase engine now deletes `notification_logs` by the shopper's buyer keys (registry action `delete`; the parity test has its verdict), and `packages/repo/test/do-shipping-tax.test.ts` mocks `@ebda/shared` as a partial (`config` now reads `REGION`).
+
+## Refresh 4 (Ruling NZ-INTEG-1): `origin/main` merged into integ (final #401, #403-#405, #412, #420-#426)
+
+Main's security and money behaviour wins; integ's backend routing (`storeDb` / `storeWriter` / D1, no Postgres for a DO store) is kept; one implementation per function.
+
+| #   | File                                                                                | Resolution                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 42  | `lib/customer-group-scope.ts`                                                       | integ's `storeDb` read (main's `prisma` read dropped); same 404 `CUSTOMER_GROUP_NOT_FOUND` no-oracle.                                                                                                                            |
+| 43  | `routes/loyalty.routes.ts`                                                          | main's order: `authenticate`, `requireCustomerStoreMatch`, THEN `requireFeature('loyalty')` on `my-transactions` and `join` (#424: a customer of another store gets the 404 before any feature answer reveals the store's plan). |
+| 44  | `services/coupon.service.ts`, `services/promotion.service.ts`                       | integ's `storeDb` / `storeWriter` (the DO-writable coupon and promotion models); main's `prisma` imports dropped; main's validation and customer-group assertion untouched.                                                      |
+| 45  | `routes/admin.routes.ts`                                                            | integ's hub imports (`platform-hub`, `customerRows`); main had removed none of them.                                                                                                                                             |
+| 46  | `services/provisioning.service.ts`                                                  | already carried the BE:F-5 `nameAr` / `descriptionAr` default category in BOTH create paths (row 2); no change.                                                                                                                  |
+| 47  | `docs/README.md`, `docs/rulings/README.md`                                          | union; `PERF-TIMEOUTS-1` row added, the duplicate `JOBS-ORPHAN-1` row kept once; count regenerated (1666 = files = rows).                                                                                                        |
+| 48  | `tests/unit/queue-depth-watch-queued.test.ts`, `tests/unit/t2-tenant-scope.test.ts` | integ's mocks (`withStoreDb`; `storeDb` mocked to the prisma mock).                                                                                                                                                              |
+
+Verified: `tsc` clean for shared, database, repo, api, admin; the 40 test files main touched pass (the one failure, `tests/integration/repo-factory-money-contract`, needs a live Postgres).
