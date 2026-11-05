@@ -6,7 +6,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { refuseDemoStore } from '../middleware/demo-store';
 import { affiliateService } from '../services/affiliate.service';
 import { listAffiliateEvents } from '../services/affiliate-event.service';
-import { prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { tenantContext } from '../middleware/tenant-context';
 
 // TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
@@ -308,14 +308,16 @@ router.get(
         return;
       }
 
+      // the store's own backend (NEON-ZERO); the `prisma` proxy for a Postgres store
+      const db = await storeDb(storeId);
       const [referrals, payouts] = await Promise.all([
-        prisma.affiliateReferral.findMany({
+        db.affiliateReferral.findMany({
           where: { storeId, affiliateId },
           include: { order: { select: { id: true, orderNumber: true, total: true } } },
           orderBy: { createdAt: 'desc' },
           take: 200,
         }),
-        prisma.affiliatePayout.findMany({
+        db.affiliatePayout.findMany({
           where: { storeId, affiliateId },
           orderBy: { createdAt: 'desc' },
           take: 200,

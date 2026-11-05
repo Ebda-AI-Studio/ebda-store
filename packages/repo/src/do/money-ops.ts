@@ -27,6 +27,7 @@ import {
   confirmInstapay,
   createPayment,
   expireInstapay,
+  initiateInstapay,
   markRefundIndeterminate,
   releaseRefund,
   type ConfirmedTransaction,
@@ -147,6 +148,7 @@ import {
   reversalClaimOp,
   affiliateCommissionOp,
   affiliateReverseOp,
+  affiliatePayoutOp,
   trialBalanceOp,
 } from './job-ops';
 import { journalExpenseOp, journalPoReceiveOp, journalStockAdjustmentOp } from './books-journals';
@@ -186,6 +188,7 @@ export type MoneyOpName =
   | 'confirmPayment'
   | 'cancel'
   | 'expireHold'
+  | 'instapayInitiate'
   | 'paymentCreate'
   | 'paymentWebhook'
   | 'refundBegin'
@@ -220,6 +223,7 @@ export type MoneyOpName =
   | 'reversalClaim'
   | 'affiliateCommission'
   | 'affiliateReverse'
+  | 'affiliatePayout'
   | 'journalExpense'
   | 'journalStockAdjustment'
   | 'journalPoReceive'
@@ -314,6 +318,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'confirmPayment',
   'cancel',
   'expireHold',
+  'instapayInitiate',
   'paymentCreate',
   'paymentWebhook',
   'refundBegin',
@@ -348,6 +353,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'reversalClaim',
   'affiliateCommission',
   'affiliateReverse',
+  'affiliatePayout',
   'journalExpense',
   'journalStockAdjustment',
   'journalPoReceive',
@@ -612,7 +618,17 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       orderId: id(a.orderId, 'orderId'),
       proofSubmitted: a.proofSubmitted === true,
     }),
-  /** Payment row of an order (PaymentService.recordCreatedPayment); amount must equal the order total. */
+  /** InstaPay hold + its pending payment (InstapayService.initiate); a replay while awaiting returns the same payment. */
+  instapayInitiate: (db, storeId, a) =>
+    initiateInstapay(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      expiresAt: a.expiresAt as number,
+      providerRef: typeof a.providerRef === 'string' ? a.providerRef : null,
+      metadata: a.metadata,
+      actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
+    }),
+  /** Payment row of an order (PaymentService.recordCreatedPayment, COD create); amount must equal the amount due. */
   paymentCreate: (db, storeId, a) =>
     createPayment(db, {
       storeId,
@@ -624,6 +640,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       transactionId: typeof a.transactionId === 'string' ? a.transactionId : null,
       invoiceId: typeof a.invoiceId === 'string' ? a.invoiceId : null,
       paymentUrl: typeof a.paymentUrl === 'string' ? a.paymentUrl : null,
+      metadata: a.metadata,
     }),
   /**
    * A signed provider delivery (Paymob, Kashier, Fawry). The gateway confirmation (Kashier) is fetched by the Worker
@@ -876,6 +893,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   reversalClaim: (db, storeId, a) => reversalClaimOp(db, storeId, a),
   affiliateCommission: (db, storeId, a) => affiliateCommissionOp(db, storeId, a),
   affiliateReverse: (db, storeId, a) => affiliateReverseOp(db, storeId, a),
+  affiliatePayout: (db, storeId, a) => affiliatePayoutOp(db, storeId, a),
   reorderExpire: (db, storeId, a) => reorderExpireOp(db, storeId, a),
   reorderUpsert: (db, storeId, a) => reorderUpsertOp(db, storeId, a),
   /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */

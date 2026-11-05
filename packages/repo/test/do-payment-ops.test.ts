@@ -269,7 +269,9 @@ describe('refunds', () => {
       walletAmount: 500,
     });
     expect(r.q('SELECT balance FROM customer_wallets')[0].balance).toBe(1500);
-    const gateway = o.total;
+    // the gateway charges the amount DUE: the wallet part was paid at checkout (Ruling NZ-MONEY-1)
+    const gateway = o.total - o.walletAmount;
+    expect(gateway).toBe(o.total - 500);
     r.op('paymentCreate', {
       orderId: o.orderId,
       provider: 'paymob',
@@ -404,5 +406,128 @@ describe('gold repricing', () => {
     const out = r.op('goldRepriceProduct', { productId: 'sku' });
     expect(out).toEqual({ repriced: 0 });
     expect(r.q("SELECT value FROM do_flags WHERE name = 'gold_reprice'")[0].value).toBe(0);
+  });
+});
+
+// NEON-ZERO money path (POST /payments/create on a Durable Object store; AffiliateService.createPayout).
+describe('payment creation on the DO: amount due, COD once, InstaPay hold, affiliate payout', () => {
+  it('paymentCreate charges the amount DUE (total less the wallet part) and stores the metadata', () => {
+    const r = rig();
+    const o = r.op('createOrder', {
+      lines: [{ productId: 'sku', quantity: 2 }],
+      shippingAddress: { phone: '01000000011' },
+      paymentMethod: 'cod',
+    });
+    r.raw.exec(`UPDATE orders SET wallet_amount = 300 WHERE id = '${o.orderId}'`);
+    expect(
+      r.code('paymentCreate', { orderId: o.orderId, provider: 'paymob', amount: o.total })
+    ).toBe('PAYMENT_AMOUNT_MISMATCH/409');
+    const { paymentId } = r.op('paymentCreate', {
+      orderId: o.orderId,
+      provider: 'cod',
+      method: 'cod',
+      amount: o.total - 300,
+      metadata: { codFee: 0, walletAmount: 300 },
+    });
+    const row = r.q(
+      'SELECT status, amount, method, metadata FROM payments WHERE id = ?',
+      paymentId
+    )[0];
+    expect(row).toMatchObject({ status: 'cod_pending', amount: o.total - 300, method: 'cod' });
+    expect(JSON.parse(row.metadata)).toEqual({ codFee: 0, walletAmount: 300 });
+    expect(
+      r.code('paymentCreate', {
+        orderId: o.orderId,
+        provider: 'cod',
+        amount: o.total - 300,
+        metadata: [1],
+      })
+    ).toBe('PAYMENT_METADATA_INVALID/400');
+  });
+
+  it('a second COD create while one is open returns the SAME row (a double-click cannot mint two); a failed one does not block', () => {
+    const r = rig();
+    const o = r.op('createOrder', {
+      lines: [{ productId: 'sku', quantity: 1 }],
+      shippingAddress: { phone: '01000000012' },
+      paymentMethod: 'cod',
+    });
+    const a = r.op('paymentCreate', { orderId: o.orderId, provider: 'cod', amount: o.total });
+    const b = r.op('paymentCreate', { orderId: o.orderId, provider: 'cod', amount: o.total });
+    expect(b).toEqual({ paymentId: a.paymentId, replayed: true });
+    expect(r.q("SELECT COUNT(*) AS n FROM payment_events WHERE event_type = 'created'")[0].n).toBe(
+      1
+    );
+    r.raw.exec(`UPDATE payments SET status = 'failed' WHERE id = '${a.paymentId}'`);
+    const c = r.op('paymentCreate', { orderId: o.orderId, provider: 'cod', amount: o.total });
+    expect(c.paymentId).not.toBe(a.paymentId);
+  });
+
+  it('instapayInitiate: the hold + a pending row + both events in one section; a replay returns the same row; refusals', () => {
+    const r = rig();
+    const o = r.op('createOrder', {
+      lines: [{ productId: 'sku', quantity: 1 }],
+      shippingAddress: { phone: '01000000013' },
+      paymentMethod: 'instapay',
+    });
+    const exp = Date.now() + 3_600_000;
+    const args = {
+      orderId: o.orderId,
+      expiresAt: exp,
+      providerRef: 'R-1',
+      metadata: { handle: 'h@ip' },
+    };
+    const first = r.op('instapayInitiate', args);
+    expect(first).toMatchObject({
+      created: true,
+      amountMinor: o.total,
+      expiresAt: exp,
+      metadata: { handle: 'h@ip' },
+    });
+    const ord = r.q(
+      'SELECT status, payment_confirmation_expires_at AS e FROM orders WHERE id = ?',
+      o.orderId
+    )[0];
+    expect(ord).toEqual({ status: 'awaiting_payment_confirmation', e: exp });
+    expect(
+      r.q('SELECT provider, status, transaction_id FROM payments WHERE order_id = ?', o.orderId)
+    ).toEqual([{ provider: 'instapay', status: 'pending', transaction_id: 'R-1' }]);
+    expect(
+      r.q('SELECT to_status FROM order_events WHERE order_id = ?', o.orderId).map(x => x.to_status)
+    ).toContain('awaiting_payment_confirmation');
+    const again = r.op('instapayInitiate', { ...args, expiresAt: exp + 999 });
+    expect(again).toMatchObject({ created: false, paymentId: first.paymentId, expiresAt: exp });
+    expect(r.q('SELECT COUNT(*) AS n FROM payments WHERE order_id = ?', o.orderId)[0].n).toBe(1);
+    r.raw.exec(`UPDATE orders SET status = 'cancelled' WHERE id = '${o.orderId}'`);
+    expect(r.code('instapayInitiate', args)).toBe('ORDER_NOT_PAYABLE/409');
+  });
+
+  it('affiliatePayout debits the pending balance once; an amount over it is refused and writes nothing', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO affiliates (id, store_id, name, email, referral_code, status, pending_balance) VALUES ('af1', 's1', 'A', 'a@x', 'RC1', 'approved', 1000)`
+    );
+    expect(r.code('affiliatePayout', { affiliateId: 'af1', amount: 1001 })).toBe(
+      'INSUFFICIENT_BALANCE/400'
+    );
+    expect(r.code('affiliatePayout', { affiliateId: 'nope', amount: 1 })).toBe('NOT_FOUND/404');
+    expect(r.code('affiliatePayout', { affiliateId: 'af1', amount: 0 })).toBe('INVALID_AMOUNT/400');
+    const p = r.op('affiliatePayout', { affiliateId: 'af1', amount: 600, method: 'bank' });
+    expect(p.payout).toMatchObject({
+      affiliateId: 'af1',
+      amount: 600,
+      method: 'bank',
+      status: 'pending',
+    });
+    expect(r.code('affiliatePayout', { affiliateId: 'af1', amount: 600 })).toBe(
+      'INSUFFICIENT_BALANCE/400'
+    );
+    expect(
+      r.q("SELECT pending_balance AS p, total_paid AS t FROM affiliates WHERE id = 'af1'")[0]
+    ).toEqual({ p: 400, t: 600 });
+    expect(r.q('SELECT COUNT(*) AS n FROM affiliate_payouts')[0].n).toBe(1);
+    expect(
+      r.q("SELECT COUNT(*) AS n FROM affiliate_events WHERE event_type = 'payout_initiated'")[0].n
+    ).toBe(1);
   });
 });

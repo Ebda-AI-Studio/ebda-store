@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { runInStoreCtx } from '../../lib/jobs/store-db';
+import { customersById, runInStoreCtx } from '../../lib/jobs/store-db';
 import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@ebda/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
@@ -968,6 +968,55 @@ export class PaymentService {
   }
 
   /**
+   * The COD payment row of POST /payments/create (`cod_pending`, the amount the courier collects) and its `created` audit
+   * event. A store on its Durable Object writes both in ONE section there (`paymentCreate`), which also returns an open COD
+   * row of the order instead of minting a second one. A Postgres store writes inside the caller's tenant transaction, as before.
+   */
+  static async recordCodPayment(a: {
+    storeId: string;
+    orderId: string;
+    amount: number;
+    currency: string;
+    metadata: Record<string, unknown>;
+    userId: string | null;
+  }): Promise<{ id: string }> {
+    const money = await storeMoney(a.storeId);
+    if (money) {
+      const r = await money.paymentCreate({
+        orderId: a.orderId,
+        provider: 'cod',
+        method: 'cod',
+        amount: a.amount,
+        currency: a.currency,
+        metadata: a.metadata,
+      });
+      return { id: r.paymentId };
+    }
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: a.orderId,
+        provider: 'cod',
+        method: 'cod',
+        status: 'cod_pending',
+        amount: a.amount,
+        currency: a.currency,
+        metadata: a.metadata as Prisma.InputJsonValue,
+      },
+    });
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      storeId: a.storeId,
+      orderId: a.orderId,
+      eventType: 'created',
+      toStatus: 'cod_pending',
+      provider: 'cod',
+      triggeredByUserId: a.userId,
+      details: { amount: a.amount, ...a.metadata } as Prisma.InputJsonValue,
+    });
+    return { id: payment.id };
+  }
+
+  /**
    * Get payment status
    */
   static async getPaymentStatus(
@@ -977,16 +1026,29 @@ export class PaymentService {
   ): Promise<PaymentStatusResponse> {
     // Try to find the payment in database to get the provider. A caller that already names the provider AND the store
     // (the auto-cancel sweep, for a store on its Durable Object whose payment is not in Postgres) needs no lookup.
+    // With the store known the row is read through that store's own backend (a Durable Object store has no Postgres row;
+    // NEON-ZERO). Only a caller with NO store (Node scripts) still asks Postgres.
     const payment =
       provider && storeId
         ? null
-        : await prisma.payment.findFirst({
-            where: { transactionId },
-            include: { order: { include: { store: true } } },
-          });
+        : storeId
+          ? await withStore(storeId, async () =>
+              (await storeDb(storeId)).payment.findFirst({
+                where: { transactionId },
+                select: { provider: true },
+              })
+            )
+          : await prisma.payment.findFirst({
+              where: { transactionId },
+              include: { order: { include: { store: true } } },
+            });
 
     const providerName = provider || (payment?.provider as PaymentProvider) || undefined;
-    const effectiveStoreId = storeId || payment?.order?.storeId;
+    const effectiveStoreId =
+      storeId ||
+      (payment && 'order' in payment
+        ? (payment.order as { storeId?: string } | null)?.storeId
+        : undefined);
     return (await factory.getProvider(providerName, effectiveStoreId)).getPaymentStatus(
       transactionId
     );
@@ -3063,11 +3125,14 @@ export class PaymentService {
   /**
    * Get payment by order ID
    */
-  static async getPaymentByOrderId(orderId: string) {
-    return prisma.payment.findFirst({
-      where: { orderId },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async getPaymentByOrderId(orderId: string, storeId: string) {
+    // the store's own backend (a Durable Object store has no Postgres row; NEON-ZERO)
+    return withStore(storeId, async () =>
+      (await storeDb(storeId)).payment.findFirst({
+        where: { orderId },
+        orderBy: { createdAt: 'desc' },
+      })
+    );
   }
 
   /**
@@ -3081,24 +3146,22 @@ export class PaymentService {
     provider: PaymentProvider | undefined,
     storeId: string
   ): Promise<PaymentResponse> {
-    const payment = await withStore(storeId, () =>
-      prisma.payment.findUnique({
+    // Through the store's own backend (NEON-ZERO: a Durable Object store has no Postgres row). `Order -> User` is a platform
+    // join the DO cannot do, so the shopper is read beside the order (Ruling NZ-A-3).
+    const payment = await withStore(storeId, async () =>
+      (await storeDb(storeId)).payment.findFirst({
         where: { id: paymentId },
-        include: {
-          order: {
-            include: {
-              items: { include: { product: true } },
-              customer: true,
-              store: true,
-            },
-          },
-        },
+        include: { order: { include: { items: { include: { product: true } } } } },
       })
     );
 
     if (!payment || payment.order.storeId !== storeId) {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
     }
+    const retryCustomer = payment.order.customerId
+      ? ((await customersById(storeId, [payment.order.customerId])).get(payment.order.customerId) ??
+        null)
+      : null;
 
     if (payment.status !== 'failed') {
       throw new AppError(400, 'INVALID_STATE', 'Payment is not in failed state');
@@ -3122,9 +3185,9 @@ export class PaymentService {
         customer: {
           id: order.customerId ?? `guest-${order.id}`,
           name:
-            `${order.customer?.firstName ?? retryShipping.firstName ?? ''} ${order.customer?.lastName ?? retryShipping.lastName ?? ''}`.trim() ||
+            `${retryCustomer?.firstName ?? retryShipping.firstName ?? ''} ${retryCustomer?.lastName ?? retryShipping.lastName ?? ''}`.trim() ||
             'Customer',
-          email: order.customer?.email || retryShipping.email || '',
+          email: retryCustomer?.email || retryShipping.email || '',
           phone: retryShipping.phone || undefined,
         },
         items: buildPaymentLineItems(order.items),

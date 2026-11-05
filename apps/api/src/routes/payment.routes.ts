@@ -15,7 +15,7 @@ import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, withStore } from '@ebda/database';
+import { withStore, type Prisma } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
@@ -33,7 +33,7 @@ import {
 import { OrderService } from '../services/order.service';
 import { checkStoreAccess } from '../middleware/store-access';
 import { onAccessD1 } from '../services/platform/access-d1';
-import { recordPaymentEvent } from '../services/payment-event.service';
+import { recordPaymentEventForStore } from '../services/payment-event.service';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
@@ -60,7 +60,7 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
-import { runInStoreCtx } from '../lib/jobs/store-db';
+import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
 // ==========================================
@@ -131,6 +131,39 @@ const retryBodySchema = z.object({ provider: z.enum(['paymob', 'kashier', 'fawry
 // ==========================================
 
 // getUserFromRequest replaced by shared getAuthUser from ../utils/store-helpers
+
+/**
+ * An order of `storeId` with its lines (+ product), its shopper and its storefront, read through the store's own backend
+ * (NEON-ZERO: Postgres is gone from the Worker; `storeDb` is the `prisma` proxy for a Postgres store, so that path reads
+ * exactly as before). `Order -> User` and `Order -> Store` are platform rows a Durable Object order cannot join, so both are
+ * read beside it (Ruling NZ-A-3), giving the same shape on both backends. Null when no order matches `where`.
+ */
+async function readOrderForPayment(storeId: string, where: Prisma.OrderWhereInput) {
+  return withStore(storeId, async () => {
+    const db = await storeDb(storeId);
+    const order = await db.order.findFirst({
+      where: { ...where, storeId },
+      include: { items: { include: { product: true } } },
+    });
+    if (!order) return null;
+    const customer = order.customerId
+      ? ((await customersById(storeId, [order.customerId])).get(order.customerId) ?? null)
+      : null;
+    const store = await db.store.findUnique({
+      where: { id: storeId },
+      select: { domain: true, slug: true, ownerId: true },
+    });
+    return { ...order, customer, store };
+  });
+}
+
+/** A payment row of `storeId` through the store's own backend (see `readOrderForPayment`). */
+async function readPayment<T>(
+  storeId: string,
+  fn: (db: Awaited<ReturnType<typeof storeDb>>) => Promise<T>
+): Promise<T> {
+  return withStore(storeId, async () => fn(await storeDb(storeId)));
+}
 
 // ==========================================
 // Routes
@@ -346,17 +379,11 @@ router.post(
       // every read happens inside that store's scope.
       const orderStoreId = await getOrderStoreId(data.orderId);
       const order = orderStoreId
-        ? await withStore(orderStoreId, () =>
-            prisma.order.findFirst({
-              where: isCustomer
-                ? { id: data.orderId, storeId: orderStoreId, customerId: req.user!.userId }
-                : { id: data.orderId, storeId: orderStoreId, customerId: null },
-              include: {
-                items: { include: { product: true } },
-                customer: true,
-                store: { select: { domain: true, slug: true } },
-              },
-            })
+        ? await readOrderForPayment(
+            orderStoreId,
+            isCustomer
+              ? { id: data.orderId, customerId: req.user!.userId }
+              : { id: data.orderId, customerId: null }
           )
         : null;
 
@@ -375,8 +402,8 @@ router.post(
       // another live gateway invoice the customer could ALSO pay (undetected
       // double capture). Terminal-failure payments (failed/cancelled/expired)
       // are excluded so a legitimate retry after a failed attempt still works.
-      const existingPayment = await withStore(order.storeId, () =>
-        prisma.payment.findFirst({
+      const existingPayment = await readPayment(order.storeId, db =>
+        db.payment.findFirst({
           where: {
             orderId: order.id,
             status: { notIn: ['failed', 'cancelled', 'expired'] },
@@ -400,7 +427,7 @@ router.post(
         }
         if (existingPayment.provider === 'cod' && data.provider === 'cod') {
           // Replay the original COD response — the fee was applied on the
-          // first call and must not stack.
+          // first call and must not stack. (A Durable Object COD row carries the same metadata.)
           const meta = (existingPayment.metadata ?? {}) as Record<string, unknown>;
           res.json({
             success: true,
@@ -632,7 +659,9 @@ router.post(
           // store charges a COD fee is refused: charging a fee the shopper was
           // never shown is the defect this replaced. A prior COD payment row
           // means a replay (or a legacy order whose fee was folded in then).
-          const priorCodPayment = await prisma.payment.findFirst({
+          const priorCodPayment = await (
+            await storeDb(order.storeId)
+          ).payment.findFirst({
             where: { orderId: order.id, provider: 'cod' },
             select: { id: true },
           });
@@ -685,43 +714,21 @@ router.post(
             { mode: 'live' }
           );
 
-          // Create payment record with cod_pending status
-          const payment = await prisma.payment.create({
-            data: {
-              orderId: order.id,
-              provider: 'cod',
-              method: 'cod',
-              status: 'cod_pending',
-              amount: collectAmount,
-              currency: order.currency,
-              metadata: {
-                codFee,
-                originalTotal: order.total - codFee,
-                ...(walletAmount > 0 ? { walletAmount } : {}),
-              },
-            },
-          });
-
-          // NOT cleared here (issue 2306): this callback runs inside the
-          // wrap's transaction, and the Payment row above is not durable
-          // until that transaction COMMITs after the callback returns. A
-          // COMMIT failure/timeout must still reach the outer catch with the
-          // rollback armed. Cleared after `runInTenantContext` resolves.
-
-          await recordPaymentEvent({
-            paymentId: payment.id,
+          const codMeta = {
+            codFee,
+            originalTotal: order.total - codFee,
+            ...(walletAmount > 0 ? { walletAmount } : {}),
+          };
+          // The row + its `created` audit event (on a Durable Object store: ONE section, an open COD row is reused).
+          // NOT disarming the rollback here (issue 2306): on Postgres this runs inside the wrap's transaction and the row is
+          // durable only once it COMMITs; the rollback context is cleared after `runInStoreCtx` resolves.
+          const payment = await PaymentService.recordCodPayment({
             storeId: order.storeId,
             orderId: order.id,
-            eventType: 'created',
-            toStatus: 'cod_pending',
-            provider: 'cod',
-            triggeredByUserId: req.user?.userId ?? null,
-            details: {
-              amount: collectAmount,
-              codFee,
-              originalTotal: order.total - codFee,
-              ...(walletAmount > 0 ? { walletAmount } : {}),
-            },
+            amount: collectAmount,
+            currency: order.currency,
+            metadata: codMeta,
+            userId: req.user?.userId ?? null,
           });
 
           await auditLog({
@@ -1139,28 +1146,30 @@ router.get(
 
       // Verify authorization: customers can only see their own payments,
       // store_admins can only see payments from their stores.
-      const allowed = await withStore(statusStoreId, async () => {
+      // Read through the store's own backend (NEON-ZERO: a Durable Object store has no Postgres row). The order is found
+      // from the payment, then the caller must own it (customer) or own its store (store_admin).
+      const allowed = await readPayment(statusStoreId, async db => {
         if (user.role === 'super_admin') return true; // super admin can view any payment
+        const pay = await db.payment.findFirst({
+          where: { transactionId },
+          select: { orderId: true },
+        });
+        if (!pay) return false;
+        const order = await db.order.findFirst({
+          where: { id: pay.orderId, storeId: statusStoreId },
+          select: { customerId: true },
+        });
+        if (!order) return false;
         if (user.role === 'store_admin') {
           // Store admin must own the store the order belongs to
-          return !!(await prisma.order.findFirst({
-            where: {
-              storeId: statusStoreId,
-              payments: { some: { transactionId } },
-              store: { ownerId: user.userId },
-            },
-            select: { id: true },
-          }));
+          const store = await db.store.findUnique({
+            where: { id: statusStoreId },
+            select: { ownerId: true },
+          });
+          return store?.ownerId === user.userId;
         }
         // Customer: must own the order
-        return !!(await prisma.order.findFirst({
-          where: {
-            storeId: statusStoreId,
-            customerId: user.userId,
-            payments: { some: { transactionId } },
-          },
-          select: { id: true },
-        }));
+        return order.customerId === user.userId;
       });
       if (!allowed) {
         notFound();
@@ -1204,14 +1213,22 @@ router.post(
         transactionId: data.transactionId,
         provider: data.provider,
       });
+      // the store's own backend (NEON-ZERO); the payment's store IS the resolved one
       const paymentRow = resolvedRefundStore
-        ? await withStore(resolvedRefundStore, () =>
-            prisma.payment.findFirst({
+        ? await readPayment(resolvedRefundStore, db =>
+            db.payment.findFirst({
               where: { transactionId: data.transactionId },
-              include: { order: { include: { store: { select: { id: true, ownerId: true } } } } },
+              include: { order: { select: { id: true, storeId: true } } },
             })
           )
         : null;
+      if (paymentRow && paymentRow.order.storeId !== resolvedRefundStore) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Payment not found' },
+        });
+        return;
+      }
       if (!paymentRow) {
         res.status(404).json({
           success: false,
@@ -1222,7 +1239,7 @@ router.post(
       // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
       // `orders:refund` (on any store) passed with no membership check at all.
       if (user.role !== 'super_admin') {
-        const access = await checkStoreAccess(paymentRow.order.store.id, user);
+        const access = await checkStoreAccess(paymentRow.order.storeId, user);
         if (!access.ok) {
           res.status(404).json({
             success: false,
@@ -1232,16 +1249,22 @@ router.post(
         }
       }
 
-      const refundStoreId = paymentRow.order.store.id;
+      const refundStoreId = paymentRow.order.storeId;
 
       // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
       // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
       const refund = await runInStoreCtx(refundStoreId, () =>
-        PaymentService.refund({
-          transactionId: data.transactionId,
-          amount: data.amount,
-          reason: data.reason,
-        })
+        // The store is named (and the provider when the caller gave one): a Durable Object store's refund is the claim /
+        // completion sections on its DO (`refundOnDo`); without it the service would look the payment up in Postgres.
+        PaymentService.refund(
+          {
+            transactionId: data.transactionId,
+            amount: data.amount,
+            reason: data.reason,
+          },
+          data.provider,
+          refundStoreId
+        )
       );
 
       // The audit trail, on its OWN transaction after the money moved, best effort + alert: a failing audit write
@@ -1262,11 +1285,14 @@ router.post(
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
-        const after = await prisma.payment.findUnique({
+        const after = await (
+          await storeDb(refundStoreId)
+        ).payment.findUnique({
           where: { id: paymentRow.id },
           select: { status: true },
         });
-        await recordPaymentEvent({
+        // on a Durable Object store the row is appended there (`paymentEventRecord`); Postgres joins this scope
+        await recordPaymentEventForStore({
           paymentId: paymentRow.id,
           storeId: refundStoreId,
           orderId: paymentRow.orderId,
@@ -1333,8 +1359,8 @@ router.post(
       // maps the payment id to its store, then the ownership check reads inside that scope.
       const paymentStoreId = await getPaymentStoreId(paymentId);
       const payment = paymentStoreId
-        ? await withStore(paymentStoreId, () =>
-            prisma.payment.findUnique({
+        ? await readPayment(paymentStoreId, db =>
+            db.payment.findUnique({
               where: { id: paymentId },
               include: { order: true },
             })
@@ -1389,20 +1415,20 @@ router.get(
       // runs inside that store.
       const orderStoreId = await getOrderStoreId(orderId);
       const order = orderStoreId
-        ? await withStore(orderStoreId, () => {
-            if (user.role === 'super_admin') {
-              return prisma.order.findUnique({ where: { id: orderId, storeId: orderStoreId } });
-            }
+        ? await readPayment(orderStoreId, async db => {
+            const o = await db.order.findFirst({ where: { id: orderId, storeId: orderStoreId } });
+            if (!o) return null;
+            if (user.role === 'super_admin') return o;
             if (user.role === 'store_admin') {
               // Store admin can only see orders from stores they own
-              return prisma.order.findFirst({
-                where: { id: orderId, storeId: orderStoreId, store: { ownerId: user.userId } },
+              const store = await db.store.findUnique({
+                where: { id: orderStoreId },
+                select: { ownerId: true },
               });
+              return store?.ownerId === user.userId ? o : null;
             }
             // Customer: can only see their own orders
-            return prisma.order.findFirst({
-              where: { id: orderId, storeId: orderStoreId, customerId: user.userId },
-            });
+            return o.customerId === user.userId ? o : null;
           })
         : null;
 
@@ -1414,9 +1440,7 @@ router.get(
         return;
       }
 
-      const payment = await withStore(order.storeId, () =>
-        PaymentService.getPaymentByOrderId(orderId)
-      );
+      const payment = await PaymentService.getPaymentByOrderId(orderId, order.storeId);
 
       res.json({
         success: true,
@@ -1474,8 +1498,8 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
       return;
     }
 
-    const events = await withStore(owner.storeId, () =>
-      prisma.paymentEvent.findMany({
+    const events = await readPayment(owner.storeId, db =>
+      db.paymentEvent.findMany({
         where: { storeId: owner.storeId, paymentId: owner.paymentId },
         orderBy: { occurredAt: 'desc' },
         select: {
@@ -1534,8 +1558,8 @@ router.get(
           })()
         : await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
       const event = owner
-        ? await withStore(owner.storeId, () =>
-            prisma.paymentEvent.findUnique({
+        ? await readPayment(owner.storeId, db =>
+            db.paymentEvent.findUnique({
               where: { id: eventId, storeId: owner.storeId },
               select: {
                 id: true,

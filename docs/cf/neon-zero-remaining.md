@@ -8,6 +8,14 @@ Last run (`SWEEP_STRICT=1`) on `integ/neon-zero` after #439, #441 and `origin/ma
 
 Reproduce: `cd apps/api && npm run cf:dry-run && SWEEP_STRICT=1 EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`.
 
+## Money path closed (PR `fix/nz-money-path-prisma`, Ruling NZ-MONEY-1)
+
+Every payment / refund / payout / webhook / checkout route was traced on the Worker with a DO store and every marker set; the reachable Postgres calls were ported (table in the PR body). Rows of `routes/payment.routes.ts`, `routes/payment-abandonments.routes.ts` and `routes/affiliate.routes.ts` were removed from the tables below: those files now have no `prisma.` call, and `tests/unit/no-prisma-in-routes.test.ts` keeps it so (money routes: zero, never allowlisted; every other route file: a ratchet that only goes down). The runtime proof is `apps/api/workers-test/money-path.test.ts`: COD + InstaPay `POST /payments/create`, signed Paymob / Fawry / Kashier webhooks (test keys) applied once in the StoreDO, the return URLs, the payment reads, refund / retry, the payment-abandonment reports and the affiliate payout, all with `/__dev/pg-reaches` empty.
+
+Found on the way and fixed: the StoreDO never drained its `d1_outbox` entity-index rows (no caller of `drainEntityIndexOutbox` existed), so no new order, payment or gateway reference of a DO store was ever resolvable from D1; `moneyOp` now drains before it answers, the alarm retries. The DO `paymentCreate` required the full order total, so a wallet-part-paid order could not record its gateway payment (it now takes the amount due).
+
+Still unported (not money-reachable from a route on a DO store, or a whole subsystem): the rest of `services/affiliate.service.ts` (affiliate CRUD, referrals, config, stats), `services/payment-providers/instapay.service.ts` Postgres branches behind `storeMoney`, and the generated rows below.
+
 ## Method and limits (read first)
 
 - Tree analysed: this branch (base `origin/feat/nz-platform-d1-b` = #415, which contains #407) merged with #410 (`feat/nz-access-auth`), #416 (`feat/nz-analytics-jobs`), #414 (`feat/nz-customer-auth-do`) and #408 (`feat/nz-store-create-on-do`) by `git merge-tree` (a read-only merge; 6 files conflict, none changes a finding). The N-10d code itself is part of the base here.
@@ -80,7 +88,6 @@ All other D1-target models are routed: billing family (#407), platform + inbox (
 | `routes/newsletter.routes.ts:222`                                  | Store | yes           | unowned                                                                  |
 | `routes/order.routes.ts:178`                                       | Store | no            | unowned                                                                  |
 | `routes/payment-settings.routes.ts:263,338,475,628,711,804`        | Store | no            | unowned; file touched by #408 (verify the use is covered)                |
-| `routes/payment.routes.ts:247,459`                                 | Store | no            | unowned; file touched by #408/#410 (verify the use is covered)           |
 | `routes/provider-activation.routes.ts:88`                          | Store | no            | unowned                                                                  |
 | `routes/public-store-layout.routes.ts:59`                          | Store | yes           | unowned                                                                  |
 | `routes/public.routes.ts:588,1857,2015,2743,2873`                  | Store | yes           | unowned                                                                  |
@@ -220,8 +227,6 @@ All other D1-target models are routed: billing family (#407), platform + inbox (
 | `mcp/tools/order.tools.ts:202`                                                | Payment               | unowned                                                                  |
 | `mcp/tools/order.tools.ts:124`                                                | PaymentConfig         | unowned                                                                  |
 | `routes/address.routes.ts:61,97,104,107,149,184 (+5)`                         | Address               | unowned                                                                  |
-| `routes/affiliate.routes.ts:318`                                              | AffiliatePayout       | unowned; file touched by #408 (verify the use is covered)                |
-| `routes/affiliate.routes.ts:312`                                              | AffiliateReferral     | unowned; file touched by #408 (verify the use is covered)                |
 | `routes/finance.routes.ts:1337,1353,1376,1422,1459,1528 (+2)`                 | BankStatement         | unowned                                                                  |
 | `routes/finance.routes.ts:1478,1504`                                          | BankTransaction       | unowned                                                                  |
 | `routes/finance.routes.ts:1138,1177`                                          | FxRateEntry           | unowned                                                                  |
@@ -231,12 +236,7 @@ All other D1-target models are routed: billing family (#407), platform + inbox (
 | `routes/order.routes.ts:2351`                                                 | AuditLog              | unowned                                                                  |
 | `routes/order.routes.ts:192,911,965,1239,1267,1370 (+5)`                      | Order                 | unowned                                                                  |
 | `routes/order.routes.ts:961,1263,1491,1565,1676`                              | Payment               | unowned                                                                  |
-| `routes/payment-abandonments.routes.ts:107,150,235,238,248,258`               | Order                 | unowned                                                                  |
 | `routes/payment-settings.routes.ts:287,360,377,398,496,513 (+11)`             | PaymentConfig         | unowned; file touched by #408 (verify the use is covered)                |
-| `routes/payment.routes.ts:345,1139,1149,1387,1391,1396`                       | Order                 | unowned; file touched by #408/#410 (verify the use is covered)           |
-| `routes/payment.routes.ts:374,628,682,1202,1258,1330`                         | Payment               | unowned; file touched by #408/#410 (verify the use is covered)           |
-| `routes/payment.routes.ts:201,592`                                            | PaymentConfig         | unowned; file touched by #408/#410 (verify the use is covered)           |
-| `routes/payment.routes.ts:1471,1522`                                          | PaymentEvent          | unowned; file touched by #408/#410 (verify the use is covered)           |
 | `routes/product-model.routes.ts:186,308,346,371`                              | ProductModel          | unowned                                                                  |
 | `routes/review.routes.ts:454`                                                 | Review                | unowned                                                                  |
 | `routes/shipping.routes.ts:85,115,666,701,831,887 (+3)`                       | ShippingAreaRate      | unowned                                                                  |

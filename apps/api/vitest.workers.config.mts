@@ -124,7 +124,31 @@ export default defineConfig(async () => {
                 }`,
             },
             {
+              // The payment gateways, as the API Worker's outbound fetch sees them (workers-test/money-path.test.ts). Kashier's
+              // transaction-details read (confirm-before-apply, PROVIDERS-17) answers SUCCESS for the id asked; any other call to a
+              // gateway host is a 503 outage (never the real internet); everything else passes through untouched.
+              name: 'gateway-stub',
+              modules: true,
+              compatibilityDate: '2026-08-01',
+              script: `
+                const GATEWAYS = /(^|\\.)(kashier\\.io|paymob\\.com|fawrystaging\\.com|atfawry\\.com)$/;
+                export default {
+                  async fetch(request) {
+                    const u = new URL(request.url);
+                    if (!GATEWAYS.test(u.hostname)) return fetch(request);
+                    const m = u.pathname.match(/\\/v2\\/aggregator\\/transactions\\/([^/]+)$/);
+                    if (m && u.hostname.endsWith('kashier.io')) {
+                      const id = decodeURIComponent(m[1]);
+                      return Response.json({ status: 'SUCCESS', body: { transactionId: id, status: 'SUCCESS', trxType: 'pay',
+                        transactions: [{ transactionId: id, operation: 'pay', status: 'SUCCESS' }] } });
+                    }
+                    return Response.json({ message: 'gateway stub: not answered' }, { status: 503 });
+                  }
+                }`,
+            },
+            {
               name: 'api',
+              outboundService: 'gateway-stub',
               modulesRoot: here('./dist-cf'),
               modules: [
                 { type: 'ESModule', path: BUNDLE },

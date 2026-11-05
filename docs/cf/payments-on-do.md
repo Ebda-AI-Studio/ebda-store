@@ -14,7 +14,7 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 
 ## Webhook routing (D1 entity index)
 
-`resolveStoreFromWebhookRef` (`lib/definer.ts`) asks Postgres first (`ebda_webhook_resolve_store_scoped`); a miss falls to `resolveDoStoreFromWebhookRef`, which reads the D1 `entity_index` key `webhook` `<provider>:<ref>` (written in the DO section that created the payment, drained by the alarm). Same contract as the Postgres resolver (WEBHOOK-SCOPE-1): no provider -> no lookup; the `payment` kind is never read for a gateway reference; the per-store URL's store must equal the index row; only a store in `STORE_DO_ENABLED_IDS` is routed. A reference nobody resolves, while any store is flagged, is 503 + Retry-After + a P0 (never the constant 401) on the generic URL.
+`resolveStoreFromWebhookRef` (`lib/definer.ts`) asks the D1 entity index first when D1 is bound; Postgres is asked only while a `pg` store exists. The D1 `entity_index` key `webhook` `<provider>:<ref>` is queued in `d1_outbox` by the DO section that created the payment and written to D1 by `StoreDO.moneyOp` BEFORE it answers (`drainEntityIndexOutbox`; a D1 failure leaves it queued, retried on the next money op and by the alarm). Until NZ-MONEY-1 nothing drained the outbox. Same contract as the Postgres resolver (WEBHOOK-SCOPE-1): no provider -> no lookup; the `payment` kind is never read for a gateway reference; the per-store URL's store must equal the index row; only a store in `STORE_DO_ENABLED_IDS` is routed. A reference nobody resolves, while any store is flagged, is 503 + Retry-After + a P0 (never the constant 401) on the generic URL.
 
 ## Options the Postgres path honours, and what the DO does with each
 
@@ -56,3 +56,23 @@ Gold product pricing edits are money ops (`do/gold-pricing.ts`); `PaymentService
 - InstaPay order receipts: ops `receiptCreate`, `receiptExtraction`, `receiptGet`, `receiptList`, `receiptProof`, `receiptSubmit`, `receiptReject`, `receiptImageDeleted`, `receiptSweep`; `confirmPayment` approves the submitted receipts in its own section. Cross-store reference claim: D1 `entity_index` kind `instapay_ref`, bound to the receipt (`claim_ref`). At cutover the table is copied from the platform `instapay_receipts` order rows with count and checksum (R6a, Ruling CF-R6A-4).
 - CSV import: ops `importBatch` and `importVariants` (`docs/cf/repo-factory.md`).
 - FOUNDING-1 `billing_grants` guard on D1: already ported by CF-LAST-2 (`migrations/platform/0002_invariants.sql`, `packages/cf-schema/test/platform.test.ts`). `PaymentService.handleWebhook` / `refund` end to end with a stub adapter: already `tests/integration/repo-factory-payment-service-contract.test.ts` (CF-LAST-1). Both re-run green in R3; nothing new was needed.
+
+## NEON-ZERO money path (Ruling NZ-MONEY-1)
+
+Postgres is gone from the Worker; these were the last Postgres calls a DO store's checkout, webhooks and payouts could reach.
+
+| Operation          | Engine                           | Replaces                                                           | Worker caller                                             |
+| ------------------ | -------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------- |
+| `paymentCreate`    | `payments.ts` `createPayment`    | + the COD row of `POST /payments/create` (`cod_pending`, metadata) | `PaymentService.recordCodPayment`, `recordCreatedPayment` |
+| `instapayInitiate` | `payments.ts` `initiateInstapay` | `InstapayService.initiate` (hold, pending row, both events)        | `InstapayService.initiateOnDo`                            |
+| `affiliatePayout`  | `job-ops.ts` `affiliatePayoutOp` | `AffiliateService.createPayout` (debit + payout + event)           | `AffiliateService.createPayout`                           |
+
+- `paymentCreate` takes the amount DUE (`total - wallet_amount`, what every Postgres caller charges); a second COD create while one is open returns the same row (`replayed: true`).
+- `instapayInitiate` replays an awaiting order's pending row (`created: false`); otherwise `ORDER_NOT_PAYABLE` / `ORDER_ALREADY_PAID` as on Postgres.
+- `affiliatePayout` re-checks the balance inside the section (`INSUFFICIENT_BALANCE`), like the Postgres `updateMany ... gte`.
+- Reads of `POST /payments/create`, `/payments/status/:ref`, `/payments/refund`, `/payments/retry/:id`, `/payments/order/:id`, `/payments/:id/events`, `/payments/events/:id/payload`, the payment-abandonment reports and the affiliate events / payouts go through `storeDb(storeId)`; `Order -> User` and `Order -> Store` are read beside the order (`customersById`, `db.store`). `POST /payments/refund` names the store, so `PaymentService.refund` takes `refundOnDo`. The inline webhook fallback (Inngest send failed) skips the Postgres transaction for a DO store, like the job. The error redirect resolves its store from the D1 index per gateway.
+- Tests: `apps/api/workers-test/money-path.test.ts` (8, built Worker, Postgres absent, signed webhooks with test keys, `gateway-stub` outbound service answers Kashier's confirm), `packages/repo/test/do-payment-ops.test.ts` (+4), `tests/unit/no-prisma-in-routes.test.ts` (static gate).
+
+Ruling NZ-MONEY-1 - the DO `paymentCreate` charges the amount due, not the order total. Evidence: every Postgres caller (`/payments/create`, payment link, retry) records `order.total - order.walletAmount`, and the DO refused that with `PAYMENT_AMOUNT_MISMATCH` (a wallet-part-paid order could not record its gateway payment; the gateway invoice was then orphaned). The one DO test that paid the full total of a wallet order encoded the wrong amount and now pays the due. Cost if wrong: a caller that really meant the full total of a wallet order is refused 409 instead of over-charging the wallet part.
+
+Ruling NZ-MONEY-2 - `StoreDO.moneyOp` drains the entity-index outbox before it answers (and the alarm retries); a drain failure never fails the money op. Evidence: `drainEntityIndexOutbox` had no caller in the Worker, so D1 `entity_index` never learnt a DO store's new orders, payments or gateway references (`POST /payments/create` 404, webhooks 503-retried forever). Cost if wrong: one extra local SELECT (and a D1 write per new entity) on each money op's latency; a D1 outage leaves a just-created order unresolvable until the next money op or the daily alarm (the gateway retries its 503).

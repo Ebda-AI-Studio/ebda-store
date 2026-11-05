@@ -524,6 +524,59 @@ export function affiliateReverseOp(
   });
 }
 
+/**
+ * AffiliateService.createPayout on the DO: debit the pending balance (refused when it does not cover the amount), write the
+ * `pending` payout row and its `payout_initiated` event, ONE section. Two concurrent payouts that each fit the balance alone
+ * cannot both be paid from it (the debit re-checks it in the same section, like the Postgres `updateMany ... gte`).
+ */
+export function affiliatePayoutOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { payout: Record<string, unknown> } {
+  const affiliateId = str(a.affiliateId, 'affiliateId');
+  const amount = a.amount;
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0)
+    throw new MoneyError('INVALID_AMOUNT', 'Payout amount must be greater than zero', 400);
+  const method = typeof a.method === 'string' && a.method ? a.method.slice(0, 64) : 'manual';
+  const notes = typeof a.notes === 'string' ? a.notes.slice(0, 2000) : null;
+  const payoutId = typeof a.payoutId === 'string' && a.payoutId ? a.payoutId : crypto.randomUUID();
+  return db.transactionSync(() => {
+    const found = db.all('SELECT id FROM affiliates WHERE id = ? AND store_id = ?', [
+      affiliateId,
+      storeId,
+    ])[0];
+    if (!found) throw new MoneyError('NOT_FOUND', 'Affiliate not found', 404);
+    const debit = db.run(
+      'UPDATE affiliates SET pending_balance = pending_balance - ?1, total_paid = total_paid + ?1 WHERE id = ?2 AND store_id = ?3 AND pending_balance >= ?1',
+      [amount, affiliateId, storeId]
+    );
+    if (debit.changes < 1)
+      throw new MoneyError('INSUFFICIENT_BALANCE', 'Payout amount exceeds pending balance', 400);
+    const now = Date.now();
+    db.run(
+      "INSERT INTO affiliate_payouts (id, store_id, affiliate_id, amount, method, status, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)",
+      [payoutId, storeId, affiliateId, amount, method, notes, now, now]
+    );
+    addAffiliateEvent(db, storeId, affiliateId, 'payout_initiated', { payoutId, amount, method });
+    const payout = db.all('SELECT * FROM affiliate_payouts WHERE id = ?', [payoutId])[0]!;
+    return {
+      payout: {
+        id: payout.id,
+        storeId: payout.store_id,
+        affiliateId: payout.affiliate_id,
+        amount: payout.amount,
+        method: payout.method,
+        status: payout.status,
+        paidAt: payout.paid_at === null ? null : new Date(payout.paid_at as number).toISOString(),
+        notes: payout.notes,
+        createdAt: new Date(payout.created_at as number).toISOString(),
+        updatedAt: new Date(payout.updated_at as number).toISOString(),
+      },
+    };
+  });
+}
+
 function addAffiliateEvent(
   db: SyncSql,
   storeId: string,

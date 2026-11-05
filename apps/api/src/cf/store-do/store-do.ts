@@ -30,6 +30,7 @@ import {
   doSyncSql,
   answerStockOp,
   answerMoneyOp,
+  drainEntityIndexOutbox,
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
@@ -325,7 +326,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    * Money operations (Ruling CF-MONEY-1): the same contract as `stockOp` (one named operation = one `transactionSync`
    * section, optional idempotency key, a refusal is an ANSWER) for the money paths moved in PR D2b.
    */
-  moneyOp(storeId: string, op: string, argsJson: string, key?: string): MoneyAnswer {
+  async moneyOp(storeId: string, op: string, argsJson: string, key?: string): Promise<MoneyAnswer> {
     try {
       this.bind(storeId);
     } catch (e) {
@@ -340,7 +341,30 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       message: 'store is closed',
     });
     if (closed) return closed;
-    return answerMoneyOp(this.sync, storeId, op, argsJson, key);
+    const answer = answerMoneyOp(this.sync, storeId, op, argsJson, key);
+    // The section above queued the id -> store rows of what it created (orders, payments, gateway references) in `d1_outbox`;
+    // write them to D1 `entity_index` BEFORE answering, so the shopper's next call (POST /payments/create by order id) and the
+    // gateway's webhook (by reference) resolve this store. A D1 failure never fails the money op: the row stays queued and is
+    // retried on the next money op and by the alarm (backoff in the outbox).
+    await this.drainIndex();
+    return answer;
+  }
+
+  /** Write the due `d1_outbox` entity-index rows to D1 (idempotent; nothing queued = no D1 call). Never throws. */
+  private async drainIndex(): Promise<void> {
+    const d1 = this.env.PLATFORM_DB;
+    if (!d1) return;
+    try {
+      const r = (await drainEntityIndexOutbox(this.sync, d1)) as {
+        failed: number;
+        deadLettered: number;
+        conflicts: unknown[];
+      };
+      if (r.failed > 0 || r.deadLettered > 0 || r.conflicts.length > 0)
+        console.error('entity index drain incomplete', JSON.stringify(r));
+    } catch (err) {
+      console.error('entity index drain failed', err);
+    }
   }
 
   /**
@@ -533,6 +557,8 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
 
   async alarm(): Promise<void> {
     try {
+      // the backstop of a money op whose index drain failed (the rows wait in the outbox with backoff)
+      await this.drainIndex();
       // The saved scope of a half-finished shopper erasure never outlives its TTL (Ruling CF-R6A-3).
       try {
         purgeErasureLedger(this.sync);

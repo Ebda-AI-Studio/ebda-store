@@ -305,7 +305,10 @@ class AffiliateService {
   // ---- Get by ID ----
 
   async getById(storeId: string, id: string) {
-    const affiliate = await prisma.affiliate.findFirst({
+    // the store's own backend (NEON-ZERO); the `prisma` proxy for a Postgres store
+    const affiliate = await (
+      await storeDb(storeId)
+    ).affiliate.findFirst({
       where: { id, storeId },
       include: {
         _count: { select: { referrals: true, payouts: true } },
@@ -693,14 +696,15 @@ class AffiliateService {
 
     const where: Prisma.AffiliatePayoutWhereInput = { storeId, affiliateId };
 
+    const db = await storeDb(storeId); // the store's own backend (NEON-ZERO); the `prisma` proxy for a Postgres store
     const [payouts, total] = await Promise.all([
-      prisma.affiliatePayout.findMany({
+      db.affiliatePayout.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.affiliatePayout.count({ where }),
+      db.affiliatePayout.count({ where }),
     ]);
 
     return {
@@ -710,6 +714,27 @@ class AffiliateService {
   }
 
   async createPayout(storeId: string, affiliateId: string, data: CreatePayoutData) {
+    // A store on its Durable Object (NEON-ZERO): the affiliate row, the debit, the payout and its event are ONE section there;
+    // the balance is re-checked inside it, so the refusals are the same (404 / INVALID_AMOUNT / INSUFFICIENT_BALANCE).
+    const money = await storeMoney(storeId);
+    if (money) {
+      if (data.amount <= 0) {
+        throw new AppError(400, 'INVALID_AMOUNT', 'Payout amount must be greater than zero');
+      }
+      const payoutId = randomUUID();
+      const { payout } = await money.affiliatePayout({
+        affiliateId,
+        amount: data.amount,
+        method: data.method ?? 'manual',
+        notes: data.notes ?? null,
+        payoutId,
+      });
+      logger.info(
+        { storeId, affiliateId, payoutId, amount: data.amount },
+        '[AffiliateService] Payout created'
+      );
+      return payout;
+    }
     const affiliate = await this.getById(storeId, affiliateId);
 
     if (data.amount <= 0) {
