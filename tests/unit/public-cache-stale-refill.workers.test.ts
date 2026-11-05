@@ -57,7 +57,6 @@ async function isolate() {
   vi.resetModules();
   const bindings = await import('@api/cf/bindings');
   bindings.setCfBindings({
-    HYPERDRIVE: { connectionString: '' },
     AUTH_STATE: ns,
     KV_CACHE: kv,
   } as unknown as Parameters<typeof bindings.setCfBindings>[0]);

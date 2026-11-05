@@ -77,7 +77,15 @@ describe('buyerKeyVector', () => {
 });
 
 describe('GET /health payload', () => {
-  const ALLOWED = new Set(['status', 'timestamp', 'commit', 'deploymentId', 'buyerKeyVector']);
+  // `postgres` is the constant 'removed' (Ruling NZ-D23): nothing derived from a phone, an order or a customer
+  const ALLOWED = new Set([
+    'status',
+    'timestamp',
+    'commit',
+    'deploymentId',
+    'buyerKeyVector',
+    'postgres',
+  ]);
 
   it('adds buyerKeyVector for a strong secret, and only the known fields', async () => {
     const body = await healthPayload({ SUITE_BUYER_KEY_SECRET: SECRET } as never);

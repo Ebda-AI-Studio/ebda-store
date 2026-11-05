@@ -56,7 +56,6 @@ beforeEach(() => {
   ns = new FakeAuthStateNamespace();
   kv = new FakeKv();
   setCfBindings({
-    HYPERDRIVE: { connectionString: '' },
     AUTH_STATE: ns,
     KV_CACHE: kv,
   } as unknown as CfBindings);

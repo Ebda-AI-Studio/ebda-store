@@ -1,7 +1,6 @@
 // The Ebda API on Cloudflare Workers (R-EBDA-001, docs/ebda/design/cloudflare-backend.md).
-// Express runs through `httpServerHandler` (`cloudflare:node`, nodejs_compat); each request
-// leases a pooled Prisma client (packages/database/src/client-pool.ts) and its own pg
-// connections over Hyperdrive. NO SECRETS HERE: local secrets live in
+// Express runs through `httpServerHandler` (`cloudflare:node`, nodejs_compat); data is on
+// StoreDO + D1; there is no Postgres (Hyperdrive removed, NEON-ZERO N-17). NO SECRETS HERE: local secrets live in
 // `.dev.vars` (see `.dev.vars.example`), deployed ones in `wrangler secret put`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -36,22 +35,7 @@
   // The serial Frankfurt/DO hops are the cost; fix them by removing hops, not by moving the Worker.
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
 
-  // Hyperdrive in front of Neon. QUERY CACHING MUST STAY OFF: a cached read is keyed on SQL text
-  // and parameters, not on the tenant GUC, so caching could serve one store's rows to another
-  // (design section 3). It is a property of the Hyperdrive CONFIG, not of this file: create it with
-  // `scripts/cf-hyperdrive-create.sh` (`--caching-disabled`). `localConnectionString` is
-  // `wrangler dev` / tests only: the local API role (`ebda_app`, NOBYPASSRLS) through pgbouncer
-  // in transaction mode, which is what Hyperdrive's pooler looks like to the Worker. The password is
-  // the repo-wide fake dev one (`ci-only-app-pw`, the CI role step and tests/integration/rls-*.test.ts):
-  // roles are cluster-wide, so a different one here would be reset by the next test run.
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      // Placeholder: replace with the id `wrangler hyperdrive create` prints, per environment.
-      "id": "00000000000000000000000000000000",
-      "localConnectionString": "postgresql://ebda_app:ci-only-app-pw@127.0.0.1:6433/ebda_s1",
-    },
-  ],
+  // No Hyperdrive / Postgres binding (NEON-ZERO N-17, Ruling NZ-D23): the Worker's Prisma client throws POSTGRES_REMOVED.
 
   // D1 `ebda-platform` (INFRA-CF-1 task 2.4): `stores.storage_backend` is the per-store backend switch read by
   // lib/store-backend.ts, and /health reports its counts. The zero id is a placeholder (like the zero ids above): the
@@ -310,14 +294,15 @@
     // column, read live by every consumer (lib/store-backend.ts backendFor / doStoreIdList). The env list is only the local / test fallback.
     // Which alarm-ready jobs fire as StoreSchedule alarms (src/lib/jobs/alarm-flag.ts): comma list or "all". Alarms are armed ONLY for
     // stores served by their Durable Object (src/lib/jobs/store-schedule.ts, Ruling CF-JOBS-1); every Postgres store keeps the global
-    // cron. With JOBS_ON_DO unset no store is a DO store, so "all" arms nothing today.
+    // cron. (With JOBS_ON_DO unset no store would be a DO store and "all" would arm nothing; it is "1" below since the cutover.)
     "JOBS_CF_ALARMS": "all",
     // "1" = background jobs follow each store's D1 backend flag (stores.storage_backend): DO stores get alarms, their unported jobs are
-    // refused with an alert, sweeps skip them (src/lib/jobs/do-guard.ts). Flipped together with the flag at the cutover; "" = every store on Postgres.
-    "JOBS_ON_DO": "",
-    // "1" = a NEW store is created on D1 + its StoreDO with no Postgres row (lib/store-create-do.ts, Ruling NZ-D22). Keep "" until the
-    // store-access gate and the billing readers (N-6, N-10) can serve a store with no Postgres row; "" = the unchanged Postgres create.
-    "STORE_CREATE_ON_DO": "",
+    // refused with an alert, sweeps skip them (src/lib/jobs/do-guard.ts). "1" since the production cutover (Ruling NZ-JOBS-FLIP-1): every
+    // store is a DO store and the Worker has no Postgres.
+    "JOBS_ON_DO": "1",
+    // "1" = a NEW store is created on D1 + its StoreDO with no Postgres row (lib/store-create-do.ts, Ruling NZ-D22). "1" since the
+    // production cutover (Ruling NZ-JOBS-FLIP-1): the store-access gate and the billing readers (N-6, N-10) serve a store with no Postgres row.
+    "STORE_CREATE_ON_DO": "1",
     // "1" = cutover write freeze (docs/runbooks/cutover-cf.md 5.1): HTTP writes answer 503 AND crons, queue consumers, Workflows and
     // DO alarms stand still (parked, never dropped; src/lib/jobs/freeze.ts). Anything else = off.
     "WRITES_FROZEN": "",

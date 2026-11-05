@@ -23,18 +23,16 @@ import { NonRetryableError } from 'cloudflare:workflows';
 import { createServer } from 'node:http';
 import app from './app';
 import {
-  ClientPoolTimeout,
-  createIsolateDb,
+  createPostgresRemovedClient,
   postgresReaches,
+  runWithRequestDb,
   trackPostgresReaches,
-  type IsolateDb,
 } from '@ebda/database';
 import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
-import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { parkIfFrozen, type ParkableBatch } from './cf/queue-freeze';
 import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
@@ -43,11 +41,7 @@ import { runScheduled } from './cf/cron';
 import { routeCutover } from './cf/cutover';
 import { runJobWorkflow } from './lib/jobs/run-workflow';
 import type { JobParams } from './lib/jobs/start';
-import {
-  createDatabaseRoleGuard,
-  queryDatabaseRole,
-  type RoleQueryable,
-} from './cf/database-role-guard';
+import { sendAlert } from './services/alerts.service';
 import { servePublicEdge, stripFillMarker, type CacheLike } from './cf/public-edge-cache';
 import { readEdgeGensForHit } from './lib/edge-gens';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -109,28 +103,29 @@ createServer(app).listen(PORT);
 /** Upper bound for the post-response drain (Workers grants 30 s after the response). */
 const DRAIN_BUDGET_MS = 25_000;
 
-let isolateDb: IsolateDb | undefined;
-
-const validateDatabaseRole = createDatabaseRoleGuard();
 let redisReady: Promise<void> | undefined;
 
 /**
- * The BYPASSRLS guard that index.ts runs at listen() on Node (finding #5): if the connection role
- * bypasses RLS, tenant isolation is off. LAZY (Ruling ROLE-GUARD-LAZY-1): it runs on a request's own
- * connection the first time that request actually opens Postgres (`ConnectionScope` onConnect), so a
- * request served by D1 or a Durable Object never touches Postgres, and one that does still fails
- * closed. Cache only success (a Worker has no boot moment).
+ * NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres (no HYPERDRIVE binding). Anything that still reaches the
+ * exported `prisma` gets a client that throws POSTGRES_REMOVED at once (no socket, no hang). The first hit per isolate is
+ * logged and raises a P1 alert; every hit is also an error response, so a missed path is seen in Sentry and by the caller.
  */
-async function checkRoleOnConnect(adapter: RoleQueryable): Promise<void> {
-  await validateDatabaseRole(async () => {
-    const rows = await queryDatabaseRole(adapter);
-    const bypass = rows[0]?.bypass === true;
-    logger.info(
-      { currentUser: rows[0]?.currentUser, rolbypassrls: bypass },
-      `[SECURITY] DB role check: current_user=${rows[0]?.currentUser ?? 'unknown'} rolbypassrls=${bypass}`
-    );
-    return rows;
-  });
+let postgresRemovedReported = false;
+function reportPostgresRemoved(err: Error): void {
+  if (postgresRemovedReported) return;
+  postgresRemovedReported = true;
+  logger.error(
+    { err: err.message },
+    '[database] POSTGRES_REMOVED: a Prisma call reached the Worker'
+  );
+  Sentry.captureException(err, { tags: { site: 'postgres-removed' } });
+  void sendAlert({
+    level: 'p1',
+    scope: 'platform',
+    source: 'api.worker.postgres_removed',
+    title: 'POSTGRES_REMOVED: a Prisma call reached the Worker',
+    body: `${err.message} The path must be ported to the StoreDO / D1 (NEON-ZERO).`,
+  }).catch(() => undefined);
 }
 
 /** Drop a client-supplied `x-ebda-backend` (the retired Phase 0 opt-in) before anything reads the request. */
@@ -177,9 +172,8 @@ function prepare(env: CfBindings): void {
 
 /**
  * Run `fn` with everything a Worker invocation needs: the bindings recorded, `waitUntil` on
- * AsyncLocalStorage, and a leased Prisma client with this request's own database connection
- * (returned, and the connection closed, after the deferred work drains). Used by fetch, queue and
- * scheduled alike: a queue consumer or a cron touches the database exactly as a request does.
+ * AsyncLocalStorage and the Postgres-removed Prisma client (any use throws POSTGRES_REMOVED), released
+ * after the deferred work drains. Used by fetch, queue and scheduled alike.
  */
 async function withWorkerContext<T>(
   env: CfBindings,
@@ -188,39 +182,8 @@ async function withWorkerContext<T>(
   signal?: AbortSignal
 ): Promise<T> {
   prepare(env);
-  isolateDb ??= createIsolateDb({
-    connectionString: env.HYPERDRIVE.connectionString,
-    onConnect: checkRoleOnConnect,
-    // Engines (~3.3 MB each) per isolate; a request waits for one when all are leased. Override
-    // with the DB_CLIENT_CONCURRENCY / DB_CLIENT_WAIT_MS vars.
-    max: Number(env.DB_CLIENT_CONCURRENCY) > 0 ? Number(env.DB_CLIENT_CONCURRENCY) : undefined,
-    maxWaitMs: Number(env.DB_CLIENT_WAIT_MS) > 0 ? Number(env.DB_CLIENT_WAIT_MS) : undefined,
-    maxQueue: Number(env.DB_CLIENT_QUEUE) > 0 ? Number(env.DB_CLIENT_QUEUE) : undefined,
-    // Prisma drops the stack of an adapter error; a RangeError ("Invalid array buffer length",
-    // incident 2026-10-22) is captured here with its own stack and the pool state.
-    onClientRangeError: (err, ctx) =>
-      Sentry.captureException(err, {
-        tags: { site: 'prisma-request', op: ctx.operation, model: ctx.model ?? 'raw' },
-        extra: { ...ctx },
-      }),
-    onAdapterError: (err, op, stats) =>
-      Sentry.captureException(err, {
-        tags: { site: 'prisma-adapter', op },
-        extra: { pool: stats },
-      }),
-    // The API opens a second transaction while the request's tenant transaction is open.
-    connectionsPerRequest:
-      Number(env.DB_REQUEST_CONNECTIONS) > 0 ? Number(env.DB_REQUEST_CONNECTIONS) : undefined,
-    log: ['error', 'warn'],
-    // The request's connection is ended after every request; workerd reports that as a
-    // cancelled stream on the idle client. Not an error.
-    onPoolError: err => logger.debug({ err: err.message }, '[database] idle pool client error'),
-  });
-  const db = isolateDb;
-  let lease: ReturnType<IsolateDb['currentLease']>;
   // Work the request handed to `cfWaitUntil` (a verification email, a webhook fan-out, ...) runs on
-  // THIS request's database lease. The lease is returned to the pool only after it has settled:
-  // a Prisma call after that would land on the next request's connection.
+  // THIS request's context, which is released only after it has settled.
   const floating = new Set<Promise<unknown>>();
   const waitUntil = (p: Promise<unknown>): void => {
     floating.add(p);
@@ -237,25 +200,12 @@ async function withWorkerContext<T>(
     }
   };
   return runWithWaitUntil(waitUntil, () =>
-    db.run(
-      async () => {
-        lease = db.currentLease();
-        noteLease(lease);
-        return fn();
-      },
-      {
-        waitUntil: p => ctx.waitUntil(p),
-        signal,
-        // Post-commit work runs on this request's connection and must finish before it closes.
-        beforeDisconnect: () =>
-          awaitDeferredWork(DRAIN_BUDGET_MS)
-            .then(drainFloating)
-            .finally(() => {
-              // The lease is released right after this; its `opened` count is final.
-              noteLeaseClosing(lease);
-            }),
-      }
-    )
+    runWithRequestDb(() => createPostgresRemovedClient(reportPostgresRemoved), fn, {
+      waitUntil: p => ctx.waitUntil(p),
+      signal,
+      // Post-commit work runs inside this request's context and must finish before it closes.
+      beforeDisconnect: () => awaitDeferredWork(DRAIN_BUDGET_MS).then(drainFloating),
+    })
   );
 }
 
@@ -346,14 +296,24 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
     const reset = new URL(request.url).searchParams.get('reset') === '1';
     return Response.json({ reaches: postgresReaches(reset) });
   }
-  if (path === '/__dev/stats') {
-    const res = devStats(env, isolateDb);
-    if (res) return res;
-  }
-  if (path === '/__dev/probe' && env.DEV_STATS === '1') {
-    const url = new URL(request.url);
-    const res = await withWorkerContext(env, ctx, () => devProbe(env, isolateDb!, url));
-    if (res) return res;
+  // Dev/test only (DEV_STATS=1, never set in wrangler.jsonc): create a store through StoreService.create (N-18's pg-unreachable test).
+  if (path === '/__dev/create-store' && request.method === 'POST' && env.DEV_STATS === '1') {
+    const body = (await request.json()) as {
+      ownerId: string;
+      name: string;
+      slug?: string;
+      operator?: boolean;
+    };
+    const res = await withWorkerContext(env, ctx, async () => {
+      const { StoreService } = await import('./services/store.service.js');
+      const store = await StoreService.create(
+        body.ownerId,
+        { name: body.name, slug: body.slug },
+        { platformOperator: body.operator === true }
+      );
+      return Response.json({ id: (store as { id: string }).id });
+    });
+    return res;
   }
   // Dev/test only (DEV_STATS=1, never set in wrangler.jsonc): create a store through StoreService.create (N-18's pg-unreachable test).
   if (path === '/__dev/create-store' && request.method === 'POST' && env.DEV_STATS === '1') {
@@ -386,26 +346,14 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
   }
   const origin = async (req: Request): Promise<Response> => {
     const forwarded = withTrustedClientIp(req);
-    try {
-      return await withWorkerContext(
-        env,
-        ctx,
-        () => handleAsNodeRequest(PORT, forwarded, env, ctx),
-        req.signal
-      );
-    } catch (err) {
-      if (err instanceof ClientPoolTimeout) {
-        if (err.reason === 'aborted') return new Response(null, { status: 499 }); // client already gone
-        logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
-        // Shed load instead of letting the isolate hit its memory limit.
-        return Response.json(
-          { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },
-          { status: 503, headers: { 'retry-after': '1' } }
-        );
-      }
-      throw err;
-    }
+    return withWorkerContext(
+      env,
+      ctx,
+      () => handleAsNodeRequest(PORT, forwarded, env, ctx),
+      req.signal
+    );
   };
+
   // Ruling EDGE-API-1: anonymous public catalogue reads are answered from the Workers Cache API while their
   // cache generations are unchanged (cf/public-edge-cache.ts). Everything else, and any doubt, goes to Express.
   const edgeCache = (globalThis as unknown as { caches?: { default?: CacheLike } }).caches?.default;

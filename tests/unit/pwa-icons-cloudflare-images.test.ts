@@ -96,7 +96,7 @@ afterEach(() => clearCfBindings());
 describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
   it('each target is a PNG of its own size; the source is stored unchanged', async () => {
     const { binding, chains } = fakeImages();
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    setCfBindings({ IMAGES: binding });
     const source = fakePng(1024, 1024);
     await generatePwaIconSet(STORE_ID, source, { background: '#0A0B0C' });
     for (const [key, size] of Object.entries(SIZES))
@@ -107,7 +107,7 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
 
   it('the maskable icon is padded: art in the central 80%, opaque store background', async () => {
     const { binding, chains } = fakeImages();
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    setCfBindings({ IMAGES: binding });
     await generatePwaIconSet(STORE_ID, fakePng(600, 600), { background: '#0A0B0C' });
     const padded = chains.filter(c => c.ops.some(o => o.border));
     expect(padded).toHaveLength(1);
@@ -119,7 +119,7 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
 
   it('a non-hex background falls back to white (the value reaches an image request)', async () => {
     const { binding, chains } = fakeImages();
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    setCfBindings({ IMAGES: binding });
     await generatePwaIconSet(STORE_ID, fakePng(600, 600), { background: 'red;x' });
     const op = chains.find(c => c.ops.some(o => o.border))!.ops.at(-1)!;
     expect(op.border?.color).toBe('#FFFFFF');
@@ -129,7 +129,7 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
     'a %s answer falls back to the source for the WHOLE set, with one warning',
     async mode => {
       const { binding } = fakeImages(mode);
-      setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+      setCfBindings({ IMAGES: binding });
       const source = fakePng(600, 600);
       await generatePwaIconSet(STORE_ID, source, { background: '#ffffff' });
       for (const key of Object.keys(SIZES)) expect(uploaded(key).equals(source), key).toBe(true);
@@ -139,7 +139,7 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
 
   it('a hung binding is cut off by the deadline and the whole set falls back (review M1)', async () => {
     const { binding } = fakeImages('hang');
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    setCfBindings({ IMAGES: binding });
     const source = fakePng(600, 600);
     await generatePwaIconSet(STORE_ID, source, { background: '#ffffff', deadlineMs: 50 });
     for (const key of Object.keys(SIZES)) expect(uploaded(key).equals(source), key).toBe(true);
@@ -149,7 +149,7 @@ describe('PWA icons through Cloudflare Images (D1016-ICONS-1)', () => {
 
   it('a fallback logs a stable code, counts it per day, and alerts once a day (review N3)', async () => {
     const { binding } = fakeImages('throw');
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, IMAGES: binding });
+    setCfBindings({ IMAGES: binding });
     await generatePwaIconSet(STORE_ID, fakePng(600, 600), { background: '#ffffff' });
     expect(warn.mock.calls[0][0]).toMatchObject({
       code: 'PWA_ICON_RESIZE_FALLBACK',

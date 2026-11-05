@@ -8,7 +8,6 @@ it('smoke config has no AI binding but keeps every other binding', () => {
   const out = stripAiBinding(src);
   expect(out).not.toMatch(/"ai":/);
   for (const key of [
-    '"hyperdrive"',
     '"kv_namespaces"',
     '"durable_objects"',
     '"services"',

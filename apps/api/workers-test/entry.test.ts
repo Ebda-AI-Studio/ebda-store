@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { api, ENV_DB, testEnv } from './helpers';
+import { api, ENV_DB } from './helpers';
 
 const call = (path: string, init: RequestInit = {}) =>
   api.fetch(`https://api.ebda.app${path}`, init);
@@ -75,10 +75,6 @@ describe('worker entry (the built bundle, in workerd)', () => {
     });
     expect(res.status).not.toBe(429);
     await res.arrayBuffer();
-  });
-
-  it('the Hyperdrive caching posture is documented in the config, not in code (see the unit test)', () => {
-    expect(testEnv).toBeTruthy();
   });
 });
 

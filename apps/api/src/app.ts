@@ -482,12 +482,18 @@ app.get(
     const checks: Record<string, { status: string; latency?: number }> = {};
 
     // Check database
+    // NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres; it is reported as removed, never probed (a probe throws
+    // POSTGRES_REMOVED and would page a P1 every call). Node (tests, local dev) still probes.
     const dbStart = Date.now();
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      checks.database = { status: 'connected', latency: Date.now() - dbStart };
-    } catch {
-      checks.database = { status: 'disconnected' };
+    if (isWorkers) {
+      checks.database = { status: 'removed' };
+    } else {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        checks.database = { status: 'connected', latency: Date.now() - dbStart };
+      } catch {
+        checks.database = { status: 'disconnected' };
+      }
     }
 
     // Check Redis
@@ -512,7 +518,8 @@ app.get(
     // Determine overall status. Database disconnect is treated as the
     // load-bearing failure (we can't serve anything without it). Redis
     // being unavailable degrades caching but the API still works.
-    const isHealthy = checks.database.status === 'connected';
+    const isHealthy =
+      checks.database.status === 'connected' || checks.database.status === 'removed';
     const status = isHealthy ? 'healthy' : 'degraded';
 
     // P1 alert when the deep health check reports degraded. Throttled
