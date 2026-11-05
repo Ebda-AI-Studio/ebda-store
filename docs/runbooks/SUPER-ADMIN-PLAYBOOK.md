@@ -83,6 +83,23 @@ Suspension is for missed renewals + AUP violations. **Super-admin only.**
 
 Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.
 
+## How to delete a store
+
+Permanent. Use it for test or abandoned stores only.
+
+1. Open `/stores` (the platform store list, super admin only). On the store row or card, tap the "..." menu and choose **Delete store** (last item, red). Or open the store (`/stores/<id>`) and use **Delete store** in the danger zone at the bottom.
+2. Type the store slug exactly (for example `qa-merchant-test`). The button stays disabled until it matches character for character.
+3. Confirm the final prompt. The row disappears and a "store deleted" toast shows; the audit log records `STORE_DELETED`.
+
+Refusals you may see (nothing is deleted):
+
+- **Billing parent** (409 `STORE_IS_BILLING_PARENT`): other stores bill through this one. Move their billing first.
+- **Money in flight** (409 `STORE_HAS_MONEY_IN_FLIGHT`): a payment or payout is still settling. Wait, then retry.
+- **403 `MFA_SETUP_REQUIRED`**: turn on two-step verification at `/account/security` first; the dialog links there.
+- **401**: the session ended, sign in again.
+
+Backed by `DELETE /api/v1/stores/:id` (`authenticate`, `requireMfaEnrolled`, `authorize('super_admin')`, `requireStoreAccess`).
+
 ## Ebda AI Studio WhatsApp side
 
 Ebda AI Studio WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.

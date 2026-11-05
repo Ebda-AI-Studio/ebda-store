@@ -364,7 +364,9 @@
       "emptyTitle": "No stores found",
       "emptyHintSearch": "Try adjusting your search or filter criteria",
       "emptyHintDefault": "Get started by creating your first store on the platform",
-      "emptyCta": "Create Your First Store"
+      "emptyCta": "Create Your First Store",
+      "deleteStore": "Delete store",
+      "rowMenuLabel": "Options for store {name}"
     },
     "new": {
       "title": "Create New Store",
@@ -447,6 +449,25 @@
     },
     "avatar": {
       "logoAlt": "{name} logo"
+    },
+    "deleteStore": {
+      "title": "Delete store",
+      "consequence": "The store \"{name}\" and all its products and orders will be permanently deleted. This cannot be undone.",
+      "typeSlugLabel": "Type the store slug {slug} exactly to confirm",
+      "typeSlugPlaceholder": "Store slug",
+      "confirmObject": "Store \"{name}\"",
+      "confirmLabel": "Delete store",
+      "submit": "Delete store",
+      "cancel": "Cancel",
+      "deleting": "Deleting…",
+      "deletedToast": "Store deleted",
+      "deletedToastBody": "\"{name}\" and all its data were deleted.",
+      "errBillingParent": "This store is the billing parent of other stores. Move their billing first, then delete it.",
+      "errMoneyInFlight": "This store has money in flight (a payment or payout). Wait for it to settle and try again.",
+      "errMfaRequired": "Turn on two-step verification for your account before deleting a store.",
+      "errSession": "Your session ended. Sign in again to continue.",
+      "errNetwork": "No connection right now. Check your internet and try again.",
+      "securityLink": "Open account security"
     }
   },
   "products": {
