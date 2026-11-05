@@ -191,7 +191,7 @@ function agePublicKey() {
     'get',
     'EBDA_BACKUP_AGE_PUBLIC_KEY',
     '--repo',
-    'Whisky-11/ebda-store',
+    'Ebda-AI-Studio/ebda-store',
   ]);
 }
 
@@ -402,8 +402,8 @@ function removeBindings() {
   const steps = [
     ['npx', ['wrangler', 'hyperdrive', 'list']],
     ...WORKER_SECRETS.map(s => ['npx', ['wrangler', 'secret', 'delete', s, '--name', WORKER]]),
-    ...GH_SECRETS.map(s => ['gh', ['secret', 'delete', s, '--repo', 'Whisky-11/ebda-store']]),
-    ...GH_VARS.map(s => ['gh', ['variable', 'delete', s, '--repo', 'Whisky-11/ebda-store']]),
+    ...GH_SECRETS.map(s => ['gh', ['secret', 'delete', s, '--repo', 'Ebda-AI-Studio/ebda-store']]),
+    ...GH_VARS.map(s => ['gh', ['variable', 'delete', s, '--repo', 'Ebda-AI-Studio/ebda-store']]),
   ];
   const hdId = process.env.EBDA_HYPERDRIVE_ID;
   if (hdId) steps.push(['npx', ['wrangler', 'hyperdrive', 'delete', hdId]]);
