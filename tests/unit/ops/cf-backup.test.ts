@@ -623,3 +623,111 @@ describe('local worker boot verdict (drill 4: every replay "fetch failed" in 1 m
     expect(D.fatalBootLine('')).toBeNull();
   });
 });
+
+describe('drill expectations (drill 6: inactive store, search_dirty, older backups with a moved table)', () => {
+  const tbl = (n: number, d = 'dg') => ({ count: n, digest: d + n });
+  async function backupOf(storeTables: Record<string, any>, dumpText: string) {
+    const b = bucket();
+    const io = {
+      ...b,
+      encrypt: async (x: Buffer) => enc(x),
+      exportD1: async () => ({ raw: Buffer.from('SQL'), tables: { stores: tbl(1) } }),
+      listStoreIds: async () => ['s1'],
+      exportStore: async () => ({ raw: Buffer.from(dumpText), tables: storeTables }),
+    };
+    await B.runBackup({ io, now: at('2026-11-04') });
+    return b;
+  }
+  const dumpOf = (...tables: string[]) =>
+    tables
+      .map(
+        t =>
+          JSON.stringify({ table: t, columns: ['id'], pk: ['id'], total: 1 }) +
+          '\n' +
+          JSON.stringify(['x1'])
+      )
+      .join('\n') + '\n';
+  const mkTargets = (verify: any, over: any = {}) => ({
+    decrypt: dec,
+    loadD1: async () => ({
+      tables: { stores: tbl(1) },
+      stores: [{ id: 's1', slug: 's', domain: null, owner_id: 'o', status: 'active' }],
+    }),
+    post: async (p: string) =>
+      p.endsWith('__verify') ? { tables: verify, fk: { violations: 0, sample: [] } } : { ok: true },
+    get: async (p: string) =>
+      p.endsWith('__tables')
+        ? { tables: ['products', 'search_dirty', 'd1_outbox'] }
+        : { tables: {} },
+    ...over,
+  });
+
+  it('search_dirty (a derived queue the import re-fills) is not compared, but the drill says so', async () => {
+    const b = await backupOf(
+      { products: tbl(1), search_dirty: tbl(0) },
+      dumpOf('products', 'search_dirty')
+    );
+    const rep = await D.runDrill({
+      io: b,
+      targets: mkTargets({ products: tbl(1), search_dirty: tbl(18) }),
+    });
+    expect(rep.pass).toBe(true);
+    const note = rep.checks.find((c: any) => /notes/.test(c.name));
+    expect(note.detail).toMatch(/search_dirty not compared .*backup 0, restored 18/);
+    expect(Object.keys(B.DERIVED_QUEUE_TABLES).sort()).toEqual(['d1_outbox', 'search_dirty']);
+  });
+  it('negative control: a BASE table that differs still fails, derived or not', async () => {
+    const b = await backupOf(
+      { products: tbl(1), search_dirty: tbl(0) },
+      dumpOf('products', 'search_dirty')
+    );
+    const rep = await D.runDrill({
+      io: b,
+      targets: mkTargets({ products: tbl(2), search_dirty: tbl(0) }),
+    });
+    expect(rep.pass).toBe(false);
+    expect(D.formatReport(rep)).toMatch(/products want 1 got 2/);
+  });
+  it('an older backup that still holds onesignal_subscriptions restores: the table is skipped with a note, not a failure', async () => {
+    const b = await backupOf(
+      { products: tbl(1), onesignal_subscriptions: tbl(3) },
+      dumpOf('products', 'onesignal_subscriptions')
+    );
+    const imported: string[] = [];
+    const post = async (p: string, body: string) => {
+      if (p.endsWith('__import')) imported.push(JSON.parse(body.split('\n')[0]).table);
+      return p.endsWith('__verify') ? { tables: { products: tbl(1) }, fk: { violations: 0 } } : {};
+    };
+    const rep = await D.runDrill({ io: b, targets: mkTargets({}, { post }) });
+    expect(rep.pass).toBe(true);
+    expect(imported).toEqual(['products']);
+    expect(rep.checks.find((c: any) => /notes/.test(c.name)).detail).toMatch(
+      /onesignal_subscriptions skipped: moved to D1/
+    );
+  });
+  it('an inactive store runs only the data checks; the public checks are SKIPPED with the reason', async () => {
+    const calls: string[] = [];
+    const http = async (m: string, p: string) => (calls.push(p), { status: 404, json: null });
+    const out = await D.apiChecksForStore(http, {
+      store: { id: 's1', slug: 'qa', domain: null, owner_id: 'o', status: 'inactive' },
+      productCount: 0,
+    });
+    expect(calls).toEqual([]);
+    expect(out).toHaveLength(1);
+    expect(out[0].ok).toBe(true);
+    expect(out[0].detail).toMatch(/SKIPPED: inactive store/);
+    // an active store without a custom domain is still checked (served on its slug subdomain)
+    const out2 = await D.apiChecksForStore(
+      async () => ({ status: 200, json: { success: true, data: { id: 's1', products: [] } } }),
+      {
+        store: { id: 's1', slug: 'a', domain: null, owner_id: 'o', status: 'active' },
+        productCount: 0,
+      }
+    );
+    expect(out2.length).toBeGreaterThan(1);
+  });
+  it('the drill reads status from the restored directory (stores query selects it)', async () => {
+    const src = (await import('node:fs')).readFileSync('scripts/ops/restore-drill.mjs', 'utf8');
+    expect(src).toMatch(/SELECT id, slug, domain, owner_id, status FROM stores/);
+  });
+});
