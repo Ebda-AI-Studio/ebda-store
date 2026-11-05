@@ -21,7 +21,7 @@
 #   DRY_RUN=1            — print Telegram message instead of sending it (safe for testing)
 #   GRAPH_ROOT=<path>    — override root where graphify-out/ is found (default: auto-detect)
 #   BLAST_TOP_N=20       — max dependent files shown in report (default 20)
-#   GH_USER=Whisky-11    — GitHub username/org owning the repos
+#   GH_USER=Ebda-AI-Studio    — GitHub username/org owning the repos
 #
 # Exit codes:
 #   0 — ran successfully (even if zero dependents found)
@@ -30,7 +30,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 NOTIFY="$HERE/notify.sh"
-GH_USER="${GH_USER:-Whisky-11}"
+GH_USER="${GH_USER:-Ebda-AI-Studio}"
 BLAST_TOP_N="${BLAST_TOP_N:-20}"
 DRY_RUN="${DRY_RUN:-0}"
 

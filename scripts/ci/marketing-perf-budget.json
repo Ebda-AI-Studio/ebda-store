@@ -2,14 +2,14 @@
   "_why": "RULING MKT-NAV-BUDGET-1 (2026-10-28, docs/rulings/MKT-NAV-BUDGET-1.md): #283 adds the shared header search (typeahead.js, afterInteractive) and site-nav.js on every page: measured +~14KB gzip and +2 scripts (default pages 191.2KB/11 scripts, home 206.6KB/13). Budgets set to the measured numbers plus <1KB headroom; ratchet down by lazy-loading typeahead on first search open. RATCHET 2026-10-27 (P14): the tracking client is now a dynamic chunk loaded after window load + idle, so every page dropped 186.9 -> 177.0KB and the home 201.5 -> 193.4KB; budgets are 180 / 196. Before that: measured 2026-10-26 on the static export: every page ships 187KB gzip of up-front JS (Next/React baseline ~178KB) and the home 201.5KB. The plan target is 200KB before the 3D viewer (a lazy chunk the HTML never lists); the home is 1.5KB over it today, so its budget is 205KB and must ratchet DOWN, never up, without a reviewed reason.",
   "default": {
     "jsGzipKb": 192,
-    "cssGzipKb": 15.5,
+    "cssGzipKb": 16,
     "htmlGzipKb": 20.5,
     "maxScripts": 11
   },
   "pages": {
     "/": {
       "jsGzipKb": 187.5,
-      "htmlGzipKb": 22.0,
+      "htmlGzipKb": 22,
       "maxScripts": 11
     },
     "/features": {
@@ -21,10 +21,10 @@
       "htmlGzipKb": 25.5
     },
     "/legal/whatsapp-terms": {
-      "htmlGzipKb": 29.0
+      "htmlGzipKb": 29
     },
     "/terms": {
-      "htmlGzipKb": 24.0
+      "htmlGzipKb": 24
     },
     "/merchant-agreement": {
       "htmlGzipKb": 24.5
@@ -36,18 +36,18 @@
     },
     "/en/features": {
       "jsGzipKb": 193,
-      "htmlGzipKb": 28.0
+      "htmlGzipKb": 28
     },
     "/en/whatsapp": {
       "jsGzipKb": 193,
-      "htmlGzipKb": 25.0
+      "htmlGzipKb": 25
     },
     "/en/legal/whatsapp-terms": {
       "htmlGzipKb": 27
     },
     "/store": {
       "jsGzipKb": 207.5,
-      "htmlGzipKb": 57.0,
+      "htmlGzipKb": 57,
       "maxScripts": 13
     },
     "/en/store": {
@@ -62,10 +62,10 @@
       "htmlGzipKb": 23.5
     },
     "/compare/shopify": {
-      "htmlGzipKb": 23.0
+      "htmlGzipKb": 23
     },
     "/compare/wuilt": {
-      "htmlGzipKb": 24.0
+      "htmlGzipKb": 24
     },
     "/compare/youcan": {
       "htmlGzipKb": 23.5
@@ -77,25 +77,25 @@
       "htmlGzipKb": 22.5
     },
     "/en/compare/expandcart": {
-      "htmlGzipKb": 23.0
+      "htmlGzipKb": 23
     },
     "/en/compare/shopify": {
       "htmlGzipKb": 22.5
     },
     "/en/compare/wuilt": {
-      "htmlGzipKb": 23.0
+      "htmlGzipKb": 23
     },
     "/en/compare/youcan": {
-      "htmlGzipKb": 23.0
+      "htmlGzipKb": 23
     },
     "/en/compare/zid": {
-      "htmlGzipKb": 22.0
+      "htmlGzipKb": 22
     },
     "/en/merchant-agreement": {
       "htmlGzipKb": 22.5
     },
     "/en/terms": {
-      "htmlGzipKb": 23.0
+      "htmlGzipKb": 23
     },
     "/legal/whatsapp-dpa": {
       "htmlGzipKb": 21.5
@@ -116,5 +116,6 @@
   "_features1": "2026-11-03 (Ruling PERF-BUDGET-FEATURES-1): /features html 25 -> 25.5KB; Umbra CI run 41498161739 measured 25.1KB with no marketing source changed on this branch (growth from shared packages on main). Ratchet back down with the studio-home nav/footer rework.",
   "_wave2": "WAVE-2 (2026-10-27, Ruling PERF-BUDGET-WAVE2-1): the merged wave measured on the CI runner: home 196.7KB js, /features and /whatsapp 180.5KB js, /legal/whatsapp-terms 21.1KB html (vendored WhatsApp legal text). Per-page overrides sit ~0.5-1KB above those numbers and must ratchet DOWN, never up, without a reviewed reason.",
   "_studio1": "2026-11-03 (Ruling MKT-STUDIO-C-1): / is now the studio home (light girih art, motifs, wordmark). html budget set to 16KB as an estimate (not measured: no local static build, MAC-LIGHT-1); ratchet down to measured+0.5KB after the first CI run reports it. /store keeps the old home's numbers.",
-  "_navfooter2": "2026-11-03 (Ruling MKT-NAV-BUDGET-2, docs/rulings/MKT-NAV-BUDGET-2.md): the studio redesign (#391: one nav + 5-col footer on all sites, girih art, wordmark) measured on Umbra CI job 126153299819: css 12.5 -> 15.1KB on every page, html +1-5KB on pages with the new footer. Budgets = measured + 0.5KB rounded up to 0.5. / and /en js ratcheted DOWN 207.5 -> 187.5 (studio home has no 3D/typeahead chunk), scripts 13 -> 11. Supersedes the _studio1 estimate. Ratchet css down by splitting the art stylesheet per route."
+  "_navfooter2": "2026-11-03 (Ruling MKT-NAV-BUDGET-2, docs/rulings/MKT-NAV-BUDGET-2.md): the studio redesign (#391: one nav + 5-col footer on all sites, girih art, wordmark) measured on Umbra CI job 126153299819: css 12.5 -> 15.1KB on every page, html +1-5KB on pages with the new footer. Budgets = measured + 0.5KB rounded up to 0.5. / and /en js ratcheted DOWN 207.5 -> 187.5 (studio home has no 3D/typeahead chunk), scripts 13 -> 11. Supersedes the _studio1 estimate. Ratchet css down by splitting the art stylesheet per route.",
+  "_css3": "2026-11-05 (Ruling MKT-CSS-BUDGET-3, docs/rulings/MKT-CSS-BUDGET-3.md): css 15.5 -> 16KB on every page; CI run 41966028877 (PR 418, no marketing source changed) measured just over 15.5KB on all pages. Growth came from shared packages on main after #397; main CI runs only affected jobs, so it never re-measured. Budget = measured + 0.5KB rounded up to 0.5. Ratchet down by splitting the art stylesheet per route."
 }
