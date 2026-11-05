@@ -299,11 +299,12 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.spyOn(featureService, 'isFeatureEnabled').mockResolvedValue(false);
 });
+// Teardown only closes connections; on a busy hosted runner closing the pool after the full suite took over 30 s
+// (run 42051542716, every test passed). Close both in parallel and give the hook its own budget.
 afterAll(async () => {
   vi.restoreAllMocks();
-  await ownerPg.end();
-  await prisma.$disconnect();
-});
+  await Promise.all([ownerPg.end(), prisma.$disconnect()]);
+}, 90_000);
 
 /** Gold: a product priced by rate (raw SQL, the price guard needs it) mirrored into the DO, and the store's rates mirrored. */
 const ownerPg = ownerPool();
