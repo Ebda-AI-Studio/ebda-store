@@ -22,7 +22,7 @@ import {
 beforeEach(() => {
   h.send.mockReset();
   clearCfBindings();
-  setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, EMAIL: { send: h.send } });
+  setCfBindings({ EMAIL: { send: h.send } });
 });
 
 describe('parseAddress', () => {

@@ -39,6 +39,8 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
+  // Spacing control readout: a pure ICU template ({px}px), same in both locales.
+  'builder.settings.spacing.px',
   // Language toggle names each language in its own script, same in both locales.
   'components.languageSwitcher.nativeEn',
   'components.languageSwitcher.nativeAr',
@@ -260,6 +262,34 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'zoneEditor.textAlignAriaLabel',
   'answerEngineProviders.geminiTitle',
   'answerEngineProviders.apiKeyPlaceholderMasked',
+  // Content-language samples (Ruling ADM-I18N-GATE-1): the placeholder of an English-only or Arabic-only content
+  // input shows what to type in THAT language, so it is the same string in both admin locales.
+  'blog.editor.bodyArPlaceholder',
+  'blog.editor.excerptArPlaceholder',
+  'blog.editor.titleArPlaceholder',
+  'categories.page.countUnitArSample',
+  'categories.page.countUnitEnSample',
+  'floatingWidget.handleSample',
+  'floatingWidget.handleSampleDemoShop',
+  'floatingWidget.menuLabelArSample',
+  'floatingWidget.menuLabelEnSample',
+  'products.edit.faqAnswerArSample',
+  'products.edit.faqAnswerEnSample',
+  'products.edit.faqQuestionArSample',
+  'products.edit.faqQuestionEnSample',
+  'products.edit.personalisation.embroideryNameArSample',
+  'products.edit.personalisation.embroideryNameEnSample',
+  'shipping.areaRates.areaNameArSample',
+  'shipping.areaRates.areaNameEnSample',
+  'shipping.areaRates.cityArSample',
+  'shipping.areaRates.cityEnSample',
+  'shipping.areaRates.countryArSample',
+  'shipping.areaRates.countryEnSample',
+  'shipping.areaRates.districtArSample',
+  'shipping.areaRates.districtEnSample',
+  'stock.suppliers.supplierNameEnSample',
+  'stock.warehouses.warehouseNameArSample',
+  'stock.warehouses.warehouseNameEnSample',
 ]);
 
 describe('admin i18n: en.json / ar.json parity', () => {

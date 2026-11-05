@@ -1,11 +1,12 @@
 # Security headers for the static export (Workers Static Assets serves these;
 # the file itself is never served). Mirrors apps/web + apps/orders.
+# CSP: form-action lets the /contact enquiry form post to the API origin and nowhere else (Ruling CONTACT-FORM-1).
 /*
   X-Content-Type-Options: nosniff
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
-  Content-Security-Policy: frame-ancestors 'none'
+  Content-Security-Policy: frame-ancestors 'none'; form-action 'self' https://api.ebda.app
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 /search-index.*
   Access-Control-Allow-Origin: *
@@ -24,6 +25,8 @@
 /demo/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /logos/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/motifs/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /3d/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800

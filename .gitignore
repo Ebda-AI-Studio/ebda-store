@@ -202,3 +202,4 @@ apps/web/public/__lamma-demo/
 **/__pycache__/
 scripts/dahab-demo/img-src/
 apps/web/public/__dahab-demo/
+.cutover-stash/

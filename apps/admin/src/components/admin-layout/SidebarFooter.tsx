@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
 
@@ -61,12 +60,14 @@ export function SidebarFooter({
               {t('focusMode.ordersOnly')}
             </span>
           </button>
+          <p className="mt-1.5 px-1 text-xs leading-snug text-muted-foreground">
+            {t('focusMode.focusModeHint')}
+          </p>
         </div>
       )}
 
-      {/* Language + Theme Toggles */}
-      <div className="flex items-center justify-between gap-2 px-4 pb-2">
-        <AdminLanguageSwitcher />
+      {/* Theme toggle. The language switcher lives in the top bar only (audit G-4: it appeared twice). */}
+      <div className="flex items-center justify-end gap-2 px-4 pb-2">
         <button
           type="button"
           onClick={onToggleTheme}
@@ -115,10 +116,18 @@ export function SidebarFooter({
             {user?.lastName?.[0]}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">
+            {/* Truncate the END of the text, never the identifying part (audit G-6). An e-mail is LTR text inside an
+                RTL chip: dir=ltr keeps its start visible and the ellipsis on the right; the name follows its own script. */}
+            <p dir="auto" className="text-sm font-semibold text-foreground truncate text-start">
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <p
+              dir="ltr"
+              title={user?.email ?? undefined}
+              className="text-xs text-muted-foreground truncate rtl:text-right"
+            >
+              {user?.email}
+            </p>
           </div>
           <Link
             href="/account/security"

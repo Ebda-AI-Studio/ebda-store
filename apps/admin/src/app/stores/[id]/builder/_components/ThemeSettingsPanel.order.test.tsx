@@ -27,7 +27,10 @@ vi.mock('@/i18n/useT', () => ({
 
 import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 
-const legends = () => [...document.querySelectorAll('legend')].map(l => l.textContent);
+const legends = () =>
+  [...document.querySelectorAll('[data-testid^="tier2-"] > summary')].map(l =>
+    l.textContent?.trim()
+  );
 afterEach(cleanup);
 
 describe('ThemeSettingsPanel order and header controls', () => {
@@ -40,8 +43,8 @@ describe('ThemeSettingsPanel order and header controls', () => {
         onSave={async () => true}
       />
     );
-    expect(legends()[0]).toBe('Header');
-    expect(legends().indexOf('Header')).toBeLessThan(legends().indexOf('Colours'));
+    expect(legends()[0]).toBe('tier.header');
+    expect(legends().indexOf('tier.header')).toBeLessThan(legends().indexOf('tier.colors'));
     expect(document.querySelector('[data-setting-id="builder.header-logo"]')).not.toBeNull();
     expect(document.querySelector('[data-setting-id="builder.header-search"]')).toBeNull();
   });
@@ -58,12 +61,15 @@ describe('ThemeSettingsPanel order and header controls', () => {
     expect(document.querySelector('[data-setting-id="builder.header-search"]')).not.toBeNull();
   });
 
-  it('a skin that draws its own header gets no Header group at all, and the rest stays', () => {
+  it('a skin that draws its own header gets only the controls it reads (the wordmark), and the rest stays', () => {
     render(
       <ThemeSettingsPanel theme={undefined} storeTemplate="dahab" onSave={async () => true} />
     );
-    expect(legends()).not.toContain('Header');
-    expect(legends()[0]).toBe('Colours');
+    expect(legends()[0]).toBe('tier.header');
+    expect(document.querySelector('[data-setting-id="builder.header-logo"]')).toBeNull();
+    expect(document.querySelector('[data-setting-id="builder.header-search"]')).toBeNull();
+    expect(document.querySelector('[data-setting-id="builder.header-wordmark"]')).not.toBeNull();
+    expect(legends()[1]).toBe('tier.cards');
   });
 
   it('choosing a placement saves it as a draft theme patch', async () => {
@@ -120,5 +126,42 @@ describe('ThemeSettingsPanel order and header controls', () => {
     expect(row.textContent).toContain('edited');
     fireEvent.click(row.querySelector('button')!);
     expect(onResetKey).toHaveBeenCalledWith('headerLogoPlacement');
+  });
+
+  it('the wordmark control shows the look value until picked; a pick saves a draft patch and can be reset', () => {
+    const onSave = vi.fn(async () => true);
+    const onResetKey = vi.fn(async () => true);
+    const { unmount } = render(
+      <ThemeSettingsPanel
+        theme={undefined}
+        storeTemplate="qamar"
+        look={getLook('qamar.atelier')}
+        onSave={onSave}
+        onResetKey={onResetKey}
+      />
+    );
+    const sel = () =>
+      document.querySelector(
+        '[data-setting-id="builder.header-wordmark"] select'
+      ) as HTMLSelectElement;
+    expect(sel().value).toBe('lockup'); // the look's own value, not an empty "inherit"
+    fireEvent.change(sel(), { target: { value: 'plain' } });
+    fireEvent.click(screen.getByText('save'));
+    expect(onSave).toHaveBeenCalledWith({ headerWordmark: 'plain' });
+    unmount();
+    render(
+      <ThemeSettingsPanel
+        theme={{ headerWordmark: 'plain' } as never}
+        storeTemplate="qamar"
+        look={getLook('qamar.atelier')}
+        onSave={onSave}
+        onResetKey={onResetKey}
+      />
+    );
+    const row = document.querySelector('[data-setting-id="builder.header-wordmark"]')!;
+    expect(sel().value).toBe('plain');
+    expect(row.textContent).toContain('edited');
+    fireEvent.click(row.querySelector('button')!);
+    expect(onResetKey).toHaveBeenCalledWith('headerWordmark');
   });
 });

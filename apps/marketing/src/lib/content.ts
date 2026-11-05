@@ -10,6 +10,7 @@ import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
 import { heroSavingAr, heroSavingEn } from './positioning';
 import type { Locale } from './site';
+import { CONTACT_FORM_COPY, type ContactFormCopy } from './contact-form-copy';
 
 const CO = BRAND.company;
 const PN = BRAND.product;
@@ -21,6 +22,8 @@ const PN = BRAND.product;
 export const LEGAL_UPDATED = LEGAL_DOC_KEYS.map(
   key => currentLegalVersion(LEGAL_POLICIES, key).publishedAt
 ).reduce((a, b) => (b > a ? b : a));
+
+export type { ContactFormCopy };
 
 /** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
 export interface Provider {
@@ -141,7 +144,7 @@ export interface Copy {
     /** The Products menu (BRAND-ARCH-1): one entry per LIVE product; the others are added when they ship. */
     products: string;
     storeBlurb: string;
-    /** The Ebda WhatsApp entry of the same menu (LAUNCH-SUITE-1). */
+    /** The Ebda Chat entry of the same menu (LAUNCH-SUITE-1). */
     whatsappBlurb: string;
     contact: string;
     /** The header's "More" menu (FAQ, About, Contact): keeps the top row to one line. */
@@ -176,13 +179,30 @@ export interface Copy {
   /** The /about page: company line, story heading, contact heading. */
   aboutPage: {
     title: string;
-    company: string;
     /** The studio's line, «ابدأ — بابك لبدء مشروعك.» (moved off the home hero, MKT-1). */
     brandLine: string;
+    /** The lead: what the studio is and what it makes today (AI, software, digital marketing; two products; one account). */
+    eyebrow: string;
+    lead: string;
+    /** «اتأسست في» / "Founded": followed by the date (BRAND.company.foundedOn through formatLegalDate). */
+    foundedLabel: string;
+    doH: string;
+    /** The call to action to /contact. */
+    talkCta: string;
+    productsH: string;
+    /** "See Ebda Store": the product's name is appended by the page. */
+    productCta: string;
     storyH: string;
+    howH: string;
+    howItems: { t: string; d: string }[];
     contactH: string;
+    contactHelp: string;
+    /** The one small legal-entity line: label, then the link text to the legal notice. */
+    legalLabel: string;
+    legalLink: string;
     desc: string;
   };
+
   /** The /contact page (6c): every way to reach Ebda AI Studio, one line each. */
   contactPage: {
     title: string;
@@ -199,6 +219,9 @@ export interface Copy {
     securityH: string;
     securityP: string;
     company: string;
+    /** The studio enquiry form (Ruling CONTACT-FORM-1). */
+    form: ContactFormCopy;
+    otherH: string;
   };
   /** «حكاية ابدأ»: why the name and the open-door mark (shown on /about). */
   about: { title: string; paras: string[]; close: string };
@@ -267,23 +290,9 @@ export interface Copy {
     cta: string;
     login: string;
   };
-  footer: {
-    product: string;
-    legalNav: string;
-    legal: string;
-    privacy: string;
-    cookies: string;
-    terms: string;
-    merchant: string;
-    acceptableUse: string;
-    contact: string;
-    legalVersion: string;
-    about: string;
-    /** Footer link to /credits. */
-    credits: string;
-    /** Ownership + copyright line (company names come from BRAND.company). */
-    ownership: string;
-  };
+  /** The footer's links and labels come from the brand module (`siteFooter`); only the legal-update line is marketing's own. */
+  footer: { legalVersion: string; dataDeletion: string };
+
   legalPages: LegalPages;
 }
 
@@ -292,7 +301,7 @@ export const COPY: Record<Locale, Copy> = {
     meta: {
       title: `${PN.nameAr} — اعمل متجرك أونلاين في دقايق`,
       description:
-        'ابدأ ستور من ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
+        'ابدأ ستور من ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
     },
     skip: 'روح للمحتوى',
     nav: {
@@ -312,7 +321,7 @@ export const COPY: Record<Locale, Copy> = {
       whatsappBlurb: 'كلّم عملاءك على واتساب من مكان واحد',
       contact: 'تواصل معنا',
       more: 'المزيد',
-      about: 'عن الاستوديو',
+      about: 'عن ابدأ ستوديو',
     },
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
@@ -640,16 +649,35 @@ export const COPY: Record<Locale, Copy> = {
       modified: 'معدّل',
     },
     aboutPage: {
-      title: 'عن ابدأ استوديو للذكاء الاصطناعي',
-      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي، بالعربي أولًا وبواجهة بسيطة.',
-      brandLine: 'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
-      company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
-      storyH: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
+      title: 'عن ابدأ ستوديو',
+      desc: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي، بيبني أدوات بسيطة لأصحاب الشغل في مصر: ابدأ ستور وابدأ شات.',
+      brandLine: 'ابدأ ستوديو — بابك لبدء مشروعك.',
+      eyebrow: 'ستوديو مصري',
+      foundedLabel: 'اتأسست في',
+      lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين. وبنقدّم كمان خدمات: تصوير، واستشارات وتدريب، وتصميم ثري دي، وفعاليات.',
+      doH: 'بنشتغل في إيه',
+      talkCta: 'كلّمنا عن مشروعك',
+      productsH: 'منتجاتنا',
+      productCta: 'شوف',
+      storyH: 'الحكاية',
+      howH: 'إزاي بنشتغل',
+      howItems: [
+        { t: 'بالعربي الأول', d: 'كل حاجة متصممة من اليمين للشمال، بمصري بسيط، والإنجليزي جنبها.' },
+        {
+          t: 'مبني لمصر',
+          d: 'دفع أونلاين وكاش وإنستا باي، وشحن مع شركات الشحن اللي بتتعامل معاها.',
+        },
+        { t: 'حساب واحد', d: 'حساب واحد يفتح ابدأ ستور وابدأ شات.' },
+        { t: 'أسعار واضحة', d: 'الأسعار معلنة بالجنيه المصري، من غير مفاجآت.' },
+      ],
       contactH: 'تواصل معنا',
+      contactHelp: 'محتاج مساعدة؟ مركز المساعدة وحالة الخدمة أسرع من أي رد.',
+      legalLabel: 'الكيان القانوني',
+      legalLink: 'الإشعار القانوني',
     },
     contactPage: {
-      title: 'تواصل مع ابدأ استوديو للذكاء الاصطناعي',
-      desc: 'إيميل وواتساب ومركز المساعدة والإبلاغ عن ثغرة أمنية، كل طرق التواصل مع ابدأ استوديو للذكاء الاصطناعي في مكان واحد.',
+      title: 'تواصل مع ابدأ ستوديو للذكاء الاصطناعي',
+      desc: 'إيميل وواتساب ومركز المساعدة والإبلاغ عن ثغرة أمنية، كل طرق التواصل مع ابدأ ستوديو للذكاء الاصطناعي في مكان واحد.',
       lead: 'اكتب لنا بالطريقة اللي تريّحك، وهنرد عليك.',
       emailH: 'إيميل',
       emailP: 'للأسئلة والاستفسارات والشراكات.',
@@ -661,14 +689,16 @@ export const COPY: Record<Locale, Copy> = {
       statusLink: 'حالة الخدمة',
       securityH: 'الإبلاغ عن ثغرة أمنية',
       securityP: 'راسلنا على الإيميل ده وهنتعامل معاه بجدية. التفاصيل في ملف security.txt.',
-      company: `ابدأ ستور منتج من ${CO.legalNameAr}.`,
+      company: `ابدأ ستور منتج من ${CO.shortNameAr}.`,
+      otherH: 'طرق تانية للتواصل',
+      form: CONTACT_FORM_COPY.ar,
     },
     about: {
-      title: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
+      title: 'الحكاية',
       paras: [
         'كل مشروع بيبدأ قبل ما يبقى مشروع، بيبدأ بجملة: «عندي فكرة».',
         'وبين الفكرة وأول عميل فيه أبواب كتير: موقع، وطلبات، وكلام مع العملاء، ومنتجات، ودفع، وتوصيل، وتكنولوجيا.',
-        'ابدأ استوديو للذكاء الاصطناعي موجودة عشان تسهّل أول باب. عشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
+        'ابدأ ستوديو موجود عشان يسهّل أول باب. عشان كده اللوجو باب، واللي جوّاه صاحب الفكرة واقف على العتبة. مش محتاج يفهم في منصات التجارة ولا الـ API ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
       ],
       close: 'ابدأ.',
     },
@@ -691,19 +721,8 @@ export const COPY: Record<Locale, Copy> = {
       login: 'عندك متجر؟ ادخل',
     },
     footer: {
-      product: `ابدأ ستور — منتج من ${CO.shortNameAr}`,
-      legalNav: 'روابط قانونية',
-      legal: 'الإشعار القانوني',
-      privacy: 'الخصوصية',
-      cookies: 'إعدادات الكوكيز',
-      terms: 'الشروط',
-      merchant: 'اتفاقية التاجر',
-      acceptableUse: 'الاستخدام المقبول',
-      contact: 'تواصل: ahlan@ebda.app',
+      dataDeletion: 'حذف البيانات',
       legalVersion: `آخر تحديث للوثائق القانونية: ${formatLegalDate(LEGAL_UPDATED, 'ar')}.`,
-      about: 'عن ابدأ استوديو للذكاء الاصطناعي',
-      credits: 'حقوق الصور والموديلات',
-      ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
     },
     legalPages: LEGAL_AR,
   },
@@ -1069,11 +1088,33 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'About Ebda AI Studio',
-      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio: Arabic first, simple, and built for the local market.',
+      desc: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing that builds simple tools for merchants in Egypt: Ebda Store and Ebda Chat.',
       brandLine: 'Ebda AI Studio — Your doorway to business.',
-      company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
-      storyH: 'The Ebda AI Studio story',
+      eyebrow: 'An Egyptian studio',
+      foundedLabel: 'Founded',
+      lead: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both. We also offer services: photography, consulting and training, 3D design and events.',
+      doH: 'What we do',
+      talkCta: 'Tell us about your project',
+      productsH: 'Our products',
+      productCta: 'See',
+      storyH: 'The story',
+      howH: 'How we work',
+      howItems: [
+        {
+          t: 'Arabic first',
+          d: 'Everything is designed right-to-left in plain Egyptian Arabic, with English beside it.',
+        },
+        {
+          t: 'Built for Egypt',
+          d: 'Online payments, cash and InstaPay, and shipping with the carriers you already use.',
+        },
+        { t: 'One account', d: 'One account opens Ebda Store and Ebda Chat.' },
+        { t: 'Clear pricing', d: 'Prices are published in Egyptian pounds, with no surprises.' },
+      ],
       contactH: 'Contact',
+      contactHelp: 'Need help? The help centre and the service status are faster than any reply.',
+      legalLabel: 'Legal entity',
+      legalLink: 'Legal notice',
     },
     contactPage: {
       title: 'Contact Ebda AI Studio',
@@ -1090,14 +1131,16 @@ export const COPY: Record<Locale, Copy> = {
       securityH: 'Report a security issue',
       securityP:
         'Write to this address and we will treat it seriously. Details are in our security.txt.',
-      company: `Ebda Store is a product of ${CO.legalNameEn}.`,
+      company: `Ebda Store is a product of ${CO.shortNameEn}.`,
+      otherH: 'Other ways to reach us',
+      form: CONTACT_FORM_COPY.en,
     },
     about: {
-      title: 'The Ebda AI Studio story',
+      title: 'The story',
       paras: [
         'Every business starts before it becomes a business. It starts with “I have an idea.”',
         'Between the idea and the first customer there are too many doors: a website, orders, talking to customers, products, payments, delivery, technology.',
-        'Ebda AI Studio exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
+        'Ebda AI Studio exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs or WhatsApp integrations. They just take the first step.',
       ],
       close: 'ابدأ.',
     },
@@ -1120,19 +1163,8 @@ export const COPY: Record<Locale, Copy> = {
       login: 'Have a store? Log in',
     },
     footer: {
-      product: `Ebda Store — a product of ${CO.shortNameEn}`,
-      legalNav: 'Legal links',
-      legal: 'Legal notice',
-      privacy: 'Privacy',
-      cookies: 'Cookie settings',
-      terms: 'Terms',
-      merchant: 'Merchant agreement',
-      acceptableUse: 'Acceptable use',
-      contact: 'Contact: ahlan@ebda.app',
+      dataDeletion: 'Data deletion',
       legalVersion: `Legal documents updated ${formatLegalDate(LEGAL_UPDATED, 'en')}.`,
-      about: 'About Ebda AI Studio',
-      credits: 'Credits',
-      ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
     },
     legalPages: LEGAL_EN,
   },

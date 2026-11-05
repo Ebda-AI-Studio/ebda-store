@@ -54,3 +54,11 @@ The permanent redirects were `private, no-store`, so no browser or edge cache ke
 
 Name another store (slug or exact custom-domain hostname). There is no wildcard. Each widening is its own baseline. Before a merchant-owned store goes on, tell the merchant: their old
 links keep working through the 301, and Search Console should be asked to re-crawl the sitemap.
+
+## Every store (Ruling LOCALE-PATHS-2)
+
+`cf-web-deploy.yml` now passes `STOREFRONT_LOCALE_PATHS=true` and `STOREFRONT_LOCALE_PATHS_STORES=all` as plain Worker vars on every
+deploy (a lone `all`; mixed with a name it is unparseable). Repo variables of the same names override them. If a Worker SECRET
+of the same name still exists from a canary, delete it first (`wrangler secret delete ... --name ebda-web`) or the deploy's var
+and the secret collide. Roll back everywhere: set the repo variable `STOREFRONT_LOCALE_PATHS=false` and re-run the web deploy
+(or narrow `STOREFRONT_LOCALE_PATHS_STORES` to named stores). Verify after the deploy with the "Verify" list above on two stores.

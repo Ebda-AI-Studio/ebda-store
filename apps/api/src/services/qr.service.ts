@@ -8,6 +8,8 @@
  * the table is bounded by the catalogue and a bot cannot grow it with made-up slugs.
  */
 import { SlugEntityType, prisma, withStore } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
+import { analyticsMoney, analyticsOnDo } from '../lib/analytics-backend';
 import { waMeLink, regionDayStart } from '@ebda/shared';
 import {
   DEFAULT_QR_SETTINGS,
@@ -54,8 +56,8 @@ export async function resolveQrScan(
   if (!slug || slug.length > 200) throw notFound();
 
   if (kind === 'product') {
-    const find = (s: string) =>
-      prisma.product.findFirst({
+    const find = async (s: string) =>
+      (await storeDb(storeId)).product.findFirst({
         where: { storeId, slug: s, status: 'active', deletedAt: null, audience: 'public' },
         select: { id: true, slug: true },
       });
@@ -68,8 +70,8 @@ export async function resolveQrScan(
     return { kind, ref: product.id, target: `/products/${encodeURIComponent(product.slug)}` };
   }
 
-  const findCat = (s: string) =>
-    prisma.category.findFirst({
+  const findCat = async (s: string) =>
+    (await storeDb(storeId)).category.findFirst({
       where: { storeId, slug: s, isActive: true },
       select: { id: true, slug: true },
     });
@@ -95,6 +97,18 @@ export async function recordQrScan(
 ): Promise<boolean> {
   const day = regionDayStart(now);
   try {
+    // Ruling NZ-AN-1: a Durable Object store counts in its own DO once the analytics copy flipped
+    const money = await analyticsMoney(storeId, 'write');
+    if (money) {
+      const prune = Math.floor(Math.random() * PRUNE_ONE_IN) === 0;
+      await money.qrScanRecord({
+        dayMs: day.getTime(),
+        kind,
+        ref,
+        ...(prune ? { pruneBeforeMs: day.getTime() - QR_SCAN_RETENTION_DAYS * 86_400_000 } : {}),
+      });
+      return true;
+    }
     await withStore(storeId, async tx => {
       await tx.$executeRaw`
         INSERT INTO qr_scan_daily (id, store_id, date, kind, ref, count)
@@ -128,7 +142,9 @@ export type QrStatRow = {
 /** Scans per code over the last `days` days, with product/category names for the admin list. */
 export async function qrStats(storeId: string, days: number): Promise<QrStatRow[]> {
   const since = new Date(regionDayStart().getTime() - (days - 1) * 86_400_000);
-  const rows = await prisma.qrScanDaily.groupBy({
+  // Ruling NZ-AN-1: the DO when this store's analytics moved, else Postgres (both answer the same groupBy)
+  const reader = (await analyticsOnDo(storeId, 'read')) ? await storeDb(storeId) : prisma;
+  const rows = await reader.qrScanDaily.groupBy({
     by: ['kind', 'ref'],
     where: { storeId, date: { gte: since } },
     _sum: { count: true },
@@ -139,13 +155,13 @@ export async function qrStats(storeId: string, days: number): Promise<QrStatRow[
   const categoryIds = rows.filter(r => r.kind === 'category').map(r => r.ref);
   const [products, categories] = await Promise.all([
     productIds.length
-      ? prisma.product.findMany({
+      ? (await storeDb(storeId)).product.findMany({
           where: { storeId, id: { in: productIds } },
           select: { id: true, name: true, nameAr: true },
         })
       : [],
     categoryIds.length
-      ? prisma.category.findMany({
+      ? (await storeDb(storeId)).category.findMany({
           where: { storeId, id: { in: categoryIds } },
           select: { id: true, name: true, nameAr: true },
         })

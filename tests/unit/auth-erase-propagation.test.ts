@@ -218,7 +218,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
       data: {
         userId: CUSTOMER.id,
         oneSignalPlayerIds: ['player-a', 'player-b'],
-        // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
+        // for Ebda Chat's customer.erased: the store, and the hashed phone when configured
         storeId: CUSTOMER.storeId,
         // Customer Intelligence: no proven phone here, and the scope is the account's own (zero) orders
         ciProven: undefined,

@@ -1,9 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
-import { sweepAcrossStores } from '../../cross-store';
+import { sweepStoresDb } from '../../jobs/store-db';
 import { stepRunUnlessEmpty } from '../empty-exit';
 
 /**
@@ -60,16 +59,18 @@ interface SweepStep {
  * Inngest handlers). The `createFunction` wrapper below just forwards `step`.
  */
 export async function handleOrderCreatedStuckSweep(
-  step: SweepStep
+  step: SweepStep,
+  event?: { data?: unknown }
 ): Promise<{ swept: number; resent: number; alerted: number }> {
   const cutoff = new Date(Date.now() - STUCK_ORDER_NOTIFY_MINUTES * 60_000);
   const floorCutoff = new Date(Date.now() - STUCK_ORDER_MAX_AGE_MINUTES * 60_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckOrder[] = await stepRunUnlessEmpty(step, 'find-stuck', async () =>
-    sweepAcrossStores({
-      fetch: storeId =>
-        prisma.order.findMany({
+    // PORTED (Ruling CF-JOBS-4): the cron lists the Postgres stores, a DO store's alarm reads its own Durable Object.
+    sweepStoresDb(event, {
+      fetch: (storeId, db) =>
+        db.order.findMany({
           where: {
             storeId,
             paymentStatus: 'paid',
@@ -133,7 +134,7 @@ export async function handleOrderCreatedStuckSweep(
           `${veryStale.length} PAID order(s) still have no order/created fanout after ` +
           `> ${3 * STUCK_ORDER_NOTIFY_MINUTES}m — no confirmation email, admin push, ` +
           `WhatsApp notify, CAPI, or accounting journal entry. Re-send isn't landing; ` +
-          `investigate Inngest delivery.`,
+          `check the Cloudflare job dispatch (Worker logs, JOBS_WORKFLOW / JOBS_QUEUE).`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
           oldestCreatedAt: veryStale[0]
@@ -176,5 +177,5 @@ export const orderCreatedStuckSweep: JobDef = inngest.createFunction(
     // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
     triggers: [{ cron: '7 * * * *' }], // hourly, off the :00 pile-up
   },
-  async ({ step }) => handleOrderCreatedStuckSweep(step)
+  async ({ step, event }) => handleOrderCreatedStuckSweep(step, event)
 );

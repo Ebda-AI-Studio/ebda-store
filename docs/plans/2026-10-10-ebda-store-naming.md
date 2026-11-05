@@ -13,7 +13,7 @@
 ## Global constraints
 
 - Product English: `Ebda Store`; Arabic: existing approved `ابدأ ستور`.
-- Company English: `Ebda AI Studio`; Arabic: existing approved `ابدأ استوديو للذكاء الاصطناعي`.
+- Company English: `Ebda AI Studio`; Arabic: existing approved `ابدأ ستوديو للذكاء الاصطناعي`.
 - Existing expanded legal company names remain where a legal operator name is required.
 - Repository ownership remains Whisky-11; this task does not create or transfer an organization.
 - Domains, user records, store records, payment identifiers, RLS roles, Worker names, secret names and durable resource bindings remain operational identifiers. Renaming a product does not require migrating them.

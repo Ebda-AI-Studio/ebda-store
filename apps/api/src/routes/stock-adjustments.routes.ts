@@ -4,8 +4,9 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
-import { runInTenantContext, prisma } from '@ebda/database';
+
 import { uniqueViolationTarget } from '../lib/prisma-errors';
+import { storeDb } from '../lib/repo-factory';
 import {
   createAdjustment,
   postAdjustment,
@@ -15,6 +16,7 @@ import {
 } from '../services/accounting/stock-adjustment.service';
 import { parseStockAdjustCsv, STOCK_ADJUST_ROW_LIMIT } from '@ebda/shared';
 import { rangeOrLegacyDays } from '../lib/report-range';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router();
 
@@ -59,7 +61,7 @@ router.get(
         return;
       }
       const { from, to } = range;
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         listAdjustments(req.params.storeId, { from, to })
       );
       res.json({ data });
@@ -77,7 +79,7 @@ router.get(
   requireFeature('inventory.bulk_adjustments'),
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         getAdjustment(req.params.storeId, req.params.id)
       );
       if (!data) {
@@ -115,7 +117,7 @@ router.post(
         });
         return;
       }
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         createAdjustment({
           storeId: req.params.storeId,
           createdBy: req.user?.userId,
@@ -214,7 +216,7 @@ router.post(
 
       const replay = async (): Promise<boolean> => {
         if (!idempotencyKey) return false;
-        const prior = await runInTenantContext(storeId, () =>
+        const prior = await runInStoreCtx(storeId, () =>
           findAdjustmentByImportKey(storeId, idempotencyKey)
         );
         if (!prior) return false;
@@ -287,7 +289,9 @@ router.post(
         return out;
       };
 
-      const lookups = await runInTenantContext(storeId, async () => {
+      // a store on its Durable Object is looked up there (Ruling CF-R7-1), the same way it is written
+      const sdb = await storeDb(storeId);
+      const lookups = await runInStoreCtx(storeId, async () => {
         const liveProduct = { storeId, deletedAt: null };
         const variantSelect = {
           id: true,
@@ -305,22 +309,22 @@ router.post(
         } as const;
         const [variantsBySku, productsBySku, variantsByBarcode, productsByBarcode] =
           await Promise.all([
-            prisma.productVariant.findMany({
+            sdb.productVariant.findMany({
               where: { sku: { in: skus }, product: liveProduct },
               select: variantSelect,
               orderBy: { id: 'asc' },
             }),
-            prisma.product.findMany({
+            sdb.product.findMany({
               where: { sku: { in: skus }, ...liveProduct },
               select: productSelect,
               orderBy: { id: 'asc' },
             }),
-            prisma.productVariant.findMany({
+            sdb.productVariant.findMany({
               where: { barcode: { in: barcodes }, product: liveProduct },
               select: variantSelect,
               orderBy: { id: 'asc' },
             }),
-            prisma.product.findMany({
+            sdb.product.findMany({
               where: { barcode: { in: barcodes }, ...liveProduct },
               select: productSelect,
               orderBy: { id: 'asc' },
@@ -402,7 +406,7 @@ router.post(
       // reads the winner on a fresh connection.
       let adjustment: Awaited<ReturnType<typeof createAdjustment>>;
       try {
-        adjustment = await runInTenantContext(storeId, () =>
+        adjustment = await runInStoreCtx(storeId, () =>
           createAdjustment({
             storeId,
             type,
@@ -424,7 +428,7 @@ router.post(
 
       let posted = false;
       if (postImmediately) {
-        await runInTenantContext(storeId, () =>
+        await runInStoreCtx(storeId, () =>
           postAdjustment(storeId, adjustment.id, req.user?.userId)
         );
         posted = true;
@@ -458,7 +462,7 @@ router.post(
   writeLimiter,
   async (req, res, next) => {
     try {
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await runInStoreCtx(req.params.storeId, () =>
         postAdjustment(req.params.storeId, req.params.id, req.user?.userId)
       );
       res.json({ data });

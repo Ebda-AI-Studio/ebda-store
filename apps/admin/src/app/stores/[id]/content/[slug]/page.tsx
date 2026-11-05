@@ -313,21 +313,13 @@ export default function ContentEditorPage() {
                 "where did the data go?" confusion. */}
             {(slug === 'faq' || slug === 'how-to-guides') && (
               <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
-                <p className="font-medium">
-                  {slug === 'faq'
-                    ? 'AI-generated FAQ items live in SEO Tools, not here.'
-                    : 'AI-generated How-To guides live in SEO Tools, not here.'}
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  This editor controls the static page wrapper (cover image, intro paragraphs,
-                  etc.). The accordion content the storefront actually renders comes from a separate
-                  surface.
-                </p>
+                <p className="font-medium">{slug === 'faq' ? t('aiFaqNote') : t('aiHowToNote')}</p>
+                <p className="mt-1 text-muted-foreground">{t('wrapperNote')}</p>
                 <Link
                   href={`/stores/${storeId}/seo#${slug === 'faq' ? 'faqs' : 'howtos'}`}
                   className="mt-2 inline-flex items-center text-sm font-medium text-primary hover:underline"
                 >
-                  {slug === 'faq' ? 'Open FAQ items in SEO →' : 'Open How-To items in SEO →'}
+                  {slug === 'faq' ? t('openFaqInSeo') : t('openHowToInSeo')}
                 </Link>
               </div>
             )}
@@ -442,7 +434,7 @@ function FieldText({
         placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
         dir={dir}
-        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
       />
     </label>
   );
@@ -522,7 +514,7 @@ function BlockColumn({
             <select
               value={pendingType}
               onChange={e => setPendingType(e.target.value as BlockType)}
-              className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               {BLOCK_TYPES.map(bt => (
                 <option key={bt} value={bt}>
@@ -647,9 +639,11 @@ function BlockFields({
             <select
               value={block.level}
               onChange={e => onChange({ ...block, level: Number(e.target.value) === 3 ? 3 : 2 })}
-              className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
+              {/* i18n-gate-allow: heading level token */}
               <option value={2}>H2</option>
+              {/* i18n-gate-allow: heading level token */}
               <option value={3}>H3</option>
             </select>
           </label>
@@ -659,7 +653,7 @@ function BlockFields({
             onChange={e => onChange({ ...block, text: e.target.value })}
             placeholder={t('headingTextPlaceholder')}
             dir={dir}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       );
@@ -671,7 +665,7 @@ function BlockFields({
           placeholder={t('paragraphPlaceholder')}
           rows={5}
           dir={dir}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       );
     case 'bullets':
@@ -700,7 +694,7 @@ function BlockFields({
             onChange={e => onChange({ ...block, alt: e.target.value })}
             placeholder={t('imageAltPlaceholder')}
             dir={dir}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       );
@@ -713,14 +707,14 @@ function BlockFields({
             onChange={e => onChange({ ...block, label: e.target.value })}
             placeholder={t('buttonLabelPlaceholder')}
             dir={dir}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <input
             type="text"
             value={block.url}
             onChange={e => onChange({ ...block, url: e.target.value })}
             placeholder={t('buttonUrlPlaceholder')}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       );
@@ -760,7 +754,7 @@ function ItemListEditor({
             value={it}
             onChange={e => updateAt(idx, e.target.value)}
             dir={dir}
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <button
             type="button"

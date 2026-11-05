@@ -14,6 +14,9 @@ vi.mock('@ebda/database', async importOriginal => {
     prisma: { store: { findUnique: m.findUnique }, aiUsage: { count: m.count } },
   };
 });
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => ({ store: { findUnique: m.findUnique } }),
+}));
 vi.mock('@api/lib/store-scoped-read', () => ({
   readInStoreContext: (_id: string, fn: () => Promise<unknown>) => fn(),
 }));

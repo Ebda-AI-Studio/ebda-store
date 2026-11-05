@@ -2,11 +2,17 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { CartService } from '../services/cart.service';
 import { customerUserId } from '../middleware/auth';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { buyerFromRequest } from '../lib/buyer-identity';
 import { setBuyerPrivate } from '../lib/edge-cache';
 import { requireFeature } from '../middleware/feature-gate';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
+
+// A customer token is bound to ONE store: it cannot create or read a cart under another store's URL (MAP-HIGH). Guests and
+// staff pass through; today no cart handler mounts `authenticate`, so this is the guard for the day one does.
+router.use(requireCustomerStoreMatch);
 
 // Cart routes are mixed-audience: guests post with `x-session-id` only, while
 // signed-in customers also have `req.user`. Pulling `req.user?.userId`
@@ -50,7 +56,8 @@ const addBundleToCartSchema = z.object({
 const getSessionId = (req: Request): string => {
   const sessionId = req.headers['x-session-id'] as string;
   if (!sessionId) {
-    throw Object.assign(new Error('Session ID required'), { statusCode: 400 });
+    // An AppError, not a bare Error with a `statusCode`: the error handler answers 500 for the latter.
+    throw new AppError(400, 'MISSING_SESSION', 'Session ID required');
   }
   return sessionId;
 };

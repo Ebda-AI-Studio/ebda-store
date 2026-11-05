@@ -224,7 +224,7 @@ export default function FinanceDashboardPage() {
                 !
               </span>
             )}
-            {major(row.balance)} EGP
+            {major(row.balance)} {tc('egp')}
           </span>
         );
       },
@@ -274,7 +274,7 @@ export default function FinanceDashboardPage() {
                     {t('couldntLoad')}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">EGP</p>
+                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 )}
               </div>
 
@@ -296,7 +296,7 @@ export default function FinanceDashboardPage() {
                     {t('couldntLoad')}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">EGP</p>
+                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 )}
               </div>
 
@@ -327,7 +327,7 @@ export default function FinanceDashboardPage() {
                     {t('couldntLoad')}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">EGP</p>
+                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 )}
               </div>
             </div>
@@ -358,7 +358,7 @@ export default function FinanceDashboardPage() {
                   <p className="text-2xl font-semibold font-mono text-green-700">
                     {major(salesStats.totalRevenue)}
                   </p>
-                  <p className="text-xs text-muted-foreground">EGP</p>
+                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 </div>
                 <div className="rounded-xl border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -392,7 +392,7 @@ export default function FinanceDashboardPage() {
                       {t('couldntLoad')}
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">EGP</p>
+                    <p className="text-sm text-muted-foreground">{tc('egp')}</p>
                   )}
                   {!dashboardErr &&
                     disabledVariantStockValue !== null &&
@@ -459,7 +459,7 @@ export default function FinanceDashboardPage() {
                         {t('couldntLoad')}
                       </p>
                     ) : (
-                      <p className="text-xs text-muted-foreground">EGP</p>
+                      <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                     )}
                   </div>
                 ))}
@@ -498,7 +498,7 @@ export default function FinanceDashboardPage() {
                               className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
                                 a.severity === 'p0'
                                   ? 'bg-red-100 text-red-700'
-                                  : 'bg-amber-100 text-amber-700'
+                                  : 'bg-warning/10 text-warning-ink'
                               }`}
                             >
                               {a.severity.toUpperCase()}

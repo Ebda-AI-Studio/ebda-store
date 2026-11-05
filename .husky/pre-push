@@ -1,11 +1,15 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Pre-push CI gate (active while GitHub Actions billing is suspended).
-# Runs lint + typecheck + unit tests locally; blocks the push on failure.
+# Pre-push gate, MAC-LIGHT-1: light. Runs only the fast checks (action pins, gitleaks on the push range, prettier on
+# changed files) via scripts/ci/pre-push-gate.sh; lint/typecheck/tests run in GitHub CI.
 # Also runs the existing DB backup on main (non-blocking, preserved).
 
 set -e
+
+# pre-push gets '<local ref> <local sha> <remote ref> <remote sha>' lines on stdin; capture before anything else reads it.
+PUSH_REFS=""
+[ -t 0 ] || PUSH_REFS=$(cat)
 
 current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
@@ -23,7 +27,7 @@ if [ "$current_branch" = "main" ]; then
   fi
 fi
 
-echo "-> Ebda pre-push CI gate: cheap checks + affected lint/typecheck/related tests, full gate when the planner cannot narrow (one at a time, host-wide)"
+echo "-> Ebda pre-push light gate (MAC-LIGHT-1): secret scan + format only; CI runs lint/typecheck/tests"
 
 # Worktrees created by new-task-worktree.sh have no node_modules of their own, so
 # every command below exits 127 ("command not found") and husky aborts the push
@@ -48,64 +52,7 @@ fi
 # `lockf -k ~/.claude/locks/heavy-test.lock <cmd>`. The advisory AI/blast-radius steps below run AFTER the lock is released.
 bash scripts/ci/host-lock.sh bash scripts/ci/pre-push-gate.sh
 
-# --- Blast-radius + AI review: ALSO run locally before push (still run in CI too) ---
-# Corrected 2026-09-02 (adversarial audit): this used to claim blast-radius.yml /
-# scoped-audit.yml / ai-review.yml "moved OUT of CI" — false, verified all three still
-# trigger on `pull_request` in .github/workflows/. They run TWICE per PR: once here
-# (advisory, local) and once in CI (none of the three are required branch-protection
-# checks). This local pass is a fast local preview, not a CI replacement. Advisory +
-# non-blocking. Skip: SKIP_AI_GATE=1.
-if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
-  git fetch origin main -q 2>/dev/null || true
-  RANGE="origin/main...HEAD"
-
-  echo "-> AI-OS gate: blast-radius (graphify dependents of this diff, advisory)..."
-  if [ -x scripts/blast-radius.sh ]; then
-    bash scripts/blast-radius.sh ebda "$RANGE" . || echo "! blast-radius advisory failed (non-blocking)"
-  else
-    echo "! scripts/blast-radius.sh missing; skipping blast-radius"
-  fi
-
-  # Model routing (LEAN mode, Ahmad 2026-10-28): Sonnet reviews every push; Opus only when
-  # the diff touches a critical path (money, auth/identity, secrets, consent/erasure,
-  # tenancy/RLS, migrations, CI/hooks). Force one with AI_REVIEW_MODEL=opus|sonnet.
-  CRITICAL_RE='(migrations/|payment|billing|wallet|refund|payout|webhook|auth|mfa|passkey|login|session|identity|encrypt|crypto|secret|consent|erasure|privacy|rls|tenant|cod-reconciliation|price|coupon|fiscal|tax|money|\.husky/|\.github/workflows/)'
-  if [ -n "${AI_REVIEW_MODEL:-}" ]; then
-    review_model="$AI_REVIEW_MODEL"
-  elif git diff --name-only "$RANGE" 2>/dev/null | grep -Eiq "$CRITICAL_RE"; then
-    review_model=opus
-  else
-    review_model=sonnet
-  fi
-  echo "-> AI-OS gate: AI review of this diff with $review_model (advisory)..."
-  if command -v claude >/dev/null 2>&1; then
-    review_dir=$(mktemp -d)
-    git diff "$RANGE" -- ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' > "$review_dir/diff" 2>/dev/null || true
-    if [ -s "$review_dir/diff" ]; then
-      # Dedup gate: skip the LLM call when this exact diff was already reviewed on
-      # this branch. Session mining 2026-07-11 found 11/15 review calls were
-      # byte-identical re-reviews (one diff reviewed 5x) — pure Opus spend for
-      # zero new signal. Marker lives in the worktree's git dir, keyed by branch.
-      diff_hash=$(shasum -a 256 "$review_dir/diff" | cut -c1-16)
-      marker="$(git rev-parse --git-dir)/.ai-review-$(printf '%s' "$current_branch" | tr '/' '_')"
-      if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$diff_hash" ]; then
-        echo "-> AI review skipped: identical diff already reviewed on this branch ($diff_hash)"
-      else
-        {
-          printf 'Review this diff for CRITICAL bugs, security issues, and regressions ONLY. Be terse; list nothing if clean.\n\n'
-          cat "$review_dir/diff"
-        } > "$review_dir/review.md"
-        if claude -p --model "$review_model" < "$review_dir/review.md"; then
-          printf '%s' "$diff_hash" > "$marker"
-        else
-          echo "! AI review advisory failed (non-blocking)"
-        fi
-      fi
-    fi
-    rm -rf "$review_dir"
-  else
-    echo "! claude CLI not found; skipping AI review (npm i -g @anthropic-ai/claude-code)"
-  fi
-fi
+# Local blast-radius + AI review REMOVED (Ahmad 2026-11-05, Ruling PREPUSH-AI-OFF-1): both run in CI on every PR
+# (blast-radius.yml, ai-review.yml); the local copies only duplicated them and queued every push 30-60 min.
 
 echo "OK pre-push CI gate passed -- push proceeding"

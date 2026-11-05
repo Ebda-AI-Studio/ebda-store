@@ -108,8 +108,9 @@ export function computeDiscount(
   base: number
 ): number {
   if (type === 'percentage') {
-    const d = Math.round((base * value) / 100);
-    return maxDiscount != null && d > maxDiscount ? maxDiscount : d;
+    const d = Math.min(base, Math.round((base * value) / 100)); // never more than the goods (a legacy value above 100)
+    // a cap of 0 (or less) means no cap: parity with apps/api promotion-targeting.ts (QA-COUPON-1)
+    return maxDiscount != null && maxDiscount > 0 && d > maxDiscount ? maxDiscount : d;
   }
   if (type === 'fixed') return value > base ? base : value;
   return 0;
@@ -137,14 +138,10 @@ export function resolveCustomerContext(
   const group = loadBuyerGroup(db, storeId, buyer);
   const customerGroupId = group?.id ?? null;
 
+  // `orders.customer_id` is the shopper's users.id (Ruling CF-FIX-2), so a session buyer's prior orders are counted by it
+  // directly; the CRM row (its own id) is only the group link.
   let customerId = who.customerId ?? null;
-  if (!customerId && buyer.kind === 'session') {
-    customerId =
-      (db.all('SELECT id FROM customers WHERE store_id = ? AND user_id = ? ORDER BY id LIMIT 1', [
-        storeId,
-        id(buyer.userId, 'userId'),
-      ])[0]?.id as string | undefined) ?? null;
-  }
+  if (!customerId && buyer.kind === 'session') customerId = id(buyer.userId, 'userId');
   if (customerId) {
     const n = db.all(
       `SELECT count(*) AS n FROM orders WHERE store_id = ? AND customer_id = ? AND deleted_at IS NULL AND status <> 'cancelled'`,

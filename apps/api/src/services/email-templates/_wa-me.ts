@@ -39,6 +39,7 @@ export function buildOrderEmailWaMe(
         items: d.items,
         totalMinor: d.total,
         address: d.shippingAddress,
+        deliveryLine: d.deliveryLine,
         storeName,
       })
     );

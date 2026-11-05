@@ -28,7 +28,9 @@ export const LEGAL_EN: LegalPages = {
         p: [
           '"Ebda Store" («ابدأ ستور»), available at ebda.app, is an online store builder for merchants in Egypt (the "Service"). The Service is a technology platform owned and operated by ' +
             OP +
-            ' ("we", "us"). Ebda AI Studio is our company brand.',
+            ' ("we", "us"). The operating legal entity is ' +
+            BRAND.company.legalNameEn +
+            '. Ebda AI Studio is our company brand.',
         ],
       },
       {
@@ -58,7 +60,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Related documents',
         p: [
-          'Terms of Service, Merchant Agreement, Acceptable Use Policy, Privacy Policy and the data deletion page for Ebda Store, and the Terms of Service, Privacy Policy and Data Processing Agreement for Ebda WhatsApp, all published on this website.',
+          'Terms of Service, Merchant Agreement, Acceptable Use Policy, Privacy Policy and the data deletion page for Ebda Store, and the Terms of Service, Privacy Policy and Data Processing Agreement for Ebda Chat, all published on this website.',
         ],
       },
     ],
@@ -91,7 +93,7 @@ export const LEGAL_EN: LegalPages = {
         h: '4. Plans, fees and payment',
         p: [
           'Paid plans, prices and billing rules are in the Merchant Agreement and the Pricing section of the website. Fees are charged in advance, in Egyptian pounds, and are non-refundable except where mandatory law says otherwise. Prices and VAT. All prices are final amounts in Egyptian pounds. We are not registered for value-added tax (VAT) and therefore charge none. If we become registered, VAT will be introduced only after at least 30 days of written notice, as a change to fees, will be shown as a separate line, and will never apply retroactively to any amount already paid or invoiced.',
-          'Ebda WhatsApp is a separate service with its own terms (https://ebda.app/legal/whatsapp-terms/). If you use it, those terms apply to it in addition to these.',
+          'Ebda Chat is a separate service with its own terms (https://ebda.app/legal/whatsapp-terms/). If you use it, those terms apply to it in addition to these.',
         ],
       },
       {
@@ -212,7 +214,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '5. Payments and funds',
         p: [
-          "Ebda Store does not process, hold or settle the Merchant's sales proceeds. Customers pay the Merchant directly by the methods the Merchant enables (such as cash on delivery, the Merchant's own InstaPay account or a gateway the Merchant has contracted with). Any payment provider is bound by its own terms, and the Merchant is responsible for fees, chargebacks, reversals, fraud and reconciliation. Ebda Store is not liable for non-payment, failed or disputed payments, or provider errors.",
+          "Ebda Store does not process, hold or settle the Merchant's sales proceeds. Customers pay the Merchant directly by the methods the Merchant enables (such as cash on delivery, the Merchant's own InstaPay account or a gateway the Merchant has contracted with). Installment (buy now, pay later) services are off by default and are financed by the provider, not by Ebda Store; the Merchant who enables one is responsible for telling customers that the provider's own terms and fees apply. For orders that include gold, cash on delivery and installments are off by default and the order is paid in full online, unless the Merchant switches that setting on, in which case the choice is the Merchant's. Any payment provider is bound by its own terms, and the Merchant is responsible for fees, chargebacks, reversals, fraud and reconciliation. Ebda Store is not liable for non-payment, failed or disputed payments, or provider errors.",
         ],
       },
       {
@@ -224,7 +226,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '7. Prohibited products and conduct',
         p: [
-          'The Merchant must not sell or promote anything prohibited by the Acceptable Use Policy or by law. We may review, remove or block any product, store or Content, but we have no duty to monitor, and not acting is not approval.',
+          'The Merchant must not sell or promote anything prohibited by the Acceptable Use Policy or by law, including alcohol, pork products, paid-entry prize draws, mystery boxes sold for chance, fake reviews, and fake scarcity or countdown timers. We may review, remove or block any product, store or Content, but we have no duty to monitor, and not acting is not approval.',
         ],
       },
       {
@@ -300,14 +302,16 @@ export const LEGAL_EN: LegalPages = {
         h: '2. General rules',
         p: [
           'Do not use the Service to break any law or regulation of Egypt or of the places you sell to; to deceive, defraud or mislead customers; to infringe intellectual property, privacy or other rights; to publish defamatory, hateful, harassing, threatening or sexually explicit material; to send spam or unsolicited messages; to spread malware; or to harm people, especially minors.',
+          'Sell honestly and openly. The following are not allowed: charging an entry fee or a purchase for a chance to win a prize (paid-entry prize draws, raffles and lotteries); selling a mystery box or any item whose contents or value are decided by chance; fake, purchased, invented or incentivised-for-rating reviews and testimonials; fake scarcity, such as a countdown timer that restarts, a stock count or "X people are viewing" notice that is not true, or a discount shown against a price that was never charged.',
         ],
       },
       {
         h: '3. Prohibited products and services',
         p: [
-          'It is not allowed to sell, offer or promote: illegal drugs, narcotics and psychoactive substances; weapons, ammunition and explosives; counterfeit, pirated or stolen goods; antiquities and cultural property; human organs, trafficked persons or any exploitation of people; adult or pornographic material; gambling and betting; pyramid, Ponzi or deceptive "get-rich" schemes; unlicensed financial services, deposit-taking, investment offers, and crypto-asset services; stolen, hacked or leaked personal data or accounts; services that facilitate fraud, forgery or cheating on exams; and anything whose sale is prohibited under Egyptian law.',
-          'The following may be sold only if the Merchant holds every licence the law requires and shows it on request: medicines, medical devices and supplements; alcohol; tobacco and vaping products; cosmetics and food products that require registration or approval; and any other regulated or restricted goods. If in doubt, ask us first.',
-          "Through Ebda WhatsApp, Meta's WhatsApp Commerce Policy also applies, and these may not be sold or promoted at all, whatever licence you hold: tobacco and vaping products; prescription drugs; adult products and services; gambling and betting; dating services; and weapons, ammunition and explosives.",
+          'It is not allowed to sell, offer or promote: illegal drugs, narcotics and psychoactive substances; weapons, ammunition and explosives; counterfeit, pirated or stolen goods; antiquities and cultural property; human organs, trafficked persons or any exploitation of people; adult or pornographic material; gambling and betting; alcoholic drinks and any intoxicating drink or substance; pork and any product made from or containing pork; pyramid, Ponzi or deceptive "get-rich" schemes; unlicensed financial services, deposit-taking, investment offers, and crypto-asset services; stolen, hacked or leaked personal data or accounts; services that facilitate fraud, forgery or cheating on exams; and anything whose sale is prohibited under Egyptian law.',
+          'The following may be sold only if the Merchant holds every licence the law requires and shows it on request: medicines, medical devices and supplements; tobacco and vaping products; cosmetics and food products that require registration or approval; and any other regulated or restricted goods. If in doubt, ask us first.',
+          'The bans on alcohol and pork apply to everything sold, offered or promoted through any Ebda AI Studio product, including Ebda Store and Ebda Chat, whatever licence the Merchant holds. Listings, images, descriptions, categories and advertising for them are removed.',
+          "Through Ebda Chat, Meta's WhatsApp Commerce Policy also applies, and these may not be sold or promoted at all, whatever licence you hold: tobacco and vaping products; prescription drugs; adult products and services; gambling and betting; dating services; and weapons, ammunition and explosives.",
         ],
       },
       {
@@ -370,7 +374,7 @@ export const LEGAL_EN: LegalPages = {
             ? POST_CUTOVER.en.providers
             : [
                 'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues, file/image storage and email delivery: transactional and campaign email); Neon (database hosting, EU region); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
-                'When a merchant uses Ebda WhatsApp, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda WhatsApp Privacy Policy (https://ebda.app/legal/whatsapp-privacy/).',
+                'When a merchant uses Ebda Chat, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda Chat Privacy Policy (https://ebda.app/legal/whatsapp-privacy/).',
                 'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
               ],
       },
@@ -380,7 +384,7 @@ export const LEGAL_EN: LegalPages = {
           PRIVACY_STACK === 'cloudflare'
             ? POST_CUTOVER.en.transfers
             : [
-                'Some providers process data outside Egypt, including in the EU and the United States. Where the law requires, we rely on appropriate contractual and technical safeguards, and we choose EU regions for the database and monitoring services above. The recipients outside Egypt are the providers listed in section 5 (Cloudflare, Neon, Sentry, Inngest, Google, PostHog, Meta and OneSignal, in the EU, the United States or both) and, for Ebda WhatsApp, Meta.',
+                'Some providers process data outside Egypt, including in the EU and the United States. Where the law requires, we rely on appropriate contractual and technical safeguards, and we choose EU regions for the database and monitoring services above. The recipients outside Egypt are the providers listed in section 5 (Cloudflare, Neon, Sentry, Inngest, Google, PostHog, Meta and OneSignal, in the EU, the United States or both) and, for Ebda Chat, Meta.',
               ],
       },
       {
@@ -429,9 +433,9 @@ export const LEGAL_EN: LegalPages = {
     links: [
       { slug: 'refund', label: 'Refund and cancellation policy' },
       { slug: 'legal/data-deletion', label: 'Data deletion and export' },
-      { slug: 'legal/whatsapp-terms', label: 'Ebda WhatsApp Terms of Service' },
-      { slug: 'legal/whatsapp-privacy', label: 'Ebda WhatsApp Privacy Policy' },
-      { slug: 'legal/whatsapp-dpa', label: 'Ebda WhatsApp Data Processing Agreement' },
+      { slug: 'legal/whatsapp-terms', label: 'Ebda Chat Terms of Service' },
+      { slug: 'legal/whatsapp-privacy', label: 'Ebda Chat Privacy Policy' },
+      { slug: 'legal/whatsapp-dpa', label: 'Ebda Chat Data Processing Agreement' },
     ],
   },
 };

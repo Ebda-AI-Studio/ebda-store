@@ -14,6 +14,7 @@ import {
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export default function MinimalFooter({
   branding,
@@ -77,9 +78,11 @@ export default function MinimalFooter({
         {/* Single-row layout: logo · links · copyright */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           {displayLogo && !hideFooterLogoMobile && (
-            <img
+            <ResponsiveImg
               src={displayLogo}
               alt={displayName}
+              sizes="240px"
+              maxWidth={480}
               className="md:hidden mx-auto h-16 w-auto object-contain mb-5"
               style={
                 !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
@@ -104,9 +107,11 @@ export default function MinimalFooter({
           {/* Brand — desktop only (Ahmad 2026-06-20: mobile logo is now centered at the top). */}
           <div className="hidden md:block flex-shrink-0">
             {displayLogo ? (
-              <img
+              <ResponsiveImg
                 src={displayLogo}
                 alt={displayName}
+                sizes="240px"
+                maxWidth={480}
                 className="h-16 sm:h-20 w-auto object-contain"
                 style={
                   // Custom footerLogo is trusted as-is. For the brand-logo

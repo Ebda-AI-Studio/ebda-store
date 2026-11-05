@@ -1,11 +1,12 @@
 import type { JobDef } from '../../jobs/types';
-import { runInStoreScope, withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+import { runInStoreScope } from '@ebda/database';
 import { GOLD_KARATS } from '@ebda/shared';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty, type StepLike } from '../empty-exit';
-import { goldFeedStores } from '../../definer';
+import { goldFeedStoresFor } from '../../jobs/gold-stores';
 import { sendAlert } from '../../../services/alerts.service';
 import { EmailService } from '../../../services/email.service';
 import { GoldRateService } from '../../../services/gold-rate/gold-rate.service';
@@ -35,13 +36,13 @@ import { config } from '../../../config';
  * over a store's jump gate is stored pending too (`GoldRateService.applyRates`, actor `feed`).
  */
 export async function handleGoldRateFeedFetch(
-  { step }: { step: StepLike },
+  { step, event }: { step: StepLike; event?: { data?: unknown } },
   adapter: { fetch(signal: AbortSignal): Promise<GoldFeedResult> } = goldFeed()
 ) {
   {
     // Read inside a step on a Workflow (no database between steps); on Inngest the empty tick (no
     // store opted in) still costs ONE execution.
-    const stores = await stepRunUnlessEmpty(step, 'stores', goldFeedStores);
+    const stores = await stepRunUnlessEmpty(step, 'stores', () => goldFeedStoresFor(event));
     if (stores.length === 0) return { stores: 0 };
 
     const result = await step.run('fetch', async (): Promise<GoldFeedResult> => {
@@ -114,7 +115,7 @@ export async function handleGoldRateFeedFetch(
             GoldRateService.applyRates(
               s.storeId,
               { rates: GOLD_KARATS.map(k => ({ karat: k, ratePerGram: candidates.get(k)! })) },
-              { feed: reference, forcePending: disagree }
+              { feed: reference, forcePending: disagree, ...(s.demo ? { skipJumpGate: true } : {}) }
             )
           );
           return {
@@ -156,8 +157,8 @@ export async function handleGoldRateFeedFetch(
       // supersede the pending rows it just made). One email per pending rate id, marked after the send.
       await step.run(`notify-${s.storeId}`, async () => {
         try {
-          const info = await withStore(s.storeId, tx =>
-            tx.store.findUnique({
+          const info = await withStoreDb(s.storeId, db =>
+            db.store.findUnique({
               where: { id: s.storeId },
               select: { name: true, owner: { select: { email: true } } },
             })
@@ -219,5 +220,5 @@ export const goldRateFeedFetchCron: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '5 */6 * * *' }],
   },
-  ({ step }) => handleGoldRateFeedFetch({ step })
+  ({ step, event }) => handleGoldRateFeedFetch({ step, event })
 );

@@ -80,11 +80,14 @@ export function parseAddress(from: string): string | { email: string; name: stri
   return name ? { email: m[2], name } : m[2];
 }
 
+/** The `sendMail` id when every recipient was a reserved-TLD placeholder: nothing left the process. */
+export const SKIPPED_UNDELIVERABLE_ID = 'skipped-undeliverable';
+
 export async function sendMail(msg: OutboundMail): Promise<{ id: string }> {
   // EVERY send path ends here, so the reserved-TLD (`.invalid`) recipient filter of Ruling WA-LEGACY-1
   // sits here too: an undeliverable placeholder is dropped and logged, never handed to the provider.
   const recipients = deliverableOnly(msg.to);
-  if (recipients.length === 0) return { id: 'skipped-undeliverable' };
+  if (recipients.length === 0) return { id: SKIPPED_UNDELIVERABLE_ID };
   const to = Array.isArray(msg.to) ? recipients : recipients[0]!;
   const binding = cfBindings()?.EMAIL;
   if (!binding) throw new EmailSendError('E_NO_BINDING', 'EMAIL send_email binding missing');

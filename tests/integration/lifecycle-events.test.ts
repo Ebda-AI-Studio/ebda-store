@@ -15,13 +15,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
+import { identityTokenForEmail } from '../helpers/identity-session';
 
 // One knob (TEST_API_URL) points the whole suite at one API, so a run cannot
 // silently talk to whatever holds port 4000 — which on this machine was a
 // different project's dev server for five days. See tests/helpers/api-base.ts.
 const API_URL = API_BASE;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@ebda.app';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // ---------------------------------------------------------------------------
 // Shared setup
@@ -37,14 +37,8 @@ const createdReturnIds: string[] = [];
 const createdAffiliateIds: string[] = [];
 
 beforeAll(async () => {
-  // Login as super_admin
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-  });
-  const loginJson = await loginRes.json();
-  authToken = loginJson.data?.accessToken as string;
+  // Super admin: signs in at the identity service, so the suite presents the token it would issue (tests/helpers/identity-session.ts)
+  authToken = await identityTokenForEmail(ADMIN_EMAIL);
 
   // The store is THIS file's own fixture. It used to be `/admin/stores?limit=1`, i.e. whatever store another
   // test file (running in parallel) had just created: when that file tore it down, the affiliate insert hit

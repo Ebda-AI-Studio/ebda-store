@@ -57,6 +57,8 @@ import { REGION } from '@ebda/shared';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
 import { useRenderNow } from '../../contexts/RenderClockContext';
+import { MissingImage } from './MissingImage';
+import { CARD_GRID_SIZES } from '../../lib/image-sizes';
 interface StorefrontProductCardProps extends ProductCardProps {
   pack?: TemplateId;
   /**
@@ -336,6 +338,7 @@ function StorefrontProductCardImpl({
       {!row && (
         <button
           type="button"
+          data-card-chrome="heart"
           onClick={handleWishlist}
           aria-label={cardActionLabel('wishlist-add', isRtl, name)}
           aria-pressed={isWishlisted}
@@ -400,7 +403,7 @@ function StorefrontProductCardImpl({
                 alt={product.images?.[0]?.alt ?? name}
                 fill
                 priority={priority}
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
+                sizes={CARD_GRID_SIZES}
                 className={`${normalizeImages ? 'object-cover' : 'object-cover'} transition-opacity duration-[var(--duration-slow)] ${
                   showHover !== false && product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
                 }`}
@@ -411,31 +414,15 @@ function StorefrontProductCardImpl({
                   src={product.images[1].url}
                   alt={product.images[1].alt ?? name}
                   fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
+                  sizes={CARD_GRID_SIZES}
                   loading="lazy"
                   className="absolute inset-0 object-cover opacity-0 transition-opacity duration-[var(--duration-slow)] group-hover/img:opacity-100"
                 />
               )}
             </>
           ) : (
-            <div
-              data-part="card-no-photo"
-              className="flex h-full w-full items-center justify-center text-muted-foreground"
-            >
-              <svg
-                className="h-10 w-10"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
+            <div data-part="card-no-photo" className="absolute inset-0">
+              <MissingImage label={name} />
             </div>
           )}
 

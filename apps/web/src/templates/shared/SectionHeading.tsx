@@ -1,5 +1,6 @@
 'use client';
 
+import { storefrontText } from '@ebda/shared';
 import type React from 'react';
 import Link from '../../components/StoreLink';
 import type { SectionDividers, DividerSettings } from '@ebda/shared';
@@ -206,9 +207,12 @@ export function SectionHeading({
   // Tailwind fallback class — used only when the merchant didn't pick.
   const FLANK_DEFAULT_CLS = 'h-px bg-foreground/30';
   const flankBaseCls = 'flex-1 max-w-[140px] sm:max-w-[200px]';
-  const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
+  const text = storefrontText(isRtl ? (titleAr ?? title) : (title ?? titleAr), !!isRtl);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
-  const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
+  const subtitleText = storefrontText(
+    isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr),
+    !!isRtl
+  );
   if (!text && !seeAllHref && !kickerText && !subtitleText) return null;
   const styles = getPackStyles(pack);
 
@@ -250,7 +254,9 @@ export function SectionHeading({
       className={
         inline
           ? `inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center ${styles.sectionSeeAll}`
-          : `mt-2 block w-full text-end ${styles.sectionSeeAll}`
+          : // Audit 2026-11-03 #6: not the far end of the row, 12-14 px and 44 px away from its heading.
+            // It sits directly under the heading block, aligned like the title, 44 px tall.
+            `inline-flex min-h-11 items-center gap-1.5 px-3 ${styles.sectionSeeAll}`
       }
       data-zone="sectionSeeAll"
       // The data-cta="link" hover effect is a from-center underline (a
@@ -260,7 +266,8 @@ export function SectionHeading({
       data-cta={seeAllZone?.textDecoration === 'none' ? undefined : 'link'}
       style={{
         fontFamily: seeAllZone?.fontFamily,
-        fontSize: responsiveFontSize(seeAllZone?.fontSize),
+        // 15 px unless the merchant sized the zone (the pack classes said 14 px and under).
+        fontSize: responsiveFontSize(seeAllZone?.fontSize) ?? '0.9375rem',
         fontWeight: seeAllZone?.fontWeight,
         color: seeAllZone?.color,
         letterSpacing: seeAllZone?.letterSpacing,
@@ -271,6 +278,20 @@ export function SectionHeading({
       }}
     >
       {isRtl ? 'عرض الكل' : 'See all'}
+      {!inline && (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4 shrink-0 rtl:-scale-x-100"
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      )}
     </Link>
   );
   return (
@@ -511,7 +532,20 @@ export function SectionHeading({
             </div>
           )}
         </div>
-        {seeAllHref && !seeAllInline && seeAllLink(false)}
+        {seeAllHref && !seeAllInline && (
+          <div
+            data-see-all-row
+            className={`flex ${
+              titleAlign === 'start'
+                ? 'justify-start'
+                : titleAlign === 'end'
+                  ? 'justify-end'
+                  : 'justify-center'
+            }`}
+          >
+            {seeAllLink(false)}
+          </div>
+        )}
       </div>
       {/* belowHeading divider — between this heading block and the section
           content (products / categories grid). Full DividerSettings shape;

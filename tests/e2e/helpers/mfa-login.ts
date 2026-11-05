@@ -23,8 +23,7 @@
  */
 
 import type { Express } from 'express';
-import request from 'supertest';
-import { authenticator } from 'otplib';
+import jwt from 'jsonwebtoken';
 import { prisma } from '@ebda/database';
 import { encryption } from '@api/services/encryption.service';
 
@@ -82,42 +81,36 @@ export async function createSuperAdminWithMfa(opts: {
  * Returns the accessToken from the completed MFA session.
  * Throws if either step fails so the calling beforeAll errors clearly.
  */
-export async function loginAsSuperAdmin(
-  app: Express,
-  email: string,
-  password: string
-): Promise<string> {
-  // Step 1: password auth → expect mfaRequired challenge
-  const loginRes = await request(app).post('/auth/login').send({ email, password });
-
-  if (!loginRes.body.data?.mfaRequired || !loginRes.body.data?.challengeToken) {
-    // If we got an accessToken directly (mfa not triggered), return it.
-    // This handles the unlikely case where the user was created without mfaEnabled.
-    if (loginRes.body.data?.accessToken) {
-      return loginRes.body.data.accessToken;
+/**
+ * An API access token for a seeded merchant-side user, signed with the API's own JWT secret. Merchants,
+ * staff and super admins sign in at the identity service (Rulings ID-1/ID-2): POST /auth/login answers
+ * 409 USE_IDENTITY_SERVICE for them, so a test that needs their session mints it the way the integration
+ * tests do. Customers still use POST /auth/login.
+ */
+export function mintAccessToken(user: { id: string; email: string; role: string }): string {
+  return jwt.sign(
+    { userId: user.id, email: user.email, role: user.role, tv: 0 },
+    process.env.JWT_SECRET!,
+    {
+      algorithm: 'HS256',
+      expiresIn: '1h',
+      issuer: 'ebda-api',
+      audience: 'ebda-app',
+      subject: user.id,
     }
-    throw new Error(
-      `E2E MFA login step 1 failed — expected mfaRequired=true. ` +
-        `Status: ${loginRes.status}, body: ${JSON.stringify(loginRes.body)}`
-    );
-  }
+  );
+}
 
-  const { challengeToken } = loginRes.body.data;
-
-  // Step 2: generate current TOTP and exchange for a real session
-  // authenticator.generate uses the same window:1 that MfaService.verifyCode allows.
-  const totpCode = authenticator.generate(E2E_MFA_SECRET);
-
-  const verifyRes = await request(app)
-    .post('/auth/mfa/verify')
-    .send({ challengeToken, code: totpCode });
-
-  if (!verifyRes.body.data?.accessToken) {
-    throw new Error(
-      `E2E MFA login step 2 (verify) failed — no accessToken. ` +
-        `Status: ${verifyRes.status}, body: ${JSON.stringify(verifyRes.body)}`
-    );
-  }
-
-  return verifyRes.body.data.accessToken;
+/** The super admin's session for an e2e run: the seeded user's minted token (see mintAccessToken). */
+export async function loginAsSuperAdmin(
+  _app: Express,
+  email: string,
+  _password: string
+): Promise<string> {
+  const user = await prisma.user.findFirst({
+    where: { email, storeId: null },
+    select: { id: true, email: true, role: true },
+  });
+  if (!user) throw new Error(`loginAsSuperAdmin: no seeded user ${email}`);
+  return mintAccessToken(user);
 }

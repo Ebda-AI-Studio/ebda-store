@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { intlLocaleForUi } from '@/lib/format';
 
 interface StaffMember {
   membershipId: string;
@@ -73,7 +74,7 @@ export default function StoreStaffPage() {
 
   function formatDate(date: string | null) {
     if (!date) return t('formatDate.never');
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString(intlLocaleForUi(), {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -190,7 +191,7 @@ export default function StoreStaffPage() {
       primaryOnMobile: true,
       cell: member => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/10 text-warning-ink">
             <span className="text-sm font-bold">
               {member.firstName[0]}
               {member.lastName[0]}
@@ -447,11 +448,11 @@ export default function StoreStaffPage() {
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
-          Remove{' '}
-          <strong>
-            {removeTarget?.firstName} {removeTarget?.lastName}
-          </strong>{' '}
-          ({removeTarget?.email}) from this store? They will lose access immediately.
+          {t.rich('removeBody', {
+            name: `${removeTarget?.firstName ?? ''} ${removeTarget?.lastName ?? ''}`.trim(),
+            email: removeTarget?.email ?? '',
+            b: chunks => <strong>{chunks}</strong>,
+          })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setRemoveTarget(null)} disabled={removing}>

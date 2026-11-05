@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useId } from 'react';
+import { useState, useEffect, useRef, useId, type CSSProperties } from 'react';
 import Link from '../../components/StoreLink';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
@@ -49,6 +49,14 @@ export default function MinimalHeader({
       // 2.4.11: never hide the header while keyboard focus is inside it (the focus scroll itself
       // would otherwise hide it again).
       if (headerRef.current?.contains(document.activeElement)) {
+        setIsVisible(true);
+        lastScrollY.current = current;
+        return;
+      }
+      // A header pinned by the page's "Sticky header" zone stays put (the mock-ups' bar never hides);
+      // hiding it would leave a transparent band over the page and strand the sticky sub-bars.
+      const zone = headerRef.current?.closest('[data-zone="header"]');
+      if (zone && getComputedStyle(zone).position === 'sticky') {
         setIsVisible(true);
         lastScrollY.current = current;
         return;
@@ -117,13 +125,26 @@ export default function MinimalHeader({
     >
       <div className="container mx-auto px-6">
         <div
-          className={
+          // The logo is absolutely centred on phones, so it adds no height: a built-in lockup (a tall display
+          // face, a stacked Latin line) would hang out of the bar. Reserve its height on the row.
+          style={
+            lockup && !displayLogo
+              ? ({
+                  // an inline lockup stacks below md (StoreLockup), so a phone reserves the stacked height
+                  '--lh-md': `${Math.ceil(
+                    lockup.size * 1.4 + (lockup.layout === 'stack' ? lockup.latinSize + 4 : 0) + 24
+                  )}px`,
+                  '--lh-sm': `${Math.ceil(lockup.size * 1.4 + lockup.latinSize + 4 + 24)}px`,
+                } as CSSProperties)
+              : undefined
+          }
+          className={`${
             isCentre
               ? 'relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center py-3'
               : isProminent
                 ? 'relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 py-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-x-4'
                 : 'relative flex items-center justify-between py-3'
-          }
+          }${lockup && !displayLogo ? ' min-h-[var(--lh-sm)] md:min-h-[var(--lh-md)]' : ''}`}
         >
           {/* Logo — absolute-centered on mobile (visual middle of the
               row regardless of asymmetric hamburger/actions widths),
@@ -135,8 +156,13 @@ export default function MinimalHeader({
               isCentre
                 ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
                 : isProminent
-                  ? 'top-3 max-w-[calc(100%-7rem)] md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]'
-                  : 'max-w-[65%] md:max-w-none'
+                  ? `top-3 ${logoPlacement ? 'max-w-[calc(100%-13rem)]' : 'max-w-[calc(100%-7rem)]'} md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]`
+                  : logoPlacement
+                    ? // the cart and language (96 px) sit on one side, so the centred logo may not reach them
+                      // 768-1023 px: the hamburger is absolutely placed at the start, so the logo (a flex item
+                      // from md up) centres in the free space instead of sitting under it (WCAG 2.5.8 overlap)
+                      'max-w-[calc(100%-13rem)] md:max-w-none md:max-lg:mx-auto'
+                    : 'max-w-[calc(100%-13rem)] md:max-w-none'
             }`}
           >
             {displayLogo ? (
@@ -161,7 +187,7 @@ export default function MinimalHeader({
                       : wordmarkClass(wordmarkSize)
                     : isCentre
                       ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
-                      : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
+                      : 'block max-w-full truncate text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
                 }
                 data-zone="storeName"
                 translate="no"
@@ -271,7 +297,7 @@ export default function MinimalHeader({
                 ? 'flex items-center gap-2 col-start-3 justify-self-end'
                 : isProminent
                   ? `flex items-center gap-2 col-start-2 row-start-1 justify-self-end md:col-start-3 ${longName ? 'min-h-[4.5rem] md:min-h-0' : ''}`
-                  : 'flex items-center gap-2'
+                  : `flex items-center gap-2${logoPlacement ? ' ms-auto' : ''}`
             }
           >
             {/* Desktop-only search toggle — mobile has a persistent search
@@ -334,7 +360,7 @@ export default function MinimalHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className={`relative ${tabBarShown ? 'hidden md:inline-flex' : 'inline-flex'} h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
               aria-label={t(
                 `Cart (${countText('en', cartItemCount, ITEMS)})`,
                 `سلة التسوق (${cartItemCount})`
@@ -355,7 +381,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR : ''}`}
+              className={`lg:hidden ${logoPlacement ? (isProminent ? 'max-lg:absolute max-lg:start-0 max-lg:top-3 ' : 'max-lg:absolute max-lg:start-0 max-lg:top-1/2 max-lg:-translate-y-1/2 ') : ''}inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR : ''}`}
               aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >

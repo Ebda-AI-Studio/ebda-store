@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { prisma, Prisma, ReturnStatus, ReturnType } from '@ebda/database';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
+import { prisma, Prisma, ReturnStatus, ReturnType, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -25,6 +26,7 @@ import {
 import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
 import { evaluateReturnWindow } from '../lib/return-window';
+import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
 
 import {
   minorToDecimalString,
@@ -245,7 +247,140 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
   }
 }
 
+/**
+ * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
+ * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
+ */
+async function withCustomer<T extends { customerId: string }>(
+  storeId: string,
+  rows: T[],
+  select: Prisma.UserSelect
+): Promise<Array<T & { customer: unknown }>> {
+  const ids = Array.from(new Set(rows.map(r => r.customerId)));
+  const doRows = await customerRows(storeId, ids);
+  const users: Array<{ id: string }> = doRows
+    ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
+    : ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids }, storeId },
+          select: { id: true, ...select },
+        })
+      : [];
+  const byId = new Map(users.map(u => [u.id, u]));
+  return rows.map(r => {
+    const u = byId.get(r.customerId) as ({ id: string } & Record<string, unknown>) | undefined;
+    if (!u) return { ...r, customer: null };
+    const { id: _id, ...rest } = u;
+    const keep = Object.fromEntries(Object.keys(select).map(k => [k, rest[k]]));
+    return { ...r, customer: { ...(select.id ? { id: u.id } : {}), ...keep } };
+  });
+}
+
+type UpdatedReturn = Prisma.ReturnGetPayload<{
+  include: {
+    customer: { select: { email: true; firstName: true; lastName: true } };
+    order: { select: { orderNumber: true; locale: true } };
+    store: { select: { name: true } };
+  };
+}>;
+
 export class ReturnService {
+  /** updateStatus on a store's Durable Object (Ruling CF-RETURNS-1): the row write is one section there, the include is read after. */
+  private static async updateStatusOnDo(
+    money: MoneyClient,
+    storeId: string,
+    returnId: string,
+    status: ReturnStatus,
+    userId: string,
+    notes?: string
+  ): Promise<UpdatedReturn> {
+    await money.returnStatus({ returnId, status, userId, notes });
+    const found = await (
+      await storeDb(storeId)
+    ).return.findFirst({
+      where: { id: returnId, storeId },
+      include: { order: { select: { orderNumber: true, locale: true } } },
+    });
+    if (!found) throw new AppError(404, 'NOT_FOUND', 'Return request not found');
+    const [row] = await withCustomer(storeId, [found], {
+      email: true,
+      firstName: true,
+      lastName: true,
+    });
+    // the Store row is authoritative in D1/Postgres, not on the DO
+    const store = await withStore(storeId, tx =>
+      tx.store.findFirst({ where: { id: storeId }, select: { name: true } })
+    );
+    return { ...row, store: { name: store?.name ?? '' } } as unknown as UpdatedReturn;
+  }
+
+  /** create on a store's Durable Object: the whole validation and both row sets are one section; the email/socket tail is the Postgres path's. */
+  private static async createOnDo(money: MoneyClient, storeId: string, data: CreateReturnData) {
+    const { returnId } = await money.returnCreate({
+      orderId: data.orderId,
+      customerId: data.customerId,
+      type: data.type,
+      reason: data.reason,
+      reasonDetail: data.reasonDetail,
+      customerNotes: data.customerNotes,
+      items: data.items,
+      bundleGroupIds: data.bundleGroupIds,
+    });
+    const db = await storeDb(storeId);
+    const returnRequest = await db.return.findFirst({
+      where: { id: returnId, storeId },
+      include: { items: true },
+    });
+    if (!returnRequest) throw new AppError(404, 'NOT_FOUND', 'Return request not found');
+    const orderRow = await db.order.findFirst({
+      where: { id: data.orderId, storeId },
+      select: { orderNumber: true, locale: true },
+    });
+    const doCustomer = await customerRow(storeId, data.customerId);
+    // a deleted / erased / suspended customer is not mailed (N-9)
+    const customer =
+      doCustomer !== undefined
+        ? doCustomer && isLiveCustomer(doCustomer)
+          ? doCustomer
+          : null
+        : await prisma.user.findFirst({
+            where: { id: data.customerId, storeId },
+            select: { email: true, firstName: true, lastName: true },
+          });
+    const order = orderRow ? { ...orderRow, customer } : null;
+    const store = await withStore(storeId, tx =>
+      tx.store.findFirst({ where: { id: storeId }, select: { name: true } })
+    );
+    const orderLocale = (order?.locale ?? undefined) as 'en' | 'ar' | undefined;
+    const customerName =
+      `${order?.customer?.firstName || ''} ${order?.customer?.lastName || ''}`.trim() || 'Customer';
+    void deferAfterTenantCommit('email.returnConfirmation', () =>
+      EmailService.sendReturnConfirmation(
+        storeId,
+        {
+          email: order?.customer?.email || '',
+          customerName,
+          storeName: store?.name ?? '',
+          returnNumber: returnRequest.returnNumber,
+          orderNumber: order?.orderNumber ?? '',
+          type: data.type,
+        },
+        orderLocale
+      )
+    ).catch(err => logger.error({ err }, 'Failed to send return confirmation email'));
+    try {
+      socketService.newReturnNotification(storeId, {
+        returnId,
+        returnNumber: returnRequest.returnNumber,
+        orderNumber: order?.orderNumber ?? '',
+        customerName,
+      });
+    } catch (notifyError) {
+      logger.error({ err: notifyError }, 'Failed to send return notification');
+    }
+    return returnRequest;
+  }
+
   /**
    * Generate unique return number
    */
@@ -273,8 +408,10 @@ export class ReturnService {
       where.type = type as ReturnType;
     }
 
-    const [returns, total] = await Promise.all([
-      prisma.return.findMany({
+    const db = await storeDb(storeId);
+    const onDo = !!(await storeMoney(storeId));
+    const [listed, total] = await Promise.all([
+      db.return.findMany({
         where,
         skip,
         take: limit,
@@ -282,9 +419,13 @@ export class ReturnService {
           order: {
             select: { orderNumber: true, total: true },
           },
-          customer: {
-            select: { id: true, email: true, firstName: true, lastName: true },
-          },
+          ...(onDo
+            ? {}
+            : {
+                customer: {
+                  select: { id: true, email: true, firstName: true, lastName: true },
+                },
+              }),
           // `orderItem` select pulls the bundle-tagging snapshot
           // (bundleGroupId/bundleName/bundleNameAr — see OrderItem in
           // schema.prisma) so the admin returns list/drawer can group a
@@ -303,11 +444,19 @@ export class ReturnService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.return.count({ where }),
+      db.return.count({ where }),
     ]);
+    const returns = onDo
+      ? await withCustomer(storeId, listed as never[], {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+        })
+      : listed;
 
     return {
-      returns,
+      returns: returns as typeof listed,
       meta: {
         page,
         limit,
@@ -321,7 +470,10 @@ export class ReturnService {
    * Get return by ID
    */
   static async getById(storeId: string, returnId: string) {
-    const returnRequest = await prisma.return.findFirst({
+    const onDo = !!(await storeMoney(storeId));
+    const found = await (
+      await storeDb(storeId)
+    ).return.findFirst({
       where: { id: returnId, storeId },
       include: {
         order: {
@@ -332,9 +484,13 @@ export class ReturnService {
             shippingAddress: true,
           },
         },
-        customer: {
-          select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-        },
+        ...(onDo
+          ? {}
+          : {
+              customer: {
+                select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+              },
+            }),
         items: {
           include: {
             product: {
@@ -355,9 +511,20 @@ export class ReturnService {
       },
     });
 
-    if (!returnRequest) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Return request not found');
     }
+    if (onDo) {
+      const [withUser] = await withCustomer(storeId, [found as never], {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+      });
+      return withUser as typeof found;
+    }
+    const returnRequest = found;
 
     return returnRequest;
   }
@@ -366,6 +533,8 @@ export class ReturnService {
    * Create a return request
    */
   static async create(storeId: string, data: CreateReturnData) {
+    const doMoney = await storeMoney(storeId);
+    if (doMoney) return ReturnService.createOnDo(doMoney, storeId, data);
     // Verify order belongs to store and customer
     const order = await prisma.order.findFirst({
       where: {
@@ -702,21 +871,24 @@ export class ReturnService {
         break;
     }
 
-    const updatedReturn = await prisma.return.update({
-      where: { id: returnId, storeId },
-      data: updateData,
-      include: {
-        customer: {
-          select: { email: true, firstName: true, lastName: true },
-        },
-        order: {
-          select: { orderNumber: true, locale: true },
-        },
-        store: {
-          select: { name: true },
-        },
-      },
-    });
+    const doMoney = await storeMoney(storeId);
+    const updatedReturn: UpdatedReturn = doMoney
+      ? await ReturnService.updateStatusOnDo(doMoney, storeId, returnId, status, userId, notes)
+      : await prisma.return.update({
+          where: { id: returnId, storeId },
+          data: updateData,
+          include: {
+            customer: {
+              select: { email: true, firstName: true, lastName: true },
+            },
+            order: {
+              select: { orderNumber: true, locale: true },
+            },
+            store: {
+              select: { name: true },
+            },
+          },
+        });
 
     const returnOrderLocale = (updatedReturn.order?.locale ?? undefined) as 'en' | 'ar' | undefined;
 
@@ -807,6 +979,17 @@ export class ReturnService {
     refundOverrides: RefundOverrides = {}
   ) {
     const returnRequest = await this.getById(storeId, returnId);
+
+    const doMoney = await storeMoney(storeId);
+    if (doMoney)
+      return ReturnService.completeOnDo(
+        doMoney,
+        storeId,
+        returnId,
+        _userId,
+        refundMethod,
+        refundOverrides
+      );
 
     if (returnRequest.status !== 'received' && returnRequest.status !== 'inspecting') {
       throw new AppError(400, 'INVALID_STATUS', 'Return must be received before completing');
@@ -1250,6 +1433,121 @@ export class ReturnService {
   }
 
   /**
+   * complete() on a store's Durable Object (Ruling CF-RETURNS-1). Three steps, the money moving only in the middle one:
+   *   returnClaim   status + order busy gate + the atomic claim + the plan        (one DO section)
+   *   provider      PaymentService.refund (itself DO-aware)                        (outside any section)
+   *   returnFinish  the completion row, tier items, STORE CREDIT / wallet share and stock effects (ONE DO section)
+   * The wallet credit is never issued apart from the completion row: they commit together or not at all, and a retry of a
+   * request whose Postgres transaction rolled back replays (`replayed: true`, wallet keyed on the return id), so it can
+   * not credit twice (security review: wallet credit inside an open Postgres transaction).
+   */
+  private static async completeOnDo(
+    money: MoneyClient,
+    storeId: string,
+    returnId: string,
+    userId: string,
+    refundMethod: string,
+    refundOverrides: RefundOverrides
+  ) {
+    const walletFeature =
+      refundMethod === 'store_credit' &&
+      (await featureService.isFeatureEnabled(storeId, 'customer_wallet'));
+    const claimArgs = { returnId, refundMethod, refundOverrides, walletFeature };
+    const plan = await money.returnClaim(claimArgs);
+    let providerRefundExecuted = false;
+    try {
+      let gatewayRanFullEffects = false;
+      let gatewayAmount: number | undefined;
+      if (plan.isGatewayRefund && plan.orderId && !plan.skipProvider) {
+        const gw = await this.planGatewayRefund(
+          storeId,
+          returnId,
+          plan.orderId,
+          plan.isFullReturn,
+          plan.partial,
+          plan.outstandingClaims
+        );
+        gatewayAmount = plan.partial ? undefined : gw.amount;
+        try {
+          const result = await PaymentService.refund(
+            {
+              transactionId: gw.transactionId,
+              reason: 'Customer return',
+              amount: gw.amount,
+              refundKey: `return:${returnId}`,
+              itemLevel: plan.partial !== null && !plan.partial.allLinesNowReturned,
+            },
+            undefined,
+            storeId
+          );
+          providerRefundExecuted = true;
+          gatewayRanFullEffects = result.wholeOrderEffectsApplied === true;
+        } catch (err) {
+          providerRefundExecuted = refundMayHaveExecuted(err);
+          logger.error(
+            { err, storeId, returnId, providerRefundExecuted },
+            providerRefundExecuted
+              ? '[ReturnService] Gateway refund FAILED AFTER the money may have moved — return NOT marked completed, reconcile manually'
+              : '[ReturnService] Gateway refund failed — return NOT marked completed'
+          );
+          if (providerRefundExecuted)
+            throw new AppError(
+              502,
+              'PROVIDER_REFUND_INDETERMINATE',
+              'The refund reached the payment provider but this return could not be completed. Do NOT refund it again: check the provider dashboard, then complete this return with "Already refunded — record only" so it is recorded without a second refund.'
+            );
+          if (err instanceof AppError && err.statusCode < 500) throw err;
+          throw new AppError(
+            502,
+            'PROVIDER_REFUND_FAILED',
+            'Payment provider refund failed. Please retry or switch refund method.'
+          );
+        }
+      }
+      const done = await money.returnFinish(
+        { ...claimArgs, userId, gatewayAmount, gatewayRanFullEffects },
+        `return-finish:${returnId}`
+      );
+      if (plan.isInventoryRestoring && plan.orderId && !gatewayRanFullEffects) {
+        if (plan.isFullReturn) {
+          await OrderService.applyRefundEffects(storeId, plan.orderId);
+        } else {
+          await OrderService.applyRefundEffects(storeId, plan.orderId, {
+            partial: {
+              items: plan.items,
+              refundKey: returnId,
+              refundAmount: done.refundAmount,
+            },
+          });
+        }
+      }
+      const row = await (
+        await storeDb(storeId)
+      ).return.findFirst({
+        where: { id: returnId, storeId },
+      });
+      return { ...row!, tierCarryWaived: done.tierCarryWaived };
+    } catch (err) {
+      if (providerRefundExecuted) {
+        logger.error(
+          { storeId, returnId },
+          '[ReturnService] completion failed AFTER the provider refund executed — claim not released so a retry cannot refund twice; reconcile manually'
+        );
+        throw err;
+      }
+      await money
+        .returnRelease({ returnId })
+        .catch(releaseErr =>
+          logger.error(
+            { releaseErr, storeId, returnId },
+            '[ReturnService] failed to release the completion claim — return may be stuck'
+          )
+        );
+      throw err;
+    }
+  }
+
+  /**
    * What completing this return would refund, per method — for the admin's
    * confirmation step (#1485, #1474), so the merchant sees the amount and
    * whether the original payment method can take it BEFORE anything moves.
@@ -1271,7 +1569,9 @@ export class ReturnService {
     let isFullReturn = false;
     let orderLines: AllocationLine[] = [];
     if (returnRequest.orderId) {
-      orderLines = await prisma.orderItem.findMany({
+      orderLines = await (
+        await storeDb(storeId)
+      ).orderItem.findMany({
         where: { orderId: returnRequest.orderId },
         select: { id: true, quantity: true, price: true, priceSource: true },
       });
@@ -1438,12 +1738,13 @@ export class ReturnService {
     items: Array<{ id: string; orderItemId: string; quantity: number; productName: string }>,
     overrides: RefundOverrides = {}
   ): Promise<{ lines: ReturnLineAdjustment[]; total: number }> {
+    const db = await storeDb(storeId);
     const [orderItems, { prevQty }, retainedRows] = await Promise.all([
-      prisma.orderItem.findMany({ where: { orderId }, select: ADJUSTMENT_LINE_SELECT }),
-      loadPriorReversedQty(prisma, { storeId, orderId, excludeKey: returnId ?? undefined }),
+      db.orderItem.findMany({ where: { orderId }, select: ADJUSTMENT_LINE_SELECT }),
+      loadPriorReversedQty(db as never, { storeId, orderId, excludeKey: returnId ?? undefined }),
       // What earlier COMPLETED returns actually retained (floor and overrides included): a later release can never hand back
       // more than was kept, or the sum of refunds could exceed what the buyer paid for those units.
-      prisma.returnItem.findMany({
+      db.returnItem.findMany({
         where: {
           return: {
             storeId,
@@ -1646,12 +1947,13 @@ export class ReturnService {
   ): Promise<PartialAllocation> {
     // Prior completed returns AND single-line backorder cancellations — the
     // same reader the GL posting uses, so the two cannot disagree.
-    const { prevQty, prevAdjustment } = await loadPriorReversedQty(prisma, {
+    const db = await storeDb(storeId);
+    const { prevQty, prevAdjustment } = await loadPriorReversedQty(db as never, {
       storeId,
       orderId,
       excludeKey: returnId,
     });
-    const order = await prisma.order.findFirst({
+    const order = await db.order.findFirst({
       where: { id: orderId, storeId },
       select: {
         subtotal: true,
@@ -1722,9 +2024,13 @@ export class ReturnService {
   private static async refuseIfRefundAlreadyIssued(
     storeId: string,
     paymentId: string,
-    returnId: string
+    returnId: string,
+    doOutstanding?: string[]
   ) {
-    const outstanding = await findOutstandingRefundClaims(paymentId, `return:${returnId}`, storeId);
+    // a DO store's claims live in its own payment_events: the claim section (`returnClaim`) read them
+    const outstanding =
+      doOutstanding ??
+      (await findOutstandingRefundClaims(paymentId, `return:${returnId}`, storeId));
     if (outstanding.length > 0) {
       throw new AppError(
         409,
@@ -1743,7 +2049,8 @@ export class ReturnService {
     returnId: string,
     orderId: string,
     isFullReturn: boolean,
-    partial: PartialAllocation | null
+    partial: PartialAllocation | null,
+    doOutstanding?: string[]
   ): Promise<{
     paymentId: string;
     transactionId: string;
@@ -1760,7 +2067,8 @@ export class ReturnService {
     // following a partial, so both died on a 400 and could never be
     // completed through the gateway. A fully 'refunded' payment stays
     // excluded — there is nothing left on it to send back.
-    const payment = await prisma.payment.findFirst({
+    const db = await storeDb(storeId);
+    const payment = await db.payment.findFirst({
       where: {
         orderId,
         status: { in: ['completed', 'partially_refunded'] },
@@ -1779,12 +2087,12 @@ export class ReturnService {
       // Say which: an online payment with nothing left on it is not a COD
       // order, and telling the merchant it is sends them looking for the
       // wrong problem.
-      const spent = await prisma.payment.findFirst({
+      const spent = await db.payment.findFirst({
         where: { orderId, status: 'refunded', transactionId: { not: null } },
         select: { id: true },
       });
       if (spent) {
-        await this.refuseIfRefundAlreadyIssued(storeId, spent.id, returnId);
+        await this.refuseIfRefundAlreadyIssued(storeId, spent.id, returnId, doOutstanding);
         throw new AppError(
           409,
           'PAYMENT_FULLY_REFUNDED',
@@ -1812,7 +2120,7 @@ export class ReturnService {
     // Before any amount check: if THIS return already sent a refund, every
     // other reason to refuse is a distraction — the balance is short because
     // of that very refund.
-    await this.refuseIfRefundAlreadyIssued(storeId, payment.id, returnId);
+    await this.refuseIfRefundAlreadyIssued(storeId, payment.id, returnId, doOutstanding);
     // Everything below budgets against what is LEFT on the payment, not its
     // original amount — a prior partial refund already sent part of it back.
     const alreadyRefunded = payment.refundedAmount ?? 0;
@@ -1927,9 +2235,10 @@ export class ReturnService {
     isFullReturn: boolean,
     thisAdjustment = 0
   ): Promise<number> {
+    const db = await storeDb(storeId);
     const [{ prevQty, prevAdjustment }, order] = await Promise.all([
-      loadPriorReversedQty(prisma, { storeId, orderId, excludeKey: returnId }),
-      prisma.order.findFirst({
+      loadPriorReversedQty(db as never, { storeId, orderId, excludeKey: returnId }),
+      db.order.findFirst({
         where: { id: orderId, storeId },
         select: {
           subtotal: true,
@@ -1962,6 +2271,15 @@ export class ReturnService {
   static async updateTracking(storeId: string, returnId: string, trackingNumber: string) {
     await this.getById(storeId, returnId);
 
+    const money = await storeMoney(storeId);
+    if (money) {
+      await money.returnTracking({ returnId, trackingNumber });
+      return (await (
+        await storeDb(storeId)
+      ).return.findFirst({
+        where: { id: returnId, storeId },
+      }))!;
+    }
     return prisma.return.update({
       where: { id: returnId, storeId },
       data: { trackingNumber },
@@ -1985,8 +2303,9 @@ export class ReturnService {
       where.status = status as ReturnStatus;
     }
 
+    const db = await storeDb(storeId);
     const [returns, total] = await Promise.all([
-      prisma.return.findMany({
+      db.return.findMany({
         where,
         skip,
         take: limit,
@@ -2007,7 +2326,7 @@ export class ReturnService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.return.count({ where }),
+      db.return.count({ where }),
     ]);
 
     return {
@@ -2025,12 +2344,13 @@ export class ReturnService {
    * Get return statistics for a store
    */
   static async getStats(storeId: string) {
+    const db = await storeDb(storeId);
     const [total, pending, approved, completed, byReason] = await Promise.all([
-      prisma.return.count({ where: { storeId } }),
-      prisma.return.count({ where: { storeId, status: 'pending' } }),
-      prisma.return.count({ where: { storeId, status: 'approved' } }),
-      prisma.return.count({ where: { storeId, status: 'completed' } }),
-      prisma.return.groupBy({
+      db.return.count({ where: { storeId } }),
+      db.return.count({ where: { storeId, status: 'pending' } }),
+      db.return.count({ where: { storeId, status: 'approved' } }),
+      db.return.count({ where: { storeId, status: 'completed' } }),
+      db.return.groupBy({
         by: ['reason'],
         where: { storeId },
         _count: true,

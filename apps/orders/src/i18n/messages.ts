@@ -21,6 +21,11 @@ export interface Messages {
     invalidEmail: string;
     passwordRequired: string;
     failed: string;
+    invalidCredentials: string;
+    emailNotVerified: string;
+    tooManyAttempts: string;
+    invalidCode: string;
+    serverError: string;
     adminOnly: string;
     rememberMe: string;
     mfaTitle: string;
@@ -263,7 +268,12 @@ export const MESSAGES: Record<Locale, Messages> = {
       submitting: 'Signing in…',
       invalidEmail: 'Enter a valid email address.',
       passwordRequired: 'Password is required.',
-      failed: 'Sign in failed. Check your credentials.',
+      failed: 'We could not sign you in. Try again.',
+      invalidCredentials: 'The email or password is not right. Check them and try again.',
+      emailNotVerified: 'Verify your email first. We sent you a code.',
+      tooManyAttempts: 'Too many attempts. Wait a few minutes and try again.',
+      invalidCode: 'That code is wrong or has expired. Try again.',
+      serverError: 'Something went wrong on our side. Try again in a moment.',
       adminOnly: 'This app is for store staff. Customer accounts cannot sign in here.',
       rememberMe: 'Remember me',
       mfaTitle: 'Two-factor authentication',
@@ -529,21 +539,26 @@ export const MESSAGES: Record<Locale, Messages> = {
     appName: `طلبات متجر ${BRAND.product.nameAr}`,
     login: {
       title: `طلبات متجر ${BRAND.product.nameAr}`,
-      subtitle: 'سجّل الدخول لإدارة طلباتك.',
+      subtitle: 'سجّل دخولك وتابع طلباتك.',
       email: 'البريد الإلكتروني',
       password: 'كلمة المرور',
       submit: 'تسجيل الدخول',
       submitting: 'جارٍ تسجيل الدخول…',
-      invalidEmail: 'أدخل بريدًا إلكترونيًا صحيحًا.',
-      passwordRequired: 'كلمة المرور مطلوبة.',
-      failed: 'فشل تسجيل الدخول. تحقّق من بياناتك.',
-      adminOnly: 'هذا التطبيق لموظفي المتجر. لا يمكن لحسابات العملاء تسجيل الدخول هنا.',
+      invalidEmail: 'اكتب بريد إلكتروني صحيح.',
+      passwordRequired: 'اكتب كلمة السر.',
+      failed: 'معرفناش نسجّل دخولك. جرّب تاني.',
+      invalidCredentials: 'البريد الإلكتروني أو كلمة السر مش مظبوطين. راجعهم وجرّب تاني.',
+      emailNotVerified: 'لازم تأكد بريدك الإلكتروني الأول. بعتنالك كود.',
+      tooManyAttempts: 'محاولات كتير. استنى كام دقيقة وجرّب تاني.',
+      invalidCode: 'الكود غلط أو خلص وقته. جرّب تاني.',
+      serverError: 'حصلت مشكلة من عندنا. جرّب تاني بعد شوية.',
+      adminOnly: 'التطبيق ده لفريق المتجر. حسابات العملاء مش بتدخل هنا.',
       rememberMe: 'تذكّرني',
       mfaTitle: 'المصادقة الثنائية',
-      mfaSubtitle: 'أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة (أو رمز احتياطي).',
+      mfaSubtitle: 'اكتب الكود المكوّن من 6 أرقام من تطبيق المصادقة (أو كود احتياطي).',
       mfaCodeLabel: 'رمز المصادقة',
       mfaVerify: 'تحقّق',
-      mfaCodeRequired: 'أدخل رمز المصادقة.',
+      mfaCodeRequired: 'اكتب كود المصادقة.',
       back: 'رجوع',
     },
     store: {
@@ -794,7 +809,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       searchOrders: 'دوّر في الطلبات',
       orders: 'الطلبات',
       home: 'الرئيسية',
-      backToSite: 'ارجع لموقع ابدأ استوديو للذكاء الاصطناعي',
+      backToSite: 'ارجع لموقع ابدأ ستوديو للذكاء الاصطناعي',
     },
   },
 };

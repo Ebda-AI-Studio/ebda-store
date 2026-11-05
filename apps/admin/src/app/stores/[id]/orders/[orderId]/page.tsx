@@ -26,8 +26,11 @@ import type { OrderDetail } from './_components/types';
 import { manualRefundBody, type ManualRefundInput } from '../_components/manualRefundCopy';
 import { ManualRefundModal } from '../../../../../components/ManualRefundModal';
 import { OrderDocumentsCard } from './_components/OrderDocumentsCard';
+import { OrderCodRiskCard } from './_components/OrderCodRiskCard';
 import { OrderEtaCard } from './_components/OrderEtaCard';
 import { useFeatures } from '@/hooks/useFeatures';
+import { useConfirm } from '@/hooks/useConfirm';
+import { ArrowStart } from '@/components/ArrowStart';
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -40,6 +43,7 @@ export default function OrderDetailPage() {
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
   const { user } = useAuth();
+  const askConfirm = useConfirm();
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +84,16 @@ export default function OrderDetailPage() {
   const requestStatusChange = (newStatus: string) => {
     if (newStatus === 'refunded') {
       if (canRefund) setConfirmRefundOpen(true);
+    } else if (newStatus === 'cancelled') {
+      // Cancel sat one tap from the primary with no question asked (UX:O-3): name the order, then act.
+      void (async () => {
+        const ok = await askConfirm({
+          object: t('cancelDialog.object', { number: order?.orderNumber ?? '' }),
+          consequence: t('cancelDialog.consequence'),
+          confirmLabel: t('cancelDialog.confirmLabel'),
+        });
+        if (ok) await handleStatusChange(newStatus);
+      })();
     } else void handleStatusChange(newStatus);
   };
 
@@ -197,46 +211,14 @@ export default function OrderDetailPage() {
         <div className="flex items-center justify-between mb-5">
           <Link
             href={`/stores/${storeId}/orders`}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/70 transition-colors"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/70 transition-colors"
             aria-label={t('back')}
           >
-            <svg
-              className={`h-5 w-5 ${locale === 'ar' ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            <ArrowStart className="h-5 w-5" />
           </Link>
           <h1 className="text-lg font-bold text-foreground">{order?.orderNumber ?? '…'}</h1>
-          <button
-            type="button"
-            onClick={openInvoice}
-            className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 17v-2a4 4 0 014-4h6m0 0l-3-3m3 3l-3 3M3 12a9 9 0 1018 0 9 9 0 00-18 0z"
-              />
-            </svg>
-            <span className="hidden sm:inline">{t('openInvoice')}</span>
-          </button>
+          {/* Invoice lives in the "..." menu at the bottom (one place per action). */}
+          <span className="h-11 w-11" aria-hidden="true" />
         </div>
 
         {isLoading && (
@@ -271,7 +253,7 @@ export default function OrderDetailPage() {
                   // every-data-needs-a-UI surface for Order.source.
                   <OrderStatusBadge
                     status="agent"
-                    label={`🤖 ${t('agent')}`}
+                    label={t('agent')}
                     colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
                   />
                 )}
@@ -285,10 +267,17 @@ export default function OrderDetailPage() {
               </span>
             </div>
 
+            {/* Reading order (UX:O-3): status + next action (above and in the footer), items + totals, who and
+                where to, then payment, shipment, notes, documents. Two columns on desktop keep that order
+                when stacked on a phone. */}
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
+                <ItemsCard order={order} previewLimit={5} />
+                <SummaryCard order={order} />
+                <CustomerCard order={order} />
                 <DeliveryCard order={order} locale={locale} />
-                <ShipmentCard storeId={storeId} orderId={orderId} onChanged={fetchOrder} />
+              </div>
+              <div className="space-y-4">
                 <PaymentCard order={order} userRole={user?.role} />
                 <OrderInstapayPanel
                   order={order}
@@ -298,13 +287,17 @@ export default function OrderDetailPage() {
                   onApprove={() => setConfirmInstapayOpen(true)}
                   onChanged={fetchOrder}
                 />
-                <CustomerCard order={order} />
+                <ShipmentCard
+                  storeId={storeId}
+                  orderId={orderId}
+                  onChanged={fetchOrder}
+                  courierHints={!featuresLoading && isEnabled('customer_intelligence')}
+                />
                 <NotesCard order={order} />
-              </div>
-              <div className="space-y-4">
-                <ItemsCard order={order} previewLimit={5} />
-                <SummaryCard order={order} />
                 <OrderDocumentsCard storeId={storeId} orderId={orderId} />
+                {!featuresLoading && isEnabled('customer_intelligence') ? (
+                  <OrderCodRiskCard storeId={storeId} orderId={orderId} />
+                ) : null}
                 {!featuresLoading && isEnabled('eta_ereceipt') ? (
                   <OrderEtaCard storeId={storeId} orderId={orderId} />
                 ) : null}
@@ -333,7 +326,7 @@ export default function OrderDetailPage() {
           open={confirmMarkPaidOpen}
           title={tList('confirm.markPaidTitle')}
           description={tList('confirm.markPaidDescription')}
-          confirmLabel={tList('confirm.confirm')}
+          confirmLabel={tList('confirm.markPaidLabel')}
           cancelLabel={tList('confirm.cancel')}
           onConfirm={handleMarkPaid}
           onClose={() => setConfirmMarkPaidOpen(false)}
@@ -343,7 +336,7 @@ export default function OrderDetailPage() {
           open={confirmInstapayOpen}
           title={tList('confirm.instapayTitle')}
           description={tList('confirm.instapayDescription')}
-          confirmLabel={tList('confirm.confirm')}
+          confirmLabel={tList('confirm.instapayLabel')}
           cancelLabel={tList('confirm.cancel')}
           isLoading={isUpdating}
           onConfirm={handleConfirmInstapay}

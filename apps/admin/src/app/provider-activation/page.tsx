@@ -192,7 +192,7 @@ function ActivationRequestsInner() {
               {r.lastTest.ok ? t('test.ok') : t('test.failed')}
             </Badge>
             <p dir="ltr" className="mt-1 text-start text-muted-foreground">
-              {TEST_CODES.includes(r.lastTest.code) ? r.lastTest.code : 'unknown'} ·{' '}
+              {TEST_CODES.includes(r.lastTest.code) ? r.lastTest.code : t('unknown')} ·{' '}
               {r.lastTest.mode}
             </p>
             <p className="text-muted-foreground">{fmt(r.lastTest.at)}</p>

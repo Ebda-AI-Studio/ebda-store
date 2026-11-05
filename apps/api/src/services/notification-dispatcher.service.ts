@@ -4,7 +4,7 @@
  * based on feature flags, per-event config, and available credentials.
  *
  * WhatsApp is intentionally NOT a dispatcher channel (it is the separate
- * Ebda WhatsApp product).
+ * Ebda Chat product).
  *
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.
  */
@@ -15,6 +15,7 @@ import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
 import { redis } from './redis.service';
 import { prisma, withStore } from '@ebda/database';
+import { storeRepo } from '../lib/repo-factory';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { SmsConsentService } from './sms-consent.service';
@@ -188,12 +189,18 @@ class NotificationDispatcherService {
       // by the storeId+event unique key, so it enters the store's scope itself
       // (withStore) for a context-independent read (defaults stay all-on only
       // when the row genuinely doesn't exist).
-      const row = await withStore(storeId, tx =>
-        tx.notificationEventConfig.findUnique({
-          where: { storeId_event: { storeId, event } },
-          select: { sms: true, push: true },
-        })
-      );
+      // A store on its Durable Object keeps its switches there (Ruling CF-NOTIFY-1): the same repo the admin writes through.
+      const args = { where: { storeId, event }, select: { sms: true, push: true } } as const;
+      const repo = await storeRepo(storeId);
+      const row =
+        repo.backend === 'do'
+          ? await (repo.db as any).notificationEventConfig.findFirst(args)
+          : await withStore(storeId, tx =>
+              tx.notificationEventConfig.findUnique({
+                where: { storeId_event: { storeId, event } },
+                select: { sms: true, push: true },
+              })
+            );
 
       if (!row) {
         return { sms: true, push: true };
@@ -201,11 +208,17 @@ class NotificationDispatcherService {
 
       return { sms: row.sms, push: row.push };
     } catch (err) {
-      logger.warn(
-        { err, storeId, event },
-        '[NotificationDispatcher] Failed to fetch event config, defaulting all on'
+      // A DO store whose switches cannot be read fails CLOSED: defaulting "all on" would message customers a merchant turned
+      // off. Postgres keeps its documented default (a missing row means all on).
+      const onDo = await storeRepo(storeId).then(
+        r => r.backend === 'do',
+        () => true
       );
-      return { sms: true, push: true };
+      logger.warn(
+        { err, storeId, event, failClosed: onDo },
+        '[NotificationDispatcher] Failed to fetch event config'
+      );
+      return onDo ? { sms: false, push: false } : { sms: true, push: true };
     }
   }
 

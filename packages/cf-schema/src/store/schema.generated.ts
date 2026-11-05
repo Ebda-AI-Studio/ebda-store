@@ -604,6 +604,96 @@ export const carts = sqliteTable('carts', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const catalogImportFiles = sqliteTable('catalog_import_files', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  jobId: text('job_id').notNull(),
+  storeId: text('store_id').notNull(),
+  storageKey: text('storage_key').notNull(),
+  mime: text('mime').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  sha256: text('sha256').notNull(),
+  originalName: text('original_name').notNull(),
+  pageCount: integer('page_count').notNull().default(1),
+  status: text('status').notNull().default('stored'),
+  attempts: integer('attempts').notNull().default(0),
+  errorCode: text('error_code'),
+  chargedPages: integer('charged_pages').notNull().default(0),
+  itemsFound: integer('items_found').notNull().default(0),
+  inputTokens: integer('input_tokens'),
+  outputTokens: integer('output_tokens'),
+  model: text('model'),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+  finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const catalogImportItems = sqliteTable('catalog_import_items', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  jobId: text('job_id').notNull(),
+  fileId: text('file_id').notNull(),
+  storeId: text('store_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  name: text('name'),
+  nameAr: text('name_ar'),
+  description: text('description'),
+  descriptionAr: text('description_ar'),
+  priceMinor: integer('price_minor'),
+  compareAtMinor: integer('compare_at_minor'),
+  priceRaw: text('price_raw'),
+  sku: text('sku'),
+  categoryName: text('category_name'),
+  categoryId: text('category_id'),
+  tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
+  variants: text('variants', { mode: 'json' }).$type<unknown>().notNull().default([]),
+  confidence: real('confidence').notNull().default(0),
+  flags: text('flags', { mode: 'json' }).$type<string[]>().notNull(),
+  acknowledged: text('acknowledged', { mode: 'json' }).$type<string[]>().notNull(),
+  sourceText: text('source_text'),
+  editedFields: text('edited_fields', { mode: 'json' }).$type<string[]>().notNull(),
+  productId: text('product_id'),
+  createErrorCode: text('create_error_code'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const catalogImportJobs = sqliteTable('catalog_import_jobs', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  createdBy: text('created_by'),
+  status: text('status').notNull().default('queued'),
+  errorCode: text('error_code'),
+  filesTotal: integer('files_total').notNull().default(0),
+  filesDone: integer('files_done').notNull().default(0),
+  filesFailed: integer('files_failed').notNull().default(0),
+  pagesTotal: integer('pages_total').notNull().default(0),
+  itemsTotal: integer('items_total').notNull().default(0),
+  draftsCreated: integer('drafts_created').notNull().default(0),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const categories = sqliteTable('categories', {
   id: text('id')
     .primaryKey()
@@ -634,6 +724,44 @@ export const categories = sqliteTable('categories', {
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
   deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+});
+
+export const ciHintLogs = sqliteTable('ci_hint_logs', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  orderId: text('order_id').notNull(),
+  feature: text('feature').notNull(),
+  band: text('band').notNull(),
+  source: text('source').notNull(),
+  n: integer('n').notNull().default(0),
+  predictedRate: real('predicted_rate'),
+  outcome: text('outcome'),
+  outcomeAt: integer('outcome_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const ciStoreGates = sqliteTable('ci_store_gates', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  feature: text('feature').notNull(),
+  band: text('band').notNull(),
+  predictedRate: real('predicted_rate').notNull(),
+  actualRate: real('actual_rate').notNull(),
+  resolved: integer('resolved').notNull(),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
 export const codRemittances = sqliteTable('cod_remittances', {
@@ -1204,6 +1332,26 @@ export const goldRatesCurrent = sqliteTable(
   t => [primaryKey({ columns: [t.storeId, t.karat] })]
 );
 
+export const gscDailyMetrics = sqliteTable('gsc_daily_metrics', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  impressions: integer('impressions').notNull().default(0),
+  clicks: integer('clicks').notNull().default(0),
+  ctr: real('ctr').notNull().default(0),
+  position: real('avg_position').notNull().default(0),
+  topQueries: text('top_queries', { mode: 'json' }).$type<unknown>().notNull().default([]),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const inventoryHistory = sqliteTable('inventory_history', {
   id: text('id')
     .primaryKey()
@@ -1389,14 +1537,21 @@ export const notificationEventConfigs = sqliteTable('notification_event_configs'
   push: integer('push', { mode: 'boolean' }).notNull().default(true),
 });
 
-export const onesignalSubscriptions = sqliteTable('onesignal_subscriptions', {
+export const notificationLogs = sqliteTable('notification_logs', {
   id: text('id')
     .primaryKey()
     .notNull()
     .$defaultFn(() => crypto.randomUUID()),
-  userId: text('user_id').notNull(),
-  playerId: text('player_id').notNull(),
-  deviceLabel: text('device_label'),
+  storeId: text('store_id').notNull(),
+  channel: text('channel').notNull(),
+  event: text('event').notNull(),
+  recipientPhoneHash: text('recipient_phone_hash'),
+  recipientEmailHash: text('recipient_email_hash'),
+  status: text('status').notNull().default('queued'),
+  providerMessageId: text('provider_message_id'),
+  idempotencyKey: text('idempotency_key'),
+  error: text('error'),
+  metadata: text('metadata', { mode: 'json' }).$type<unknown>().notNull().default({}),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
@@ -1693,6 +1848,17 @@ export const productCategories = sqliteTable(
   },
   t => [primaryKey({ columns: [t.productId, t.categoryId] })]
 );
+
+export const productDailyViews = sqliteTable('product_daily_views', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  productId: text('product_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  count: integer('count').notNull().default(0),
+});
 
 export const productFaqs = sqliteTable('product_faqs', {
   id: text('id')
@@ -2082,6 +2248,18 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const qrScanDaily = sqliteTable('qr_scan_daily', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  kind: text('kind').notNull(),
+  ref: text('ref').notNull().default(''),
+  count: integer('count').notNull().default(0),
+});
+
 export const reorderRules = sqliteTable('reorder_rules', {
   id: text('id')
     .primaryKey()
@@ -2234,6 +2412,20 @@ export const reviews = sqliteTable('reviews', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const searchQueryDaily = sqliteTable('search_query_daily', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+  term: text('term').notNull(),
+  searches: integer('searches').notNull().default(0),
+  zeroResults: integer('zero_results').notNull().default(0),
+  lastResultCount: integer('last_result_count').notNull().default(0),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const sequences = sqliteTable(

@@ -28,11 +28,9 @@ describe('wrangler.jsonc', () => {
     expect(config.compatibility_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('binds Hyperdrive with a LOCAL connection string for the non-bypass role, through the pooler', () => {
-    const hd = config.hyperdrive[0];
-    expect(hd.binding).toBe('HYPERDRIVE');
-    expect(hd.localConnectionString).toMatch(/^postgresql:\/\/ebda_app:/);
-    expect(hd.localConnectionString).not.toMatch(/postgres:|neondb_owner/);
+  it('binds NO Hyperdrive / Postgres: the Worker has none (NEON-ZERO N-17, Ruling NZ-D23)', () => {
+    expect(config.hyperdrive).toBeUndefined();
+    expect(api('wrangler.jsonc')).not.toMatch(/"hyperdrive"|"HYPERDRIVE"/);
   });
 
   it('holds no secret: every secret-shaped var is absent and the only password is the repo-wide fake one', () => {
@@ -96,27 +94,6 @@ describe('wrangler.jsonc', () => {
     for (const target of Object.values(alias)) {
       expect(() => readFileSync(join(ROOT, 'apps/api', target)), target).not.toThrow();
     }
-  });
-});
-
-describe('Hyperdrive caching stays OFF', () => {
-  // A cached read is keyed on SQL text + parameters, not on the transaction-local tenant GUCs, so
-  // caching could serve one store's rows to another (design section 3). It is a property of the
-  // Hyperdrive config, created by this script; the config file cannot express it.
-  const script = api('scripts/cf-hyperdrive-create.sh');
-
-  it('the creation script passes --caching-disabled to the create command', () => {
-    expect(script).toMatch(/hyperdrive create .*--caching-disabled/);
-  });
-
-  it('and refuses an owner / superuser connection string', () => {
-    expect(script).toMatch(/neondb_owner/);
-    expect(script).toMatch(/refusing an owner\/superuser/);
-  });
-
-  it('nothing in the repo turns caching on', () => {
-    expect(api('wrangler.jsonc')).not.toMatch(/caching.*(enabled|true)/i);
-    expect(script).not.toMatch(/--caching-enabled|--max-age|--stale-while-revalidate/);
   });
 });
 

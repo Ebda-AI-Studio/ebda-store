@@ -14,10 +14,39 @@ permissions:
 concurrency:
   group: ebda-help-production
   cancel-in-progress: false
+# Ruling DEPLOY-OOM-1: every tsc / build step of a deploy gets the same heap as ci.yml. cf-api-deploy's `tsc --noEmit` hit the
+# default heap limit on 2026-11-02 (exit 134) and left main undeployed; tests/unit/deploy-workflows-heap.test.ts pins this.
+env:
+  NODE_OPTIONS: --max-old-space-size=4096
+
 jobs:
-  deploy:
+  # Ruling CI-BUDGET-2: skip the whole deploy (seconds, not a build) when nothing this app is built from changed -
+  # a workflow-only edit, a shared script another app uses, a lockfile entry this app does not depend on.
+  # workflow_dispatch and `[force-deploy]` in the head commit message always deploy. scripts/ci/deploy-plan.mjs.
+  plan:
+    name: Does this push change help?
     if: github.ref == 'refs/heads/main'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.plan.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: node scripts/ci/deploy-plan.mjs --app help --event "$EVENT" --before "$BEFORE" --sha "$GITHUB_SHA"
+  deploy:
+    needs: [plan]
+    if: github.ref == 'refs/heads/main' && needs.plan.outputs.deploy == 'true'
+    # ubuntu-latest became 26.04 (2026-11); Playwright 1.60 unsupported — Ruling CI-HOSTED-2
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     environment: production
     env:
@@ -47,6 +76,8 @@ jobs:
         working-directory: apps/help
         run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-help
       - name: Deploy help Worker
+        # Ruling DEPLOY-TIMEOUT-1: a hung wrangler/OpenNext R2 populate must fail the step, not hold the runner.
+        timeout-minutes: 10
         working-directory: apps/help
         run: npx wrangler deploy
       - name: Verify the live host, roll back automatically if it is unhealthy
@@ -67,7 +98,7 @@ jobs:
     name: Notify on deploy failure
     needs: [deploy]
     if: always() && needs.deploy.result == 'failure'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:
       - name: Send Telegram alert

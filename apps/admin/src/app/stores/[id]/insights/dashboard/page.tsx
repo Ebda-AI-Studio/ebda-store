@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
+import { PageState } from '@/components/PageState';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
@@ -82,6 +83,7 @@ function num(v: number | null | undefined, digits = 2): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InsightsDashboardPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.dashboard');
@@ -91,6 +93,7 @@ export default function InsightsDashboardPage() {
 
   const [data, setData] = useState<InsightsDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -99,23 +102,22 @@ export default function InsightsDashboardPage() {
         if (apiError) setError(apiError.message);
         else if (d) setData(d);
       })
-      .catch(() => setError('Failed to load insights dashboard'));
-  }, [storeId]);
+      .catch(() => setError(t('loadFailed')));
+  }, [storeId, reloadKey]);
 
-  if (error) {
+  if (error || !data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!data) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
+        <PageState
+          loading={!error}
+          error={error}
+          onRetry={() => {
+            setError(null);
+            setReloadKey(k => k + 1);
+          }}
+        >
+          {null}
+        </PageState>
       </AdminLayout>
     );
   }
@@ -148,7 +150,10 @@ export default function InsightsDashboardPage() {
       header: t('colVelocity'),
       alignEnd: true,
       cell: sku => (
-        <span className="font-mono text-xs text-muted-foreground">{num(sku.velocity, 2)}/day</span>
+        <span className="font-mono text-xs text-muted-foreground">
+          {num(sku.velocity, 2)}
+          {t('perDay')}
+        </span>
       ),
     },
   ];
@@ -178,7 +183,7 @@ export default function InsightsDashboardPage() {
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('aov')}</p>
             <p className="text-2xl font-semibold font-mono">{major(aovThis)}</p>
             <p className="text-xs text-muted-foreground">
-              EGP
+              {tc('egp')}
               {aovChange !== 0 && (
                 <span
                   className={`ms-2 font-medium ${
@@ -196,7 +201,7 @@ export default function InsightsDashboardPage() {
           <div className="rounded-xl border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('mrr30d')}</p>
             <p className="text-2xl font-semibold font-mono text-green-700">{major(data.mrr30d)}</p>
-            <p className="text-xs text-muted-foreground">EGP</p>
+            <p className="text-xs text-muted-foreground">{tc('egp')}</p>
           </div>
 
           {/* Repeat purchase rate */}
@@ -223,8 +228,8 @@ export default function InsightsDashboardPage() {
                   {data.topSegment.segment.replace(/_/g, ' ')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {data.topSegment.count} customers ·{' '}
-                  {major(data.topSegment.revenueContributionFils)} EGP
+                  {t('topSegmentCustomers', { count: data.topSegment.count })} ·{' '}
+                  {major(data.topSegment.revenueContributionFils)} {tc('egp')}
                 </p>
               </>
             ) : (

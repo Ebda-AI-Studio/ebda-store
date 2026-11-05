@@ -4,13 +4,29 @@ Runs only after the Cloudflare cutover (`docs/runbooks/cutover-cf.md`) has serve
 
 Owner: the cutover agent (phases 5 and 7). Approver for step 7: Ahmad.
 
+## NEON-ZERO order (Ruling NZ-D23; supersedes the 7-day wait and the PR table below for the NEON-ZERO path)
+
+Ahmad approved deleting the Neon project once the cutover is VERIFIED. Strict order, each step proven before the next:
+
+1. Production cutover (copy scripts + markers) verified: `/api/v1/health` (super_admin) shows every live store `do`; the strict route sweep is green (`SWEEP_STRICT=1`).
+2. Fresh final dump immediately before step 3 (`node scripts/cf/decommission-neon.mjs final-dump ...`, section 3 below). The restore drill passed on 2026-11-04; take a NEW dump now and record key, sha256 and counts in the register. `restore-drill` on the new object is optional only if the dump script's own verification and counts match.
+3. Merge the N-17 lite PR (`feat/nz-remove-hyperdrive`, base `integ/neon-zero`; `deploy-change` label added by the controller after Ahmad's approval). It must NOT merge before steps 1 and 2.
+4. Deploy runs (`cf-api-deploy.yml`, no Postgres step any more). Verify live, both halves: `/health` `commit` == tip of `main`, `postgres: "removed"`, `status: "ok"`; unknown slug 404; storedemo + one flipped store home / PDP / cart / admin login page; the sweep smoke against production read-only (GET routes, guest cart only, never a purchase). Sentry: no `POSTGRES_REMOVED` and no P1 `api.worker.postgres_removed` for one hour. Not verifiable by CI: that no scheduled job still reaches Postgres on its own tick (watch one full cron cycle).
+5. Rollback window: the Neon project is still alive and unbound. A revert of the PR plus re-creating the Hyperdrive config (`wrangler hyperdrive create`, caching disabled) restores the old Worker. Observe 24 hours (section 5).
+6. Delete the Neon project (Ahmad's explicit yes recorded in the register), then clean up:
+   - disable `db-backup.yml` (`gh workflow disable db-backup.yml`; it dumps Neon nightly with `EBDA_MIGRATE_DATABASE_URL`) and remove the Ebda entry from `~/.claude/scripts/backup-all-neon.sh` + the `com.ebda.neon-backup` launchd job (section 2);
+   - delete the GitHub secret `EBDA_MIGRATE_DATABASE_URL`, the repo variable `EBDA_HYPERDRIVE_ID` and the Hyperdrive config (`wrangler hyperdrive delete <id>`), and the Worker secrets `DATABASE_URL`, `DIRECT_URL`, `OWNER_DATABASE_URL` (the controller does this; the PR only STOPS USING them);
+   - the later N-16 cleanup PR deletes the dead Postgres helpers, `packages/database` runtime and the Postgres CI lanes.
+
+Secrets and variables the Worker deploy no longer reads after the PR: `EBDA_HYPERDRIVE_ID` (var), `EBDA_MIGRATE_DATABASE_URL` (secret, `cf-api-deploy.yml`), `DATABASE_URL` / `DIRECT_URL` step env of the deleted migrate step. Still read until Neon is deleted: `EBDA_MIGRATE_DATABASE_URL` by `db-backup.yml`.
+
 ## 0. Entry conditions (script: `preflight`)
 
 ```bash
 node scripts/cf/decommission-neon.mjs preflight --flipped-at <ISO time of the flip> --api https://api.ebda.app --attest-sentry-clean
 ```
 
-All must hold: at least 7 days since the flip; `/health` `storage_backend` is 100% `do` and its commit is the tip of `main`; Sentry clean for the whole period (checked by hand, attested with the flag); the Worker config no longer has a `hyperdrive` binding (step 1 merged); DO nightly exports present in R2 for every store for the last 7 days (`npx wrangler r2 object list ebda-backups --prefix backups/` shows stores x 7); the CF bill is within the projection. A failing check prints the reason and exits 1: fix it, do not skip it.
+All must hold: at least 7 days since the flip; `/api/v1/health` `data.storage_backend` (super_admin, `OPS_HEALTH_TOKEN`) is 100% `do` and its commit is the tip of `main`; Sentry clean for the whole period (checked by hand, attested with the flag); the Worker config no longer has a `hyperdrive` binding (step 1 merged); DO nightly exports present in R2 for every store for the last 7 days (`npx wrangler r2 object list ebda-backups --prefix backups/` shows stores x 7); the CF bill is within the projection. A failing check prints the reason and exits 1: fix it, do not skip it.
 
 ## 1. Code cleanup of the Postgres paths (PRs, in this order; gate: `residue --strict`)
 

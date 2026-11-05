@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
+import { DataTable } from '@/components/mobile/DataTable';
 import { apiGet, apiFetch } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -160,7 +161,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       .catch(() => {
         if (!isLatest()) return;
         setRows(null);
-        setError('Failed to load trial balance');
+        setError(t('loadTrialFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -248,63 +249,55 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {rows && !loading && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="text-start px-3 py-2 w-20 font-medium text-muted-foreground">
-                    {tb('accountCode')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {tb('accountName')}
-                  </th>
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('debit')} (EGP)
-                  </th>
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('credit')} (EGP)
-                  </th>
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('balance')} (EGP)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr key={i} className="border-t border-border/40">
-                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.code}</td>
-                    <td className="px-3 py-2">
-                      {r.nameEn}
-                      {r.nameAr && (
-                        <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-                          — {r.nameAr}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-end font-mono">{major(r.debit)}</td>
-                    <td className="px-3 py-2 text-end font-mono">{major(r.credit)}</td>
-                    <td className="px-3 py-2 text-end font-mono">{major(r.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-muted/20 border-t border-border">
-                <tr>
-                  <td className="px-3 py-2 font-semibold" colSpan={2}>
-                    {tb('totals')}
-                  </td>
-                  <td className="px-3 py-2 text-end font-mono font-semibold">
-                    {major(totals.debit)}
-                  </td>
-                  <td className="px-3 py-2 text-end font-mono font-semibold">
-                    {major(totals.credit)}
-                  </td>
-                  <td className="px-3 py-2 text-end text-xs">
-                    {balanced && <span className="text-green-700">{tb('balanced')}</span>}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+        <div className="space-y-3">
+          <DataTable<(typeof rows)[number]>
+            ariaLabel={tb('accountName')}
+            columns={[
+              {
+                header: tb('accountCode'),
+                cell: r => (
+                  <span className="font-mono text-xs text-muted-foreground">{r.code}</span>
+                ),
+              },
+              {
+                header: tb('accountName'),
+                primaryOnMobile: true,
+                cell: r => (
+                  <span>
+                    {r.nameEn}
+                    {r.nameAr && (
+                      <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
+                        — {r.nameAr}
+                      </span>
+                    )}
+                  </span>
+                ),
+              },
+              {
+                header: `${tb('debit')} ${tc('egpParen')}`,
+                alignEnd: true,
+                cell: r => <span className="font-mono">{major(r.debit)}</span>,
+              },
+              {
+                header: `${tb('credit')} ${tc('egpParen')}`,
+                alignEnd: true,
+                cell: r => <span className="font-mono">{major(r.credit)}</span>,
+              },
+              {
+                header: `${tb('balance')} ${tc('egpParen')}`,
+                alignEnd: true,
+                cell: r => <span className="font-mono">{major(r.balance)}</span>,
+              },
+            ]}
+            rows={rows}
+            rowKey={r => r.code}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-3 py-2 text-sm font-semibold">
+            <span>{tb('totals')}</span>
+            <span className="font-mono">
+              {major(totals.debit)} / {major(totals.credit)}
+            </span>
+            {balanced && <span className="text-xs text-success-ink">{tb('balanced')}</span>}
           </div>
         </div>
       )}
@@ -342,7 +335,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
       .catch(() => {
         if (!isLatest()) return;
         setData(null);
-        setError('Failed to load P&L');
+        setError(t('loadPnlFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -436,7 +429,9 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
+                      <td className="px-3 py-2 text-end font-mono">
+                        {major(a.balance)} {tc('egp')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -446,7 +441,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalRevenue')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-green-700">
-                      {major(data.revenue.total)} EGP
+                      {major(data.revenue.total)} {tc('egp')}
                     </td>
                   </tr>
                 </tfoot>
@@ -466,7 +461,9 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
+                      <td className="px-3 py-2 text-end font-mono">
+                        {major(a.balance)} {tc('egp')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -476,7 +473,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalExpenses')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-red-600">
-                      {major(data.expenses.total)} EGP
+                      {major(data.expenses.total)} {tc('egp')}
                     </td>
                   </tr>
                 </tfoot>
@@ -493,7 +490,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
               }`}
             >
               {data.netIncome < 0 ? '−' : ''}
-              {major(Math.abs(data.netIncome))} EGP
+              {major(Math.abs(data.netIncome))} {tc('egp')}
             </span>
           </div>
         </div>
@@ -531,7 +528,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
       .catch(() => {
         if (!isLatest()) return;
         setData(null);
-        setError('Failed to load balance sheet');
+        setError(t('loadBalanceFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -590,7 +587,9 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
+                  <td className="px-3 py-2 text-end font-mono">
+                    {major(a.balance)} {tc('egp')}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -600,7 +599,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                   {totalLabel}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {major(section.total)} EGP
+                  {major(section.total)} {tc('egp')}
                 </td>
               </tr>
             </tfoot>
@@ -705,7 +704,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
       .catch(() => {
         if (!isLatest()) return;
         setData(null);
-        setError('Failed to load tax report');
+        setError(t('loadTaxFailed'));
       })
       .finally(() => {
         if (isLatest()) setLoading(false);
@@ -814,13 +813,13 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {major(data.summary.totalTaxableSales)} EGP
+                {major(data.summary.totalTaxableSales)} {tc('egp')}
               </p>
             </div>
-            <div className="rounded-xl border border-border p-4 bg-amber-50 border-amber-200">
+            <div className="rounded-xl border border-border p-4 bg-warning/10 border-warning/30">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
-              <p className="text-2xl font-semibold font-mono text-amber-800">
-                {major(data.summary.totalTaxCollected)} EGP
+              <p className="text-2xl font-semibold font-mono text-warning-ink">
+                {major(data.summary.totalTaxCollected)} {tc('egp')}
               </p>
             </div>
           </div>
@@ -840,10 +839,10 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                         {tt('entries')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('taxableBase')} (EGP)
+                        {tt('taxableBase')} {tc('egpParen')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('taxCollected')} (EGP)
+                        {tt('taxCollected')} {tc('egpParen')}
                       </th>
                     </tr>
                   </thead>
@@ -853,7 +852,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                         <td className="px-3 py-2 font-mono">{r.taxRate}%</td>
                         <td className="px-3 py-2 text-end font-mono">{r.transactionCount}</td>
                         <td className="px-3 py-2 text-end font-mono">{major(r.totalSubtotal)}</td>
-                        <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                        <td className="px-3 py-2 text-end font-mono font-semibold text-warning-ink">
                           {major(r.totalTaxCollected)}
                         </td>
                       </tr>
@@ -890,16 +889,16 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           {tt('customer')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('taxableBase')} (EGP)
+                          {tt('taxableBase')} {tc('egpParen')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
                           {tt('taxRate')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('taxCollected')} (EGP)
+                          {tt('taxCollected')} {tc('egpParen')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('orderTotal')} (EGP)
+                          {tt('orderTotal')} {tc('egpParen')}
                         </th>
                       </tr>
                     </thead>
@@ -921,7 +920,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           </td>
                           <td className="px-3 py-2 text-end font-mono">{major(row.subtotal)}</td>
                           <td className="px-3 py-2 text-end font-mono">{row.taxRate}%</td>
-                          <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                          <td className="px-3 py-2 text-end font-mono font-semibold text-warning-ink">
                             {major(row.taxCollected)}
                           </td>
                           <td className="px-3 py-2 text-end font-mono">
@@ -939,7 +938,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           {major(data.summary.totalTaxableSales)}
                         </td>
                         <td />
-                        <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                        <td className="px-3 py-2 text-end font-mono font-semibold text-warning-ink">
                           {major(data.summary.totalTaxCollected)}
                         </td>
                         <td />

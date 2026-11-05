@@ -1,0 +1,3 @@
+# CF-OPUS-4
+
+Ruling CF-OPUS-4 (2026-10-30, INFRA-CF-1 Opus review) - A provider refund and the whole-order reversal are one DO section. `completeRefund` runs `refundOrder` (external) inside its own transaction when the claim flips the order, so a failing reversal rolls the executed marker back and the caller's retry re-runs both; the API's keyed `refundBook` stays as an idempotent no-op for claims completed earlier (failure-injection test in `packages/repo/test/do-payment-ops.test.ts`). Cost if wrong: a refund whose reversal throws deterministically is retried by the operator instead of half-applied.

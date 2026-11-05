@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { BulkExportPanel } from './_components/BulkExportPanel';
 import { BulkImportWizard } from './_components/BulkImportWizard';
 import { BulkTabs } from './_components/BulkTabs';
+import { CatalogImportPanel } from './_components/CatalogImportPanel';
 import type { BulkTab } from './_components/types';
 import { useBulkOperations } from './_hooks/useBulkOperations';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
@@ -48,25 +48,7 @@ export default function BulkOperationsPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout
-      title={tPage('title')}
-      subtitle={tPage('subtitle')}
-      actions={
-        <Button variant="outline" onClick={() => router.push(`/stores/${storeId}`)}>
-          <span className="inline-flex items-center gap-2">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            {tPage('backToStore')}
-          </span>
-        </Button>
-      }
-    >
+    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       <BulkTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab === 'import' && (
@@ -85,6 +67,8 @@ export default function BulkOperationsPage() {
           onViewProducts={() => router.push(`/stores/${storeId}/products`)}
         />
       )}
+
+      {activeTab === 'catalog' && <CatalogImportPanel storeId={storeId} />}
 
       {activeTab === 'export' && (
         <BulkExportPanel

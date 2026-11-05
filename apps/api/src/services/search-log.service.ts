@@ -24,12 +24,16 @@
  * NEW terms: Ruling SEARCH-T5-4).
  */
 import { createHmac } from 'node:crypto';
-import { acrossStores, storeDirectory, withStore } from '@ebda/database';
+import { storeDirectory, withoutHiddenStores, withStore } from '@ebda/database';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 import { foldSearchLogTerm, isPersonalDataTerm, REGION, zonedIsoDay } from '@ebda/shared';
 import { derivedSecret } from '../lib/derived-secret';
 import logger from '../lib/logger';
 import { redis } from './redis.service';
 import { withSavepoint } from '../lib/savepoint';
+import { analyticsMoney } from '../lib/analytics-backend';
+
+const dayMs = (day: string): number => Date.parse(`${day}T00:00:00Z`);
 
 export const SEARCH_LOG_RETENTION_DAYS = 90;
 /** Distinct terms one store may add per Cairo day (soft: concurrent inserts can pass it by a few). */
@@ -162,6 +166,12 @@ export async function recordSearch(
   const day = searchLogDay(opts.now);
   const cap = opts.maxTermsPerDay ?? SEARCH_LOG_MAX_TERMS_PER_DAY;
   try {
+    // Ruling NZ-AN-1: a Durable Object store counts in its own DO once the analytics copy flipped
+    const money = await analyticsMoney(storeId, 'write');
+    if (money) {
+      const r = await money.searchLogRecord({ dayMs: dayMs(day), term, count, zero, cap });
+      return r.counted;
+    }
     const affected = await withStore(storeId, tx =>
       // Savepoint: a failure must not poison the deferred task's transaction.
       withSavepoint(
@@ -194,6 +204,8 @@ export async function recordSearch(
  */
 export async function purgeSearchLog(storeId: string, now: Date = new Date()): Promise<number> {
   const cutoff = isoDayMinus(searchLogDay(now), SEARCH_LOG_RETENTION_DAYS);
+  const money = await analyticsMoney(storeId, 'write');
+  if (money) return (await money.searchLogPurge({ cutoffMs: dayMs(cutoff) })).deleted;
   return withStore(
     storeId,
     tx => tx.$executeRaw`
@@ -209,17 +221,31 @@ export async function purgeSearchLog(storeId: string, now: Date = new Date()): P
 export async function purgeSearchLogAcrossStores(
   opts: { storeIds?: string[]; now?: Date } = {}
 ): Promise<{ purged: number; failedStores: number }> {
+  // Ruling NZ-AN-1: every store, Durable Object stores included (a DO store is purged in its own DO once its analytics moved,
+  // else in Postgres like any store). `runInStoreCtx` opens the Postgres tenant transaction only for a Postgres store.
   const storeIds =
-    opts.storeIds ?? (await storeDirectory(undefined, { includeDeleted: true })).map(s => s.id);
+    opts.storeIds ??
+    (await withoutHiddenStores(() => storeDirectory(undefined, { includeDeleted: true }))).map(
+      s => s.id
+    );
   let failedStores = 0;
-  const results = await acrossStores(storeId => purgeSearchLog(storeId, opts.now), {
-    storeIds,
-    onStoreError: (storeId, err) => {
-      failedStores += 1;
-      logger.error({ storeId, code: errCode(err) }, '[SEARCH-LOG] purge failed for store');
-    },
-  });
-  return { purged: results.reduce((n, r) => n + r.value, 0), failedStores };
+  let purged = 0;
+  // bounded parallelism (8 stores at a time): serial over every store made the daily run O(stores) round trips
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, storeIds.length) }, async () => {
+      while (next < storeIds.length) {
+        const storeId = storeIds[next++];
+        try {
+          purged += await runInStoreCtx(storeId, () => purgeSearchLog(storeId, opts.now));
+        } catch (err) {
+          failedStores += 1;
+          logger.error({ storeId, code: errCode(err) }, '[SEARCH-LOG] purge failed for store');
+        }
+      }
+    })
+  );
+  return { purged, failedStores };
 }
 
 export type SearchInsightsDays = 7 | 30 | 90;
@@ -249,6 +275,30 @@ export async function getSearchInsights(
 ): Promise<SearchLogInsights> {
   const since = isoDayMinus(searchLogDay(opts.now), opts.days - 1);
   const zeroOnly = opts.filter === 'zero';
+  const money = await analyticsMoney(storeId, 'read');
+  if (money) {
+    const r = await money.searchInsights({
+      sinceMs: dayMs(since),
+      minShown: SEARCH_LOG_MIN_SEARCHES_SHOWN,
+      zeroOnly,
+      limit: 50,
+    });
+    const searches = r.totals.searches;
+    return {
+      days: opts.days,
+      totals: {
+        searches,
+        zeroResultSearches: r.totals.zero,
+        zeroResultRate: searches === 0 ? null : r.totals.zero / searches,
+      },
+      terms: r.terms.map(t => ({
+        term: t.term,
+        searches: t.searches,
+        zeroResults: t.zero_results,
+        lastResultCount: t.last_result_count,
+      })),
+    };
+  }
   return withStore(storeId, async tx => {
     const [totals] = await tx.$queryRaw<Array<{ searches: number; zero: number }>>`
       SELECT COALESCE(SUM(searches), 0)::int AS searches, COALESCE(SUM(zero_results), 0)::int AS zero

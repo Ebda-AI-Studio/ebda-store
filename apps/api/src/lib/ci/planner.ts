@@ -6,11 +6,11 @@
  * yield the SAME eventId.
  *
  * What is deliberately NOT emitted here: a COD confirmed/refused/no-reply that arrived from WhatsApp.
- * Ebda WhatsApp already emitted that outcome itself (contract section 8, #218); emitting it again would
+ * Ebda Chat already emitted that outcome itself (contract section 8, #218); emitting it again would
  * double every row. Detected by the `order.cod_outcome` audit row the WhatsApp consumer writes.
  */
 import { buyerKeyFor } from '@ebda/shared';
-import type { CiOutcomeInput } from './envelope';
+import { ONBOARDING_STEPS, type CiOutcomeInput, type PAYMENT_FAILURE_CODES } from './envelope';
 import { mapReturnReason, scrubFreeText } from './return-reason';
 import type { CiOrderFacts, CiShipmentFacts, CiSource } from './source';
 
@@ -121,6 +121,7 @@ export async function planOrderStatusChanged(
           minutesToConfirm: t
             ? Math.round((t.at.getTime() - o.createdAt.getTime()) / 60_000)
             : null,
+          areaKey: o.area.areaKey,
         },
       });
     }
@@ -155,7 +156,7 @@ export async function planOrderStatusChanged(
         seed: `cod:${o.id}`,
         occurredAt: t?.at ?? new Date(),
         ...base(o, buyerKey),
-        data: { confirmedVia: 'none', minutesToConfirm: null },
+        data: { confirmedVia: 'none', minutesToConfirm: null, areaKey: o.area.areaKey },
       });
     }
   }
@@ -200,6 +201,7 @@ export async function planShipmentUpdated(
   const o = await ctx.source.order(e.storeId, s.orderId);
   if (!o) throw new Error(`order ${s.orderId} not visible yet`);
   const b = base(o, await buyerKeyOf(ctx, o));
+  const areaKey = s.areaKey ?? o.area.areaKey;
   const out: CiOutcomeInput[] = [];
   for (const m of e.ci) {
     const at = new Date(m.at);
@@ -226,6 +228,7 @@ export async function planShipmentUpdated(
             carrier: s.carrier,
             attemptNo: m.attemptNo ?? 1,
             reasonCode: raw ? mapReturnReason(s.carrier, raw).code : null,
+            areaKey,
           },
         });
         break;
@@ -241,6 +244,8 @@ export async function planShipmentUpdated(
             codMinor: s.codMinor,
             hoursSincePickup: since,
             attempts: s.deliveryAttempts,
+            areaKey,
+            shippingFeeMinor: o.shippingMinor,
           },
         });
         break;
@@ -263,6 +268,8 @@ export async function planShipmentUpdated(
             returnReasonRaw: reason.raw,
             attempts: s.deliveryAttempts,
             hoursSincePickup: since,
+            areaKey,
+            shippingFeeMinor: o.shippingMinor,
           },
         });
         break;
@@ -270,6 +277,121 @@ export async function planShipmentUpdated(
     }
   }
   return out;
+}
+
+const failureCodeOf = (kind: string): (typeof PAYMENT_FAILURE_CODES)[number] =>
+  kind === 'expired' ? 'expired' : kind === 'cancelled' ? 'cancelled' : 'declined';
+const validDate = (iso: unknown): Date => {
+  const d = typeof iso === 'string' ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : new Date();
+};
+
+/**
+ * `ci/payment-failed`: the gateway (pull-side confirm) or its webhook settled a payment as failed,
+ * expired or cancelled. Sent once by the call that won the order's `unpaid -> failed` claim, and the seed is
+ * the payment id, so a replay is harmless. `failureCode` is a closed code: the provider's own message is
+ * never read here.
+ */
+export async function planPaymentFailed(
+  ctx: PlanCtx,
+  e: { storeId?: string; orderId?: string; paymentId?: string; kind?: string; at?: string }
+): Promise<CiOutcomeInput[]> {
+  if (!e.storeId || !e.orderId || !e.paymentId) return [];
+  const o = await ctx.source.order(e.storeId, e.orderId);
+  if (!o) throw new Error(`order ${e.orderId} not visible yet`);
+  const p = o.payments.find(x => x.id === e.paymentId) ?? o.payments[0];
+  if (!p) return [];
+  return [
+    {
+      type: 'payment.failed',
+      seed: `payment-failed:${e.paymentId}`,
+      occurredAt: validDate(e.at),
+      ...base(o, await buyerKeyOf(ctx, o)),
+      data: {
+        provider: p.provider,
+        methodKind: p.method ?? p.provider,
+        totalMinor: o.totalMinor,
+        failureCode: failureCodeOf(e.kind ?? ''),
+      },
+    },
+  ];
+}
+
+/**
+ * `ci/cart-reminder-sent`: a recovery message went out. There is no order yet and the cart's contact is a
+ * reminder consent, not a CI one, so the event carries no buyer key at all.
+ */
+export async function planCartReminder(
+  ctx: PlanCtx,
+  e: { storeId?: string; abandonedCartId?: string; channel?: string; step?: number; at?: string }
+): Promise<CiOutcomeInput[]> {
+  if (!e.storeId || !e.abandonedCartId) return [];
+  const step = e.step && e.step >= 1 && e.step <= 3 ? e.step : 1;
+  const channel = e.channel === 'email' ? 'email' : 'notification';
+  return [
+    {
+      type: 'cart.abandoned',
+      seed: `cart:${e.abandonedCartId}:${channel}:${step}`,
+      occurredAt: validDate(e.at),
+      storeId: e.storeId,
+      orderId: null,
+      buyerKey: null,
+      xstore: await ctx.source.storeCiSharing(e.storeId),
+      data: { channel, step },
+    },
+  ];
+}
+
+/** `ci/cart-recovered`: only when a reminder had actually gone out first (otherwise it was not recovered BY one). */
+export async function planCartRecovered(
+  ctx: PlanCtx,
+  e: { storeId?: string; abandonedCartId?: string; orderId?: string; at?: string }
+): Promise<CiOutcomeInput[]> {
+  if (!e.storeId || !e.abandonedCartId || !e.orderId) return [];
+  const cart = await ctx.source.abandonedCart(e.storeId, e.abandonedCartId);
+  if (!cart) throw new Error(`abandoned cart ${e.abandonedCartId} not visible yet`);
+  if (!cart.firstReminderAt || !cart.firstChannel) return [];
+  const o = await ctx.source.order(e.storeId, e.orderId);
+  if (!o) throw new Error(`order ${e.orderId} not visible yet`);
+  const at = cart.recoveredAt ?? validDate(e.at);
+  return [
+    {
+      type: 'cart.recovered',
+      seed: `cart:${cart.id}:recovered`,
+      occurredAt: at,
+      ...base(o, await buyerKeyOf(ctx, o)),
+      data: { channel: cart.firstChannel, hoursToRecover: hoursBetween(cart.firstReminderAt, at) },
+    },
+  ];
+}
+
+/** `ci/onboarding-step`: a milestone of the store setup. One event per (store, step), ever. */
+export async function planOnboardingStep(
+  ctx: PlanCtx,
+  e: { storeId?: string; step?: string; at?: string }
+): Promise<CiOutcomeInput[]> {
+  if (!e.storeId || !e.step || !(ONBOARDING_STEPS as readonly string[]).includes(e.step)) return [];
+  const facts = await ctx.source.storeSetup(e.storeId);
+  if (!facts) throw new Error(`store ${e.storeId} not visible yet`);
+  const at = validDate(e.at);
+  return [
+    {
+      type: 'merchant.onboarding_step',
+      seed: `onboarding:${e.storeId}:${e.step}`,
+      occurredAt: at,
+      storeId: e.storeId,
+      orderId: null,
+      buyerKey: null,
+      xstore: facts.ciSharing,
+      data: {
+        step: e.step as (typeof ONBOARDING_STEPS)[number],
+        secondsSinceSignup: facts.ownerSignupAt
+          ? Math.max(0, Math.round((at.getTime() - facts.ownerSignupAt.getTime()) / 1000))
+          : null,
+        template: facts.template,
+      },
+    },
+  ];
 }
 
 export type { CiShipmentFacts };

@@ -6,9 +6,20 @@ import {
   acrossStores,
   withStore,
   withUser,
+  runInTenantContext,
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
+import { hubOnD1 } from '../lib/platform-hub';
+import {
+  copyStoreSettings,
+  storeDb,
+  storeRepo,
+  storeUpdateOnDo,
+  closeDoIfNoMoney,
+  reopenDoAfterFailedDelete,
+  storeWritesToDo,
+} from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -19,11 +30,19 @@ import {
   unlinkUserAuditLogs,
 } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
+import {
+  finishDoStoreCreate,
+  insertDoStore,
+  countOwnerStores,
+  ownerStores,
+  storeCreateOnDo,
+} from '../lib/store-create-do';
 import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
 import { config as appConfig } from '../config';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
+  GOLD_ALLOW_DEFERRED_SETTING,
   slugifyWithFallback,
   isReservedSlug,
   isProtectedSlug,
@@ -48,19 +67,26 @@ import {
   deleteStoreClients,
   eraseIdentityUser,
   getAccountState,
+  getAccountsBrief,
   isIdentityManagedUser,
   setAccountStatus,
 } from '../lib/identity-client';
+import { platformFamilyOnD1 } from './platform/cutover';
+import { pageDirectoryStoreIds } from './platform/directory-d1';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { sendAlert } from './alerts.service';
 import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
+import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
+import { finishStoreDeletion } from '../lib/store-delete-post-commit';
+import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
   assertPlanAllows,
   assertWithinLimit,
+  ownerStoreAllowance,
 } from './plan-limit.service';
 import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
@@ -89,8 +115,14 @@ import { startSignupTrial } from './billing/trial';
 export async function bustStoreCaches(
   storeId: string,
   slug: string | null,
-  domain?: string | null
+  domain?: string | null,
+  /** The values BEFORE a slug / domain change: the old address must stop resolving to this store. */
+  previous: { slug?: string | null; domain?: string | null } = {}
 ): Promise<void> {
+  // NEON-SCALE-1 rule 1: the cached store directory (slug / domain / id -> status) is event-invalidated here, BEFORE the
+  // payload caches are busted (so a refill cannot read a stale directory entry) and AGAIN at the end (a refill that raced
+  // the first pass is dropped).
+  await invalidateStoreDirectory(storeId, slug, domain, previous);
   await invalidateCached(`public:store:${storeId}`);
   if (slug) {
     await invalidateCached(`public:store:${slug}`);
@@ -111,6 +143,67 @@ export async function bustStoreCaches(
   // layout (`GET /public/stores/:id/layout`); without it a layout save could not
   // reach the Next data cache and stayed stale for the 60s revalidate window.
   revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`] });
+  await invalidateStoreDirectory(storeId, slug, domain, previous);
+}
+
+/**
+ * Settings write-through (Ruling CF-WRITES-2): runs the authoritative `Store` update (D1/Postgres) exactly as `withStore`
+ * did, then copies the changed fields to the Durable Object's settings copy for a store served by its DO. On Postgres the
+ * copy is a no-op. The patch is captured from the `tx.store.update({ data })` call itself, so no call site restates it.
+ */
+export async function updateStoreThrough<T>(
+  storeId: string,
+  run: (tx: Parameters<Parameters<typeof withStore>[1]>[0]) => Promise<T>
+): Promise<T> {
+  // Ruling NZ-D8: a store on its Durable Object is written by D1 + the DO, never Postgres. `run` sees a transaction-shaped
+  // stand-in that serves ONLY `store.update` / `store.findUnique`; any other model throws 501 (that caller needs its own port).
+  if (await storeWritesToDo(storeId)) {
+    const unsupported = (what: string) => {
+      throw new AppError(
+        501,
+        'STORE_TX_UNSUPPORTED',
+        `${what} is not served for a Durable Object store`
+      );
+    };
+    const doTx = new Proxy({} as object, {
+      get(_t, prop) {
+        if (prop !== 'store') return unsupported(`tx.${String(prop)}`);
+        return {
+          update: (args: { data: Record<string, unknown> }) =>
+            storeUpdateOnDo(storeId, args as never),
+          findUnique: async (args: any) => (await storeDb(storeId)).store.findUnique(args),
+          findUniqueOrThrow: async (args: any) =>
+            (await storeDb(storeId)).store.findUniqueOrThrow(args),
+        };
+      },
+    });
+    return run(doTx as never);
+  }
+  let patch: Record<string, unknown> | undefined;
+  const result = await withStore(storeId, tx => {
+    const watched = new Proxy(tx as object, {
+      get(target, prop) {
+        const v = (target as any)[prop];
+        // `$queryRaw` / `$executeRaw` are called as `tx.$queryRaw`..., i.e. with this Proxy as `this`: bind them to the real client.
+        if (prop !== 'store')
+          return typeof v === 'function' && typeof prop === 'string' && prop[0] === '$'
+            ? v.bind(target)
+            : v;
+        return new Proxy(v, {
+          get(st, m) {
+            if (m !== 'update') return st[m];
+            return (args: { data: Record<string, unknown> }) => {
+              patch = args.data;
+              return st.update(args);
+            };
+          },
+        });
+      },
+    });
+    return run(watched as typeof tx);
+  });
+  if (patch) await copyStoreSettings(storeId, patch);
+  return result as T;
 }
 
 /**
@@ -182,15 +275,78 @@ async function countStoreRows(
   opts: { orders?: boolean } = {}
 ): Promise<{ products: number; categories: number; orders?: number }> {
   return withStore(storeId, async tx => {
+    // products + categories follow the store's backend (a Postgres store keeps this very tx); orders stay on the tx
+    const db = (await storeRepo(storeId)).backend === 'do' ? await storeDb(storeId) : tx;
     const [products, categories, orders] = await Promise.all([
-      tx.product.count({ where: { storeId } }),
-      tx.category.count({ where: { storeId } }),
+      db.product.count({ where: { storeId } }),
+      db.category.count({ where: { storeId } }),
       opts.orders ? tx.order.count({ where: { storeId } }) : Promise.resolve(undefined),
     ]);
     return opts.orders
       ? { products, categories, orders: orders as number }
       : { products, categories };
   });
+}
+
+/**
+ * `Store.settings` writers, BE:F-2 (Ruling FP-5).
+ *
+ * The lost update came from merging against a copy read minutes earlier (a page mounted, another surface wrote, the page saved its
+ * stale whole copy). Two paths, by where the store is written:
+ *
+ * - POSTGRES-authoritative store: ONE SQL statement does the merge (`settings = coalesce(settings,'{}') || patch`, or `jsonb_set`
+ *   for one key), so it is atomic in the database whatever the transaction shape. This matters: the `/stores` router has NO
+ *   request transaction (it runs under `storeScopeContext`), so every query is its own transaction and a `SELECT ... FOR UPDATE`
+ *   followed by a separate UPDATE would release its lock between the two. Never write that pair here.
+ * - D1 + Durable Object store (`storeWritesToDo`): there is no single statement across D1 and the DO, so the writer reads the row
+ *   at write time (`readLiveSettings`) and writes the merge. RESIDUAL: two writers inside the same few milliseconds can still
+ *   interleave and one key is lost. Cost if wrong: one key written in that window is lost, instead of every key written during the
+ *   page's lifetime.
+ */
+async function readLiveSettings(
+  tx: Parameters<Parameters<typeof updateStoreThrough>[1]>[0],
+  storeId: string
+): Promise<Record<string, unknown>> {
+  const row = await tx.store.findUnique({ where: { id: storeId }, select: { settings: true } });
+  return (row?.settings as Record<string, unknown> | null) ?? {};
+}
+
+const stamp = (row?: { updatedAt?: Date }) =>
+  row?.updatedAt instanceof Date ? { updatedAt: row.updatedAt } : {};
+
+/** Atomic shallow merge of `patch` into `stores.settings` (Postgres path). Returns the resulting settings. */
+async function mergeSettingsAtomic(
+  storeId: string,
+  patch: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const rows = await withStore(
+    storeId,
+    tx => tx.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
+      UPDATE stores
+      SET settings = coalesce(settings, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb,
+          updated_at = now()
+      WHERE id = ${storeId}
+      RETURNING settings, updated_at AS "updatedAt"`
+  );
+  const settings = (rows?.[0]?.settings as Record<string, unknown> | null) ?? {};
+  // N-19: the DO copy (a Node / dev store whose DO is not yet the writer) gets the WHOLE resulting value from RETURNING, never a
+  // re-read, stamped with the row's updated_at so the DO ignores a copy older than the one it holds.
+  await copyStoreSettings(storeId, { settings, ...stamp(rows?.[0]) });
+  return settings;
+}
+
+/** Atomic replace of ONE top-level `settings` key (Postgres path). */
+async function setSettingsKeyAtomic(storeId: string, key: string, value: unknown): Promise<void> {
+  const rows = await withStore(
+    storeId,
+    tx => tx.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
+      UPDATE stores
+      SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), ARRAY[${key}]::text[], ${JSON.stringify(value)}::jsonb),
+          updated_at = now()
+      WHERE id = ${storeId}
+      RETURNING settings, updated_at AS "updatedAt"`
+  );
+  await copyStoreSettings(storeId, { settings: rows?.[0]?.settings ?? {}, ...stamp(rows?.[0]) });
 }
 
 export class StoreService {
@@ -219,6 +375,42 @@ export class StoreService {
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
+    // NEON-ZERO (integration gap): with the access family on D1 the directory is D1 `stores`, each store's record is read from
+    // its own backend, the owner from the identity service and the counts from the store's backend. No Postgres.
+    if (await platformFamilyOnD1('access')) {
+      const { ids, total } = await pageDirectoryStoreIds({
+        ownerId: options.ownerId,
+        skip,
+        take: limit,
+      });
+      const rows = await Promise.all(
+        ids.map(async id => {
+          const db = await storeDb(id);
+          const [st, products, orders] = await Promise.all([
+            db.store.findUnique({ where: { id } }),
+            db.product.count({ where: { storeId: id } }),
+            db.order.count({ where: { storeId: id } }),
+          ]);
+          return st ? { st, products, orders } : null;
+        })
+      );
+      const found = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+      const owners = new Map(
+        (await getAccountsBrief(found.map(r => (r.st as { ownerId: string }).ownerId))).map(a => [
+          a.id,
+          { id: a.id, email: a.email, firstName: a.firstName, lastName: a.lastName },
+        ])
+      );
+      return {
+        stores: found.map(r => ({
+          ...r.st,
+          owner: owners.get((r.st as { ownerId: string }).ownerId) ?? null,
+          _count: { products: r.products, orders: r.orders },
+        })),
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    }
+
     const where = options.ownerId ? { ownerId: options.ownerId } : {};
 
     const [stores, total] = await Promise.all([
@@ -242,7 +434,7 @@ export class StoreService {
       (
         await acrossStores(
           async storeId => ({
-            products: await prisma.product.count({ where: { storeId } }),
+            products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
           { storeIds: stores.map(st => st.id) }
@@ -280,7 +472,7 @@ export class StoreService {
    * path does.
    */
   static async setStatus(storeId: string, status: StoreStatus) {
-    const store = await withStore(storeId, tx =>
+    const store = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { status },
@@ -376,11 +568,13 @@ export class StoreService {
     // go-live-gate.ts), an additional one (only reachable on a multi-store plan)
     // rides the owner's Business plan — the same shapes as self-serve onboarding.
     // The platform operator keeps the old behaviour (active, default plan).
+    // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
+    const onDo = storeCreateOnDo();
     const merchantCreate = !opts.platformOperator
       ? {
           firstStore:
-            (await withUser(ownerId, tx =>
-              tx.store.count({ where: { ownerId, deletedAt: null } })
+            (await countOwnerStores(ownerId, () =>
+              withUser(ownerId, tx => tx.store.count({ where: { ownerId, deletedAt: null } }))
             )) === 0,
         }
       : null;
@@ -428,6 +622,46 @@ export class StoreService {
       await assertPlanAllows(STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
     }
 
+    const newSettings = ((data.settings && typeof data.settings === 'object'
+      ? stripServerOwnedSettings(data.settings as Record<string, unknown>)
+      : null) || {
+      currency: REGION.currency,
+      locale: 'ar-EG',
+      defaultLanguage: REGION.defaultLocale,
+    }) as Prisma.InputJsonValue;
+    const newTheme = { frameChromeDedup: true, oosRibbonColor: '#6b7280' };
+
+    if (onDo) {
+      const plan = merchantCreate
+        ? merchantCreate.firstStore
+          ? ('professional' as const)
+          : ('enterprise' as const)
+        : NEW_STORE_LEGACY_PLAN;
+      const id = await insertDoStore({
+        name: data.name,
+        slug,
+        domain: data.domain ?? null,
+        ownerId,
+        status: merchantCreate ? 'inactive' : 'active',
+        plan,
+        settings: newSettings as Record<string, unknown>,
+        theme: newTheme,
+        layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
+        vatRateHundredths: REGION.defaultVatBps,
+        trial: merchantCreate?.firstStore ? {} : undefined,
+        // atomic plan gate, fails closed (the Redis creation lock fails open): the insert itself refuses past the allowance
+        maxOwnedStores: opts.platformOperator
+          ? null
+          : (await ownerStoreAllowance(ownerId)).allowance,
+      });
+      const created = await finishDoStoreCreate(id, {
+        slug,
+        domain: data.domain ?? null,
+      });
+      // The owner row is identity (Postgres until the identity track moves it): not read on this path.
+      return { ...created, owner: { id: ownerId } } as typeof created & { owner: { id: string } };
+    }
+
     // `stores` is under RLS (R-EBDA-005): the row is inserted AS its owner (the policy's
     // WITH CHECK and the tenant guard both key a new store on the acting owner).
     const store = await withUser(ownerId, () =>
@@ -452,13 +686,7 @@ export class StoreService {
                   : ('enterprise' as const),
               }
             : {}),
-          settings: ((data.settings && typeof data.settings === 'object'
-            ? stripServerOwnedSettings(data.settings as Record<string, unknown>)
-            : null) || {
-            currency: REGION.currency,
-            locale: 'ar-EG',
-            defaultLanguage: REGION.defaultLocale,
-          }) as Prisma.InputJsonValue,
+          settings: newSettings,
           // 2026-07-12 design structural batch: new stores get the card-frame dedup
           // ON by default (Ahmad-approved for NEW
           // stores only — every existing store keeps these flags undefined/false
@@ -469,10 +697,7 @@ export class StoreService {
           // terracotta). Existing stores keep it undefined and render unchanged.
           // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8); nor is
           // `personaChromeV2`: only the deleted Force skins read it (Ruling SKIN-DEL-5).
-          theme: {
-            frameChromeDedup: true,
-            oosRibbonColor: '#6b7280',
-          },
+          theme: newTheme,
         },
       })
     );
@@ -512,6 +737,11 @@ export class StoreService {
       })
     );
 
+    // Hotfix N-22: the new store must resolve (lookups read D1). The creating write committed above, so read it back and mirror it.
+    await syncStoreDirectoryFromPg(store.id);
+    // A slug probed before this store existed is negatively cached in the directory: clear it so the new store resolves at once.
+    await invalidateStoreDirectory(store.id, store.slug, store.domain);
+
     return { ...store, owner };
   }
 
@@ -547,18 +777,27 @@ export class StoreService {
       }
     }
 
-    // Merge settings instead of replacing entirely
-    let mergedSettings = data.settings;
-    if (data.settings && typeof data.settings === 'object') {
-      // Server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
-      mergedSettings = mergeClientSettings(
-        (store.settings as Record<string, unknown>) || {},
-        data.settings as Record<string, unknown>
-      ) as Prisma.InputJsonValue;
-    }
+    // Merge settings instead of replacing entirely. BE:F-2: the merge happens against the row as it is NOW (see the note above
+    // readLiveSettings): ONE atomic SQL statement on a Postgres store, a write-time read on a DO store. `incoming` holds only the
+    // keys the client sent; server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
+    const incoming =
+      data.settings && typeof data.settings === 'object'
+        ? (data.settings as Record<string, unknown>)
+        : undefined;
+    const onDo = incoming ? await storeWritesToDo(storeId) : false;
+    const atomicPatch = incoming && !onDo ? stripServerOwnedSettings(incoming) : undefined;
 
-    const updatedStore = await withStore(storeId, tx =>
-      tx.store.update({
+    const updatedStore = await updateStoreThrough(storeId, async tx => {
+      const mergedSettings =
+        incoming && onDo
+          ? (mergeClientSettings(
+              await readLiveSettings(tx, storeId),
+              incoming
+            ) as Prisma.InputJsonValue)
+          : incoming
+            ? undefined // written below by the atomic statement
+            : data.settings;
+      return tx.store.update({
         where: { id: storeId },
         data: {
           name: data.name,
@@ -601,8 +840,15 @@ export class StoreService {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
         },
-      })
-    );
+      });
+    });
+
+    if (atomicPatch && Object.keys(atomicPatch).length > 0) {
+      (updatedStore as { settings: unknown }).settings = await mergeSettingsAtomic(
+        storeId,
+        atomicPatch
+      );
+    }
 
     // Invalidate store cache (best-effort)
     try {
@@ -627,7 +873,10 @@ export class StoreService {
       );
     }
 
-    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain, {
+      slug: store.slug,
+      domain: store.domain,
+    });
 
     if (data.heroImage !== undefined && previousHeroImage && previousHeroImage !== data.heroImage) {
       void deleteR2ObjectIfOrphan(previousHeroImage).catch(err =>
@@ -656,17 +905,51 @@ export class StoreService {
    * and for writing the STORE_DELETED audit log AFTER this returns successfully.
    */
   static async delete(storeId: string, actorUserId?: string) {
-    const store = await this.getById(storeId);
+    // Decided BEFORE the Postgres delete (Ruling NZ-D14): the post-commit teardown must know whether the store lived on its DO.
+    const wasOnDo = await storeWritesToDo(storeId);
+    // N-18 (Ruling NZ-D14): a store created on D1 + its DO has NO Postgres row, so the Postgres phase (getById, the raw SQL deletes)
+    // has nothing to act on and is skipped; only the DO close, the owner-family check (D1), and finishStoreDeletion apply.
+    // Once the platform families are on D1 a DO store has no Postgres row by definition (Ruling NZ-C-15 routes Store reads to the DO,
+    // so the probe below would find the DO's record and wrongly take the Postgres delete path).
+    const pgRow =
+      wasOnDo && !(await hubOnD1())
+        ? await withStore(storeId, tx =>
+            tx.store.findUnique({ where: { id: storeId }, select: { id: true } })
+          )
+        : wasOnDo
+          ? null
+          : true;
+    const doNative = wasOnDo && !pgRow;
+    const store = doNative
+      ? await (async () => {
+          const r = (await (
+            await storeDb(storeId)
+          ).store.findUnique({
+            where: { id: storeId },
+            select: { id: true, name: true, slug: true, domain: true, ownerId: true },
+          })) as {
+            id: string;
+            name: string;
+            slug: string;
+            domain: string | null;
+            ownerId: string;
+          } | null;
+          if (!r) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+          return r;
+        })()
+      : await this.getById(storeId);
     // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
     // owner still has other live stores would strand the paid period and re-parent the
     // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
     if (store.ownerId) {
       const family = sortOwnerStores(
-        await withUser(store.ownerId, tx =>
-          tx.store.findMany({
-            where: { ownerId: store.ownerId!, deletedAt: null },
-            select: { id: true, createdAt: true },
-          })
+        await ownerStores(store.ownerId, () =>
+          withUser(store.ownerId!, tx =>
+            tx.store.findMany({
+              where: { ownerId: store.ownerId!, deletedAt: null },
+              select: { id: true, createdAt: true },
+            })
+          )
         )
       );
       if (family.length > 1 && family[0].id === storeId) {
@@ -680,155 +963,176 @@ export class StoreService {
     // The owner's identity (credential + sessions) lives in the shared identity service. If this deletion also removes the
     // owner's profile row, the identity is deactivated FIRST (ends their sessions at once) and erased only after the commit;
     // if the transaction fails the identity is re-activated (compensating rollback).
+    // Placed after every refusal that precedes the Postgres delete (the billing-parent check), so nothing can leave it closed.
+    // A DO store's money lives in the DO, not in its stale Postgres copy. ONE atomic DO call checks money in flight and closes the
+    // store (Ruling NZ-D17): refused -> 409 and nothing else is touched. A failed delete below reopens only what this call closed.
+    const doClose = wasOnDo ? await closeDoIfNoMoney(storeId) : null;
     let deactivatedOwnerId: string | null = null;
     let erasedOwnerId: string | null = null;
 
     try {
-      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-        // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
-        // statements because the Prisma-typed approach kept hitting
-        // P2003 (journal_entries_store_id_fkey) even with explicit
-        // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
-        //   1. unambiguous about which table + column the delete targets
-        //      (no Prisma client cache / schema drift)
-        //   2. easier to debug — each step logs storeId + affected row
-        //      count via $executeRaw's number return value
-        //   3. order-explicit — Postgres processes statements sequentially
-        //      so any FK cascade chain is committed before the next step
-        //
-        // Order matters. Each step listed below corresponds to a Store FK
-        // that's either Restrict OR a child whose own FK to Product is
-        // NoAction. Cascade-from-Store relations clean themselves up via
-        // store.delete() at the end. Schema audit done 2026-05-21:
-        //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
-        //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
-        //   JournalEntry(Restrict), BackorderLine.product(NoAction),
-        //   AuditLog.store(NoAction nullable).
-        // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
-        // to zero rows. The accounting tables (journal_entries, expenses,
-        // stock_adjustments, accounts, sequences) have row-level-security
-        // policies that match only the transaction's store, and this
-        // transaction had none set, so DELETE matched 0 rows even though rows
-        // existed. The FK violation at store.delete then fired because the
-        // journal_entries rows were never actually touched.
-        //
-        // The transaction is scoped to THIS store with a transaction-local
-        // set_config (no bypass flag exists any more). It dies on commit/rollback,
-        // and this is a super-admin-only code path (the route gates on role).
-        // The acting super_admin is set too: unlinking the owner's audit rows below
-        // happens AFTER the store row is gone, so the definer's "user of the caller's
-        // store" test cannot match; the caller's own role (ebda_is_super_admin) is
-        // what authorises it.
-        // `scopeTransaction` also makes this the ambient tenant transaction, so the
-        // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
-        return scopeTransaction(
-          tx,
-          { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
-          async () => {
-            logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
+      if (!doNative)
+        await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+          // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
+          // statements because the Prisma-typed approach kept hitting
+          // P2003 (journal_entries_store_id_fkey) even with explicit
+          // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
+          //   1. unambiguous about which table + column the delete targets
+          //      (no Prisma client cache / schema drift)
+          //   2. easier to debug — each step logs storeId + affected row
+          //      count via $executeRaw's number return value
+          //   3. order-explicit — Postgres processes statements sequentially
+          //      so any FK cascade chain is committed before the next step
+          //
+          // Order matters. Each step listed below corresponds to a Store FK
+          // that's either Restrict OR a child whose own FK to Product is
+          // NoAction. Cascade-from-Store relations clean themselves up via
+          // store.delete() at the end. Schema audit done 2026-05-21:
+          //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
+          //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
+          //   JournalEntry(Restrict), BackorderLine.product(NoAction),
+          //   AuditLog.store(NoAction nullable).
+          // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
+          // to zero rows. The accounting tables (journal_entries, expenses,
+          // stock_adjustments, accounts, sequences) have row-level-security
+          // policies that match only the transaction's store, and this
+          // transaction had none set, so DELETE matched 0 rows even though rows
+          // existed. The FK violation at store.delete then fired because the
+          // journal_entries rows were never actually touched.
+          //
+          // The transaction is scoped to THIS store with a transaction-local
+          // set_config (no bypass flag exists any more). It dies on commit/rollback,
+          // and this is a super-admin-only code path (the route gates on role).
+          // The acting super_admin is set too: unlinking the owner's audit rows below
+          // happens AFTER the store row is gone, so the definer's "user of the caller's
+          // store" test cannot match; the caller's own role (ebda_is_super_admin) is
+          // what authorises it.
+          // `scopeTransaction` also makes this the ambient tenant transaction, so the
+          // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
+          return scopeTransaction(
+            tx,
+            { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
+            async () => {
+              logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 
-            // Ruling MONEYB-4: refuse while money is in flight, then copy every
-            // fiscal record the deletes below would cascade away (legacy orders
-            // without an issued document, Ebda's billing_events VAT ledger) into
-            // the immutable 6-year archive. Issued invoices / receipts / credit
-            // notes live there already (no FK to stores) and survive as they are.
-            await assertNoMoneyInFlight(tx, storeId);
-            await archiveFiscalRecords(tx, storeId);
+              // Ruling MONEYB-4: refuse while money is in flight, then copy every
+              // fiscal record the deletes below would cascade away (legacy orders
+              // without an issued document, Ebda's billing_events VAT ledger) into
+              // the immutable 6-year archive. Issued invoices / receipts / credit
+              // notes live there already (no FK to stores) and survive as they are.
+              await assertNoMoneyInFlight(tx, storeId);
+              await archiveFiscalRecords(tx, storeId);
 
-            const reviewCount =
-              await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
+              const reviewCount =
+                await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
 
-            const returnCount =
-              await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
+              const returnCount =
+                await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
 
-            const orderCount =
-              await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
+              const orderCount =
+                await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
 
-            const expenseCount =
-              await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
+              const expenseCount =
+                await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
 
-            const stockAdjCount =
-              await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
+              const stockAdjCount =
+                await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
 
-            const poCount =
-              await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
+              const poCount =
+                await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
 
-            const journalCount =
-              await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
+              const journalCount =
+                await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
 
-            const backorderCount =
-              await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
-            logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
+              const backorderCount =
+                await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
+              logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
-            // Detach historical audit logs by nulling their storeId (preserves trail).
-            // A definer: nulling store_id leaves the store scope, which the policy's
-            // WITH CHECK would reject.
-            const auditCount = await detachStoreAuditLogs(storeId, tx);
-            logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
+              // Detach historical audit logs by nulling their storeId (preserves trail).
+              // A definer: nulling store_id leaves the store scope, which the policy's
+              // WITH CHECK would reject.
+              const auditCount = await detachStoreAuditLogs(storeId, tx);
+              logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
-            // Verification: count any rows that would still block the store delete.
-            // If any of these come back > 0, we know exactly which table.
-            const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
+              // Verification: count any rows that would still block the store delete.
+              // If any of these come back > 0, we know exactly which table.
+              const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
           SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM public.orders WHERE store_id = ${storeId}
           UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM public.journal_entries WHERE store_id = ${storeId}
           UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM public.expenses WHERE store_id = ${storeId}
           UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM public.stock_adjustments WHERE store_id = ${storeId}
           UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM public.purchase_orders WHERE store_id = ${storeId}
         `;
-            const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
-            if (stillBlocking.length > 0) {
-              logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
-            }
-
-            // Final delete — cascades products, categories, customers, pages,
-            // carts, coupons, accounts, suppliers, backorders, etc.
-            await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
-            logger.info({ storeId }, '[STORE_DELETE] store deleted');
-
-            // If the owner was a store_admin and this was their only store,
-            // delete the user too. Otherwise they remain in the system as a
-            // login-able account with no stores to manage — confusing UI and
-            // dead weight on the users list. Super-admins are never deleted
-            // here (they own the platform, not specific stores). Cleaned up
-            // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
-            // The owner's row is outside this store's scope (users.store_id NULL): only the
-            // platform operator may read and delete it ('platform-operator' hatch, checked by
-            // `ebda_is_super_admin()` in this same transaction).
-            if (!actorUserId) return;
-            await asPlatformOperator(actorUserId, async () => {
-              const owner = await tx.user.findUnique({
-                where: { id: store.ownerId },
-                select: { id: true, role: true, _count: { select: { stores: true } } },
-              });
-              if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
-                await unlinkUserAuditLogs(owner.id, tx);
-                // User-keyed rows: deleted through the guarded definer (the acting user is
-                // the super_admin, not the owner).
-                await deleteUserTokens(owner.id);
-                // Only an ACTIVE owner is flipped (and restored on rollback): a suspended owner stays suspended either way.
-                const managed = await isIdentityManagedUser(owner.id);
-                if (managed) {
-                  const acc = await getAccountState(owner.id);
-                  if (acc?.status === 'active') {
-                    await setAccountStatus(owner.id, 'inactive', 'store-deleted');
-                    deactivatedOwnerId = owner.id;
-                  }
-                }
-                await tx.user.delete({ where: { id: owner.id } });
-                if (managed) erasedOwnerId = owner.id;
+              const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
+              if (stillBlocking.length > 0) {
+                logger.error(
+                  { storeId, stillBlocking },
+                  '[STORE_DELETE] BLOCKING rows still exist'
+                );
               }
-            });
-          }
-        );
-      });
+
+              // Final delete — cascades products, categories, customers, pages,
+              // carts, coupons, accounts, suppliers, backorders, etc.
+              await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
+              logger.info({ storeId }, '[STORE_DELETE] store deleted');
+
+              // If the owner was a store_admin and this was their only store,
+              // delete the user too. Otherwise they remain in the system as a
+              // login-able account with no stores to manage — confusing UI and
+              // dead weight on the users list. Super-admins are never deleted
+              // here (they own the platform, not specific stores). Cleaned up
+              // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
+              // The owner's row is outside this store's scope (users.store_id NULL): only the
+              // platform operator may read and delete it ('platform-operator' hatch, checked by
+              // `ebda_is_super_admin()` in this same transaction).
+              if (!actorUserId) return;
+              await asPlatformOperator(actorUserId, async () => {
+                const owner = await tx.user.findUnique({
+                  where: { id: store.ownerId },
+                  select: { id: true, role: true, _count: { select: { stores: true } } },
+                });
+                if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
+                  await unlinkUserAuditLogs(owner.id, tx);
+                  // User-keyed rows: deleted through the guarded definer (the acting user is
+                  // the super_admin, not the owner).
+                  await deleteUserTokens(owner.id);
+                  // Only an ACTIVE owner is flipped (and restored on rollback): a suspended owner stays suspended either way.
+                  const managed = await isIdentityManagedUser(owner.id);
+                  if (managed) {
+                    const acc = await getAccountState(owner.id);
+                    if (acc?.status === 'active') {
+                      await setAccountStatus(owner.id, 'inactive', 'store-deleted');
+                      deactivatedOwnerId = owner.id;
+                    }
+                  }
+                  await tx.user.delete({ where: { id: owner.id } });
+                  if (managed) erasedOwnerId = owner.id;
+                }
+              });
+            }
+          );
+        });
     } catch (err) {
+      // Compensating rollback (Ruling NZ-D17): the Postgres delete failed, so the DO this call closed is reopened (only its own flag).
+      if (doClose?.token) {
+        await reopenDoAfterFailedDelete(storeId, doClose.token).catch(e =>
+          sendAlert({
+            level: 'p1',
+            scope: 'platform',
+            source: 'store.delete.reopen_failed',
+            title: 'Store delete failed and the Durable Object could not be reopened',
+            body: `store ${storeId} is CLOSED but still exists: reopen it by hand (do_flags closed + closed_by_delete). ${e instanceof Error ? e.message : ''}`,
+            context: { storeId },
+          }).catch(() => undefined)
+        );
+      }
       if (deactivatedOwnerId) {
         await setAccountStatus(deactivatedOwnerId, 'active', 'store-delete-rolled-back').catch(e =>
           logger.error(
@@ -862,6 +1166,9 @@ export class StoreService {
         )
       );
     }
+
+    // Ruling NZ-D14: lookups read D1 and a DO store keeps its data in the DO; neither is touched by the Postgres delete above.
+    await finishStoreDeletion({ storeId, wasOnDo });
 
     // Invalidate store cache (best-effort, post-commit)
     try {
@@ -948,7 +1255,7 @@ export class StoreService {
     // Ahmad 2026-05-21 — Demo Shop had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
-        prisma.product.count({ where: { storeId, status: 'active' } }),
+        (await storeDb(storeId)).product.count({ where: { storeId, status: 'active' } }),
         prisma.order.count({ where: { storeId } }),
         prisma.customer.count({ where: { storeId } }),
         prisma.order.aggregate({
@@ -1044,7 +1351,7 @@ export class StoreService {
 
     // A bare skin is the legacy way to style a store: picking one leaves the looks
     // system (the storefront composes skin < look < theme only while `look` is set).
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { template: template as StoreTemplate, ...(store.look ? { look: null } : {}) },
@@ -1122,7 +1429,7 @@ export class StoreService {
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that
     // must not be overwritten.
-    const updated = await withStore(storeId, async tx => {
+    const updated = await updateStoreThrough(storeId, async tx => {
       const live = await tx.store.findUnique({
         where: { id: storeId },
         select: { theme: true },
@@ -1167,7 +1474,7 @@ export class StoreService {
     const mergedTheme: Record<string, unknown> = { ...existingTheme, ...theme };
     for (const [k, v] of Object.entries(theme)) if (v === null) delete mergedTheme[k];
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { theme: mergedTheme as Prisma.InputJsonValue },
@@ -1198,7 +1505,7 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1250,7 +1557,7 @@ export class StoreService {
   static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { socialLinks },
@@ -1279,7 +1586,7 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1315,7 +1622,7 @@ export class StoreService {
         : {};
     const merged = { ...existing, ...announcementBar };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { announcementBar: merged as Prisma.InputJsonValue },
@@ -1338,51 +1645,93 @@ export class StoreService {
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
   /**
-   * QR-1: replace `settings.qr` only. One atomic jsonb_set so a concurrent write of another
+   * QR-1: replace `settings.qr` only (setSettingsKey: one atomic jsonb_set on Postgres, a write-time read-merge on a DO store) so a concurrent write of another
    * settings key (floating widget, announcement, ...) is never overwritten by a stale read-merge-write.
    */
   static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
-    const store = await this.getById(storeId);
-    await withStore(
-      storeId,
-      tx => tx.$executeRaw`
-        UPDATE stores
-        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{qr}', ${JSON.stringify(qr)}::jsonb),
-            updated_at = now()
-        WHERE id = ${storeId}`
-    );
-    await StoreService.invalidateCache(store);
+    await this.setSettingsKey(storeId, 'qr', qr);
   }
 
   /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
   static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
-    const store = await this.getById(storeId);
-    await withStore(
-      storeId,
-      tx => tx.$executeRaw`
-        UPDATE stores
-        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{labels}', ${JSON.stringify(labels)}::jsonb),
-            updated_at = now()
-        WHERE id = ${storeId}`
-    );
-    await StoreService.invalidateCache(store);
+    await this.setSettingsKey(storeId, 'labels', labels);
   }
 
-  static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
+  /**
+   * Replace ONE top-level `settings` key (BE:F-2): one atomic `jsonb_set` statement on a Postgres store, a write-time read-merge
+   * on a DO store (see readLiveSettings), then bust the caches. Used by the single-purpose setters so none of them writes back a
+   * copy read earlier.
+   */
+  private static async setSettingsKey(storeId: string, key: string, value: unknown) {
     const store = await this.getById(storeId);
-    const existingSettings = (store.settings as Record<string, unknown>) || {};
-    const mergedSettings = { ...existingSettings, floatingWidget };
-
-    const updatedStore = await withStore(storeId, tx =>
-      tx.store.update({
-        where: { id: storeId },
-        data: { settings: mergedSettings as Prisma.InputJsonValue },
-      })
-    );
-
+    let updatedStore;
+    if (await storeWritesToDo(storeId)) {
+      updatedStore = await updateStoreThrough(storeId, async tx => {
+        const live = await readLiveSettings(tx, storeId);
+        return tx.store.update({
+          where: { id: storeId },
+          data: { settings: { ...live, [key]: value } as Prisma.InputJsonValue },
+        });
+      });
+    } else {
+      await setSettingsKeyAtomic(storeId, key, value);
+      updatedStore = await this.getById(storeId);
+    }
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
+  }
+
+  /**
+   * The branding page's Save as ONE unit (BE:F-3). Every part runs in ONE database transaction on a Postgres store
+   * (`runInTenantContext`; each `withStore` inside reuses it), so a failure in any part rolls ALL of it back. The `/stores`
+   * router has no request transaction of its own (it runs under `storeScopeContext`), so the transaction is opened here.
+   *
+   * D1 + Durable Object store (`storeWritesToDo`): D1 and the DO cannot share a transaction, so the parts apply in order and a
+   * failure leaves the earlier parts written (Ruling FP-8). Cost if wrong: a merchant sees one error and finds part of the page
+   * saved; saving again converges because every part is an idempotent write.
+   *
+   * Caches are busted AFTER the commit so a read between the bust and the commit cannot re-cache the old values.
+   */
+  static async updateBrandingBundle(
+    storeId: string,
+    parts: {
+      branding?: Parameters<typeof StoreService.updateBranding>[1];
+      theme?: Record<string, unknown>;
+      contact?: Parameters<typeof StoreService.updateContactInfo>[1];
+      /** Given the stored social links, returns the merged links to write. */
+      social?: (stored: unknown) => Prisma.InputJsonValue;
+      settings?: Prisma.InputJsonValue;
+      blogEnabled?: boolean;
+    }
+  ) {
+    const before = await this.getById(storeId);
+    const run = async () => {
+      if (parts.branding) await this.updateBranding(storeId, parts.branding);
+      if (parts.theme) await this.updateTheme(storeId, parts.theme);
+      if (parts.contact) await this.updateContactInfo(storeId, parts.contact);
+      if (parts.social) {
+        const stored = await this.getById(storeId);
+        await this.updateSocialLinks(storeId, parts.social(stored.socialLinks));
+      }
+      if (parts.settings !== undefined || parts.blogEnabled !== undefined) {
+        await this.update(storeId, {
+          ...(parts.settings !== undefined && { settings: parts.settings }),
+          ...(parts.blogEnabled !== undefined && { blogEnabled: parts.blogEnabled }),
+        });
+      }
+    };
+    const onDo = await storeWritesToDo(storeId);
+    if (onDo) await run();
+    else await runInTenantContext(storeId, run);
+    const after = await this.getById(storeId);
+    await StoreService.invalidateCache(before);
+    await bustStoreCaches(after.id, after.slug, after.domain);
+    return after;
+  }
+
+  static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
+    return this.setSettingsKey(storeId, 'floatingWidget', floatingWidget);
   }
 
   /**
@@ -1393,19 +1742,16 @@ export class StoreService {
    * is the `merchant_mcp_write` feature (mcp/merchant-write.ts checks both).
    */
   static async setMcpWriteEnabled(storeId: string, enabled: boolean) {
-    const store = await this.getById(storeId);
-    const existingSettings = (store.settings as Record<string, unknown>) || {};
-    const mergedSettings = { ...existingSettings, mcpWriteEnabled: enabled };
+    await this.setSettingsKey(storeId, 'mcpWriteEnabled', enabled);
+    return enabled;
+  }
 
-    const updatedStore = await withStore(storeId, tx =>
-      tx.store.update({
-        where: { id: storeId },
-        data: { settings: mergedSettings as Prisma.InputJsonValue },
-      })
-    );
-
-    await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+  /**
+   * Merchant's switch "allow COD / installments for gold" (`settings.goldAllowDeferredPayment`, absent =
+   * OFF, Ruling SHARIA-GOLD-1). Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setGoldAllowDeferredPayment(storeId: string, enabled: boolean) {
+    await this.setSettingsKey(storeId, GOLD_ALLOW_DEFERRED_SETTING, enabled);
     return enabled;
   }
 
@@ -1432,7 +1778,7 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1482,7 +1828,7 @@ export class StoreService {
       }
     >;
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {

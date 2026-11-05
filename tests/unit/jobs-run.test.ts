@@ -82,7 +82,6 @@ beforeEach(() => {
   captureException.mockClear();
   flush.mockClear();
   setCfBindings({
-    HYPERDRIVE: { connectionString: 'x' },
     JOBS_WORKFLOW: { create: async () => ({ id: 'i' }) },
     JOBS_QUEUE: { send: qsend },
     JOB_GATE: { idFromName: (n: string) => n, get: (id: unknown) => gateStub(String(id)) as never },

@@ -2,11 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@ebda/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { runInTenantContext, withStore } from '@ebda/database';
 import {
   findOrderByIdempotencyKey,
   getOrderStoreId,
   getStorefrontForPaymentRef,
+  storefrontForStoreId,
   resolveStoreFromWebhookRef,
   webhookInbox,
 } from '../lib/definer';
@@ -21,6 +22,8 @@ import {
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
+import { hasStoresOnBackend } from '../lib/store-backend';
+import { storeMoney } from '../lib/repo-factory';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { inngest } from '../lib/inngest/client';
 import { sendAlert } from '../services/alerts.service';
@@ -165,6 +168,32 @@ function respondUnresolvedPayment(res: Response, provider: string, idempotencyKe
     });
 }
 
+function respondUnresolvedForDoFleet(
+  res: Response,
+  provider: string,
+  idempotencyKey: string
+): void {
+  logger.error(
+    { provider, idempotencyKey },
+    '[WEBHOOK] No store resolves this reference while Durable Object stores exist; refused for retry'
+  );
+  void sendAlert({
+    level: 'p0',
+    scope: 'platform',
+    source: 'payment.webhook.unresolvable_do_fleet',
+    title: 'payment webhook with an unresolvable reference while Durable Object stores exist',
+    body: `A ${provider} webhook named a payment neither Postgres nor the D1 entity index resolves. It was answered 503 so the gateway retries (nothing was applied). If it keeps arriving, the entity index outbox is stuck or the payment is unknown: check d1_outbox dead letters, then the provider dashboard.`,
+    context: { provider, idempotencyKey },
+  }).catch(() => undefined);
+  res
+    .status(503)
+    .set('Retry-After', '60')
+    .json({
+      success: false,
+      error: { code: 'PAYMENT_NOT_YET_VISIBLE', message: 'Payment not found yet, please retry' },
+    });
+}
+
 /**
  * Ruling WEBHOOK-ORDER-1: authenticate FIRST. Returns the owning store id, or undefined after having
  * answered:
@@ -215,7 +244,17 @@ async function gateDelivery(args: {
   }
 
   const owner = await resolveStoreIdFromWebhookPayload(provider, payload);
-  if (!owner) return refuse(true);
+  if (!owner) {
+    // Once any store lives on its Durable Object an unresolvable reference may be ITS payment whose index row has not landed
+    // (CF-PAY-1): never the constant 401 (the gateway would not retry and the order would stay unpaid), but 503 + retry and a
+    // P0. The answer is the same for a forged delivery, so it reveals nothing; the alert is throttled by its fixed title.
+    if (await hasStoresOnBackend('do')) {
+      await burnDummyWork(rawBody);
+      respondUnresolvedForDoFleet(res, provider, idempotencyKey);
+      return undefined;
+    }
+    return refuse(true);
+  }
   if (!(await authentic(owner))) return refuse(false);
   return owner;
 }
@@ -244,6 +283,9 @@ async function checkIdempotency(
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
+  // A store on its Durable Object dedupes inside the DO (`payment_event_log`, same section as the effects, Ruling CF-PAY-1);
+  // there is no Postgres order row to look up (NZ-N12-3: nothing of a DO store's webhook may touch Postgres).
+  if (await storeMoney(storeId)) return { alreadyProcessed: false };
   // The store is not known yet, so this exact-key lookup is a definer
   // (`ebda_webhook_order_by_idempotency`), not a store-scoped read.
   const order = await findOrderByIdempotencyKey(idempotencyKey);
@@ -299,6 +341,9 @@ async function markWebhookProcessed(
   // by primary key through a definer — never a bypass.
   const scopeStoreId = storeId ?? (await getOrderStoreId(orderId));
   if (!scopeStoreId) return;
+  // A store on its Durable Object keeps its dedupe in the DO (`payment_event_log`, written in the same section as the
+  // effects, Ruling CF-PAY-1): there is no Postgres order row to stamp.
+  if (await storeMoney(scopeStoreId)) return;
   await withStore(scopeStoreId, tx =>
     tx.order.update({
       where: { id: orderId, storeId: scopeStoreId },
@@ -953,9 +998,7 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   async function getStorefrontUrl(storeId: string | null): Promise<string> {
     try {
       if (!storeId) return config.webUrl;
-      const store = await withStore(storeId, () =>
-        prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
-      );
+      const store = await storefrontForStoreId(storeId);
       if (store) return storefrontOrigin(store);
       return config.webUrl;
     } catch {

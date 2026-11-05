@@ -1,4 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod/v3';
+import { revokeForAccount } from '../lib/wa/consent';
+import { customerAuthRoute } from '../lib/customer-auth';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
 import {
@@ -8,6 +11,7 @@ import {
   summarizeExportFilters,
 } from '../lib/exports/xlsx';
 import { prisma, type RfmSegment } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requirePermission } from '../middleware/rbac';
@@ -55,6 +59,9 @@ export { invalidateCustomersCache };
 // per call, esp. export.xlsx) the same way other heavy admin routes are
 // limited — see writeLimiter usage in ai.routes.ts / bulk.routes.ts /
 // order.routes.ts.
+/** BE:S-30: how deep a staff member can page the customer list (the owner is not capped). */
+export const STAFF_LIST_MAX_ROWS = 500;
+
 const adminMiddleware = [
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
@@ -121,7 +128,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, slug: true },
       });
@@ -562,6 +571,26 @@ router.get(
       const page = Math.max(1, Number(req.query.page ?? 1) || 1);
       // Hard-cap perPage so a caller can't request an unbounded page.
       const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
+      // BE:S-30 / D9: staff keep read access (order context), but cannot page through the whole PII list: they reach at most the
+      // first STAFF_LIST_MAX_ROWS rows of a view and must search to find anyone beyond it. Every staff list read leaves an audit row.
+      if (req.user?.role === 'staff') {
+        if (page * perPage > STAFF_LIST_MAX_ROWS)
+          throw new AppError(
+            400,
+            'PAGE_LIMIT_EXCEEDED',
+            `Staff can browse the first ${STAFF_LIST_MAX_ROWS} customers; search to find a specific one`
+          );
+        await auditLog({
+          action: 'customers.list_viewed',
+          userId: req.user.userId,
+          storeId,
+          resourceType: 'store',
+          resourceId: storeId,
+          details: { page, perPage, searched: Boolean(searchTerm(req, res)) },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
       // The KPI strip and the truncation notice describe the whole store (cached aggregate); a
       // search replaces only the rows (SQL match, see `aggregateCustomersMatching`).
       const { customers: allCustomers, truncated, summary } = await aggregateCustomers(storeId);
@@ -723,6 +752,13 @@ export async function resolveStoreCustomerOrThrow(storeId: string, customerId: s
   if (!CUSTOMER_ID_RE.test(customerId)) {
     throw new AppError(404, 'NOT_FOUND', 'Customer not found');
   }
+  // N-9: a customer of a store served by its StoreDO is that DO's.
+  const route = await customerAuthRoute(storeId, { write: false });
+  if (route.kind === 'do') {
+    const u = await route.client.call<unknown | null>('getProfile', { userId: customerId });
+    if (!u) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+    return { id: customerId, storeId, role: 'customer' as const };
+  }
   const user = await prisma.user.findUnique({
     where: { id: customerId, storeId },
     select: { id: true, storeId: true, role: true },
@@ -757,6 +793,7 @@ router.post(
       const outcome = await AuthService.eraseAccount(customerId, {
         scopeStoreId: storeId,
         actorId: req.user!.userId,
+        storeHint: storeId,
       });
       // #1880: the CRM copy is matched by email/phone and can be missed or
       // refused as ambiguous. Record what happened so a partial erasure is
@@ -799,6 +836,76 @@ router.post(
 );
 
 /**
+ * PUT /stores/:storeId/customers/:customerId/status   { status: 'active' | 'inactive' | 'suspended' }
+ *
+ * The store-scoped way to suspend or reactivate a customer of THIS store (owner/admin with `users:write`, never staff, never
+ * while impersonating). For a customer served by the store's Durable Object (N-9) the status and the revocation of every
+ * session are ONE DO section, so a suspended customer's refresh token and access token die at once; the super-admin
+ * `PUT /admin/users/:id` cannot reach such a customer (it has no Postgres row after the flip).
+ */
+router.put(
+  '/customers/:customerId/status',
+  ...privacyMiddleware,
+  requirePermission('users:write'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerId } = req.params;
+      const body = z
+        .object({ status: z.enum(['active', 'inactive', 'suspended']) })
+        .parse(req.body);
+      await resolveStoreCustomerOrThrow(storeId, customerId);
+      await AuthService.setCustomerStatus(customerId, storeId, body.status);
+      await auditLog({
+        action: 'customer.status.changed_by_merchant',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'user',
+        resourceId: customerId,
+        details: { actorRole: req.user!.role, status: body.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { id: customerId, status: body.status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /stores/:storeId/customers/:customerId
+ *
+ * Deactivate (soft-delete) a customer of this store: sessions end now, the account can no longer sign in, WhatsApp marketing
+ * consent is withdrawn. Irreversible PII removal stays `POST .../erase`. Same guards as the status route.
+ */
+router.delete(
+  '/customers/:customerId',
+  ...privacyMiddleware,
+  requirePermission('users:write'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerId } = req.params;
+      await resolveStoreCustomerOrThrow(storeId, customerId);
+      const { phone } = await AuthService.softDeleteCustomer(customerId, storeId);
+      await revokeForAccount(storeId, customerId, phone);
+      await auditLog({
+        action: 'customer.account.deleted_by_merchant',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'user',
+        resourceId: customerId,
+        details: { actorRole: req.user!.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { message: 'Customer account deactivated' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /stores/:storeId/customers/:customerId/export
  *
  * Merchant-initiated data export — the same JSON bundle shape as the
@@ -814,7 +921,7 @@ router.get(
       const { storeId, customerId } = req.params;
       await resolveStoreCustomerOrThrow(storeId, customerId);
 
-      const bundle = await AuthService.exportAccount(customerId);
+      const bundle = await AuthService.exportAccount(customerId, storeId);
 
       await auditLog({
         action: 'customer.data.exported_by_merchant',

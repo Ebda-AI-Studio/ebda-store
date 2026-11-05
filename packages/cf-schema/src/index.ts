@@ -4,3 +4,4 @@
 // The DDL lives in migrations/{store,platform}/*.sql; these are the query-builder definitions.
 export * as store from './store/schema.generated';
 export * as platform from './platform/schema.generated';
+export { STORE_MIGRATIONS } from './store/migrations.generated';

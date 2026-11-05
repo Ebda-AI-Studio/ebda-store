@@ -6,7 +6,9 @@
  * transaction or `runInTenantContext`); both tables are under strict RLS, so a
  * call without one reads nothing and writes nothing.
  */
-import { prisma, Prisma } from '@ebda/database';
+import { Prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { atomicWrites } from '../lib/atomic-writes';
 import type {
   Model3dBindingInput,
   Model3dMaterial,
@@ -92,7 +94,9 @@ export const ADMIN_MODEL3D_SELECT = {
 
 /** The live (not soft-deleted) product, or a 404. */
 export async function assertProductInStore(storeId: string, productId: string) {
-  const product = await prisma.product.findFirst({
+  const product = await (
+    await storeDb(storeId)
+  ).product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: { id: true },
   });
@@ -103,11 +107,11 @@ export async function assertProductInStore(storeId: string, productId: string) {
 export async function getAdminModel(storeId: string, productId: string) {
   await assertProductInStore(storeId, productId);
   const [model, options] = await Promise.all([
-    prisma.productModel.findFirst({
+    (await storeDb(storeId)).productModel.findFirst({
       where: { storeId, productId },
       select: ADMIN_MODEL3D_SELECT,
     }),
-    prisma.productOption.findMany({
+    (await storeDb(storeId)).productOption.findMany({
       where: { productId },
       orderBy: { position: 'asc' },
       select: {
@@ -155,7 +159,9 @@ export async function upsertModel(
   }
 ): Promise<{ previousModelUrl: string | null; droppedBindings: number }> {
   await assertProductInStore(storeId, productId);
-  const existing = await prisma.productModel.findFirst({
+  const existing = await (
+    await storeDb(storeId)
+  ).productModel.findFirst({
     where: { storeId, productId },
     select: { id: true, modelUrl: true },
   });
@@ -171,27 +177,30 @@ export async function upsertModel(
     // keeps the request transaction alive when ours loses (CLAUDE.md RLS note);
     // the loser then takes the replace path below against the winner's row.
     try {
-      await withSavepoint(() =>
-        prisma.productModel.create({ data: { storeId, productId, ...data } })
-      );
+      const w = await storeWriter(storeId);
+      await withSavepoint(() => w.productModel.create({ data: { storeId, productId, ...data } }));
       return { previousModelUrl: null, droppedBindings: 0 };
     } catch (err) {
       if ((err as { code?: string }).code !== 'P2002') throw err;
       return upsertModel(storeId, productId, input);
     }
   }
-  await prisma.productModel.update({ where: { id: existing.id, storeId }, data });
+  const w = await storeWriter(storeId);
   const materialNames = input.materials.map(m => m.name);
-  const dropped = await prisma.productModelBinding.deleteMany({
-    where: {
-      storeId,
-      modelId: existing.id,
-      OR: [
-        { kind: 'material', target: { notIn: materialNames } },
-        { kind: 'gltf_variant', target: { notIn: input.gltfVariants } },
-      ],
-    },
-  });
+  // one atomic batch: the replaced file and the dropped bindings land together
+  const [, dropped] = await atomicWrites(storeId, w, [
+    w.productModel.update({ where: { id: existing.id, storeId }, data }),
+    w.productModelBinding.deleteMany({
+      where: {
+        storeId,
+        modelId: existing.id,
+        OR: [
+          { kind: 'material', target: { notIn: materialNames } },
+          { kind: 'gltf_variant', target: { notIn: input.gltfVariants } },
+        ],
+      },
+    }),
+  ]);
   return { previousModelUrl: existing.modelUrl, droppedBindings: dropped.count };
 }
 
@@ -201,12 +210,16 @@ export async function setUsdz(
   usdzUrl: string,
   usdzBytes: number
 ): Promise<{ previousUsdzUrl: string | null }> {
-  const existing = await prisma.productModel.findFirst({
+  const existing = await (
+    await storeDb(storeId)
+  ).productModel.findFirst({
     where: { storeId, productId },
     select: { id: true, usdzUrl: true },
   });
   if (!existing) throw new AppError(404, 'NO_MODEL', 'Upload the .glb model first');
-  await prisma.productModel.update({
+  await (
+    await storeWriter(storeId)
+  ).productModel.update({
     where: { id: existing.id, storeId },
     data: { usdzUrl, usdzBytes },
   });
@@ -214,7 +227,9 @@ export async function setUsdz(
 }
 
 export async function getModelRow(storeId: string, productId: string) {
-  const model = await prisma.productModel.findFirst({
+  const model = await (
+    await storeDb(storeId)
+  ).productModel.findFirst({
     where: { storeId, productId },
     select: {
       id: true,
@@ -240,7 +255,9 @@ export async function replaceBindings(
   bindings: Model3dBindingInput[]
 ): Promise<number> {
   const model = await getModelRow(storeId, productId);
-  const values = await prisma.productOptionValue.findMany({
+  const values = await (
+    await storeDb(storeId)
+  ).productOptionValue.findMany({
     where: { option: { productId } },
     select: { id: true },
   });
@@ -260,20 +277,25 @@ export async function replaceBindings(
       throw new AppError(400, 'UNKNOWN_TARGET', `"${b.target}" is not in the 3D model`);
     }
   }
-  await prisma.productModelBinding.deleteMany({ where: { storeId, modelId: model.id } });
-  if (bindings.length > 0) {
-    await prisma.productModelBinding.createMany({
-      data: bindings.map(b => ({
-        storeId,
-        modelId: model.id,
-        optionValueId: b.optionValueId,
-        kind: b.kind,
-        target: b.target,
-        color: b.kind === 'material' ? (b.color ?? null) : null,
-        metalness: b.kind === 'material' ? (b.metalness ?? null) : null,
-        roughness: b.kind === 'material' ? (b.roughness ?? null) : null,
-      })),
-    });
-  }
+  const w = await storeWriter(storeId);
+  await atomicWrites(storeId, w, [
+    w.productModelBinding.deleteMany({ where: { storeId, modelId: model.id } }),
+    ...(bindings.length > 0
+      ? [
+          w.productModelBinding.createMany({
+            data: bindings.map(b => ({
+              storeId,
+              modelId: model.id,
+              optionValueId: b.optionValueId,
+              kind: b.kind,
+              target: b.target,
+              color: b.kind === 'material' ? (b.color ?? null) : null,
+              metalness: b.kind === 'material' ? (b.metalness ?? null) : null,
+              roughness: b.kind === 'material' ? (b.roughness ?? null) : null,
+            })),
+          }),
+        ]
+      : []),
+  ]);
   return bindings.length;
 }

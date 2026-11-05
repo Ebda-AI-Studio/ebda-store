@@ -58,7 +58,7 @@ harder to land. Cost if wrong: an XSS on an iOS PWA admin reads a 30-minute acce
 long-lived refresh token. Follow-up if wanted: ship the iOS refresh token as a non-extractable
 credential (WebAuthn or a device-bound key), a product change, not a CSP one.
 
-Ruling SEC-4d - the storefront (`apps/web`) is NOT changed: Ahmad 2026-09-02 (`storefront-csp.md`) kept
+Ruling SEC-4d - SUPERSEDED 2026-10-29 by Ruling CSP-WEB-1 (the storefront now ships the same nonce + strict-dynamic policy, `docs/architecture/storefront-csp.md`). Original text: the storefront (`apps/web`) was NOT changed: Ahmad 2026-09-02 (`storefront-csp.md`) kept
 `'unsafe-inline'` because a per-request nonce forces dynamic rendering and forecloses
 `STOREFRONT_TENANT_ROUTING` cacheable routes (and the P14 edge-cache work). Its `'unsafe-eval'` stays
 for the OneSignal v16 page SDK and its ad hosts for the merchant pixels. `script-src-attr 'none'`
@@ -99,3 +99,16 @@ CSP again. Cost if wrong: a response that bypasses middleware has no CSP; the ma
   body, so the protection is the CSP, not the storage location.
 - NOT verified: behaviour on OpenNext/Workers (only `next start` was run), signed-in screens, and the
   OneSignal push-subscribe flow without `'unsafe-eval'`.
+
+## connect-src and the identity service (Ruling CSP-ACCOUNTS-1)
+
+Admin and Orders sign in from the browser against the shared identity service (`apps/*/src/lib/accounts.ts` fetches `NEXT_PUBLIC_ACCOUNTS_URL`, default `https://accounts.ebda.app`, with credentials). Both CSP builders therefore name exactly that one origin in `connect-src` (`accountsOrigin()` in each `lib/csp.ts`, https or loopback only, no wildcard). `tests/unit/csp-connect-src-covers-browser-clients.test.ts` fails when an app reads a `NEXT_PUBLIC_*_URL/ORIGIN/HOST` base that is not decided in its table, or whose origin is missing from that app's `connect-src`.
+
+## Admin push opt-in (2026-11-03, audit G-1 follow-up)
+
+The OneSignal SDK no longer loads on admin page load. It is lazy-loaded by one click ("enable order alerts on this device",
+`components/EnableOrderAlertsButton.tsx` -> `lib/push-opt-in.ts`), and the OneSignal hosts are in the admin CSP on EVERY route
+(connect-src, frame-src, style-src; script hosts are moot under `'strict-dynamic'`). The admin is a SPA, so the CSP of the first page
+loaded governs every later client-side navigation: a per-route allowance (the earlier `PUSH_OPT_IN_PATH`) blocked opt-in from the
+dashboard card and from anyone who landed elsewhere. The script nonce model is unchanged. The service
+worker (`public/OneSignalSDKWorker.js`) stays, so existing subscriptions keep receiving pushes. Guard: `tests/unit/admin-no-onesignal.test.ts`.

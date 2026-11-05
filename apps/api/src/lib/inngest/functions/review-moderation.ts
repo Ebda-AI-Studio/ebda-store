@@ -1,6 +1,7 @@
 import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { storeWriter } from '../../repo-factory';
+import { runInStoreCtx } from '../../jobs/store-db';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
 import logger from '../../logger';
 import { featureService } from '../../../services/feature.service';
@@ -51,16 +52,16 @@ export const reviewModeration: JobDef = inngest.createFunction(
     }
 
     // ── 1. Spam check — determines visibility ──────────────────────────────
-    // detectSpamReview uses bare prisma internally. Wrap in runInTenantContext
-    // so FORCE RLS sees the correct store GUC and the Review row is visible.
+    // detectSpamReview reads the review through storeDb (the DO, or Postgres under the
+    // tenant scope that runInStoreCtx opens so FORCE RLS sees the store GUC).
     const spam = await step.run('detect-spam', () =>
-      runInTenantContext(storeId, () => detectSpamReview(reviewId))
+      runInStoreCtx(storeId, () => detectSpamReview(reviewId))
     );
 
-    // persist-spam-result also needs the tenant context — Review is an RLS table.
+    // persist-spam-result goes through storeWriter (the DO, or the Postgres tenant scope).
     await step.run('persist-spam-result', () =>
-      runInTenantContext(storeId, () =>
-        prisma.review.update({
+      runInStoreCtx(storeId, async () =>
+        (await storeWriter(storeId)).review.update({
           where: { id: reviewId, storeId },
           data: {
             spamScore: spam.spamScore,
@@ -74,10 +75,8 @@ export const reviewModeration: JobDef = inngest.createFunction(
     // ── 2. Translate — only if not spam ────────────────────────────────────
     if (spam.recommendedStatus !== 'spam') {
       try {
-        // translateReview uses bare prisma — wrap for the same reason.
-        await step.run('translate', () =>
-          runInTenantContext(storeId, () => translateReview(reviewId))
-        );
+        // translateReview reads and writes through storeDb / storeWriter — same scope.
+        await step.run('translate', () => runInStoreCtx(storeId, () => translateReview(reviewId)));
       } catch (err) {
         // Non-blocking: review already has correct status; just log.
         logger.warn({ err, reviewId }, '[REVIEW-MODERATION] translate failed; continuing');

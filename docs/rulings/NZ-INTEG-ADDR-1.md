@@ -1,0 +1,5 @@
+# NZ-INTEG-ADDR-1
+
+> Section: NEON-ZERO integration gaps (2026-11-04)
+
+**Ruling NZ-INTEG-ADDR-1 - the `/addresses` address book belongs to storefront customers only; a merchant, staff or super_admin token is refused 400 `ADDRESS_BOOK_CUSTOMER_ONLY`.** After NEON-ZERO the Postgres `addresses` table is retired with the database, and a shopper's address book lives in the customer's StoreDO (NZ-SF-5). A merchant token had kept the Postgres book it always had, which left four routes needing Postgres for a surface nothing uses: the route sweep found `GET/PUT/DELETE /addresses` answering 500 with Postgres dead, and a repository-wide search finds no caller outside `apps/web` (`account/addresses`, a customer session); `apps/admin`, `apps/orders` and `apps/accounts` never call it. The refusal is made once, in `resolveAddressStore`, before any store or user scope is opened. Evidence: `tests/unit/address-routes-store-binding.test.ts` (all four methods, three roles, no Postgres and no DO touched). Cost if wrong: a merchant tool that stored a personal address through this router would get a 400 instead of a row; none exists, and the customer path is unchanged.

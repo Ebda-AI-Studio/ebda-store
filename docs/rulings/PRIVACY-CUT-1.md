@@ -1,0 +1,5 @@
+# PRIVACY-CUT-1
+
+> Section: 2026-10-29 - Close sweep 2 (N5a, `docs/cutover-privacy-stack`, based on PR #340)
+
+Ruling PRIVACY-CUT-1 - flipping `PRIVACY_STACK` to `'cloudflare'` is a numbered step of the cutover runbook, not a thing to remember. `docs/runbooks/cutover-cf.md` (PR #340) had no mention of it (grep empty, master N5a); it now has go/no-go row 16 (the flip branch plus the material privacy 1.2 `LEGAL_POLICIES` entry exist, are green on `privacy-stack-switch.test.ts` and are held) and section 8.3a (merge right after the flag flip, wait for the marketing deploy, verify live in both languages that `/privacy` and `/en/privacy` no longer contain `Neon` and do contain `Cloudflare`, send the material-policy notice the same day, revert together with the flip if it is rolled back). Checked 2026-10-29: both live pages still name Neon, so the verification command has a true "before". Cost if wrong: if the branch is merged before the flip the live policy lists processors we do not use yet, and if after, it lists ones that are gone; the runbook ties it to right after 8.3 but nothing automated enforces the order.

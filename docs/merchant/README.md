@@ -13,8 +13,10 @@ Welcome. This guide covers everything you need to set up and run your store on E
 4. [Orders (and the Orders app) — الطلبات](./orders.md) — manage orders, payment links, refunds, invoices, and payment alerts
 5. [Inventory: variant stock, adjustments & scanning — المخزون](./inventory.md) — variant stock totals, stock adjustments, and barcode Receive/Pick/Count
 6. [Product details — تفاصيل المنتج](./product-details.md) — swatches, facts, personalisation, delivery time, size guides, hero video
-7. [FAQ — الأسئلة الشائعة](./faq.md) — answers to the questions every merchant asks
-8. [Troubleshooting — حل المشاكل](./troubleshooting.md) — when something looks wrong
+7. [Gold orders and installments — طلبات الدهب والتقسيط](./gold-and-payments.md) — gold is paid in full online by default; installments are off by default
+8. [What you may and may not sell — ما يجوز بيعه وما لا يجوز](./acceptable-use.md) — the acceptable-use rules in short
+9. [FAQ — الأسئلة الشائعة](./faq.md) — answers to the questions every merchant asks
+10. [Troubleshooting — حل المشاكل](./troubleshooting.md) — when something looks wrong
 
 ## Need help? — تحتاج مساعدة؟
 

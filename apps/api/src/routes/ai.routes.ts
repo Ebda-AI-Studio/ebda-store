@@ -6,6 +6,8 @@
  * `writeLimiter` per-IP rate limiter on top of the AI service's own
  * per-store daily token budget.
  */
+import { aiUsageCost, aiUsageLast30Days } from '../services/usage-aggregates.service';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
@@ -31,8 +33,9 @@ import {
   balanceProductLanguages,
   revertProductBalance,
 } from '../services/ai-autofill.service';
-import { withSavepoint } from '../lib/savepoint';
+import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -58,7 +61,7 @@ router.put('/settings', writeLimiter, async (req: Request, res: Response, next: 
   try {
     const { storeId } = req.params;
     const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(req.body);
-    await prisma.store.update({ where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
+    await storeUpdate(prisma, { where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
     await auditLog({
       action: enabled ? 'store.ai.enabled' : 'store.ai.disabled',
       userId: req.user!.userId,
@@ -131,7 +134,9 @@ router.post(
       const { storeId } = req.params;
       const { section, existingTitle, existingTitleAr } = sectionSchema.parse(req.body);
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -147,7 +152,9 @@ router.post(
       // inventing generic "fashion / accessories / lifestyle" lines.
       let categoryNames: string[] | undefined;
       if (section === 'categories') {
-        const cats = await prisma.category.findMany({
+        const cats = await (
+          await storeDb(storeId)
+        ).category.findMany({
           where: { storeId },
           select: { name: true },
           take: 8,
@@ -274,7 +281,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
     const { storeId } = req.params;
     const { kind, id } = seoSchema.parse(req.body);
 
-    const store = await prisma.store.findUnique({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { name: true, nameAr: true, description: true, descriptionAr: true },
     });
@@ -299,7 +308,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
         });
         return;
       }
-      const cat = await prisma.category.findFirst({
+      const cat = await (
+        await storeDb(storeId)
+      ).category.findFirst({
         where: { id, storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -321,7 +332,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
         });
         return;
       }
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id, storeId },
         select: {
           name: true,
@@ -383,7 +396,9 @@ router.post(
       const { storeId } = req.params;
       const { productId } = productMetaAeoSchema.parse(req.body);
 
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: { id: true, name: true, description: true },
       });
@@ -391,7 +406,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true },
       });
@@ -446,7 +463,9 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = categorizeSchema.parse(req.body);
-      const cats = await prisma.category.findMany({
+      const cats = await (
+        await storeDb(storeId)
+      ).category.findMany({
         where: { storeId, isActive: true },
         select: { id: true, name: true, nameAr: true },
       });
@@ -475,7 +494,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { logo: true },
       });
@@ -505,24 +526,11 @@ const bulkTranslateSchema = z.object({
   direction: z.enum(['to_ar', 'to_en']),
 });
 
-// Helper: when inngest is unreachable (DNS / outage / wrong key), the
-// job row was created but no one will ever process it. Mark it failed
-// so the merchant sees an actionable error instead of a stuck "queued"
-// row that lingers forever.
-async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
-  const message = err instanceof AppError ? err.message : 'Failed to enqueue job';
-  try {
-    // Savepointed: best-effort inside the request's tenant transaction — a
-    // swallowed failure must not abort it (issue 2215's class).
-    await withSavepoint(() =>
-      prisma.bulkAiJob.update({
-        where: { id: jobId, storeId: currentStoreId() },
-        data: { status: 'failed', errorMessage: message, completedAt: new Date() },
-      })
-    );
-  } catch {
-    // best-effort
-  }
+// Helper: when the job start fails (Cloudflare Workflows/Queues unreachable or unbound), the job
+// row was created but no one will ever process it. Mark it failed so the merchant sees an
+// actionable error instead of a stuck "queued" row that lingers forever (lib/jobs/enqueue-fail.ts).
+function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
+  return markJobFailedOnEnqueueError(currentStoreId(), jobId, err);
 }
 
 router.post(
@@ -534,7 +542,9 @@ router.post(
       const { storeId } = req.params;
       const { direction } = bulkTranslateSchema.parse(req.body);
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'translate', direction },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -572,7 +582,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -609,7 +621,9 @@ router.post(
 router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const jobs = await prisma.bulkAiJob.findMany({
+    const jobs = await (
+      await storeDb(currentStoreId())
+    ).bulkAiJob.findMany({
       where: { storeId },
       orderBy: { createdAt: 'desc' },
       take: 20,
@@ -638,7 +652,9 @@ router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId, jobId } = req.params;
-    const job = await prisma.bulkAiJob.findFirst({
+    const job = await (
+      await storeDb(currentStoreId())
+    ).bulkAiJob.findFirst({
       where: { id: jobId, storeId },
       select: {
         id: true,
@@ -690,7 +706,9 @@ router.post(
       const { productId, count } = draftProductFaqsSchema.parse(req.body);
 
       // Verify the product belongs to this store.
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: {
           id: true,
@@ -711,7 +729,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true },
       });
@@ -777,7 +797,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -830,7 +852,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'category_assign' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -871,7 +895,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'image_alt' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -911,7 +937,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -956,7 +984,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1019,27 +1049,10 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
       // costMicros is NULL for a model with no configured rate, which SUM
       // and COUNT(cost_micros) both correctly ignore — null (unpriced) must
       // never be folded into 0 (genuinely free) when reporting spend. See
-      // lib/ai-pricing.ts's doc comment.
-      prisma.$queryRaw<Array<{ total: bigint | null; unpriced: bigint }>>`
-          SELECT SUM(cost_micros) AS total, COUNT(*) FILTER (WHERE cost_micros IS NULL) AS unpriced
-          FROM ai_usage
-          WHERE store_id = ${storeId} AND created_at >= ${startOfDay}
-        `,
-      prisma.$queryRaw<Array<{ total: bigint | null; unpriced: bigint }>>`
-          SELECT SUM(cost_micros) AS total, COUNT(*) FILTER (WHERE cost_micros IS NULL) AS unpriced
-          FROM ai_usage
-          WHERE store_id = ${storeId} AND created_at >= ${startOfMonth}
-        `,
-      prisma.$queryRaw<Array<{ day: Date; total: bigint }>>`
-          SELECT
-            DATE_TRUNC('day', created_at) AS day,
-            COUNT(*) AS total
-          FROM ai_usage
-          WHERE store_id = ${storeId}
-            AND created_at >= NOW() - INTERVAL '30 days'
-          GROUP BY day
-          ORDER BY day ASC
-        `,
+      // lib/ai-pricing.ts's doc comment. (Ruling NZ-AN-1: no raw SQL; the router serves D1 or Postgres.)
+      aiUsageCost(storeId, startOfDay),
+      aiUsageCost(storeId, startOfMonth),
+      aiUsageLast30Days(storeId, now),
     ]);
 
     res.json({
@@ -1053,15 +1066,12 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
         // window has a configured rate. unpriced*Count is how many rows
         // that total excludes, so the admin surface can label it a partial
         // figure rather than implying it covers every call.
-        todayCostMicros: todayCost[0]?.total != null ? Number(todayCost[0].total) : null,
-        todayUnpricedCount: Number(todayCost[0]?.unpriced ?? 0),
-        monthCostMicros: monthCost[0]?.total != null ? Number(monthCost[0].total) : null,
-        monthUnpricedCount: Number(monthCost[0]?.unpriced ?? 0),
+        todayCostMicros: todayCost.total,
+        todayUnpricedCount: todayCost.unpriced,
+        monthCostMicros: monthCost.total,
+        monthUnpricedCount: monthCost.unpriced,
         // Convert bigint → number so JSON.stringify works.
-        last30Days: last30.map(r => ({
-          day: r.day.toISOString().slice(0, 10),
-          total: Number(r.total),
-        })),
+        last30Days: last30,
       },
     });
   } catch (error) {
@@ -1128,7 +1138,9 @@ router.post(
       const count = Math.min(parseInt(String(req.body?.count ?? '8'), 10) || 8, 20);
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1172,7 +1184,9 @@ router.post(
       const count = Math.min(parseInt(String(req.body?.count ?? '3'), 10) || 3, 10);
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1215,7 +1229,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1266,7 +1282,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1320,7 +1338,7 @@ router.post(
 
       // Create all three jobs in parallel
       const [faqJob, howtoJob, metaJob] = await Promise.all([
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1329,7 +1347,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1338,7 +1356,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1415,7 +1433,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1458,7 +1478,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1501,7 +1523,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1547,7 +1571,7 @@ router.post(
       const geoSweepForce = req.body?.force === true;
 
       const [llmsJob, citationJob, factsJob] = await Promise.all([
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1559,7 +1583,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1571,7 +1595,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1646,7 +1670,9 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, jobId } = req.params;
-      const updated = await prisma.bulkAiJob.updateMany({
+      const updated = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.updateMany({
         where: { id: jobId, storeId, status: { in: ['queued', 'running'] } },
         data: { status: 'cancelled', completedAt: new Date() },
       });
@@ -1678,12 +1704,12 @@ router.get('/results/geo', async (req: Request, res: Response, next: NextFunctio
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [store, totalProducts, productsWithCitation] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { llmsTxt: true, aboutJson: true },
       }),
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, deletedAt: null, citationCopy: { not: null } },
       }),
     ]);
@@ -1728,7 +1754,9 @@ router.get('/results/recommendations', async (req: Request, res: Response, next:
       throw new AppError(400, 'PRODUCT_ID_REQUIRED', 'productId query param is required');
     }
 
-    const rows = await prisma.aiRecommendation.findMany({
+    const rows = await (
+      await storeDb(currentStoreId())
+    ).aiRecommendation.findMany({
       where: { storeId, sourceProductId: productId },
       orderBy: { score: 'desc' },
       take: 25,
@@ -1788,17 +1816,14 @@ router.get(
     try {
       const storeId = (req.params as { storeId: string }).storeId;
 
-      const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
-        prisma.product.count({ where: { storeId, deletedAt: null } }),
-        prisma.aiRecommendation
-          .findMany({
-            where: { storeId },
-            distinct: ['sourceProductId'],
-            select: { sourceProductId: true },
-          })
-          .then(rows => rows.length),
-        prisma.aiRecommendation.count({ where: { storeId } }),
+      const db = await storeDb(storeId);
+      const [totalProducts, recSources] = await Promise.all([
+        db.product.count({ where: { storeId, deletedAt: null } }),
+        // no `distinct` (not served by the DO client): the distinct sources are counted in memory
+        db.aiRecommendation.findMany({ where: { storeId }, select: { sourceProductId: true } }),
       ]);
+      const totalRecs = recSources.length;
+      const distinctSourcesWithRecs = new Set(recSources.map(r => r.sourceProductId)).size;
 
       res.json({
         success: true,
@@ -1834,16 +1859,16 @@ router.get('/results/translate', async (req: Request, res: Response, next: NextF
 
     const [totalProducts, productsWithAr, totalCategories, categoriesWithAr, recentlyTranslated] =
       await Promise.all([
-        prisma.product.count({ where: { storeId, deletedAt: null } }),
-        prisma.product.count({
+        (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+        (await storeDb(storeId)).product.count({
           where: { storeId, deletedAt: null, nameAr: { not: null } },
         }),
-        prisma.category.count({ where: { storeId } }),
-        prisma.category.count({
+        (await storeDb(storeId)).category.count({ where: { storeId } }),
+        (await storeDb(storeId)).category.count({
           where: { storeId, nameAr: { not: null } },
         }),
         // Products that got an Arabic name in the last 30 days
-        prisma.product.findMany({
+        (await storeDb(storeId)).product.findMany({
           where: {
             storeId,
             deletedAt: null,
@@ -1903,12 +1928,12 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
       categoriesWithMeta,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaTitle: true, metaDescription: true },
       }),
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
         where: {
           storeId,
           deletedAt: null,
@@ -1916,15 +1941,15 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
           metaDescription: { not: null },
         },
       }),
-      prisma.category.count({ where: { storeId } }),
-      prisma.category.count({
+      (await storeDb(storeId)).category.count({ where: { storeId } }),
+      (await storeDb(storeId)).category.count({
         where: {
           storeId,
           metaTitle: { not: null },
           metaDescription: { not: null },
         },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: {
           storeId,
           deletedAt: null,
@@ -1983,7 +2008,9 @@ router.get('/results/faqs', async (req: Request, res: Response, next: NextFuncti
   try {
     const storeId = (req.params as { storeId: string }).storeId;
 
-    const faqs = await prisma.storeFaq.findMany({
+    const faqs = await (
+      await storeDb(currentStoreId())
+    ).storeFaq.findMany({
       where: { storeId, isActive: true },
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2029,7 +2056,9 @@ router.get('/results/howtos', async (req: Request, res: Response, next: NextFunc
   try {
     const storeId = (req.params as { storeId: string }).storeId;
 
-    const howtos = await prisma.storeHowto.findMany({
+    const howtos = await (
+      await storeDb(currentStoreId())
+    ).storeHowto.findMany({
       where: { storeId, isActive: true },
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2094,19 +2123,19 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
       categoriesWithAeo,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaDescriptionAeo: true },
       }),
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, deletedAt: null, metaDescriptionAeo: { not: null } },
       }),
-      prisma.category.count({ where: { storeId } }),
-      prisma.category.count({
+      (await storeDb(storeId)).category.count({ where: { storeId } }),
+      (await storeDb(storeId)).category.count({
         where: { storeId, metaDescriptionAeo: { not: null } },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: { storeId, deletedAt: null, metaDescriptionAeo: { not: null } },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -2171,7 +2200,9 @@ router.post(
         return;
       }
 
-      const product = await prisma.product.findFirst({ where: { id: productId, storeId } });
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({ where: { id: productId, storeId } });
       if (!product) {
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
         return;
@@ -2181,7 +2212,9 @@ router.post(
       // autofill core treats it as an empty gap and regenerates it.
       const sources = { ...((product.aiFieldSources as Record<string, string>) ?? {}) };
       delete sources[field];
-      await prisma.product.update({
+      await (
+        await storeWriter(storeId)
+      ).product.update({
         where: { id: productId, storeId },
         data: { [field]: null, aiFieldSources: sources },
       });
@@ -2190,7 +2223,9 @@ router.post(
 
       await fillProductFields(storeId, productId, { op: 'create', onlyFields: [field] });
 
-      const updated = await prisma.product.findFirst({ where: { id: productId, storeId } });
+      const updated = await (
+        await storeDb(storeId)
+      ).product.findFirst({ where: { id: productId, storeId } });
       res.json({
         success: true,
         data: {
@@ -2222,7 +2257,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'description_balance' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -2259,7 +2296,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'description_revert' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -2299,7 +2338,9 @@ router.post(
 
       const result = await balanceProductLanguages(storeId, productId, { force });
 
-      const updated = await prisma.product.findFirst({
+      const updated = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -2333,7 +2374,9 @@ router.post(
 
       const result = await revertProductBalance(storeId, productId);
 
-      const updated = await prisma.product.findFirst({
+      const updated = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -2369,11 +2412,13 @@ router.get('/results/categorize', async (req: Request, res: Response, next: Next
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalProducts, categorizedProducts, recentProducts] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
+        where: { storeId, status: 'active', deletedAt: null },
+      }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, status: 'active', deletedAt: null, categories: { some: {} } },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: { storeId, status: 'active', deletedAt: null, categories: { some: {} } },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -2416,10 +2461,10 @@ router.get('/results/image-alt', async (req: Request, res: Response, next: NextF
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalImages, imagesWithAlt] = await Promise.all([
-      prisma.productImage.count({
+      (await storeDb(storeId)).productImage.count({
         where: { product: { storeId, status: 'active', deletedAt: null } },
       }),
-      prisma.productImage.count({
+      (await storeDb(storeId)).productImage.count({
         where: {
           product: { storeId, status: 'active', deletedAt: null },
           alt: { not: null },
@@ -2451,11 +2496,13 @@ router.get('/results/excerpt', async (req: Request, res: Response, next: NextFun
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalProducts, productsWithExcerpt, recentProducts] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
+        where: { storeId, status: 'active', deletedAt: null },
+      }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, status: 'active', deletedAt: null, excerpt: { not: null } },
       }),
-      prisma.product.findMany({
+      (await storeDb(storeId)).product.findMany({
         where: { storeId, status: 'active', deletedAt: null, excerpt: { not: null } },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -2488,11 +2535,13 @@ router.get('/results/tags', async (req: Request, res: Response, next: NextFuncti
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [totalProducts, taggedProducts, totalTags] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
-      prisma.product.count({
+      (await storeDb(storeId)).product.count({
+        where: { storeId, status: 'active', deletedAt: null },
+      }),
+      (await storeDb(storeId)).product.count({
         where: { storeId, status: 'active', deletedAt: null, tags: { some: {} } },
       }),
-      prisma.tag.count({ where: { storeId } }),
+      (await storeDb(storeId)).tag.count({ where: { storeId } }),
     ]);
 
     res.json({

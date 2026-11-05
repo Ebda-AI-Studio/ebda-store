@@ -8,7 +8,6 @@ import { createSqlite } from '../helpers/sqlite-sql';
 beforeEach(() => {
   const stores = new Map<string, AuthStateStore>();
   setCfBindings({
-    HYPERDRIVE: { connectionString: '' },
     AUTH_STATE: {
       idFromName: (n: string) => n,
       get: (id: unknown) => {

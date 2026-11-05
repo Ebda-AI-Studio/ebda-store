@@ -316,11 +316,11 @@ they bypass any client-side sanitization and render as stored XSS on the storefr
 
 ---
 
-## Cross-service tenant isolation: Ebda Store and Ebda WhatsApp
+## Cross-service tenant isolation: Ebda Store and Ebda Chat
 
 The legacy in-Store WhatsApp bridge (`/api/v1/wa-bridge/*`, the per-store bridge key
 and the `ebda_wbs_bridge_keys()` definer) was DELETED (Ruling WA-LEGACY-1, 2026-10-25).
-Ebda WhatsApp (wa.ebda.app) is a separate product that talks to the Store only through
+Ebda Chat (wa.ebda.app) is a separate product that talks to the Store only through
 the Store contract (`business/ebda/plans/2026-10-24-ebda-whatsapp-store-contract.md`).
 The rule that carried over: a cross-service caller never names its own tenant in a
 query string or body; the tenant is derived from the credential, in the middleware,

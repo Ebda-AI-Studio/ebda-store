@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { storeDb } from '../../repo-factory';
+import { runInStoreCtx } from '../../jobs/store-db';
 import { InvoiceService } from '../../../services/invoice.service';
 import { EmailService } from '../../../services/email.service';
 import logger from '../../logger';
@@ -28,16 +29,17 @@ export const invoiceEmail: JobDef = inngest.createFunction(
       return;
     }
 
-    // InvoiceService.generateInvoiceEmail reads the order; it runs its own DB
-    // calls that need tenant context. Wrap in runInTenantContext so FORCE
-    // RLS lets those reads through (Inngest has no HTTP middleware context).
+    // InvoiceService.generateInvoiceEmail reads the order through the store's backend (its Durable Object, or Postgres).
+    // runInStoreCtx opens the tenant scope a Postgres store needs for FORCE RLS (Inngest has no HTTP middleware context).
     const html = await step.run('render-invoice', () =>
-      runInTenantContext(storeId, () => InvoiceService.generateInvoiceEmail(storeId, orderId))
+      runInStoreCtx(storeId, () => InvoiceService.generateInvoiceEmail(storeId, orderId))
     );
 
     const order = await step.run('load-order-number', () =>
-      runInTenantContext(storeId, async () => {
-        const row = await prisma.order.findUnique({
+      runInStoreCtx(storeId, async () => {
+        const row = await (
+          await storeDb(storeId)
+        ).order.findUnique({
           where: { id: orderId, storeId },
           select: { orderNumber: true, locale: true },
         });

@@ -2,6 +2,7 @@ import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { webhookInbox } from '../../definer';
 import { PaymentService } from '../../../services/payment-providers/payment.factory';
+import { storeMoney } from '../../repo-factory';
 import type { PaymentProvider } from '../../../services/payment-providers/types';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -72,15 +73,21 @@ export const paymentWebhookProcess: JobDef = inngest.createFunction(
     //    route's checkIdempotency / resolveStoreIdFromWebhookPayload reads.
     // The inbox row must be read BEFORE a store scope exists (store_id may be
     // NULL), so every inbox access here is a SECURITY DEFINER function.
-    const row = await step.run('load-inbox', async () => webhookInbox.get(webhookEventId));
-
-    if (!row) {
-      logger.error(
-        { webhookEventId, idempotencyKey },
-        '[payment-webhook-process] inbox row not found — nothing to process'
-      );
-      return;
-    }
+    // A miss THROWS (the step is retried, then dead-lettered P0): never a silent return. During a cutover the row can be
+    // in the middle of being put back into D1; a miss here must not drop a payment notification.
+    const row = await step.run('load-inbox', async () => {
+      const found = await webhookInbox.get(webhookEventId);
+      if (!found) {
+        logger.error(
+          { webhookEventId, idempotencyKey },
+          '[payment-webhook-process] inbox row not found — retrying'
+        );
+        throw new Error(
+          `webhook inbox row ${webhookEventId} not found (retry; it may be mid-cutover)`
+        );
+      }
+      return found;
+    });
 
     // Idempotency layer 1 — already fully processed, this is a retry / duplicate
     // enqueue. No-op. (Pure decision in shouldProcessInboxRow for unit testing.)
@@ -121,6 +128,20 @@ export const paymentWebhookProcess: JobDef = inngest.createFunction(
           status?: string;
           orderId?: string;
         }> => {
+          // A store on its Durable Object (Ruling CF-JOBS-4): the order row, the payment row and the
+          // event log live there, and the DO dedupes the signed event inside the same section that applies it
+          // (`payment_event_log (provider, event_id)`, outcome `replayed`). So there is no Postgres
+          // `webhookProcessedAt` to read or stamp: `handleWebhook` is the whole apply, and a retry of this
+          // step is a `replayed` no-op there. An external money fact is recorded in full, never rejected.
+          if (storeId && (await storeMoney(storeId))) {
+            return PaymentService.handleWebhook(
+              provider,
+              payload,
+              row.signature,
+              storeId,
+              row.rawBody
+            );
+          }
           // Re-check idempotency by the route's contract: if there is already an
           // order marked processed for this idempotency key, skip re-applying.
           // Order is a tenant model: with no store scope (no storeId on the
@@ -158,7 +179,7 @@ export const paymentWebhookProcess: JobDef = inngest.createFunction(
         // Same tenant-context branching the route used: scoped when storeId is
         // known; called directly (no wrapper) for the platform-only path — see
         // the docstring above for why withRlsBypass here was a no-op.
-        if (storeId) {
+        if (storeId && !(await storeMoney(storeId))) {
           return runInTenantContext(storeId, apply);
         }
         return apply();

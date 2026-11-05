@@ -16,7 +16,7 @@ import sitemap from '../../apps/marketing/src/app/sitemap';
 import robots, { AI_CRAWLERS } from '../../apps/marketing/src/app/robots';
 import { jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS } from '../../apps/marketing/src/lib/plans';
-import { SITE_PAGES, pagePath } from '../../apps/marketing/src/lib/site';
+import { SITE_PAGES, pagePath, productOfPage } from '../../apps/marketing/src/lib/site';
 
 const APP = path.resolve(__dirname, '../../apps/marketing/src/app');
 const walk = (d: string): string[] =>
@@ -89,7 +89,7 @@ describe('JSON-LD', () => {
       expect(brand.alternateName).toContain('ابدأ ستور');
       expect(brand.alternateName).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
       expect(brand['@id']).toBe('https://ebda.app/#store');
-      expect(brand.url).toBe('https://ebda.app/#store');
+      expect(brand.url).toBe(`https://ebda.app/${locale === 'en' ? 'en/' : ''}store/`);
       expect(byType.SoftwareApplication.brand['@id']).toBe(brand['@id']);
       expect(byType.SoftwareApplication.featureList.length).toBeGreaterThan(10);
       const product = locale === 'ar' ? 'ابدأ ستور' : 'Ebda Store';
@@ -133,27 +133,40 @@ describe('every page exports metadata with a canonical', () => {
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
       expect(meta, `${rel} must export metadata`).toBeTruthy();
       // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher. The /whatsapp page is
-      // the second product (Ebda WhatsApp): its own name, brand line and OG image, never the Store's.
-      const wa = page === 'whatsapp';
+      // the second product (Ebda Chat): its own name, brand line and OG image, never the Store's.
+      const kind = productOfPage(page);
+      const wa = kind === 'chat';
+      // the studio's own pages (the home, About, Contact, Credits, the studio-level legal pages) say Ebda AI Studio, never
+      // Ebda Store (NAV-PRODUCT-OF-PAGE-1); /store and its family say Ebda Store; Chat and its documents say Ebda Chat
+      const studio = kind === 'studio';
+      const landing = page === '' || page === 'store';
       const product = wa
         ? isEn
-          ? 'Ebda WhatsApp'
-          : 'ابدأ واتساب'
-        : isEn
-          ? 'Ebda Store'
-          : 'ابدأ ستور';
+          ? 'Ebda Chat'
+          : 'ابدأ شات'
+        : studio
+          ? isEn
+            ? 'Ebda AI Studio'
+            : 'ابدأ ستوديو للذكاء الاصطناعي'
+          : isEn
+            ? 'Ebda Store'
+            : 'ابدأ ستور';
       expect(meta.title).toContain(product);
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
       // brand disambiguation (not ebda3i.com or any other "Ebda"): the one brand line is in the OG
       // description; inner titles end in the short tail and stay SERP-length
-      expect(meta.openGraph.description).toContain(
-        wa
-          ? 'Ebda WhatsApp — ابدأ واتساب, by Ebda AI Studio (ebda.app)'
-          : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
-      );
-      if (page) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
-      expect(meta.title.length).toBeLessThanOrEqual(page ? 90 : 60);
+      if (!studio)
+        expect(meta.openGraph.description).toContain(
+          wa
+            ? 'Ebda Chat — ابدأ شات, by Ebda AI Studio (ebda.app)'
+            : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
+        );
+      // inner titles end in the domain tail; a studio page never carries the Store tail, a Store page always does
+      if (!landing) expect(meta.title.endsWith('(ebda.app)')).toBe(true);
+      if (!landing && !studio) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
+      if (studio && page !== '') expect(meta.title).not.toMatch(/Ebda Store|ابدأ ستور/);
+      expect(meta.title.length).toBeLessThanOrEqual(landing ? 60 : 90);
       expect(meta.twitter.title).toBe(meta.title);
       expect(meta.openGraph.siteName).toBe(product);
       expect(meta.description).toBeTruthy();

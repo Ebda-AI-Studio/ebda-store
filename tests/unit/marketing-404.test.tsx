@@ -39,7 +39,7 @@ describe('marketing 404', () => {
   });
 
   it('maps the site by product and marks WhatsApp, CRM and ERP as coming soon (not links)', () => {
-    for (const label of ['ابدأ ستور', 'Ebda Store', 'ابدأ واتساب', 'Ebda CRM', 'Ebda ERP']) {
+    for (const label of ['ابدأ ستور', 'Ebda Store', 'ابدأ شات', 'Ebda CRM', 'Ebda ERP']) {
       expect(html).toContain(label);
     }
     expect(html).toContain('قريباً');

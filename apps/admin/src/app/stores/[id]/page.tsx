@@ -3,11 +3,11 @@
 import { GoldRateBanner } from './_components/GoldRateBanner';
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, useToast } from '@ebda/ui';
+import { buttonVariants, cn } from '@ebda/ui';
+import Link from 'next/link';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
-import { apiDelete } from '../../../lib/api';
 import { getStoreDisplayUrl, getStoreHref } from '../../../lib/store-url';
 import { useT } from '@/i18n/useT';
 import { useDashboardData } from './_hooks/useDashboardData';
@@ -15,6 +15,8 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StatsGrid } from './_components/StatsGrid';
+import { NeedsAction } from './_components/NeedsAction';
+import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
@@ -23,7 +25,7 @@ import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
 import { SuspendStoreModal } from './_components/SuspendStoreModal';
 import { DangerZone } from './_components/DangerZone';
-import { DeleteStoreModal } from './_components/DeleteStoreModal';
+import { useDeleteStore } from '../_components/useDeleteStore';
 import { StoreLoadingSkeleton } from './_components/StoreLoadingSkeleton';
 import { StoreErrorState } from './_components/StoreErrorState';
 import type { StoreFormErrors } from './_components/types';
@@ -35,8 +37,6 @@ export default function StoreDetailPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('stores.dashboard');
-  const tDanger = useT('stores.dashboard.dangerZone');
-  const { success: toastSuccess, error: toastError } = useToast();
   const tErrors = useT('stores.dashboard.details.errors');
   const translateError = useCallback(
     (key: string) => tErrors(key as Parameters<typeof tErrors>[0]),
@@ -63,33 +63,9 @@ export default function StoreDetailPage() {
   } = useDashboardData(storeId);
 
   const [showSuspendModal, setShowSuspendModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!store) return;
-    setIsDeleting(true);
-    try {
-      const { error: apiError } = await apiDelete(`/api/v1/stores/${store.id}`);
-      if (apiError) {
-        toastError(tDanger('deleteFailed'), apiError.message ?? '');
-        setIsDeleting(false);
-        return;
-      }
-      toastSuccess(
-        tDanger('deletedToastTitle'),
-        tDanger('deletedToastDescription', { name: store.name })
-      );
-      // Close the modal so the closing animation runs before we navigate;
-      // the redirect itself unmounts the page so isDeleting state cleanup
-      // is implicit.
-      setShowDeleteModal(false);
-      router.push('/stores');
-    } catch (err) {
-      toastError(tDanger('deleteFailed'), err instanceof Error ? err.message : '');
-      setIsDeleting(false);
-    }
-  }, [store, tDanger, toastError, toastSuccess, router]);
+  const { requestDelete, dialog: deleteDialog } = useDeleteStore(
+    useCallback(() => router.push('/stores'), [router])
+  );
 
   const clearFieldError = useCallback(
     (field: keyof StoreFormErrors) => {
@@ -119,15 +95,14 @@ export default function StoreDetailPage() {
       title={store.name}
       subtitle={getStoreDisplayUrl(store)}
       actions={
-        <div className="flex gap-2">
-          {!isEditing && (
-            <Button size="sm" onClick={() => setIsEditing(true)}>
-              {t('editStore')}
-            </Button>
-          )}
-        </div>
+        // One primary: the editor, the job a merchant opens this page for. "View store" is the TopBar's own button.
+        <Link href={`/stores/${store.id}/builder`} className={cn(buttonVariants({ size: 'sm' }))}>
+          {t('openEditor')}
+        </Link>
       }
     >
+      <NeedsAction storeId={store.id} />
+
       <GoldRateBanner storeId={store.id} />
 
       <SetupGuideCard
@@ -138,6 +113,8 @@ export default function StoreDetailPage() {
           (store.settings as { defaultLanguage?: string } | undefined)?.defaultLanguage
         )}
       />
+
+      <OrderAlertsPromptCard storeId={store.id} />
 
       <StatsGrid storeId={store.id} />
 
@@ -159,6 +136,8 @@ export default function StoreDetailPage() {
             setIsEditing(false);
             resetEditForm();
           }}
+          onActivate={() => setIsEditing(true)}
+          onEdit={() => setIsEditing(true)}
         />
         <div className="space-y-6">
           <StoreOwnerCard owner={store.owner} />
@@ -170,13 +149,7 @@ export default function StoreDetailPage() {
           dashboard 2026-05-14 to avoid duplicating the surface and to keep
           the dashboard focused on quick-glance store overview + actions. */}
 
-      <QuickActions
-        store={store}
-        isSuperAdmin={isSuperAdmin}
-        isChangingStatus={isChangingStatus}
-        onRequestSuspend={() => setShowSuspendModal(true)}
-        onActivate={() => handleStatusChange('active')}
-      />
+      <QuickActions store={store} isSuperAdmin={isSuperAdmin} />
 
       <SettingsLink storeId={store.id} />
 
@@ -184,7 +157,15 @@ export default function StoreDetailPage() {
           store admins must NOT see this. Rendered last so it's clearly
           separated from the rest of the dashboard. */}
       {isSuperAdmin && (
-        <DangerZone isDeleting={isDeleting} onRequestDelete={() => setShowDeleteModal(true)} />
+        <DangerZone
+          onRequestDelete={() =>
+            requestDelete({ id: store.id, name: store.name, slug: store.slug })
+          }
+          status={store.status}
+          isChangingStatus={isChangingStatus}
+          onRequestSuspend={() => setShowSuspendModal(true)}
+          onActivate={() => handleStatusChange('active')}
+        />
       )}
 
       <SuspendStoreModal
@@ -198,13 +179,7 @@ export default function StoreDetailPage() {
         }}
       />
 
-      <DeleteStoreModal
-        isOpen={showDeleteModal}
-        storeName={store.name}
-        isDeleting={isDeleting}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleDeleteConfirm}
-      />
+      {isSuperAdmin && deleteDialog}
     </AdminLayout>
   );
 }

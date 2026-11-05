@@ -3,6 +3,7 @@ import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { reverseEntry } from '../journal.service';
 import logger from '../../../lib/logger';
+import { storeMoney } from '../../../lib/repo-factory';
 
 /**
  * Reverse the GL entries associated with a refunded order. Reverses:
@@ -40,6 +41,11 @@ export async function postRefundJournal(args: {
   storeId?: string;
   tx?: Prisma.TransactionClient;
 }): Promise<{ reversed: number }> {
+  // A store on its Durable Object reverses its own sale, COGS and partial entries in one section (Ruling CF-LEDGER-1).
+  if (args.storeId) {
+    const money = await storeMoney(args.storeId);
+    if (money) return money.journalRefund({ orderId: args.orderId, reason: args.reason });
+  }
   if (!args.tx) {
     return withScopedToOrderStore(args, tx => postRefundJournal({ ...args, tx }), { reversed: 0 });
   }

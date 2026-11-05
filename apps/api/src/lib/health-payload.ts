@@ -1,19 +1,42 @@
 import { buildIdentity } from './build-identity';
+import { cfBindings } from '../cf/bindings';
+import { storageBackendCounts } from './store-backend';
 import { buyerKeyVector } from './wa/health-vector';
+import { isWorkers } from './runtime';
+import { alertIfStoreCreateMisconfigured } from './store-create-config';
 
 /**
  * The public GET /health body: status, time, which build is running and, when the suite buyer-key secret is
- * set, `buyerKeyVector` (proof both Workers hold the same secret, WA-HEALTH-VECTOR-1). Never anything
+ * set, `buyerKeyVector` (proof both Workers hold the same secret, WA-HEALTH-VECTOR-1), and `platform_db` is "ok" | "unavailable" (D1 reachable; omitted when unbound). Never anything
  * derived from a phone, an order or a customer; the field is omitted, never a placeholder, without the secret.
  */
 export async function healthPayload(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<Record<string, unknown>> {
-  const vector = await buyerKeyVector(env.SUITE_BUYER_KEY_SECRET).catch(() => null);
+  const [vector, backends, storeCreate] = await Promise.all([
+    buyerKeyVector(env.SUITE_BUYER_KEY_SECRET).catch(() => null),
+    storageBackendCounts(cfBindings()?.PLATFORM_DB),
+    // NZ-PG-9: reported, never a reason to fail the deploy probe (the var is set at a later cutover step)
+    alertIfStoreCreateMisconfigured(),
+  ]);
+  // Fail loud at boot (multi-service env rule): a DEPLOYED Worker without the platform D1 would silently serve the legacy
+  // Postgres paths (backendFor defaults to `pg`, store writes keep the Postgres route). `status: degraded` makes the deploy-guard
+  // probe (`status === 'ok'` + commit) fail, so the deploy rolls back instead of degrading.
+  const platformUnbound = isWorkers && backends === undefined;
   return {
-    status: 'ok',
+    status: platformUnbound ? 'degraded' : 'ok',
     timestamp: new Date().toISOString(),
     ...buildIdentity(),
+    // NEON-ZERO N-17 (Ruling NZ-D23): there is no Postgres to report on; a constant so a caller can tell "removed" from "not said".
+    postgres: 'removed',
     ...(vector ? { buyerKeyVector: vector } : {}),
+    ...(isWorkers ? { store_create: storeCreate } : {}),
+    // Public: reachability only. The per-backend store COUNTS disclose the store count, so they are served only by
+    // the super_admin GET /api/v1/health (app.ts).
+    ...(backends !== undefined
+      ? { platform_db: backends === null ? 'unavailable' : 'ok' }
+      : platformUnbound
+        ? { platform_db: 'unbound' }
+        : {}),
   };
 }

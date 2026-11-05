@@ -65,6 +65,8 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   // the request (rates, products, settings), and the request writes nothing through the proxy first.
   // The atomicity this needs (rate rows + every price commit or roll back together) is exactly what
   // its own transaction gives; tests/integration/gold-rate-apply.test.ts case 5 proves it.
+  'services/catalog-import.service.ts':
+    'variants are written by `withMoneyTx` in createDraftForItem, which only the catalog-import-create-drafts job calls inside `runInStoreScope` (per-query scope, each statement committed), so the draft product it references is already committed and visible; no request-path caller',
   'services/gold-rate/gold-rate.service.ts':
     'rate / settings / spec writes run in one money transaction (advisory lock + FOR UPDATE + repricer); no prior write in the request, reads only committed rows',
   // (AuthService.verifyEmail used to be listed here: it now runs `withUser`, which joins or opens
@@ -86,10 +88,14 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   // handler writes nothing through the proxy first, so no uncommitted row can be invisible to it.
   'services/store-category-suggest.service.ts':
     'creates categories + product links in one transaction over committed products; no prior write in the request',
+  'services/recommendation.service.ts':
+    'setProductRelations replaces one source product relations in one batch (deleteMany + createMany through the store writer); no prior write in the request',
   'routes/category.routes.ts':
     'reorder batches (category.updateMany / productCategory.updateMany) over existing rows; no prior write in the request',
   'routes/product.routes.ts':
     'reorder batches (product.update) over existing rows; no prior write in the request',
+  'routes/payment-settings.routes.ts':
+    'unset-other-default + create/update batch over this store payment_configs rows only; no prior write in the request (Ruling NEON-ZERO-2: one atomic RPC on a DO store)',
   'routes/shipping.routes.ts':
     'area-rate upsert batches keyed on (storeId, country, governorate, area); reference only storeId; no prior write in the request',
   'routes/order.routes.ts':
@@ -108,7 +114,6 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
 const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'services/barcode-scan.service.ts',
   'services/bulk.service.ts',
-  'services/customer-group.service.ts',
   'services/inventory.service.ts',
   'services/loyalty-automation.service.ts',
   'services/loyalty.service.ts',
@@ -118,9 +123,9 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   // `withMoneyTx(` — which calls `$transaction` on the caller's behalf, so the
   // literal never appears in the caller (#1787). Not yet reviewed for the
   // write-then-reference shape; listed so they are counted, not hidden.
-  'lib/inngest/functions/ai-autofill-cleanup.ts',
   'lib/inngest/functions/bulk-ai-product-faqs.ts',
-  'lib/inngest/functions/bulk-ai-recommendations.ts',
+  // `w.$transaction([$proc])` is ONE Durable Object RPC (the DO twin of the guarded AI write), not a Postgres transaction
+  'services/ai-autofill.service.ts',
   'lib/inngest/functions/order-refunded.ts',
   'services/accounting/purchase-order.service.ts',
   'services/accounting/stock-adjustment.service.ts',
@@ -155,7 +160,9 @@ function code(file: string): string {
 }
 
 /** Opens its own transaction: directly, or through `withMoneyTx`. */
-const OPENS_TRANSACTION = /prisma\.\$transaction\b|\bwithMoneyTx\(/;
+// `w.$transaction` is the same call through `storeWriter` (lib/repo-factory.ts): on Postgres it IS `prisma.$transaction`, so a
+// route that moved to the writer must stay visible to this guard (CF-WRITES-1).
+const OPENS_TRANSACTION = /(?:prisma|\bw)\.\$transaction\b|\bwithMoneyTx\(/;
 
 /** Files that open a transaction at all. */
 function callers(): string[] {

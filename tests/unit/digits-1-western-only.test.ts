@@ -30,8 +30,15 @@ const ALL = [...walk(path.join(ROOT, 'apps')), ...walk(path.join(ROOT, 'packages
   f.split(path.sep).join('/')
 );
 const isTest = (f: string) => /\.test\.|\/__tests__\/|\/test\/|\.spec\./.test(f);
-const SOURCE = ALL.filter(f => /\.(ts|tsx|mjs|js)$/.test(f) && !isTest(f));
-const COPY = ALL.filter(f => /\.(json|mdx|md|html|hbs)$/.test(f) && !isTest(f));
+// the vendored pdf-lib build (Ruling BUNDLE-BUDGET-7) is third-party minified code, not first-party source
+const SOURCE = ALL.filter(
+  f =>
+    /\.(ts|tsx|mjs|js)$/.test(f) && !isTest(f) && !f.endsWith('apps/api/src/cf/modules/pdf-lib.mjs')
+);
+// foundation/vectors = vendored cross-product test vectors that deliberately contain Arabic-Indic input
+const COPY = ALL.filter(
+  f => /\.(json|mdx|md|html|hbs)$/.test(f) && !isTest(f) && !/\/foundation\/vectors\//.test(f)
+);
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
@@ -39,9 +46,11 @@ const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const NORMALISERS = [
   /packages\/shared\/src\/search\//, // search folding + its vectors
   /packages\/shared\/src\/region\/index\.ts$/, // normaliseDigits / phone parsing
+  /packages\/shared\/src\/foundation\/(phone|text)\.ts$/, // vendored foundation v0.1.0: phone + Arabic fold input normalisers
   /packages\/shared\/src\/barcode\/ean\.ts$/, // scanner/typed barcode input normaliser
   /packages\/shared\/src\/tax-profile\.ts$/,
   /packages\/shared\/src\/instapay-receipt\.ts$/,
+  /packages\/shared\/src\/ascii-digits\.ts$/,
   /apps\/api\/src\/services\/price-cell\.ts$/,
   /apps\/api\/src\/services\/accounting\/bank-statement-parser\.ts$/,
   /apps\/api\/src\/services\/carriers\/egypt-areas\.ts$/,

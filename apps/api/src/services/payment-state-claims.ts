@@ -12,7 +12,7 @@
 import { prisma } from '@ebda/database';
 
 export type PaidClaim = 'claimed' | 'already_paid' | 'blocked_status';
-export type FailedClaim = 'claimed' | 'already_failed' | 'blocked_paid_or_settled';
+export type FailedClaim = 'claimed' | 'already_failed' | 'blocked_paid_or_settled' | 'not_found';
 
 /**
  * unpaid|failed -> paid. Only the caller that gets `claimed` runs the fan-out.
@@ -83,5 +83,7 @@ export async function claimOrderFailed(orderId: string, storeId: string): Promis
     where: { id: orderId, storeId },
     select: { paymentStatus: true },
   });
-  return cur?.paymentStatus === 'failed' ? 'already_failed' : 'blocked_paid_or_settled';
+  // 0 rows AND no such order here (a Durable Object store's order is not in Postgres): never read as "paid or settled".
+  if (!cur) return 'not_found';
+  return cur.paymentStatus === 'failed' ? 'already_failed' : 'blocked_paid_or_settled';
 }

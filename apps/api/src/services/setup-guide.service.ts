@@ -12,7 +12,8 @@
  * zones are RLS-protected): routes mount it behind `tenantContext`; other
  * callers wrap it in `readInStoreContext`.
  */
-import { prisma, withStore } from '@ebda/database';
+import { prisma } from '@ebda/database';
+import { copyStoreSettings, storeDb, storeUpdate, storeWritesToDo } from '../lib/repo-factory';
 import {
   getLook,
   SETUP_GUIDE_ITEMS,
@@ -40,21 +41,75 @@ function hasBrandColor(theme: unknown): boolean {
   );
 }
 
+/**
+ * Merge a tick (`manual`) or the dismissed flag into `settings.setupGuide` (N-19). Postgres store: ONE atomic statement (two tabs
+ * ticking at once cannot clobber each other) and the DO copy gets the whole RETURNING value. D1 + Durable Object store (no
+ * Postgres row): a write-time read-merge through `storeUpdate` with the whole `settings` value. RESIDUAL: two writers within the
+ * same few milliseconds on a DO store can interleave and lose one tick (same residual as StoreService.setSettingsKey). Cost if
+ * wrong: one checklist tick is lost and the merchant ticks it again.
+ */
+async function patchGuide(
+  storeId: string,
+  change: { manual: { key: string; done: boolean } } | { dismissed: boolean }
+): Promise<void> {
+  if (await storeWritesToDo(storeId)) {
+    const row = await storeDb(storeId).then(db =>
+      db.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    );
+    const live = (row?.settings as Record<string, unknown> | null) ?? {};
+    const guide = (live.setupGuide as StoredGuide | undefined) ?? {};
+    const next: StoredGuide =
+      'manual' in change
+        ? { ...guide, manual: { ...(guide.manual ?? {}), [change.manual.key]: change.manual.done } }
+        : { ...guide, dismissed: change.dismissed };
+    await storeUpdate(prisma, {
+      where: { id: storeId },
+      data: { settings: { ...live, setupGuide: next } as never },
+      select: { id: true },
+    });
+    return;
+  }
+  const rows =
+    'manual' in change
+      ? await prisma.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
+          UPDATE stores SET settings = jsonb_set(
+            COALESCE(settings, '{}'::jsonb), '{setupGuide}',
+            COALESCE(settings->'setupGuide', '{}'::jsonb) || jsonb_build_object(
+              'manual', COALESCE(settings->'setupGuide'->'manual', '{}'::jsonb)
+                        || jsonb_build_object(${change.manual.key}::text, ${change.manual.done}::boolean)
+            ), true)
+          WHERE id = ${storeId}
+          RETURNING settings, updated_at AS "updatedAt"`
+      : await prisma.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
+          UPDATE stores SET settings = jsonb_set(
+            COALESCE(settings, '{}'::jsonb), '{setupGuide}',
+            COALESCE(settings->'setupGuide', '{}'::jsonb)
+              || jsonb_build_object('dismissed', ${change.dismissed}::boolean), true)
+          WHERE id = ${storeId}
+          RETURNING settings, updated_at AS "updatedAt"`;
+  await copyStoreSettings(storeId, {
+    settings: rows?.[0]?.settings ?? {},
+    ...(rows?.[0]?.updatedAt instanceof Date ? { updatedAt: rows[0].updatedAt } : {}),
+  });
+}
+
 export class SetupGuideService {
   static async get(storeId: string): Promise<SetupGuideState> {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
+    const store = await storeDb(storeId).then(db =>
+      db.store.findUnique({
         where: { id: storeId },
         select: { logo: true, theme: true, look: true, domain: true, settings: true },
       })
     );
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
+    // the catalogue, zones, orders and gateways live in the store's backend (Durable Object or Postgres)
+    const db = await storeDb(storeId);
     const [products, zones, orders, otherMethods] = await Promise.all([
-      prisma.product.count({ where: { storeId, deletedAt: null } }),
-      prisma.shippingZone.count({ where: { storeId, isActive: true } }),
-      prisma.order.count({ where: { storeId } }),
-      prisma.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
+      db.product.count({ where: { storeId, deletedAt: null } }),
+      db.shippingZone.count({ where: { storeId, isActive: true } }),
+      db.order.count({ where: { storeId } }),
+      db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
     ]);
 
     const stored = readStored(store.settings);
@@ -107,26 +162,12 @@ export class SetupGuideService {
         'This item completes automatically from your data'
       );
     }
-    // One atomic statement: concurrent ticks from two tabs cannot clobber each
-    // other (no read-modify-write of the whole settings blob).
-    await prisma.$executeRaw`
-      UPDATE stores SET settings = jsonb_set(
-        COALESCE(settings, '{}'::jsonb), '{setupGuide}',
-        COALESCE(settings->'setupGuide', '{}'::jsonb) || jsonb_build_object(
-          'manual', COALESCE(settings->'setupGuide'->'manual', '{}'::jsonb)
-                    || jsonb_build_object(${key}::text, ${done}::boolean)
-        ), true)
-      WHERE id = ${storeId}`;
+    await patchGuide(storeId, { manual: { key, done } });
     return this.get(storeId);
   }
 
   static async setDismissed(storeId: string, dismissed: boolean): Promise<SetupGuideState> {
-    await prisma.$executeRaw`
-      UPDATE stores SET settings = jsonb_set(
-        COALESCE(settings, '{}'::jsonb), '{setupGuide}',
-        COALESCE(settings->'setupGuide', '{}'::jsonb)
-          || jsonb_build_object('dismissed', ${dismissed}::boolean), true)
-      WHERE id = ${storeId}`;
+    await patchGuide(storeId, { dismissed });
     return this.get(storeId);
   }
 }

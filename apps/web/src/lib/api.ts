@@ -339,6 +339,8 @@ interface Order {
   codFee?: number;
   tax?: number;
   taxIncludedInPrice?: boolean;
+  /** The delivery pick (the first notes line without its prefix); `notes` itself is never sent to a shopper. */
+  deliveryLine?: string | null;
   /** Payment rows (`ORDER_PAYMENT_SELECT`); the receipt names the method. */
   payments?: Array<{ provider: string; method?: string | null }>;
   items: Array<{
@@ -580,6 +582,19 @@ function hasSessionEvidence(): boolean {
     localStorage.getItem('refreshToken') !== null ||
     localStorage.getItem('csrfToken') !== null
   );
+}
+
+/**
+ * Public read of the session hint for code that must not call `/auth/me` blind (AuthContext's mount
+ * check on non-account routes, the PDP review form): true when this browser has ever held a session.
+ */
+export function hasSessionHint(): boolean {
+  try {
+    return hasSessionEvidence();
+  } catch {
+    // Blocked storage (private mode, a throwing accessor): no hint, the conservative answer.
+    return false;
+  }
 }
 
 /**

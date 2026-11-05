@@ -86,6 +86,10 @@ vi.mock('@ebda/database', () => ({
       },
     }),
   prisma: {
+    // `storeDb(id).store` on the Postgres path is the request `prisma` proxy (NEON-ZERO-1: the route reads the row through it)
+    store: {
+      findUnique: async ({ where }: { where: { id: string } }) => storeRowById(where.id),
+    },
     // The faqs + howtos + disabled-pages triple is one raw round trip (fetchStoreExtras).
     $queryRaw: vi.fn().mockResolvedValue([{ faqs: [], howtos: [], disabled: [] }]),
     storePage: { findMany: vi.fn().mockResolvedValue([]) },
@@ -136,6 +140,7 @@ vi.mock('@api/services/redis.service', () => ({
 vi.mock('@api/lib/revalidate-storefront', () => ({ revalidateStorefront: vi.fn() }));
 vi.mock('@api/lib/store-scoped-read', () => ({
   readInStoreContext: (_id: string, fn: () => unknown) => fn(),
+  inDoStoreScope: (_id: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/order-tax', () => ({
   resolveActiveTaxRate: vi.fn().mockResolvedValue({ ratePercent: 0, seller: null }),
@@ -210,6 +215,7 @@ vi.mock('@api/lib/logger', () => ({
 import publicRoutes from '@api/routes/public.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { invalidateCachedPrefix } from '@api/lib/public-cache';
+import { invalidateStoreDirectory } from '@api/lib/store-directory';
 
 function buildApp() {
   const app = express();
@@ -364,12 +370,14 @@ describe('cache isolation (Review Focus 1)', () => {
     expect(unknownCustom.status).toBe(404);
   });
 
-  it('a miss is never cached as a store: a store created after a 404 resolves immediately', async () => {
+  it('a miss is negatively cached but cleared by the creation bust: a store created after a 404 resolves immediately', async () => {
     expect((await resolve('fresh.ebda.app')).status).toBe(404);
     world.stores = [
       ...(world.stores as StoreRow[]),
       { ...STORE_B, id: 'store-new', slug: 'fresh' },
     ];
+    // Store creation busts the directory (NEON-SCALE-1 rule 1): the negative entry from the 404 is cleared.
+    await invalidateStoreDirectory('store-new', 'fresh');
     const res = await resolve('fresh.ebda.app');
     expect(res.status).toBe(200);
     expect(res.body.data.store.id).toBe('store-new');
@@ -382,7 +390,9 @@ describe('cache isolation (Review Focus 1)', () => {
     const keys = [...redisData.keys()];
     expect(keys.length).toBeGreaterThanOrEqual(3);
     for (const key of keys) {
-      expect(key).toMatch(/amelia\.ebda\.app|demo-boutique\.ebda\.app|ameliaaurum\.com|store-[ab]/);
+      expect(key).toMatch(
+        /dir:(id|slug|domain):|amelia\.ebda\.app|demo-boutique\.ebda\.app|ameliaaurum\.com|store-[ab]/
+      );
     }
     expect(keys.some(k => k.endsWith(':default'))).toBe(false);
   });
@@ -436,12 +446,13 @@ describe('GET /public/stores/:slugOrId', () => {
     }
   );
 
-  it('an unknown slug is a 404 and is not cached (a store created later resolves at once)', async () => {
+  it('an unknown slug is a 404, negatively cached, and cleared by the creation bust', async () => {
     expect((await request(app).get('/public/stores/newcomer')).status).toBe(404);
     world.stores = [
       ...(world.stores as StoreRow[]),
       { ...STORE_B, id: 'store-n', slug: 'newcomer' },
     ];
+    await invalidateStoreDirectory('store-n', 'newcomer');
     const res = await request(app).get('/public/stores/newcomer');
     expect(res.status).toBe(200);
     expect(res.body.data.store.id).toBe('store-n');

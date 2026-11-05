@@ -1,4 +1,5 @@
-import { prisma } from '@ebda/database';
+import { currentStoreId, prisma } from '@ebda/database';
+import { storeDb } from '../../lib/repo-factory';
 
 /**
  * Funnel read model over `funnel_snapshots` (one row per store per Cairo day,
@@ -12,7 +13,7 @@ export type FunnelWindow = (typeof FUNNEL_WINDOWS)[number];
 
 export async function listFunnelSnapshots(storeId: string, days: number) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return prisma.funnelSnapshot.findMany({
+  return (await storeDb(currentStoreId())).funnelSnapshot.findMany({
     where: { storeId, periodDate: { gte: since } },
     orderBy: { periodDate: 'desc' },
   });

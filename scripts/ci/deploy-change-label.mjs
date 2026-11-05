@@ -10,9 +10,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LABEL = 'deploy-change';
-/** Files that decide what reaches production: the deploy workflows, the backup workflow, the deploy guard and its secret list. */
+/** Files that decide what reaches production: the deploy workflows, the backup workflow, the deploy guard, the deploy planner and the secret list. */
 export const DEPLOY_FILE =
-  /^(\.github\/workflows\/(cf-[a-z0-9-]+-deploy|db-backup)\.yml|scripts\/ci\/(deploy-guard\.mjs|api-required-secrets\.json)|scripts\/cf-build\.sh|scripts\/ebda-cf-api-config\.mjs)$/;
+  /^(\.github\/workflows\/(cf-[a-z0-9-]+-deploy|db-backup)\.yml|scripts\/ci\/(deploy-guard\.mjs|deploy-plan\.mjs|api-required-secrets\.json)|scripts\/cf-build\.sh|scripts\/ebda-cf-api-config\.mjs)$/;
 
 export function deployFilesChanged(files) {
   return files.filter(f => DEPLOY_FILE.test(f));
@@ -24,17 +24,31 @@ export function check(files, labels) {
   return { ok: labels.includes(LABEL), changed };
 }
 
+/**
+ * The PR's OWN changed files. On pull_request CI, HEAD is a merge commit of the PR head into the CURRENT base, so diffing the
+ * event's (possibly stale) base sha pulls main's later commits into the list. For a merge commit diff its parents
+ * (HEAD^1...HEAD^2 = merge-base..PR head); otherwise (push/local) fall back to base...HEAD.
+ */
+// A git hook exports GIT_DIR, which would point these calls at the wrong repo.
+const cleanEnv = () =>
+  Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
+export function changedFiles(cwd, base) {
+  const git = args =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', env: cleanEnv() })
+      .split('\n')
+      .filter(Boolean);
+  const parents = git(['rev-list', '--parents', '-n', '1', 'HEAD'])[0]?.split(' ').slice(1) ?? [];
+  const range = parents.length === 2 ? 'HEAD^1...HEAD^2' : `${base}...HEAD`;
+  return git(['diff', '--name-only', range]);
+}
+
 function main(argv) {
   const val = k => (argv.includes(`--${k}`) ? argv[argv.indexOf(`--${k}`) + 1] : undefined);
   const base = val('base');
   const labels = JSON.parse(val('labels') || '[]');
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const files = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], {
-    cwd: root,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .filter(Boolean);
+  const files = changedFiles(root, base);
   const r = check(files, labels);
   if (!r.ok) {
     console.error(

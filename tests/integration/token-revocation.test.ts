@@ -17,6 +17,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { API_BASE } from '../helpers/api-base';
+import { legacySessionFor } from '../helpers/legacy-session';
 
 // One knob configures the whole suite; see tests/helpers/api-base.ts for why
 // it is TEST_API_URL rather than the server's own API_URL or API_HOST. The
@@ -29,7 +30,10 @@ const PW = 'Test1234!pw';
 const createdUserIds: string[] = [];
 
 /**
- * Create a fresh test user and log in.
+ * Create a fresh test user and mint its Store (HS256) session; /auth/login is closed for this role (Rulings ID-1/ID-2), the
+ * HS256 shape is what customer and impersonation tokens still use. The ES256 identity-session revocation (revokeUser by sid) is
+ * covered end to end in user-status-enforcement.test.ts.
+ *
  * Returns the access token, its jti claim, and the user's DB id.
  */
 async function setupAndLogin(): Promise<{ token: string; jti: string; userId: string }> {
@@ -42,7 +46,7 @@ async function setupAndLogin(): Promise<{ token: string; jti: string; userId: st
       passwordHash: await bcrypt.hash(PW, 10),
       firstName: 'Rev',
       lastName: 'Oke',
-      role: 'super_admin',
+      role: 'store_admin',
       emailVerified: true,
       storeId: null,
     },
@@ -50,21 +54,9 @@ async function setupAndLogin(): Promise<{ token: string; jti: string; userId: st
   });
   createdUserIds.push(user.id);
 
-  const r = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PW }),
-  });
-
-  if (!r.ok) {
-    const body = await r.text();
-    throw new Error(`login failed (${r.status}): ${body}`);
-  }
-
-  const json = await r.json();
-  const token = json.data.accessToken as string;
+  const { accessToken: token } = await legacySessionFor(user.id);
   const decoded = jwt.decode(token) as { jti?: string } | null;
-  if (!decoded?.jti) throw new Error('access token missing jti claim — Task 5 not applied?');
+  if (!decoded?.jti) throw new Error('access token missing jti claim');
 
   return { token, jti: decoded.jti, userId: user.id };
 }
@@ -85,7 +77,28 @@ describe('access-token revocation', () => {
   });
 
   it('login stamps jti and tv on the access token (Task 5)', async () => {
-    const { token } = await setupAndLogin();
+    // The real Store login path (/auth/login) is still open for customer accounts, so Task 5's stamping is proven there.
+    const email = `revoke-cust-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.test`;
+    const customer = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await bcrypt.hash(PW, 10),
+        firstName: 'Rev',
+        lastName: 'Cust',
+        role: 'customer',
+        emailVerified: true,
+        storeId: null,
+      },
+      select: { id: true },
+    });
+    createdUserIds.push(customer.id);
+    const r = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: PW }),
+    });
+    expect(r.status).toBe(200);
+    const token = (await r.json()).data.accessToken as string;
     const decoded = jwt.decode(token) as Record<string, unknown> | null;
     expect(decoded).not.toBeNull();
     // jti must be a UUID

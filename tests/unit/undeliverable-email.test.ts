@@ -51,7 +51,7 @@ describe('undeliverable addresses', () => {
 describe('StoreMailer refuses *.invalid recipients', () => {
   beforeEach(() => {
     clearCfBindings();
-    setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, EMAIL: { send } });
+    setCfBindings({ EMAIL: { send } });
   });
 
   it('sendBrandedEmail to a placeholder never reaches the provider', async () => {

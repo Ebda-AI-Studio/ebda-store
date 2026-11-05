@@ -1,4 +1,5 @@
 import { prisma } from '@ebda/database';
+import { storeMoney } from '../../lib/repo-factory';
 
 export interface TrialBalanceRow {
   accountId: string;
@@ -54,6 +55,24 @@ async function accountTotals(
   storeId: string,
   window: { from?: Date; to?: Date }
 ): Promise<TrialBalanceRow[]> {
+  // A store on its Durable Object answers from its own ledger (Ruling CF-JOBS-4): the same totals, one statement in the DO.
+  const money = await storeMoney(storeId);
+  if (money) {
+    const { rows } = await money.accountTotals({
+      ...(window.from ? { fromMs: window.from.getTime() } : {}),
+      ...(window.to ? { toMs: window.to.getTime() } : {}),
+    });
+    return rows.map(r => ({
+      accountId: r.id,
+      code: r.code,
+      nameEn: r.nameEn,
+      nameAr: r.nameAr,
+      type: r.type,
+      debitTotal: r.debit,
+      creditTotal: r.credit,
+      balance: r.debit - r.credit,
+    }));
+  }
   // Prisma 6.19 $queryRawUnsafe rejects JS Date objects ("Could not convert
   // from JSON date object to PrismaValue"), so pass an ISO string. A bound
   // string binds as `text`, and `posted_at` is `timestamp without time zone`

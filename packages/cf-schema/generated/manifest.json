@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 122,
+      "tables": 131,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -23,6 +23,7 @@
         "product_option_values": 8,
         "product_variants": 24,
         "product_models": 16,
+        "search_query_daily": 8,
         "product_price_tiers": 9,
         "wholesale_applications": 15,
         "size_charts": 11,
@@ -44,7 +45,7 @@
         "notification_configs": 8,
         "notification_event_configs": 6,
         "push_subscriptions": 9,
-        "onesignal_subscriptions": 6,
+        "notification_logs": 13,
         "abandoned_carts": 23,
         "abandoned_cart_configs": 16,
         "product_relations": 7,
@@ -101,6 +102,11 @@
         "customer_cohort_snapshots": 9,
         "funnel_snapshots": 11,
         "customer_rfm_snapshots": 11,
+        "product_daily_views": 5,
+        "qr_scan_daily": 6,
+        "gsc_daily_metrics": 10,
+        "ci_hint_logs": 11,
+        "ci_store_gates": 9,
         "count_sessions": 10,
         "count_lines": 8,
         "bank_statements": 9,
@@ -122,6 +128,9 @@
         "store_whatsapp_consents": 12,
         "eta_connections": 15,
         "eta_receipts": 25,
+        "catalog_import_jobs": 16,
+        "catalog_import_files": 20,
+        "catalog_import_items": 26,
         "store_profile": 62,
         "store_config": 24,
         "commerce_outcomes": 14,
@@ -130,7 +139,7 @@
       }
     },
     "d1": {
-      "tables": 28,
+      "tables": 31,
       "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
@@ -142,12 +151,15 @@
         "legal_notice_sends": 6,
         "legal_notice_deliveries": 8,
         "store_features": 7,
+        "onesignal_subscriptions": 6,
+        "ai_usage": 11,
         "store_usage_snapshots": 21,
+        "ci_insights": 12,
         "answer_engine_provider_configs": 5,
         "merchant_api_keys": 12,
         "plans": 12,
         "store_subscriptions": 27,
-        "billing_events": 21,
+        "billing_events": 30,
         "instapay_receipts": 38,
         "manual_payment_claims": 17,
         "billing_reminders": 6,
@@ -159,7 +171,7 @@
         "billing_referrals": 3,
         "billing_grants": 17,
         "stores": 31,
-        "entity_index": 4,
+        "entity_index": 5,
         "platform_audit_log": 8
       }
     }
@@ -1195,6 +1207,96 @@
       "name": "store_subscriptions_billing_anchor_day_check",
       "table": "store_subscriptions",
       "disposition": "d1:store_subscriptions"
+    },
+    {
+      "kind": "check",
+      "name": "ci_insights_status_check",
+      "table": "ci_insights",
+      "disposition": "d1:ci_insights"
+    },
+    {
+      "kind": "check",
+      "name": "ci_hint_logs_band_check",
+      "table": "ci_hint_logs",
+      "disposition": "store-do:ci_hint_logs"
+    },
+    {
+      "kind": "check",
+      "name": "ci_hint_logs_source_check",
+      "table": "ci_hint_logs",
+      "disposition": "store-do:ci_hint_logs"
+    },
+    {
+      "kind": "check",
+      "name": "ci_hint_logs_outcome_check",
+      "table": "ci_hint_logs",
+      "disposition": "store-do:ci_hint_logs"
+    },
+    {
+      "kind": "check",
+      "name": "ci_store_gates_feature_check",
+      "table": "ci_store_gates",
+      "disposition": "store-do:ci_store_gates"
+    },
+    {
+      "kind": "check",
+      "name": "ci_store_gates_band_check",
+      "table": "ci_store_gates",
+      "disposition": "store-do:ci_store_gates"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_jobs_status_chk",
+      "table": "catalog_import_jobs",
+      "disposition": "store-do:catalog_import_jobs"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_files_status_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_files_pages_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_files_charged_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_status_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_tags_max_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_variants_max_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_price_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "catalog_import_items_len_chk",
+      "table": "catalog_import_items",
+      "disposition": "store-do:catalog_import_items"
     },
     {
       "kind": "index",

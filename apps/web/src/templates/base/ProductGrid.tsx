@@ -2,7 +2,7 @@
 
 import type { ProductGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getGridColsClass, getDisplayTitle } from '../shared';
+import { getGridColsClass, getDisplayTitle, fitDesktopColumns } from '../shared';
 import ProductCard from './ProductCard';
 
 export default function MinimalProductGrid({
@@ -24,7 +24,7 @@ export default function MinimalProductGrid({
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
-  const gridCols = getGridColsClass(columns);
+  const gridCols = getGridColsClass(fitDesktopColumns(products.length, columns) as 2 | 3 | 4 | 5);
 
   return (
     <section
@@ -40,7 +40,7 @@ export default function MinimalProductGrid({
         )}
 
         {/* Products Grid */}
-        <div className={`grid ${gridCols} gap-3 md:gap-4`}>
+        <div data-part="product-grid" className={`grid ${gridCols} gap-3 md:gap-4`}>
           {products.map((product, i) => (
             // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
             // motion-safe only — no layout shift (opacity/transform only).

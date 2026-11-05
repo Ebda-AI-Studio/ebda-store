@@ -19,7 +19,9 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { planDeficit } from '../lib/warehouse-deficit';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { storeStock } from '../lib/repo-factory';
 import { searchProductIdSet, searchVariantIdsBySku } from './product-search.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -510,6 +512,20 @@ export class WarehouseService {
       throw new AppError(400, 'INVALID_QUANTITY', 'Quantity cannot be negative');
     }
 
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): the checks, the upsert and the aggregate sum are ONE section.
+      await stock.setWarehouseStock({
+        warehouseId,
+        productId: input.productId,
+        variantId: input.variantId ?? null,
+        quantity: input.quantity,
+      });
+      await notifyCatalogChanged({ storeId, productIds: [input.productId] });
+      await invalidateStoreProductCaches(storeId);
+      return;
+    }
+
     // Verify warehouse belongs to store
     const warehouse = await prisma.warehouse.findFirst({
       where: { id: warehouseId, storeId },
@@ -523,7 +539,7 @@ export class WarehouseService {
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
     const variantId = input.variantId ?? null;
-    await WarehouseService.assertNotVariantProductLevel(input.productId, variantId);
+    await WarehouseService.assertNotVariantProductLevel(storeId, input.productId, variantId);
 
     await retryOnWriteConflict(
       () =>
@@ -559,6 +575,21 @@ export class WarehouseService {
     warehouseId: string,
     input: StockAdjustInput
   ): Promise<{ newQuantity: number }> {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): checks, upsert, aggregate sum and the audit row are ONE section.
+      const r = await stock.adjustWarehouseStock({
+        warehouseId,
+        productId: input.productId,
+        variantId: input.variantId ?? null,
+        delta: input.delta,
+        reason: input.reason,
+      });
+      await notifyCatalogChanged({ storeId, productIds: [input.productId] });
+      await invalidateStoreProductCaches(storeId);
+      return { newQuantity: r.newQuantity };
+    }
+
     // Verify warehouse belongs to store
     const warehouse = await prisma.warehouse.findFirst({
       where: { id: warehouseId, storeId },
@@ -572,7 +603,7 @@ export class WarehouseService {
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
     const variantId = input.variantId ?? null;
-    await WarehouseService.assertNotVariantProductLevel(input.productId, variantId);
+    await WarehouseService.assertNotVariantProductLevel(storeId, input.productId, variantId);
 
     const newQty = await retryOnWriteConflict(
       () =>
@@ -640,10 +671,21 @@ export class WarehouseService {
    * loud, as InventoryService.adjustInventory does.
    */
   private static async assertNotVariantProductLevel(
+    storeId: string,
     productId: string,
     variantId: string | null
   ): Promise<void> {
-    if (variantId) return;
+    if (variantId) {
+      // BE:S-25: the caller verified the product belongs to the store; the variant must belong to THAT product.
+      // Same pooled client as the surrounding writes (this path runs only after the DO early-return, i.e. on Postgres). A second
+      // client lease per call (`storeDb`) exhausted the pool under 20 concurrent adjustments (tests/integration/warehouse/stock-race).
+      const own = await prisma.productVariant.findFirst({
+        where: { id: variantId, productId, product: { storeId } },
+        select: { id: true },
+      });
+      if (!own) throw new AppError(404, 'VARIANT_NOT_FOUND', 'Variant not found');
+      return;
+    }
     const variantCount = await prisma.productVariant.count({ where: { productId } });
     if (variantCount > 0) {
       throw new AppError(
@@ -706,7 +748,7 @@ export class WarehouseService {
             RETURNING quantity
           `;
 
-    // Stock changed: Ebda WhatsApp must see availability (raw SQL bypasses the db write observer).
+    // Stock changed: Ebda Chat must see availability (raw SQL bypasses the db write observer).
     await notifyCatalogChanged({ storeId: args.storeId, productIds: [args.productId] });
     return rows[0].quantity;
   }
@@ -862,20 +904,11 @@ export class WarehouseService {
    * `INSERT … ON CONFLICT … RETURNING` helper Task 1 built — applying the
    * diff as a relative delta to the default warehouse's row.
    *
-   * Clamp-vs-negative decision (documented + tested, see
-   * task-2-report.md): the default warehouse's row is allowed to go
-   * NEGATIVE. This is deliberate — the invariant this helper exists to
-   * restore is `SUM(WarehouseStock for this SKU) === authoritative
-   * aggregate`, always, exactly. Clamping the default's absorption at 0
-   * would silently re-introduce drift whenever the default warehouse cannot
-   * absorb the full diff on its own (e.g. default holds 2 units, diff is
-   * -9): clamping leaves SUM off by the unabsorbed residual, which is
-   * exactly the bug this task fixes, just smaller. Allow-negative keeps the
-   * invariant exact in every case. A negative per-warehouse row is a
-   * reconciliation signal (this warehouse's shadow has never legitimately
-   * gone negative from `adjustStock`, which still floors at 0) — a
-   * follow-up could surface/alert on it, but that's out of this task's
-   * scope (helper + backfill only, no wiring).
+   * Clamp-vs-negative decision (Ruling WAREHOUSE-NEG-1, supersedes the earlier allow-negative-on-default policy): a
+   * SURPLUS goes to the default warehouse's row; a DEFICIT is spread over the SKU's rows (default first, then
+   * priority desc, created_at asc), each giving at most its own quantity, so NO row ever goes negative and
+   * SUM(rows) still equals the aggregate. If the rows cannot cover the deficit (the aggregate itself is below what the
+   * rows hold) every row is floored at 0 and the shortfall is logged as `reconcile_shortfall` (alert), never negative.
    *
    * Deadlock-safety (fix wave 1, 2026-07): `setStock`/`adjustStock` lock
    * WarehouseStock (via `upsertWarehouseStock`'s own row lock/upsert) FIRST,
@@ -913,6 +946,9 @@ export class WarehouseService {
     productId: string,
     variantId: string | null = null
   ): Promise<{ reconciled: boolean; diff: number }> {
+    // A store on its Durable Object (Ruling CF-JOBS-4): the aggregate, the shadow sum and the writes are ONE section there.
+    const doStock = await storeStock(storeId);
+    if (doStock) return doStock.reconcileWarehouseSku({ productId, variantId });
     // Fast path: single-/no-warehouse stores (the majority of merchants)
     // have no WarehouseStock rows to drift — nothing to reconcile.
     const warehouseCount = await prisma.warehouse.count({ where: { storeId } });
@@ -969,19 +1005,65 @@ export class WarehouseService {
             return { reconciled: false, diff: 0 };
           }
 
-          // Apply the diff as a relative delta to the default warehouse's row
-          // — works identically whether or not that row existed before
-          // (initialQty covers the INSERT branch). No GREATEST(0, …) clamp:
-          // see docstring.
-          await WarehouseService.upsertWarehouseStock(tx, {
-            warehouseId: defaultWarehouse.id,
-            productId,
-            variantId,
-            storeId,
-            setExpr: Prisma.sql`"warehouse_stock"."quantity" + ${diff}`,
-            initialQty: diff,
-          });
+          if (diff > 0) {
+            // Surplus: the default warehouse's row takes it (INSERT branch covers a row that did not exist yet).
+            await WarehouseService.upsertWarehouseStock(tx, {
+              warehouseId: defaultWarehouse.id,
+              productId,
+              variantId,
+              storeId,
+              setExpr: Prisma.sql`"warehouse_stock"."quantity" + ${diff}`,
+              initialQty: diff,
+            });
+            return { reconciled: true, diff };
+          }
 
+          // Deficit (WAREHOUSE-NEG-1): spread it over the SKU's warehouse rows, default first, so NO row goes negative.
+          // Order is shared with the Durable Object (packages/repo/src/do/stock-ops.ts reconcileToAggregate).
+          const rows = variantId
+            ? await tx.$queryRaw<Array<{ warehouse_id: string; quantity: number }>>`
+                SELECT ws."warehouse_id", ws."quantity" FROM "warehouse_stock" ws
+                JOIN "warehouses" w ON w."id" = ws."warehouse_id"
+                WHERE ws."store_id" = ${storeId} AND ws."product_id" = ${productId} AND ws."variant_id" = ${variantId}
+                ORDER BY (ws."warehouse_id" = ${defaultWarehouse.id}) DESC, w."priority" DESC, w."created_at" ASC, ws."warehouse_id" ASC
+                FOR UPDATE OF ws
+              `
+            : await tx.$queryRaw<Array<{ warehouse_id: string; quantity: number }>>`
+                SELECT ws."warehouse_id", ws."quantity" FROM "warehouse_stock" ws
+                JOIN "warehouses" w ON w."id" = ws."warehouse_id"
+                WHERE ws."store_id" = ${storeId} AND ws."product_id" = ${productId} AND ws."variant_id" IS NULL
+                ORDER BY (ws."warehouse_id" = ${defaultWarehouse.id}) DESC, w."priority" DESC, w."created_at" ASC, ws."warehouse_id" ASC
+                FOR UPDATE OF ws
+              `;
+          const { takes, shortfall } = planDeficit(
+            rows.map(r => ({ id: r.warehouse_id, quantity: r.quantity })),
+            -diff
+          );
+          for (const t of takes) {
+            await WarehouseService.upsertWarehouseStock(tx, {
+              warehouseId: t.id,
+              productId,
+              variantId,
+              storeId,
+              setExpr: Prisma.sql`"warehouse_stock"."quantity" - ${t.amount}`,
+              initialQty: 0,
+            });
+          }
+          if (shortfall > 0) {
+            // Impossible to honour SUM == aggregate without a negative row (the aggregate itself is below what the
+            // rows hold, or a row was already negative): leave every row at >= 0 and ALERT, never go negative.
+            logger.error(
+              {
+                storeId,
+                productId,
+                variantId,
+                aggregate: authoritative,
+                shadowSum: currentSum,
+                shortfall,
+              },
+              '[Warehouse] reconcile_shortfall: deficit exceeds the warehouse stock; rows floored at 0, shadow still above the aggregate (WAREHOUSE-NEG-1)'
+            );
+          }
           return { reconciled: true, diff };
         }),
       {
@@ -1019,6 +1101,22 @@ export class WarehouseService {
   static async backfillReconcileAll(
     storeId: string
   ): Promise<{ skusReconciled: number; skusFailed: number }> {
+    // A store on its Durable Object (Ruling CF-JOBS-4): paged sections there, each reconciling up to 500 SKUs.
+    const doStock = await storeStock(storeId);
+    if (doStock) {
+      let skusReconciled = 0;
+      let skusFailed = 0;
+      let afterKey: string | null = null;
+      for (;;) {
+        const page: Awaited<ReturnType<typeof doStock.reconcileWarehouseAll>> =
+          await doStock.reconcileWarehouseAll({ limit: 500, afterKey });
+        skusReconciled += page.skusReconciled;
+        skusFailed += page.skusFailed;
+        if (!page.more || !page.nextKey) break;
+        afterKey = page.nextKey;
+      }
+      return { skusReconciled, skusFailed };
+    }
     const warehouseCount = await prisma.warehouse.count({ where: { storeId } });
     if (warehouseCount === 0) {
       return { skusReconciled: 0, skusFailed: 0 };

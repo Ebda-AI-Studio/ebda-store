@@ -1,10 +1,17 @@
 /**
  * SP5 task 2 - self-serve onboarding, end to end against a real Postgres.
  *
- * signup -> verify (token read from the CAPTURED mail; nothing is ever sent
- * outside production) -> login -> create store (inactive, free plan) -> pick a
+ * signup -> verify -> sign in -> create store (inactive, free plan) -> pick a
  * template -> first product -> payment method -> go live -> the store answers
  * at `<slug>.ebda.app` (x-store-domain, as apps/web forwards the Host).
+ *
+ * Since Stage 3 (Rulings ID-1/ID-2) the merchant's credential, the verification code and mail, its cooldown and the sign-in
+ * live in the shared identity service (accounts); it is not reachable from this in-process harness, so a recording fake
+ * stands in for its `createUser` / `resendVerification` and a signed-in session is the HS256 token the Store accepts
+ * in-process. Covered there: apps/accounts/test/identity.test.ts ('signup answers the same for a new and an existing address,
+ * mails a code, and verifies the email') and apps/accounts/test/rpc.test.ts. The Store keeps, and this file proves: the id
+ * handshake and profile row, the duplicate-signup notice, the Store's verification-token engine, the store creation gate,
+ * slugs, plan caps and the rest of the funnel.
  *
  * Mutation proofs (run by hand, recorded in the commit body):
  *   1. onboarding.routes.ts: drop `requireVerifiedEmail` from POST /store ->
@@ -36,7 +43,8 @@ import {
   latestCapturedMailTo,
   tokenFromCapturedMail,
 } from '@api/services/platform-mailer';
-import { hasDb } from '../helpers/bundle-fixtures';
+import { configureIdentityClient } from '@api/lib/identity-client';
+import { hasDb, storeAdminAccessTokenFor } from '../helpers/bundle-fixtures';
 
 // Card paths are exercised explicitly; the product default is InstaPay-only.
 process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
@@ -81,6 +89,9 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
   // `caps stores per owner` exercises the LIFETIME cap (3); the daily cap has its own suite.
   process.env.STORES_PER_ACCOUNT_PER_DAY = '10';
   const api = () => request(app);
+  /** What the (fake) identity service was asked to do. */
+  const created: Array<{ id?: string; email: string; password: string }> = [];
+  const resent: string[] = [];
 
   async function signup(email: string, extra: Record<string, unknown> = {}) {
     // Abuse controls (SP5 task 4): the signed form token the signup form fetches.
@@ -98,15 +109,30 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         ...extra,
       });
   }
-  async function verify(email: string) {
-    const token = tokenFromCapturedMail(latestCapturedMailTo(email));
-    expect(token, 'verification mail captured').toBeTruthy();
-    return { token: token!, res: await api().post('/api/v1/auth/verify-email').send({ token }) };
+  /** The Store's verification-token engine: seed the hashed one-time token the mail used to carry, then redeem it. */
+  async function seedVerification(
+    email: string,
+    expiresAt = new Date(Date.now() + 24 * 3_600_000)
+  ) {
+    const user = await prisma.user.findFirstOrThrow({ where: { email, storeId: null } });
+    const token = crypto.randomBytes(32).toString('hex');
+    await prisma.verificationToken.create({
+      data: {
+        userId: user.id,
+        token: crypto.createHash('sha256').update(token).digest('hex'),
+        expiresAt,
+      },
+    });
+    return { token, userId: user.id };
   }
+  async function verify(email: string) {
+    const { token } = await seedVerification(email);
+    return { token, res: await api().post('/api/v1/auth/verify-email').send({ token }) };
+  }
+  /** A signed-in merchant session. Sign-in is the identity service's; in-process the Store accepts its own token for the profile row. */
   async function login(email: string) {
-    const res = await api().post('/api/v1/auth/login').send({ email, password: PASSWORD });
-    expect(res.status).toBe(200);
-    return res.body.data.accessToken as string;
+    const user = await prisma.user.findFirstOrThrow({ where: { email, storeId: null } });
+    return storeAdminAccessTokenFor(user.id);
   }
   /** Signup funnel: save a card on the stub provider (nothing charged). */
   async function saveCard(jwt: string, storeId: string) {
@@ -144,11 +170,22 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
   beforeAll(() => {
     app = buildApp();
     clearCapturedMail();
+    configureIdentityClient({
+      createUser: async i => {
+        created.push({ id: i.id, email: i.email, password: i.password });
+        return { id: i.id! };
+      },
+      resendVerification: async email => void resent.push(email),
+      revokeUser: async () => undefined,
+    });
   });
-  afterAll(wipe);
+  afterAll(async () => {
+    configureIdentityClient(undefined);
+    await wipe();
+  });
 
   describe('signup + email verification', () => {
-    it('creates an UNVERIFIED store_admin and mails a 24h single-use token (captured, never sent)', async () => {
+    it('creates an UNVERIFIED store_admin profile under the id the Store chose; the credential goes to the identity service only', async () => {
       const email = mkEmail('signup');
       const res = await signup(email, { phone: '010 1234 5678', language: 'ar' });
       expect(res.status).toBe(200);
@@ -162,18 +199,15 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       expect(user.emailVerified).toBe(false);
       expect(user.storeId).toBeNull();
       expect(user.phone).toBe('+201012345678'); // normalised E.164
-      expect(user.passwordHash).not.toContain(PASSWORD);
+      expect(user.passwordHash).not.toContain(PASSWORD); // the Store stores no credential for a merchant
 
-      const mail = latestCapturedMailTo(email);
-      expect(mail?.subject).toBeTruthy();
-      const token = tokenFromCapturedMail(mail)!;
-      // The plaintext token is only in the mail; the DB holds its SHA-256.
-      const row = await prisma.verificationToken.findFirstOrThrow({ where: { userId: user.id } });
-      expect(row.token).not.toBe(token);
-      expect(row.token).toBe(crypto.createHash('sha256').update(token).digest('hex'));
-      const hours = (row.expiresAt.getTime() - Date.now()) / 3_600_000;
-      expect(hours).toBeGreaterThan(23.9);
-      expect(hours).toBeLessThanOrEqual(24);
+      // The identity service got the password and the id this request generated; it mails the 24h code (accounts tests).
+      const call = created.find(c => c.email === email)!;
+      expect(call.id).toBe(user.id);
+      expect(call.password).toBe(PASSWORD);
+      // The Store issued neither a verification token nor a mail of its own.
+      expect(await prisma.verificationToken.count({ where: { userId: user.id } })).toBe(0);
+      expect(latestCapturedMailTo(email)).toBeFalsy();
     });
 
     it('rejects a weak password, a bad email and a non-Egyptian phone', async () => {
@@ -188,6 +222,7 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       const first = await signup(email);
       await verify(email);
       clearCapturedMail();
+      const createdBefore = created.length;
       // Different case on purpose: the duplicate check is case-insensitive.
       const second = await signup(email.toUpperCase());
       expect(second.status).toBe(first.status);
@@ -195,21 +230,21 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       expect(
         await prisma.user.count({ where: { email: { equals: email, mode: 'insensitive' } } })
       ).toBe(1);
+      expect(created.length, 'no second identity is created for a verified address').toBe(
+        createdBefore
+      );
       // The rightful owner is told, with no verification link.
       const notice = latestCapturedMailTo(email);
       expect(notice).toBeTruthy();
-      expect(tokenFromCapturedMail(notice)).toBeNull();
+      expect(tokenFromCapturedMail(notice)).toBeFalsy();
     });
 
     it('an expired token is refused and the user stays unverified', async () => {
       const email = mkEmail('expired');
       await signup(email);
       const user = await prisma.user.findFirstOrThrow({ where: { email } });
-      await prisma.verificationToken.updateMany({
-        where: { userId: user.id },
-        data: { expiresAt: new Date(Date.now() - 1000) },
-      });
-      const { res } = await verify(email);
+      const { token } = await seedVerification(email, new Date(Date.now() - 1000));
+      const res = await api().post('/api/v1/auth/verify-email').send({ token });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('TOKEN_EXPIRED');
       expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).emailVerified).toBe(
@@ -236,37 +271,25 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       expect(res.status).toBe(400);
     });
 
-    it('resend answers generically, mails only unverified accounts, and honours a cooldown', async () => {
-      const unknown = await api()
-        .post('/api/v1/auth/merchant/resend-verification')
-        .send({ email: mkEmail('nobody') });
-      expect(unknown.status).toBe(200);
-      expect(unknown.body.data).toEqual({ emailVerificationSent: true });
-      expect(latestCapturedMailTo(emails[emails.length - 1])).toBeUndefined();
-
+    it('resend answers generically and hands every address to the identity service; the Store mails nothing and keeps no token', async () => {
+      // Which addresses get a code, the 60s cooldown and the token rotation are the identity service's
+      // (apps/accounts/test/rpc.test.ts resendVerification); the Store's half is the uniform answer and the hand-over.
+      const unknown = mkEmail('nobody');
       const email = mkEmail('resend');
       await signup(email);
-      const before = getCapturedMail().filter(m => m.to === email).length;
-      // Inside the 60s cooldown: generic 200, no second mail.
-      const again = await api().post('/api/v1/auth/merchant/resend-verification').send({ email });
-      expect(again.body).toEqual(unknown.body);
-      expect(getCapturedMail().filter(m => m.to === email).length).toBe(before);
-      // Past the cooldown: a fresh token is mailed and the old one stops working.
-      const oldToken = tokenFromCapturedMail(latestCapturedMailTo(email))!;
-      await prisma.verificationToken.updateMany({
-        data: { createdAt: new Date(Date.now() - 120_000) },
-        where: { user: { email } },
-      });
-      await api().post('/api/v1/auth/merchant/resend-verification').send({ email });
-      expect(getCapturedMail().filter(m => m.to === email).length).toBe(before + 1);
-      const newToken = tokenFromCapturedMail(latestCapturedMailTo(email))!;
-      expect(newToken).not.toBe(oldToken);
-      expect((await api().post('/api/v1/auth/verify-email').send({ token: oldToken })).status).toBe(
-        400
-      );
-      expect((await api().post('/api/v1/auth/verify-email').send({ token: newToken })).status).toBe(
-        200
-      );
+      clearCapturedMail();
+      const a = await api()
+        .post('/api/v1/auth/merchant/resend-verification')
+        .send({ email: unknown });
+      const b = await api().post('/api/v1/auth/merchant/resend-verification').send({ email });
+      expect(a.status).toBe(200);
+      expect(a.body.data).toEqual({ emailVerificationSent: true });
+      expect(b.status).toBe(a.status);
+      expect(b.body).toEqual(a.body);
+      expect(resent).toEqual(expect.arrayContaining([unknown, email]));
+      expect(getCapturedMail().filter(m => m.to === email || m.to === unknown)).toHaveLength(0);
+      const user = await prisma.user.findFirstOrThrow({ where: { email } });
+      expect(await prisma.verificationToken.count({ where: { userId: user.id } })).toBe(0);
     });
   });
 
@@ -274,7 +297,7 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
     it('an unverified user can log in but cannot create a store', async () => {
       const email = mkEmail('unverified');
       await signup(email);
-      const jwt = await login(email); // login itself is allowed
+      const jwt = await login(email); // a signed-in session exists before the e-mail is verified
       const res = await api()
         .post('/api/v1/onboarding/store')
         .set(bearer(jwt))
@@ -306,7 +329,11 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
           emailVerified: true,
         },
       });
-      const jwt = await login(customer.email);
+      const loginRes = await api()
+        .post('/api/v1/auth/login')
+        .send({ email: customer.email, password: PASSWORD });
+      expect(loginRes.status).toBe(200);
+      const jwt = loginRes.body.data.accessToken as string;
       const res = await api()
         .post('/api/v1/onboarding/store')
         .set(bearer(jwt))

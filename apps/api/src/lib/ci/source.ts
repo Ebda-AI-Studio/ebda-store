@@ -3,7 +3,8 @@
  * today `prismaCiSource` (Postgres, one row per call, by id, under the store's tenant scope); after the
  * StoreDO cutover the repo layer supplies a StoreDO-backed one. No method scans a table.
  */
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInStoreScope, runInTenantContext, withUser } from '@ebda/database';
+import { storeMoney, storeRepo, type StoreRepo, type StoreReads } from '../repo-factory';
 import { toE164 } from '@ebda/shared';
 import { areaKeyFor, type AreaKeyResult } from './area-key';
 
@@ -11,6 +12,8 @@ export interface CiOrderFacts {
   id: string;
   storeId: string;
   totalMinor: number;
+  /** What the buyer was charged for shipping (`orders.shipping`, piastres). */
+  shippingMinor: number;
   currency: string;
   channel: string;
   status: string;
@@ -21,6 +24,7 @@ export interface CiOrderFacts {
   phoneE164: string | null;
   area: AreaKeyResult;
   payments: Array<{
+    id: string;
     provider: string;
     method: string | null;
     status: string;
@@ -49,10 +53,26 @@ export interface CiShipmentFacts {
   returnReasonRaw: string | null;
 }
 
+/** An abandoned-cart row, reduced to when reminders went out and when (if) the cart turned into an order. */
+export interface CiAbandonedCartFacts {
+  id: string;
+  firstReminderAt: Date | null;
+  /** Which sender reached the buyer FIRST: the push/SMS/WhatsApp steps, or the recovery email. */
+  firstChannel: 'email' | 'notification' | null;
+  recoveredAt: Date | null;
+}
+
+export interface CiStoreSetupFacts {
+  /** When the owner's account was created (the signup), or null if unknown. */
+  ownerSignupAt: Date | null;
+  template: string | null;
+  ciSharing: boolean;
+}
+
 export interface CiSource {
   order(storeId: string, orderId: string): Promise<CiOrderFacts | null>;
   shipment(storeId: string, shipmentId: string): Promise<CiShipmentFacts | null>;
-  /** Did a WhatsApp COD answer already drive this order (Ebda WhatsApp emitted that outcome itself)? */
+  /** Did a WhatsApp COD answer already drive this order (Ebda Chat emitted that outcome itself)? */
   hasWhatsAppCodOutcome(storeId: string, orderId: string): Promise<boolean>;
   /** Earlier orders by the same buyer in THIS store (a point count on (store, buyerKey)), or null if unknown. */
   priorOrdersByBuyer(
@@ -67,21 +87,45 @@ export interface CiSource {
     orderId: string,
     v: { areaKey: string | null; buyerKey: string | null }
   ): Promise<void>;
+  abandonedCart(storeId: string, abandonedCartId: string): Promise<CiAbandonedCartFacts | null>;
+  storeSetup(storeId: string): Promise<CiStoreSetupFacts | null>;
   /** The shipment's own flag for ciSharing lookups of a shipment's store. */
   storeCiSharing(storeId: string): Promise<boolean>;
 }
 
 const toNum = (d: unknown): number | null => (d == null ? null : Number(d));
 
+/**
+ * Run `fn` for a store on its backend (Ruling CF-JOBS-4): a store on its Durable Object reads through its DO client in the
+ * store's scope, a Postgres store keeps `runInTenantContext` and `prisma` exactly as before (`repo.db` IS `prisma` there).
+ */
+async function inStore<T>(
+  storeId: string,
+  fn: (db: StoreReads, repo: StoreRepo) => Promise<T>
+): Promise<T> {
+  const repo = await storeRepo(storeId);
+  return repo.backend === 'do'
+    ? runInStoreScope(storeId, () => fn(repo.db, repo))
+    : runInTenantContext(storeId, () => fn(repo.db, repo));
+}
+
+/** The store's CI-sharing switch: a platform (`stores`) row, read in a short Postgres scope for either backend. */
+async function readCiSharing(storeId: string): Promise<{ ciSharing: boolean } | null> {
+  return runInTenantContext(storeId, () =>
+    prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } })
+  );
+}
+
 export const prismaCiSource: CiSource = {
   async order(storeId, orderId) {
-    return runInTenantContext(storeId, async () => {
+    return inStore(storeId, async (db, repo) => {
       const [o, store] = await Promise.all([
-        prisma.order.findFirst({
+        db.order.findFirst({
           where: { id: orderId, storeId },
           select: {
             id: true,
             total: true,
+            shipping: true,
             currency: true,
             source: true,
             status: true,
@@ -91,6 +135,7 @@ export const prismaCiSource: CiSource = {
             _count: { select: { items: true } },
             payments: {
               select: {
+                id: true,
                 provider: true,
                 method: true,
                 status: true,
@@ -106,7 +151,7 @@ export const prismaCiSource: CiSource = {
             shipment: { select: { pickedUpAt: true, returnedAt: true } },
           },
         }),
-        prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } }),
+        readCiSharing(storeId),
       ]);
       if (!o) return null;
       const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
@@ -115,6 +160,7 @@ export const prismaCiSource: CiSource = {
         id: o.id,
         storeId,
         totalMinor: o.total,
+        shippingMinor: o.shipping,
         currency: o.currency,
         channel: o.source || 'web',
         status: String(o.status),
@@ -142,8 +188,8 @@ export const prismaCiSource: CiSource = {
   },
 
   async shipment(storeId, shipmentId) {
-    return runInTenantContext(storeId, async () => {
-      const s = await prisma.shipment.findFirst({
+    return inStore(storeId, async (db, repo) => {
+      const s = await db.shipment.findFirst({
         where: { id: shipmentId, storeId },
         select: {
           id: true,
@@ -184,8 +230,17 @@ export const prismaCiSource: CiSource = {
   },
 
   async hasWhatsAppCodOutcome(storeId, orderId) {
-    return runInTenantContext(storeId, async () => {
-      const row = await prisma.auditLog.findFirst({
+    return inStore(storeId, async (db, repo) => {
+      // the DO read client has no JSON-path filter: read the order's COD outcome rows and test `details.source` here
+      if (repo.backend === 'do') {
+        const rows = await db.auditLog.findMany({
+          where: { storeId, action: 'order.cod_outcome', resourceId: orderId },
+          select: { details: true },
+          take: 50,
+        });
+        return rows.some(r => (r.details as { source?: unknown } | null)?.source === 'whatsapp');
+      }
+      const row = await db.auditLog.findFirst({
         where: {
           storeId,
           action: 'order.cod_outcome',
@@ -199,20 +254,75 @@ export const prismaCiSource: CiSource = {
   },
 
   async priorOrdersByBuyer(storeId, buyerKey, before, excludeOrderId) {
-    return runInTenantContext(storeId, () =>
-      prisma.order.count({
+    return inStore(storeId, db =>
+      db.order.count({
         where: { storeId, buyerKey, id: { not: excludeOrderId }, createdAt: { lt: before } },
       })
     );
   },
 
   async stampOrder(storeId, orderId, v) {
+    const money = await storeMoney(storeId);
+    if (money) {
+      // an order is a money row on the DO: its CI stamp is a named op (only while both are still null)
+      await money.ciOrderStamp({ orderId, areaKey: v.areaKey, buyerKey: v.buyerKey });
+      return;
+    }
     await runInTenantContext(storeId, async () => {
       await prisma.order.updateMany({
         where: { id: orderId, storeId, areaKey: null, buyerKey: null },
         data: { areaKey: v.areaKey, buyerKey: v.buyerKey },
       });
     });
+  },
+
+  async abandonedCart(storeId, abandonedCartId) {
+    return inStore(storeId, async db => {
+      const a = await db.abandonedCart.findFirst({
+        where: { id: abandonedCartId, storeId },
+        select: {
+          id: true,
+          step1SentAt: true,
+          step2SentAt: true,
+          step3SentAt: true,
+          emailSentAt: true,
+          recoveredAt: true,
+        },
+      });
+      if (!a) return null;
+      const push = [a.step1SentAt, a.step2SentAt, a.step3SentAt]
+        .filter((d): d is Date => d != null)
+        .sort((x, y) => x.getTime() - y.getTime())[0];
+      const email = a.emailSentAt ?? undefined;
+      const first = [push, email]
+        .filter((d): d is Date => d != null)
+        .sort((x, y) => x.getTime() - y.getTime())[0];
+      return {
+        id: a.id,
+        firstReminderAt: first ?? null,
+        firstChannel: !first ? null : first === email ? 'email' : 'notification',
+        recoveredAt: a.recoveredAt,
+      };
+    });
+  },
+
+  async storeSetup(storeId) {
+    const s = await runInTenantContext(storeId, () =>
+      prisma.store.findFirst({
+        where: { id: storeId },
+        select: { template: true, ciSharing: true, ownerId: true },
+      })
+    );
+    if (!s) return null;
+    // `users` rows are visible only under their own user context (strict RLS), never the store's.
+    const owner = await withUser(s.ownerId, tx =>
+      tx.user.findFirst({ where: { id: s.ownerId }, select: { createdAt: true } })
+    );
+    return {
+      ownerSignupAt: owner?.createdAt ?? null,
+      template: s.template ? String(s.template) : null,
+      ciSharing: s.ciSharing ?? false,
+    };
   },
 
   async storeCiSharing(storeId) {

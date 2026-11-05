@@ -19,7 +19,7 @@ import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { runInTenantContext } from '@ebda/database';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router({ mergeParams: true });
 
@@ -102,7 +102,7 @@ router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: Ne
       where['paymentGatewayAbandonedAt'] = bounds;
     }
 
-    const [rows, total] = await runInTenantContext(storeId, () =>
+    const [rows, total] = await runInStoreCtx(storeId, () =>
       Promise.all([
         prisma.order.findMany({
           where,
@@ -230,7 +230,7 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const [total, last7d, last30d, totalValueResult] = await runInTenantContext(storeId, () =>
+      const [total, last7d, last30d, totalValueResult] = await runInStoreCtx(storeId, () =>
         Promise.all([
           prisma.order.count({
             where: { storeId, deletedAt: null, paymentGatewayAbandonedAt: { not: null } },

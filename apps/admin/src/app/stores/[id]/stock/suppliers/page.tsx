@@ -7,6 +7,10 @@ import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch } from '@/lib/api';
+import { Button } from '@ebda/ui';
+import { RowActions } from '@/components/RowActions';
+import { PageState } from '@/components/PageState';
+import { useConfirm } from '@/hooks/useConfirm';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +33,7 @@ export default function SuppliersPage() {
   const router = useRouter();
   const t = useT('stock.suppliers');
   const tc = useT('common');
+  const askConfirm = useConfirm();
 
   const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +56,7 @@ export default function SuppliersPage() {
           setSuppliers(data ?? []);
         }
       })
-      .catch(() => setError('Failed to load suppliers'));
+      .catch(() => setError(t('loadFailed')));
   }
 
   useEffect(() => {
@@ -72,132 +77,137 @@ export default function SuppliersPage() {
     );
   }, [suppliers, search]);
 
-  async function handleDeactivate(id: string) {
-    if (!confirm('Deactivate this supplier?')) return;
+  async function handleDeactivate(s: Supplier) {
+    const ok = await askConfirm({
+      object: t('deactivateObject', { name: s.name }),
+      consequence: t('deactivateConsequence'),
+      confirmLabel: t('deactivateAction'),
+    });
+    if (!ok) return;
+    const id = s.id;
     setDeleting(id);
     await apiPatch(`/api/v1/stores/${storeId}/suppliers/${id}`, { isActive: false });
     setDeleting(null);
     load();
   }
 
-  if (error) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!suppliers) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
-      </AdminLayout>
-    );
-  }
-
   return (
-    <AdminLayout title={t('title')} subtitle={t('description')}>
+    <AdminLayout
+      title={t('title')}
+      subtitle={t('description')}
+      actions={
+        <Button
+          className="min-h-11"
+          onClick={() => router.push(`/stores/${storeId}/stock/suppliers/new`)}
+        >
+          {t('newButton')}
+        </Button>
+      }
+    >
       <div className="max-w-5xl space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <SearchInput
-            value={search}
-            onSearch={setSearch}
-            placeholder={t('searchPlaceholder')}
-            className="w-full sm:w-64"
-          />
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/stock/suppliers/new`)}
-            className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
-          >
-            {t('newButton')}
-          </button>
-        </div>
+        <PageState
+          loading={!suppliers && !error}
+          error={error}
+          onRetry={() => {
+            setError(null);
+            load();
+          }}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SearchInput
+              value={search}
+              onSearch={setSearch}
+              placeholder={t('searchPlaceholder')}
+              className="w-full sm:w-64"
+            />
+          </div>
 
-        <DataTable<Supplier>
-          ariaLabel={t('title')}
-          columns={[
-            {
-              header: t('name'),
-              primaryOnMobile: true,
-              cell: s => <span className="font-medium truncate max-w-[12rem] block">{s.name}</span>,
-            },
-            {
-              header: t('contact'),
-              className: 'w-36',
-              cell: s => (
-                <span className="text-muted-foreground truncate block">{s.contactName ?? '—'}</span>
-              ),
-            },
-            {
-              header: t('phone'),
-              className: 'w-32',
-              cell: s => (
-                <span className="text-muted-foreground font-mono text-xs">{s.phone ?? '—'}</span>
-              ),
-            },
-            {
-              header: t('email'),
-              hideOnMobile: true,
-              className: 'w-40',
-              cell: s => (
-                <span className="text-muted-foreground truncate text-xs block">
-                  {s.email ?? '—'}
-                </span>
-              ),
-            },
-            {
-              header: t('paymentTerms'),
-              className: 'w-32',
-              cell: s => (
-                <span className="text-muted-foreground">
-                  {s.paymentTerms === 'custom'
-                    ? `${s.customTermsDays ?? '?'} days`
-                    : t(`terms.${s.paymentTerms}`)}
-                </span>
-              ),
-            },
-            {
-              header: t('active'),
-              mobileBadge: true,
-              className: 'w-20 text-center',
-              cell: s => <span className="text-muted-foreground">{s.isActive ? '✓' : '—'}</span>,
-            },
-            {
-              header: '',
-              alignEnd: true,
-              mobileActions: true,
-              className: 'w-28',
-              cell: s => (
-                <div className="flex gap-2 justify-end">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(`/stores/${storeId}/stock/suppliers/new?supplierId=${s.id}`)
-                    }
-                    className="text-primary text-xs underline underline-offset-2 hover:opacity-80 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
-                  >
-                    {tc('edit')}
-                  </button>
-                  {s.isActive && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeactivate(s.id)}
-                      disabled={deleting === s.id}
-                      className="text-red-600 text-xs underline underline-offset-2 hover:opacity-80 disabled:opacity-40 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
-                    >
-                      {tc('deactivate')}
-                    </button>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredSuppliers ?? []}
-          rowKey={s => s.id}
-          emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
-        />
+          <DataTable<Supplier>
+            ariaLabel={t('title')}
+            columns={[
+              {
+                header: t('name'),
+                primaryOnMobile: true,
+                cell: s => (
+                  <span className="font-medium truncate max-w-[12rem] block">{s.name}</span>
+                ),
+              },
+              {
+                header: t('contact'),
+                className: 'w-36',
+                cell: s => (
+                  <span className="text-muted-foreground truncate block">
+                    {s.contactName ?? '—'}
+                  </span>
+                ),
+              },
+              {
+                header: t('phone'),
+                className: 'w-32',
+                cell: s => (
+                  <span className="text-muted-foreground font-mono text-xs">{s.phone ?? '—'}</span>
+                ),
+              },
+              {
+                header: t('email'),
+                hideOnMobile: true,
+                className: 'w-40',
+                cell: s => (
+                  <span className="text-muted-foreground truncate text-xs block">
+                    {s.email ?? '—'}
+                  </span>
+                ),
+              },
+              {
+                header: t('paymentTerms'),
+                className: 'w-32',
+                cell: s => (
+                  <span className="text-muted-foreground">
+                    {s.paymentTerms === 'custom'
+                      ? t('termsDays', { count: s.customTermsDays ?? 0 })
+                      : t(`terms.${s.paymentTerms}`)}
+                  </span>
+                ),
+              },
+              {
+                header: t('active'),
+                mobileBadge: true,
+                className: 'w-20 text-center',
+                cell: s => <span className="text-muted-foreground">{s.isActive ? '✓' : '—'}</span>,
+              },
+              {
+                header: '',
+                alignEnd: true,
+                mobileActions: true,
+                className: 'w-28',
+                cell: s => (
+                  <RowActions
+                    menuLabel={t('rowMenu', { name: s.name })}
+                    items={[
+                      {
+                        label: tc('edit'),
+                        href: `/stores/${storeId}/stock/suppliers/new?supplierId=${s.id}`,
+                      },
+                      ...(s.isActive
+                        ? [
+                            {
+                              label: tc('deactivate'),
+                              destructive: true,
+                              disabled: deleting === s.id,
+                              onSelect: () => handleDeactivate(s),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                ),
+              },
+            ]}
+            rows={filteredSuppliers ?? []}
+            rowKey={s => s.id}
+            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
+          />
+        </PageState>
       </div>
     </AdminLayout>
   );

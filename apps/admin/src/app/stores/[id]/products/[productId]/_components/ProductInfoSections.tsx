@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
-import { formatPrice } from '../../../../../../lib/format';
+import { formatPrice, intlLocaleForUi } from '../../../../../../lib/format';
 
 interface Product {
   id: string;
@@ -260,7 +260,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
           <div className="flex justify-between">
             <span className="text-muted-foreground">{tFields('created')}</span>
             <span className="text-foreground">
-              {new Date(product.createdAt).toLocaleDateString('en-US', {
+              {new Date(product.createdAt).toLocaleDateString(intlLocaleForUi(), {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
@@ -270,7 +270,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
           <div className="flex justify-between">
             <span className="text-muted-foreground">{tFields('updated')}</span>
             <span className="text-foreground">
-              {new Date(product.updatedAt).toLocaleDateString('en-US', {
+              {new Date(product.updatedAt).toLocaleDateString(intlLocaleForUi(), {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',

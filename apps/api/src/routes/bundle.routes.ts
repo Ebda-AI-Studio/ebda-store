@@ -22,6 +22,8 @@
  * persistence + admin-time validation only.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { searchNameIds } from '../services/product-search.service';
@@ -178,6 +180,16 @@ const listQuerySchema = z.object({
  * that the product exists elsewhere, and never letting a merchant bundle a
  * competitor's catalog.
  */
+/**
+ * The bundle clients of a store (NEON-ZERO-1 N-3, Ruling NZ-SF-4): a Durable Object store's bundles live in its DO, a Postgres
+ * store's are the unchanged `prisma` proxy (so the request transaction and its nested writes are untouched). Typed as `prisma`
+ * because the two backends answer the same Prisma shape.
+ */
+const bundleDb = async (storeId: string) => (await storeDb(storeId)) as unknown as typeof prisma;
+const bundleWriter = async (storeId: string) =>
+  (await storeWriter(storeId)) as unknown as typeof prisma;
+const bundlesOnDo = async (storeId: string) => (await storeRepo(storeId)).backend === 'do';
+
 async function resolveBundleLines(
   storeId: string,
   items: BundleItemInput[]
@@ -185,7 +197,9 @@ async function resolveBundleLines(
   // Fetched BEFORE the duplicate-component check below (P2-e, scoped
   // re-review) so that check can name the product, not just echo its uuid.
   const productIds = [...new Set(items.map(i => i.productId))];
-  const products = await prisma.product.findMany({
+  const products = await (
+    await storeDb(storeId)
+  ).product.findMany({
     where: { id: { in: productIds }, storeId },
     select: {
       id: true,
@@ -374,7 +388,7 @@ function assertPriceWithinComponentSum(
  */
 async function tryResolveBundle(storeId: string, id: string): Promise<ResolvedBundle | null> {
   try {
-    return await resolveBundle(prisma, storeId, id);
+    return await resolveBundle(await bundleDb(storeId), storeId, id);
   } catch (err) {
     if (err instanceof AppError && err.statusCode === 404) return null;
     throw err;
@@ -400,18 +414,27 @@ router.get(
       if (isActive !== undefined) where.isActive = isActive;
       if (search) {
         // Arabic-normalised name + nameAr word-AND (product-search.service searchNameIds).
-        where.id = { in: await searchNameIds('bundles', storeId, search) };
+        if (await bundlesOnDo(storeId)) {
+          // The Postgres search is a raw SQL fold over `bundles`; a DO store filters its own rows by every word in the name
+          // or the Arabic name (no Arabic digit / hamza folding there), never by ids from a table it does not have.
+          const words = search.trim().split(/\s+/).filter(Boolean).slice(0, 8);
+          where.AND = words.map(w => ({
+            OR: [{ name: { contains: w } }, { nameAr: { contains: w } }],
+          }));
+        } else {
+          where.id = { in: await searchNameIds('bundles', storeId, search) };
+        }
       }
 
       const [rows, total] = await Promise.all([
-        prisma.bundle.findMany({
+        (await bundleWriter(storeId)).bundle.findMany({
           where,
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
           select: { id: true },
         }),
-        prisma.bundle.count({ where }),
+        (await bundleWriter(storeId)).bundle.count({ where }),
       ]);
 
       // Small per-store admin list (bounded by `limit`, max 100) — resolving
@@ -439,13 +462,15 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const resolved = await resolveBundle(prisma, storeId, id);
+      const resolved = await resolveBundle(await bundleDb(storeId), storeId, id);
 
       // The admin editor needs to know WHICH products/variants make up the
       // bundle to prefill the form — `resolveBundle`'s `lines` are keyed by
       // BundleItem id for pricing/allocation, not by productId, so fetch the
       // raw component rows alongside it.
-      const items = await prisma.bundleItem.findMany({
+      const items = await (
+        await bundleWriter(storeId)
+      ).bundleItem.findMany({
         where: { bundleId: id },
         select: {
           id: true,
@@ -513,32 +538,45 @@ router.post(
         );
       }
 
-      const created = await prisma.bundle.create({
-        data: {
-          storeId,
-          name: data.name,
-          nameAr: data.nameAr ?? null,
-          slug: data.slug,
-          description: data.description ?? null,
-          descriptionAr: data.descriptionAr ?? null,
-          image: data.image ?? null,
-          pricingType: data.pricingType,
-          pricingValue: data.pricingValue,
-          isActive: data.isActive ?? true,
-          startsAt: data.startsAt ?? null,
-          expiresAt: data.expiresAt ?? null,
-          items: {
-            create: data.items.map(item => ({
-              productId: item.productId,
-              variantId: item.variantId ?? null,
-              quantity: item.quantity,
-            })),
-          },
-        },
-        select: { id: true },
-      });
+      const bundleData = {
+        storeId,
+        name: data.name,
+        nameAr: data.nameAr ?? null,
+        slug: data.slug,
+        description: data.description ?? null,
+        descriptionAr: data.descriptionAr ?? null,
+        image: data.image ?? null,
+        pricingType: data.pricingType,
+        pricingValue: data.pricingValue,
+        isActive: data.isActive ?? true,
+        startsAt: data.startsAt ?? null,
+        expiresAt: data.expiresAt ?? null,
+      };
+      const componentRows = data.items.map(item => ({
+        productId: item.productId,
+        variantId: item.variantId ?? null,
+        quantity: item.quantity,
+      }));
+      let created: { id: string };
+      if (await bundlesOnDo(storeId)) {
+        // The Durable Object takes the bundle and its components as ONE atomic batch (no nested relation writes there).
+        const dw = await storeWriter(storeId);
+        const id = randomUUID();
+        await dw.$transaction([
+          dw.bundle.create({ data: { id, ...bundleData } as never }),
+          dw.bundleItem.createMany({
+            data: componentRows.map(r => ({ bundleId: id, ...r })) as never,
+          }),
+        ]);
+        created = { id };
+      } else {
+        created = await prisma.bundle.create({
+          data: { ...bundleData, items: { create: componentRows } },
+          select: { id: true },
+        });
+      }
 
-      const bundle = await resolveBundle(prisma, storeId, created.id);
+      const bundle = await resolveBundle(await bundleDb(storeId), storeId, created.id);
       // Task 10: the AI product feed caches bundle data (getCached, under
       // the same `public:products:${storeId}:` prefix product writes bust)
       // — a new bundle must invalidate it the same way a new product does,
@@ -563,7 +601,9 @@ router.put(
       const { storeId, id } = req.params;
       const data = updateSchema.parse(req.body);
 
-      const existing = await prisma.bundle.findFirst({
+      const existing = await (
+        await bundleWriter(storeId)
+      ).bundle.findFirst({
         where: { id, storeId },
         include: { items: true },
       });
@@ -603,61 +643,86 @@ router.put(
         );
       }
 
-      await prisma.bundle.update({
-        where: { id, storeId },
-        data: {
-          ...(data.name !== undefined && { name: data.name }),
-          ...(data.nameAr !== undefined && { nameAr: data.nameAr }),
-          ...(data.slug !== undefined && { slug: data.slug }),
-          ...(data.description !== undefined && { description: data.description }),
-          ...(data.descriptionAr !== undefined && { descriptionAr: data.descriptionAr }),
-          ...(data.image !== undefined && { image: data.image }),
-          ...(data.pricingType !== undefined && { pricingType: data.pricingType }),
-          ...(data.pricingValue !== undefined && { pricingValue: data.pricingValue }),
-          ...(data.isActive !== undefined && { isActive: data.isActive }),
-          ...(data.startsAt !== undefined && { startsAt: data.startsAt }),
-          ...(data.expiresAt !== undefined && { expiresAt: data.expiresAt }),
-          // Full replace — simplest correct semantics for a small,
-          // merchant-edited component list (avoids reconciling adds/removes/
-          // quantity-changes against existing BundleItem rows).
-          //
-          // The wipe is NESTED in this update, never a standalone
-          // `prisma.bundleItem.deleteMany` run ahead of it, so the wipe and the
-          // rewrite fail together by construction.
-          //
-          // Accuracy note, because the original justification for this shape was
-          // wrong and is worth not re-deriving: the ambient tenant transaction
-          // (`middleware/tenant-context.ts:75`) does commit on every status <500
-          // and roll back only on 5xx — but on THIS route no 4xx is reachable
-          // between the wipe and the update. Every 4xx-throwing check
-          // (`resolveBundleLines`, `assertPriceWithinComponentSum`, the
-          // allocatable guard) runs earlier, and a raw Prisma error here is not
-          // mapped (`throwIfBundleFkViolation` is never called in this file), so
-          // P2002/P2003 reach `next(error)` as a 500 and DO roll back. The
-          // standalone form was therefore correct — but correct only by
-          // statement ordering. This nested form is correct structurally, so
-          // adding a 4xx mapping to this route later cannot silently open a
-          // data-loss window. Do NOT split them back out, and do NOT wrap this
-          // in `prisma.$transaction` — see the file header.
-          //
-          // Prisma runs the nested deleteMany before the nested create, which
-          // matters here: BundleItem is @@unique([bundleId, productId,
-          // variantId]), so re-sending an unchanged component would otherwise
-          // collide with its own surviving row.
-          ...(data.items && {
-            items: {
-              deleteMany: {},
-              create: data.items.map(item => ({
-                productId: item.productId,
-                variantId: item.variantId ?? null,
-                quantity: item.quantity,
-              })),
-            },
-          }),
-        },
-      });
+      const scalarPatch = {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.nameAr !== undefined && { nameAr: data.nameAr }),
+        ...(data.slug !== undefined && { slug: data.slug }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.descriptionAr !== undefined && { descriptionAr: data.descriptionAr }),
+        ...(data.image !== undefined && { image: data.image }),
+        ...(data.pricingType !== undefined && { pricingType: data.pricingType }),
+        ...(data.pricingValue !== undefined && { pricingValue: data.pricingValue }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.startsAt !== undefined && { startsAt: data.startsAt }),
+        ...(data.expiresAt !== undefined && { expiresAt: data.expiresAt }),
+      };
+      if (await bundlesOnDo(storeId)) {
+        // Durable Object: no nested relation writes, so the component wipe + rewrite and the update are ONE atomic batch.
+        const dw = await storeWriter(storeId);
+        await dw.$transaction([
+          ...(data.items ? [dw.bundleItem.deleteMany({ where: { bundleId: id } })] : []),
+          dw.bundle.update({ where: { id, storeId }, data: scalarPatch as never }),
+          ...(data.items
+            ? [
+                dw.bundleItem.createMany({
+                  data: data.items.map(item => ({
+                    bundleId: id,
+                    productId: item.productId,
+                    variantId: item.variantId ?? null,
+                    quantity: item.quantity,
+                  })) as never,
+                }),
+              ]
+            : []),
+        ]);
+      } else
+        await (
+          await bundleWriter(storeId)
+        ).bundle.update({
+          where: { id, storeId },
+          data: {
+            ...scalarPatch,
+            // Full replace — simplest correct semantics for a small,
+            // merchant-edited component list (avoids reconciling adds/removes/
+            // quantity-changes against existing BundleItem rows).
+            //
+            // The wipe is NESTED in this update, never a standalone
+            // `prisma.bundleItem.deleteMany` run ahead of it, so the wipe and the
+            // rewrite fail together by construction.
+            //
+            // Accuracy note, because the original justification for this shape was
+            // wrong and is worth not re-deriving: the ambient tenant transaction
+            // (`middleware/tenant-context.ts:75`) does commit on every status <500
+            // and roll back only on 5xx — but on THIS route no 4xx is reachable
+            // between the wipe and the update. Every 4xx-throwing check
+            // (`resolveBundleLines`, `assertPriceWithinComponentSum`, the
+            // allocatable guard) runs earlier, and a raw Prisma error here is not
+            // mapped (`throwIfBundleFkViolation` is never called in this file), so
+            // P2002/P2003 reach `next(error)` as a 500 and DO roll back. The
+            // standalone form was therefore correct — but correct only by
+            // statement ordering. This nested form is correct structurally, so
+            // adding a 4xx mapping to this route later cannot silently open a
+            // data-loss window. Do NOT split them back out, and do NOT wrap this
+            // in `prisma.$transaction` — see the file header.
+            //
+            // Prisma runs the nested deleteMany before the nested create, which
+            // matters here: BundleItem is @@unique([bundleId, productId,
+            // variantId]), so re-sending an unchanged component would otherwise
+            // collide with its own surviving row.
+            ...(data.items && {
+              items: {
+                deleteMany: {},
+                create: data.items.map(item => ({
+                  productId: item.productId,
+                  variantId: item.variantId ?? null,
+                  quantity: item.quantity,
+                })),
+              },
+            }),
+          },
+        });
 
-      const bundle = await resolveBundle(prisma, storeId, id);
+      const bundle = await resolveBundle(await bundleDb(storeId), storeId, id);
       // See the POST handler above — the same feed-cache invalidation gap.
       // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
       // in the SAME outbound request — a separate invalidateStoreBundlesCache
@@ -689,7 +754,9 @@ router.delete(
     try {
       const { storeId, id } = req.params;
 
-      const existing = await prisma.bundle.findFirst({
+      const existing = await (
+        await bundleWriter(storeId)
+      ).bundle.findFirst({
         where: { id, storeId },
         select: { id: true },
       });
@@ -697,7 +764,9 @@ router.delete(
         throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
       }
 
-      await prisma.bundle.update({ where: { id, storeId }, data: { isActive: false } });
+      await (
+        await bundleWriter(storeId)
+      ).bundle.update({ where: { id, storeId }, data: { isActive: false } });
       // See the POST handler above — the same feed-cache invalidation gap;
       // a deactivated bundle must stop being purchasable there too, not just
       // in `resolveBundle`'s live-read callers.
@@ -745,7 +814,9 @@ router.get(
       // write, which calls it too (issue 2202). Same 120s TTL and
       // staleness class as the public product list this mirrors.
       const bundles = await getCached(bundlesCacheKey(storeId), 120, async () => {
-        const candidates = await prisma.bundle.findMany({
+        const candidates = await (
+          await bundleWriter(storeId)
+        ).bundle.findMany({
           where: { storeId, isActive: true },
           orderBy: { createdAt: 'desc' },
           // Store-scale bundle counts are small (a merchant hand-curates
@@ -837,7 +908,11 @@ router.get(
     try {
       const { storeId } = req.params;
       const { productIds } = bundleSavingsQuerySchema.parse({ productIds: req.query.productIds });
-      const savings = await listBundleSavingsForProducts(prisma, storeId, productIds);
+      const savings = await listBundleSavingsForProducts(
+        await bundleDb(storeId),
+        storeId,
+        productIds
+      );
       res.setHeader('Cache-Control', 'no-store');
       res.json({ success: true, data: { savings } });
     } catch (error) {
@@ -878,7 +953,9 @@ router.get(
         `public:products:${storeId}:bundles:v2:${slug}`,
         120,
         async () => {
-          const row = await prisma.bundle.findFirst({
+          const row = await (
+            await bundleWriter(storeId)
+          ).bundle.findFirst({
             where: { storeId, slug },
             select: { id: true, isActive: true, description: true, descriptionAr: true },
           });
@@ -887,12 +964,14 @@ router.get(
             throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
           }
 
-          const resolved = await resolveBundle(prisma, storeId, row.id);
+          const resolved = await resolveBundle(await bundleDb(storeId), storeId, row.id);
 
           // "What's inside" by component NAME only — never per-component
           // allocated prices (see `ResolvedBundle`'s doc comment on
           // `pricingType`/`pricingValue`, which this response also omits).
-          const items = await prisma.bundleItem.findMany({
+          const items = await (
+            await bundleWriter(storeId)
+          ).bundleItem.findMany({
             where: { bundleId: row.id },
             select: { product: { select: { name: true, nameAr: true, audience: true } } },
           });

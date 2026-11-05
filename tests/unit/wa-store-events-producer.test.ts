@@ -1,5 +1,5 @@
 /**
- * Store -> Ebda WhatsApp producer (contract 2026-10-24 section 4): the events, their envelope, the
+ * Store -> Ebda Chat producer (contract 2026-10-24 section 4): the events, their envelope, the
  * buyer key, idempotent ids, and the "not linked / no phone: send nothing" rules.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,16 +15,26 @@ const h = vi.hoisted(() => ({
   consent: vi.fn(),
   owner: vi.fn(),
   consentRow: vi.fn(),
+  store: vi.fn(),
+}));
+const dbMock = vi.hoisted(() => ({
+  order: { findUnique: h.order },
+  abandonedCart: { findFirst: h.cart },
+  user: { findFirst: h.owner },
+  storeWhatsAppConsent: { findUnique: h.consentRow },
+  product: { findMany: h.products },
+  store: { findUnique: h.store },
 }));
 vi.mock('@ebda/database', () => ({
-  prisma: {
-    order: { findUnique: h.order },
-    abandonedCart: { findFirst: h.cart },
-    user: { findFirst: h.owner },
-    storeWhatsAppConsent: { findUnique: h.consentRow },
-    product: { findMany: h.products },
-  },
+  prisma: dbMock,
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  runInStoreScope: (_s: string, fn: () => unknown) => fn(),
+  // the cart event reads `Store` (a platform row) with withStore
+  withStore: (_s: string, fn: (tx: unknown) => unknown) => fn(dbMock),
+}));
+// a Postgres store: the job reads through the same prisma mock (a DO store is covered in jobs-money-on-do.test.ts)
+vi.mock('@api/lib/repo-factory', () => ({
+  storeRepo: async (storeId: string) => ({ storeId, backend: 'pg', db: dbMock }),
 }));
 vi.mock('@api/lib/wa/consent', () => ({ WhatsAppConsentService: { hasConsent: h.consent } }));
 vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked, hasWhatsAppLinkRow: h.linkRow }));
@@ -74,7 +84,11 @@ beforeEach(() => {
     recoveredAt: null,
     customerPhone: '01001234567',
     createdAt: new Date('2026-10-25T09:00:00Z'),
-    store: { slug: 'souq', domain: null, settings: { defaultLanguage: 'en' } },
+  });
+  h.store.mockReset().mockResolvedValue({
+    slug: 'souq',
+    domain: null,
+    settings: { defaultLanguage: 'en' },
   });
   h.planInput.mockReset().mockResolvedValue({
     seed: 'plan:x',
@@ -93,7 +107,7 @@ beforeEach(() => {
   });
   h.send.mockReset().mockResolvedValue(undefined);
   clearCfBindings();
-  setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, WA_EVENTS_QUEUE: { send: h.send } });
+  setCfBindings({ WA_EVENTS_QUEUE: { send: h.send } });
 });
 
 const send_clear = () => h.send.mockClear();
@@ -335,10 +349,9 @@ describe('helpers', () => {
 
   it('boot guard: the WhatsApp queue bound without the secret throws; unbound is fine', () => {
     delete process.env.SUITE_BUYER_KEY_SECRET;
-    expect(() => assertWhatsAppLinkConfig({ HYPERDRIVE: { connectionString: 'x' } })).not.toThrow();
+    expect(() => assertWhatsAppLinkConfig({})).not.toThrow();
     expect(() =>
       assertWhatsAppLinkConfig({
-        HYPERDRIVE: { connectionString: 'x' },
         WA_EVENTS_QUEUE: { send: h.send },
       })
     ).toThrow(/SUITE_BUYER_KEY_SECRET/);
@@ -358,7 +371,7 @@ describe('store/plan-changed', () => {
     });
     expect(storeEventSchema.safeParse(sent()[0]).success).toBe(true);
   });
-  it('a store Ebda WhatsApp has never heard of gets nothing', async () => {
+  it('a store Ebda Chat has never heard of gets nothing', async () => {
     h.linkRow.mockResolvedValue(false);
     expect(await emitStoreEventsFor(ev)).toBe(0);
     expect(h.send).not.toHaveBeenCalled();
@@ -443,7 +456,7 @@ describe('account/erased (customer.erased)', () => {
     data: { storeId: STORE, buyerKey: KEY, userId: 'u1' },
   };
 
-  it('sends ONLY the hashed key, for any store Ebda WhatsApp knows, linked or not', async () => {
+  it('sends ONLY the hashed key, for any store Ebda Chat knows, linked or not', async () => {
     h.linked.mockResolvedValue(false);
     expect(await emitStoreEventsFor(ev)).toBe(1);
     expect(sent()[0]).toMatchObject({

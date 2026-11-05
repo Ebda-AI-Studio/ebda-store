@@ -1,6 +1,13 @@
 import { normalizePhoneForStorage } from '../../../shared/src/region';
+import {
+  GOLD_PREPAID_ERROR_CODE,
+  GOLD_PREPAID_MESSAGE,
+  checkGoldPayment,
+  goldAllowsDeferredPayment,
+} from '../../../shared/src/commerce/payment-policy';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { decrementProduct, decrementVariant, forceDecrementVariant, recordMovement } from './stock';
+import { issueSaleDocument } from './fiscal';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
 import {
   cartItemsForTargeting,
@@ -23,20 +30,24 @@ export interface CheckoutLine {
   quantity: number;
   /** gold-rate lines: the unit price the shopper was shown (the gate refuses a stale quote). */
   quotedUnitPrice?: number | null;
+  /** the shopper's personalisation text for this line (order_items.personalisation, Ruling CF-FINAL-1) */
+  note?: string | null;
 }
 export interface HoldCaps {
   /** open unpaid orders per phone/email for COD and InstaPay (default 2) */
   manual?: number;
   /** same, any other payment label (default 5) */
   gateway?: number;
-  /** open unpaid orders per checkout IP (default 8: shared CGNAT) */
+  /** open unpaid orders per checkout IP (default 40: shared CGNAT, QA-HOLDS-1) */
   ip?: number;
+  /** only holds created in the last N hours count toward the IP cap (default 24, QA-HOLDS-1) */
+  ipWindowHours?: number;
 }
 /**
  * TRUST BOUNDARY: this core trusts `buyer`/`customerId`, `wholesaleEntitled`, `loyaltyFeatureEnabled`,
  * `backorderEnabled` and `goldRequireQuote` (the store Worker resolves them from the verified session and the platform
  * database; the shopper never supplies them). Amounts are NEVER trusted: prices, discounts, shipping, tax, COD fee and
- * totals are all computed here from the rows. The core still checks that the customer exists in THIS store.
+ * totals are all computed here from the rows. `customerId` is the shopper's users.id (Ruling CF-FIX-2): no CRM row is required.
  */
 export interface CheckoutInput {
   storeId: string;
@@ -75,7 +86,50 @@ export interface CheckoutInput {
   /** the total the shopper last saw: a different server total aborts with PRICE_CHANGED (Ruling B2B-9). */
   expectedTotal?: number;
   customerNotes?: string;
+  /**
+   * A QUOTE (Ruling CF-FINAL-1): price the cart exactly as an order would, take no stock, no wallet, no hold slot, write
+   * nothing, and answer with the totals and the per-line prices (`quoteOrder`). Only `quoteOrder` sets it.
+   */
+  dryRun?: boolean;
   now?: number;
+}
+export interface OrderQuoteResult {
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  codFee: number;
+  tax: number;
+  total: number;
+  taxIncludedInPrice: boolean;
+  /** one entry per loose line, in the order of `lines` of the input (bundle components are not quoted, as on Postgres) */
+  lines: Array<{
+    index: number;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    listPrice: number;
+    priceSource: string;
+    priceTierMinQty: number | null;
+  }>;
+}
+class QuoteSignal {
+  constructor(readonly quote: OrderQuoteResult) {}
+}
+/** Price a cart as an order would (Ruling CF-FINAL-1): the section is abandoned, so a quote writes nothing at all. */
+export function quoteOrder(db: SyncSql, input: CheckoutInput): OrderQuoteResult {
+  try {
+    placeOrder(db, {
+      ...input,
+      dryRun: true,
+      idempotencyKey: undefined,
+      cart: undefined,
+    });
+  } catch (e) {
+    if (e instanceof QuoteSignal) return e.quote;
+    throw e;
+  }
+  throw new MoneyError('QUOTE_FAILED', 'the quote did not complete', 500);
 }
 export interface PlacedOrder {
   orderId: string;
@@ -148,6 +202,7 @@ interface OrderLine {
     tierLadder?: unknown;
   };
   goldSnapshot?: string;
+  personalisation?: string | null;
   bundle?: { bundleId: string; groupId: string; name: string; nameAr: string | null };
 }
 
@@ -177,9 +232,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
   };
   const buyer: Buyer =
     input.buyer ??
-    (input.customerId
-      ? { kind: 'merchant-selected', customerId: input.customerId }
-      : { kind: 'anonymous' });
+    (input.customerId ? { kind: 'session', userId: input.customerId } : { kind: 'anonymous' });
 
   const bundleTotals = new Map<string, number>();
   for (const b of input.bundles ?? [])
@@ -259,8 +312,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
     }
 
+    let cartCustomerId: string | null = null;
     if (input.cart) {
-      const owned = db.all('SELECT id FROM carts WHERE id = ? AND store_id = ?', [
+      const owned = db.all('SELECT id, customer_id FROM carts WHERE id = ? AND store_id = ?', [
         input.cart.id,
         input.storeId,
       ])[0];
@@ -308,15 +362,16 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       // counted above, deleted here: the section is single-writer, so nothing slips between the two
       db.run('DELETE FROM cart_items WHERE cart_id = ?', [input.cart.id]);
       db.run('DELETE FROM cart_bundles WHERE cart_id = ?', [input.cart.id]);
+      cartCustomerId = (owned!.customer_id as string | null) ?? null;
     }
 
-    if (input.customerId) {
-      const c = db.all('SELECT id FROM customers WHERE id = ? AND store_id = ?', [
-        input.customerId,
-        input.storeId,
-      ])[0];
-      if (!c) throw new MoneyError('CUSTOMER_NOT_FOUND', 'unknown customer for this store', 404);
-    }
+    // `customerId` is the shopper's platform users.id (Ruling CF-FIX-2): the identity lives on the platform, the Worker
+    // authenticated it, and the DO has no users table. It is NOT a CRM `customers.id`, so there is nothing to look up here.
+    if (
+      input.customerId !== undefined &&
+      (typeof input.customerId !== 'string' || !input.customerId)
+    )
+      throw new MoneyError('BAD_ARGS', 'customerId', 400);
 
     for (const l of input.lines) {
       if (!Number.isInteger(l.quantity) || l.quantity < 1 || l.quantity > 1000)
@@ -399,6 +454,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       stockTaken: number;
     }[] = [];
     const take = (productId: string, variantId: string | null, qty: number, lineIndex: number) => {
+      if (input.dryRun) return; // a quote reserves nothing
       const p = db.all(
         'SELECT track_inventory, allow_backorder FROM products WHERE id = ? AND store_id = ?',
         [productId, input.storeId]
@@ -415,10 +471,11 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
             storeId: input.storeId,
             productId,
             type: 'sale',
-            quantity: qty,
+            quantity: -qty,
             previousStock: r.previousStock,
             newStock: r.newStock,
             reference: orderId,
+            reason: 'Sold via order',
           });
         // a variant inherits the product's backorder flag (lineAllowsBackorder), and the store feature must be on
         if (input.backorderEnabled === true && (v?.allow_backorder || p.allow_backorder)) {
@@ -427,7 +484,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
             storeId: input.storeId,
             productId,
             type: 'sale',
-            quantity: f.previousStock - f.newStock,
+            quantity: f.newStock - f.previousStock,
             previousStock: f.previousStock,
             newStock: f.newStock,
             reference: orderId,
@@ -472,7 +529,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           storeId: input.storeId,
           productId,
           type: 'sale',
-          quantity: qty,
+          quantity: -qty,
           previousStock: r.previousStock,
           newStock: r.newStock,
           reference: orderId,
@@ -484,10 +541,11 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         storeId: input.storeId,
         productId,
         type: 'sale',
-        quantity: qty,
+        quantity: -qty,
         previousStock: r.previousStock,
         newStock: r.newStock,
         reference: orderId,
+        reason: 'Sold via order',
       });
     };
     const costOf = (productId: string, variantId: string | null): number | null => {
@@ -528,6 +586,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         costPrice: costOf(l.productId, l.variantId),
         snapshot: l.snapshot as OrderLine['snapshot'],
         goldSnapshot: gold?.snapshotJson.get(l.key),
+        personalisation: input.lines[Number(l.key)]?.note ?? null,
       });
     }
     for (const box of bundles.boxes) {
@@ -571,6 +630,15 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         return {};
       }
     })();
+    // Ruling SHARIA-GOLD-1 (the Postgres twin is assertGoldPaymentAllowed): gold is prepaid online unless the merchant allowed COD / installments.
+    if (
+      !checkGoldPayment({
+        hasGold: gold !== null,
+        allowDeferred: goldAllowsDeferredPayment(settings),
+        provider: input.paymentMethod,
+      }).ok
+    )
+      throw new MoneyError(GOLD_PREPAID_ERROR_CODE, GOLD_PREPAID_MESSAGE.en, 409);
     const minOrder = typeof settings.minimumOrderFils === 'number' ? settings.minimumOrderFils : 0;
     if (minOrder > 0 && subtotal < minOrder)
       throw new MoneyError(
@@ -605,6 +673,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         [input.storeId, input.couponCode]
       )[0];
       if (!c || !c.is_active) throw new MoneyError('COUPON_INVALID', 'coupon is not valid', 409);
+      // QA-COUPON-1: parity with CouponService.getByCode, a percentage/fixed coupon with no value is refused, never "applied".
+      if (c.type !== 'free_shipping' && !((c.value as number) > 0))
+        throw new MoneyError('COUPON_INVALID', 'coupon has no discount value', 409);
       if (
         (c.starts_at !== null && (c.starts_at as number) > now) ||
         (c.expires_at !== null && (c.expires_at as number) <= now)
@@ -742,6 +813,26 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     const total = taxFields.total;
     if (total < 0) throw new MoneyError('NEGATIVE_TOTAL', 'order total cannot be negative', 500);
     if (total > MAX_TOTAL) throw new MoneyError('TOTAL_TOO_LARGE', 'order total too large', 400);
+    if (input.dryRun)
+      throw new QuoteSignal({
+        subtotal,
+        discount,
+        shipping,
+        codFee,
+        tax: taxFields.tax,
+        total,
+        taxIncludedInPrice: taxFields.taxIncludedInPrice === 1,
+        lines: priced.lines.map((l, index) => ({
+          index,
+          productId: l.productId,
+          quantity: l.qty,
+          unitPrice: l.resolved.unitMinor,
+          lineTotal: l.resolved.unitMinor * l.qty,
+          listPrice: l.resolved.listMinor,
+          priceSource: l.resolved.source,
+          priceTierMinQty: l.resolved.tierMinQty,
+        })),
+      });
     if (input.expectedTotal !== undefined && input.expectedTotal !== total)
       throw new MoneyError(
         'PRICE_CHANGED',
@@ -777,7 +868,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     if (!fullyWalletPaid && (who.phone || who.email || input.checkoutIp)) {
       const manual = MANUAL.has(input.paymentMethod ?? 'cod');
       const cap = manual ? (input.holdCaps?.manual ?? 2) : (input.holdCaps?.gateway ?? 5);
-      const ipCap = input.holdCaps?.ip ?? 8;
+      const ipCap = input.holdCaps?.ip ?? 40;
+      const ipWindowMs = (input.holdCaps?.ipWindowHours ?? 24) * 3_600_000;
       if (who.phone || who.email) {
         const n = db.all(
           `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND ((? IS NOT NULL AND json_extract(shipping_address, '$.phone') = ?) OR (? IS NOT NULL AND lower(json_extract(shipping_address, '$.email')) = ?))`,
@@ -788,8 +880,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
       if (input.checkoutIp) {
         const n = db.all(
-          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND checkout_ip = ?`,
-          [input.storeId, input.checkoutIp]
+          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND checkout_ip = ? AND created_at >= ?`,
+          [input.storeId, input.checkoutIp, now - ipWindowMs]
         )[0].n as number;
         if (n >= ipCap)
           throw new MoneyError('TOO_MANY_OPEN_ORDERS', 'too many unpaid open orders', 429);
@@ -827,7 +919,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         promo.promotionDiscount,
         promo.appliedPromotionId,
         bundles.bundleDiscount,
-        loyaltyPoints,
+        loyaltyPoints > 0 ? loyaltyPoints : null,
         loyaltyDiscount,
         walletAmount,
         input.customerNotes ?? null,
@@ -845,7 +937,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       const itemId = crypto.randomUUID();
       itemIds.push(itemId);
       db.run(
-        'INSERT INTO order_items (id, order_id, product_id, variant_id, product_name, variant_name, variant_name_ar, sku, quantity, price, cost_price, total, list_price, price_source, price_tier_min_qty, price_group_applied, tier_ladder, gold_snapshot, bundle_id, bundle_group_id, bundle_name, bundle_name_ar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO order_items (id, order_id, product_id, variant_id, product_name, variant_name, variant_name_ar, sku, quantity, price, cost_price, total, list_price, price_source, price_tier_min_qty, price_group_applied, tier_ladder, gold_snapshot, bundle_id, bundle_group_id, bundle_name, bundle_name_ar, personalisation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           itemId,
           orderId,
@@ -869,6 +961,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           it.bundle?.groupId ?? null,
           it.bundle?.name ?? null,
           it.bundle?.nameAr ?? null,
+          it.personalisation ?? null,
         ]
       );
     }
@@ -914,6 +1007,18 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     // entity index (audit DB-2): queued in the SAME section as the order; the Worker awaits it (awaitEntityIndexed) before
     // it hands the order reference to a provider or a shopper
     indexEntity(db, input.storeId, 'order', orderId, now);
+    // The sale's fiscal document (tax invoice or receipt) with its gapless serial, in THIS section: the order and its number
+    // commit or roll back together (Ruling MONEYB-1, CF-R2-1).
+    issueSaleDocument(db, { storeId: input.storeId, orderId, now });
+    // Abandoned-cart recovery (best effort on Postgres, a plain UPDATE here): the cart's own row, else the same customer's open
+    // one. A guest cart (no customer) matches only its own row.
+    if (input.cart)
+      db.run(
+        `UPDATE abandoned_carts SET status = 'recovered', recovered_at = ?1, recovered_order_id = ?2, updated_at = ?1
+         WHERE id = (SELECT id FROM abandoned_carts WHERE store_id = ?3 AND status IN ('pending', 'step1_sent', 'step2_sent', 'step3_sent')
+           AND (cart_id = ?4 OR (?5 IS NOT NULL AND customer_id = ?5)) ORDER BY (cart_id = ?4) DESC, created_at LIMIT 1)`,
+        [now, orderId, input.storeId, input.cart.id, cartCustomerId]
+      );
     return {
       orderId,
       orderNumber: num,

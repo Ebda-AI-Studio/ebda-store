@@ -10,7 +10,7 @@ import { NOT_FOUND, sourcesAttr } from '@/lib/not-found-copy';
 import { LOCALES, demoLookUrl, type Locale } from '@/lib/site';
 
 export const metadata: Metadata = {
-  title: 'الصفحة مش موجودة | ابدأ استوديو للذكاء الاصطناعي',
+  title: 'الصفحة مش موجودة | ابدأ ستوديو للذكاء الاصطناعي',
   robots: { index: false, follow: true },
   icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
 };

@@ -61,6 +61,7 @@ import { recordUsage } from '../ai.service';
 import logger from '../../lib/logger';
 import { isGeminiQuotaError, withGeminiFailover } from '../../lib/ai/gemini-keys';
 import type { AnswerEngineProvider, EngineAnswer } from './provider';
+import { fetchWithTimeout, LLM_FETCH_TIMEOUT_MS } from '../../lib/fetch-timeout';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -200,7 +201,8 @@ export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
     try {
       res = await withGeminiFailover(
         async apiKey => {
-          const r = await fetch(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
+          const r = await fetchWithTimeout(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
+            timeoutMs: LLM_FETCH_TIMEOUT_MS,
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

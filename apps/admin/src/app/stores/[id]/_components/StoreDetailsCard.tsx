@@ -16,6 +16,10 @@ interface StoreDetailsCardProps {
   onClearFieldError: (field: keyof StoreFormErrors) => void;
   onSave: () => void;
   onCancel: () => void;
+  /** Opens the edit form on the status field: an inactive store gets a visible way to go live (audit D-1). */
+  onActivate?: () => void;
+  /** Start editing; the page header no longer carries "edit store" (its primary is the editor). */
+  onEdit?: () => void;
 }
 
 export function StoreDetailsCard({
@@ -28,6 +32,8 @@ export function StoreDetailsCard({
   onClearFieldError,
   onSave,
   onCancel,
+  onActivate,
+  onEdit,
 }: StoreDetailsCardProps) {
   const t = useT('stores.dashboard.details');
   const statusLabel = {
@@ -43,6 +49,11 @@ export function StoreDetailsCard({
     <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b p-4">
         <h2 className="font-semibold text-foreground">{t('title')}</h2>
+        {!isEditing && onEdit && (
+          <Button variant="outline" size="sm" onClick={onEdit}>
+            {t('edit')}
+          </Button>
+        )}
         {isEditing && (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onCancel}>
@@ -132,9 +143,14 @@ export function StoreDetailsCard({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('status')}</p>
-              <Badge variant={statusColors[store.status]} className="mt-1">
-                {statusLabel}
-              </Badge>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Badge variant={statusColors[store.status]}>{statusLabel}</Badge>
+                {store.status === 'inactive' && onActivate && (
+                  <Button type="button" size="sm" variant="outline" onClick={onActivate}>
+                    {t('activateCta')}
+                  </Button>
+                )}
+              </div>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('created')}</p>

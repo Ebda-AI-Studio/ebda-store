@@ -51,6 +51,8 @@ import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from 
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
 import { useRenderNow } from '../../contexts/RenderClockContext';
+import { MissingImage } from './MissingImage';
+import { CARD_CAROUSEL_SIZES } from '../../lib/image-sizes';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -306,12 +308,14 @@ function SharedProductCarousel({
           }}
         >
           {canAutoplay && (
+            // PREMIUM-4: a small labelled control UNDER the strip at the inline end (it used to be a
+            // bare 44px glyph floating beside "view all"). Rendered only when the strip auto-scrolls.
             <button
               type="button"
               data-autoplay-toggle
               aria-pressed={userPaused}
               onClick={() => setUserPaused(p => !p)}
-              className="absolute -top-12 end-0 z-10 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="absolute -bottom-3 end-0 z-10 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={
                 userPaused
                   ? isRtl
@@ -322,9 +326,12 @@ function SharedProductCarousel({
                     : 'Pause automatic scrolling'
               }
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 {userPaused ? <path d="M8 5v14l11-7z" /> : <path d="M7 5h4v14H7zM13 5h4v14h-4z" />}
               </svg>
+              <span aria-hidden="true">
+                {userPaused ? (isRtl ? 'تشغيل' : 'Play') : isRtl ? 'إيقاف' : 'Pause'}
+              </span>
             </button>
           )}
           {/* Prev arrow — sits at the leading edge (left in LTR, right in
@@ -389,6 +396,7 @@ function SharedProductCarousel({
             // 2026-05-17: gap is now driven by the per-store cardGap
             // setting on newArrivals + bestSellers; the previous hard-
             // coded gap-4/6/8 ignored merchant saves entirely.
+            data-part="product-grid"
             className={`-mx-4 flex justify-[safe_center] snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 scroll-smooth`}
             style={{ scrollbarWidth: 'thin' }}
           >
@@ -488,7 +496,7 @@ function SharedProductCarousel({
                   // shadow around each card so they read as contained tiles.
                   // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
                   // motion-safe only — no layout shift (opacity/transform only).
-                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
+                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] ${lookCarouselLgWidth(cardGap)} ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
                   style={
                     {
                       ['--i' as string]: i,
@@ -572,7 +580,7 @@ function SharedProductCarousel({
                               alt={product.images?.[0]?.alt || name}
                               fill
                               priority={i < 4}
-                              sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
+                              sizes={CARD_CAROUSEL_SIZES}
                               // Only fade out on hover when there's a second
                               // image to crossfade IN. Without this guard,
                               // single-image products go transparent on
@@ -589,29 +597,14 @@ function SharedProductCarousel({
                                 src={product.images[1].url}
                                 alt={product.images[1].alt || name}
                                 fill
-                                sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
+                                sizes={CARD_CAROUSEL_SIZES}
                                 loading="lazy"
                                 className="absolute inset-0 object-cover opacity-0 transition-opacity duration-[var(--duration-slow)] group-hover/img:opacity-100"
                               />
                             )}
                           </>
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                            <svg
-                              className="h-10 w-10"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              aria-hidden
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                              />
-                            </svg>
-                          </div>
+                          <MissingImage label={name} />
                         )}
                         {/* BUG 1 fix: use helper for EGP/pct text.
                             BUG 2 fix: show when OOS too. Corner + color are

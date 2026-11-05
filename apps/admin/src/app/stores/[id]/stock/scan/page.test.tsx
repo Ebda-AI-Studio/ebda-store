@@ -92,3 +92,62 @@ describe('barcode scan page: plan gate (inventory.barcode)', () => {
     expect(screen.queryByTestId('scan-feature-off')).toBeNull();
   });
 });
+
+describe('barcode scan page: pick mismatch warning', () => {
+  const progress = {
+    orderId: 'o-1',
+    orderNumber: 'ORD-1',
+    status: 'processing',
+    fullyPicked: false,
+    items: [{ id: 'i-1', productName: 'Abaya', quantity: 1, pickedQty: 0, pickedAt: null }],
+  };
+
+  async function scanOnLoadedOrder(code: string) {
+    apiGet.mockImplementation(async (url: string) =>
+      url.includes('pick-progress')
+        ? { data: progress, error: null }
+        : {
+            data: { orders: [{ id: 'o-1', orderNumber: 'ORD-1' }], meta: { total: 1 } },
+            error: null,
+          }
+    );
+    await loadOrderNumber('ORD-1');
+    const input = await screen.findByPlaceholderText('barcodeInputPlaceholder');
+    fireEvent.change(input, { target: { value: '999' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    return code;
+  }
+
+  it('a wrong item shows the alert warning, not the generic not-found text', async () => {
+    apiPost.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'NOT_IN_ORDER',
+        message: 'Scarf is not in this order',
+        status: 409,
+        details: { productName: 'Scarf' },
+      },
+    });
+    await scanOnLoadedOrder('NOT_IN_ORDER');
+    const alert = await screen.findByTestId('pick-mismatch-warning');
+    expect(alert.getAttribute('role')).toBe('alert');
+    expect(alert.textContent).toBe('picking.notInOrder');
+    expect(screen.queryByText('picking.itemNotFound')).toBeNull();
+  });
+
+  it('a surplus unit shows the already-picked warning', async () => {
+    apiPost.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'ALREADY_PICKED',
+        message: 'x',
+        status: 409,
+        details: { productName: 'Abaya' },
+      },
+    });
+    await scanOnLoadedOrder('ALREADY_PICKED');
+    expect((await screen.findByTestId('pick-mismatch-warning')).textContent).toBe(
+      'picking.alreadyPicked'
+    );
+  });
+});

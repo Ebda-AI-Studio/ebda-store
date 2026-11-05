@@ -16,7 +16,7 @@ function walk(dir: string): string[] {
     return statSync(p).isDirectory() ? (f === 'ci' ? [] : walk(p)) : p.endsWith('.ts') ? [p] : [];
   });
 }
-const CALL = /\b(?:prisma|tx)\.shipment\.(create|update|updateMany|upsert)\(/g;
+const CALL = /(?:\b(?:prisma|tx|w)|\))\.shipment\.(create|update|updateMany|upsert)\(/g;
 const WRITES_STATUS = /\bstatus\s*:|\.\.\.fields\b/;
 
 const found: Array<{ file: string; line: number; tag: string | null; file$: string }> = [];

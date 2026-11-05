@@ -62,6 +62,18 @@ function v11(material: boolean, summary: { ar: string; en: string }): LegalVersi
   });
 }
 
+/** v1.2 (SHARIA-AUP-1), published 2026-11-03. No fee change. */
+function v12(summary: { ar: string; en: string }): LegalVersion {
+  return Object.freeze({
+    version: '1.2',
+    publishedAt: '2026-11-03',
+    effectiveAt: '2026-11-03',
+    material: true,
+    feeChange: false,
+    summary: Object.freeze(summary),
+  });
+}
+
 const doc = (...history: LegalVersion[]) =>
   Object.freeze({ history: Object.freeze(history) as readonly LegalVersion[] });
 
@@ -70,29 +82,33 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
   legal: doc(
     firstVersion(),
     v11(false, {
-      ar: 'بريد مستقل لطلبات الخصوصية وحماية البيانات، وروابط إلى صفحة حذف البيانات ووثائق ابدأ واتساب.',
-      en: 'A separate address for privacy and data-protection requests, and links to the data deletion page and the Ebda WhatsApp documents.',
+      ar: 'بريد مستقل لطلبات الخصوصية وحماية البيانات، وروابط إلى صفحة حذف البيانات ووثائق ابدأ شات.',
+      en: 'A separate address for privacy and data-protection requests, and links to the data deletion page and the Ebda Chat documents.',
     })
   ),
   privacy: doc(
     firstVersion(),
     v11(true, {
-      ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ واتساب، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
-      en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda WhatsApp is used, 72-hour breach notice, and a link to the data deletion page.',
+      ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ شات، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
+      en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda Chat is used, 72-hour breach notice, and a link to the data deletion page.',
     })
   ),
   terms: doc(
     firstVersion(),
     v11(true, {
-      ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ واتساب.',
-      en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda WhatsApp terms.',
+      ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ شات.',
+      en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda Chat terms.',
     })
   ),
   acceptableUse: doc(
     firstVersion(),
     v11(true, {
-      ar: 'منتجات ممنوعة عبر ابدأ واتساب وفق سياسة التجارة في واتساب من Meta.',
-      en: "Products that may not be sold through Ebda WhatsApp, following Meta's WhatsApp Commerce Policy.",
+      ar: 'منتجات ممنوعة عبر ابدأ شات وفق سياسة التجارة في واتساب من Meta.',
+      en: "Products that may not be sold through Ebda Chat, following Meta's WhatsApp Commerce Policy.",
+    }),
+    v12({
+      ar: 'حظر الكحوليات ولحم الخنزير، وحظر السحوبات ذات الدخول المدفوع والصناديق الغامضة التي تُباع بالصدفة والتقييمات المزيفة والندرة المزيفة.',
+      en: 'Alcohol and pork are banned, as are paid-entry prize draws, mystery boxes sold for chance, fake reviews, and fake scarcity or countdown timers.',
     })
   ),
   merchant: doc(
@@ -100,6 +116,10 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
     v11(true, {
       ar: 'الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإخطار التاجر بالاختراق خلال 72 ساعة، وضمانات النقل خارج مصر.',
       en: 'Prices are final amounts with no VAT, notice of a data breach to the merchant within 72 hours, and safeguards for transfers outside Egypt.',
+    }),
+    v12({
+      ar: 'الأحكام الجديدة في سياسة الاستخدام المقبول (الكحوليات ولحم الخنزير والسحوبات المدفوعة والتقييمات المزيفة)، والتقسيط معطّل افتراضيًا، وطلبات الذهب تُدفع كاملة عبر الإنترنت ما لم يغيّر التاجر الإعداد.',
+      en: 'The new Acceptable Use Policy bans (alcohol, pork, paid-entry draws, fake reviews), installments off by default, and gold orders paid in full online unless the merchant changes the setting.',
     })
   ),
 });

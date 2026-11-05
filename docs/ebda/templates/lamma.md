@@ -6,13 +6,13 @@ Lamma is the Egyptian home-kitchen and grocery template: stuffed vegetables, tag
 
 ## The three looks
 
-|              | Family table (`lamma.table`)                                 | Kitchen notebook (`lamma.notebook`)                      | Fresh market (`lamma.market`)                         |
-| ------------ | ------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------- |
-| Scene        | A home kitchen taking same-day orders like a restaurant      | One named cook who is the brand                          | Grocery and produce with repeat baskets               |
-| Colour       | White, pomegranate clay `#A5303F`, herb `#2F6B34`, rose tint | Deep green `#1F3D2B`, paper ink, antique brass `#D3B87C` | White, herb green `#23744A`, crimson tomato `#CC2F3F` |
-| Type         | El Messiri / Cairo / Fraunces                                | Aref Ruqaa / Noto Sans Arabic / Lora                     | Baloo Bhaijaan 2 / Almarai / Nunito                   |
-| Radius, etc. | md (8px), regular, 4/3, subtle                               | sm (4px), airy, 4/3, subtle                              | lg (16px), compact, 1/1, expressive                   |
-| Card action  | the skin's add control, becomes a stepper in the cart        | quiet outline add, becomes a stepper                     | the skin's add control, becomes a stepper             |
+|              | Family table (`lamma.table`)                                                                                    | Kitchen notebook (`lamma.notebook`)                      | Fresh market (`lamma.market`)                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------- |
+| Scene        | A home kitchen taking same-day orders like a restaurant                                                         | One named cook who is the brand                          | Grocery and produce with repeat baskets               |
+| Colour       | White, pomegranate clay `#A5303F`, herb `#3E7A3A` (the mock's herb, TEMPLATES-MOCK-9; was `#2F6B34`), rose tint | Deep green `#1F3D2B`, paper ink, antique brass `#D3B87C` | White, herb green `#23744A`, crimson tomato `#CC2F3F` |
+| Type         | El Messiri / Cairo / Fraunces                                                                                   | Aref Ruqaa / Noto Sans Arabic / Lora                     | Baloo Bhaijaan 2 / Almarai / Nunito                   |
+| Radius, etc. | md (8px), regular, 4/3, subtle                                                                                  | sm (4px), airy, 4/3, subtle                              | lg (16px), compact, 1/1, expressive                   |
+| Card action  | the skin's add control, becomes a stepper in the cart                                                           | quiet outline add, becomes a stepper                     | the skin's add control, becomes a stepper             |
 
 ### Tokens and measured contrast (computed 2026-10-22, asserted in `tests/unit/lamma-look-tokens.test.ts`)
 
@@ -66,3 +66,7 @@ Order again (the customer's own last products), deals today (`on_sale`), a cart 
 ## Status of the build (Phase B4)
 
 Built: skin id, tokens and gates, the header, the pack, the four platform pieces, the three mixes, the reorder source, the date chips, the demo and its catalogue, the scenario matrix and the pack. Rulings B4-1 to B4-14 are in `docs/RULINGS.md`. Not verified without a device: a real-phone walk; production: nothing is deployed from this branch.
+
+## Storefront audit 2026-11-03 (PREMIUM-36)
+
+The maker line of the showroom is real copy with no placeholder tag and no invented licence claim (`scripts/storedemo/lamma-home.mjs`).

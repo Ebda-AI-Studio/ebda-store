@@ -368,8 +368,8 @@
     "subjectKeys": ["customerId"],
     "note": ""
   },
-  "store-do:onesignal_subscriptions": {
-    "db": "store-do",
+  "d1:onesignal_subscriptions": {
+    "db": "d1",
     "class": "customer-pii",
     "action": "delete",
     "piiColumns": ["user_id", "player_id"],
@@ -1129,7 +1129,10 @@
     "subjectKeys": ["email"],
     "note": "invitee address; pending invites expire, rows leave with the store",
     "userIdColumns": ["invited_by", "accepted_by"],
-    "actorScrub": { "invited_by": null, "accepted_by": null }
+    "actorScrub": {
+      "invited_by": null,
+      "accepted_by": null
+    }
   },
   "d1:store_staff": {
     "db": "d1",
@@ -1259,7 +1262,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "seller_legal_name is the SELLER (the company issuing the invoice), not a person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column.",
+    "reviewedNotPii": ["seller_legal_name"]
   },
   "d1:instapay_receipts": {
     "db": "d1",
@@ -1440,5 +1444,108 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
+  },
+  "store-do:catalog_import_jobs": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by"],
+    "subjectKeys": ["userId"],
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record and expires after 30 days",
+    "userIdColumns": ["created_by"],
+    "actorScrub": {
+      "created_by": null
+    }
+  },
+  "store-do:catalog_import_files": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "the stored original is purged with its job (30 days); the file name is display-only text typed by the merchant",
+    "reviewedNotPii": ["original_name", "input_tokens", "output_tokens"]
+  },
+  "store-do:catalog_import_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "extracted product text; phone numbers, emails and links are redacted before staging (packages/shared/src/catalogue/pii.ts)",
+    "reviewedNotPii": ["category_name"]
+  },
+  "store-do:ci_store_gates": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "a feature name, a band and three numbers per store: no buyer key, phone or text; goes with the store (CASCADE)"
+  },
+  "store-do:ci_hint_logs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "a band, a sample size and a later outcome per order: no buyer key, phone or text; goes with the order (CASCADE)"
+  },
+  "d1:ci_insights": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "findings over k-anonymous cohort cells; no store, order or buyer identifier"
+  },
+  "store-do:search_query_daily": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:product_daily_views": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:qr_scan_daily": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:gsc_daily_metrics": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: aggregate counter per store/day, no user, session or IP"
+  },
+  "store-do:notification_logs": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["recipient_phone_hash", "recipient_email_hash"],
+    "subjectKeys": ["buyerKey"],
+    "note": "NZ-AN-1: recipient_phone_hash is the suite buyer key (HMAC of the E.164 phone), so a shopper erasure deletes the rows by it; recipient_email_hash is never written"
+  },
+  "d1:ai_usage": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "NZ-AN-1: feature, token counts, model, cost; subject_id is a catalogue object id, never a person",
+    "reviewedNotPii": ["input_tokens", "output_tokens"]
   }
 }

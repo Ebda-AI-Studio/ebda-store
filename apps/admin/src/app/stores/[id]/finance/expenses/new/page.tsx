@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { FormFooter } from '@/components/FormFooter';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl, localizedApiMessage } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
@@ -75,6 +76,7 @@ export default function NewExpensePage() {
   const router = useRouter();
   const t = useT('finance.expenses.new');
   const tc = useT('common');
+  const tList = useT('finance.expenses');
 
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<AccountNode[]>([]);
@@ -339,7 +341,10 @@ export default function NewExpensePage() {
   }
 
   return (
-    <AdminLayout title={t('title')}>
+    <AdminLayout
+      title={t('title')}
+      parent={{ label: tList('title'), href: `/stores/${storeId}/finance/expenses` }}
+    >
       <div className="max-w-2xl space-y-5">
         {/* ── OCR Upload Section ──────────────────────────────────────────── */}
         <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
@@ -545,7 +550,9 @@ export default function NewExpensePage() {
               required
             />
             {isNonBase && rawAmount > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">= {minorToMajor(baseAmountFils)} EGP</p>
+              <p className="text-xs text-muted-foreground">
+                = {minorToMajor(baseAmountFils)} {tc('egp')}
+              </p>
             )}
           </label>
           <label className="block space-y-1">
@@ -561,7 +568,9 @@ export default function NewExpensePage() {
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
             />
             {isNonBase && rawTax > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">= {minorToMajor(baseTaxFils)} EGP</p>
+              <p className="text-xs text-muted-foreground">
+                = {minorToMajor(baseTaxFils)} {tc('egp')}
+              </p>
             )}
           </label>
         </div>
@@ -573,12 +582,16 @@ export default function NewExpensePage() {
               <span className="text-muted-foreground">
                 {t('totalInBaseConverted', { rate: fxRateNum })}{' '}
               </span>
-              <span className="font-semibold font-mono">{totalMajor} EGP</span>
+              <span className="font-semibold font-mono">
+                {totalMajor} {tc('egp')}
+              </span>
             </>
           ) : (
             <>
               <span className="text-muted-foreground">{t('totalInBase')}: </span>
-              <span className="font-semibold font-mono">{totalMajor} EGP</span>
+              <span className="font-semibold font-mono">
+                {totalMajor} {tc('egp')}
+              </span>
             </>
           )}
         </div>
@@ -619,26 +632,19 @@ export default function NewExpensePage() {
           <p className="text-xs text-muted-foreground">{t('receiptHint')}</p>
         </label>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
+        {error && (
+          <div role="alert" className="text-destructive-ink text-sm">
+            {error}
+          </div>
+        )}
 
         {/* Actions */}
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium disabled:opacity-50"
-          >
-            {submitting ? tc('saving') : t('submit')}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/finance/expenses`)}
-            className="px-4 py-2 border border-border rounded text-sm"
-          >
-            {tc('cancel')}
-          </button>
-        </div>
+        <FormFooter
+          primaryLabel={t('submit')}
+          cancelHref={`/stores/${storeId}/finance/expenses`}
+          onPrimary={submit}
+          saving={submitting}
+        />
       </div>
     </AdminLayout>
   );

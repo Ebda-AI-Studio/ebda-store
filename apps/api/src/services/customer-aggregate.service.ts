@@ -1,4 +1,7 @@
-import { prisma, Prisma, type RfmSegment } from '@ebda/database';
+import { currentStoreId, prisma, Prisma, type RfmSegment } from '@ebda/database';
+import { customerRow, customerRows, pickSelected } from '../lib/customer-directory';
+import { customerAuthRoute } from '../lib/customer-auth';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { getCached, customersCacheKey } from '../lib/public-cache';
 import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
@@ -266,6 +269,52 @@ export interface CustomerAggregateScope {
   zeroOrderUserIds: string[];
 }
 
+/**
+ * `order.findMany` for a query that selects the `customer` (a `users` row). On a store served by its Durable Object the
+ * `customer` relation lives in another database (prisma-lite refuses it), so the orders are read flat with `customerId`
+ * and joined in memory to the DO's customer directory. Postgres stores run the unchanged relation query.
+ */
+async function findOrdersWithCustomer(storeId: string, args: any): Promise<any[]> {
+  const odb = await storeDb(storeId);
+  if ((await storeRepo(storeId)).backend !== 'do') return (odb.order as any).findMany(args);
+  const useSelect = !!args.select;
+  const { customer: customerArgs, ...others } = (useSelect ? args.select : args.include) as Record<
+    string,
+    any
+  >;
+  const { select: _s, include: _i, ...base } = args;
+  const rows: any[] = await (odb.order as any).findMany({
+    ...base,
+    ...(useSelect ? { select: { ...others, customerId: true } } : { include: others }),
+  });
+  const ids = rows.map(r => r.customerId as string | null);
+  const found =
+    (await customerRows(storeId, ids)) ??
+    (ids.some(Boolean)
+      ? await prisma.user.findMany({
+          where: { storeId, id: { in: ids.filter((x): x is string => !!x) } },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            createdAt: true,
+          },
+        })
+      : []);
+  const byId = new Map<string, any>(found.map((u: any) => [u.id, u]));
+  const sel = customerArgs && typeof customerArgs === 'object' ? (customerArgs.select ?? {}) : {};
+  return rows.map(r => {
+    const u = r.customerId ? byId.get(r.customerId) : undefined;
+    const { customerId, ...rest } = r;
+    return {
+      ...(useSelect && !args.select.customerId ? rest : r),
+      customer: u ? pickSelected(u, sel) : null,
+    };
+  });
+}
+
 async function aggregateCustomersUncached(
   storeId: string,
   scope?: CustomerAggregateScope
@@ -281,7 +330,7 @@ async function aggregateCustomersUncached(
   orders: OrderWithItems[];
   summary: CustomersSummary;
 }> {
-  const fetched = await prisma.order.findMany({
+  const fetched: OrderWithItems[] = await findOrdersWithCustomer(storeId, {
     where: { storeId, deletedAt: null, ...(scope ? scope.orderWhere : {}) },
     select: {
       id: true,
@@ -456,18 +505,56 @@ async function aggregateCustomersUncached(
   // scan). It is bounded: `MAX_ZERO_ORDER_CUSTOMERS` newest sign-ups, with
   // the overflow reported through the same `truncated` flag the page's notice
   // reads, never silently dropped.
-  const zeroOrderFetched = await prisma.user.findMany({
-    where: {
-      storeId,
-      role: 'customer',
-      deletedAt: null,
-      orders: { none: { storeId, deletedAt: null } },
-      ...(scope ? { id: { in: scope.zeroOrderUserIds } } : {}),
-    },
-    select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-    orderBy: { createdAt: 'desc' },
-    take: MAX_ZERO_ORDER_CUSTOMERS + 1,
-  });
+  // N-9: a DO-served store's registered customers are its DO's. "Never ordered" is decided against the store's own orders
+  // (also the DO's), in bounded batches over the newest sign-ups, so the cap and the truncation flag keep their meaning.
+  const zeroOrderViaDo = async () => {
+    const route = await customerAuthRoute(storeId, { write: false });
+    if (route.kind !== 'do') return null;
+    const out: Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+    }> = [];
+    const batch = await route.client.call<
+      Array<{
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        phone: string | null;
+      }>
+    >('newest', { limit: 5000, ...(scope ? { ids: scope.zeroOrderUserIds.slice(0, 500) } : {}) });
+    const odb = await storeDb(storeId);
+    for (let i = 0; i < batch.length && out.length <= MAX_ZERO_ORDER_CUSTOMERS; i += 200) {
+      const chunk = batch.slice(i, i + 200);
+      const ordered = new Set(
+        (
+          await odb.order.findMany({
+            where: { storeId, deletedAt: null, customerId: { in: chunk.map(u => u.id) } },
+            select: { customerId: true },
+          })
+        ).map(o => o.customerId)
+      );
+      for (const u of chunk) if (!ordered.has(u.id)) out.push(u);
+    }
+    return out.slice(0, MAX_ZERO_ORDER_CUSTOMERS + 1);
+  };
+  const zeroOrderFetched =
+    (await zeroOrderViaDo()) ??
+    (await prisma.user.findMany({
+      where: {
+        storeId,
+        role: 'customer',
+        deletedAt: null,
+        orders: { none: { storeId, deletedAt: null } },
+        ...(scope ? { id: { in: scope.zeroOrderUserIds } } : {}),
+      },
+      select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_ZERO_ORDER_CUSTOMERS + 1,
+    }));
   const zeroOrderTruncated = zeroOrderFetched.length > MAX_ZERO_ORDER_CUSTOMERS;
   const zeroOrderUsers = zeroOrderTruncated
     ? zeroOrderFetched.slice(0, MAX_ZERO_ORDER_CUSTOMERS)
@@ -583,6 +670,54 @@ export async function aggregateCustomers(storeId: string): Promise<{
  * `GET /customers/:customerKey` so `admin_get_customer` returns the same
  * profile the dashboard renders. Pass the DECODED key.
  */
+/**
+ * The guest orders (no customer_id) whose lowercased shipping email is `key`, or, when the order has no email, whose phone is
+ * `key`: newest first, at most MAX_CUSTOMER_ORDERS + 1. Postgres answers with its JSON operators; a Durable Object store has
+ * no JSON-path filter, so its guest orders are scanned newest-first in bounded pages (the same 20k cap as the list's scan).
+ */
+async function guestOrderIdsForKey(storeId: string, key: string): Promise<Array<{ id: string }>> {
+  if ((await storeRepo(storeId)).backend === 'do') {
+    const odb = await storeDb(storeId);
+    const out: Array<{ id: string }> = [];
+    const PAGE = 500;
+    for (
+      let skip = 0;
+      skip < MAX_ORDERS_SCANNED && out.length <= MAX_CUSTOMER_ORDERS;
+      skip += PAGE
+    ) {
+      const page = await odb.order.findMany({
+        where: { storeId, deletedAt: null, customerId: null },
+        select: { id: true, shippingAddress: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: PAGE,
+        skip,
+      });
+      for (const o of page) {
+        const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
+        const email = typeof a.email === 'string' ? a.email : '';
+        const phone = typeof a.phone === 'string' ? a.phone : '';
+        if (email.toLowerCase() === key || (email === '' && phone === key)) out.push({ id: o.id });
+      }
+      if (page.length < PAGE) break;
+    }
+    return out.slice(0, MAX_CUSTOMER_ORDERS + 1);
+  }
+  return prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id::text AS id
+      FROM public.orders
+      WHERE store_id = ${storeId}
+        AND deleted_at IS NULL
+        AND customer_id IS NULL
+        AND (
+              LOWER(shipping_address->>'email') = ${key}
+           OR (COALESCE(shipping_address->>'email', '') = ''
+               AND shipping_address->>'phone' = ${key})
+        )
+      ORDER BY created_at DESC
+      LIMIT ${MAX_CUSTOMER_ORDERS + 1}
+    `;
+}
+
 export async function getCustomerProfile(storeId: string, customerKey: string) {
   const decodedKey = customerKey;
 
@@ -602,20 +737,7 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   if (isUuid) {
     orderScope = { customerId: decodedKey };
   } else {
-    const guestOrderIds = await prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT id::text AS id
-      FROM public.orders
-      WHERE store_id = ${storeId}
-        AND deleted_at IS NULL
-        AND customer_id IS NULL
-        AND (
-              LOWER(shipping_address->>'email') = ${decodedKey}
-           OR (COALESCE(shipping_address->>'email', '') = ''
-               AND shipping_address->>'phone' = ${decodedKey})
-        )
-      ORDER BY created_at DESC
-      LIMIT ${MAX_CUSTOMER_ORDERS + 1}
-    `;
+    const guestOrderIds = await guestOrderIdsForKey(storeId, decodedKey);
     orderScope = { id: { in: guestOrderIds.map(r => r.id) } };
   }
 
@@ -624,7 +746,7 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   // Unlike the siblings, this query previously had NO `take` at all — a
   // customer with an unusually large order history could load its full
   // set of orders (each with items + payments) on every profile view.
-  const fetchedOrders = await prisma.order.findMany({
+  const fetchedOrders = await findOrdersWithCustomer(storeId, {
     where: {
       storeId,
       deletedAt: null,
@@ -675,17 +797,23 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     // the erase/export routes (PR #1852) unreachable through the admin
     // UI for that population even though the routes themselves work.
     if (isUuid) {
-      const zeroOrderUser = await prisma.user.findFirst({
-        where: { id: decodedKey, storeId, role: 'customer', deletedAt: null },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          createdAt: true,
-        },
-      });
+      const doZero = await customerRow(storeId, decodedKey);
+      const zeroOrderUser =
+        doZero !== undefined
+          ? doZero && doZero.deletedAt === null
+            ? doZero
+            : null
+          : await prisma.user.findFirst({
+              where: { id: decodedKey, storeId, role: 'customer', deletedAt: null },
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                createdAt: true,
+              },
+            });
       if (zeroOrderUser) {
         return {
           customer: {
@@ -717,7 +845,9 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
             paymentMethods: [],
             statuses: [],
             ...(await (async () => {
-              const linked = await prisma.customer.findFirst({
+              const linked = await (
+                await storeDb(storeId)
+              ).customer.findFirst({
                 where: { storeId, userId: zeroOrderUser.id },
                 select: {
                   groupId: true,
@@ -825,7 +955,9 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     group: { id: string; name: string; nameAr: string | null } | null;
   } | null = null;
   if (!customer.isGuest) {
-    grouped = await prisma.customer.findFirst({
+    grouped = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: { storeId, userId: customer.id },
       select: groupSelect,
     });
@@ -834,7 +966,9 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     if (customer.phone) identityOr.push({ phone: customer.phone });
     if (customer.email) identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
     if (identityOr.length > 0) {
-      grouped = await prisma.customer.findFirst({
+      grouped = await (
+        await storeDb(storeId)
+      ).customer.findFirst({
         where: { storeId, userId: null, OR: identityOr },
         select: groupSelect,
       });
@@ -879,7 +1013,9 @@ export async function segmentsForCustomers(
   const out = new Map<string, RfmSegment>();
   if (rows.length === 0) return out;
   const keyOf = new Map(rows.map(r => [r.id, rfmKeyFor(r.id, r.isGuest)]));
-  const snapshots = await prisma.customerRfmSnapshot.findMany({
+  const snapshots = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.findMany({
     where: { storeId, customerId: { in: Array.from(new Set(keyOf.values())) } },
     select: { customerId: true, segment: true },
   });
@@ -901,7 +1037,9 @@ export async function filterCustomersBySegment<T extends { id: string; isGuest: 
   rows: ReadonlyArray<T>,
   segment: RfmSegment
 ): Promise<T[]> {
-  const members = await prisma.customerRfmSnapshot.findMany({
+  const members = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.findMany({
     where: { storeId, segment },
     select: { customerId: true },
   });
@@ -916,7 +1054,9 @@ export async function filterCustomersBySegment<T extends { id: string; isGuest: 
  * a read of every snapshot (issue 2243).
  */
 export async function presentRfmSegments(storeId: string): Promise<RfmSegment[]> {
-  const groups = await prisma.customerRfmSnapshot.groupBy({
+  const groups = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.groupBy({
     by: ['segment'],
     where: { storeId },
   });

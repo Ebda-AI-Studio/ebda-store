@@ -1,8 +1,10 @@
+import { platformD1ReferencedKeys } from '../lib/r2-platform-d1-references';
 import { currentStoreId, storeDirectory, withStore } from '@ebda/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
 import { collectUrlsFromJson, isR2UrlReferenced } from '../lib/r2-references';
+import { collectDoStoreReferencedKeys } from '../lib/r2-do-references';
 import logger from '../lib/logger';
 
 /**
@@ -133,8 +135,13 @@ async function isStillReferenced(url: string, key: string): Promise<boolean> {
       return isR2UrlReferenced(tx, url, key);
     });
     if (referenced) return true;
+    // A store on its Durable Object (Ruling CF-R2-REF-1): its Postgres rows are sealed and stale, so its DO is asked too. A DO that
+    // cannot be read THROWS, and the caller's catch KEEPS the object (a leaked file, never a deleted live one).
+    const doKeys = await collectDoStoreReferencedKeys(id, urlToR2Key, key);
+    if (doKeys?.has(key)) return true;
   }
-  return false;
+  // Platform tables that moved to D1 (N-10d): their Postgres rows are stale, so D1 is asked too (a throw keeps the object).
+  return (await platformD1ReferencedKeys(urlToR2Key, key)).has(key);
 }
 
 /** Per-statement ceiling for the orphan check (ms). See isStillReferenced. */

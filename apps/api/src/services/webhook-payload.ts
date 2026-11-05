@@ -4,6 +4,8 @@
  * email and phone travel ONLY on an endpoint whose `includeCustomer` is on.
  */
 import { prisma } from '@ebda/database';
+import { storeRepo } from '../lib/repo-factory';
+import { customersById } from '../lib/jobs/store-db';
 
 export interface FanoutEvent {
   type: string;
@@ -82,9 +84,14 @@ export function formatOrderParts(row: OrderRow): Pick<FanoutEvent, 'data' | 'cus
 
 /** The order for a webhook, read in the ambient tenant. null when it is not this store's. */
 export async function loadOrderParts(storeId: string, orderId: string) {
-  const row = await prisma.order.findFirst({
+  const repo = await storeRepo(storeId);
+  // A store on its Durable Object: the order is read from its DO and the buyer (a platform `User`) attached after the read,
+  // with the same select the Postgres relation has (Ruling CF-JOBS-4B).
+  const reader = repo.backend === 'do' ? repo.db : prisma;
+  const raw = await reader.order.findFirst({
     where: { id: orderId, storeId },
     select: {
+      customerId: true,
       id: true,
       orderNumber: true,
       status: true,
@@ -97,7 +104,9 @@ export async function loadOrderParts(storeId: string, orderId: string) {
       total: true,
       createdAt: true,
       shippingAddress: true,
-      customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
+      ...(repo.backend === 'do'
+        ? {}
+        : { customer: { select: { firstName: true, lastName: true, email: true, phone: true } } }),
       items: {
         select: {
           productId: true,
@@ -112,11 +121,23 @@ export async function loadOrderParts(storeId: string, orderId: string) {
       },
     },
   });
-  return row ? { row, ...formatOrderParts(row as OrderRow) } : null;
+  if (!raw) return null;
+  const row =
+    repo.backend === 'do'
+      ? {
+          ...raw,
+          customer:
+            (
+              await customersById(storeId, [(raw as { customerId?: string | null }).customerId])
+            ).get((raw as { customerId?: string | null }).customerId ?? '') ?? null,
+        }
+      : raw;
+  return { row, ...formatOrderParts(row as unknown as OrderRow) };
 }
 
 export async function loadProductData(storeId: string, productId: string) {
-  const p = await prisma.product.findFirst({
+  const repo = await storeRepo(storeId);
+  const p = await (repo.backend === 'do' ? repo.db : prisma).product.findFirst({
     where: { id: productId, storeId },
     select: {
       id: true,

@@ -27,12 +27,20 @@ import { resolve } from 'path';
 
 const findFirst = vi.fn();
 vi.mock('@ebda/database', () => ({
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn((await import('./helpers/invoice-repo-mock')).platformTx()),
   prisma: {
     fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
     order: { findFirst: (...a: unknown[]) => findFirst(...a) },
     store: { findUnique: vi.fn() },
   },
 }));
+vi.mock('@api/lib/repo-factory', async () =>
+  (await import('./helpers/invoice-repo-mock')).repoFactoryMock()
+);
+vi.mock('@api/lib/jobs/store-db', async () =>
+  (await import('./helpers/invoice-repo-mock')).storeDbMock()
+);
 vi.mock('@api/services/store-mailer.service', () => ({
   StoreMailer: { sendBrandedEmail: vi.fn() },
 }));
@@ -62,6 +70,7 @@ import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-a
 import { GOLD_RATE_NOTICES } from '@api/services/email-templates/gold-rate-notices';
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
 import { lifecycleContent } from '@api/services/email-templates/lifecycle';
+import { contactEnquiryReceipt } from '@api/services/email-templates/contact-enquiry';
 import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-disabled';
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
@@ -255,6 +264,11 @@ const TEMPLATES: Record<string, Tpl> = {
   wholesaleNotice: {
     en: () => wholesaleNotice('rejected', 'en', WS_SAMPLE).content,
     ar: () => wholesaleNotice('rejected', 'ar', WS_SAMPLE).content,
+  },
+  // The visitor's receipt (the studio-inbox mail in the same file is internal and English-only).
+  contactEnquiry: {
+    en: () => contactEnquiryReceipt.en({ name: 'Mona', requestId: 'r1' }),
+    ar: () => contactEnquiryReceipt.ar({ name: 'منى', requestId: 'r1' }),
   },
   legalNotice: {
     en: () => legalNoticeTemplate.body(LEGAL_NOTICE_SAMPLE),

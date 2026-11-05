@@ -1,13 +1,13 @@
 /**
  * `customer.consent_changed` (envelope v1.1): emitted on EVERY write of a buyer's WhatsApp marketing
  * consent (checkout tick, account settings, admin change, STOP, erasure -> false), by ONE database
- * observer like `store.plan_changed`, so no write path can change consent without Ebda WhatsApp
+ * observer like `store.plan_changed`, so no write path can change consent without Ebda Chat
  * hearing of it. The observer only names the (store, buyer); the job re-reads the CURRENT row, so
  * the message always carries the truth and a retry cannot send a stale value.
  */
 import type { ModelWriteEvent } from '@ebda/database';
+import { readStoreDb } from '../jobs/store-db';
 import { whatsappOptInWording } from '@ebda/shared';
-import { prisma, runInTenantContext } from '@ebda/database';
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import logger from '../logger';
 import type { StoreEventInput } from './events';
@@ -69,8 +69,8 @@ export async function consentChangedInput(
   buyerKey: string,
   now: Date = new Date()
 ): Promise<{ input: StoreEventInput; seed: string; occurredAt: Date }> {
-  const row = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppConsent.findUnique({
+  const row = await readStoreDb(storeId, db =>
+    db.storeWhatsAppConsent.findUnique({
       where: { storeId_buyerKey: { storeId, buyerKey } },
       select: { granted: true, grantedAt: true, revokedAt: true, updatedAt: true, locale: true },
     })

@@ -18,7 +18,7 @@ export const tenantStorage = new AsyncLocalStorage<object>();
 export const txGucs = new WeakMap<object, TenantGucs>();
 
 /** A store scope WITHOUT a long-lived transaction (`runInStoreScope`). */
-export const storeScope = new AsyncLocalStorage<{ storeId: string }>();
+export const storeScope = new AsyncLocalStorage<{ storeId?: string; userId?: string }>();
 
 /**
  * The NAMED escape hatches of the code-level tenant guard. A closed list: there is
@@ -54,5 +54,5 @@ export function ambientScope(): AmbientScope {
     return { storeId: g?.storeId, userId: g?.userId, hatch };
   }
   const scope = storeScope.getStore();
-  return { storeId: scope?.storeId, hatch };
+  return { storeId: scope?.storeId, userId: scope?.userId, hatch };
 }

@@ -23,7 +23,14 @@ vi.mock('@ebda/database', async importOriginal => {
     product: { findMany: m.prodFindMany },
     productCategory: { createMany: m.pcCreateMany },
   };
-  return { ...actual, prisma: { ...tx, $transaction: (fn: (t: unknown) => unknown) => fn(tx) } };
+  return {
+    ...actual,
+    prisma: {
+      ...tx,
+      $transaction: (arg: unknown) =>
+        Array.isArray(arg) ? Promise.all(arg) : (arg as (t: unknown) => unknown)(tx),
+    },
+  };
 });
 vi.mock('@api/services/ai.service', () => ({ AIService: { proposeStoreCategories: m.propose } }));
 vi.mock('@api/lib/public-cache', () => ({ invalidateCached: m.invalidate }));
@@ -119,8 +126,10 @@ describe('applyStoreCategories', () => {
       id: { in: [uuid(1), uuid(2)] },
     });
     expect(m.pcCreateMany.mock.calls[0][0].data).toEqual([
-      { productId: uuid(1), categoryId: 'c-clothes-1', position: 0 },
+      // the service generates the category id (one atomic batch cannot read a generated id back)
+      { productId: uuid(1), categoryId: m.catCreate.mock.calls[0][0].data.id, position: 0 },
     ]);
+    expect(m.catCreate.mock.calls[0][0].data.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(m.invalidate).toHaveBeenCalledWith('public:categories:s1');
     expect(m.audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'category.created_from_ai_suggestion' })

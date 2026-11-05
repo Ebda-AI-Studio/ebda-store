@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireStore } from '../middleware/store';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -8,7 +9,7 @@ import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
-import { prisma } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
 import { requireAiEnabled } from '../lib/store-ai-switch';
@@ -120,6 +121,7 @@ router.post(
   '/',
   requireStore,
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -451,7 +453,9 @@ router.put(
       const data = ownerResponseSchema.parse(req.body);
       // Direct prisma update — ReviewService.update doesn't expose owner
       // response fields (those are merchant-managed, not moderation fields).
-      const review = await prisma.review.update({
+      const review = await (
+        await storeWriter(req.storeId!)
+      ).review.update({
         where: { id, storeId: req.storeId! },
         data: {
           ownerResponse: data.ownerResponse,

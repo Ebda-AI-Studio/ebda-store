@@ -16,7 +16,9 @@
  * Zero-customer stores: every function returns 0 cleanly — no throws.
  */
 
+import { analyticsRead } from '../../lib/analytics-backend';
 import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../../lib/repo-factory';
 import { RfmSegment } from '@ebda/database';
 import logger from '../../lib/logger';
 import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
@@ -226,8 +228,11 @@ export function classifySegment(params: {
  * Returns the total number of snapshot rows written (created + updated).
  */
 export async function runCohortRollup(storeId: string): Promise<number> {
+  // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+  const db = await storeDb(storeId);
+  const sw = await storeWriter(storeId);
   // Step 1: find the oldest paid order for this store (store launch month)
-  const oldest = await prisma.order.findFirst({
+  const oldest = await db.order.findFirst({
     where: { storeId, paymentStatus: 'paid', deletedAt: null },
     orderBy: { createdAt: 'asc' },
     select: { createdAt: true },
@@ -252,7 +257,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
     total: number;
   };
 
-  const allOrders = await prisma.order.findMany({
+  const allOrders = await db.order.findMany({
     where: { storeId, paymentStatus: 'paid', deletedAt: null },
     select: {
       id: true,
@@ -355,7 +360,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
   let rowsWritten = 0;
 
   if (computedRows.length > 0) {
-    const existing = await prisma.customerCohortSnapshot.findMany({
+    const existing = await db.customerCohortSnapshot.findMany({
       where: { storeId, cohortMonth: { in: cohortMonths } },
       select: { id: true, cohortMonth: true, periodOffset: true },
     });
@@ -376,7 +381,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
 
     if (toCreate.length > 0) {
       try {
-        await withSavepoint(() => prisma.customerCohortSnapshot.createMany({ data: toCreate }));
+        await withSavepoint(() => sw.customerCohortSnapshot.createMany({ data: toCreate }));
         rowsWritten += toCreate.length;
       } catch (err) {
         logger.error(
@@ -389,7 +394,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
     rowsWritten += await writeInChunks(
       toUpdate,
       ({ id, row }) =>
-        prisma.customerCohortSnapshot.update({
+        sw.customerCohortSnapshot.update({
           where: { id, storeId },
           data: {
             customersTotal: row.customersTotal,
@@ -422,6 +427,9 @@ export async function runCohortRollup(storeId: string): Promise<number> {
  * Returns the number of day-rows written.
  */
 export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<number> {
+  // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+  const db = await storeDb(storeId);
+  const sw = await storeWriter(storeId);
   const today = dayStartOf(new Date());
 
   type FunnelRow = {
@@ -441,12 +449,12 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     const dayEnd = regionDayStartOffset(dayStart, 1); // next Cairo midnight (DST-safe, not +24h)
 
     // cartsCreated
-    const cartsCreated = await prisma.cart.count({
+    const cartsCreated = await db.cart.count({
       where: { storeId, createdAt: { gte: dayStart, lt: dayEnd } },
     });
 
     // cartItemsAdded (CartItem rows created in this day, for this store's carts)
-    const cartItemsAdded = await prisma.cartItem.count({
+    const cartItemsAdded = await db.cartItem.count({
       where: {
         cart: { storeId },
         createdAt: { gte: dayStart, lt: dayEnd },
@@ -454,12 +462,12 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     });
 
     // checkoutsStarted (AbandonedCart rows created this day — proxy for checkout initiation)
-    const checkoutsStarted = await prisma.abandonedCart.count({
+    const checkoutsStarted = await db.abandonedCart.count({
       where: { storeId, createdAt: { gte: dayStart, lt: dayEnd } },
     });
 
     // ordersCompleted
-    const ordersCompletedAgg = await prisma.order.aggregate({
+    const ordersCompletedAgg = await db.order.aggregate({
       where: {
         storeId,
         paymentStatus: 'paid',
@@ -475,7 +483,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     // ordersAbandoned: AbandonedCart created before (dayStart - 7d) with recoveredAt IS NULL
     // These are carts that had 7+ days to convert and did not.
     const abandonedThreshold = new Date(dayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const ordersAbandoned = await prisma.abandonedCart.count({
+    const ordersAbandoned = await db.abandonedCart.count({
       where: {
         storeId,
         recoveredAt: null,
@@ -486,13 +494,19 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     // productViews: sum of ProductDailyView.count for this store on this calendar day.
     // `date` in product_daily_views is a DATE stored at UTC midnight (regionDayStart output),
     // so an exact equality match on dayStart gives the right rows.
-    const productViewsAgg = await prisma.productDailyView.aggregate({
+    const viewsArgs = {
       where: {
         storeId,
         date: dayStart, // exact match — DATE column stored as Cairo-day-start instant
       },
-      _sum: { count: true },
-    });
+      _sum: { count: true as const },
+    };
+    // Ruling NZ-AN-1: the store's DO once its analytics moved, else Postgres
+    const productViewsAgg = await analyticsRead(
+      storeId,
+      r => r.productDailyView.aggregate(viewsArgs),
+      () => prisma.productDailyView.aggregate(viewsArgs)
+    );
     const productViews = productViewsAgg._sum.count ?? 0;
 
     computedRows.push({
@@ -512,7 +526,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
   let rowsWritten = 0;
 
   if (computedRows.length > 0) {
-    const existing = await prisma.funnelSnapshot.findMany({
+    const existing = await db.funnelSnapshot.findMany({
       where: { storeId, periodDate: { in: computedRows.map(r => r.periodDate) } },
       select: { id: true, periodDate: true },
     });
@@ -531,7 +545,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
 
     if (toCreate.length > 0) {
       try {
-        await withSavepoint(() => prisma.funnelSnapshot.createMany({ data: toCreate }));
+        await withSavepoint(() => sw.funnelSnapshot.createMany({ data: toCreate }));
         rowsWritten += toCreate.length;
       } catch (err) {
         logger.error(
@@ -544,7 +558,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     rowsWritten += await writeInChunks(
       toUpdate,
       ({ id, row }) =>
-        prisma.funnelSnapshot.update({
+        sw.funnelSnapshot.update({
           where: { id, storeId },
           data: {
             productViews: row.productViews,
@@ -580,6 +594,9 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
  * Returns the number of customers segmented.
  */
 export async function runRfmRollup(storeId: string): Promise<number> {
+  // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+  const db = await storeDb(storeId);
+  const sw = await storeWriter(storeId);
   // Step 1: load all paid orders for this store (same fields as cohort rollup)
   type RawOrder = {
     customerId: string | null;
@@ -588,7 +605,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
     total: number;
   };
 
-  const allOrders = await prisma.order.findMany({
+  const allOrders = await db.order.findMany({
     where: { storeId, paymentStatus: 'paid', deletedAt: null },
     select: {
       customerId: true,
@@ -699,7 +716,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   let rowsWritten = 0;
 
   if (computedRows.length > 0) {
-    const existing = await prisma.customerRfmSnapshot.findMany({
+    const existing = await db.customerRfmSnapshot.findMany({
       where: { storeId, customerId: { in: computedRows.map(r => r.customerId) } },
       select: { id: true, customerId: true, segment: true },
     });
@@ -719,7 +736,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
 
     if (toCreate.length > 0) {
       try {
-        await withSavepoint(() => prisma.customerRfmSnapshot.createMany({ data: toCreate }));
+        await withSavepoint(() => sw.customerRfmSnapshot.createMany({ data: toCreate }));
         rowsWritten += toCreate.length;
       } catch (err) {
         logger.error({ err, storeId, count: toCreate.length }, 'rfm-rollup: batched create failed');
@@ -729,7 +746,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
     rowsWritten += await writeInChunks(
       toUpdate,
       ({ id, row, previousSegment }) =>
-        prisma.customerRfmSnapshot.update({
+        sw.customerRfmSnapshot.update({
           where: { id, storeId },
           data: {
             isGuest: row.isGuest,
@@ -759,7 +776,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   let staleRemoved = 0;
   try {
     const removed = await withSavepoint(() =>
-      prisma.customerRfmSnapshot.deleteMany({
+      sw.customerRfmSnapshot.deleteMany({
         where: { storeId, customerId: { notIn: computedRows.map(r => r.customerId) } },
       })
     );

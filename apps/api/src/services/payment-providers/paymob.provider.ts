@@ -570,7 +570,11 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
         }
         methodIds = [one];
       } else {
-        methodIds = Object.values(ids).filter((n): n is number => typeof n === 'number');
+        // Ruling SHARIA-GOLD-1: a prepaid-only (gold) order leaves the installment integrations out.
+        const skip = req.metadata?.excludeBnpl === 'true' ? ['valu', 'kiosk'] : [];
+        methodIds = Object.entries(ids)
+          .filter(([m, n]) => typeof n === 'number' && !skip.includes(m))
+          .map(([, n]) => n as number);
       }
       if (!settings.publicKey || methodIds.length === 0) {
         throw new PaymentProviderError(

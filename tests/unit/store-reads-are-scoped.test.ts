@@ -22,10 +22,18 @@ const DIRS = ['lib', 'services', 'mcp', 'middleware', 'utils'].map(d =>
   path.join(ROOT, 'apps/api/src', d)
 );
 const SCOPES =
-  /^(withStore|runInStoreScope|runInTenantContext|acrossStores|acrossStoresFlat|withUser|asPlatformOperator|scopeTransaction|readInStoreContext|withTenantContext|pageAcrossStores|sweepAcrossStores)$/;
+  /^(withStore|runInStoreScope|runInTenantContext|acrossStores|acrossStoresFlat|withUser|asPlatformOperator|asOperator|scopeTransaction|readInStoreContext|withTenantContext|pageAcrossStores|sweepAcrossStores)$/;
 
 /** `file::function` that run only under a caller's scope, with the reason. */
 const ALLOWED: Record<string, string> = {
+  'apps/api/src/services/billing/grants.service.ts::listGrants':
+    'super-admin grants list; on the platform D1 prisma.store is answered by D1 (no store scope exists for a cross-store list)',
+  'apps/api/src/services/provider-activation.service.ts::listAllRequests':
+    'super-admin queue; on the platform D1 prisma.store is answered by D1, behind the admin router operator hatch',
+  'apps/api/src/services/ci-hints.service.ts::ciOverview':
+    'only called from GET /stores/:storeId/ci/overview, behind requireStoreAccess (the request scope)',
+  'apps/api/src/services/ci-hints.service.ts::setCiSharing':
+    'only called from PUT /stores/:storeId/ci/sharing, behind requireStoreAccess (the request scope)',
   'apps/api/src/services/page-builder.service.ts::publisherNames':
     'only reached from listRevisions, behind the page-builder routes (requireStoreAccess opens the request scope)',
   'apps/api/src/services/store.service.ts::list':

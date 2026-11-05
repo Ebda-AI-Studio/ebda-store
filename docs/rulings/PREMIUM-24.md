@@ -1,0 +1,5 @@
+# PREMIUM-24
+
+> Section: 2026-11-03 - Storefront premium defaults (PREMIUM-\*)
+
+Ruling PREMIUM-24 - no /auth/me call without a session hint, except on account and order routes. `AuthProvider` checks on mount when the browser holds a session hint (`hasSessionHint`) OR the route is an account/order route (`isSessionIntentPath`: cart, checkout, account, wishlist, auth, returns, track); elsewhere a hint-less browser is a guest and makes no call. The PDP review form is gated on the same hint. Measured on production before this change (Playwright, fresh 390px context): the first page logged `/auth/me` 401 + `/auth/refresh` 401, every later page `/auth/me` 401. Residual: the first account/order route a hint-less browser reaches still costs one 401 pair (that is how the Safari-ITP cohort whose localStorage was evicted is healed, #2164); a wholesale/B2B customer in that cohort sees retail PDP prices until they visit cart/checkout/account. Cost if wrong: a signed-in customer with evicted storage looks like a guest on content pages until their next cart or account visit.

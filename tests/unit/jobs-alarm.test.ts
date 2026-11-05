@@ -72,7 +72,6 @@ describe('nextRunAfter', () => {
 describe('alarm flag', () => {
   beforeEach(() => {
     setCfBindings({
-      HYPERDRIVE: { connectionString: 'x' },
       JOBS_WORKFLOW: { create: async () => ({ id: 'i' }) },
       JOBS_QUEUE: { send: async () => undefined },
       STORE_SCHEDULE: { idFromName: (n: string) => n, get: () => ({}) as never },

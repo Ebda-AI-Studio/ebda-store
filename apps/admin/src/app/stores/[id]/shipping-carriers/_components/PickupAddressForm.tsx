@@ -48,7 +48,7 @@ export function PickupAddressForm({
               value={value[field]}
               onChange={e => onChange({ [field]: e.target.value })}
               placeholder={t(`placeholders.${field}`)}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
         ))}

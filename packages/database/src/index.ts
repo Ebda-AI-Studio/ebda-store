@@ -10,8 +10,19 @@ import {
   ambientScope as ambientScopeImpl,
 } from './tenant-scope';
 import { setTenantGucs as setTenantGucsImpl } from './tenant-gucs';
+import { getModelRouter, routeTx, routedDelegate } from './tx-route';
+export { setModelRouter, type ModelRouter, routeTx } from './tx-route';
 import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
+import { dropHiddenStores } from './job-store-guard';
+import { afterTxCommit, registerTxHooks, runCommitHooks } from './tx-hooks';
+
+export {
+  withHiddenStores,
+  withoutHiddenStores,
+  dropHiddenStores,
+  type HiddenStoresScope,
+} from './job-store-guard';
 
 // The client factory, the per-request client binding and the process singleton
 // live in ./client and ./request-db. Everything below resolves its client
@@ -27,7 +38,13 @@ export {
   type IsolateDb,
   type IsolateDbOptions,
 } from './request-db';
+export { trackPostgresReaches, postgresReaches, withReachLabel } from './request-db';
 export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
+export {
+  createPostgresRemovedClient,
+  PostgresRemovedError,
+  POSTGRES_REMOVED,
+} from './postgres-removed';
 export {
   TenantScopeViolation,
   assertTenantScoped,
@@ -39,6 +56,8 @@ export {
   GLOBAL_MODELS,
   setDbHopObserver,
   setModelWriteObserver,
+  notifyModelWrite,
+  setRoutedModelGuard,
   type ModelWriteEvent,
 } from './tenant-guard';
 export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
@@ -94,7 +113,7 @@ function ambientGucs(): TenantGucs | undefined {
   const tx = tenantStorage.getStore();
   if (tx) return txGucs.get(tx as object);
   const scope = storeScope.getStore();
-  return scope ? { storeId: scope.storeId } : undefined;
+  return scope ? { storeId: scope.storeId, userId: scope.userId } : undefined;
 }
 
 /**
@@ -114,9 +133,13 @@ function isScopedOp(v: unknown): v is ScopedOp {
   return Boolean(v && typeof v === 'object' && (v as Record<symbol, unknown>)[SCOPED_OP]);
 }
 
-function scopedOp(storeId: string, exec: () => Promise<unknown>): ScopedOp & Promise<unknown> {
+function scopedOp(
+  storeId: string | undefined,
+  exec: () => Promise<unknown>,
+  userId?: string
+): ScopedOp & Promise<unknown> {
   let started: Promise<unknown> | undefined;
-  const run = () => (started ??= runInTenantContext(storeId, exec));
+  const run = () => (started ??= runInTenantContext(storeId, exec, userId));
   const op = {
     [SCOPED_OP]: true as const,
     exec,
@@ -153,7 +176,7 @@ function transactionWithGucs(gucs: TenantGucs) {
       const fn = arg as (tx: TenantTx) => Promise<unknown>;
       return base(async (tx: TenantTx) => {
         await applyGucs(tx, gucs);
-        return fn(tx);
+        return fn(routeTx(tx));
       }, opts);
     }
     if (Array.isArray(arg)) {
@@ -402,6 +425,34 @@ export function currentTenantGucs(): TenantGucs | undefined {
  */
 export const prisma = new Proxy({} as AppPrismaClient, {
   get(_target, prop) {
+    // NEON-ZERO-1: a model the API has moved to D1 resolves per CALL (the cutover switch is read then), and only
+    // the Postgres branch of that call touches `basePrisma()` - a D1-served call never needs a Postgres client.
+    const modelRouter = getModelRouter();
+    if (modelRouter && typeof prop === 'string' && modelRouter.models.has(prop))
+      return routedDelegate(prop, () => proxiedGet(prop), modelRouter);
+    return proxiedGet(prop);
+  },
+  // The target is an empty shell, so the remaining traps forward to the live
+  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
+  // then behave as they did when the target was the client itself.
+  has: (_t, prop) => prop in basePrisma(),
+  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
+  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
+  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
+  ownKeys: () => Reflect.ownKeys(basePrisma()),
+  getOwnPropertyDescriptor: (_t, prop) => {
+    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
+    if (d) d.configurable = true;
+    return d;
+  },
+  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
+  // PrismaClient the types would still advertise `passwordHash` while the
+  // runtime omits it — code reading it would compile and silently get
+  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
+}) as AppPrismaClient;
+
+function proxiedGet(prop: string | symbol): unknown {
+  {
     const target = basePrisma();
     const receiver = target;
     const tx = tenantStorage.getStore();
@@ -423,8 +474,10 @@ export const prisma = new Proxy({} as AppPrismaClient, {
       const self = prisma as unknown as Record<string, unknown>;
       if (PROXIED_PRISMA_METHODS.has(prop)) {
         return (...args: unknown[]) =>
-          scopedOp(scope.storeId, () =>
-            (self[prop] as (...a: unknown[]) => Promise<unknown>)(...args)
+          scopedOp(
+            scope.storeId,
+            () => (self[prop] as (...a: unknown[]) => Promise<unknown>)(...args),
+            scope.userId
           );
       }
       const value = Reflect.get(target, prop, receiver);
@@ -434,10 +487,14 @@ export const prisma = new Proxy({} as AppPrismaClient, {
             const v = Reflect.get(delegate, method, r);
             if (typeof v !== 'function' || typeof method !== 'string') return v;
             return (...args: unknown[]) =>
-              scopedOp(scope.storeId, () => {
-                const d = self[prop] as Record<string, (...a: unknown[]) => Promise<unknown>>;
-                return d[method](...args);
-              });
+              scopedOp(
+                scope.storeId,
+                () => {
+                  const d = self[prop] as Record<string, (...a: unknown[]) => Promise<unknown>>;
+                  return d[method](...args);
+                },
+                scope.userId
+              );
           },
         });
       }
@@ -447,28 +504,19 @@ export const prisma = new Proxy({} as AppPrismaClient, {
     // `$connect` / `$disconnect` / `$on` / `$extends` / `$use` are called as
     // `prisma.$x()`, i.e. with the proxy as `this`; they must act on the
     // client resolved NOW, not on whatever the proxy resolves to later.
+    if (prop === '$transaction' && typeof value === 'function' && getModelRouter()) {
+      // a raw client handed to a callback must route the D1 models too (tx-route.ts)
+      const bound = value.bind(target) as (...a: unknown[]) => unknown;
+      return (arg: unknown, opts?: unknown) =>
+        typeof arg === 'function'
+          ? bound((tx: object) => (arg as (t: object) => unknown)(routeTx(tx)), opts)
+          : bound(arg, opts);
+    }
     return typeof value === 'function' && typeof prop === 'string' && prop[0] === '$'
       ? value.bind(target)
       : value;
-  },
-  // The target is an empty shell, so the remaining traps forward to the live
-  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
-  // then behave as they did when the target was the client itself.
-  has: (_t, prop) => prop in basePrisma(),
-  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
-  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
-  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
-  ownKeys: () => Reflect.ownKeys(basePrisma()),
-  getOwnPropertyDescriptor: (_t, prop) => {
-    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
-    if (d) d.configurable = true;
-    return d;
-  },
-  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
-  // PrismaClient the types would still advertise `passwordHash` while the
-  // runtime omits it — code reading it would compile and silently get
-  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
-}) as AppPrismaClient;
+  }
+}
 
 // Re-export everything from Prisma client (types, enums, Prisma namespace)
 export * from '@prisma/client';
@@ -516,6 +564,7 @@ export { prisma as db };
 // Money-safe transaction wrapper (Neon pgbouncer P2028 guard). Use for every
 // interactive $transaction call site. See ./with-money-tx.ts.
 export { withMoneyTx } from './with-money-tx';
+export { afterTxCommit, setCommitHookErrorReporter } from './tx-hooks';
 
 // Set RLS settings on a caller-opened transaction. See ./tenant-gucs.ts.
 export { setTenantGucs, type TenantGucs } from './tenant-gucs';
@@ -568,9 +617,6 @@ export { setTenantGucs, type TenantGucs } from './tenant-gucs';
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** After-COMMIT callbacks of transactions opened by `runInTenantContext` (see `afterTenantTxCommit`). */
-const afterCommitHooks = new WeakMap<object, Array<() => unknown>>();
-
 /**
  * Run `fn` after the ambient tenant transaction COMMITS — for side effects that must not see (or
  * announce) uncommitted rows, e.g. an Inngest event, when there is no request deferral scope
@@ -582,10 +628,7 @@ const afterCommitHooks = new WeakMap<object, Array<() => unknown>>();
  */
 export function afterTenantTxCommit(fn: () => unknown): boolean {
   const tx = tenantStorage.getStore() as object | undefined;
-  const hooks = tx ? afterCommitHooks.get(tx) : undefined;
-  if (!hooks) return false;
-  hooks.push(fn);
-  return true;
+  return tx ? afterTxCommit(tx, fn) : false;
 }
 
 export async function runInTenantContext<T>(
@@ -599,7 +642,7 @@ export async function runInTenantContext<T>(
   const hooks: Array<() => unknown> = [];
   const result = await basePrisma().$transaction(
     async tx => {
-      afterCommitHooks.set(tx as object, hooks);
+      registerTxHooks(tx as object, hooks);
       await applyGucs(tx, { storeId, userId });
       txGucs.set(tx as object, { storeId, userId });
       try {
@@ -631,13 +674,8 @@ export async function runInTenantContext<T>(
     { maxWait: 10000, timeout: 30000 }
   );
   // COMMITTED (a rollback threw above and the hooks are dropped with it).
-  for (const hook of hooks.splice(0)) {
-    try {
-      await tenantStorage.exit(() => hook());
-    } catch {
-      // The transaction is committed; a failing callback reports its own error.
-    }
-  }
+  await runCommitHooks(hooks.map(h => () => tenantStorage.exit(() => h())));
+  hooks.length = 0;
   return result;
 }
 
@@ -659,10 +697,20 @@ export async function withTenantContext<T>(
       await applyGucs(tx, { storeId });
       // Ambient for the code-level tenant guard (and the proxy), like runInTenantContext.
       txGucs.set(tx as object, { storeId });
-      return tenantStorage.run(tx, () => settleInScope(() => fn(tx)));
+      return tenantStorage.run(tx, () => settleInScope(() => fn(routeTx(tx))));
     },
     { maxWait: 10000, timeout: 30000 }
   );
+}
+
+/**
+ * A USER scope without a store and without a long-lived transaction: the per-query counterpart of `userContext`'s request
+ * transaction. Every Postgres query in `fn` opens its own short `runInTenantContext(undefined, ..., userId)`, so a request
+ * that never touches a user-keyed Postgres table never opens a Postgres connection at all (Workers with D1 serving the
+ * platform data). Atomicity across several Postgres writes is NOT provided: use it only where that is acceptable.
+ */
+export function runInUserScope<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return storeScope.run({ userId }, () => settleInScope(fn));
 }
 
 /**
@@ -685,11 +733,15 @@ export async function withTenantContext<T>(
  * identical on the owner role — the only cost is one short transaction per
  * query, negligible next to an AI call.
  */
-export function runInStoreScope<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+export function runInStoreScope<T>(
+  storeId: string,
+  fn: () => Promise<T>,
+  userId?: string
+): Promise<T> {
   if (!UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return storeScope.run({ storeId }, () => settleInScope(fn));
+  return storeScope.run({ storeId, userId }, () => settleInScope(fn));
 }
 
 // ---------------------------------------------------------------------------
@@ -732,11 +784,47 @@ export function runInStoreScope<T>(storeId: string, fn: () => Promise<T>): Promi
  * `fn` receives the `prisma` proxy typed as a transaction client, so existing
  * `tx.model.findMany(...)` code moves over without change.
  */
-export function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+export async function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>): Promise<T> {
   const run = () => fn(prisma as unknown as TenantTx);
   if (currentTenantGucs()?.storeId === storeId) return run();
   if (!tenantStorage.getStore() && storeScope.getStore()?.storeId === storeId) return run();
+  // NEON-ZERO (NZ-TX-2, one resolver): a store whose data is not in Postgres (served by its Durable Object) needs no Postgres
+  // transaction just to be scoped; a caller outside any request transaction (the super-admin hub, a job step) gets the lazy
+  // per-query store scope. A Postgres store keeps `runInTenantContext` (BEGIN + set_config), so tenant scoping is never skipped.
+  if (!tenantStorage.getStore() && (await lazyForStore(storeId)))
+    return runInStoreScope(storeId, async () => run());
   return runInTenantContext(storeId, run);
+}
+
+/**
+ * ONE resolver for every `withStore` / `withUser` / `acrossStores` call that has NO ambient transaction (NEON-ZERO-1, Rulings
+ * NZ-TX-2 + NZ-C-3, reconciled in NZ-INTEG-1). It decides whether the call opens a Postgres transaction (the default: BEGIN +
+ * `set_config`, atomic) or only carries the scope, each Postgres query then running in its own short transaction WITH the
+ * GUCs (a call that never touches Postgres never connects). Registered once by the API (`lib/store-scope-resolver.ts`);
+ * unregistered (Node scripts, unit tests) = every call keeps the Postgres transaction.
+ *  - `lazyForStore`: true for a store served by its Durable Object. An unreadable flag THROWS (never a guess).
+ *  - `lazyForUser`: true when the platform data (billing, access, platform families) is on D1, so the user scope needs no BEGIN.
+ *  - `directory`: the store DIRECTORY (every store, never capped) read from D1 where the platform D1 is bound, or undefined
+ *    to use the Postgres `ebda_store_directory()` definer (Node, tests, local dev). Once D1 is bound there is NO Postgres fallback.
+ */
+export interface ScopeResolver {
+  lazyForStore(storeId: string): Promise<boolean>;
+  lazyForUser(): boolean | Promise<boolean>;
+  directory?(opts: {
+    includeDeleted: boolean;
+    filter?: (s: StoreDirectoryEntry) => boolean;
+  }): Promise<StoreDirectoryEntry[] | undefined>;
+}
+let scopeResolver: ScopeResolver | undefined;
+export function setScopeResolver(r: ScopeResolver | undefined): void {
+  scopeResolver = r;
+}
+const lazyForStore = async (storeId: string): Promise<boolean> =>
+  scopeResolver ? scopeResolver.lazyForStore(storeId) : false;
+/** The per-store scope runner `acrossStores` uses (same decision as `withStore`). */
+async function runInStoreTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  if (await lazyForStore(storeId)) return runInStoreScope(storeId, fn);
+  return runInTenantContext(storeId, fn);
 }
 
 /**
@@ -745,7 +833,7 @@ export function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>):
  * `app.current_user_id`. Reuses the ambient transaction when it already carries
  * this user (and store, if one is given).
  */
-export function withUser<T>(
+export async function withUser<T>(
   userId: string,
   fn: (tx: TenantTx) => Promise<T>,
   storeId?: string
@@ -754,6 +842,13 @@ export function withUser<T>(
   const ambient = currentTenantGucs();
   if (ambient?.userId === userId && (storeId === undefined || ambient.storeId === storeId)) {
     return run();
+  }
+  if (scopeResolver && !tenantStorage.getStore()) {
+    if (storeId === undefined) {
+      if (await scopeResolver.lazyForUser()) return runInUserScope(userId, async () => run());
+    } else if (await scopeResolver.lazyForStore(storeId)) {
+      return runInStoreScope(storeId, async () => run(), userId);
+    }
   }
   return runInTenantContext(storeId, run, userId);
 }
@@ -781,8 +876,18 @@ export interface StoreDirectoryEntry {
 /** Every store that is not soft-deleted (id order), optionally filtered. See `StoreDirectoryEntry`. */
 export async function storeDirectory(
   filter?: (s: StoreDirectoryEntry) => boolean,
-  opts: { includeDeleted?: boolean } = {}
+  opts: { includeDeleted?: boolean; postgresOnly?: boolean } = {}
 ): Promise<StoreDirectoryEntry[]> {
+  // NEON-ZERO (Ruling NZ-PG-1): where the platform D1 is bound the directory IS D1 `stores` (status, deleted, hidden are applied
+  // below exactly as for the definer); the Postgres definer is only the answer where no D1 is bound (Node, tests, local dev).
+  // `postgresOnly`: the D1-vs-Postgres drift reconcile needs the Postgres side as Postgres says it (it is skipped when Postgres is gone).
+  const fromD1 = opts.postgresOnly
+    ? undefined
+    : await scopeResolver?.directory?.({ includeDeleted: opts.includeDeleted === true, filter });
+  if (fromD1) {
+    const kept = dropHiddenStores(fromD1, s => s.id, 'storeDirectory');
+    return filter ? kept.filter(filter) : kept;
+  }
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -809,7 +914,8 @@ export async function storeDirectory(
     hasDomain: r.has_domain,
     hasPendingDomain: r.has_pending_domain,
   }));
-  return filter ? all.filter(filter) : all;
+  const kept = dropHiddenStores(all, s => s.id, 'storeDirectory');
+  return filter ? kept.filter(filter) : kept;
 }
 
 /**
@@ -828,7 +934,7 @@ export async function scopeTransaction<Tx extends object, T>(
 ): Promise<T> {
   await setTenantGucsImpl(tx as unknown as Parameters<typeof setTenantGucsImpl>[0], gucs);
   txGucs.set(tx, { ...gucs });
-  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(tx)));
+  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(routeTx(tx))));
 }
 
 /**
@@ -842,14 +948,25 @@ export async function scopeTransaction<Tx extends object, T>(
  */
 export function asPlatformOperator<T>(userId: string, fn: () => Promise<T>): Promise<T> {
   return withUser(userId, async () => {
-    const rows = await prisma.$queryRaw<
-      Array<{ ok: boolean }>
-    >`SELECT public.ebda_is_super_admin() AS ok`;
-    if (rows[0]?.ok !== true) {
+    // NEON-ZERO-1: where the identity service is the authority for accounts, it answers "is this an active super_admin"
+    // (one RPC, the same fact `ebda_is_super_admin()` read from Postgres); the SQL definer stays the default elsewhere.
+    const ok =
+      (await platformOperatorVerifier?.(userId)) ??
+      (await prisma.$queryRaw<Array<{ ok: boolean }>>`SELECT public.ebda_is_super_admin() AS ok`)[0]
+        ?.ok === true;
+    if (!ok) {
       throw new Error('asPlatformOperator: the acting user is not an active super_admin');
     }
     return guardHatch.run('platform-operator', () => settleInScope(fn));
   });
+}
+
+/** Resolves true/false for a user, or `undefined` when it cannot decide (the SQL definer then decides). */
+let platformOperatorVerifier: ((userId: string) => Promise<boolean | undefined>) | undefined;
+export function setPlatformOperatorVerifier(
+  fn: ((userId: string) => Promise<boolean | undefined>) | undefined
+): void {
+  platformOperatorVerifier = fn;
 }
 
 export interface AcrossStoresOptions {
@@ -884,7 +1001,11 @@ export async function acrossStores<T>(
   fn: (storeId: string) => Promise<T>,
   opts: AcrossStoresOptions = {}
 ): Promise<Array<{ storeId: string; value: T }>> {
-  const storeIds = opts.storeIds ?? (await storeDirectory(opts.filter)).map(s => s.id);
+  // The list is the FULL directory (`storeDirectory`: D1 where bound, never capped, paged inside the resolver): a cron that
+  // visits "every store" must not silently stop at a hub cap (Ruling NZ-PG-3).
+  const storeIds = opts.storeIds
+    ? dropHiddenStores(opts.storeIds, id => id, 'acrossStores')
+    : (await storeDirectory(opts.filter)).map(s => s.id);
 
   const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
   let next = 0;
@@ -895,7 +1016,7 @@ export async function acrossStores<T>(
       if (i >= storeIds.length) return;
       const storeId = storeIds[i];
       try {
-        out[i] = { storeId, value: await runInTenantContext(storeId, () => fn(storeId)) };
+        out[i] = { storeId, value: await runInStoreTx(storeId, () => fn(storeId)) };
       } catch (err) {
         if (opts.onStoreError) opts.onStoreError(storeId, err);
         else failure = { err };
@@ -1013,7 +1134,7 @@ export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<
   // Hatch 'owner-role-tx' (R-EBDA-003): the role was just proven to bypass RLS, so the
   // code-level tenant guard stands aside for this transaction only.
   return guardHatch.run('owner-role-tx', () =>
-    client.$transaction(tx => fn(tx), { maxWait: 10000, timeout: 30000 })
+    client.$transaction(tx => fn(routeTx(tx)), { maxWait: 10000, timeout: 30000 })
   );
 }
 

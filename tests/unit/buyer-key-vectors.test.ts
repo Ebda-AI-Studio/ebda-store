@@ -1,5 +1,5 @@
 /**
- * The Store's phone normaliser and buyer key must produce EXACTLY what Ebda WhatsApp produces (audit
+ * The Store's phone normaliser and buyer key must produce EXACTLY what Ebda Chat produces (audit
  * CODE-10: two normalisers that differ give one customer two keys). Both repos run the IDENTICAL vector
  * files, created by the WhatsApp session:
  *   tests/vectors/ebda-wa/phone.json      [{ in, e164 | null }]
@@ -32,7 +32,7 @@ function phoneCases(raw: unknown): Array<[string, string | null]> {
   });
 }
 
-describe('shared vectors with Ebda WhatsApp', () => {
+describe('shared vectors with Ebda Chat', () => {
   it('the vendored vector files exist (never skipped: they are committed)', () => {
     expect(present).toBe(true);
   });

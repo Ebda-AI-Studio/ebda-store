@@ -1,0 +1,3 @@
+# CF-OPUS-3
+
+Ruling CF-OPUS-3 (2026-10-30, INFRA-CF-1 Opus review) - A gateway capture or refund on an order that cannot take the transition is recorded in full, flagged and alerted, never thrown. `applyPaymentWebhook` no longer asserts the order transition: a blocked one keeps the order status, writes the payment, event log and an order event with `review`, and raises `captured_on_unconfirmable_order` / `refund_on_unreversible_order`; `order_paid` fan-out is not queued (`packages/repo/test/do-payment-ops.test.ts`, `do-payments.test.ts`). MONEY-FACT-1. Cost if wrong: a cancelled order shows payment_status paid until an operator refunds or restores it, which the alert asks for.

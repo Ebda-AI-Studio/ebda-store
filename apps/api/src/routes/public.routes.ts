@@ -11,7 +11,10 @@ import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
-import { readInStoreContext } from '../lib/store-scoped-read';
+import { cfBindings } from '../cf/bindings';
+import { withStoreRead } from '../lib/store-read';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
+import { inDoStoreScope, readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { recordQrScan, resolveQrScan } from '../services/qr.service';
 import { AppError } from '../middleware/error-handler';
@@ -22,7 +25,6 @@ import {
   rejectImpersonated,
 } from '../middleware/auth';
 import { buyerFromRequest } from '../lib/buyer-identity';
-import { backendFor, storeDo, unwrapDo } from '../lib/store-backend';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
@@ -67,6 +69,7 @@ import {
 } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
+import { lookupStoreCached } from '../lib/store-directory';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
 import {
@@ -75,6 +78,7 @@ import {
   CONTACT_HONEYPOT_FIELD,
   normalizeArabicSearch,
   normalizeLegacyTemplate,
+  deliveryLineFromNotes,
 } from '@ebda/shared';
 import {
   assertScalarQuery,
@@ -130,7 +134,14 @@ router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
 router.get('/health', async (_req: Request, res: Response) => {
   try {
     // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
+    // A deployed Worker has no Postgres to ping: the platform D1 is the database it stands on (NEON-ZERO-1).
+    const d1 = (
+      cfBindings() as
+        | { PLATFORM_DB?: { prepare(q: string): { first(): Promise<unknown> } } }
+        | undefined
+    )?.PLATFORM_DB;
+    if (d1) await d1.prepare('SELECT 1').first();
+    else await prisma.$queryRaw`SELECT 1`;
 
     res.json({
       success: true,
@@ -281,14 +292,6 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const headerTerm = searchQueryFromHeader(req);
     const search = headerTerm ?? req.query.search;
     const storeId = await getStoreIdFromRequest(req);
-    if (backendFor(storeId, req) === 'do') {
-      // Phase 0 spike (Ruling INFRA-CF-1): flagged demo store + opt-in header only. Postgres path below is untouched.
-      const lim = Math.min(Math.max(Number(limit) || 24, 1), 100);
-      const products = unwrapDo(await storeDo(storeId).listProducts(storeId, lim));
-      res.setHeader('x-store-backend', 'do');
-      res.json({ success: true, data: { products } });
-      return;
-    }
     // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
     // to turn an absent param into `featured: false`, which listPublic applied
     // as `WHERE featured = false` on every non-"Featured" listing.
@@ -591,7 +594,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     if (!enabled) {
       throw new AppError(404, 'NOT_FOUND', 'Not found');
     }
-    const store = await prisma.store.findUniqueOrThrow({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUniqueOrThrow({
       where: { id: storeId },
       select: { id: true, name: true, slug: true, currency: true, domain: true },
     });
@@ -662,7 +667,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
       // Ruling B5-21 (item 9): does this store sell gold-rate products? Cached WITH the feed inputs (same
       // key, same purge), so a rate write that clears this key also re-reads the flag.
       const hasGold =
-        (await prisma.product.count({
+        (await (
+          await storeDb(storeId)
+        ).product.count({
           where: {
             storeId,
             status: 'active',
@@ -877,14 +884,6 @@ router.post(
 
       const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      if (backendFor(storeId, req) === 'do') {
-        const { cartId } = unwrapDo(
-          await storeDo(storeId).addCartItem(storeId, sessionId, productId, quantity, variantId)
-        );
-        res.setHeader('x-store-backend', 'do');
-        res.json({ success: true, data: { cart: { id: cartId } } });
-        return;
-      }
       const cart = await CartService.addItem(
         storeId,
         sessionId,
@@ -1025,8 +1024,8 @@ router.post(
 // caller must be a logged-in customer with a cart in THIS session; consent is recorded against the
 // number on their own account (the number the reminder goes to), source 'checkout', audited with the
 // cart id. A guest, another session or a body-supplied phone cannot opt anyone in or out. Rate-limited
-// per IP+session and per store. Only offered on a store that has Ebda WhatsApp linked.
-/** Show the WhatsApp marketing box only where Ebda WhatsApp is linked; a lookup failure fails CLOSED (hidden). */
+// per IP+session and per store. Only offered on a store that has Ebda Chat linked.
+/** Show the WhatsApp marketing box only where Ebda Chat is linked; a lookup failure fails CLOSED (hidden). */
 async function whatsappOptInAvailable(storeId: string): Promise<boolean> {
   try {
     return await isWhatsAppLinked(storeId);
@@ -1330,16 +1329,6 @@ router.post(
 
       const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
-      if (backendFor(storeId, req) === 'do') {
-        // Spike order path: stock + order rows in ONE DO transaction. The demo copy only; no payment, no email.
-        const order = unwrapDo(await storeDo(storeId).createOrder(storeId, sessionId));
-        // The order just decremented stock in the Durable Object: every cache layer (KV, the Worker edge cache
-        // through the same generations, the storefront tag) must see it, exactly as the Postgres path does.
-        await invalidateStoreProductCachesAfterOrder(storeId);
-        res.setHeader('x-store-backend', 'do');
-        res.status(201).json({ success: true, data: { order } });
-        return;
-      }
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
       // and storefront origins (api.ebda.app host), so a merchant
@@ -1563,7 +1552,8 @@ router.get(
       void _ip;
       void _notes;
       void _idem;
-      const visible = shopperOrder;
+      // The delivery pick, alone: `notes` stays hidden, but the receipt must show when it arrives.
+      const visible = { ...shopperOrder, deliveryLine: deliveryLineFromNotes(order.notes) };
       // The answer differs by token: never cache it shared.
       res.setHeader('Cache-Control', 'private, no-store');
       res.vary('X-Order-View-Token');
@@ -1623,7 +1613,9 @@ router.post(
       const body = verifyPaymentSchema.parse(req.body ?? {});
       const storeId = await getStoreIdFromRequest(req);
 
-      const order = await prisma.order.findFirst({
+      const order = await (
+        await storeDb(storeId)
+      ).order.findFirst({
         where: { id, storeId, deletedAt: null },
         select: {
           id: true,
@@ -1688,6 +1680,21 @@ router.post(
       // COD orders have a cod_pending payment and never an online provider
       // transaction — there's nothing to verify against a gateway.
       if (!payment || !payment.transactionId || payment.provider === 'cod') {
+        res.json({
+          success: true,
+          data: {
+            paymentStatus: order.paymentStatus === 'failed' ? 'failed' : 'unpaid',
+            providerStatus: 'pending',
+            statusChanged: false,
+          },
+        });
+        return;
+      }
+
+      // A Durable Object store's order and payment rows live in its DO; the confirmation below claims and writes them in
+      // Postgres, where they do not exist (a failed claim there used to read as "paid", a completed one threw). Until N-11 /
+      // N-12 port that money path, report the DO order's own state and let the webhook settle it. Never derive "paid" here.
+      if ((await storeRepo(storeId)).backend === 'do') {
         res.json({
           success: true,
           data: {
@@ -1875,7 +1882,9 @@ router.get(
       }
 
       // Verify store exists and is active before querying wishlists
-      const store = await prisma.store.findFirst({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findFirst({
         where: { id: storeId, status: 'active' },
         select: { id: true },
       });
@@ -1887,7 +1896,9 @@ router.get(
         return;
       }
 
-      const wishlist = await prisma.wishlist.findFirst({
+      const wishlist = await (
+        await storeDb(storeId)
+      ).wishlist.findFirst({
         where: { userId, storeId },
         include: {
           items: {
@@ -1990,7 +2001,9 @@ router.post(
 
       // Verify the product belongs to this store (ownership guard).
       // Explicit select to avoid fetching unnecessary columns.
-      const product = await prisma.product.findFirst({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findFirst({
         where: { id: productId, storeId, deletedAt: null, audience: 'public' },
         select: { id: true },
       });
@@ -2030,7 +2043,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
     const stores = (
       await Promise.all(
         storePage.ids.map(id =>
-          withStore(id, tx =>
+          withStoreRead(id, tx =>
             tx.store.findUnique({
               where: { id },
               select: {
@@ -2086,6 +2099,36 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
  * scope (`readInStoreContext`), so RLS still filters every table.
  */
 async function fetchStoreExtras(storeId: string) {
+  // A store on its Durable Object reads the same three sets from its own tables, in one DO round trip batch (NEON-ZERO-1 N-5).
+  const repo = await storeRepo(storeId);
+  if (repo.backend === 'do') {
+    const db = repo.db;
+    const [faqs, howtos, disabled] = await Promise.all([
+      db.storeFaq.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { orderIndex: 'asc' },
+        select: { id: true, question: true, questionAr: true, answer: true, answerAr: true },
+      }),
+      db.storeHowto.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { orderIndex: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          titleAr: true,
+          description: true,
+          descriptionAr: true,
+          steps: true,
+          stepsAr: true,
+        },
+      }),
+      db.storePage.findMany({
+        where: { storeId, isPublished: false },
+        select: { slug: true },
+      }),
+    ]);
+    return { faqs, howtos, disabledCmsSlugs: disabled.map(p => p.slug) };
+  }
   return readInStoreContext(storeId, async () => {
     const rows = await prisma.$queryRaw<
       Array<{ faqs: unknown; howtos: unknown; disabled: unknown }>
@@ -2173,8 +2216,8 @@ async function fetchFooterLocations(store: {
       ? (store.theme as Record<string, unknown>)
       : null;
   if (!store.locationsEnabled || theme?.showBranchesInFooter !== true) return undefined;
-  return readInStoreContext(store.id, () =>
-    prisma.storeLocation.findMany({
+  return readInStoreContext(store.id, async () =>
+    (await storeDb(store.id)).storeLocation.findMany({
       where: { storeId: store.id, isPublished: true },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2220,122 +2263,127 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // stores (`deletedAt` set) are also excluded.
       // `stores` is under RLS (R-EBDA-005): resolve through the lookup definer, then read
       // the row inside that store's own scope.
-      const hit = await lookupStore(isUuid ? { id: slugOrId } : { slug: slugOrId }, [
+      const hit = await lookupStoreCached(isUuid ? { id: slugOrId } : { slug: slugOrId }, [
         'active',
         'suspended',
       ]);
-      const store = hit
-        ? await withStore(hit.id, tx =>
-            tx.store.findUnique({
-              where: { id: hit.id },
-              select: {
-                id: true,
-                name: true,
-                nameAr: true,
-                slug: true,
-                domain: true,
-                status: true,
-                logo: true,
-                logoAr: true,
-                favicon: true,
-                description: true,
-                descriptionAr: true,
-                currency: true,
-                timezone: true,
-                template: true,
-                look: true,
-                isDemo: true,
-                theme: true,
-                typography: true,
-                socialLinks: true,
-                email: true,
-                phone: true,
-                phoneAr: true,
-                whatsapp: true,
-                address: true,
-                addressAr: true,
-                announcementBar: true,
-                metaTitle: true,
-                metaTitleAr: true,
-                metaDescription: true,
-                metaDescriptionAr: true,
-                metaDescriptionAeo: true,
-                metaDescriptionAeoAr: true,
-                ogImage: true,
-                twitterHandle: true,
-                googleSiteVerification: true,
-                settings: true,
-                taxEnabled: true,
-                taxIncludedInPrice: true,
-                marketingPixels: true,
-                pwaEnabled: true,
-                pwaSettings: true,
-                blogEnabled: true,
-                locationsEnabled: true,
-                returnWindowDays: true,
-                returnFeesPaidBy: true,
-                heroTitle: true,
-                heroTitleAr: true,
-                heroSubtitle: true,
-                heroSubtitleAr: true,
-                heroCtaText: true,
-                heroCtaTextAr: true,
-                heroCtaLink: true,
-                heroImage: true,
-                createdAt: true,
-                llmsTxt: true,
-                aboutJson: true,
-              },
-            })
-          )
-        : null;
+      if (!hit) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+      // A Durable Object store runs the rest of the fill in a bare store scope, so the settings, tax, features and
+      // entitlement reads below open no Postgres transaction for it (NEON-ZERO-1 N-2); a Postgres store is unchanged.
+      return inDoStoreScope(hit.id, async () => {
+        const store = hit
+          ? await readInStoreContext(hit.id, async () =>
+              (await storeDb(hit.id)).store.findUnique({
+                where: { id: hit.id },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  slug: true,
+                  domain: true,
+                  status: true,
+                  logo: true,
+                  logoAr: true,
+                  favicon: true,
+                  description: true,
+                  descriptionAr: true,
+                  currency: true,
+                  timezone: true,
+                  template: true,
+                  look: true,
+                  isDemo: true,
+                  theme: true,
+                  typography: true,
+                  socialLinks: true,
+                  email: true,
+                  phone: true,
+                  phoneAr: true,
+                  whatsapp: true,
+                  address: true,
+                  addressAr: true,
+                  announcementBar: true,
+                  metaTitle: true,
+                  metaTitleAr: true,
+                  metaDescription: true,
+                  metaDescriptionAr: true,
+                  metaDescriptionAeo: true,
+                  metaDescriptionAeoAr: true,
+                  ogImage: true,
+                  twitterHandle: true,
+                  googleSiteVerification: true,
+                  settings: true,
+                  taxEnabled: true,
+                  taxIncludedInPrice: true,
+                  marketingPixels: true,
+                  pwaEnabled: true,
+                  pwaSettings: true,
+                  blogEnabled: true,
+                  locationsEnabled: true,
+                  returnWindowDays: true,
+                  returnFeesPaidBy: true,
+                  heroTitle: true,
+                  heroTitleAr: true,
+                  heroSubtitle: true,
+                  heroSubtitleAr: true,
+                  heroCtaText: true,
+                  heroCtaTextAr: true,
+                  heroCtaLink: true,
+                  heroImage: true,
+                  createdAt: true,
+                  llmsTxt: true,
+                  aboutJson: true,
+                },
+              })
+            )
+          : null;
 
-      if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+        if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-      // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
-      // access tokens) before this store object reaches the public storefront
-      // (and the edge cache). The browser pixel snippets only use the public
-      // pixel IDs — the tokens must never be exposed to anonymous visitors.
-      const publicStore = {
-        ...store,
-        // A store still holding a retired Force skin renders as its mapped Ebda template, at
-        // read time, with no database write (Ruling SKIN-DEL-8).
-        template: normalizeLegacyTemplate(store.template),
-        marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
-        settings: publicStoreSettings(store.settings),
-        // The checkout/cart tax line needs the rate, not just the
-        // enabled/included booleans already on the Store row. The SAME
-        // resolver order creation charges against (ruling M3-9), so it carries
-        // the VAT gate (ruling TAX-2): an unverified store is never shown a
-        // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
-        // rows still `isActive: true`. `taxEnabled` is overwritten with the
-        // EFFECTIVE value so no storefront code can key on the merchant's wish.
-        ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-        ...(await fetchStoreFaqsAndHowtos(store.id)),
-        // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
-        // this is true (sms feature on + provider configured + a promotional
-        // event enabled), so a store without SMS marketing shows no new UI.
-        // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
-        // SWR 600; a provider switched on/off shows up within that window.
-        // It is display-only — the send gate re-checks everything live.
-        smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-        cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-        whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
-      };
+        // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
+        // access tokens) before this store object reaches the public storefront
+        // (and the edge cache). The browser pixel snippets only use the public
+        // pixel IDs — the tokens must never be exposed to anonymous visitors.
+        const publicStore = {
+          ...store,
+          // A store still holding a retired Force skin renders as its mapped Ebda template, at
+          // read time, with no database write (Ruling SKIN-DEL-8).
+          template: normalizeLegacyTemplate(store.template),
+          marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+          settings: publicStoreSettings(store.settings),
+          // The checkout/cart tax line needs the rate, not just the
+          // enabled/included booleans already on the Store row. The SAME
+          // resolver order creation charges against (ruling M3-9), so it carries
+          // the VAT gate (ruling TAX-2): an unverified store is never shown a
+          // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
+          // rows still `isActive: true`. `taxEnabled` is overwritten with the
+          // EFFECTIVE value so no storefront code can key on the merchant's wish.
+          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
+          ...(await fetchStoreFaqsAndHowtos(store.id)),
+          // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
+          // this is true (sms feature on + provider configured + a promotional
+          // event enabled), so a store without SMS marketing shows no new UI.
+          // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
+          // SWR 600; a provider switched on/off shows up within that window.
+          // It is display-only — the send gate re-checks everything live.
+          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+        };
 
-      const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-      // Mirror the /store/resolve endpoint: surface explicitly-disabled
-      // CMS pages so the storefront footer can hide their links rather
-      // than rendering a "Page unavailable" landing on click.
-      const disabledPages = await readInStoreContext(store.id, () =>
-        prisma.storePage.findMany({
-          where: { storeId: store.id, isPublished: false },
-          select: { slug: true },
-        })
-      );
-      const disabledCmsSlugs = disabledPages.map(p => p.slug);
-      const locations = await fetchFooterLocations(store);
-      return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+        // Mirror the /store/resolve endpoint: surface explicitly-disabled
+        // CMS pages so the storefront footer can hide their links rather
+        // than rendering a "Page unavailable" landing on click.
+        const disabledPages = await readInStoreContext(store.id, async () =>
+          (await storeDb(store.id)).storePage.findMany({
+            where: { storeId: store.id, isPublished: false },
+            select: { slug: true },
+          })
+        );
+        const disabledCmsSlugs = disabledPages.map(p => p.slug);
+        const locations = await fetchFooterLocations(store);
+        return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+      });
     });
 
     if (!result) {
@@ -2440,7 +2488,10 @@ router.get(
         // stay hidden — those should still 404.
         // `stores` is under RLS (R-EBDA-005): resolve through the lookup definer, then read
         // the row inside that store's own scope.
-        const hit = await lookupStore(
+        // The public path (no expected id) reads the cached directory (Ruling NZ-D1: reads only); the editor preview is
+        // never cached and always asks D1.
+        const resolve = expectedStoreId ? lookupStore : lookupStoreCached;
+        const hit = await resolve(
           lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain },
           statuses
         );
@@ -2449,8 +2500,8 @@ router.get(
           throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
         }
         const store = hit
-          ? await withStore(hit.id, tx =>
-              tx.store.findUnique({
+          ? await readInStoreContext(hit.id, async () =>
+              (await storeDb(hit.id)).store.findUnique({
                 where: { id: hit.id },
                 select: {
                   id: true,
@@ -2516,38 +2567,41 @@ router.get(
         if (!store)
           throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
 
-        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+        // Durable Object store: the rest of the fill runs in a bare store scope (no Postgres transaction), see /stores/:slugOrId.
+        return inDoStoreScope(store.id, async () => {
+          const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
 
-        // Surface CMS pages that the merchant has explicitly turned off
-        // ("Show on storefront" toggle in /content). The storefront uses
-        // this to hide footer links pointing at those slugs — without it,
-        // a customer would click "Privacy" in the footer and land on a
-        // "Page unavailable" message, which is a worse UX than the link
-        // simply not being there. Only rows that exist AND are unpublished
-        // need to be reported; if the row is missing the storefront falls
-        // back to its built-in copy and the link should still work.
-        const extras = await fetchStoreExtras(store.id);
-        const disabledCmsSlugs = extras.disabledCmsSlugs;
+          // Surface CMS pages that the merchant has explicitly turned off
+          // ("Show on storefront" toggle in /content). The storefront uses
+          // this to hide footer links pointing at those slugs — without it,
+          // a customer would click "Privacy" in the footer and land on a
+          // "Page unavailable" message, which is a worse UX than the link
+          // simply not being there. Only rows that exist AND are unpublished
+          // need to be reported; if the row is missing the storefront falls
+          // back to its built-in copy and the link should still work.
+          const extras = await fetchStoreExtras(store.id);
+          const disabledCmsSlugs = extras.disabledCmsSlugs;
 
-        // Strip server-only marketing-pixel secrets before the store reaches the
-        // public storefront + edge cache (browser pixels use public IDs only).
-        const publicStore = {
-          ...store,
-          template: normalizeLegacyTemplate(store.template),
-          marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
-          settings: publicStoreSettings(store.settings),
-          // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
-          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-          faqs: extras.faqs,
-          howtos: extras.howtos,
-          // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
-          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
-        };
+          // Strip server-only marketing-pixel secrets before the store reaches the
+          // public storefront + edge cache (browser pixels use public IDs only).
+          const publicStore = {
+            ...store,
+            template: normalizeLegacyTemplate(store.template),
+            marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+            settings: publicStoreSettings(store.settings),
+            // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
+            ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
+            faqs: extras.faqs,
+            howtos: extras.howtos,
+            // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
+            smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
+            cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+            whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+          };
 
-        const locations = await fetchFooterLocations(store);
-        return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+          const locations = await fetchFooterLocations(store);
+          return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+        });
       };
 
       if (previewStoreId) {
@@ -2617,7 +2671,10 @@ router.post(
       await assertNotDemoStore(storeId);
       const normalizedEmail = data.email.trim().toLowerCase();
 
-      const existing = await prisma.newsletterSubscriber.findUnique({
+      // the list lives on the store's own backend (Ruling CF-R4-4)
+      const subscribers = await storeDb(storeId);
+      const subscriberWriter = await storeWriter(storeId);
+      const existing = await subscribers.newsletterSubscriber.findUnique({
         where: {
           storeId_email: { storeId, email: normalizedEmail },
         },
@@ -2627,7 +2684,7 @@ router.post(
         // If they had previously unsubscribed, re-activate the row so the
         // admin's send count stays correct.
         if (!existing.isActive) {
-          await prisma.newsletterSubscriber.update({
+          await subscriberWriter.newsletterSubscriber.update({
             where: { id: existing.id, storeId },
             data: {
               isActive: true,
@@ -2645,7 +2702,7 @@ router.post(
         return;
       }
 
-      await prisma.newsletterSubscriber.create({
+      await subscriberWriter.newsletterSubscriber.create({
         data: {
           storeId,
           email: normalizedEmail,
@@ -2698,7 +2755,9 @@ router.get(
       const { orderId, productId, token } = schema.parse(req.query);
       const storeId = await getStoreIdFromRequest(req);
 
-      const order = await prisma.order.findUnique({
+      const order = await (
+        await storeDb(storeId)
+      ).order.findUnique({
         where: { id: orderId, storeId },
         select: {
           id: true,
@@ -2730,7 +2789,9 @@ router.get(
       }
 
       // Check no existing review for this (orderId, productId) pair
-      const existing = await prisma.review.findUnique({
+      const existing = await (
+        await storeDb(storeId)
+      ).review.findUnique({
         where: { orderId_productId: { orderId, productId }, storeId },
         select: { id: true },
       });
@@ -2740,7 +2801,9 @@ router.get(
       }
 
       // Load product + store info for the form
-      const product = await prisma.product.findUnique({
+      const product = await (
+        await storeDb(storeId)
+      ).product.findUnique({
         where: { id: productId, storeId },
         select: { id: true, name: true, nameAr: true, images: true, storeId: true },
       });
@@ -2749,7 +2812,9 @@ router.get(
         return;
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(order.storeId)
+      ).store.findUnique({
         where: { id: order.storeId },
         select: { name: true, nameAr: true, slug: true, logo: true },
       });
@@ -2782,7 +2847,9 @@ router.post(
       const storeId = await getStoreIdFromRequest(req);
 
       // Re-validate token + order state — never trust the form's prior check
-      const order = await prisma.order.findUnique({
+      const order = await (
+        await storeDb(storeId)
+      ).order.findUnique({
         where: { id: data.orderId, storeId },
         select: {
           id: true,
@@ -2805,7 +2872,9 @@ router.post(
       }
 
       // Verify the product is actually in this order (defense-in-depth)
-      const orderItem = await prisma.orderItem.findFirst({
+      const orderItem = await (
+        await storeDb(storeId)
+      ).orderItem.findFirst({
         where: { orderId: data.orderId, productId: data.productId },
         select: { id: true },
       });
@@ -2815,7 +2884,9 @@ router.post(
       }
 
       // Create the review — status 'pending' until AI spam-check + moderation
-      const review = await prisma.review.create({
+      const review = await (
+        await storeWriter(order.storeId)
+      ).review.create({
         data: {
           productId: data.productId,
           storeId: order.storeId,
@@ -2879,7 +2950,9 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
       return;
     }
 
-    const store = await prisma.store.findUnique({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { isDemo: true },
     });

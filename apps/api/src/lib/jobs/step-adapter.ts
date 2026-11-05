@@ -92,6 +92,8 @@ export interface DurableStepOptions {
   dispatch: (payload: JobEvent | JobEvent[]) => Promise<unknown>;
   /** Runs before every step body (inside the step): renews the concurrency lease, throws if lost. */
   beforeStep?: () => Promise<void>;
+  /** Awaited before every step starts (the write freeze parks the run here, outside the step). */
+  beforeStepWait?: () => Promise<void>;
   /** Called around sleeps: release the gates before, re-acquire after. */
   aroundSleep?: { before: () => Promise<void>; after: () => Promise<void> };
   /** Cloudflare's `NonRetryableError` constructor (from `cloudflare:workflows`). */
@@ -108,8 +110,10 @@ export function durableStep(wf: WorkflowStepLike, o: DurableStepOptions): JobSte
     },
     timeout: '15 minutes',
   };
-  const run = <T>(id: string, fn: () => Promise<T> | T, config = cfg): Promise<T> =>
-    wf.do(name(id), config, () =>
+  const run = async <T>(id: string, fn: () => Promise<T> | T, config = cfg): Promise<T> => {
+    const stepName = name(id); // numbered synchronously: the Nth use of an id keeps its number across replays
+    await o.beforeStepWait?.();
+    return wf.do(stepName, config, () =>
       o.withContext(async () => {
         try {
           await o.beforeStep?.();
@@ -121,6 +125,7 @@ export function durableStep(wf: WorkflowStepLike, o: DurableStepOptions): JobSte
         }
       })
     );
+  };
   return {
     run: run as JobStep['run'],
     // Marker read by `stepRunUnlessEmpty`: code between steps has no database on a Workflow.

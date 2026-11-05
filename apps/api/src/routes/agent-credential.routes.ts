@@ -26,7 +26,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -35,6 +35,7 @@ import { featureService } from '../services/feature.service';
 import { AGENT_OPEN_WRITES_FEATURE } from '../mcp/agent-auth';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -102,6 +103,7 @@ router.get(
 router.post(
   '/:id/integrations/agent-key',
   ...chain,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -115,7 +117,7 @@ router.post(
       }
 
       const key = mintKey();
-      await prisma.store.update({
+      await storeUpdate(prisma, {
         where: { id: storeId },
         data: {
           agentApiKeyRotatedAt: new Date(),
@@ -164,6 +166,7 @@ router.post(
 router.delete(
   '/:id/integrations/agent-key',
   ...chain,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -176,7 +179,7 @@ router.delete(
         return;
       }
 
-      await prisma.store.update({
+      await storeUpdate(prisma, {
         where: { id: storeId },
         data: {
           agentApiKeyRotatedAt: new Date(),

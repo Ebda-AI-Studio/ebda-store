@@ -19,6 +19,8 @@ useDefault = true
 description = "CI-only test secrets (not real credentials)"
 regexTarget = "line"
 regexes = [
+  # foundation.lock.json: sha256 file pins for the vendored ebda-foundation tree (public hashes, not credentials).
+  '''"packages/shared/src/foundation/[^"]+": "[0-9a-f]{64}"''',
   # Paymob OFFICIAL DOCS example values (public, test-mode) used verbatim in
   # tests/contracts/paymob/*.official.json contract fixtures — not credentials.
   '''egy_csk_test_94042f793419c5a0f14a4cadfda9d626''',
@@ -75,6 +77,10 @@ regexes = [
   # blanket removed above was masking that this entry was dead on arrival; without it,
   # gitleaks correctly flags this fixture (private-key rule) until fixed here.
   '''nDjm07wI9wchYGBdTM7cFDagEuV6dm7xXAFfY5mkviqnPNWmjWChxTLTYs14cL0y''',
+  # sha256 content pins of published docs pages (support-wa-docs-drift.test.ts,
+  # `'en/api.mdx': '<64 hex>'`) - public file digests, not credentials. Matches the
+  # pin line shape only, commit-independent.
+  '''['"](?:ar|en)/[a-z-]+\.mdx['"]\s*:\s*['"][0-9a-f]{64}['"]''',
 ]
 
 # CORRECTED 2026-09-02 (adversarial audit, P2): this used to also carry a

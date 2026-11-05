@@ -20,7 +20,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -28,6 +28,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { createPoFromSuggestion } from '../services/accounting/purchase-order.service';
 import { createClearanceCouponFromFlag } from '../services/accounting/deadstock-scan.service';
 import { inngest } from '../lib/inngest/client';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router({ mergeParams: true });
 
@@ -72,9 +73,10 @@ router.get(
       const where: any = { storeId: req.params.storeId };
       if (status === 'open') where.status = 'open';
 
-      const [items, total] = await runInTenantContext(req.params.storeId, () =>
-        Promise.all([
-          prisma.reorderSuggestion.findMany({
+      const [items, total] = await runInStoreCtx(req.params.storeId, async () => {
+        const db = await storeDb(req.params.storeId);
+        return Promise.all([
+          db.reorderSuggestion.findMany({
             where,
             include: {
               product: { select: { id: true, name: true, nameAr: true, sku: true } },
@@ -86,9 +88,9 @@ router.get(
             skip: (page - 1) * perPage,
             take: perPage,
           }),
-          prisma.reorderSuggestion.count({ where }),
-        ])
-      );
+          db.reorderSuggestion.count({ where }),
+        ]);
+      });
 
       res.json({ success: true, data: { data: items, meta: pageMeta(page, perPage, total) } });
     } catch (err) {
@@ -107,7 +109,7 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const po = await runInTenantContext(req.params.storeId, () =>
+      const po = await runInStoreCtx(req.params.storeId, () =>
         createPoFromSuggestion(req.params.id, req.params.storeId, req.user?.userId)
       );
       res.json({ data: { poId: po.id } });
@@ -127,8 +129,8 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await runInTenantContext(req.params.storeId, () =>
-        prisma.reorderSuggestion.updateMany({
+      await runInStoreCtx(req.params.storeId, async () =>
+        (await storeWriter(req.params.storeId)).reorderSuggestion.updateMany({
           where: { id: req.params.id, storeId: req.params.storeId, status: 'open' },
           data: {
             status: 'dismissed',
@@ -174,9 +176,9 @@ router.get(
       const where: any = { storeId: req.params.storeId };
       if (status === 'open') where.status = 'open';
 
-      const [items, total, valueUnknownCount] = await runInTenantContext(req.params.storeId, () =>
+      const [items, total, valueUnknownCount] = await runInStoreCtx(req.params.storeId, async () =>
         Promise.all([
-          prisma.deadStockFlag.findMany({
+          (await storeDb(req.params.storeId)).deadStockFlag.findMany({
             where,
             include: {
               product: { select: { id: true, name: true, sku: true } },
@@ -188,8 +190,10 @@ router.get(
             skip: (page - 1) * perPage,
             take: perPage,
           }),
-          prisma.deadStockFlag.count({ where }),
-          prisma.deadStockFlag.count({ where: { ...where, stockValueFils: null } }),
+          (await storeDb(req.params.storeId)).deadStockFlag.count({ where }),
+          (await storeDb(req.params.storeId)).deadStockFlag.count({
+            where: { ...where, stockValueFils: null },
+          }),
         ])
       );
 
@@ -213,7 +217,7 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await runInTenantContext(req.params.storeId, () =>
+      const result = await runInStoreCtx(req.params.storeId, () =>
         createClearanceCouponFromFlag(req.params.id, req.params.storeId)
       );
       res.json({ data: { couponCode: result.couponCode } });
@@ -233,8 +237,8 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await runInTenantContext(req.params.storeId, () =>
-        prisma.deadStockFlag.updateMany({
+      await runInStoreCtx(req.params.storeId, async () =>
+        (await storeWriter(req.params.storeId)).deadStockFlag.updateMany({
           where: { id: req.params.id, storeId: req.params.storeId, status: 'open' },
           data: {
             status: 'dismissed',
@@ -290,15 +294,16 @@ router.get(
       if (acknowledged === 'true') where.acknowledged = true;
       if (acknowledged === 'false') where.acknowledged = false;
 
-      const [items, total] = await runInTenantContext(req.params.storeId, () =>
+      const anomalyDb = await storeDb(req.params.storeId);
+      const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
-          prisma.profitAnomaly.findMany({
+          anomalyDb.profitAnomaly.findMany({
             where,
             orderBy: [{ severity: 'desc' }, { detectedAt: 'desc' }],
             skip: (page - 1) * perPage,
             take: perPage,
           }),
-          prisma.profitAnomaly.count({ where }),
+          anomalyDb.profitAnomaly.count({ where }),
         ])
       );
 
@@ -320,8 +325,9 @@ router.post(
   requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await runInTenantContext(req.params.storeId, () =>
-        prisma.profitAnomaly.updateMany({
+      const anomalyWriter = await storeWriter(req.params.storeId);
+      await runInStoreCtx(req.params.storeId, () =>
+        anomalyWriter.profitAnomaly.updateMany({
           where: { id: req.params.id, storeId: req.params.storeId, acknowledged: false },
           data: {
             acknowledged: true,

@@ -2,6 +2,7 @@ import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
 import { getSystemAccountIdByCode } from '../account.service';
 import logger from '../../../lib/logger';
+import { storeMoney } from '../../../lib/repo-factory';
 
 export interface PoReceiveJournalInput {
   storeId: string;
@@ -35,6 +36,12 @@ export interface PoReceiveJournalInput {
  * Sub-sourceId per receive-pass is a v2 patch.
  */
 export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise<void> {
+  // A store on its Durable Object posts in one section there (Ruling CF-JOBS-4); idempotent per source row.
+  const money = await storeMoney(args.storeId);
+  if (money) {
+    await money.journalPoReceive({ poId: args.poId, clearedBackorders: args.clearedBackorders });
+    return;
+  }
   const po = await prisma.purchaseOrder.findUnique({
     where: { id: args.poId, storeId: args.storeId },
     include: { items: true, store: { select: { accountingEnabled: true } } },

@@ -339,12 +339,15 @@ describe('Customers page — export is an owner action (SEC-14)', () => {
   it('shows the Excel export to the owner', async () => {
     renderPage();
     await screen.findByTestId('customers-kpi-strip');
-    expect(screen.queryAllByRole('button').map(b => b.textContent)).toContain('exportXlsx');
+    // Export lives in the "..." menu (placement standard rule 2), not as a header button.
+    fireEvent.click(screen.getByLabelText('moreMenu'));
+    expect(screen.queryAllByRole('menuitem').map(b => b.textContent)).toContain('exportXlsx');
   });
   it('hides it from staff (the API answers 403 to them)', async () => {
     auth.role = 'staff';
     renderPage();
     await screen.findByTestId('customers-kpi-strip');
+    expect(screen.queryByLabelText('moreMenu')).toBeNull();
     expect(screen.queryAllByRole('button').map(b => b.textContent)).not.toContain('exportXlsx');
   });
 });

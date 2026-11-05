@@ -19,6 +19,7 @@ import { isGrantedPlan } from './billing/period';
 import { reconcileStoreAccess } from './billing/account.service';
 import logger from '../lib/logger';
 import { planSubscriberCounts, storeIdsOnPlan } from '../lib/definer';
+import { storeDb, storeUpdate } from '../lib/repo-factory';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -153,7 +154,9 @@ export const planService = {
     if (!UUID_RE.test(storeId)) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
     // The subscription is written in the store's own scope (strict RLS).
     const store = await withStore(storeId, async tx => {
-      const s = await tx.store.findUnique({
+      const s = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { id: true, slug: true, domain: true },
       });
@@ -168,7 +171,7 @@ export const planService = {
           ordersOverLimitNotifiedAt: null,
         },
       });
-      await tx.store.update({ where: { id: storeId }, data: { plan: plan.featureTier } });
+      await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
       return s;
     });
 

@@ -172,7 +172,11 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
   /** Every observable part of a middleware response, for byte-for-byte comparison. */
   const snapshot = (res: Response) => ({
     status: res.status,
-    headers: [...res.headers.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    // The CSP nonce is fresh on every request (Ruling CSP-WEB-1): compare everything else.
+    headers: [...res.headers.entries()]
+      .map(([k, v]) => [k, v.replace(/nonce-[^']+/g, 'nonce-N')] as [string, string])
+      .filter(([k]) => k !== 'x-middleware-request-x-nonce')
+      .sort(([a], [b]) => a.localeCompare(b)),
   });
 
   const SAMPLE_REQUESTS = () => [

@@ -1,16 +1,12 @@
 /**
  * `store.plan_changed` (contract section 4): the plan a store is on, whether it includes the Ebda
  * WhatsApp package, and its standing (`status`, `periodEnd`), so a dunning suspension, a cancellation
- * or an expiry reaches Ebda WhatsApp's package gate. Entitlement is a NEVER-stale class: it is
+ * or an expiry reaches Ebda Chat's package gate. Entitlement is a NEVER-stale class: it is
  * sent on EVERY write of a plan or subscription (one observer on the database client, see
  * `installWaWriteObservers`), with an 12-hourly reconciliation as the backstop.
  */
-import {
-  prisma,
-  runInTenantContext,
-  setModelWriteObserver,
-  type ModelWriteEvent,
-} from '@ebda/database';
+import { withStore, setModelWriteObserver, type ModelWriteEvent } from '@ebda/database';
+import { storeRepo } from '../repo-factory';
 import { getEntitlements } from '../../services/plan-entitlements';
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import logger from '../logger';
@@ -74,7 +70,7 @@ export function planChangeStoreId(e: ModelWriteEvent): string | null {
   return null;
 }
 
-/** Ask the job to re-read this store's plan state and tell Ebda WhatsApp. Never throws. */
+/** Ask the job to re-read this store's plan state and tell Ebda Chat. Never throws. */
 export async function notifyPlanChanged(storeId: string): Promise<void> {
   await sendEventAfterCommit(
     'wa-plan-changed',
@@ -117,8 +113,13 @@ export async function planChangedInput(
 ): Promise<{ input: StoreEventInput; seed: string } | null> {
   const [ent, store] = await Promise.all([
     getEntitlements(storeId),
-    runInTenantContext(storeId, () =>
-      prisma.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+    // `Store` is a platform row: the same read for a Postgres store and a store on its Durable Object (Ruling CF-JOBS-4)
+    storeRepo(storeId).then(repo =>
+      repo.backend === 'do'
+        ? repo.db.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+        : withStore(storeId, tx =>
+            tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+          )
     ),
   ]);
   if (!ent || !store) return null;

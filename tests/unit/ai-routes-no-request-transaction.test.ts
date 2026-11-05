@@ -161,7 +161,9 @@ describe('aiRouteContext splits the router by method', () => {
   });
 
   it('a read fan-out shares ONE transaction', async () => {
-    const res = await request(appWith(aiRouteContext)).get(`/stores/${STORE}/ai/results/seo`);
+    const res = await request(appWith(aiRouteContext))
+      .get(`/stores/${STORE}/ai/results/seo`)
+      .set('Authorization', 'Bearer merchant'); // an admin read carries a credential (an anonymous one takes no transaction, LAZY-TX-3)
     expect(res.status).toBe(200);
     expect(h.committedWrites).toBe(2); // two queries...
     expect(h.txOpened).toBe(1); // ...one transaction, one connection

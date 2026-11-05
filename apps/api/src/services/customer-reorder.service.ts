@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 
 /** Orders looked at, and products returned, by "order again" (Ruling B4-8). */
 export const REORDER_ORDERS = 3;
@@ -28,7 +28,9 @@ export class CustomerReorderService {
     limit: number = REORDER_MAX
   ): Promise<string[]> {
     const cap = Math.min(REORDER_MAX, Math.max(1, Math.floor(limit) || REORDER_MAX));
-    const orders = await prisma.order.findMany({
+    const orders = await (
+      await storeDb(storeId)
+    ).order.findMany({
       where: {
         storeId,
         customerId,
@@ -50,7 +52,9 @@ export class CustomerReorderService {
       for (const item of order.items)
         if (!ordered.includes(item.productId)) ordered.push(item.productId);
     if (ordered.length === 0) return [];
-    const live = await prisma.product.findMany({
+    const live = await (
+      await storeDb(storeId)
+    ).product.findMany({
       where: { storeId, id: { in: ordered }, status: 'active', deletedAt: null },
       select: { id: true },
     });

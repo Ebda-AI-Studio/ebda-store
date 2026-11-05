@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { DEFAULT_THEME, type StoreBranding, type StoreTheme } from '../_components/types';
@@ -67,6 +67,11 @@ export function useBranding(storeId: string, messages: ToastMessages) {
   // defaults). Saving diffs against it so only the keys the merchant changed
   // here reach `PUT /theme` — never the defaults (see theme-patch.ts).
   const [loadedTheme, setLoadedTheme] = useState<StoreTheme | null>(null);
+  // The branding as last loaded/saved: the sticky Save bar shows while the page differs from it.
+  const [baseline, setBaseline] = useState<string | null>(null);
+  // `settings.contact` as stored. The bundle replaces that one top-level key, so the keys we do not edit in it
+  // (anything besides addressUrl/addressLink) are carried through from here, not from a fresh GET of ALL settings.
+  const [storedContact, setStoredContact] = useState<Record<string, unknown>>({});
 
   const fetchBranding = useCallback(async () => {
     try {
@@ -102,7 +107,8 @@ export function useBranding(storeId: string, messages: ToastMessages) {
 
         const shownTheme: StoreTheme = { ...DEFAULT_THEME, ...(store.theme || {}) };
         setLoadedTheme(shownTheme);
-        setBranding({
+        setStoredContact(settingsContact);
+        const loaded: StoreBranding = {
           id: store.id,
           template: store.template,
           name: store.name,
@@ -123,7 +129,9 @@ export function useBranding(storeId: string, messages: ToastMessages) {
           addressLink,
           socialLinks: store.socialLinks || {},
           blogEnabled: store.blogEnabled,
-        });
+        };
+        setBranding(loaded);
+        setBaseline(JSON.stringify(loaded));
       }
     } catch (error) {
       console.error('Failed to fetch branding:', error);
@@ -138,103 +146,72 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
+  const dirty = useMemo(
+    () => baseline !== null && branding !== null && JSON.stringify(branding) !== baseline,
+    [baseline, branding]
+  );
+
+  /**
+   * ONE request (BE:F-3): `PUT /stores/:id/branding-bundle` applies branding, theme, contact, social and the
+   * `settings.contact` flags together and rolls ALL of it back on any failure, so a 429 or a bad field can no
+   * longer leave the store half saved. Only this page's keys travel (BE:F-2): `settings` carries just `contact`,
+   * never the whole blob, and `blogEnabled` is not sent at all (it lives on the blog page now).
+   */
   const saveBranding = useCallback(async () => {
     if (!branding) return;
 
     setIsSaving(true);
     try {
-      const basePath = `/api/v1/stores/${storeId}`;
-
-      // Persist the new addressUrl / addressLink flags inside the JSONB
-      // `settings.contact` blob. We have to merge with the rest of
-      // `settings` so we don't blow away unrelated keys (footerLinks,
-      // utilityBar, navMenu, etc.). Empty/whitespace URL collapses to
-      // undefined so a stray space doesn't produce an `<a href=" ">`.
+      // Empty/whitespace URL collapses to a missing key so a stray space never produces an `<a href=" ">`.
       const trimmedAddressUrl = branding.addressUrl?.trim();
-      const settingsResultPromise = (async () => {
-        const { data: getData, error: getErr } = await apiGet<{
-          store: { settings?: Record<string, unknown> };
-        }>(basePath);
-        if (getErr) return { error: getErr };
-        const currentSettings: Record<string, unknown> = { ...(getData?.store?.settings ?? {}) };
-        const currentContact: Record<string, unknown> = {
-          ...((currentSettings.contact as Record<string, unknown> | undefined) ?? {}),
-        };
-        if (trimmedAddressUrl) currentContact.addressUrl = trimmedAddressUrl;
-        else delete currentContact.addressUrl;
-        // Persist the boolean explicitly so legacy `'maps' | 'none'` values
-        // get rewritten cleanly. Default `true` matches the storefront
-        // resolver's default.
-        currentContact.addressLink = branding.addressLink !== false;
-        currentSettings.contact = currentContact;
-        // Persist blogEnabled alongside the settings PUT — both ride
-        // the same generic PUT /stores/:id endpoint per the
-        // updateStoreSchema (2026-05-17). One round-trip covers both.
-        return apiPut(basePath, {
-          settings: currentSettings,
-          ...(branding.blogEnabled !== undefined && { blogEnabled: branding.blogEnabled }),
-        });
-      })();
+      const nextContact: Record<string, unknown> = { ...storedContact };
+      if (trimmedAddressUrl) nextContact.addressUrl = trimmedAddressUrl;
+      else delete nextContact.addressUrl;
+      // Persist the boolean explicitly so legacy `'maps' | 'none'` values get rewritten cleanly.
+      nextContact.addressLink = branding.addressLink !== false;
 
-      // Only the keys the merchant changed on this page; nothing at all when
-      // the theme was not touched (a logo/phone edit must not write theme).
+      // Only the theme keys the merchant changed on this page; none at all when the theme was not touched.
       const changedTheme = themePatch(loadedTheme ?? branding.theme, branding.theme);
       const themeChanged = Object.keys(changedTheme).length > 0;
 
-      const [brandingResult, themeResult, contactResult, socialResult, settingsResult] =
-        await Promise.all([
-          apiPut(`${basePath}/branding`, {
-            name: branding.name,
-            nameAr: branding.nameAr,
-            logo: branding.logo,
-            logoAr: branding.logoAr,
-            favicon: branding.favicon,
-            description: branding.description,
-            descriptionAr: branding.descriptionAr,
-          }),
-          themeChanged
-            ? apiPut(`${basePath}/theme`, changedTheme)
-            : Promise.resolve({ data: null, error: null }),
-          apiPut(`${basePath}/contact`, {
-            email: branding.email,
-            phone: branding.phone,
-            phoneAr: branding.phoneAr,
-            whatsapp: branding.whatsapp,
-            address: branding.address,
-            addressAr: branding.addressAr,
-          }),
-          apiPut(`${basePath}/social`, branding.socialLinks),
-          settingsResultPromise,
-        ]);
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/branding-bundle`, {
+        branding: {
+          name: branding.name,
+          nameAr: branding.nameAr,
+          logo: branding.logo,
+          logoAr: branding.logoAr,
+          favicon: branding.favicon,
+          description: branding.description,
+          descriptionAr: branding.descriptionAr,
+        },
+        ...(themeChanged && { theme: changedTheme }),
+        contact: {
+          email: branding.email,
+          phone: branding.phone,
+          phoneAr: branding.phoneAr,
+          whatsapp: branding.whatsapp,
+          address: branding.address,
+          addressAr: branding.addressAr,
+        },
+        social: branding.socialLinks,
+        settings: { contact: nextContact },
+      });
 
-      const failed = [
-        { name: messages.sectionBranding, result: brandingResult },
-        { name: messages.sectionTheme, result: themeResult },
-        { name: messages.sectionContact, result: contactResult },
-        { name: messages.sectionSocial, result: socialResult },
-        { name: messages.sectionContact, result: settingsResult },
-      ].filter(r => r.result.error != null);
-
-      if (failed.length > 0) {
-        // Surface all failed sections, not just the first, so merchants know
-        // exactly which parts of their branding didn't save.
-        const first = failed[0];
-        const err = first.result.error;
-        if (err?.status === 403) {
+      if (error) {
+        if (error.status === 403) {
           toast.error(messages.accessDeniedTitle, messages.accessDeniedBody);
-        } else if (err?.status === 401) {
+        } else if (error.status === 401) {
           toast.error(messages.sessionExpiredTitle, messages.sessionExpiredBody);
         } else {
-          const failedNames = [...new Set(failed.map(f => f.name))].join(', ');
-          toast.error(
-            `${messages.saveFailedPrefix}${failedNames}`,
-            err?.message || messages.serverError
-          );
+          // apiRequest already localized the message (ERROR_AR / server messageAr).
+          toast.error(messages.saveFailedPrefix, error.message || messages.serverError);
         }
         return;
       }
 
       setLoadedTheme(branding.theme);
+      setStoredContact(nextContact);
+      setBaseline(JSON.stringify(branding));
       toast.success(messages.saveSuccessTitle, messages.saveSuccessBody);
     } catch (error) {
       console.error('Failed to save branding:', error);
@@ -242,7 +219,11 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     } finally {
       setIsSaving(false);
     }
-  }, [branding, loadedTheme, storeId, toast, messages]);
+  }, [branding, loadedTheme, storedContact, storeId, toast, messages]);
+
+  const resetBranding = useCallback(() => {
+    if (baseline) setBranding(JSON.parse(baseline) as StoreBranding);
+  }, [baseline]);
 
   return {
     branding,
@@ -250,5 +231,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     isLoading,
     isSaving,
     saveBranding,
+    dirty,
+    resetBranding,
   };
 }

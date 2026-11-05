@@ -1,13 +1,17 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { acquireSiteBuildLock } from '../helpers/site-build-lock';
 import { renderStatusPage } from '../../apps/status/src/render';
 import {
   SITE_NAV_PANEL_CSS,
-  siteNavItems,
+  siteNavCta,
   siteNavLabels,
+  siteNavLogin,
   siteNavProducts,
+  siteNavResources,
+  siteNavStudio,
 } from '../../packages/shared/src/brand';
 import { COPY } from '../../apps/marketing/src/lib/content';
 import type { Snapshot } from '../../apps/status/src/types';
@@ -21,7 +25,9 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = (...p: string[]) => readFileSync(path.join(ROOT, ...p), 'utf8');
 const navOf = (html: string) => /<nav class="top-nav"[\s\S]*?<\/nav>/.exec(html)![0];
 const links = (nav: string) =>
-  [...nav.matchAll(/<a href="([^"]+)"( aria-current="page")?>([\s\S]*?)<\/a>/g)].map(m => ({
+  [
+    ...nav.matchAll(/<a href="([^"]+)"(?: class="[^"]*")?( aria-current="page")?>([\s\S]*?)<\/a>/g),
+  ].map(m => ({
     href: m[1],
     current: !!m[2],
     text: m[3]
@@ -39,10 +45,14 @@ const snap: Snapshot = {
 } as unknown as Snapshot;
 
 describe('shared header nav on docs, help and status', () => {
-  beforeAll(() => {
+  let release: () => void = () => {};
+  // the help/docs builds wipe and rewrite out/; another test file building them in parallel would delete our pages mid-read
+  beforeAll(async () => {
+    release = await acquireSiteBuildLock();
     for (const app of ['docs', 'help'])
       execFileSync('npm', ['run', 'build', '-w', `apps/${app}`], { cwd: ROOT, stdio: 'pipe' });
-  }, 240_000);
+  }, 840_000);
+  afterAll(() => release());
 
   for (const lang of ['ar', 'en'] as const) {
     describe(lang, () => {
@@ -59,29 +69,42 @@ describe('shared header nav on docs, help and status', () => {
         expect(strip(p.docs)).toBe(strip(p.status));
       });
 
-      it('has exactly the five site links in the one order, plus the Products menu', () => {
-        const want = siteNavItems(lang);
+      it('has the studio bar: Products, Resources, About, Contact, Log in, the CTA, in the one order (ar and en)', () => {
+        const prods = siteNavProducts(lang);
+        const want = [
+          ...prods.map(p => p.href),
+          ...siteNavResources(lang).map(r => r.href),
+          ...siteNavStudio(lang).map(i => i.href),
+          ...siteNavLogin(lang).items.map(i => i.href),
+          siteNavCta(lang).href,
+        ];
         for (const [site, html] of Object.entries(pages())) {
           const nav = navOf(html);
           const desktop = links(nav.slice(0, nav.indexOf('<details class="nav-menu">')));
-          const prods = siteNavProducts(lang);
           expect(prods.map(p => p.label)).toEqual(
-            lang === 'ar' ? ['ابدأ ستور', 'ابدأ واتساب'] : ['Ebda Store', 'Ebda WhatsApp']
+            lang === 'ar' ? ['ابدأ ستور', 'ابدأ شات'] : ['Ebda Store', 'Ebda Chat']
           );
           expect(
             desktop.map(l => l.href),
             site
-          ).toEqual([...prods.map(p => p.href), ...want.map(i => i.href)]);
-          expect(desktop.map(l => l.text).slice(prods.length), site).toEqual(
-            want.map(i => i.label)
-          );
-          expect(nav).toContain(`<summary>${siteNavLabels(lang).products}</summary>`);
-          // the mobile menu repeats every link
-          const mobile = links(nav.slice(nav.indexOf('<details class="nav-menu">')));
+          ).toEqual(want);
+          for (const t of [siteNavLabels(lang).products, siteNavLabels(lang).resources])
+            expect(nav).toContain(`<summary>${t}</summary>`);
+          // the mobile menu repeats every link, grouped Products / Resources / Studio / Log in
+          const menu = nav.slice(nav.indexOf('<details class="nav-menu">'));
           expect(
-            mobile.map(l => l.href),
+            links(menu).map(l => l.href),
             site
-          ).toEqual([...prods.map(p => p.href), ...want.map(i => i.href)]);
+          ).toEqual(want);
+          for (const g of [
+            siteNavLabels(lang).products,
+            siteNavLabels(lang).resources,
+            siteNavLabels(lang).studio,
+            siteNavLogin(lang).label,
+          ])
+            expect(menu, `${site}: group ${g}`).toContain(`<p>${g}</p>`);
+          // no Store dashboard, no duplicate studio item (audit P1-7)
+          expect(desktop.map(l => l.text).join('|'), site).not.toMatch(/Dashboard|لوحة التحكم/);
         }
       });
 

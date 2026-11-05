@@ -9,6 +9,7 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, useToast } from '@ebda/ui';
+import { useConfirm } from '@/hooks/useConfirm';
 import type { ProductModelViewerHandle } from '@ebda/ui/model3d';
 import {
   DEFAULT_THEME,
@@ -28,6 +29,7 @@ import { useFeatures } from '../../../../../../hooks/useFeatures';
 import { uploadErrorText } from '../../../../../../hooks/useImageUpload';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
 import { ColorField } from '../../../../../../components/ColorField';
+import { intlLocaleForUi } from '@/lib/format';
 
 const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
@@ -188,6 +190,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
   const { isEnabled, isLoading: featuresLoading } = useFeatures();
   const enabled = isEnabled('product_3d');
   const { success: toastSuccess, error: toastError } = useToast();
+  const askConfirm = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<AdminModel | null>(null);
@@ -346,7 +349,12 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
   }
 
   async function removeModel() {
-    if (!window.confirm(t('removeConfirm'))) return;
+    const ok = await askConfirm({
+      object: t('removeDialog.object'),
+      consequence: t('removeDialog.consequence'),
+      confirmLabel: t('removeDialog.confirmLabel'),
+    });
+    if (!ok) return;
     setBusy(true);
     const { error } = await apiDelete(base);
     setBusy(false);
@@ -464,7 +472,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
             <p className="text-xs text-muted-foreground">
               {t('stats', {
                 mb: mb(model.modelBytes),
-                vertices: (model.stats.vertices ?? 0).toLocaleString('en-US'),
+                vertices: (model.stats.vertices ?? 0).toLocaleString(intlLocaleForUi()),
                 materials: model.materials.length,
               })}
             </p>

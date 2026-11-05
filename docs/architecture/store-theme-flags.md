@@ -60,11 +60,11 @@ All flags ride the `StoreTheme` JSON column except `blogEnabled` (own `Store` co
 
 Looks (`docs/ebda/templates/looks.md`) own a set of `StoreTheme` keys, `LOOK_TOKEN_KEYS` in `packages/shared/src/looks/types.ts` (the colour keys, `headingFont`, `bodyFont`, `borderRadius`, `bgPage`, `bgSectionAlt` and three new ones). A stored value for one of them is a **merchant override**.
 
-| Key          | Type                                 | Default | Owner                                                                                                |
-| ------------ | ------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------- |
-| `density`    | `'compact' \| 'regular' \| 'airy'`   | unset   | set only by a look (`lookTheme`); `--space-unit` 0.875 / 1 / 1.25; scales UNSET section spacing only |
-| `imageRatio` | `'1/1' \| '4/5' \| '3/4' \| '4/3'`   | unset   | set only by a look; `--image-ratio`; product card media `aspect-[var(--image-ratio,4/5)]`            |
-| `motion`     | `'none' \| 'subtle' \| 'expressive'` | unset   | set only by a look; `--motion-duration` 0 / 180 / 280ms; forced to 0ms under reduced motion          |
+| Key          | Type                                 | Default | Owner                                                                                                                                                                                                    |
+| ------------ | ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `density`    | `'compact' \| 'regular' \| 'airy'`   | unset   | set by a look (`lookTheme`) or by the merchant in the Theme panel's "Spacing between sections" (draft key `density`, Ruling SP-1..3); `--space-unit` 0.875 / 1 / 1.25; scales UNSET section spacing only |
+| `imageRatio` | `'1/1' \| '4/5' \| '3/4' \| '4/3'`   | unset   | set only by a look; `--image-ratio`; product card media `aspect-[var(--image-ratio,4/5)]`                                                                                                                |
+| `motion`     | `'none' \| 'subtle' \| 'expressive'` | unset   | set only by a look; `--motion-duration` 0 / 180 / 280ms; forced to 0ms under reduced motion                                                                                                              |
 
 All three are optional and absent from `DEFAULT_THEME` (Ruling LOOKS-6): a legacy store (`stores.look` null) emits none of the look CSS variables and renders byte-identical.
 
@@ -90,7 +90,22 @@ The theme PUT refuses any other value for these keys (`null` deletes). Any store
 
 - **`headerLogoPlacement`** (`'start' | 'centre'`) and **`headerSearch`** (`'prominent' | 'icon'`) are merchant overrides of the look's `chrome.header`. Precedence **merchant > look > skin**, resolved by `resolveHeaderChrome(theme, lookHeader)` (`@ebda/shared`, `looks/compose.ts`) in the Qamar, Souq, Jasmine and Lamma headers. A store with no override draws exactly what its look says (pinned by `tests/unit/header-chrome-override.test.tsx`). Canonical editor: **Visual editor → Theme pane → Header group** (first group, like the header on the storefront), a DRAFT edit that goes live on Publish (Ruling VE-4); clearing it writes `null` into the draft and the look's value shows again. The logo position is offered to the four skins built on the minimal header, the search placement to Souq only (`shownFor`). The theme PUT refuses any other value (`apps/api/src/lib/theme-schema.ts`), the draft schema accepts the two keys (`THEME_SETTINGS_SCHEMA`), and both keys are in `LOOK_OWNED_THEME_KEYS`, so `design: 'reset'` clears them and `overriddenLookKeys` shows the "edited" badge. They are not look tokens: no look sets them in `tokens`.
 - **There is no "header band" override.** The EP plan listed one next to logo placement and search placement; `LookChrome` has no such key and no skin draws one, so there is nothing to override (Ruling EP-4).
+
 - **The Theme tab holds at most 7 toggle cards** (rule 4). Each card carries `data-theme-toggle`; `tests/unit/themetab-ceiling.test.ts` counts them (5 after `rtlPolish` and `personaChromeV2` were removed). The next toggle goes to a dedicated page. A toggle a template does not read is not shown on that template.
+
+## Mock traits: merchant overrides with look defaults (TEMPLATES-MOCK-1/-2/-3, 2026-10-28)
+
+The five templates default to the old Python mock-ups (plan `docs/plans/2026-10-25-templates-match-mockups.md`), and each trait of that look is a control in **Visual editor → Theme pane**. Every trait is an OPTIONAL `StoreTheme` key that is **absent until the merchant picks a value**; the look supplies the default (`traitDefault(key, lookId)` in `packages/shared/src/looks/traits.ts`, mock numbers in `looks/mock-tokens.ts`). Precedence merchant > look > skin; a saved value is never rewritten, a store with no look is untouched (Ruling TEMPLATES-MOCK-3). Each key is in `LOOK_OWNED_THEME_KEYS` (so `design: 'reset'` clears it and the panel shows "edited" + Reset), validated by the theme PUT (`apps/api/src/lib/theme-schema.ts`) and the draft schema (`THEME_SETTINGS_SCHEMA`, `trait: true`). Merchant help: `apps/help/content/{en,ar}/store-look-controls.mdx`.
+
+| Key                                       | Values                         | Default (look)                                               | Reader                                                                  | Control                                                   |
+| ----------------------------------------- | ------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------- |
+| `headerWordmark`                          | `lockup` \| `plain`            | `lockup` for a store with no logo (a logo always wins)       | `resolveLockup` in the five headers                                     | Header → Store name without a logo                        |
+| `heroRatio`                               | `tall` \| `square` \| `wide`   | the look's `heroAspect` (unset); `wide` = old landscape crop | `mockCssVars(lookId, theme)` → `--look-hero-aspect`                     | Background and rhythm → Hero height on phones             |
+| `tabBar`                                  | `always` \| `inner` \| `never` | `inner` on a look store, `always` with no look               | `resolveTabBar` → `useTabBarShown` (BottomTabBar, base + Dahab headers) | Header → Bottom bar on phones                             |
+| `headingWeight`                           | `strong` \| `regular`          | bold unless the look's display face is single-weight         | `lookTraitAttrs` → `<body data-heading-weight>` → globals.css           | Typography → Section heading weight                       |
+| `priceColour`                             | `accent` \| `text`             | `accent` (readable, `--look-price-colour`)                   | `lookTraitAttrs` + `lookCssVars`                                        | Typography → Price colour on cards                        |
+| `cardHeart` / `cardSwatches` / `cardTags` | `on` \| `off`                  | `off` on a look store (home sections only)                   | `lookTraitAttrs` → `<body data-card-*>` → globals.css                   | Background and rhythm → heart / dots / tags on home cards |
+| `gridGutter`                              | `tight` \| `regular` \| `airy` | `tight` on qamar.atelier, else `regular` (old gaps)          | `lookTraitAttrs` → `<body data-grid-gutter>` → globals.css (home grids) | Background and rhythm → Space between home cards          |
 
 ## Product-card CTA + OOS-label + name-case (2026-06-24)
 
@@ -226,3 +241,11 @@ The layout keys `sizing`, `bottomBar`, `locationsPage`, `productCardDefaults` (h
 ## Look switch (Task 9)
 
 `PUT /stores/:id/look` (apply) and `POST /stores/:id/look/preview` (what apply would do, no write) share `composeLookDocument` in `page-builder.service.ts`. The editor's Look pane drives both; the revision token ties an apply to the preview it came from (409 `DRAFT_MOVED`). No native `confirm` remains in the visual editor (`tests/unit/builder-no-native-dialogs.test.ts`).
+
+## Premium defaults (2026-11-03, Rulings PREMIUM-1..5)
+
+- **Section tone contract**: a section painted with a colour that the theme ink does not read on (< 4.5:1 body or muted, any gradient stop) re-scopes `--foreground`, `--muted-foreground`, `--card*`, `--border`, `--input`, `--primary*`, `--accent*` to an ink derived from the band (`templates/shared/section-ink.ts`, via `sectionBgStyle`). Merchant colours are never changed, only the ink on them. Test: `section-ink.test.tsx`.
+- **Hero headline**: fluid 36px (390) to 72px (>= 1100); a typography zone size only raises the ceiling. `heroHeadlineFontSize`.
+- **Product grids** choose the desktop column count the count fills (`fitDesktopColumns`); carousels are 4-up at lg with a 12px minimum gap.
+- **Missing image**: `MissingImage` (store tokens) on every card path, category tile, list row, search row, bundle line and PDP.
+- **Images**: `sizes` from `lib/image-sizes.ts`; WebP variants written at upload; `NEXT_PUBLIC_IMAGE_VARIANTS=1` turns the srcset on (`docs/ENVIRONMENT.md`).

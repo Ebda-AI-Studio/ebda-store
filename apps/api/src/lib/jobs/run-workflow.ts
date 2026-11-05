@@ -12,6 +12,15 @@
  */
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch';
+import {
+  decideRunForStore,
+  guardedRun,
+  jobTargetStore,
+  needsStoreLookup,
+  reportRefusal,
+  resolveRunStore,
+} from './do-guard';
+import { FREEZE_MAX_WAITS, FREEZE_PARK_SECONDS, writesFrozen } from './freeze';
 import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,
@@ -106,11 +115,48 @@ export async function runJobWorkflow(a: RunWorkflowArgs): Promise<void> {
     }
   };
 
+  // Write freeze (Ruling CF-JOBS-2): park before anything runs, and again before EVERY later step. The wait is a Workflow
+  // sleep, so a long window costs no CPU and loses nothing. Held concurrency leases are released for the sleep and re-taken.
+  let freezeSleeps = 0;
+  const waitUnfrozen = async (): Promise<void> => {
+    let waits = 0;
+    while (writesFrozen()) {
+      if (++waits > FREEZE_MAX_WAITS) {
+        throw new a.NonRetryable(`write freeze lasted over ${FREEZE_MAX_WAITS} waits; run aborted`);
+      }
+      const hadGates = held.size > 0;
+      if (hadGates) await releaseAll();
+      logger.warn({ job: def.id, runId: a.instanceId }, '[jobs] write freeze: run parked');
+      await step.sleep(`freeze-wait-${freezeSleeps++}`, FREEZE_PARK_SECONDS * 1000);
+      if (hadGates) await acquireAll();
+    }
+  };
+  await waitUnfrozen();
+
+  // A DO store's job that still reads/writes its Postgres tables does not run (Ruling CF-JOBS-1).
+  // The lookup needs a database connection, which code outside a step does not have on a Workflow: it is its own step.
+  const runStore = (await needsStoreLookup(def, event))
+    ? await step.do(
+        'resolve-run-store',
+        NO_RETRY,
+        async () => (await resolveRunStore(def, event)) ?? null
+      )
+    : (jobTargetStore(event) ?? null);
+  const decision = await decideRunForStore(def, runStore ?? undefined);
+  if (!decision.run) {
+    await step.do('do-guard-refusal', NO_RETRY, async () => {
+      await reportRefusal(def, event, a.instanceId, decision);
+      return null;
+    });
+    return;
+  }
+
   if (gates.length > 0) await acquireAll();
 
   const jstep = durableStep(step, {
     retries: def.options.retries ?? 4,
-    withContext: a.withContext,
+    withContext: fn => a.withContext(() => guardedRun(def, event, fn)),
+    beforeStepWait: waitUnfrozen,
     dispatch: p => dispatchEventsToAll(p),
     NonRetryable: a.NonRetryable,
     ...(gates.length > 0

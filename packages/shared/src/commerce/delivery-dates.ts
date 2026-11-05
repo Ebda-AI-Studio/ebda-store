@@ -203,3 +203,18 @@ export function deliveryNoteLine(a: {
   const range = `${formatWindowTime12(a.window.start, a.locale)}–${formatWindowTime12(a.window.end, a.locale)}`;
   return `${prefix}: ${day}${ar ? '،' : ','} ${label} (${range})`;
 }
+
+/**
+ * The delivery line at the top of an order's `notes` ("Delivery: Fri 23 Oct, Evening (6:00 PM-8:00 PM)" /
+ * "التوصيل: ..."), WITHOUT its prefix, or null. `notes` itself never reaches a shopper (it may carry the
+ * merchant's own text), so every shopper-facing surface (receipt, confirmation email) reads only this
+ * line, which the server wrote from the structured pick (Ruling B4-7) or the client wrote for
+ * today/tomorrow stores. Only the FIRST line counts: a customer who types "Delivery: ..." into their
+ * own note cannot forge it.
+ */
+export function deliveryLineFromNotes(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const first = notes.split('\n', 1)[0] ?? '';
+  const m = /^(?:التوصيل|Delivery):\s*(.+)$/.exec(first.trim());
+  return m?.[1]?.trim() || null;
+}

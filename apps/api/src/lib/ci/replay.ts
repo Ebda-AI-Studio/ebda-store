@@ -42,7 +42,7 @@ export async function replayCiDlq(
         continue;
       }
       if (
-        (await ci.get(ciOrderTombstoneKey(env.orderId))) ||
+        (env.orderId && (await ci.get(ciOrderTombstoneKey(env.orderId)))) ||
         (env.buyerKey && (await ci.get(ciBuyerTombstoneKey(env.storeId, env.buyerKey))))
       ) {
         out.refusedErased++;

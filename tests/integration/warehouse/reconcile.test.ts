@@ -270,13 +270,10 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
     await prisma.warehouse.deleteMany({ where: { id: warehouseB.id } });
   });
 
-  it('allow-negative-on-default: default cannot absorb the full diff without going negative → still SUM == aggregate', async () => {
-    // Default warehouse only holds 2 units; other warehouse holds 10.
-    // Aggregate drifts down to 3 (diff = 3 - 12 = -9). The default warehouse
-    // must absorb the FULL -9 (going from 2 to -7) so that
-    // SUM(WarehouseStock) == Product.inventory always holds exactly — a
-    // clamp-at-0 policy would leave SUM at 1 instead of 3, reintroducing
-    // drift. This test locks in the allow-negative-on-default decision.
+  it('WAREHOUSE-NEG-1: default cannot absorb the full deficit → the rest comes from the other warehouses, no row negative, SUM == aggregate', async () => {
+    // Default warehouse only holds 2 units; other warehouse holds 10. The aggregate drifts down to 3 (diff = 3 - 12 = -9).
+    // WAREHOUSE-NEG-1: the default gives its 2 (to 0), warehouse C gives the other 7 (to 3): SUM == aggregate and no row is
+    // negative. (The earlier allow-negative-on-default policy took the whole -9 from the default: 2 -> -7.)
     const productId = await makeProduct('negative-absorb', 12);
     const warehouseC = await prisma.warehouse.create({
       data: {
@@ -309,17 +306,42 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
     const defaultStock = await prisma.warehouseStock.findFirst({
       where: { warehouseId, productId, variantId: null },
     });
-    expect(defaultStock?.quantity).toBe(-7); // allowed negative — no clamp
+    expect(defaultStock?.quantity).toBe(0); // WAREHOUSE-NEG-1: floored at 0, the rest of the deficit comes from C
 
     const cStock = await prisma.warehouseStock.findFirst({
       where: { warehouseId: warehouseC.id, productId, variantId: null },
     });
-    expect(cStock?.quantity).toBe(10);
+    expect(cStock?.quantity).toBe(3);
 
     const sum = (defaultStock?.quantity ?? 0) + (cStock?.quantity ?? 0);
     expect(sum).toBe(3); // SUM == Product.inventory, the invariant holds exactly
 
     await prisma.warehouse.deleteMany({ where: { id: warehouseC.id } });
+  });
+
+  it('WAREHOUSE-NEG-1: a deficit the rows cannot cover floors every row at 0 and logs reconcile_shortfall', async () => {
+    const productId = await makeProduct('shortfall', 4);
+    await prisma.warehouseStock.create({
+      data: { warehouseId, productId, variantId: null, quantity: 4, storeId },
+    });
+    // the aggregate falls below zero (a state the stock operations cannot produce, forced here): no row may follow it down
+    await prisma.$executeRaw`UPDATE "products" SET "inventory" = -3 WHERE "id" = ${productId}`;
+    const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+    try {
+      const result = await WarehouseService.reconcileWarehouseStockToAggregate(
+        storeId,
+        productId,
+        null
+      );
+      expect(result.reconciled).toBe(true);
+      const row = await prisma.warehouseStock.findFirst({
+        where: { warehouseId, productId, variantId: null },
+      });
+      expect(row?.quantity).toBe(0);
+      expect(errSpy.mock.calls.some(c => String(c[1]).includes('reconcile_shortfall'))).toBe(true);
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 
   it('reconcile is idempotent: re-running immediately after a successful reconcile makes no further change', async () => {

@@ -21,6 +21,7 @@ const h = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
   runInStoreScope: async (_s: string, fn: () => Promise<unknown>) => fn(),
+  withoutHiddenStores: <T>(fn: () => T) => fn(),
   // The cron lists stores through the directory definer; the filter is applied in code.
   storeDirectory: async (filter?: (s: Record<string, unknown>) => boolean) =>
     ['s1', 's2']

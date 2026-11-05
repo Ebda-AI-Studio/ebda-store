@@ -4,7 +4,7 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, siteMedalHtml, siteNavMap } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -17,6 +17,7 @@ import {
   writeSeoFiles,
   writeSiteCss,
 } from '@ebda/site-kit/build/shell';
+import { assertNoBrokenLinks } from '@ebda/site-kit/build/links';
 import { writeSearchAssets } from '@ebda/site-kit/build/search';
 import { loadContent, resetOut, writePage } from '@ebda/site-kit/build/site';
 
@@ -40,7 +41,6 @@ const L = {
     sidebarLabel: 'المقالات',
     search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في المساعدة' },
     switch: { label: 'English', lang: 'en' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}. تحتاج مساعدة إضافية؟ راسلنا.`,
     searchMsgs: {
       loading: 'جارٍ تحميل فهرس البحث…',
       none: 'لا توجد نتائج.',
@@ -68,7 +68,6 @@ const L = {
     sidebarLabel: 'Articles',
     search: { action: '/en/search/', label: 'Search', placeholder: 'Search help' },
     switch: { label: 'العربية', lang: 'ar' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. Need more help? Email us.`,
     searchMsgs: {
       loading: 'Loading the search index…',
       none: 'No results.',
@@ -94,7 +93,7 @@ writeSiteCss(out);
 const PRODUCT_FOLDERS = [
   {
     id: 'whatsapp',
-    name: { ar: 'ابدأ واتساب', en: 'Ebda WhatsApp' },
+    name: { ar: 'ابدأ شات', en: 'Ebda Chat' },
   },
 ];
 const PRODUCT_NAME = {
@@ -156,17 +155,7 @@ const base = lang => {
     active: 'help',
     search: c.search,
     skipLabel: c.skip,
-    footer: renderFooter({
-      copy: c.footer,
-      links: [
-        { href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail },
-        {
-          href: `https://${BRAND.domains.status}`,
-          label: lang === 'ar' ? 'حالة الخدمة' : 'Status',
-        },
-        { href: `${BRAND_MARKETING_URL}/privacy/`, label: lang === 'ar' ? 'الخصوصية' : 'Privacy' },
-      ],
-    }),
+    footer: renderFooter({ lang }),
     langSwitch: { label: L[other].switch.label, lang: other },
   };
 };
@@ -198,7 +187,7 @@ for (const lang of ['ar', 'en']) {
     .filter(id => content[lang].some(a => a.product === id))
     .map(
       id =>
-        `<section aria-labelledby="p-${id}"><h2 id="p-${id}">${esc(PRODUCT_NAME[id][lang])}</h2><ul class="cards">${cardsFor(id)}</ul></section>`
+        `${siteMedalHtml(id === 'whatsapp' ? 'm12' : 'm8')}<section aria-labelledby="p-${id}"><h2 id="p-${id}">${esc(PRODUCT_NAME[id][lang])}</h2><ul class="cards">${cardsFor(id)}</ul></section>`
     )
     .join('')}</div>`;
   writePage(
@@ -212,6 +201,7 @@ for (const lang of ['ar', 'en']) {
       alternates: alternates('/', '/en/'),
       langSwitch: { ...base(lang).langSwitch, href: homeUrl(other) },
       main: homeMain,
+      tess: true,
     })
   );
   urls.push(homeUrl(lang));
@@ -284,7 +274,7 @@ const NF = {
     mapLabel: 'أقسام مركز المساعدة',
     sections: 'أقسام المساعدة',
     ebda: BRAND.company.shortNameAr,
-    links: { home: 'الصفحة الرئيسية للمساعدة', docs: 'وثائق المطوّرين', contact: 'تواصل معانا' },
+    links: { home: 'الصفحة الرئيسية للمساعدة' },
   },
   en: {
     line: "The page you're looking for can't be found.",
@@ -292,7 +282,7 @@ const NF = {
     mapLabel: 'Help sections',
     sections: 'Help sections',
     ebda: BRAND.company.shortNameEn,
-    links: { home: 'Help home', docs: 'Developer docs', contact: 'Contact' },
+    links: { home: 'Help home' },
   },
 };
 for (const lang of ['ar', 'en']) {
@@ -300,7 +290,7 @@ for (const lang of ['ar', 'en']) {
   const firstOfSection = new Map();
   for (const a of content[lang]) {
     const g = a.data.section ?? '';
-    if (g && !firstOfSection.has(g)) firstOfSection.set(g, articleUrl(lang, a.slug));
+    if (g && !firstOfSection.has(g)) firstOfSection.set(g, articleUrl(lang, a.path));
   }
   writeFileSync(
     path.join(out, lang === 'ar' ? '404.html' : 'en/404.html'),
@@ -326,9 +316,9 @@ for (const lang of ['ar', 'en']) {
             title: c.ebda,
             links: [
               { href: homeUrl(lang), label: c.links.home },
-              ...siteNavItems(lang).map(i => ({ href: i.href, label: i.label })),
-              { href: `https://${BRAND.domains.docs}/`, label: c.links.docs },
-              { href: `mailto:${BRAND.supportEmail}`, label: c.links.contact },
+              ...siteNavMap(lang)
+                .filter(i => i.id !== 'help')
+                .map(i => ({ href: i.href, label: i.label })),
             ],
           },
         ],
@@ -342,6 +332,7 @@ writeFileSync(
     .map(a => `- [${a.data.title}](${ORIGIN}${articleUrl('en', a.path)}): ${a.data.description}`)
     .join('\n')}\n`
 );
+assertNoBrokenLinks(out, ORIGIN);
 console.log(
   `help built: ${urls.length} pages (${content.en.length} articles x 2 locales) -> ${out}`
 );

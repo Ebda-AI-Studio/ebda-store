@@ -12,7 +12,7 @@
  *    re-runs the handler (backoff, the job's `retries`, then the failure path). `step.sleep` is not
  *    available there.
  *  - `alarm`: a store-iterating schedule that becomes a per-store Durable Object alarm once StoreDO
- *    owns the data (phases 2-3, other agents). Alarm-ready ones run as alarms when `JOBS_CF_ALARMS` lists them (lib/jobs/alarm-flag.ts); otherwise as a Cron Trigger -> Workflow.
+ *    owns the data (phases 2-3, other agents). Alarm-ready ones run as alarms for stores on their Durable Object when `JOBS_CF_ALARMS` lists them (lib/jobs/alarm-flag.ts, Ruling CF-JOBS-1); Postgres stores keep the Cron Trigger -> Workflow path.
  * Cron Triggers start every `cron` function (lib/jobs/schedule.ts); events start the `event` ones.
  *
  * The group number is the order jobs were ported in (all run on Cloudflare now).
@@ -31,9 +31,14 @@ export interface JobMapEntry {
 export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'agent-write-denied-watch': { group: '1-observability', kind: 'queue', trigger: 'cron' },
   'gmail-alert-poller': { group: '1-observability', kind: 'queue', trigger: 'cron' },
-  'gold-rate-staleness-watch': { group: '1-observability', kind: 'workflow', trigger: 'cron' },
+  'gold-rate-staleness-watch': {
+    group: '1-observability',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   heartbeat: { group: '1-observability', kind: 'queue', trigger: 'cron' },
-  'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron' },
+  'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron', alarm: true },
   'abandoned-cart-purge-weekly': {
     group: '2-housekeeping',
     kind: 'queue',
@@ -47,10 +52,26 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     trigger: 'cron',
     alarm: true,
   },
-  'bulk-import-orphan-cleanup': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'bulk-import-orphan-cleanup': {
+    group: '2-housekeeping',
+    kind: 'queue',
+    trigger: 'cron',
+    alarm: true,
+  },
+  'catalog-import-uploads-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'domain-claim-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
-  'instapay-receipt-retention-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
-  'order-anonymize-5y-monthly': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'instapay-receipt-retention-daily': {
+    group: '2-housekeeping',
+    kind: 'queue',
+    trigger: 'cron',
+    alarm: true,
+  },
+  'order-anonymize-5y-monthly': {
+    group: '2-housekeeping',
+    kind: 'queue',
+    trigger: 'cron',
+    alarm: true,
+  },
   'r2-orphan-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'search-log-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'soft-deleted-user-anonymize-monthly': {
@@ -64,7 +85,12 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     trigger: 'cron',
     alarm: true,
   },
-  'webhook-delivery-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'webhook-delivery-purge-daily': {
+    group: '2-housekeeping',
+    kind: 'queue',
+    trigger: 'cron',
+    alarm: true,
+  },
   'accounting-daily-close': {
     group: '3-books-stock',
     kind: 'workflow',
@@ -100,7 +126,12 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   'analytics-rollup-on-demand': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
-  'gold-rate-feed-fetch': { group: '3-books-stock', kind: 'workflow', trigger: 'cron' },
+  'gold-rate-feed-fetch': {
+    group: '3-books-stock',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'stock-deadstock-scan-cron': {
     group: '3-books-stock',
     kind: 'workflow',
@@ -157,6 +188,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'bulk-ai-tags': { group: '4-ai', kind: 'workflow', trigger: 'event' },
   'bulk-ai-translate': { group: '4-ai', kind: 'workflow', trigger: 'event' },
   'bulk-import-products': { group: '4-ai', kind: 'queue', trigger: 'event' },
+  'catalog-import-run': { group: '4-ai', kind: 'workflow', trigger: 'event' },
+  'catalog-import-create-drafts': { group: '4-ai', kind: 'workflow', trigger: 'event' },
   'gsc-ingest-cron': { group: '4-ai', kind: 'workflow', trigger: 'cron' },
   'gsc-ingest-on-demand': { group: '4-ai', kind: 'queue', trigger: 'event' },
   'ebda-ads-conversion': { group: '5-integrations', kind: 'queue', trigger: 'event' },
@@ -164,12 +197,19 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'eta-receipt-redrive': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'eta-receipt-submit': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'order-capi-conversion': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
-  'search-index-backstop': { group: '5-integrations', kind: 'workflow', trigger: 'cron' },
+  'search-index-backstop': {
+    group: '5-integrations',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'search-product-index': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
-  'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
+  'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron', alarm: true },
   'wa-store-events': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'ci-erasure-second-pass': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'ci-outcomes': { group: '5-integrations', kind: 'queue', trigger: 'event' },
+  'ci-aggregation-daily': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
+  'ci-hint-calibration-weekly': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
   'webhook-deliver': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'webhook-fanout': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'campaign-send': { group: '6-comms', kind: 'workflow', trigger: 'event' },
@@ -184,17 +224,52 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'review-moderation': { group: '6-comms', kind: 'workflow', trigger: 'event' },
   'review-request': { group: '6-comms', kind: 'workflow', trigger: 'event' },
   'billing-renewal-daily': { group: '7-money', kind: 'workflow', trigger: 'cron' },
-  'instapay-expiry': { group: '7-money', kind: 'workflow', trigger: 'cron' },
+  'instapay-expiry': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'instapay-receipt-extract': { group: '7-money', kind: 'queue', trigger: 'event' },
-  'order-auto-cancel-unpaid': { group: '7-money', kind: 'workflow', trigger: 'cron' },
-  'order-created-stuck-sweep': { group: '7-money', kind: 'workflow', trigger: 'cron' },
+  'order-auto-cancel-unpaid': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
+  'order-created-stuck-sweep': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'order-refunded-fanout': { group: '7-money', kind: 'workflow', trigger: 'event' },
-  'order-status-fanout-stuck-sweep': { group: '7-money', kind: 'workflow', trigger: 'cron' },
-  'payment-abandonment-sweep': { group: '7-money', kind: 'workflow', trigger: 'cron' },
-  'payment-reconcile-sweep': { group: '7-money', kind: 'workflow', trigger: 'cron' },
+  'order-status-fanout-stuck-sweep': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
+  'payment-abandonment-sweep': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
+  'payment-reconcile-sweep': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'payment-webhook-process': { group: '7-money', kind: 'workflow', trigger: 'event' },
   'payment-webhook-stuck-sweep': { group: '7-money', kind: 'workflow', trigger: 'cron' },
-  'refund-reversal-stuck-sweep': { group: '7-money', kind: 'workflow', trigger: 'cron' },
+  'refund-reversal-stuck-sweep': {
+    group: '7-money',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'shipment-create': { group: '7-money', kind: 'queue', trigger: 'event' },
   'alerts-failure-watch': { group: '8-failure-watch', kind: 'queue', trigger: 'event' },
 };

@@ -1,7 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, customerUserId } from '../middleware/auth';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { tenantContext } from '../middleware/tenant-context';
@@ -46,10 +48,14 @@ const adjustSchema = z.object({
 
 /** 404 unless the id is a customer account of THIS store. */
 async function assertStoreCustomer(storeId: string, customerId: string, res: Response) {
-  const customer = await prisma.user.findFirst({
-    where: { ...storeCustomerWhere(storeId, customerId), storeId },
-    select: { id: true },
-  });
+  const doCustomer = await customerRow(storeId, customerId);
+  const customer =
+    doCustomer !== undefined
+      ? doCustomer
+      : await prisma.user.findFirst({
+          where: { ...storeCustomerWhere(storeId, customerId), storeId },
+          select: { id: true },
+        });
   if (!customer) {
     res.status(404).json({
       success: false,
@@ -185,6 +191,7 @@ function requireCustomer(req: Request, res: Response): string | null {
 router.get(
   '/public/:storeId/wallet',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('customer_wallet'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -209,6 +216,7 @@ router.get(
 router.get(
   '/public/:storeId/wallet/transactions',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('customer_wallet'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

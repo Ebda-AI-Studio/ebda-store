@@ -62,7 +62,7 @@ export function toAnalyticsPoint(e: CiEnvelope): {
       str(d.carrier),
       str(d.areaKey),
       str(d.paymentMethod) || str(d.provider),
-      str(d.returnReasonCode) || str(d.reasonCode),
+      str(d.returnReasonCode) || str(d.reasonCode) || str(d.failureCode) || str(d.step),
       e.xstore ? '1' : '0',
       String(e.v),
     ],
@@ -217,7 +217,7 @@ export async function handleCiEventsBatch(
     }
     // Erased since this event was queued (retry / DLQ replay): an erased order's event is dropped, an
     // erased buyer's key is removed (the outcome stays, anonymous).
-    if (await ci.get(ciOrderTombstoneKey(e.orderId))) {
+    if (e.orderId && (await ci.get(ciOrderTombstoneKey(e.orderId)))) {
       msg.ack();
       continue;
     }

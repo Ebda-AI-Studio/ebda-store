@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * The Ebda WhatsApp help guides on help.ebda.app/whatsapp/ equal their source (ebda-whatsapp docs/help/{ar,en}/NN-slug.md,
+ * The Ebda Chat help guides on help.ebda.app/whatsapp/ equal their source (ebda-whatsapp docs/help/{ar,en}/NN-slug.md,
  * vendored verbatim in apps/help/wa-source/ by `node apps/help/scripts/import-wa-help.mjs <docs/help>`). PINNED_SHA256 pins
  * each vendored file to the version the WhatsApp session published: when they ship new text, re-import and update the
  * hashes together. The word comparison fails if a published page differs from its source (link targets aside).
@@ -14,14 +14,14 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/01-verify-your-business-on-meta.md':
     '802f25961b54fbd5d0714187990becfd0fe5093750fea6c43c4e089fa62cd566',
   'ar/02-connect-your-own-number.md':
-    'f3196178cc89558af0c0fa78c935bfc57fb29bb94d324b4cbd61ed1423f8cba8',
+    '7c78d73479ce44dbd2eeb9cd96fb4b6c67ec150b7a4b04f4ffbf94dd892fe2df',
   'ar/03-use-the-shared-number.md':
-    '621957716efc09ae1e10c9caafe98de8664601071a3f9132bc17c4844e939e9d',
+    '840979f2ea3bcfaf4000f8e5510196d56576f7eeded449294668910bcdddf33a',
   'ar/04-templates-and-the-24-hour-window.md':
-    '0ca3f09794a10b4c84cac4187ad4caff8b478903f4d291ce676b61cd434c78e1',
-  'ar/05-cod-confirmations.md': '91f62e3356718ef87dcc7d6461abf8aceab53f8cfa640762ae7685bf635711ef',
+    '65bea01b18064a8fbfcc251bebde5f21a0cc666e0fc2be9655069d57fa487995',
+  'ar/05-cod-confirmations.md': '3e1d726629b3cdc258f99fbcf8efcb07224b1f174b14cf1e90b22649f689742e',
   'ar/06-instapay-orders-in-whatsapp.md':
-    'a2d574dcad19da541df2e4029cca86aac2c0eedaf4f1395464ab8fef9338768b',
+    'd02829291f3503e08bbc6d89717aa72fd77cd605b8be451adbf426f847228a97',
   'ar/07-ai-agent.md': 'c65b53c5f268272c1b8e4f38e8bafca7f3e5c867e6713432162e0835ec966013',
   'ar/08-campaigns-and-opt-out.md':
     '2b059c59937e0b71b09bdc88198224829e38787cb175fac36a7582a196d4b6f0',
@@ -32,20 +32,22 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/11-service-menu-hours-and-location.md':
     '37c92f3718b22c245bd20b0a7a5151bbabfddf01d51b2da561d8ba2a7a3cb0ac',
   'ar/12-delete-your-workspace.md':
-    '8558653848df02992f0e31a892b5f1b8e1092a4ee4fa5d05e316f2c063778970',
+    '762abb80d07114750ff5dbdadf4a48e71b9e32c26f417be1c6c7123a053f142d',
   'ar/13-your-customers-data.md':
     '70c99e0bc2e321ad79bd6a6001ea2f921c0a2c48432b977f5f98badbd24a2c44',
+  'ar/14-team-members-and-seats.md':
+    '9a81c3d534f72f4c269f8a5a9d2a5ff3680d76aeac56fe3326377fc26503342b',
   'en/01-verify-your-business-on-meta.md':
     '3de91aea62cd457aa08d7bed246781d1d7908c8208b643dbfa3a30eff3b5e8b2',
   'en/02-connect-your-own-number.md':
-    '6601a5a1826546df50bd69c559bf9dcd739d85dd3bc50dff3908415d55eb19a2',
+    '34ea9294215fe8b0be66527d0203dd743c38176276c61c64cd90ba8e0dcc03b4',
   'en/03-use-the-shared-number.md':
     'f8241dac63f9dc29d09219a15cbc677b19af45373630fe99c65d24828ddcef72',
   'en/04-templates-and-the-24-hour-window.md':
-    '77ccada792ca49c7c6d3c34dd7d1641e6578d9f878b9d36655bed6bacbf84b38',
-  'en/05-cod-confirmations.md': 'de265900d41f2ad2ac9797cd547dd8db723e49908f7a9557fb3d44c63d277e07',
+    '34cd5123b5806cc76643269cc99c441ad226a6a581f52225ff7fd461b0a4c8ef',
+  'en/05-cod-confirmations.md': '41d46d3aaa7d10ec327f4ba8a69d898bb4d0a32b08143db62751463d17802b4d',
   'en/06-instapay-orders-in-whatsapp.md':
-    'fcc636f8f4b82394d81924652351bdb333411a229e22d8bc0c8091b1be050452',
+    '5c41633f1f1adf3fc1159e85bed7cc9cc8f27144f3ff42563f2493528e1e715a',
   'en/07-ai-agent.md': '4670c20b6232664cf71d1c8dc91305786d2806019bf684841a770f2b49a5b055',
   'en/08-campaigns-and-opt-out.md':
     '380b45e446e026e57e4c3d03f9ba1b5eff4c5b4a9d8bb0adb522434aef467f32',
@@ -56,14 +58,16 @@ const PINNED_SHA256: Record<string, string> = {
   'en/11-service-menu-hours-and-location.md':
     'c6e9ca322f45a98148ad2d2ab47ed7aefbdb4e7ea801a39e8db5e6b4cf30847a',
   'en/12-delete-your-workspace.md':
-    '827f1f33a5c58c64c0a0ff0f4e706314ae1c802534919da6c6cc026446c1571b',
+    '1f2ae43438a4cf7b533e50e3c72bd7a6c16faf2dea47ea5bbab8fe540b8598c9',
   'en/13-your-customers-data.md':
     'd1e2b534f7016ffec835b5ef4dc1925fe2f99fc401f9061896f815b86b060bd7',
+  'en/14-team-members-and-seats.md':
+    '0d35bc89db69ec5fe8ca3351336280486efeb635baabfb1fcdc22320e95c6122',
 };
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];
 const noTargets = (t: string) => t.replace(/\]\([^)]*\)/g, ']');
 
-describe('Ebda WhatsApp help guides equal their vendored source', () => {
+describe('Ebda Chat help guides equal their vendored source', () => {
   it('every vendored file is exactly the pinned version, and none is unpinned', () => {
     const found: string[] = [];
     for (const lang of ['ar', 'en'])
@@ -114,12 +118,12 @@ describe('Ebda WhatsApp help guides equal their vendored source', () => {
       );
   });
 
-  it('every vendored guide is published in both locales (13 guides, none left behind)', () => {
+  it('every vendored guide is published in both locales (14 guides, none left behind)', () => {
     for (const lang of ['ar', 'en']) {
       const slugs = readdirSync(path.join(HELP, 'wa-source', lang)).map(f =>
         f.slice(3).replace(/\.md$/, '')
       );
-      expect(slugs.length).toBe(13);
+      expect(slugs.length).toBe(14);
       expect(
         readdirSync(path.join(HELP, 'content', lang, 'whatsapp'))
           .map(f => f.replace(/\.mdx$/, ''))

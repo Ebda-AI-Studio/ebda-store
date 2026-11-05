@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { ProductService } from '../services/product.service';
@@ -136,7 +137,18 @@ const createProductSchema = z.object({
       })
     )
     .optional(),
+  // BE:F-6: a single photo URL is accepted too (the category API's shape); the route folds it into `images`.
+  image: z.string().url().optional(),
 });
+
+/** Fold the single-photo `image` into `images` (an explicit `images` wins); the service only knows `images`. */
+function foldImage<T extends { image?: string; images?: Array<{ url: string; alt?: string }> }>(
+  d: T
+): Omit<T, 'image'> {
+  const { image, ...rest } = d;
+  if (image && !rest.images?.length) return { ...rest, images: [{ url: image }] };
+  return rest;
+}
 
 /**
  * Reject a fixed discount that exceeds the price — it would produce a
@@ -166,8 +178,13 @@ function refineFixedDiscount(
   }
 }
 
-export const createProductSchemaChecked = createProductSchema.superRefine(refineFixedDiscount);
-export const updateProductSchema = createProductSchema.partial().superRefine(refineFixedDiscount);
+export const createProductSchemaChecked = createProductSchema
+  .superRefine(refineFixedDiscount)
+  .transform(foldImage);
+export const updateProductSchema = createProductSchema
+  .partial()
+  .superRefine(refineFixedDiscount)
+  .transform(foldImage);
 
 /**
  * @swagger
@@ -411,7 +428,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isNew: true, deletedAt: null },
         orderBy: [{ newArrivalPosition: 'asc' }, { createdAt: 'desc' }],
         select: {
@@ -446,7 +465,9 @@ router.put(
       const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
 
       // Validate every supplied ID is a product in this store with isNew=true.
-      const existing = await prisma.product.findMany({
+      const existing = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isNew: true, id: { in: orderedProductIds }, deletedAt: null },
         select: { id: true },
       });
@@ -464,9 +485,10 @@ router.put(
       }
 
       // Persist positions in a single transaction — position = index.
-      await prisma.$transaction(
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+      await w.$transaction(
         orderedProductIds.map((id, index) =>
-          prisma.product.update({
+          w.product.update({
             where: { id, storeId },
             data: { newArrivalPosition: index },
           })
@@ -495,7 +517,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isBestSeller: true, deletedAt: null },
         orderBy: [{ bestSellerPosition: 'asc' }, { createdAt: 'desc' }],
         select: {
@@ -530,7 +554,9 @@ router.put(
       const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
 
       // Validate every supplied ID is a product in this store with isBestSeller=true.
-      const existing = await prisma.product.findMany({
+      const existing = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: { storeId, isBestSeller: true, id: { in: orderedProductIds }, deletedAt: null },
         select: { id: true },
       });
@@ -548,9 +574,10 @@ router.put(
       }
 
       // Persist positions in a single transaction — position = index.
-      await prisma.$transaction(
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+      await w.$transaction(
         orderedProductIds.map((id, index) =>
-          prisma.product.update({
+          w.product.update({
             where: { id, storeId },
             data: { bestSellerPosition: index },
           })
@@ -619,7 +646,9 @@ router.post(
       if (typeof enabled !== 'boolean') {
         throw new AppError(400, 'INVALID_BODY', 'enabled must be true or false');
       }
-      const result = await prisma.product.updateMany({
+      const result = await (
+        await storeWriter(storeId)
+      ).product.updateMany({
         where: { storeId, status: 'active', deletedAt: null },
         data: { allowBackorder: enabled },
       });
@@ -650,6 +679,11 @@ router.post(
 // the merchant controls exactly which rows change.
 //
 // Body: { productIds: string[]; lowStockThreshold: number }
+// BE:S-28: Zod at the edge (uuid ids, at most 500, bounded threshold) instead of a hand check.
+const bulkLowStockSchema = z.object({
+  productIds: z.array(z.string().uuid()).min(1).max(500),
+  lowStockThreshold: z.number().int().min(0).max(1_000_000),
+});
 router.post(
   '/bulk-set-low-stock-threshold',
   authenticate,
@@ -660,28 +694,11 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { productIds, lowStockThreshold } = req.body as {
-        productIds?: unknown;
-        lowStockThreshold?: unknown;
-      };
-      if (
-        !Array.isArray(productIds) ||
-        productIds.length === 0 ||
-        !productIds.every(id => typeof id === 'string' && id.length > 0)
-      ) {
-        throw new AppError(400, 'INVALID_BODY', 'productIds must be a non-empty string array');
-      }
-      if (
-        typeof lowStockThreshold !== 'number' ||
-        !Number.isInteger(lowStockThreshold) ||
-        lowStockThreshold < 0
-      ) {
-        throw new AppError(400, 'INVALID_BODY', 'lowStockThreshold must be a non-negative integer');
-      }
+      const { productIds, lowStockThreshold } = bulkLowStockSchema.parse(req.body);
 
       const result = await ProductService.bulkSetLowStockThreshold(
         storeId,
-        productIds as string[],
+        productIds,
         lowStockThreshold
       );
 
@@ -810,7 +827,8 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { product },
+        // BE:F-6: the category the product was filed under, so a caller need not re-read it (first of `categories`).
+        data: { product: { ...product, categoryId: data.categories?.[0] ?? null } },
       });
     } catch (error) {
       next(error);
@@ -906,13 +924,16 @@ router.get(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
-      const faqs = await prisma.productFaq.findMany({
+      const faqs = await (
+        await storeDb(req.params.storeId)
+      ).productFaq.findMany({
         where: { productId: req.params.id },
         orderBy: { createdAt: 'asc' },
       });
@@ -930,14 +951,15 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
       const body = productFaqSchema.parse(req.body);
-      const faq = await prisma.productFaq.create({
+      const faq = await w.productFaq.create({
         data: {
           productId: req.params.id,
           question: body.question,
@@ -962,14 +984,15 @@ router.put(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
       const body = productFaqSchema.partial().parse(req.body);
-      const result = await prisma.productFaq.updateMany({
+      const result = await w.productFaq.updateMany({
         where: { id: req.params.faqId, productId: req.params.id },
         data: {
           ...(body.question !== undefined && { question: body.question }),
@@ -982,7 +1005,9 @@ router.put(
       if (result.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
-      const updated = await prisma.productFaq.findUnique({ where: { id: req.params.faqId } });
+      const updated = await (
+        await storeDb(req.params.storeId)
+      ).productFaq.findUnique({ where: { id: req.params.faqId } });
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);
@@ -997,13 +1022,14 @@ router.delete(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
-      const deleted = await prisma.productFaq.deleteMany({
+      const deleted = await w.productFaq.deleteMany({
         where: { id: req.params.faqId, productId: req.params.id },
       });
       if (deleted.count === 0) {

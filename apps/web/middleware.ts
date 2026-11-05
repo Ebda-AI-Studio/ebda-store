@@ -1,6 +1,12 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } from '@ebda/shared';
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  newCspNonce,
+  parseStoreHost,
+  storeHost,
+  type ParsedStoreHost,
+  type PlatformApp,
+} from '@ebda/shared';
+import { buildStorefrontCsp } from './src/lib/csp';
 // Relative import (not the `@/*` tsconfig alias) so this file is importable
 // directly from the root Vitest suite, which has no per-workspace `@/*`
 // alias plugin (each app's `@/*` points at its OWN `src/`, so a single
@@ -387,8 +393,9 @@ function handleStoreHost(
   }
 
   // Language in the URL (Ruling LOCALE-PATHS-1): only for a store that opted in, never inside the admin preview
-  // iframe, never for a demo-look preview. See `src/lib/locale-paths.ts` for the rules.
-  const localePaths = !isPreviewIframe && !demoLook && localePathsOn(storeKey);
+  // iframe. A demo-look preview (`?look=`) DOES take the prefix rules (skipping them left `/ar?look=x` unrewritten = 404),
+  // but never the shared tenant-tree and always `private, no-store`. See `src/lib/locale-paths.ts` for the rules.
+  const localePaths = !isPreviewIframe && localePathsOn(storeKey);
   if (localePaths) {
     const decision = decideLocalePath({
       pathname: request.nextUrl.pathname,
@@ -396,7 +403,16 @@ function handleStoreHost(
       method: request.method,
     });
     if (decision.kind === 'redirect') {
-      return NextResponse.redirect(new URL(decision.location, request.url), 301);
+      // Built from the request's own URL with an explicit pathname + search, and refused unless it stays on this
+      // origin (Ruling LOCALE-PATHS-3: `/ar//evil.com` must never become a cached off-site 301).
+      const target = request.nextUrl.clone();
+      const q = decision.location.indexOf('?');
+      target.pathname = q === -1 ? decision.location : decision.location.slice(0, q);
+      target.search = q === -1 ? '' : decision.location.slice(q);
+      if (target.origin === request.nextUrl.origin && target.pathname.startsWith('/')) {
+        return NextResponse.redirect(target, 301);
+      }
+      return new NextResponse(null, { status: 404 });
     }
     if (decision.kind === 'pending') {
       // An old unprefixed URL. Only the root layout knows the store's default language (middleware has no store),
@@ -413,13 +429,15 @@ function handleStoreHost(
       requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
       requestHeaders.set(LOCALE_REST_HEADER, decision.rest);
       let target: URL;
-      if (isTenantTreeEligible(decision.rest, isPreviewIframe, storeKey)) {
+      if (!demoLook && isTenantTreeEligible(decision.rest, isPreviewIframe, storeKey)) {
         target = buildStoreTreeUrl(request, host, decision.rest, storeKey, decision.locale);
       } else {
         target = request.nextUrl.clone();
         target.pathname = decision.rest;
       }
-      const response = NextResponse.rewrite(target, { request: { headers: requestHeaders } });
+      const response = uncacheableForDemoLook(
+        NextResponse.rewrite(target, { request: { headers: requestHeaders } })
+      );
       response.headers.set('x-store-domain', host);
       // The URL decides the language; keep the cookie in step so the unprefixed pages (cart, checkout) match.
       if (request.cookies.get('force-language')?.value !== decision.locale) {
@@ -515,7 +533,29 @@ export const MIDDLEWARE_ASSERTED_HEADERS = [
   LOCALE_SEARCH_HEADER,
 ] as const;
 
+/**
+ * Entry point: the per-request Content-Security-Policy nonce (Ruling CSP-WEB-1), then host routing.
+ *
+ * Mints a nonce, puts `Content-Security-Policy` + `x-nonce` on the REQUEST (that is how Next stamps the nonce on
+ * its own bootstrap and flight-data scripts, and how the root layout reads it for its inline script), runs the
+ * routing below on that request, and sets the same policy on whatever response comes back (page, rewrite,
+ * redirect or 404). Any client-sent `x-nonce` / CSP request header is overwritten here, never trusted.
+ */
 export function middleware(request: NextRequest) {
+  const nonce = newCspNonce();
+  const csp = buildStorefrontCsp(nonce);
+  const headers = new Headers(request.headers);
+  headers.set('x-nonce', nonce);
+  headers.set('Content-Security-Policy', csp);
+  const response = routeStorefront(new NextRequest(request, { headers }));
+  // The studio pages (ebda.app help/status hosts) already carry their own, stricter CSP: keep it.
+  if (!response.headers.has('Content-Security-Policy')) {
+    response.headers.set('Content-Security-Policy', csp);
+  }
+  return response;
+}
+
+function routeStorefront(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
 
   // /tenant-store/* is an INTERNAL rewrite target only (rewrites don't re-enter

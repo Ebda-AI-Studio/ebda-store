@@ -1,0 +1,150 @@
+/* The /contact enquiry form: the About page's quiet light art (medallion + gold hairline from about.css), no new motifs.
+   Logical properties only, so Arabic RTL and English LTR share one layout. Errors never rely on colour alone: text
+   plus a leading mark; focus is the global :focus-visible ring. */
+.cf-lead,
+.cf {
+  max-width: 40rem;
+}
+.cf-lead {
+  margin: 0 0 24px;
+  color: var(--muted);
+}
+.cf-form {
+  display: grid;
+  gap: 20px;
+}
+.cf-row {
+  display: grid;
+  gap: 6px;
+}
+.cf-row label {
+  font-weight: 600;
+}
+.cf-opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+.cf-row input[type='text'],
+.cf-row input[type='tel'],
+.cf-row input[type='email'],
+.cf-row select,
+.cf-row textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+.cf-row textarea {
+  resize: vertical;
+}
+.cf-row [aria-invalid='true'] {
+  border-color: #b3261e;
+  border-width: 2px;
+}
+.cf-hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.cf-err {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #b3261e;
+}
+.cf-err::before {
+  content: '! ';
+}
+.cf-consent {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 10px;
+}
+.cf-consent input {
+  width: 22px;
+  height: 22px;
+  margin-top: 4px;
+  accent-color: var(--gold);
+}
+.cf-consent label {
+  font-weight: 400;
+}
+.cf-consent .cf-err {
+  grid-column: 1 / -1;
+}
+.cf-form .btn {
+  justify-self: start;
+  min-height: 48px;
+}
+.cf-form .btn[disabled] {
+  opacity: 0.65;
+  cursor: progress;
+}
+.cf-summary,
+.cf-banner,
+.cf-sent,
+.cf-flag {
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--gold);
+  border-radius: var(--radius);
+}
+.cf-summary {
+  border-inline-start-color: #b3261e;
+}
+.cf-summary p,
+.cf-banner,
+.cf-sent p,
+.cf-flag p {
+  margin: 0;
+}
+.cf-summary ul {
+  margin: 8px 0 0;
+  padding-inline-start: 20px;
+}
+.cf-sent h3,
+.cf-flag h3 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  color: var(--accent-text);
+}
+.cf-sent:focus,
+.cf-sent h3:focus {
+  outline: none;
+}
+/* Visually hidden live region while empty */
+.cf-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Honeypot: off-screen, not display:none (some bots skip display:none fields) */
+.cf-hp {
+  position: absolute;
+  inset-inline-start: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+/* Redirect targets for the no-JavaScript post (the API sends the browser to /contact/#sent or #send-failed). */
+.cf-flag {
+  display: none;
+  margin-bottom: 20px;
+}
+.cf-flag:target {
+  display: block;
+}
+.cf-flag-bad {
+  border-inline-start-color: #b3261e;
+}
+#sent:target ~ .cf-form {
+  display: none;
+}

@@ -35,7 +35,7 @@ const STORE = {
 beforeEach(() => {
   send.mockReset();
   clearCfBindings();
-  setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, EMAIL: { send } });
+  setCfBindings({ EMAIL: { send } });
   findUnique.mockReset().mockResolvedValue(STORE);
 });
 

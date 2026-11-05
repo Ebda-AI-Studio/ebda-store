@@ -52,6 +52,8 @@ interface DurableObjectStateLike {
       };
     };
     transactionSync<T>(fn: () => T): T;
+    /** Async transaction (storage-only awaits): prisma-lite's interactive `$transaction`. */
+    transaction<T>(fn: () => Promise<T>): Promise<T>;
     setAlarm(time: number | Date): Promise<void>;
     getAlarm(): Promise<number | null>;
     deleteAlarm(): Promise<void>;

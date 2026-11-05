@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { useConfirm } from '../../../../hooks/useConfirm';
 import { Alert } from '../../../../components/Alert';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
@@ -23,6 +24,7 @@ export default function StoreDomainPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('domain.page');
+  const askConfirm = useConfirm();
   const { store, isLoading, refetch: refetchStore } = useCurrentStore(storeId);
 
   // ----- Domain section state -----
@@ -45,6 +47,25 @@ export default function StoreDomainPage() {
     emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
   } | null>(null);
   const [domainError, setDomainError] = useState('');
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  /** Every record as plain tab-separated lines: paste into a chat or a registrar ticket. */
+  const recordsAsText = (rows: Array<{ type: string; name: string; value: string }>) =>
+    rows.map(r => `${r.type}\t${r.name}\t${r.value}`).join('\n');
+  async function copyAllRecords(rows: Array<{ type: string; name: string; value: string }>) {
+    try {
+      await navigator.clipboard.writeText(recordsAsText(rows));
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    } catch {
+      /* clipboard blocked: the per-row copy buttons still work */
+    }
+  }
+  /** A ready email the merchant sends to whoever manages the domain (a developer, the registrar's support). */
+  const emailInstructionsHref = (rows: Array<{ type: string; name: string; value: string }>) =>
+    `mailto:?subject=${encodeURIComponent(t('emailSubject'))}&body=${encodeURIComponent(
+      `${t('emailBody')}\n\n${recordsAsText(rows)}`
+    )}`;
 
   // Returns the latest fetched data so callers (e.g. the verify polling
   // loop) can branch on the live response without dealing with React's
@@ -131,6 +152,13 @@ export default function StoreDomainPage() {
   }
 
   async function handleRemoveDomain() {
+    const ok = await askConfirm({
+      object: t('removeObject', { domain: store?.domain ?? store?.pendingDomain ?? '' }),
+      consequence: t('removeConsequence'),
+      confirmLabel: t('removeLabel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
     setNewDomain('');
     setIsSaving(true);
     try {
@@ -259,11 +287,6 @@ export default function StoreDomainPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
       <div className="mx-auto max-w-4xl p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">{t('heading')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
-        </div>
-
         {(claimStatus === 'pending' || claimStatus === 'failed') && domain && (
           <div
             role="status"
@@ -304,6 +327,7 @@ export default function StoreDomainPage() {
                   size="sm"
                   onClick={handleRemoveDomain}
                   disabled={isSaving}
+                  className="text-destructive-ink"
                 >
                   {t('remove')}
                 </Button>
@@ -432,7 +456,7 @@ export default function StoreDomainPage() {
                     className: 'whitespace-nowrap',
                     cell: record => (
                       <span className="font-mono text-xs text-muted-foreground">
-                        {record.ttl ?? '1 Hour'}
+                        {record.ttl ?? t('ttlAuto')}
                       </span>
                     ),
                   },
@@ -457,10 +481,20 @@ export default function StoreDomainPage() {
                     {needsDnsRecords && (
                       <Alert
                         variant="warning"
-                        title={isDnsPointingWrong ? t('dnsPointingTitle') : t('dnsRequired')}
+                        title={
+                          isDnsPointingWrong
+                            ? t('dnsPointingTitle')
+                            : !isVerified
+                              ? t('dnsWaitingTitle')
+                              : t('dnsEmailTitle')
+                        }
                       >
                         <p className="mt-1 text-sm">
-                          {isDnsPointingWrong ? t('dnsPointingMessage') : t('dnsInstructions')}
+                          {isDnsPointingWrong
+                            ? t('dnsPointingMessage')
+                            : !isVerified
+                              ? t('dnsWaitingMessage')
+                              : t('dnsInstructions')}
                         </p>
                         <div className="mt-3">
                           <DataTable<DnsRecordRow>
@@ -469,6 +503,22 @@ export default function StoreDomainPage() {
                             rows={dnsRows}
                             rowKey={(record, i) => `${record.type}-${record.name}-${i}`}
                           />
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11"
+                            onClick={() => void copyAllRecords(dnsRows)}
+                          >
+                            {copiedAll ? t('copiedAll') : t('copyAll')}
+                          </Button>
+                          <a
+                            href={emailInstructionsHref(dnsRows)}
+                            className="inline-flex min-h-11 items-center text-sm font-medium text-primary-ink underline underline-offset-2"
+                          >
+                            {t('emailInstructions')}
+                          </a>
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <p className="text-xs opacity-80">{t('dnsPropagation')}</p>

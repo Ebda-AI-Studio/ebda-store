@@ -19,7 +19,15 @@ import {
   CAPABILITY_IDS,
   featuresFaq,
 } from '../../apps/marketing/src/lib/capabilities';
-import { ALL_ROW_IDS, COMPARE, compareRows } from '../../apps/marketing/src/lib/compare';
+import {
+  ALL_ROW_IDS,
+  COMPARE_AS_OF,
+  COMPARE_AS_OF_AR,
+  CHECKED_ON,
+  CHECKED_ON_AR,
+  COMPARE,
+  compareRows,
+} from '../../apps/marketing/src/lib/compare';
 import { COMPARE_SLUGS, LOCALES, pagePath } from '../../apps/marketing/src/lib/site';
 
 const APP = path.resolve(__dirname, '../../apps/marketing');
@@ -104,7 +112,8 @@ describe('/compare is balanced', () => {
         }
         for (const r of [...compareRows().gap, ...compareRows().strength])
           expect(html).toContain(r.label[locale]);
-        expect(html).toContain(locale === 'en' ? 'October 2026' : 'أكتوبر 2026');
+        // the as-of date comes from the same source the page renders (lib/compare.ts), never a hardcoded month
+        expect(html).toContain(locale === 'en' ? COMPARE_AS_OF : COMPARE_AS_OF_AR);
         expect(html).not.toMatch(BAD);
         // JSON-LD on a compare page carries no FAQPage
         expect(html).not.toContain('FAQPage');
@@ -132,9 +141,9 @@ describe('sourced compare pages (Wuilt, YouCan, EasyOrders, ExpandCart)', () => 
   });
   for (const slug of sourced)
     for (const locale of LOCALES) {
-      it(`${locale} ${slug}: cites https sources dated 22 October 2026 as new-tab links, says where they are cheaper, invents nothing`, () => {
+      it(`${locale} ${slug}: cites https sources dated 2 November 2026 as new-tab links, says where they are cheaper, invents nothing`, () => {
         const html = renderToStaticMarkup(<ComparePage locale={locale} slug={slug} />);
-        expect(html).toContain(locale === 'en' ? '22 October 2026' : '22 أكتوبر 2026');
+        expect(html).toContain(locale === 'en' ? CHECKED_ON : CHECKED_ON_AR);
         for (const src of COMPARE[slug].sources!) {
           expect(src.href).toMatch(/^https:\/\//);
           expect(html).toMatch(
@@ -153,14 +162,32 @@ describe('sourced compare pages (Wuilt, YouCan, EasyOrders, ExpandCart)', () => 
       });
     }
   it('cheaper-for-small-sellers vendors say so in the price cell, in both languages', () => {
-    for (const slug of ['wuilt', 'easyorders'] as const) {
-      expect(COMPARE[slug].cells.currency.v).toBe('them');
-      expect(COMPARE[slug].en.chooseThem[0]).toMatch(/nobody on payroll|few pages/);
-    }
+    expect(COMPARE.wuilt.cells.currency.v).toBe('them');
+    expect(COMPARE.wuilt.en.chooseThem[0]).toMatch(/nobody on payroll|few pages/);
     expect(COMPARE.youcan.cells.commission.v).toBe('ebda');
     expect(COMPARE.wuilt.cells.currency.text.en).toContain('1,250');
-    expect(COMPARE.easyorders.cells.currency.text.en).toContain('$0.04');
+    expect(COMPARE.wuilt.cells.currency.text.en).toContain('Business EGP 17,500');
     expect(COMPARE.expandcart.cells.commission.text.en).toContain('no commissions');
+  });
+  it('COMPARE-1 (2 November 2026): corrected figures, EGP for ExpandCart, nothing unverifiable for EasyOrders', () => {
+    const yc = COMPARE.youcan.cells;
+    expect(yc.currency.text.en).toContain('Premium $149');
+    expect(yc.currency.text.en).toContain('Unlimited plan (up to 5 stores) at $229');
+    expect(yc.currency.text.en).not.toContain('$187');
+    expect(yc.commission.text.en).toContain('$0 in transaction fees');
+    expect(yc.commission.text.en).toContain('pay-as-you-go');
+    expect(yc.commission.text.ar).toContain('0$ رسوم معاملات');
+    const ec = COMPARE.expandcart.cells.currency.text;
+    for (const n of ['599', '1,199', '4,599']) expect(ec.en).toContain(n);
+    expect(ec.en).not.toMatch(/\$19|\$39|\$1,499/);
+    const eo = JSON.stringify([
+      COMPARE.easyorders.cells,
+      COMPARE.easyorders.en,
+      COMPARE.easyorders.ar,
+    ]);
+    expect(eo).not.toMatch(/0\.04|\$100|100\$|4 سنت/);
+    expect(COMPARE.easyorders.cells.currency.v).toBe('even');
+    expect(CHECKED_ON).toBe('2 November 2026');
   });
 });
 
@@ -174,7 +201,7 @@ describe('llms.txt and llms-full.txt', () => {
         expect(llms).toContain(`https://ebda.app${pagePath(locale, `compare/${s}` as never)}/`);
     }
     expect(llms).toContain('https://ebda.app/llms-full.txt');
-    expect(llms).toMatch(/^# Ebda Store/);
+    expect(llms).toMatch(/^# Ebda AI Studio/);
     expect(llms).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
     expect(llms).toMatch(/## Not there yet/);
     expect(llms).not.toMatch(BAD);

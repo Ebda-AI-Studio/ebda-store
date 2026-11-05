@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Button, useToast } from '@ebda/ui';
 import { recommendedSizeTextForTemplate, type TemplateId } from '@ebda/shared';
 import { arrayMove } from '@dnd-kit/sortable';
@@ -16,6 +15,7 @@ import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
 import { CategorySuggestionPanel } from './CategorySuggestionPanel';
 import { useT } from '@/i18n/useT';
+import { RowActions } from '../../../../components/RowActions';
 import type { SizeChartOption } from '../../../../components/SizeChartSelect';
 
 const emptyForm: CategoryFormData = {
@@ -421,21 +421,15 @@ export default function StoreCategoriesPage() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <div className="flex gap-2">
-          <Link href={`/stores/${storeId}/tags`}>
-            <Button type="button" variant="outline">
-              {tTags('manage')}
-            </Button>
-          </Link>
-          <Link href={`/stores/${storeId}`}>
-            <Button type="button" variant="outline">
-              {t('backToStore')}
-            </Button>
-          </Link>
+        <div className="flex items-center gap-2">
+          <RowActions
+            menuLabel={t('moreMenu')}
+            items={[{ label: tTags('manage'), href: `/stores/${storeId}/tags` }]}
+          />
           <button
             type="button"
             onClick={openAddForm}
-            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
+            className="min-h-11 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
           >
             {t('addCategory')}
           </button>
@@ -564,7 +558,7 @@ export default function StoreCategoriesPage() {
               type="text"
               value={countUnitEn}
               onChange={e => setCountUnitEn(e.target.value)}
-              placeholder="pieces"
+              placeholder={t('countUnitEnSample')}
               maxLength={30}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
@@ -583,7 +577,7 @@ export default function StoreCategoriesPage() {
               dir="rtl"
               value={countUnitAr}
               onChange={e => setCountUnitAr(e.target.value)}
-              placeholder="قطعة"
+              placeholder={t('countUnitArSample')}
               maxLength={30}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
@@ -599,8 +593,8 @@ export default function StoreCategoriesPage() {
             {savingCountUnit ? tCommon('saving') : t('saveLabelButton')}
           </button>
           <span className="text-xs text-muted-foreground">
-            {t('previewLabel')} <strong>{countUnitEn || 'pieces'}</strong> /{' '}
-            <strong dir="rtl">{countUnitAr || 'قطعة'}</strong>
+            {t('previewLabel')} <strong>{countUnitEn || t('countUnitEnSample')}</strong> /{' '}
+            <strong dir="rtl">{countUnitAr || t('countUnitArSample')}</strong>
           </span>
         </div>
       </div>

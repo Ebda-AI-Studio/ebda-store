@@ -45,4 +45,26 @@ describe('built-in store lockup (G1)', () => {
     );
     expect(ar).toMatch(/aria-hidden="true"[^>]*>QAMAR/);
   });
+
+  it('PREMIUM-30: the Latin line never truncates with an ellipsis, keeps its tracking on an Arabic page, and does not shrink its box', () => {
+    const ar = renderToStaticMarkup(
+      <StoreLockup lockup={LOCKUPS['qamar.atelier']} name="Qamar" nameAr="قمر" isRtl />
+    );
+    const latin = ar.slice(ar.indexOf('aria-hidden="true"'));
+    expect(latin).not.toContain('text-ellipsis');
+    expect(latin).toContain('lang="en"'); // :lang(ar) * resets tracking; the Latin word is exempt
+    expect(latin).toContain('dir="ltr"');
+    expect(latin).not.toMatch(/margin-inline-end:calc/); // the negative end margin made the box narrower than the word
+    expect(latin).toContain('padding-inline-start:0.34em');
+  });
+
+  it('PREMIUM-30: an inline lockup stacks on a phone and returns to a row from md; the display name keeps room for its marks', () => {
+    const inline = renderToStaticMarkup(
+      <StoreLockup lockup={LOCKUPS['jasmine.bloom']} name="Jasmine" nameAr="ياسمين" isRtl />
+    );
+    expect(inline).toContain('flex-col');
+    expect(inline).toContain('md:flex-row');
+    expect(inline).toMatch(/padding-block:0\.3em/);
+    expect(inline).toMatch(/margin-block:-0\.3em/);
+  });
 });

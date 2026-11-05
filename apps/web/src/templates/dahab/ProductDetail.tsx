@@ -44,6 +44,7 @@ import {
   ZoomIcon,
   cx,
 } from './ui';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export interface DahabProductDetailProps {
   /** B2B wholesale panel (MOQ + public price breaks + the signed-in buyer's prices), rendered under the price. */
@@ -294,10 +295,12 @@ function Gallery({
         {lightbox && (
           <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 pt-16">
             {images.map((img, i) => (
-              <img
+              <ResponsiveImg
                 key={img.id ?? i}
                 src={img.url}
                 alt={img.alt || name}
+                sizes="(max-width: 896px) 100vw, 896px"
+                maxWidth={1920}
                 loading={i === selected ? 'eager' : 'lazy'}
                 className="w-full rounded-[var(--radius)]"
               />

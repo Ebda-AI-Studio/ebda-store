@@ -3,14 +3,12 @@
  * Workerd boot smoke (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot see a Worker
  * that dies at boot or on every request in workerd (2026-10-08: `Prisma.dmmf` threw -> Cloudflare
  * 1101 on every request, all Node tests green). This boots the Worker the way `wrangler deploy`
- * would build it (same config, same esbuild alias block) in a local workerd, against a REAL
- * migrated Postgres, and fails on any boot error or 5xx.
+ * would build it (same config, same esbuild alias block) in a local workerd with a local D1 directory, and fails on
+ * any boot error or 5xx. NEON-ZERO N-17 (Ruling NZ-D23): there is no Postgres, so the Worker has no HYPERDRIVE binding.
  *
- *   SMOKE_OWNER_DATABASE_URL  owner role, schema already migrated from scratch (seeds two stores)
- *   SMOKE_APP_DATABASE_URL    the non-bypass `ebda_app` login the Worker connects as
  *   node scripts/ci/workerd-smoke.mjs [--config .wrangler.deploy.jsonc] [--port 8799]
  *
- * Needs `wrangler` from the repo and `npx prisma` (to run the seed). Fake secrets only.
+ * Needs `wrangler` from the repo. Fake secrets only.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, rmSync, writeFileSync, createWriteStream, readFileSync } from 'node:fs';
@@ -63,8 +61,8 @@ export function smokeProblems(observed) {
 
 export const CHECKS = [
   { path: '/health', want: 200, check: b => safe(b)?.status === 'ok' },
-  // Tenant-scoped public read through RLS (ebda_app role): a seeded store resolves ...
-  { path: '/api/v1/public/stores/alpha', want: 200, check: b => /Alpha Store/.test(b) },
+  // A directory row that still says `pg` is a clean 410 (the Worker has no Postgres), never a 500 ...
+  { path: '/api/v1/public/stores/alpha', want: 410 },
   // ... and an unknown one is a clean 404, not a 500 and not "first store".
   { path: '/api/v1/public/stores/smoke-no-such-store', want: 404 },
   { path: '/api/v1/definitely-not-a-route', want: 404 },
@@ -95,10 +93,6 @@ async function main() {
     const i = process.argv.indexOf(`--${n}`);
     return i > 0 ? process.argv[i + 1] : undefined;
   };
-  const owner = process.env.SMOKE_OWNER_DATABASE_URL;
-  const app = process.env.SMOKE_APP_DATABASE_URL;
-  if (!owner || !app)
-    throw new Error('SMOKE_OWNER_DATABASE_URL and SMOKE_APP_DATABASE_URL are required');
   const config = arg('config') ?? 'wrangler.jsonc';
   // Before anything is written: a config with no AI line fails here, leaving no files behind.
   const smokeSource = stripImagesBinding(
@@ -106,13 +100,6 @@ async function main() {
   );
   const port = Number(arg('port') ?? 8799);
   const base = `http://127.0.0.1:${port}`;
-
-  const seed = spawnSync(
-    'npx',
-    ['prisma', 'db', 'execute', '--url', owner, '--file', path.join(API, 'scripts/cf-seed.sql')],
-    { cwd: ROOT, encoding: 'utf8' }
-  );
-  if (seed.status !== 0) throw new Error(`seed failed: ${seed.stderr || seed.stdout}`);
 
   const devVars = path.join(API, '.dev.vars');
   if (existsSync(devVars))
@@ -141,6 +128,50 @@ async function main() {
   const smokeConfig = path.join(API, '.wrangler.smoke.jsonc');
   writeFileSync(smokeConfig, smokeSource);
 
+  // The config binds the platform D1 (`PLATFORM_DB`, the per-store backend switch); a fresh local one has no `stores` table, so
+  // every store read would 503 (STORE_BACKEND_UNAVAILABLE). Apply its migrations to the same local state `wrangler dev` reads.
+  const d1 = spawnSync(
+    'npx',
+    [
+      'wrangler',
+      'd1',
+      'migrations',
+      'apply',
+      'PLATFORM_DB',
+      '--local',
+      '--config',
+      '.wrangler.smoke.jsonc',
+    ],
+    { cwd: API, encoding: 'utf8' }
+  );
+  if (d1.status !== 0) {
+    rmSync(devVars, { force: true });
+    rmSync(smokeConfig, { force: true });
+    throw new Error(`local D1 migrations failed: ${d1.stderr || d1.stdout}`);
+  }
+
+  // The store directory (slug -> id) is read from D1 only: two rows still flagged `pg` prove the 410 path.
+  const dir = spawnSync(
+    'npx',
+    [
+      'wrangler',
+      'd1',
+      'execute',
+      'PLATFORM_DB',
+      '--local',
+      '--config',
+      '.wrangler.smoke.jsonc',
+      '--command',
+      "INSERT OR REPLACE INTO stores (id, name, slug, owner_id, storage_backend) VALUES ('11111111-1111-4111-8111-111111111111', 'Alpha Store', 'alpha', '99999999-9999-4999-8999-999999999999', 'pg'), ('22222222-2222-4222-8222-222222222222', 'Bravo Store', 'bravo', '99999999-9999-4999-8999-999999999999', 'pg')",
+    ],
+    { cwd: API, encoding: 'utf8' }
+  );
+  if (dir.status !== 0) {
+    rmSync(devVars, { force: true });
+    rmSync(smokeConfig, { force: true });
+    throw new Error(`local D1 directory seed failed: ${dir.stderr || dir.stdout}`);
+  }
+
   const logPath = path.join(tmpdir(), `workerd-smoke-${process.pid}.log`);
   const log = createWriteStream(logPath);
   const child = spawn(
@@ -152,7 +183,6 @@ async function main() {
       env: {
         ...process.env,
         NO_PROXY: '127.0.0.1,localhost',
-        CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: app,
       },
     }
   );

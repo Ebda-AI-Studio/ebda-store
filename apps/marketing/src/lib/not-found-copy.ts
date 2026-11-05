@@ -1,5 +1,13 @@
 import { BRAND } from '@ebda/shared/brand';
-import { HOME, LOGIN_URL, SIGNUP_URL, demoLookUrl, pagePath, type Locale } from './site';
+import {
+  HOME,
+  STORE_HOME,
+  LOGIN_URL,
+  SIGNUP_URL,
+  demoLookUrl,
+  pagePath,
+  type Locale,
+} from './site';
 
 /**
  * The 404's words and links, both languages (Egyptian Arabic in full sentences). One static 404.html serves
@@ -47,7 +55,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         title: BRAND.company.shortNameAr,
         links: [
           { href: HOME.ar, label: 'الرئيسية' },
-          { href: pagePath('ar', 'about'), label: 'عن الاستوديو' },
+          { href: pagePath('ar', 'about'), label: 'عن ابدأ ستوديو' },
           { href: pagePath('ar', 'contact'), label: 'تواصل معانا' },
         ],
       },
@@ -55,7 +63,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         title: BRAND.product.nameAr,
         links: [
           { href: pagePath('ar', 'features'), label: 'المميزات' },
-          { href: `${HOME.ar === '/' ? '' : HOME.ar}/#pricing`, label: 'الأسعار' },
+          { href: `${STORE_HOME.ar}#pricing`, label: 'الأسعار' },
           { href: SIGNUP_URL, label: 'ابدأ متجرك' },
           { href: LOGIN_URL, label: 'دخول' },
           { href: demo, label: 'متجر تجريبي' },
@@ -64,7 +72,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
       {
         title: 'قريباً',
         links: [
-          { href: '', label: 'ابدأ واتساب', soon: true },
+          { href: '', label: 'ابدأ شات', soon: true },
           { href: '', label: 'ابدأ CRM', soon: true },
           { href: '', label: 'ابدأ ERP', soon: true },
         ],
@@ -101,7 +109,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         title: BRAND.product.nameEn,
         links: [
           { href: pagePath('en', 'features'), label: 'Features' },
-          { href: `${HOME.en}/#pricing`, label: 'Pricing' },
+          { href: `${STORE_HOME.en}#pricing`, label: 'Pricing' },
           { href: SIGNUP_URL, label: 'Start your store' },
           { href: LOGIN_URL, label: 'Log in' },
           { href: demo, label: 'Demo store' },
@@ -110,7 +118,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
       {
         title: 'Coming soon',
         links: [
-          { href: '', label: 'Ebda WhatsApp', soon: true },
+          { href: '', label: 'Ebda Chat', soon: true },
           { href: '', label: 'Ebda CRM', soon: true },
           { href: '', label: 'Ebda ERP', soon: true },
         ],

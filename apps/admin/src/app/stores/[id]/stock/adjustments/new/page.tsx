@@ -6,6 +6,9 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { Button } from '@ebda/ui';
+import Link from 'next/link';
+import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
 import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
 import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
@@ -206,7 +209,11 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         {
           header: tNew('colReason'),
           hideOnMobile: true,
-          cell: row => <span className="truncate max-w-[120px] block">{row.reason ?? '—'}</span>,
+          cell: row => (
+            <span className="truncate max-w-[120px] block" title={row.reason ?? undefined}>
+              {row.reason ?? '—'}
+            </span>
+          ),
         },
         {
           header: tNew('colStatus'),
@@ -284,7 +291,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             onChange={e => setReason(e.target.value)}
             rows={2}
             className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-            placeholder="Optional reason in English"
+            placeholder={t('reasonEnPlaceholder')}
           />
         </label>
         <label className="space-y-1" dir="rtl">
@@ -295,7 +302,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             rows={2}
             dir="rtl"
             className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-            placeholder="سبب التسوية بالعربية (اختياري)"
+            placeholder={t('reasonArPlaceholder')}
           />
         </label>
       </div>
@@ -432,7 +439,11 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         </div>
       )}
 
-      {error && <div className="text-red-600 text-sm">{error}</div>}
+      {error && (
+        <div role="alert" className="text-destructive-ink text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Actions */}
       {!importResult && (
@@ -469,14 +480,14 @@ export default function NewStockAdjustmentPage() {
   const searchParams = useSearchParams();
   const t = useT('stock.adjustments');
   const tNew = useT('stock.adjustments.new');
-  const tc = useT('common');
+  const askConfirm = useConfirm();
 
   // Pre-fill from query params (linked from inventory page)
   const prefillProductId = searchParams?.get('productId') ?? '';
   const prefillNewQty = searchParams?.get('newQty') ?? '';
 
-  // Tab state — default to CSV if no pre-fill
-  const [activeTab, setActiveTab] = useState<TabMode>(prefillProductId ? 'manual' : 'csv');
+  // Tab state: the manual form is the common job (one product, one count); CSV is the bulk path.
+  const [activeTab, setActiveTab] = useState<TabMode>('manual');
 
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [type, setType] = useState<string>('cycle_count');
@@ -565,7 +576,7 @@ export default function NewStockAdjustmentPage() {
     setError(null);
     const validItems = items.filter(it => it.productId && it.newQty !== '');
     if (validItems.length === 0) {
-      setError('Add at least one product with a quantity.');
+      setError(tNew('itemsRequired'));
       return;
     }
     setSubmitting(true);
@@ -602,9 +613,16 @@ export default function NewStockAdjustmentPage() {
     setError(null);
     const validItems = items.filter(it => it.productId && it.newQty !== '');
     if (validItems.length === 0) {
-      setError('Add at least one product with a quantity.');
+      setError(tNew('itemsRequired'));
       return;
     }
+    const ok = await askConfirm({
+      object: tNew('postObject', { count: validItems.length }),
+      consequence: tNew('postConsequence'),
+      confirmLabel: tNew('submitPost'),
+      tone: 'default',
+    });
+    if (!ok) return;
     setSubmitting(true);
     try {
       const payload = {
@@ -626,7 +644,7 @@ export default function NewStockAdjustmentPage() {
         return;
       }
       if (!data?.id) {
-        setError('Unexpected response from server.');
+        setError(tNew('unexpectedResponse'));
         return;
       }
       const { error: postError } = await apiPost(
@@ -634,7 +652,7 @@ export default function NewStockAdjustmentPage() {
         {}
       );
       if (postError) {
-        setError(`Created draft ${data.id} but posting failed: ${postError.message}`);
+        setError(tNew('postFailedAfterDraft', { error: postError.message }));
         return;
       }
       // invalidate App Router cache so the destination list re-fetches the saved row
@@ -648,21 +666,14 @@ export default function NewStockAdjustmentPage() {
   }
 
   return (
-    <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
+    <AdminLayout
+      title={tNew('title')}
+      subtitle={tNew('description')}
+      parent={{ label: t('title'), href: `/stores/${storeId}/stock/adjustments` }}
+    >
       <div className="max-w-4xl space-y-5">
         {/* Tab switcher */}
         <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1 w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveTab('csv')}
-            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
-              activeTab === 'csv'
-                ? 'bg-background shadow text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tNew('tabCsv')}
-          </button>
           <button
             type="button"
             onClick={() => setActiveTab('manual')}
@@ -673,6 +684,17 @@ export default function NewStockAdjustmentPage() {
             }`}
           >
             {tNew('tabManual')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('csv')}
+            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
+              activeTab === 'csv'
+                ? 'bg-background shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tNew('tabCsv')}
           </button>
         </div>
 
@@ -721,7 +743,7 @@ export default function NewStockAdjustmentPage() {
                   onChange={e => setReason(e.target.value)}
                   rows={3}
                   className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-                  placeholder="Optional reason in English"
+                  placeholder={t('reasonEnPlaceholder')}
                 />
               </label>
               <label className="space-y-1" dir="rtl">
@@ -732,7 +754,7 @@ export default function NewStockAdjustmentPage() {
                   rows={3}
                   dir="rtl"
                   className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-                  placeholder="سبب التسوية بالعربية (اختياري)"
+                  placeholder={t('reasonArPlaceholder')}
                 />
               </label>
             </div>
@@ -745,7 +767,7 @@ export default function NewStockAdjustmentPage() {
                 value={evidenceUrl}
                 onChange={e => setEvidenceUrl(e.target.value)}
                 className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-                placeholder="https://… (paste R2 upload URL)"
+                placeholder={tNew('evidencePlaceholder')}
               />
             </label>
 
@@ -768,38 +790,47 @@ export default function NewStockAdjustmentPage() {
               </button>
             </div>
 
-            {error && <div className="text-red-600 text-sm">{error}</div>}
-
-            {/* Submit buttons */}
-            <div className="flex gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={submitDraft}
-                disabled={submitting}
-                className="px-4 py-2 border border-border rounded text-sm disabled:opacity-50"
-              >
-                {submitting ? tc('saving') : tNew('submitDraft')}
-              </button>
-              <button
-                type="button"
-                onClick={submitPost}
-                disabled={submitting}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-              >
-                {submitting ? tc('saving') : tNew('submitPost')}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push(`/stores/${storeId}/stock/adjustments`)}
-                className="px-4 py-2 border border-border rounded text-sm"
-              >
-                {tc('cancel')}
-              </button>
-            </div>
+            {error && (
+              <div role="alert" className="text-destructive-ink text-sm">
+                {error}
+              </div>
+            )}
 
             <div className="flex items-start gap-1.5">
               <p className="text-xs text-muted-foreground">{tNew('irreversibleNote')}</p>
               <HelpTip text={tNew('glJournalTip')} />
+            </div>
+
+            {/* Create flow footer (rule 4): cancel at the start edge, draft + the irreversible primary at the end. */}
+            <div className="sticky bottom-[calc(var(--bottom-chrome))] z-20 -mx-4 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-md lg:-mx-6 lg:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Link
+                  href={`/stores/${storeId}/stock/adjustments`}
+                  className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                  {tNew('cancel')}
+                </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={submitDraft}
+                    disabled={submitting}
+                  >
+                    {tNew('submitDraft')}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="min-h-11"
+                    onClick={submitPost}
+                    disabled={submitting}
+                    isLoading={submitting}
+                  >
+                    {tNew('submitPost')}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -224,12 +224,17 @@ const GAPS = [
   opt('loose', 'Loose', 'واسع'),
   opt('xloose', 'Extra loose', 'واسع جداً'),
 ];
-const PADDING = [opt('none', 'None', 'بدون'), ...GAPS];
+const PADDING = [opt('none', 'None', 'بدون'), ...GAPS, opt('xxloose', 'Huge', 'ضخم')];
 
 /** Padding + width. Visibility is NOT a setting: it is `hidden` / `responsive.<viewport>.hidden`. */
 export const spacingSettings = (): SettingDefinition[] => [
-  settingFactories.select('paddingTop', 'Top spacing', 'المسافة العلوية', PADDING),
-  settingFactories.select('paddingBottom', 'Bottom spacing', 'المسافة السفلية', PADDING),
+  // Per device (Ruling SP-1): tablet / mobile values live in `responsive.<vp>.settings`.
+  settingFactories.select('paddingTop', 'Top spacing', 'المسافة العلوية', PADDING, {
+    responsive: ['tablet', 'mobile'],
+  }),
+  settingFactories.select('paddingBottom', 'Bottom spacing', 'المسافة السفلية', PADDING, {
+    responsive: ['tablet', 'mobile'],
+  }),
   settingFactories.select('maxWidth', 'Width', 'العرض', [
     opt('contained', 'Contained', 'محدود'),
     opt('full', 'Full width', 'كامل العرض'),
@@ -307,6 +312,11 @@ export const SETTING_OPTIONS = { SIZES, ASPECTS, SHAPES, GAPS, PADDING, opt };
  */
 export interface ThemeSettingDefinition extends Omit<SettingDefinition, 'id' | 'group'> {
   id: keyof StoreTheme;
+  /**
+   * A merchant override of a look-owned trait (TEMPLATES-MOCK-2): unset means "the look decides". The panel
+   * shows the look's own value (`traitDefault`) until the merchant picks one, and a pick can be reset.
+   */
+  trait?: boolean;
 }
 export interface ThemeSettingsGroup {
   id: 'header' | 'colors' | 'typography' | 'buttons' | 'cards' | 'spacing';
@@ -354,6 +364,39 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
         // only the Souq header turns the search into a field
         shownFor: { templates: ['souq'] },
       },
+      {
+        id: 'headerWordmark',
+        type: 'select',
+        labelEn: 'Store name without a logo',
+        labelAr: 'اسم المتجر لما مفيش شعار',
+        hintEn:
+          'Designed wordmark (large name with a spaced Latin line) or the plain name. An uploaded logo always wins.',
+        hintAr:
+          'كلمة متصمّمة (الاسم كبير وتحته سطر لاتيني متباعد) أو الاسم عادي. الشعار المرفوع بيطلع دايمًا لو موجود.',
+        options: [
+          opt('lockup', 'Designed wordmark', 'كلمة متصمّمة'),
+          opt('plain', 'Plain name', 'الاسم عادي'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'tabBar',
+        type: 'select',
+        labelEn: 'Bottom bar on phones',
+        labelAr: 'الشريط السفلي على الموبايل',
+        hintEn:
+          'The home / search / cart bar. "Not on the home page" keeps the screen clean and shows the cart bag in the header.',
+        hintAr:
+          'شريط الرئيسية والبحث والسلة. «مش في الرئيسية» بيسيب الشاشة نضيفة وبيطلّع شنطة السلة في الهيدر.',
+        options: [
+          opt('always', 'On every page', 'في كل الصفحات'),
+          opt('inner', 'Not on the home page', 'مش في الرئيسية'),
+          opt('never', 'Never', 'أبدًا'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
     ],
   },
   {
@@ -376,6 +419,34 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
     labelEn: 'Typography',
     labelAr: 'الخطوط',
     settings: [
+      {
+        id: 'headingWeight',
+        type: 'select',
+        labelEn: 'Section heading weight',
+        labelAr: 'سُمك عناوين الأقسام',
+        hintEn:
+          'Bold or regular section titles. Some display fonts have a single weight, so the look keeps those regular.',
+        hintAr:
+          'عناوين الأقسام بخط عريض أو عادي. بعض خطوط العناوين ليها سُمك واحد، فالشكل بيسيبها عادية.',
+        options: [opt('strong', 'Bold', 'عريض'), opt('regular', 'Regular', 'عادي')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'priceColour',
+        type: 'select',
+        labelEn: 'Price colour on cards',
+        labelAr: 'لون السعر على الكروت',
+        hintEn:
+          'Prices in the look accent colour (made readable on your page) or in the normal text colour.',
+        hintAr: 'الأسعار بلون الشكل المميز (متظبط يبان على صفحتك) أو بلون النص العادي.',
+        options: [
+          opt('accent', 'Accent colour', 'اللون المميز'),
+          opt('text', 'Text colour', 'لون النص'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
       {
         id: 'fontFamily',
         type: 'select',
@@ -492,6 +563,91 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
           opt('pureWhite', 'White', 'أبيض'),
           opt('brandColor', 'Brand colour', 'لون العلامة'),
         ],
+      },
+      {
+        // The look's section rhythm (`--space-unit`): scales every section whose spacing is unset.
+        // Offered as one of three feels in the Theme panel; only a store with a look reads it.
+        id: 'density',
+        type: 'select',
+        labelEn: 'Spacing between sections',
+        labelAr: 'المسافات بين الأقسام',
+        hintEn: 'Compact, regular or airy. It scales every section whose own spacing is not set.',
+        hintAr: 'ضيقة أو عادية أو واسعة. بتطبّق على كل قسم مسافاته مش مضبوطة بإيدك.',
+        options: [
+          opt('compact', 'Compact', 'ضيقة'),
+          opt('regular', 'Regular', 'عادية'),
+          opt('airy', 'Airy', 'واسعة'),
+        ],
+      },
+      {
+        id: 'cardHeart',
+        type: 'select',
+        labelEn: 'Wishlist heart on home cards',
+        labelAr: 'قلب المفضلة على كروت الرئيسية',
+        hintEn:
+          'The heart button on each product card in home page sections. Product pages keep theirs.',
+        hintAr: 'زر القلب على كل كارت منتج في أقسام الصفحة الرئيسية. صفحات المنتج بتفضل فيها.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'cardSwatches',
+        type: 'select',
+        labelEn: 'Colour dots on home cards',
+        labelAr: 'نقط الألوان على كروت الرئيسية',
+        hintEn:
+          'The small colour dots under the price. Hidden, the card stays clean; the colours still show on the product page.',
+        hintAr:
+          'النقط الصغيرة تحت السعر. لو مخفية الكارت بيفضل نضيف، والألوان بتظهر في صفحة المنتج.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'cardTags',
+        type: 'select',
+        labelEn: 'Tag chips on home cards',
+        labelAr: 'شارات التصنيف على كروت الرئيسية',
+        hintEn: 'The small outlined tags (material, origin...) on each card.',
+        hintAr: 'الشارات الصغيرة (الخامة والمنشأ...) على كل كارت.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'gridGutter',
+        type: 'select',
+        labelEn: 'Space between home cards',
+        labelAr: 'المسافة بين كروت الرئيسية',
+        hintEn:
+          'Tight (a hairline between photos, like a lookbook), regular, or airy. Home page sections only.',
+        hintAr:
+          'ضيقة (فاصل رفيع بين الصور زي اللوك بوك) أو عادية أو واسعة. أقسام الصفحة الرئيسية بس.',
+        options: [
+          opt('tight', 'Tight', 'ضيقة'),
+          opt('regular', 'Regular', 'عادية'),
+          opt('airy', 'Airy', 'واسعة'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'heroRatio',
+        type: 'select',
+        labelEn: 'Hero height on phones',
+        labelAr: 'طول الصورة الرئيسية على الموبايل',
+        hintEn:
+          'Tall portrait, square, or the wide landscape strip. Phones only; the look picks one until you do.',
+        hintAr:
+          'طويلة (بورتريه) أو مربعة أو شريط عريض. على الموبايل بس، والشكل بيختار لحد ما تختار انت.',
+        options: [
+          opt('tall', 'Tall (4:5)', 'طويلة (4:5)'),
+          opt('square', 'Square (1:1)', 'مربعة (1:1)'),
+          opt('wide', 'Wide strip', 'شريط عريض'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
       },
       themeColor('bgPage', 'Page background', 'خلفية الصفحة'),
       themeColor('bgSectionAlt', 'Alternate section background', 'خلفية الأقسام البديلة'),

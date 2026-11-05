@@ -4,6 +4,15 @@ import { jwks, signingKey } from './keys';
 
 export const ACCESS_TTL_SECONDS = 15 * 60;
 
+/**
+ * Ruling NZ-D2: the Store API trusts the signed claims on plain reads, so a merchant / staff / admin token for the `store`
+ * audience lives <= 5 minutes (every write and sensitive read asks this service live). Other audiences keep the 15 minute
+ * contract (docs/contracts/identity-token).
+ */
+export const STORE_ACCESS_TTL_SECONDS = 5 * 60;
+export const accessTtlFor = (aud: string): number =>
+  aud === 'store' ? STORE_ACCESS_TTL_SECONDS : ACCESS_TTL_SECONDS;
+
 export interface StoreClaim {
   id: string;
   role: 'owner' | 'staff';
@@ -41,10 +50,10 @@ export async function mintAccessToken(
     .setSubject(c.sub)
     .setIssuedAt(now)
     .setNotBefore(now)
-    .setExpirationTime(now + ACCESS_TTL_SECONDS)
+    .setExpirationTime(now + accessTtlFor(c.aud))
     .setJti(crypto.randomUUID())
     .sign(key.privateKey);
-  return { token, expiresAt: (now + ACCESS_TTL_SECONDS) * 1000 };
+  return { token, expiresAt: (now + accessTtlFor(c.aud)) * 1000 };
 }
 
 /** Verify one of OUR tokens (used by logout/revoke/passkey management when called with a bearer). */

@@ -276,12 +276,16 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     bar.setAttribute('role', 'dialog');
     bar.setAttribute('aria-label', t.label);
     bar.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    // Phones (<= 600px) get a compact bar: it is fixed over the content, so every pixel of height hides the page
+    // (Ruling MKT-IMPECCABLE-3). Same copy and the same 44px buttons, side by side instead of wrapped.
+    const compact =
+      typeof win.matchMedia === 'function' && win.matchMedia('(max-width:600px)').matches;
     bar.style.cssText =
-      `position:fixed;inset-inline:16px;bottom:16px;z-index:2147483000;max-width:640px;margin-inline:auto;` +
+      `position:fixed;inset-inline:${compact ? 8 : 16}px;bottom:${compact ? 8 : 16}px;z-index:2147483000;max-width:640px;margin-inline:auto;` +
       `background:${BRAND.colors.night};color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:12px;` +
-      `padding:16px;font:14px/1.6 ${BRAND.fonts.stacks.arabic};box-shadow:0 8px 32px rgba(0,0,0,.4)`;
+      `padding:${compact ? '10px 12px' : '16px'};font:${compact ? '13px/1.5' : '14px/1.6'} ${BRAND.fonts.stacks.arabic};box-shadow:0 8px 32px rgba(0,0,0,.4)`;
     const p = doc.createElement('p');
-    p.style.margin = '0 0 12px';
+    p.style.margin = compact ? '0 0 8px' : '0 0 12px';
     p.textContent = `${t.text} `;
     if (config.privacyUrl) {
       const a = doc.createElement('a');
@@ -291,13 +295,13 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
       p.appendChild(a);
     }
     const row = doc.createElement('div');
-    row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+    row.style.cssText = compact ? 'display:flex;gap:8px' : 'display:flex;gap:8px;flex-wrap:wrap';
     const mk = (label: string, primary: boolean, choice: boolean) => {
       const b = doc.createElement('button');
       b.type = 'button';
       b.textContent = label;
       b.style.cssText =
-        `min-height:44px;padding:0 18px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;` +
+        `min-height:44px;padding:0 ${compact ? 10 : 18}px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;${compact ? 'flex:1;' : ''}` +
         (primary
           ? `background:${BRAND.colors.gold};color:${BRAND.colors.night};border:0`
           : `background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4)`);

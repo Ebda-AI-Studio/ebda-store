@@ -28,6 +28,7 @@ import {
 } from '../lib/search/embedding-provider';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
+import { storeMoney } from '../lib/repo-factory';
 import { takeEmbedCalls } from '../lib/search/embed-budget';
 
 /** Must stay byte-identical across every query below: the hash is md5 of exactly this. */
@@ -139,6 +140,9 @@ export async function hasStaleProducts(storeId: string): Promise<boolean> {
 export async function storeIndexStatus(
   storeId: string
 ): Promise<{ products: number; indexed: number; stale: number; failed: number }> {
+  // Ruling NZ-PG-7: a store on its Durable Object keeps its index state there (product_vector_state); no Postgres read.
+  const money = await storeMoney(storeId);
+  if (money) return money.vectorStatus({});
   const [r] = await prisma.$queryRaw<Array<{ products: bigint; stale: bigint; failed: bigint }>>`
     SELECT count(*) AS products,
            count(*) FILTER (WHERE ${DOC_STALE} AND NOT ${quarantined(storeId)}) AS stale,

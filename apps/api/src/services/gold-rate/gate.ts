@@ -87,18 +87,27 @@ export async function loadCurrentRates(
   const out = new Map<GoldKarat, CurrentRate>();
   if (wanted.length === 0) return out;
   type Row = { karat: number; rate_id: string; rate_per_gram: number; applied_at: Date };
-  const lock =
-    opts.lock === 'update'
-      ? Prisma.sql`FOR UPDATE`
-      : opts.lock === 'share'
-        ? Prisma.sql`FOR SHARE`
-        : Prisma.empty;
-  const rows = await db.$queryRaw<Row[]>(
-    Prisma.sql`SELECT karat, rate_id, rate_per_gram, applied_at
+  // An unlocked read is a plain model read, so it also runs on a Durable Object store's rows (Ruling CF-R4-3: the cart shows
+  // the public gold facts). Only a locking read needs raw SQL: `FOR UPDATE` / `FOR SHARE` is Postgres's row lock.
+  const rows: Row[] = opts.lock
+    ? await db.$queryRaw<Row[]>(
+        Prisma.sql`SELECT karat, rate_id, rate_per_gram, applied_at
                  FROM gold_rates_current
                 WHERE store_id = ${storeId} AND karat = ANY(${wanted}::smallint[])
-                ORDER BY karat ${lock}`
-  );
+                ORDER BY karat ${opts.lock === 'update' ? Prisma.sql`FOR UPDATE` : Prisma.sql`FOR SHARE`}`
+      )
+    : (
+        await db.goldRateCurrent.findMany({
+          where: { storeId, karat: { in: [...wanted] } },
+          orderBy: { karat: 'asc' },
+          select: { karat: true, rateId: true, ratePerGram: true, appliedAt: true },
+        })
+      ).map(r => ({
+        karat: r.karat,
+        rate_id: r.rateId,
+        rate_per_gram: r.ratePerGram,
+        applied_at: r.appliedAt,
+      }));
   for (const r of rows)
     out.set(r.karat as GoldKarat, {
       karat: r.karat as GoldKarat,

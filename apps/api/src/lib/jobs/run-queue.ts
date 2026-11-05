@@ -7,6 +7,8 @@
  */
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch';
+import { decideRunForStore, guardedRun, reportRefusal, resolveRunStore } from './do-guard';
+import { FREEZE_MAX_WAITS, FREEZE_PARK_SECONDS, writesFrozen } from './freeze';
 import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,
@@ -18,8 +20,27 @@ import {
 } from './gate';
 import { getJob } from './registry';
 import { inlineStep, isNonRetriable } from './step-adapter';
-import { isJobQueueMessage, JOBS_DLQ_NAME, type JobQueueMessage } from './start';
+import {
+  isJobQueueMessage,
+  isLegacyCronMessage,
+  JOBS_DLQ_NAME,
+  type JobQueueMessage,
+  type LegacyCronMessage,
+} from './start';
 import { cfBindings } from '../../cf/bindings';
+import { sendAlert } from '../../services/alerts.service';
+import {
+  applyAuditRetry,
+  isAuditWriteRetry,
+  parkDeadAuditRow,
+  type AuditWriteRetryMessage,
+} from '../../services/audit-sink';
+import {
+  applyStoreUpdateRetry,
+  isStoreUpdateRetry,
+  type StoreUpdateRetryMessage,
+} from '../store-update-retry';
+import { isPgCopyScrub, scrubPgCustomerCopy } from '../customer-pg-scrub';
 
 const GATE_MAX_WAITS = 120;
 
@@ -52,6 +73,35 @@ export async function handleJobsBatch(batch: JobsBatchLike): Promise<void> {
 }
 
 async function handleOne(msg: QueueMessageLike): Promise<void> {
+  // Write freeze (Ruling CF-JOBS-2): the Worker parks the whole batch first (cf/queue-freeze.ts); this is the same rule
+  // for a message that reaches the handler anyway, so no path runs a job while frozen.
+  if (writesFrozen()) {
+    await parkFrozen(msg);
+    return;
+  }
+  if (isLegacyCronMessage(msg.body)) {
+    await runLegacyCron(msg, msg.body);
+    return;
+  }
+  if (isStoreUpdateRetry(msg.body)) {
+    await handleStoreUpdateRetry(msg, msg.body);
+    return;
+  }
+  if (isPgCopyScrub(msg.body)) {
+    // N-9: the erased customer's stale Postgres copy; idempotent, retried with backoff until the queue dead-letters it.
+    try {
+      await scrubPgCustomerCopy(msg.body.userId, msg.body.storeId);
+      msg.ack();
+    } catch (err) {
+      logger.warn({ err, userId: msg.body.userId }, '[jobs] pg-copy-scrub failed, will retry');
+      msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+    }
+    return;
+  }
+  if (isAuditWriteRetry(msg.body)) {
+    await handleAuditRetry(msg, msg.body);
+    return;
+  }
   if (!isJobQueueMessage(msg.body)) {
     logger.error({ id: msg.id }, '[jobs] unreadable queue message dropped');
     msg.ack();
@@ -65,6 +115,14 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
     return;
   }
   const event = body.event;
+
+  // A DO store's job that still reads/writes its Postgres tables does not run (Ruling CF-JOBS-1): alert, ack, no failure path.
+  const decision = await decideRunForStore(def, await resolveRunStore(def, event));
+  if (!decision.run) {
+    await reportRefusal(def, event, msg.id, decision);
+    msg.ack();
+    return;
+  }
 
   const deb = debounceFor(def, event);
   if (deb && body.debounceToken && !(await debounceClient.isLatest(deb, body.debounceToken))) {
@@ -83,12 +141,14 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
       }
       held.push({ gate, token });
     }
-    await def.handler({
-      event,
-      step: inlineStep({ dispatch: dispatchEventsToAll }),
-      runId: msg.id,
-      attempt: msg.attempts - 1,
-    });
+    await guardedRun(def, event, () =>
+      def.handler({
+        event,
+        step: inlineStep({ dispatch: dispatchEventsToAll }),
+        runId: msg.id,
+        attempt: msg.attempts - 1,
+      })
+    );
     msg.ack();
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
@@ -104,6 +164,48 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
     }
   } finally {
     await release(held);
+  }
+}
+
+/** Re-send the message later (no attempt spent); after 24 h of freeze it goes to the failure path, loudly. */
+async function parkFrozen(msg: QueueMessageLike): Promise<void> {
+  const body = msg.body as { frozenWaits?: number } | undefined;
+  const waits = (body?.frozenWaits ?? 0) + 1;
+  const q = cfBindings()?.JOBS_QUEUE;
+  if (waits > FREEZE_MAX_WAITS || !q) {
+    // No producer binding, or a day-long freeze: let the platform retry/DLQ path (which alerts) take over.
+    msg.retry({ delaySeconds: FREEZE_PARK_SECONDS });
+    return;
+  }
+  await q.send(
+    { ...(msg.body as object), frozenWaits: waits },
+    { contentType: 'json', delaySeconds: FREEZE_PARK_SECONDS }
+  );
+  msg.ack();
+}
+
+/** A rare legacy cron (cf/cron.ts CRON_SCHEDULE) that was parked during a freeze and now runs. */
+async function runLegacyCron(msg: QueueMessageLike, body: LegacyCronMessage): Promise<void> {
+  const { CRON_SCHEDULE } = await import('../../cf/cron.js');
+  const job = CRON_SCHEDULE[body.cron]?.find(j => j.name === body.name);
+  if (!job) {
+    logger.error(
+      { id: msg.id, name: body.name, cron: body.cron },
+      '[jobs] parked legacy cron no longer exists, dropped'
+    );
+    msg.ack();
+    return;
+  }
+  try {
+    await job.run();
+    msg.ack();
+  } catch (err) {
+    logger.error(
+      { err, name: body.name, cron: body.cron },
+      '[jobs] parked legacy cron failed, retrying'
+    );
+    if (msg.attempts > 4) msg.ack();
+    else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
   }
 }
 
@@ -145,7 +247,65 @@ async function parkForGate(msg: QueueMessageLike, body: JobQueueMessage, gate: G
 }
 
 /** Retries exhausted at the platform level (a crash loop): same failure path, once. */
+/**
+ * A post-commit D1 / DO Store write that failed once (lib/store-update-retry.ts): re-sync the CURRENT committed state with backoff (Ruling NZ-D20); otherwise the delivery is retried until the queue dead-letters it (alerted there).
+ */
+async function handleStoreUpdateRetry(
+  msg: QueueMessageLike,
+  m: StoreUpdateRetryMessage
+): Promise<void> {
+  const out = await applyStoreUpdateRetry(m, {
+    sync: async storeId => {
+      const { syncStoreEntitlement } = await import('../repo-factory.js');
+      await syncStoreEntitlement(storeId);
+    },
+  });
+  if (out === 'done') msg.ack();
+  else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+}
+
+/** An audit row that could not be written inline (services/audit-sink.ts): retried with backoff, parked + paged at the DLQ. */
+async function handleAuditRetry(msg: QueueMessageLike, m: AuditWriteRetryMessage): Promise<void> {
+  const { replayAuditRowPg } = await import('../definer.js');
+  const out = await applyAuditRetry(m, { pgInsert: replayAuditRowPg });
+  if (out === 'done') msg.ack();
+  else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+}
+
 async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
+  if (writesFrozen()) {
+    msg.retry({ delaySeconds: 3600 });
+    return;
+  }
+  if (isPgCopyScrub(msg.body)) {
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'customer.erase.pg_copy_exhausted',
+      title: 'Erased customer still has a Postgres copy: scrub retries exhausted',
+      body: `user ${msg.body.userId} store ${msg.body.storeId}: scrub the users row, tokens and passkeys by hand.`,
+      context: { userId: msg.body.userId, storeId: msg.body.storeId },
+    }).catch(() => undefined);
+    msg.ack();
+    return;
+  }
+  if (isAuditWriteRetry(msg.body)) {
+    await parkDeadAuditRow(msg.body.row);
+    msg.ack();
+    return;
+  }
+  if (isStoreUpdateRetry(msg.body)) {
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'store.update.retry_exhausted',
+      title: 'Store update retry exhausted: D1/DO still behind Postgres',
+      body: `store ${msg.body.storeId}: re-sync its plan / billing / status to D1 and the StoreDO by hand.`,
+      context: { storeId: msg.body.storeId },
+    }).catch(() => undefined);
+    msg.ack();
+    return;
+  }
   if (isJobQueueMessage(msg.body)) {
     const def = getJob(msg.body.fn);
     if (def) {

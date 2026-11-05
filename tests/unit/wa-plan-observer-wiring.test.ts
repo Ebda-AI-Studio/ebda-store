@@ -84,7 +84,7 @@ describe('wiring', () => {
   });
 
   it('no code writes catalog tables with raw SQL (it would bypass the catalog observer)', () => {
-    // Raw writers exist (stock upserts, the gold repricer): each must tell Ebda WhatsApp itself
+    // Raw writers exist (stock upserts, the gold repricer): each must tell Ebda Chat itself
     // (`notifyCatalogChanged`) or carry the waiver `wa-catalog: not-catalog-data`.
     const writers = walk(SRC).filter(f =>
       /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(products|product_variants|warehouse_stock)"?/.test(
@@ -100,12 +100,19 @@ describe('wiring', () => {
   });
 
   it('no code writes subscription / plan state with raw SQL (it would bypass the observer)', () => {
-    const raw = walk(SRC).filter(
-      f =>
+    // Waivers: `wa-plan: new-store-not-linked` (lib/store-create-do.ts: the INITIAL subscription row of a store created a moment ago
+    // on D1, no WhatsApp link to tell; the `wa-plan-sync` cron reconciles every linked store) and `wa-plan: observer notified`
+    // (a raw D1 writer, services/platform/billing-d1.ts, tells the observer itself via notifyModelWrite).
+    const raw = walk(SRC).filter(f => {
+      const t = readFileSync(f, 'utf8');
+      if (/wa-plan: new-store-not-linked/.test(t)) return false;
+      if (/wa-plan: observer notified/.test(t) && /notifyModelWrite\(/.test(t)) return false;
+      return (
         /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(store_subscriptions|store_whatsapp_consents)"?/i.test(
-          readFileSync(f, 'utf8')
-        ) || /UPDATE\s+"?stores"?\s+SET\s+"?plan"?\b/i.test(readFileSync(f, 'utf8'))
-    );
+          t
+        ) || /UPDATE\s+"?stores"?\s+SET\s+"?plan"?\b/i.test(t)
+      );
+    });
     expect(raw.map(f => path.relative(SRC, f))).toEqual([]);
   });
 });

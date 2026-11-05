@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
@@ -9,6 +10,16 @@ import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishl
 import { gateBackorderPayload } from '../lib/effective-inventory';
 import { featureService } from '../services/feature.service';
 const router = Router();
+
+/**
+ * The wishlist client of the request's store (NEON-ZERO-1 N-3): a Durable Object store's wishlist lives in its DO, a Postgres
+ * store's is the unchanged `prisma` proxy. The store comes from the `x-store-id` header; the two delete routes the storefront
+ * can call without it (known gap above) stay on Postgres, as before.
+ */
+async function wishlistDb(req: Request) {
+  const id = getStoreIdFromHeader(req);
+  return (id ? await storeWriter(id) : prisma) as unknown as typeof prisma;
+}
 
 // Helper to get store ID from request header
 function getStoreIdFromHeader(req: Request): string | null {
@@ -75,7 +86,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Find or create default wishlist for user in this store
-    let wishlist = await prisma.wishlist.findFirst({
+    let wishlist = await (
+      await wishlistDb(req)
+    ).wishlist.findFirst({
       where: { userId, storeId },
       include: {
         items: {
@@ -100,7 +113,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     });
 
     if (!wishlist) {
-      wishlist = await prisma.wishlist.create({
+      wishlist = await (
+        await wishlistDb(req)
+      ).wishlist.create({
         data: { userId, storeId },
         include: {
           items: {
@@ -170,7 +185,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const { productId } = parsed.data;
 
     // Verify product exists and belongs to this store
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       // B2B-7b: a wholesale-only product cannot be wishlisted from the anonymous storefront (404, no existence oracle)
       where: { id: productId, storeId, audience: 'public' },
     });
@@ -184,18 +201,24 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Find or create default wishlist for user in this store
-    let wishlist = await prisma.wishlist.findFirst({
+    let wishlist = await (
+      await wishlistDb(req)
+    ).wishlist.findFirst({
       where: { userId, storeId },
     });
 
     if (!wishlist) {
-      wishlist = await prisma.wishlist.create({
+      wishlist = await (
+        await wishlistDb(req)
+      ).wishlist.create({
         data: { userId, storeId },
       });
     }
 
     // Check if item already in wishlist
-    const existingItem = await prisma.wishlistItem.findFirst({
+    const existingItem = await (
+      await wishlistDb(req)
+    ).wishlistItem.findFirst({
       where: {
         wishlistId: wishlist.id,
         productId,
@@ -211,7 +234,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Add item to wishlist
-    const item = await prisma.wishlistItem.create({
+    const item = await (
+      await wishlistDb(req)
+    ).wishlistItem.create({
       data: {
         wishlistId: wishlist.id,
         productId,
@@ -263,7 +288,9 @@ router.delete('/product/:productId', async (req: Request, res: Response, next: N
       return;
     }
     const { productId } = req.params;
-    await prisma.wishlistItem.deleteMany({
+    await (
+      await wishlistDb(req)
+    ).wishlistItem.deleteMany({
       where: { productId, wishlist: { userId } },
     });
     res.json({ success: true });
@@ -286,7 +313,9 @@ router.delete('/:itemId', async (req: Request, res: Response, next: NextFunction
     const { itemId } = req.params;
 
     // Find the item and verify ownership
-    const item = await prisma.wishlistItem.findUnique({
+    const item = await (
+      await wishlistDb(req)
+    ).wishlistItem.findUnique({
       where: { id: itemId },
       include: {
         wishlist: true,
@@ -310,7 +339,9 @@ router.delete('/:itemId', async (req: Request, res: Response, next: NextFunction
     }
 
     // Delete the item
-    await prisma.wishlistItem.delete({
+    await (
+      await wishlistDb(req)
+    ).wishlistItem.delete({
       where: { id: itemId },
     });
 
@@ -355,16 +386,22 @@ router.put('/visibility', async (req: Request, res: Response, next: NextFunction
     const { isPublic } = parsedBody.data;
 
     // Find or create the wishlist and update visibility
-    let wishlist = await prisma.wishlist.findFirst({
+    let wishlist = await (
+      await wishlistDb(req)
+    ).wishlist.findFirst({
       where: { userId, storeId },
     });
 
     if (!wishlist) {
-      wishlist = await prisma.wishlist.create({
+      wishlist = await (
+        await wishlistDb(req)
+      ).wishlist.create({
         data: { userId, storeId, isPublic },
       });
     } else {
-      wishlist = await prisma.wishlist.update({
+      wishlist = await (
+        await wishlistDb(req)
+      ).wishlist.update({
         where: { id: wishlist.id, storeId },
         data: { isPublic },
       });
@@ -400,12 +437,16 @@ router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    const wishlist = await prisma.wishlist.findFirst({
+    const wishlist = await (
+      await wishlistDb(req)
+    ).wishlist.findFirst({
       where: { userId, storeId },
     });
 
     if (wishlist) {
-      await prisma.wishlistItem.deleteMany({
+      await (
+        await wishlistDb(req)
+      ).wishlistItem.deleteMany({
         where: { wishlistId: wishlist.id },
       });
     }

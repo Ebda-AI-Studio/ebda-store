@@ -7,11 +7,19 @@ import { describe, it, expect, vi } from 'vitest';
 
 const findFirst = vi.fn();
 vi.mock('@ebda/database', () => ({
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn((await import('./helpers/invoice-repo-mock')).platformTx()),
   prisma: {
     fiscalDocument: { findMany: async () => [] },
     order: { findFirst: (...a: unknown[]) => findFirst(...a) },
   },
 }));
+vi.mock('@api/lib/repo-factory', async () =>
+  (await import('./helpers/invoice-repo-mock')).repoFactoryMock()
+);
+vi.mock('@api/lib/jobs/store-db', async () =>
+  (await import('./helpers/invoice-repo-mock')).storeDbMock()
+);
 const { InvoiceService } = await import('@api/services/invoice.service');
 
 function order(settings: unknown) {

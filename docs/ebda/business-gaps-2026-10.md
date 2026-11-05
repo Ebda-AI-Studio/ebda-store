@@ -115,7 +115,7 @@ Format: _"<buyer> loses <EGP/month> to <problem>; Ebda removes it."_
 
 Context (MEASURED):
 
-- The "other products" are not built yet: Ruling PRODUCT-NAME-1 names Ebda Store as the product and Ebda WhatsApp / CRM / ERP as **future** products, with `id`, `accounts`, `hub` slugs reserved (`docs/RULINGS.md`). A shared account across products therefore cannot be proven today beyond the Store itself; what CAN be proven now is the single-product journey plus the `wa.me` hand-off.
+- The "other products" are not built yet: Ruling PRODUCT-NAME-1 names Ebda Store as the product and Ebda Chat / CRM / ERP as **future** products, with `id`, `accounts`, `hub` slugs reserved (`docs/RULINGS.md`). A shared account across products therefore cannot be proven today beyond the Store itself; what CAN be proven now is the single-product journey plus the `wa.me` hand-off.
 - `docs/ebda/launch-readiness-2026-10-05.md`: signup/email verification passed locally with captured dev mail; "Real sender/domain delivery still needs verification."
 - STATUS item 7: the human timed onboarding run (<10 min target) has not been recorded.
 

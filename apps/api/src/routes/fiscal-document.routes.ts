@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { fiscalArchiveHub, fiscalArchiveStoresHub } from '../lib/fiscal-archive-hub';
+import { hubOnD1 } from '../lib/platform-hub';
 import { z } from 'zod/v3';
 import { prisma, withUser } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
@@ -40,6 +42,8 @@ const listQuery = z.object({
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
+  /** Search by document number (INV-000042) or the number of the document a credit note reverses. */
+  q: z.string().trim().min(1).max(64).optional(),
 });
 const localeQuery = z.object({ locale: z.enum(['ar', 'en']).optional() });
 const UUID = z.string().uuid();
@@ -116,7 +120,9 @@ fiscalArchiveRoutes.get(
   ...superAdmin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const stores = await withUser(req.user!.userId, () => fiscalArchiveStores());
+      const stores = (await hubOnD1())
+        ? await fiscalArchiveStoresHub()
+        : await withUser(req.user!.userId, () => fiscalArchiveStores());
       res.json({ success: true, data: { stores } });
     } catch (error) {
       next(error);
@@ -130,7 +136,9 @@ fiscalArchiveRoutes.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = parseInput(UUID, req.params.storeId);
-      const rows = await withUser(req.user!.userId, () => fiscalArchive(storeId));
+      const rows = (await hubOnD1())
+        ? await fiscalArchiveHub(storeId)
+        : await withUser(req.user!.userId, () => fiscalArchive(storeId));
       // The list omits the payload; the HTML route renders a document from it.
       const documents = rows.map(({ payload, ...d }) => ({
         ...d,
@@ -151,7 +159,9 @@ fiscalArchiveRoutes.get(
       const storeId = parseInput(UUID, req.params.storeId);
       const docId = parseInput(UUID, req.params.docId);
       const { locale } = parseInput(localeQuery, req.query);
-      const rows = await withUser(req.user!.userId, () => fiscalArchive(storeId));
+      const rows = (await hubOnD1())
+        ? await fiscalArchiveHub(storeId)
+        : await withUser(req.user!.userId, () => fiscalArchive(storeId));
       const doc = rows.find(r => r.id === docId);
       if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
       res.type('html').send(renderFiscalDocumentHtml(doc, locale ?? 'ar'));

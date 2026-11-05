@@ -216,8 +216,9 @@ describe('lamma demo catalogue: unbranded and fictional (Rulings B4-10, B4-11)',
     expect(JSON.stringify(maker.settings)).not.toMatch(
       /om hassan|da gusto|al assriya|أم حسن|دا جوستو/i
     );
-    // the claim-like line says it is demo text
-    expect(maker.settings.hygieneAr).toContain('نص توضيحي');
+    // PREMIUM-36: real copy, no placeholder tag and no invented licence or certificate claim
+    expect(maker.settings.hygieneAr).not.toMatch(/نص توضيحي|شهادة|مرخّص/);
+    expect(maker.settings.hygiene).not.toMatch(/demo text|certificate|licensed/i);
   });
 });
 

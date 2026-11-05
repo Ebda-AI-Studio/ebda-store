@@ -132,7 +132,7 @@ export default function InsightsProductsPage() {
       cell: row =>
         row.stockOnHand !== null ? (
           <span
-            className={`font-mono ${row.stockOnHand <= 5 ? 'text-amber-600 font-semibold' : ''}`}
+            className={`font-mono ${row.stockOnHand <= 5 ? 'text-warning-ink font-semibold' : ''}`}
           >
             {row.stockOnHand}
           </span>

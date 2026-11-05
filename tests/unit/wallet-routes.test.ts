@@ -35,6 +35,7 @@ vi.mock('@api/middleware/auth', () => ({
     req.user = {
       userId: h.role.current === 'customer' ? 'cust-1' : 'admin-1',
       role: h.role.current,
+      storeId: h.role.current === 'customer' ? '11111111-1111-4111-8111-111111111111' : null,
     };
     next();
   },

@@ -22,8 +22,16 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'store-1', statementId: 'stmt-1' }),
   useRouter: () => ({ push: vi.fn() }),
 }));
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => () => Promise.resolve(true) }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
-vi.mock('@/lib/format', () => ({ minorToMajor: (n: number) => String(n) }));
+vi.mock('@/lib/format', () => ({
+  minorToMajor: (n: number) => String(n),
+  intlLocaleForUi: () => 'en-GB',
+}));
 vi.mock('@/components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));

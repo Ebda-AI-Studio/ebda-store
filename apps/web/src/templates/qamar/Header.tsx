@@ -1,5 +1,5 @@
 'use client';
-import { getLook, lockupFor, resolveHeaderChrome } from '@ebda/shared';
+import { getLook, resolveHeaderChrome, resolveLockup } from '@ebda/shared';
 import MinimalHeader from '../base/Header';
 import type { HeaderProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
@@ -18,7 +18,7 @@ export default function QamarHeader(props: HeaderProps) {
   return (
     <MinimalHeader
       {...props}
-      lockup={lockupFor(store?.look, store?.template)}
+      lockup={resolveLockup(store?.theme, store?.look, store?.template)}
       logoPlacement={placement}
       wordmarkSize={store?.theme?.wordmarkSize}
     />

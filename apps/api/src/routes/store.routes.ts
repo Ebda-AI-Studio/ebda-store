@@ -1,12 +1,20 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { storeScopeContext, tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
-import { Prisma, prisma, StoreStatus, withUser, asPlatformOperator } from '@ebda/database';
+import {
+  Prisma,
+  prisma,
+  StoreStatus,
+  currentStoreId,
+  withUser,
+  asPlatformOperator,
+} from '@ebda/database';
 import { StoreService } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
+import { toSafeStoreResponse } from '../lib/store-response';
 import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
@@ -34,13 +42,12 @@ import {
   footerBottomBarSchema,
   normalizeStoredBottomBar,
   reservedSettingsKeys,
+  ECHOED_SERVER_OWNED_KEYS,
 } from '@ebda/shared';
-import {
-  maskMarketingPixelSecrets,
-  preserveMaskedPixelSecrets,
-} from '../lib/marketing-pixels-secrets';
+import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
+import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -183,8 +190,10 @@ function addInstalmentsIssues(settings: Record<string, unknown> | undefined, ctx
  * All other keys pass through unvalidated (existing behaviour).
  */
 function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z.RefinementCtx) {
-  // Server-owned keys (e.g. the Ebda WhatsApp link) are never accepted from a client.
+  // Server-owned keys (e.g. the Ebda Chat link) are never accepted from a client.
   for (const key of reservedSettingsKeys(settings)) {
+    // BE:F-2 / S-8: a flag echoed back from a stale whole-settings copy is stripped by the service, not refused.
+    if (ECHOED_SERVER_OWNED_KEYS.includes(key)) continue;
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: [key],
@@ -629,8 +638,7 @@ router.get(
       // treated as "unchanged" (see PUT /marketing-pixels).
       const safeStore = store
         ? {
-            ...store,
-            marketingPixels: maskMarketingPixelSecrets(store.marketingPixels),
+            ...toSafeStoreResponse(store),
             // Super-admin only: how the owner found Ebda. ip / user agent / Meta ids stay server-side.
             ...(isSuperAdmin
               ? { owner: { ...store.owner, acquisition: acquisitionForAdmin(store.owner) } }
@@ -751,7 +759,7 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -807,7 +815,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -850,6 +858,10 @@ router.delete(
   }
 );
 
+const storeStatusBody = z.object({ status: z.enum(['active', 'suspended']) });
+const templateBody = z.object({ template: z.string().trim().min(1).max(40) });
+const domainBody = z.object({ domain: z.string().max(253).nullable() });
+
 // PATCH /stores/:id/status - Suspend or activate a store (super_admin only)
 router.patch(
   '/:id/status',
@@ -858,11 +870,12 @@ router.patch(
   authorize('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { status } = req.body as { status: StoreStatus };
-
-      if (!['active', 'suspended'].includes(status)) {
+      // BE:S-15: a body that is not an object (or has a non-string status) is the same 400, not a TypeError.
+      const parsedStatus = storeStatusBody.safeParse(req.body);
+      if (!parsedStatus.success) {
         throw new AppError(400, 'INVALID_STATUS', 'Status must be active or suspended');
       }
+      const status: StoreStatus = parsedStatus.data.status;
 
       // StoreService.setStatus owns the write AND the public-cache bust
       // (resolve/slug/id keys + storefront revalidate purge) — account
@@ -904,7 +917,7 @@ router.patch(
           logger.warn({ err, storeId: req.params.id }, '[store.status] audit log write failed');
         });
 
-      res.json({ success: true, data: store });
+      res.json({ success: true, data: toSafeStoreResponse(store) });
     } catch (error) {
       next(error);
     }
@@ -921,7 +934,14 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { template } = req.body;
+      const parsedTemplate = templateBody.safeParse(req.body);
+      if (
+        !parsedTemplate.success &&
+        typeof (req.body as { template?: unknown })?.template === 'string'
+      ) {
+        throw parsedTemplate.error; // present but too long / empty after trim: a 400 VALIDATION_ERROR
+      }
+      const template = parsedTemplate.success ? parsedTemplate.data.template : undefined;
 
       if (!template) {
         res.status(400).json({
@@ -935,7 +955,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1005,7 +1025,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1029,13 +1049,40 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
     }
   }
 );
+
+/**
+ * Merge a social-links body into the stored links. Keys the admin UI omits (e.g. `whatsapp`, which lives in the schema but has
+ * no UI input) are never silently wiped on save. Only keys the client explicitly SENT (present in the raw body) are updated; a
+ * sent empty value (mapped to undefined by `optionalUrl`) clears the stored value. Iterates the schema's STATIC key allowlist
+ * (never user-controlled keys) so a crafted `{"__proto__": ...}` can't reach `merged[key]`; `hasOwnProperty`, not `in`.
+ * Shared by `PUT /:id/social` and `PUT /:id/branding-bundle`.
+ */
+function mergeSocialLinks(
+  existingSocialLinks: unknown,
+  incoming: unknown,
+  rawBody: unknown
+): Prisma.InputJsonValue {
+  const existingLinks = (existingSocialLinks as Record<string, string | null> | null) ?? {};
+  const merged: Record<string, string | null | undefined> = { ...existingLinks };
+  const incomingRecord = incoming as Record<string, string | undefined>;
+  for (const key of Object.keys(socialSchema.shape)) {
+    if (!Object.prototype.hasOwnProperty.call(rawBody, key)) continue;
+    const val = incomingRecord[key];
+    if (val === undefined) {
+      delete merged[key]; // explicitly cleared (empty string -> remove)
+    } else {
+      merged[key] = val;
+    }
+  }
+  return merged as Prisma.InputJsonValue;
+}
 
 // PUT /stores/:id/social - Update store social links
 router.put(
@@ -1049,38 +1096,63 @@ router.put(
       const { id } = req.params;
       const incoming = socialSchema.parse(req.body);
 
-      // Merge with the existing socialLinks so keys the admin UI omits
-      // (e.g. `whatsapp`, which lives in the schema but has no UI input)
-      // are never silently wiped on save. Only keys the client explicitly
-      // sends (present in req.body) are updated; absent keys keep their
-      // existing values. A sent key with an empty string maps to undefined
-      // (via optionalUrl preprocessing) and clears the stored value.
       const existing = await StoreService.getById(id);
-      const existingLinks = (existing.socialLinks as Record<string, string | null> | null) ?? {};
-      const merged: Record<string, string | null | undefined> = { ...existingLinks };
-      // Iterate the schema's STATIC key allowlist (never user-controlled keys) so a
-      // crafted body like {"__proto__": ...} / {"constructor": ...} can't reach
-      // `merged[key]` — avoids remote property injection / prototype pollution.
-      // `hasOwnProperty` (not the `in` operator) keeps the "was this key sent?" check
-      // off the prototype chain. Only keys the client explicitly sent are touched;
-      // a sent empty value clears, an omitted key keeps its existing value.
-      const incomingRecord = incoming as Record<string, string | undefined>;
-      for (const key of Object.keys(socialSchema.shape)) {
-        if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
-        const val = incomingRecord[key];
-        if (val === undefined) {
-          delete merged[key]; // explicitly cleared (empty string → remove)
-        } else {
-          merged[key] = val;
-        }
-      }
+      const merged = mergeSocialLinks(existing.socialLinks, incoming, req.body);
 
-      const store = await StoreService.updateSocialLinks(id, merged as Prisma.InputJsonValue);
+      const store = await StoreService.updateSocialLinks(id, merged);
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:id/branding-bundle - the branding page's Save as ONE request (BE:F-3).
+//
+// The page used to fire five independent PUTs (branding, theme, contact, social, settings). A 429 in the middle left the store
+// half saved, with only a partial-failure toast. Every part here is optional and validated by the SAME schema as its own route.
+// `StoreService.updateBrandingBundle` applies them in ONE database transaction on a Postgres store (any failure rolls all of it
+// back); on a D1 + Durable Object store the parts apply in order and a failure leaves the earlier ones written (Ruling FP-8).
+// This router has NO request transaction (storeScopeContext), so the transaction is opened in the service, not here. `settings`
+// goes through the shallow merge of `PUT /:id` (live row, server-owned keys kept), so the page sends only the keys it owns.
+const brandingBundleSchema = z
+  .object({
+    branding: brandingSchema.optional(),
+    theme: themeSchema.optional(),
+    contact: contactSchema.optional(),
+    social: socialSchema.optional(),
+    settings: updateStoreSchema.shape.settings,
+    blogEnabled: z.boolean().optional(),
+  })
+  .strict();
+
+router.put(
+  '/:id/branding-bundle',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const body = brandingBundleSchema.parse(req.body);
+      const raw = (req.body ?? {}) as Record<string, unknown>;
+
+      const store = await StoreService.updateBrandingBundle(id, {
+        branding: body.branding,
+        theme: body.theme as Record<string, unknown> | undefined,
+        contact: body.contact,
+        social: body.social
+          ? stored => mergeSocialLinks(stored, body.social, raw.social ?? {})
+          : undefined,
+        settings: body.settings as Prisma.InputJsonValue | undefined,
+        blogEnabled: body.blogEnabled,
+      });
+      res.json({ success: true, data: { store: toSafeStoreResponse(store) } });
     } catch (error) {
       next(error);
     }
@@ -1103,7 +1175,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1150,7 +1222,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1187,7 +1259,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1222,7 +1294,7 @@ router.get(
 
       if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
-      res.json({ success: true, data: store });
+      res.json({ success: true, data: toSafeStoreResponse(store) });
     } catch (error) {
       next(error);
     }
@@ -1236,6 +1308,8 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // BE:S-9: the `seo` feature (Starter+) gates the write on the server, not only the page. Deletes stay open so a downgraded store can clean up.
+  requireFeature('seo'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -1245,7 +1319,7 @@ router.put(
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: toSafeStoreResponse(store) },
       });
     } catch (error) {
       next(error);
@@ -1282,9 +1356,7 @@ router.put(
 
       // Mask secrets again on the way back out so the response can't leak the
       // freshly-stored token.
-      const safeStore = store
-        ? { ...store, marketingPixels: maskMarketingPixelSecrets(store.marketingPixels) }
-        : store;
+      const safeStore = toSafeStoreResponse(store);
 
       res.json({
         success: true,
@@ -1417,12 +1489,16 @@ router.put(
   '/:id/domain',
   authenticate,
   requireMfaEnrolled,
+  // BE:S-2 (Ruling FP-3): repointing the live domain is not an impersonation action.
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const rawDomain = (req.body as { domain: string | null }).domain;
+      // BE:S-14: `domain` must be PRESENT (string or null). A body without it used to clear the live verified domain and its
+      // Cloudflare hostname; clearing is now an explicit `{ "domain": null }` (or "").
+      const { domain: rawDomain } = domainBody.parse(req.body);
 
       // Normalize domain: lowercase, strip www prefix, trim whitespace
       const domain = rawDomain ? normalizeDomain(rawDomain) : null;
@@ -1489,7 +1565,7 @@ router.put(
         // Clearing: drop the verified domain AND any pending claim.
         await DomainClaimService.cancelPending(id, domainSvc);
         if (oldDomain) {
-          await prisma.store.update({
+          await storeUpdate(prisma, {
             where: { id },
             data: { domain: null, domainStatus: null, domainVerifiedAt: null },
           });
@@ -1574,7 +1650,9 @@ router.get(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const faqs = await prisma.storeFaq.findMany({
+      const faqs = await (
+        await storeDb(currentStoreId())
+      ).storeFaq.findMany({
         where: { storeId: req.params.id },
         orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       });
@@ -1591,13 +1669,17 @@ router.post(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // BE:S-9: the `seo` feature (Starter+) gates the write on the server, not only the page. Deletes stay open so a downgraded store can clean up.
+  requireFeature('seo'),
   // store_faqs / store_howtos have STRICT RLS policies; this router is
   // context-less (routes/index.ts), so set the store's context per route.
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.parse(req.body);
-      const faq = await prisma.storeFaq.create({
+      const faq = await (
+        await storeWriter(currentStoreId())
+      ).storeFaq.create({
         data: {
           storeId: req.params.id,
           question: body.question,
@@ -1623,13 +1705,17 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // BE:S-9: the `seo` feature (Starter+) gates the write on the server, not only the page. Deletes stay open so a downgraded store can clean up.
+  requireFeature('seo'),
   // store_faqs / store_howtos have STRICT RLS policies; this router is
   // context-less (routes/index.ts), so set the store's context per route.
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.partial().parse(req.body);
-      const faq = await prisma.storeFaq.updateMany({
+      const faq = await (
+        await storeWriter(currentStoreId())
+      ).storeFaq.updateMany({
         where: { id: req.params.faqId, storeId: req.params.id },
         data: {
           ...(body.question !== undefined && { question: body.question }),
@@ -1644,7 +1730,9 @@ router.put(
       if (faq.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
-      const updated = await prisma.storeFaq.findUnique({
+      const updated = await (
+        await storeDb(currentStoreId())
+      ).storeFaq.findUnique({
         where: { id: req.params.faqId, storeId: req.params.id },
       });
       res.json({ success: true, data: updated });
@@ -1665,7 +1753,9 @@ router.delete(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const deleted = await prisma.storeFaq.deleteMany({
+      const deleted = await (
+        await storeWriter(currentStoreId())
+      ).storeFaq.deleteMany({
         where: { id: req.params.faqId, storeId: req.params.id },
       });
       if (deleted.count === 0) {
@@ -1708,7 +1798,9 @@ router.get(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const howtos = await prisma.storeHowto.findMany({
+      const howtos = await (
+        await storeDb(currentStoreId())
+      ).storeHowto.findMany({
         where: { storeId: req.params.id },
         orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       });
@@ -1725,13 +1817,17 @@ router.post(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // BE:S-9: the `seo` feature (Starter+) gates the write on the server, not only the page. Deletes stay open so a downgraded store can clean up.
+  requireFeature('seo'),
   // store_faqs / store_howtos have STRICT RLS policies; this router is
   // context-less (routes/index.ts), so set the store's context per route.
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = howtoSchema.parse(req.body);
-      const howto = await prisma.storeHowto.create({
+      const howto = await (
+        await storeWriter(currentStoreId())
+      ).storeHowto.create({
         data: {
           storeId: req.params.id,
           title: body.title,
@@ -1759,6 +1855,8 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // BE:S-9: the `seo` feature (Starter+) gates the write on the server, not only the page. Deletes stay open so a downgraded store can clean up.
+  requireFeature('seo'),
   // store_faqs / store_howtos have STRICT RLS policies; this router is
   // context-less (routes/index.ts), so set the store's context per route.
   tenantContext,
@@ -1766,7 +1864,9 @@ router.put(
     try {
       const body = howtoSchema.partial().parse(req.body);
       // Verify ownership before update
-      const existing = await prisma.storeHowto.findFirst({
+      const existing = await (
+        await storeDb(currentStoreId())
+      ).storeHowto.findFirst({
         where: { id: req.params.howtoId, storeId: req.params.id },
         select: { id: true },
       });
@@ -1785,7 +1885,9 @@ router.put(
       }
       if (body.orderIndex !== undefined) updateData.orderIndex = body.orderIndex;
       if (body.isActive !== undefined) updateData.isActive = body.isActive;
-      const updated = await prisma.storeHowto.update({
+      const updated = await (
+        await storeWriter(currentStoreId())
+      ).storeHowto.update({
         where: { id: req.params.howtoId, storeId: req.params.id },
         data: updateData,
       });
@@ -1807,7 +1909,9 @@ router.delete(
   tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const deleted = await prisma.storeHowto.deleteMany({
+      const deleted = await (
+        await storeWriter(currentStoreId())
+      ).storeHowto.deleteMany({
         where: { id: req.params.howtoId, storeId: req.params.id },
       });
       if (deleted.count === 0) {

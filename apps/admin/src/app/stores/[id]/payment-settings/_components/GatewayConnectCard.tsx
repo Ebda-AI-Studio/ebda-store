@@ -56,7 +56,7 @@ interface Props {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-border bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
+  'w-full rounded-lg border border-input bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
 const btnPrimary =
   'rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50';
 const btnOutline =
@@ -368,6 +368,12 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
                   <p id={`${id}-help`} className="mt-1 text-xs text-muted-foreground">
                     {f.help[locale]}
                   </p>
+                  {/* SHARIA-BNPL-1: an installment method is financed by the provider; its terms and fees apply. */}
+                  {(f.key === 'integrationId.valu' || f.key === 'integrationId.kiosk') && (
+                    <p role="note" className="mt-1 rounded-md bg-muted p-2 text-xs text-foreground">
+                      {t('bnplDisclosure')}
+                    </p>
+                  )}
                   <details className="mt-1 text-xs">
                     <summary className="cursor-pointer text-primary">{t('whereToFind')}</summary>
                     <p className="mt-1 text-muted-foreground">{f.whereToFind[locale]}</p>
@@ -604,6 +610,11 @@ function GatewayOptions({
           ))}
         </div>
       </fieldset>
+      {isKashier && methods.includes('bnpl') && (
+        <p role="note" className="rounded-md bg-muted p-2 text-xs text-foreground">
+          {t('bnplDisclosure')}
+        </p>
+      )}
       {isKashier ? (
         <div>
           <label htmlFor="kashier-display" className="mb-1 block text-xs text-muted-foreground">
@@ -663,9 +674,9 @@ function HealthChip({ config }: { config: GatewayConfig }) {
     state === 'down'
       ? 'bg-destructive/10 text-destructive-ink'
       : state === 'degraded'
-        ? 'bg-amber-100 text-amber-800'
+        ? 'bg-warning/10 text-warning-ink'
         : state === 'healthy'
-          ? 'bg-emerald-100 text-emerald-800'
+          ? 'bg-success/10 text-success-ink'
           : 'bg-muted text-muted-foreground';
   return (
     <span

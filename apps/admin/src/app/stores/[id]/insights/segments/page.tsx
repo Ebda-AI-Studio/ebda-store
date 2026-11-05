@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
+import { PageState } from '@/components/PageState';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
@@ -32,7 +33,7 @@ const SEGMENT_COLORS: Record<string, string> = {
   loyal: 'bg-blue-100 text-blue-900 border-blue-200',
   potential: 'bg-cyan-100 text-cyan-900 border-cyan-200',
   new_customer: 'bg-green-100 text-green-900 border-green-200',
-  at_risk: 'bg-amber-100 text-amber-900 border-amber-200',
+  at_risk: 'bg-warning/10 text-warning-ink border-warning/30',
   hibernating: 'bg-yellow-100 text-yellow-900 border-yellow-200',
   lost: 'bg-red-100 text-red-900 border-red-200',
 };
@@ -50,6 +51,7 @@ const SEGMENT_ICONS: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InsightsSegmentsPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.segments');
@@ -57,6 +59,7 @@ export default function InsightsSegmentsPage() {
 
   const [data, setData] = useState<SegmentsData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -66,22 +69,21 @@ export default function InsightsSegmentsPage() {
         else if (d) setData(d);
       })
       .catch(() => setError(t('loadFailed')));
-  }, [storeId, t]);
+  }, [storeId, reloadKey, t]);
 
-  if (error) {
+  if (error || !data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!data) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
+        <PageState
+          loading={!error}
+          error={error}
+          onRetry={() => {
+            setError(null);
+            setReloadKey(k => k + 1);
+          }}
+        >
+          {null}
+        </PageState>
       </AdminLayout>
     );
   }
@@ -110,7 +112,7 @@ export default function InsightsSegmentsPage() {
 
         {/* Summary */}
         {totalCustomers > 0 && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {t('totalSegmentedCustomers')}
@@ -124,7 +126,7 @@ export default function InsightsSegmentsPage() {
               <p className="text-2xl font-semibold font-mono text-green-700">
                 {minorToMajor(totalRevenue)}
               </p>
-              <p className="text-xs text-muted-foreground">EGP</p>
+              <p className="text-xs text-muted-foreground">{tc('egp')}</p>
             </div>
           </div>
         )}
@@ -173,7 +175,7 @@ export default function InsightsSegmentsPage() {
                       {t(`segment.${seg.segment}`)}
                     </h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                     <div>
                       <p className="text-xs opacity-70">{t('count')}</p>
                       <p className="font-mono font-semibold">{seg.count}</p>
@@ -181,7 +183,7 @@ export default function InsightsSegmentsPage() {
                     <div>
                       <p className="text-xs opacity-70">{t('revenue')}</p>
                       <p className="font-mono font-semibold">
-                        {minorToMajor(seg.totalMonetaryFils)} EGP
+                        {minorToMajor(seg.totalMonetaryFils)} {tc('egp')}
                       </p>
                       <p className="text-xs opacity-60">
                         {t('shareOfTotal', { pct: revSharePct })}

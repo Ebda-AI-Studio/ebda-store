@@ -25,6 +25,7 @@ import {
 } from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
 import { insertAuditLog } from '../lib/definer';
+import { currentImpersonator } from '../lib/impersonation-context';
 
 import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 // ==========================================
@@ -1528,6 +1529,25 @@ export const uploadLimiter = rateLimit({
   },
 });
 
+// Catalogue import: uploads per STORE per hour (a staff pile-on or a looping client cannot spend a
+// store's AI budget). Keyed on the store from the route, never the body. The page ledger and the
+// active-jobs cap are the money-side limits; this is the request-rate side.
+export const catalogImportStoreLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'catalog-import-store'),
+  windowMs: 60 * 60 * 1000,
+  max: parseInt(process.env.CATALOG_IMPORT_UPLOADS_PER_HOUR || '10', 10),
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many imports this hour, try again later.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTest,
+  keyGenerator: req => `store:${req.params.storeId || 'unknown'}`,
+  validate: { keyGeneratorIpFallback: false },
+});
+
 // Daily upload limit per user
 export const dailyUploadLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'upload-daily'),
@@ -1882,6 +1902,20 @@ export interface AuditLogEntry {
   storeId?: string;
   ip?: string;
   userAgent?: string;
+  /**
+   * The super_admin acting through an impersonation session. Normally NOT passed: `auditLog` fills it from the request's
+   * impersonation scope (lib/impersonation-context.ts) and stores it in `details.impersonatedBy` (BE:S-2).
+   */
+  impersonatedBy?: string;
+}
+
+function withImpersonator(entry: AuditLogEntry): Record<string, unknown> {
+  const details: Record<string, unknown> = entry.details
+    ? JSON.parse(JSON.stringify(entry.details))
+    : {};
+  const by = entry.impersonatedBy ?? currentImpersonator();
+  if (by && details.impersonatedBy === undefined) details.impersonatedBy = by;
+  return details;
 }
 
 export async function auditLog(entry: AuditLogEntry) {
@@ -1907,7 +1941,7 @@ export async function auditLog(entry: AuditLogEntry) {
         storeId: entry.storeId,
         resourceType: entry.resourceType,
         resourceId: entry.resourceId,
-        details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
+        details: withImpersonator(entry),
         ip: entry.ip,
         userAgent: entry.userAgent,
       })

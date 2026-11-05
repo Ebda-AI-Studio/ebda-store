@@ -37,6 +37,7 @@ vi.mock('@ebda/database', () => ({
   },
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
   runInStoreScope: (_s: string, fn: () => unknown) => fn(),
+  withStore: async (_s: string, fn: (tx: unknown) => unknown) => fn(holder.prisma),
   onClosedTenantTxAccess: () => undefined,
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
@@ -50,6 +51,9 @@ vi.mock('@api/middleware/auth', () => ({
 }));
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),
+}));
+vi.mock('@api/middleware/feature-gate', () => ({
+  requireFeature: () => (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/security', () => ({
   auditLog: vi.fn(),

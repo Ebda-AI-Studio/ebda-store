@@ -146,6 +146,42 @@ export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern:
     file: 'packages/shared/src/looks/compose.ts',
     pattern: /theme\?\.headerSearch/,
   },
+  'theme/headerWordmark': {
+    file: 'packages/shared/src/looks/compose.ts',
+    pattern: /theme\?\.headerWordmark/,
+  },
+  'theme/cardHeart': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /cardHeart/,
+  },
+  'theme/cardSwatches': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /cardSwatches/,
+  },
+  'theme/cardTags': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /cardTags/,
+  },
+  'theme/gridGutter': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /gridGutter/,
+  },
+  'theme/headingWeight': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /headingWeight/,
+  },
+  'theme/priceColour': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /priceColour/,
+  },
+  'theme/tabBar': {
+    file: 'packages/shared/src/looks/compose.ts',
+    pattern: /theme\?\.tabBar/,
+  },
+  'theme/heroRatio': {
+    file: 'packages/shared/src/looks/mock-tokens.ts',
+    pattern: /theme\?\.heroRatio/,
+  },
   'testimonials/verifiedOnly': {
     file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /layout\.testimonials\.verifiedOnly/,

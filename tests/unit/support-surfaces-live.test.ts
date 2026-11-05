@@ -1,7 +1,8 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { acquireSiteBuildLock } from '../helpers/site-build-lock';
 
 /**
  * help.ebda.app, docs.ebda.app and status.ebda.app are each their own live host (6c): master-brand titles
@@ -11,9 +12,16 @@ import path from 'node:path';
 const ROOT = path.resolve(__dirname, '../..');
 const read = (...p: string[]) => readFileSync(path.join(ROOT, ...p), 'utf8');
 
+// the help/docs builds wipe and rewrite out/; another test file building them in parallel would delete our pages mid-read
+let releaseBuildLock: () => void = () => {};
+beforeAll(async () => {
+  releaseBuildLock = await acquireSiteBuildLock();
+}, 650_000);
+afterAll(() => releaseBuildLock());
+
 describe.each([
-  ['help', 'Ebda AI Studio Help', 'مركز مساعدة ابدأ استوديو للذكاء الاصطناعي'],
-  ['docs', 'Ebda AI Studio Docs', 'وثائق ابدأ استوديو للذكاء الاصطناعي'],
+  ['help', 'Ebda AI Studio Help', 'مركز مساعدة ابدأ ستوديو'],
+  ['docs', 'Ebda AI Studio Docs', 'وثائق ابدأ ستوديو'],
 ] as const)('%s.ebda.app', (app, titleEn, titleAr) => {
   const out = (...p: string[]) => path.join(ROOT, 'apps', app, 'out', ...p);
   beforeAll(() => {
@@ -80,15 +88,37 @@ describe('deploy workflows (production only, verified after deploy)', () => {
   }
 });
 
+describe('docs.ebda.app Ebda Chat section (LAUNCH-SUITE-1)', () => {
+  it('four pages build in English at /whatsapp/<slug>/ and Arabic at /ar/whatsapp/<slug>/, linked and listed', () => {
+    const slugs = ['overview', 'connect-your-number', 'api', 'webhooks'];
+    const out = (...p: string[]) => path.join(ROOT, 'apps/docs/out', ...p);
+    for (const s of slugs) {
+      expect(existsSync(out('whatsapp', s, 'index.html')), `en ${s}`).toBe(true);
+      expect(existsSync(out('ar', 'whatsapp', s, 'index.html')), `ar ${s}`).toBe(true);
+    }
+    const ar = readFileSync(out('ar', 'whatsapp', 'api', 'index.html'), 'utf8');
+    expect(ar).toContain('dir="rtl"');
+    expect(ar).toContain('hreflang="en" href="https://docs.ebda.app/whatsapp/api/"');
+    expect(readFileSync(out('whatsapp', 'overview', 'index.html'), 'utf8')).toContain('Ebda Chat');
+    const map = readFileSync(out('sitemap.xml'), 'utf8');
+    expect(map).toContain('https://docs.ebda.app/whatsapp/webhooks/');
+    expect(map).toContain('https://docs.ebda.app/ar/whatsapp/webhooks/');
+    // Arabic pages link to Arabic pages, never to the English twin by accident
+    expect(readFileSync(out('ar', 'whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
+      'href="/ar/whatsapp/api/"'
+    );
+  });
+});
+
 describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
-  it('Ebda WhatsApp guides build at /whatsapp/<slug>/ in both locales, with a sidebar group and a home section', () => {
+  it('Ebda Chat guides build at /whatsapp/<slug>/ in both locales, with a sidebar group and a home section', () => {
     const ar = readdirSync(path.join(ROOT, 'apps/help/content/ar/whatsapp')).filter(f =>
       f.endsWith('.mdx')
     );
     const en = readdirSync(path.join(ROOT, 'apps/help/content/en/whatsapp')).filter(f =>
       f.endsWith('.mdx')
     );
-    expect(ar.length).toBe(13);
+    expect(ar.length).toBe(14);
     expect(ar).toEqual(en); // parity: same slugs in both locales
     const out = (...p: string[]) => path.join(ROOT, 'apps/help/out', ...p);
     for (const f of ar) {
@@ -97,7 +127,7 @@ describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
       expect(existsSync(out('en', 'whatsapp', slug, 'index.html')), `en ${slug}`).toBe(true);
     }
     const page = readFileSync(out('en', 'whatsapp', 'ai-agent', 'index.html'), 'utf8');
-    expect(page).toContain('Ebda WhatsApp'); // eyebrow + sidebar group
+    expect(page).toContain('Ebda Chat'); // eyebrow + sidebar group
     expect(readFileSync(out('index.html'), 'utf8')).toContain('id="p-whatsapp"');
     expect(readFileSync(out('sitemap.xml'), 'utf8')).toContain(
       'https://help.ebda.app/whatsapp/ai-agent/'

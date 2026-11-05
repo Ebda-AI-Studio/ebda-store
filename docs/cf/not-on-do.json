@@ -1,0 +1,39 @@
+{
+  "note": "Ruling CF-FINAL-1. tests/unit/do-not-on-do-guard.test.ts keeps `refusals` EQUAL to what the code refuses (a new 501 or *_NOT_ON_DO fails the build until it is listed here or removed). `postgresOnly` lists flows a Durable Object store still runs against Postgres (no 501, so the scan cannot see them). A store may be flipped to `do` only when `node scripts/cf/not-on-do.mjs` exits 0. R4 (Ruling CF-R4-1) removed ORDER_SEARCH_NOT_ON_DO; manual orders, cart pricing, newsletter_subscribers and the abandoned-cart jobs were never refusals (CF-R2-1 section 5 named them as still on Postgres) and now run on the DO (CF-R4-2..5). R6a (Rulings CF-R6A-1 .. CF-R6A-3) moved the then-last three Postgres-only flows onto the DO: the admin command-palette search, the e-mail campaign send and the shopper account erasure. R6b (CF-R6B-1) found three more (the accounting flows, the barcode scan stock flows, the product bulk-update inventory field) and R7 (Ruling CF-R7-1) ported them; the list is empty again. JOBS (Rulings CF-JOBS-4, CF-JOBS-4; CF-JOBS-4 served 32 of the non-money jobs and left `accounting-expense-ocr-process` as a written blocker): `jobsRefused` are the MONEY jobs still refused for a DO store (they close the gate), `jobsAccepted` the non-money jobs also refused (P1 alert; counted, listed, do not close the gate until Ahmad rules otherwise), `sweepSkips` the ported cron sweeps with no alarm. tests/unit/do-not-on-do-guard.test.ts keeps all three EQUAL to job-data.ts / jobs-map.ts / alarm-flag.ts.",
+  "refusals": [
+    {
+      "code": "STORE_FILTER_UNSUPPORTED",
+      "file": "apps/api/src/lib/repo-factory.ts",
+      "reason": "NEON-ZERO-1 (Ruling NZ-D8): a Store write/read shape the Durable Object path does not serve yet; the caller needs its own port (plan N-18/N-19). Refused loudly, never a Postgres fallback."
+    },
+    {
+      "code": "STORE_READ_UNSUPPORTED",
+      "file": "apps/api/src/lib/repo-factory.ts",
+      "reason": "NEON-ZERO-1 (Ruling NZ-D8): a Store write/read shape the Durable Object path does not serve yet; the caller needs its own port (plan N-18/N-19). Refused loudly, never a Postgres fallback."
+    },
+    {
+      "code": "STORE_WRITE_UNSUPPORTED",
+      "file": "apps/api/src/lib/repo-factory.ts",
+      "reason": "NEON-ZERO-1 (Ruling NZ-D8): a Store write/read shape the Durable Object path does not serve yet; the caller needs its own port (plan N-18/N-19). Refused loudly, never a Postgres fallback."
+    },
+    {
+      "code": "STORE_TX_UNSUPPORTED",
+      "file": "apps/api/src/services/store.service.ts",
+      "reason": "NEON-ZERO-1 (Ruling NZ-D8): a Store write/read shape the Durable Object path does not serve yet; the caller needs its own port (plan N-18/N-19). Refused loudly, never a Postgres fallback."
+    },
+    {
+      "code": "STORE_TX_WRITE_UNSUPPORTED",
+      "file": "apps/api/src/lib/repo-factory.ts",
+      "reason": "NEON-ZERO-1 (Ruling NZ-D18): a Store update for a Durable Object store inside a database transaction has no post-commit hook on this path (storeUpdate) or is a compare-and-set that cannot be deferred (storeUpdateMany); the caller needs its own port (plan N-18/N-19/N-26). Refused loudly, never applied before the commit."
+    },
+    {
+      "code": "CUSTOMER_WRITE_UNSUPPORTED",
+      "file": "apps/api/src/services/customer-group.service.ts",
+      "reason": "NEON-ZERO-1 group B (#430, integration row 33): assigning a customer to a group on a Durable Object store needs the customer directory write (N-9); refused loudly, never a Postgres fallback."
+    }
+  ],
+  "postgresOnly": [],
+  "jobsRefused": [],
+  "jobsAccepted": [],
+  "sweepSkips": []
+}

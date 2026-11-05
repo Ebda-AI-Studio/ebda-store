@@ -1,9 +1,11 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+
 import { config } from '../../../config';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk } from '../batch-utils';
+import type { StoreReads } from '../../repo-factory';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
 import { StoreMailer } from '../../../services/store-mailer.service';
@@ -13,6 +15,7 @@ import { sendAlert } from '../../../services/alerts.service';
 import {
   CAMPAIGN_STORE_SELECT,
   buildCampaignAudience,
+  inCampaignStore,
   storeCampaignDailyCap,
   campaignThrottleMs,
   listUnsubscribeHeaders,
@@ -81,9 +84,9 @@ async function loadSendContext(
   storeId: string,
   campaignId: string
 ): Promise<{ campaign: CampaignForSend | null; store: CampaignStoreContext | null }> {
-  return runInTenantContext(storeId, async () => {
-    const [campaign, store] = await Promise.all([
-      prisma.campaign.findFirst({
+  const [campaign, store] = await Promise.all([
+    inCampaignStore(storeId, db =>
+      db.campaign.findFirst({
         where: { id: campaignId, storeId },
         select: {
           status: true,
@@ -93,17 +96,20 @@ async function loadSendContext(
           bodyHtmlAr: true,
           localeStrategy: true,
         },
-      }),
-      prisma.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT }),
-    ]);
-    return { campaign, store: store as CampaignStoreContext | null };
-  });
+      })
+    ),
+    // `Store` is platform data on both backends (Ruling CF-WRITES-2)
+    withStoreDb(storeId, db =>
+      db.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT })
+    ),
+  ]);
+  return { campaign, store: store as CampaignStoreContext | null };
 }
 
 /** Every still-`queued` recipient of the campaign → failed(reason). */
 async function failQueuedRecipients(storeId: string, campaignId: string, reason: string) {
-  return runInTenantContext(storeId, () =>
-    prisma.campaignRecipient.updateMany({
+  return inCampaignStore(storeId, (_db, w) =>
+    w.campaignRecipient.updateMany({
       where: { campaignId, storeId, status: 'queued' },
       data: { status: 'failed', error: reason },
     })
@@ -117,13 +123,14 @@ async function failQueuedRecipients(storeId: string, campaignId: string, reason:
  * status write and `onFailure` (#1952) can persist it on its own.
  */
 async function computeRecipientCounts(
+  db: StoreReads,
   storeId: string,
   campaignId: string
 ): Promise<{ recipientCount: number; sentCount: number; failedCount: number }> {
   const [recipientCount, sentCount, failedCount] = await Promise.all([
-    prisma.campaignRecipient.count({ where: { campaignId, storeId } }),
-    prisma.campaignRecipient.count({ where: { campaignId, storeId, sentAt: { not: null } } }),
-    prisma.campaignRecipient.count({ where: { campaignId, storeId, status: 'failed' } }),
+    db.campaignRecipient.count({ where: { campaignId, storeId } }),
+    db.campaignRecipient.count({ where: { campaignId, storeId, sentAt: { not: null } } }),
+    db.campaignRecipient.count({ where: { campaignId, storeId, status: 'failed' } }),
   ]);
   return { recipientCount, sentCount, failedCount };
 }
@@ -182,8 +189,8 @@ const campaignSendFn = inngest.createFunction(
       const data = (event?.data?.event?.data ?? {}) as SendEventData;
       const { campaignId, storeId, scheduledAt } = data;
       if (!campaignId || !storeId || !scheduledAt) return;
-      const updated = await runInTenantContext(storeId, () =>
-        prisma.campaign.updateMany({
+      const updated = await inCampaignStore(storeId, (_db, w) =>
+        w.campaign.updateMany({
           where: {
             id: campaignId,
             storeId,
@@ -199,9 +206,9 @@ const campaignSendFn = inngest.createFunction(
         // recipientCount/sentCount/failedCount stuck at their pre-run value
         // (often 0) while the admin's recipients tab already showed the true
         // counts via its own live groupBy — the two admin surfaces disagreed.
-        await runInTenantContext(storeId, async () => {
-          const counts = await computeRecipientCounts(storeId, campaignId);
-          await prisma.campaign.updateMany({ where: { id: campaignId, storeId }, data: counts });
+        await inCampaignStore(storeId, async (db, w) => {
+          const counts = await computeRecipientCounts(db, storeId, campaignId);
+          await w.campaign.updateMany({ where: { id: campaignId, storeId }, data: counts });
         });
       }
       logger.error({ campaignId, storeId, marked: updated.count }, '[CAMPAIGN] send job failed');
@@ -219,8 +226,8 @@ const campaignSendFn = inngest.createFunction(
     //    yet (the event is sent inside it) — throw so THIS step retries; a
     //    memoized draft result would otherwise be replayed on every retry.
     const initial = await step.run('load', async () => {
-      const c = await runInTenantContext(storeId, () =>
-        prisma.campaign.findFirst({
+      const c = await inCampaignStore(storeId, db =>
+        db.campaign.findFirst({
           where: { id: campaignId, storeId },
           select: { status: true, scheduledAt: true },
         })
@@ -243,8 +250,8 @@ const campaignSendFn = inngest.createFunction(
     // 3. Claim scheduled → sending, atomically and only for this request.
     //    A cancel during the wait leaves it `cancelled` and nothing is sent.
     const claimed = await step.run('claim', () =>
-      runInTenantContext(storeId, async () => {
-        const r = await prisma.campaign.updateMany({
+      inCampaignStore(storeId, async (_db, w) => {
+        const r = await w.campaign.updateMany({
           where: { id: campaignId, storeId, status: 'scheduled', scheduledAt: nonce },
           data: { status: 'sending' },
         });
@@ -258,13 +265,13 @@ const campaignSendFn = inngest.createFunction(
       const { campaign, store } = await loadSendContext(storeId, campaignId);
       if (!campaign || !store) return { aborted: 'CAMPAIGN_OR_STORE_MISSING' as const };
 
-      const audience = await runInTenantContext(storeId, () => buildCampaignAudience(storeId));
-      const alreadySent = await runInTenantContext(storeId, () => sentInLast24h(storeId));
-      const dailyCap = await runInTenantContext(storeId, () => storeCampaignDailyCap(storeId));
+      const audience = await inCampaignStore(storeId, () => buildCampaignAudience(storeId));
+      const alreadySent = await inCampaignStore(storeId, () => sentInLast24h(storeId));
+      const dailyCap = await storeCampaignDailyCap(storeId);
       const remaining = Math.max(0, dailyCap - alreadySent);
       const abort = async (reason: string) => {
-        await runInTenantContext(storeId, () =>
-          prisma.campaign.updateMany({
+        await inCampaignStore(storeId, (_db, w) =>
+          w.campaign.updateMany({
             where: { id: campaignId, storeId, status: 'sending' },
             data: { status: 'failed', lastError: reason, recipientCount: audience.length },
           })
@@ -275,8 +282,8 @@ const campaignSendFn = inngest.createFunction(
       if (audience.length > remaining) return { aborted: await abort('DAILY_CAP_EXCEEDED') };
 
       // Link a CRM customer by email, for display only (never widens consent).
-      const customers = await runInTenantContext(storeId, () =>
-        prisma.customer.findMany({
+      const customers = await inCampaignStore(storeId, db =>
+        db.customer.findMany({
           where: {
             storeId,
             email: { in: audience.map(a => a.email), mode: 'insensitive' },
@@ -290,8 +297,8 @@ const campaignSendFn = inngest.createFunction(
       }
 
       const storeLang = storeDefaultLanguage(store);
-      await runInTenantContext(storeId, async () => {
-        await prisma.campaignRecipient.createMany({
+      await inCampaignStore(storeId, async (_db, w) => {
+        await w.campaignRecipient.createMany({
           data: audience.map(a => ({
             campaignId,
             storeId,
@@ -302,7 +309,7 @@ const campaignSendFn = inngest.createFunction(
           })),
           skipDuplicates: true,
         });
-        await prisma.campaign.update({
+        await w.campaign.update({
           where: { id: campaignId, storeId },
           data: { recipientCount: audience.length },
         });
@@ -316,9 +323,9 @@ const campaignSendFn = inngest.createFunction(
 
     // 5. Stable id list (memoized), then crash-resumable batches.
     const ids: string[] = await step.run('list-queued', () =>
-      runInTenantContext(storeId, async () =>
+      inCampaignStore(storeId, async db =>
         (
-          await prisma.campaignRecipient.findMany({
+          await db.campaignRecipient.findMany({
             where: { campaignId, storeId, status: 'queued' },
             select: { id: true },
             orderBy: { createdAt: 'asc' },
@@ -354,18 +361,27 @@ const campaignSendFn = inngest.createFunction(
           deferred = true;
           break;
         }
-        const r = await runInTenantContext(storeId, () =>
-          prisma.campaignRecipient.findFirst({
+        // The subscriber is read by id, not through a relation: a DO store has no relation join (Ruling CF-R6A-2).
+        const r = await inCampaignStore(storeId, async db => {
+          const row = await db.campaignRecipient.findFirst({
             where: { id: recipientId, campaignId, storeId },
             select: {
               id: true,
               email: true,
               locale: true,
               status: true,
-              subscriber: { select: { isActive: true, unsubscribedAt: true } },
+              subscriberId: true,
             },
-          })
-        );
+          });
+          if (!row) return null;
+          const subscriber = row.subscriberId
+            ? await db.newsletterSubscriber.findFirst({
+                where: { id: row.subscriberId, storeId },
+                select: { isActive: true, unsubscribedAt: true },
+              })
+            : null;
+          return { ...row, subscriber };
+        });
         // Idempotency guard: anything already sent, failed or unsubscribed
         // (or erased since) is never mailed again.
         if (!r || r.status !== 'queued') {
@@ -376,8 +392,8 @@ const campaignSendFn = inngest.createFunction(
         // subscriber who unsubscribed (via another campaign's link) or was
         // erased while this campaign was queued is skipped, never mailed.
         if (!r.subscriber || !r.subscriber.isActive || r.subscriber.unsubscribedAt) {
-          await runInTenantContext(storeId, () =>
-            prisma.campaignRecipient.updateMany({
+          await inCampaignStore(storeId, (_db, w) =>
+            w.campaignRecipient.updateMany({
               where: { id: r.id, storeId, status: 'queued' },
               data: { status: 'unsubscribed', error: 'CONSENT_WITHDRAWN_BEFORE_SEND' },
             })
@@ -418,8 +434,8 @@ const campaignSendFn = inngest.createFunction(
           // skipped on the retry.
           if (err instanceof EmailSendError && err.isRateLimit) throw err;
           const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
-          await runInTenantContext(storeId, () =>
-            prisma.campaignRecipient.updateMany({
+          await inCampaignStore(storeId, (_db, w) =>
+            w.campaignRecipient.updateMany({
               where: { id: r.id, storeId, status: 'queued' },
               data: { status: 'failed', error: message },
             })
@@ -439,8 +455,8 @@ const campaignSendFn = inngest.createFunction(
 
         // Not inside the try: if this write fails the step retries, the row
         // is still `queued`, and the idempotency key makes the resend a no-op.
-        await runInTenantContext(storeId, () =>
-          prisma.campaignRecipient.updateMany({
+        await inCampaignStore(storeId, (_db, w) =>
+          w.campaignRecipient.updateMany({
             where: { id: r.id, storeId, status: 'queued' },
             data: {
               status: 'sent',
@@ -483,9 +499,9 @@ const campaignSendFn = inngest.createFunction(
     ) {
       leftoverSteps += 1;
       const left: string[] = await step.run(`leftover-list-${pass}`, () =>
-        runInTenantContext(storeId, async () =>
+        inCampaignStore(storeId, async db =>
           (
-            await prisma.campaignRecipient.findMany({
+            await db.campaignRecipient.findMany({
               where: { campaignId, storeId, status: 'queued' },
               select: { id: true },
               orderBy: { createdAt: 'asc' },
@@ -523,19 +539,19 @@ const campaignSendFn = inngest.createFunction(
     // (the same shape `onFailure` uses) and a P1 names the campaign — only
     // while the campaign is still `sending`, so a cancel keeps its own reason.
     const finalized = await step.run('finalize', () =>
-      runInTenantContext(storeId, async () => {
-        const live = await prisma.campaign.findFirst({
+      inCampaignStore(storeId, async (db, w) => {
+        const live = await db.campaign.findFirst({
           where: { id: campaignId, storeId, status: 'sending' },
           select: { id: true },
         });
         const stranded = live
-          ? await prisma.campaignRecipient.updateMany({
+          ? await w.campaignRecipient.updateMany({
               where: { campaignId, storeId, status: 'queued' },
               data: { status: 'failed', error: 'SEND_WINDOW_EXHAUSTED' },
             })
           : { count: 0 };
-        const counts = await computeRecipientCounts(storeId, campaignId);
-        const done = await prisma.campaign.updateMany({
+        const counts = await computeRecipientCounts(db, storeId, campaignId);
+        const done = await w.campaign.updateMany({
           where: { id: campaignId, storeId, status: 'sending' },
           data: {
             ...counts,
@@ -546,7 +562,7 @@ const campaignSendFn = inngest.createFunction(
         });
         if (done.count === 0) {
           // Cancelled mid-send: keep `cancelled`, record what did go out.
-          await prisma.campaign.updateMany({ where: { id: campaignId, storeId }, data: counts });
+          await w.campaign.updateMany({ where: { id: campaignId, storeId }, data: counts });
         }
         return { ...counts, stranded: stranded.count };
       })

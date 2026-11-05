@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { z } from 'zod/v3';
-import { authenticate, authorize } from '../middleware/auth';
+import { storeDb, storeRepo } from '../lib/repo-factory';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { shippingCarrierRouteContext } from '../middleware/tenant-context';
 import { requireFeature } from '../middleware/feature-gate';
@@ -21,6 +23,7 @@ import {
 import { assertMayConfigureCarrier } from '../services/carriers/carrier-connection.service';
 import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 
 const router = Router();
 
@@ -204,6 +207,7 @@ router.get(
 router.put(
   '/:storeId/shipping-carriers/configs/:carrier',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, carrier } = req.params;
@@ -297,6 +301,7 @@ router.put(
 router.delete(
   '/:storeId/shipping-carriers/configs/:carrier',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, carrier } = req.params;
@@ -454,7 +459,9 @@ router.post(
 
       // Find the shipment for this order
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { orderId, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { orderId, storeId } });
 
       if (!existing) {
         res.status(404).json({
@@ -506,7 +513,9 @@ router.get(
     try {
       const { storeId, id } = req.params;
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -604,7 +613,9 @@ router.post(
       const { storeId, id } = req.params;
       const { status, restock } = manualStatusSchema.parse(req.body);
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -632,6 +643,7 @@ router.post(
 router.post(
   '/:storeId/shipping-carriers/webhook-secret/:carrier/rotate',
   ...adminMiddleware,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, carrier } = req.params;
@@ -731,7 +743,13 @@ router.get(
       const { storeId, id } = req.params;
       const { prisma } = await import('@ebda/database');
 
-      const shipment = await prisma.shipment.findFirst({
+      // A DO store cannot join the platform `customer` (a User): the order's customerId is read and the customer attached
+      // from Postgres, so the response has the same shape on either backend (Ruling CF-R6B-1).
+      const onDo = (await storeRepo(storeId)).backend === 'do';
+      const customerSelect = { email: true, firstName: true, lastName: true } as const;
+      const shipment = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({
         where: { id, storeId },
         include: {
           order: {
@@ -739,11 +757,24 @@ router.get(
               orderNumber: true,
               status: true,
               total: true,
-              customer: { select: { email: true, firstName: true, lastName: true } },
+              ...(onDo ? { customerId: true } : { customer: { select: customerSelect } }),
             },
           },
         },
       });
+      if (shipment && onDo) {
+        const o = shipment.order as unknown as Record<string, unknown> | null;
+        const customerId = o?.customerId as string | null | undefined;
+        if (o) {
+          const doCustomer = customerId ? await customerRow(storeId, customerId) : undefined;
+          o.customer = !customerId
+            ? null
+            : doCustomer !== undefined
+              ? doCustomer
+              : await prisma.user.findFirst({ where: { id: customerId }, select: customerSelect });
+          delete o.customerId;
+        }
+      }
 
       if (!shipment) {
         res.status(404).json({
@@ -774,7 +805,9 @@ router.post(
 
       // Verify the shipment belongs to this store
       const { prisma } = await import('@ebda/database');
-      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({ where: { id, storeId } });
 
       if (!existing) {
         res.status(404).json({
@@ -805,6 +838,7 @@ router.post(
 router.get(
   '/public/:storeId/orders/:orderId/tracking',
   authenticate,
+  requireCustomerStoreMatch,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
@@ -831,10 +865,11 @@ router.get(
       // this check a store_admin from Store A could read tracking for
       // any Order under Store B by changing :storeId in the URL.
       if (user?.role === 'customer') {
+        // Another customer's order answers exactly like a missing one: no existence oracle.
         if (order.customerId !== user.userId) {
-          res.status(403).json({
+          res.status(404).json({
             success: false,
-            error: { code: 'FORBIDDEN', message: 'Access denied' },
+            error: { code: 'NOT_FOUND', message: 'Order not found' },
           });
           return;
         }
@@ -854,7 +889,9 @@ router.get(
         return;
       }
 
-      const shipment = await prisma.shipment.findFirst({
+      const shipment = await (
+        await storeDb(storeId)
+      ).shipment.findFirst({
         // a booking that failed or is in flight is the merchant's business, not the customer's
         where: { orderId, storeId, status: { notIn: ['creation_failed', 'creating'] } },
         select: {

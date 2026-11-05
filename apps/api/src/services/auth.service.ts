@@ -20,6 +20,7 @@ import {
   deleteUserTokens,
   findUserIdByEmail,
   getUserState,
+  insertAuditLog,
   purgeRefreshTokens,
   refreshTokenUser,
   revokeUserSessionsRow,
@@ -52,6 +53,7 @@ import {
   lockAccountConsent,
   phoneOnOwnOrder,
   revokeForPhoneChangeInTx,
+  revokeForPhoneChange,
 } from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
@@ -60,9 +62,20 @@ import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { sendAlert } from './alerts.service';
 import { SEND_CAP_WINDOW_MS } from './campaign.service';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
 import { emitEbdaConversion } from './ebda-ads-emit';
+import { signSessionTokens } from './session-tokens';
+import {
+  clientForScopedToken,
+  customerAuthRoute,
+  type CustomerAuthClient,
+} from '../lib/customer-auth';
+import { doStoreIdList, hasStoresOnBackend, storeDo } from '../lib/store-backend';
+import { scrubOrEnqueue } from '../lib/customer-pg-scrub';
+import { CustomerAuthFlows, type DoCustomer } from './customer-auth-flows';
+import { verifyRefreshJwt } from '../middleware/security';
 
 interface TokenPayload {
   userId: string;
@@ -379,6 +392,25 @@ export class AuthService {
   }) {
     const storeId = data.storeId ?? null;
 
+    // N-9: a DO store's customers live in its StoreDO (marker on); otherwise Postgres, refused while frozen for the copy.
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') {
+      let first = data.firstName;
+      let last = data.lastName;
+      if (data.name && !first) {
+        const parts = data.name.trim().split(' ');
+        first = parts[0];
+        last = parts.slice(1).join(' ') || '';
+      }
+      return CustomerAuthFlows.register(route.client, {
+        email: data.email,
+        password: data.password,
+        firstName: first || '',
+        lastName: last || '',
+        language: data.language,
+      });
+    }
+
     // Check if user exists in the target scope. Customers in different
     // stores can share an email — the lookup must use the composite key.
     // `users` is under strict RLS: a storefront registration is read inside the
@@ -601,6 +633,10 @@ export class AuthService {
   static async verifyEmail(
     token: string
   ): Promise<{ success: boolean; message: string; registrationEventId?: string }> {
+    // N-9: a token minted for a DO store carries its store id (lib/customer-auth.ts).
+    const doClient = await clientForScopedToken(token);
+    if (doClient) return CustomerAuthFlows.verifyEmail(doClient, token);
+
     // Hash the provided token
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -665,6 +701,11 @@ export class AuthService {
       return { success: true, message: 'Email already verified' };
     }
 
+    // N-9: refused (503) while the store's rows are frozen for the copy; and a pre-flip link of a store now served by its StoreDO
+    // is invalid, never "verified" in the stale Postgres copy while the live account is unchanged.
+    if ((await customerAuthRoute(tokenUser.storeId, { write: true })).kind === 'do')
+      throw new AppError(400, 'TOKEN_INVALID', 'Invalid verification token');
+
     // Update user as verified and mark token as used
     await withUser(
       verificationToken.userId,
@@ -722,6 +763,9 @@ export class AuthService {
     email: string,
     storeId: string | null = null
   ): Promise<{ success: boolean; message: string }> {
+    if (typeof email !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') return CustomerAuthFlows.resend(route.client, email);
     const user = await findUserInScope(
       email,
       storeId,
@@ -787,6 +831,17 @@ export class AuthService {
     // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
     // exact-case key let an attacker reset the 5-per-15-min budget by
     // re-casing the address (Ebda SP5 review).
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') return CustomerAuthFlows.login(route.client, email, password, ip);
+    // No store: the admin namespace (merchants, staff, super admins), whose credentials live in the identity service. The answer
+    // does not depend on the email or the password, so it needs no Postgres lookup and reveals nothing about any account.
+    if (storeId === null && (await hasStoresOnBackend('do')) && !(await hasStoresOnBackend('pg')))
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
+
     const lockoutKey = loginGate.lockoutKey(email, storeId);
     await loginGate.assertNotLocked(lockoutKey);
 
@@ -933,6 +988,11 @@ export class AuthService {
         'Sign in through the Ebda AI Studio account service'
       );
     }
+
+    // N-9: a passkey completion for a StoreDO customer mints its refresh row in the DO.
+    const issueRoute = await customerAuthRoute(user.storeId, { write: true });
+    if (issueRoute.kind === 'do')
+      return CustomerAuthFlows.issueSession(issueRoute.client, user as unknown as DoCustomer);
 
     const tokens = await this.generateTokens({
       userId: user.id,
@@ -1130,6 +1190,14 @@ export class AuthService {
   }
 
   static async refreshTokens(refreshToken: string): Promise<AuthTokens> {
+    // N-9: the (verified) refresh JWT names the store; a DO store on the marker rotates inside its StoreDO.
+    const claims = verifyRefreshJwt(refreshToken, { ignoreExpiration: true });
+    const refreshRoute = await customerAuthRoute(
+      typeof claims?.storeId === 'string' ? claims.storeId : null,
+      { write: true }
+    );
+    if (refreshRoute.kind === 'do' && claims)
+      return CustomerAuthFlows.refresh(refreshRoute.client, refreshToken, claims as never);
     // Hash the token to look it up
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
@@ -1414,10 +1482,30 @@ export class AuthService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    // N-9: a DO store's refresh rows are its DO's (expired and long-revoked ones; the DO alarm does the same nightly). The
+    // Postgres definer is asked ONLY while a `pg` store exists: with every store on D1 / a DO there is nothing in Postgres to
+    // purge, and the cron must not need it.
+    let total = 0;
+    for (const storeId of await doStoreIdList()) {
+      const route = await customerAuthRoute(storeId, { write: true });
+      if (route.kind !== 'do') continue;
+      try {
+        total += (await route.client.call<{ deleted: number }>('purge', {})).deleted;
+      } catch (err) {
+        // a closed store keeps its rows as a retained record (Ruling NZ-D15); anything else fails the job
+        if (!(err instanceof AppError && err.code === 'STORE_CLOSED')) throw err;
+      }
+    }
+    if (!(await hasStoresOnBackend('pg'))) {
+      if (total > 0)
+        logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows (DO stores)');
+      return total;
+    }
+
     // `refresh_tokens` is user-keyed under RLS; the cross-user purge is the
     // `ebda_refresh_tokens_purge` definer, which only the named platform job
     // 'token-retention' may call (`withSystemJob`).
-    const total = await purgeRefreshTokens(now, thirtyDaysAgo);
+    total += await purgeRefreshTokens(now, thirtyDaysAgo);
     if (total > 0) {
       logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows');
     }
@@ -1425,6 +1513,14 @@ export class AuthService {
   }
 
   static async logout(refreshToken: string): Promise<void> {
+    const claims = verifyRefreshJwt(refreshToken, { ignoreExpiration: true });
+    const route = await customerAuthRoute(
+      typeof claims?.storeId === 'string' ? claims.storeId : null,
+      {
+        write: true,
+      }
+    );
+    if (route.kind === 'do') return CustomerAuthFlows.logout(route.client, refreshToken);
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     // Mark instead of delete so a stolen copy of the same token replayed
     // after logout still triggers the reuse-detection path in
@@ -1441,7 +1537,13 @@ export class AuthService {
     );
   }
 
-  static async getProfile(userId: string) {
+  static async getProfile(userId: string, scope?: { storeId?: string | null }) {
+    const route = await customerAuthRoute(scope?.storeId, { write: false });
+    if (route.kind === 'do') {
+      const u = await route.client.call<DoCustomer | null>('getProfile', { userId });
+      if (!u) throw new AppError(404, 'NOT_FOUND', 'User not found');
+      return CustomerAuthFlows.toProfile(u);
+    }
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -1475,8 +1577,20 @@ export class AuthService {
 
   static async updateProfile(
     userId: string,
-    data: { firstName?: string; lastName?: string; phone?: string }
+    data: { firstName?: string; lastName?: string; phone?: string },
+    tenant?: { storeId?: string | null }
   ) {
+    const route = await customerAuthRoute(tenant?.storeId, { write: true });
+    if (route.kind === 'do') {
+      // WA-CONSENT-1: the old number's consent ends with the number. Revoked FIRST; a failed revoke aborts the update.
+      if (data.phone !== undefined) {
+        const cur = await route.client.call<DoCustomer | null>('getProfile', { userId });
+        if (cur?.phone && toE164(cur.phone) !== toE164(data.phone))
+          await revokeForPhoneChange(route.client.storeId, userId, cur.phone);
+      }
+      const r = await route.client.call<{ user: DoCustomer }>('updateProfile', { userId, ...data });
+      return CustomerAuthFlows.toProfile(r.user);
+    }
     // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one needs
     // a fresh tick and proof). For a store customer the revoke and the phone write are ONE transaction
     // holding the account's consent lock, the same lock a grant takes, so a grant can never land on a
@@ -1534,7 +1648,29 @@ export class AuthService {
     });
   }
 
-  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    scope?: { storeId?: string | null }
+  ) {
+    const route = await customerAuthRoute(scope?.storeId, { write: true });
+    if (route.kind === 'do') {
+      // One DO section: verify the current password, set the new hash, drop every passkey, bump the version, revoke every session.
+      const r = await CustomerAuthFlows.changePassword(
+        route.client,
+        userId,
+        currentPassword,
+        newPassword
+      );
+      await pushTokenVersion(userId, r.tokenVersion, 'auth.changePassword.setTokenVersion');
+      await announcePasskeyPurge({
+        user: { ...r.user, storeId: route.client.storeId },
+        count: r.purgedPasskeys,
+        reason: 'password_changed',
+      });
+      return;
+    }
     // Needs the hash to verify the CURRENT password — opt back in by name.
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
@@ -1593,8 +1729,41 @@ export class AuthService {
    */
   static async revokeAllSessions(
     userId: string,
-    reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all'
+    reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all',
+    scope?: { storeId?: string | null }
   ): Promise<void> {
+    // No scope given (admin suspend, MFA change, any sibling path): resolve the customer's store from the user row, so a DO-served
+    // customer is revoked in its DO and never only in a stale Postgres row (security review of 5bd6aac92).
+    let scopeStoreId = scope?.storeId ?? null;
+    if (!scopeStoreId) {
+      // Fail CLOSED: if the store cannot be resolved the revocation might belong to a DO-served customer, and reporting success
+      // after revoking only a stale Postgres row is the exact bug this guards. 503, retryable.
+      let st: Awaited<ReturnType<typeof getUserState>> = null;
+      try {
+        st = await getUserState(userId);
+      } catch (err) {
+        logger.error(
+          { err, userId },
+          '[auth.revokeAllSessions] user lookup failed; refusing to revoke blind'
+        );
+        throw new AppError(
+          503,
+          'REVOCATION_UNAVAILABLE',
+          'Could not resolve the account to revoke; retry',
+          {
+            retryable: true,
+          }
+        );
+      }
+      if (st?.role === 'customer') scopeStoreId = st.storeId;
+    }
+    const route = await customerAuthRoute(scopeStoreId, { write: true });
+    if (route.kind === 'do') {
+      // The DO is the revocation authority: the bump and the refresh revocation are one section; the cache push follows.
+      const r = await route.client.call<{ tokenVersion: number }>('revokeAll', { userId, reason });
+      await pushTokenVersion(userId, r.tokenVersion, 'auth.revokeAllSessions.setTokenVersion');
+      return;
+    }
     // Atomically increment tokenVersion and read the new value — and revoke the
     // user's merchant MCP keys in EVERY store they hold one for. One definer call
     // (`ebda_user_revoke_sessions`): it runs inside the caller's transaction (so
@@ -1674,6 +1843,78 @@ export class AuthService {
   }
 
   /**
+   * Operator / merchant status change of a CUSTOMER served by a StoreDO: status + version bump + revocation of every session in
+   * ONE DO section, then the cache push. Returns false when the customer is not DO-served (the caller keeps its Postgres write).
+   * Throws if the store is DO-served and the DO does not know the customer: a Postgres-only write there would leave it active.
+   */
+  static async setCustomerStatusOnDo(
+    userId: string,
+    storeId: string | null,
+    status: 'active' | 'inactive' | 'suspended'
+  ): Promise<boolean> {
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind !== 'do') return false;
+    const r = await route.client.call<{ tokenVersion: number }>('setStatus', { userId, status });
+    await pushTokenVersion(userId, r.tokenVersion, 'auth.setCustomerStatus.setTokenVersion');
+    return true;
+  }
+
+  /**
+   * Store-scoped status change of a customer (suspend / deactivate / reactivate): the DO when the store is DO-served (status +
+   * session revocation in one section), else the Postgres row followed by `revokeAllSessions`. Used by the store-scoped customer
+   * route; a customer unknown to the store is a 404.
+   */
+  static async setCustomerStatus(
+    userId: string,
+    storeId: string,
+    status: 'active' | 'inactive' | 'suspended'
+  ): Promise<void> {
+    if (await AuthService.setCustomerStatusOnDo(userId, storeId, status)) return;
+    const before = await withStore(storeId, tx =>
+      tx.user.findFirst({
+        where: { id: userId, storeId, role: 'customer' },
+        select: { status: true },
+      })
+    );
+    if (!before) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+    await withStore(storeId, tx =>
+      tx.user.update({ where: { id: userId, storeId }, data: { status } })
+    );
+    await AuthService.revokeAllSessions(userId, 'revoke_all', { storeId });
+  }
+
+  /**
+   * Store-scoped deactivation (soft delete) of a customer: sessions end NOW. DO: one section (`softDelete`) then the cache push;
+   * Postgres: deletedAt then `revokeAllSessions`. Returns the phone for the caller's WhatsApp-consent withdrawal.
+   */
+  static async softDeleteCustomer(
+    userId: string,
+    storeId: string
+  ): Promise<{ phone: string | null }> {
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') {
+      const r = await route.client.call<{ tokenVersion: number; phone: string | null }>(
+        'softDelete',
+        { userId }
+      );
+      await pushTokenVersion(userId, r.tokenVersion, 'auth.softDelete.setTokenVersion');
+      return { phone: r.phone };
+    }
+    const before = await withStore(storeId, tx =>
+      tx.user.findFirst({
+        where: { id: userId, storeId, role: 'customer' },
+        select: { phone: true },
+      })
+    );
+    if (!before) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+    await withStore(storeId, tx =>
+      tx.user.update({ where: { id: userId, storeId }, data: { deletedAt: new Date() } })
+    );
+    await AuthService.revokeAllSessions(userId, 'revoke_all', { storeId });
+    return { phone: before.phone ?? null };
+  }
+
+  /**
    * Create a single-use password-set/reset token for a known account and store
    * its hash as a `reset:<hash>` RefreshToken row (redeemed by `resetPassword`,
    * same as a self-service "forgot password"). Only the SHA-256 is stored; the
@@ -1723,6 +1964,9 @@ export class AuthService {
     email: string,
     storeId: string | null = null
   ): Promise<{ userId: string } | null> {
+    if (typeof email !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
+    const route = await customerAuthRoute(storeId, { write: true });
+    if (route.kind === 'do') return CustomerAuthFlows.requestReset(route.client, email);
     // Tenant-scoped lookup so a Store A reset request doesn't leak the
     // existence of an account on Store B with the same email.
     const user = await findUserInScope(
@@ -1789,6 +2033,26 @@ export class AuthService {
    * reset proves control of the inbox, not of the second factor.
    */
   static async resetPassword(token: string, newPassword: string): Promise<{ userId: string }> {
+    const doClient = await clientForScopedToken(token);
+    if (doClient) {
+      const r = await CustomerAuthFlows.resetPassword(doClient, token, newPassword);
+      await pushTokenVersion(r.userId, r.tokenVersion, 'auth.resetPassword.setTokenVersion');
+      await announcePasskeyPurge({
+        user: {
+          id: r.userId,
+          email: r.email,
+          firstName: r.firstName,
+          language: r.language,
+          storeId: doClient.storeId,
+        },
+        count: r.purgedPasskeys,
+        reason: 'password_reset',
+      });
+      await accountLockout
+        .unlockAccount(`${doClient.storeId}:${r.email.trim().toLowerCase()}`)
+        .catch(err => logger.warn({ err, userId: r.userId }, 'lockout clear after reset failed'));
+      return { userId: r.userId };
+    }
     // Hash the provided token. The lookup below is an equality match on this
     // SHA-256 digest, never on the plaintext: a timing difference in the
     // index walk can only leak bits of a hash of 256 random bits, which says
@@ -1817,6 +2081,16 @@ export class AuthService {
 
     if (!storedToken) {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
+    }
+
+    // N-9: a pre-flip (Postgres) link of a customer whose store is now served by its StoreDO must NOT write the stale Postgres
+    // copy and report "reset" while the live account is unchanged: it is simply invalid (the customer asks for a new link).
+    // For a store still on Postgres this is the freeze guard (retryable 503 while its rows are copied).
+    const resetUser = await getUserState(storedToken.userId);
+    if (resetUser?.storeId) {
+      const r = await customerAuthRoute(resetUser.storeId, { write: true });
+      if (r.kind === 'do')
+        throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
     }
 
     // Hash new password (slow) BEFORE claiming the token, so the claim and the
@@ -1926,8 +2200,14 @@ export class AuthService {
    */
   static async eraseAccount(
     userId: string,
-    opts: { scopeStoreId?: string; actorId?: string } = {}
+    opts: { scopeStoreId?: string; actorId?: string; storeHint?: string | null } = {}
   ): Promise<EraseOutcome> {
+    // N-9: a customer served by the StoreDO is erased there (store rows AND the auth rows), with no Postgres transaction.
+    const hint = opts.storeHint ?? opts.scopeStoreId;
+    const doRoute = hint
+      ? await customerAuthRoute(hint, { write: true })
+      : ({ kind: 'pg' } as const);
+    if (doRoute.kind === 'do') return AuthService.eraseOnDo(doRoute.client, userId, opts);
     const actorId = opts.actorId ?? 'system';
     const eraseUserSelect = {
       id: true,
@@ -1971,6 +2251,57 @@ export class AuthService {
       throw new AppError(404, 'NOT_FOUND', 'Customer not found');
     }
 
+    // A shopper of a store on its Durable Object: the store-owned rows (orders, reviews, wallet, carts, consents, campaign mail,
+    // CRM copy) live there, so they are erased there, in ONE section, BEFORE the Postgres transaction below (Ruling CF-R6A-3).
+    // The Postgres transaction still runs for the platform rows and for the pre-cutover copy of the same data, which is erased
+    // too; a retry after a failure in either half converges because both are idempotent.
+    const doMoney = user.storeId ? ((await storeRepo(user.storeId)).money ?? null) : null;
+    let doErase: Awaited<ReturnType<NonNullable<typeof doMoney>['eraseShopper']>> | undefined;
+    let doProvenBuyerKey: string | undefined;
+    if (doMoney && user.storeId) {
+      const proofStore = opts.scopeStoreId ?? user.storeId;
+      const key = await buyerKeyForErasure(user.phone);
+      doProvenBuyerKey =
+        key &&
+        user.phone &&
+        (await phoneOnOwnOrder(
+          proofStore,
+          userId,
+          user.phone,
+          (await storeDb(user.storeId)) as never
+        ))
+          ? key
+          : undefined;
+      doErase = await doMoney.eraseShopper({
+        userId,
+        role: user.role,
+        email: user.email,
+        phone: user.phone,
+        smsPhoneKey: smsConsentPhoneKey(user.phone),
+        provenBuyerKey: doProvenBuyerKey ?? null,
+        actorId,
+        capWindowMs: SEND_CAP_WINDOW_MS,
+      });
+      // the wallet audit row Postgres writes for a self-service / cron erasure (a merchant-scoped one writes none)
+      if (
+        opts.scopeStoreId === undefined &&
+        (doErase.walletForfeited > 0 || doErase.walletNotesScrubbed)
+      )
+        await insertAuditLog({
+          action: 'customer.wallet.erased',
+          userId: actorId !== 'system' ? actorId : null,
+          storeId: user.storeId,
+          resourceType: 'user',
+          resourceId: userId,
+          details: {
+            actor: actorId,
+            reason: 'account_erasure',
+            forfeitedFils: doErase.walletForfeited,
+            notesScrubbed: doErase.walletNotesScrubbed,
+          },
+        });
+    }
+
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
     const anonymizedAddressJson = { anonymized: true } as const;
 
@@ -1999,7 +2330,7 @@ export class AuthService {
       )
     ).map(s => s.playerId);
 
-    // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
+    // The suite buyer key of this person's phone (Ebda Chat contract `customer.erased`), taken
     // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
     const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
@@ -2032,8 +2363,9 @@ export class AuthService {
       const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
       if (!consentStoreId)
         throw new Error('[auth.eraseAccount] no store id for the consent erasure');
-      eraseProvenBuyerKey =
-        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
+      eraseProvenBuyerKey = doMoney
+        ? (doErase?.provenBuyerKey ?? undefined)
+        : buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
           ? buyerKey
           : undefined;
 
@@ -2055,12 +2387,17 @@ export class AuthService {
         where: { customerId: userId, storeId: eraseStoreId },
         select: { id: true, buyerKey: true, createdAt: true },
       });
+      // a DO store's orders are the DO's (the Postgres rows are only the pre-cutover copy)
       ciScope = {
         storeId: eraseStoreId,
-        orderIds: ownOrders.map(o => o.id),
-        buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+        orderIds: doErase ? doErase.orderIds : ownOrders.map(o => o.id),
+        buyerKeys: doErase
+          ? doErase.buyerKeys
+          : [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
         // The prefix pass starts at the sink's partition day of the first order minus a margin (lib/ci/layout.ts).
-        sinceDay: ciSinceDay(ownOrders.map(o => o.createdAt)),
+        sinceDay: doErase
+          ? ciSinceDay(doErase.since == null ? [] : [new Date(doErase.since)])
+          : ciSinceDay(ownOrders.map(o => o.createdAt)),
       };
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
@@ -2142,10 +2479,12 @@ export class AuthService {
       // the anonymized account can no longer sign in to spend it, and leaving
       // it would overstate the merchant's outstanding store-credit liability
       // forever. Runs on this erasure transaction, so it is atomic with it.
-      await WalletService.forfeitOnErasure(userId, tx, {
-        storeId: opts.scopeStoreId ?? null,
-        actorId,
-      });
+      // (a DO store's wallet was forfeited in the DO section above; the Postgres copy of it is not a live balance)
+      if (!doErase)
+        await WalletService.forfeitOnErasure(userId, tx, {
+          storeId: opts.scopeStoreId ?? null,
+          actorId,
+        });
 
       // Merchant-CRM copy of the same identity (`customers` +
       // `customer_addresses`). Without this the shopper's name, email,
@@ -2335,7 +2674,7 @@ export class AuthService {
         },
       });
       // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
-      // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
+      // account. The consent observer announces the resulting `false` to Ebda Chat.
       // (the proof, `eraseProvenBuyerKey`, was computed at the START of this transaction, before the order scrub)
       await WhatsAppConsentService.eraseForAccount(tx, consentStoreId, userId, eraseProvenBuyerKey);
 
@@ -2404,6 +2743,24 @@ export class AuthService {
       );
     }
 
+    // The merchant-CRM result of a DO store is the DO's (the Postgres pass above only erased the pre-cutover copy).
+    if (doErase) {
+      outcome.crmChecked = doErase.crmChecked;
+      outcome.crmRowsScrubbed = doErase.crmRowsScrubbed;
+      outcome.crmAmbiguous = doErase.crmAmbiguous;
+      // The receipt screenshots (private R2) go after the commits: an object delete before the erasure is final would lose
+      // the evidence of a rolled-back one. Each miss is retried by the retention sweep (the rows are marked scrubbed).
+      if (user.storeId && doErase.receiptIds.length > 0) {
+        const receiptStore = user.storeId;
+        const receiptIds = doErase.receiptIds;
+        void deferAfterTenantCommit('auth.eraseAccount.receipt-images', () =>
+          InstapayReceiptService.deleteImages(receiptStore, receiptIds)
+        ).catch(err =>
+          logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')
+        );
+      }
+    }
+
     // Push the bumped token version into the tv cache the authenticate
     // middleware reads FIRST — a warm cache still holding the old version
     // would keep accepting the old access tokens (the cache key has no TTL).
@@ -2446,10 +2803,10 @@ export class AuthService {
     // may still roll back. `deferAfterTenantCommit` fires it after COMMIT and
     // DROPS it if the transaction failed. Outside a request (self-service,
     // retention cron) it runs inline, unchanged.
-    void deferAfterTenantCommit('auth.eraseAccount.propagate', () =>
-      inngest.send({
+    void deferAfterTenantCommit('auth.eraseAccount.propagate', async () => {
+      await inngest.send({
         name: 'account/erased',
-        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
+        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda Chat erase the
         // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
         data: {
           userId,
@@ -2459,12 +2816,126 @@ export class AuthService {
           ciProven,
           ciScope,
         },
-      })
-    ).catch(err =>
+      });
+      // The DO's saved erasure scope is NOT finalized here: enqueue is not execution. The job's last step does it once
+      // every propagation succeeded (Ruling CF-OPUS-1); the nightly alarm purges it after the TTL if the job never does.
+    }).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );
 
     return outcome;
+  }
+
+  /**
+   * Erasure of a customer served by the StoreDO (N-9). The store-owned rows (orders, wallet, carts, consents, CRM copy) are
+   * erased by the DO's own `eraseShopper` section (Ruling CF-R6A-3), the auth rows by `eraseCustomer`; nothing touches
+   * Postgres. Both are idempotent, so a retry after a failure in either converges.
+   */
+  private static async eraseOnDo(
+    client: CustomerAuthClient,
+    userId: string,
+    opts: { scopeStoreId?: string; actorId?: string }
+  ): Promise<EraseOutcome> {
+    const actorId = opts.actorId ?? 'system';
+    const storeId = client.storeId;
+    if (opts.scopeStoreId !== undefined && opts.scopeStoreId !== storeId)
+      throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+    const user = await client.call<DoCustomer | null>('getProfile', { userId });
+    if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    const doMoney = (await storeRepo(storeId)).money;
+    if (!doMoney)
+      throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend is unavailable');
+    const db = await storeDb(storeId);
+    const oneSignalPlayerIds =
+      (
+        await (db as any).oneSignalSubscription
+          ?.findMany({ where: { userId }, select: { playerId: true } })
+          .catch(() => [])
+      )?.map((x: { playerId: string }) => x.playerId) ?? [];
+    const key = await buyerKeyForErasure(user.phone);
+    const provenKey =
+      key && user.phone && (await phoneOnOwnOrder(storeId, userId, user.phone, db as never))
+        ? key
+        : undefined;
+    const doErase = await doMoney.eraseShopper({
+      userId,
+      role: user.role,
+      email: user.email,
+      phone: user.phone,
+      smsPhoneKey: smsConsentPhoneKey(user.phone),
+      provenBuyerKey: provenKey ?? null,
+      actorId,
+      capWindowMs: SEND_CAP_WINDOW_MS,
+    });
+    const auth = await client.call<{ erased: boolean; tokenVersion: number | null }>(
+      'eraseCustomer',
+      { userId }
+    );
+    if (auth.tokenVersion !== null)
+      await pushTokenVersion(userId, auth.tokenVersion, 'auth.eraseAccount.revoke-sessions');
+    // The stale Postgres copy of the same person goes too (queued + P1 if Postgres is unreachable).
+    await scrubOrEnqueue(userId, storeId);
+    if (doErase.receiptIds.length > 0)
+      void InstapayReceiptService.deleteImages(storeId, doErase.receiptIds).catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')
+      );
+    if (user.avatar)
+      void deleteR2ObjectIfOrphan(user.avatar, { ownerStoreId: storeId }).catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
+      );
+    const eraseProvenBuyerKey = doErase.provenBuyerKey ?? undefined;
+    void inngest
+      .send({
+        name: 'account/erased',
+        data: {
+          userId,
+          oneSignalPlayerIds,
+          storeId,
+          buyerKey: eraseProvenBuyerKey,
+          ciProven: eraseProvenBuyerKey ? { storeId, buyerKeys: [eraseProvenBuyerKey] } : undefined,
+          ciScope: {
+            storeId,
+            orderIds: doErase.orderIds,
+            buyerKeys: doErase.buyerKeys,
+            sinceDay: ciSinceDay(doErase.since == null ? [] : [new Date(doErase.since)]),
+          },
+        },
+      })
+      .catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
+      );
+    return {
+      crmChecked: doErase.crmChecked,
+      crmRowsScrubbed: doErase.crmRowsScrubbed,
+      crmAmbiguous: doErase.crmAmbiguous,
+    };
+  }
+
+  /**
+   * Data portability for a StoreDO customer: the auth slice (profile + passkey LABELS, never a hash or key) plus every
+   * customer-pii table of the store DO, found by the same registry the PDPL job uses (cf/erasure/registry.ts).
+   */
+  private static async exportOnDo(client: CustomerAuthClient, userId: string) {
+    const acct = await client.call<{ profile: unknown; passkeys: unknown[] } | null>(
+      'exportCustomer',
+      { userId }
+    );
+    if (!acct) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    const profile = acct.profile as DoCustomer;
+    const key = await buyerKeyForErasure(profile.phone);
+    const stub = storeDo(client.storeId) as unknown as {
+      exportSubject(s: Record<string, unknown>): Promise<{ tables: Record<string, unknown[]> }>;
+    };
+    const store = await stub.exportSubject({
+      kind: 'customer',
+      requestId: crypto.randomUUID(),
+      buyerKey: key ?? '',
+      email: profile.email,
+      phoneE164: profile.phone ? (toE164(profile.phone) ?? undefined) : undefined,
+      userId,
+      storeIds: [client.storeId],
+    });
+    return { account: acct.profile, passkeys: acct.passkeys, store: store.tables };
   }
 
   /**
@@ -2476,7 +2947,9 @@ export class AuthService {
    * exported file is the user's data, not a marketing surface, so field
    * names match the schema for transparency.
    */
-  static async exportAccount(userId: string) {
+  static async exportAccount(userId: string, storeHint?: string | null) {
+    const exportRoute = await customerAuthRoute(storeHint, { write: false });
+    if (exportRoute.kind === 'do') return AuthService.exportOnDo(exportRoute.client, userId);
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
@@ -2542,14 +3015,21 @@ export class AuthService {
       // Art. 20 portability bundle that looks complete. `withUser` reads them AS
       // the shopper — unlike the erase, this is read-only, so a second
       // connection carries no atomicity or independent-commit hazard.
-      withUser(userId, tx => tx.address.findMany({ where: { userId } })),
+      // A Durable Object store keeps the shopper's address book in its DO (Ruling NZ-SF-5).
+      storeRepo(storeId).then(repo =>
+        repo.backend === 'do'
+          ? repo.db.address.findMany({ where: { userId } })
+          : withUser(userId, tx => tx.address.findMany({ where: { userId } }))
+      ),
       prisma.order.findMany({
         where: { customerId: userId, storeId },
         include: { items: true, payments: true },
       }),
-      prisma.abandonedCart.findMany({ where: { customerId: userId, storeId } }),
-      prisma.wishlist.findMany({ where: { userId, storeId } }),
-      prisma.review.findMany({ where: { customerId: userId, storeId } }),
+      storeDb(storeId).then(db =>
+        db.abandonedCart.findMany({ where: { customerId: userId, storeId } })
+      ),
+      storeDb(storeId).then(db => db.wishlist.findMany({ where: { userId, storeId } })),
+      storeDb(storeId).then(db => db.review.findMany({ where: { customerId: userId, storeId } })),
       prisma.return.findMany({ where: { customerId: userId, storeId } }),
       prisma.loyaltyPoints.findMany({ where: { customerId: userId, storeId } }),
       prisma.loyaltyTransaction.findMany({ where: { customerId: userId, storeId } }),
@@ -2701,39 +3181,8 @@ export class AuthService {
     payload: TokenPayload,
     refreshRowExpiresAt?: Date
   ): Promise<AuthTokens> {
-    // Generate access token — stamped with a unique jti (for per-token
-    // revocation via the JTI denylist) and a tv (token version, for
-    // bulk revocation on logout-all / password change).
-    const accessJti = crypto.randomUUID();
-    const accessToken = jwt.sign({ ...payload, tv: payload.tv ?? 0 }, config.jwtSecret, {
-      algorithm: 'HS256',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expiresIn: config.jwtExpiresIn as any,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      subject: payload.userId,
-      jwtid: accessJti,
-    });
-
-    // Generate refresh token. Long-lived (1 year) so the admin PWA on
-    // a phone keeps the user signed in between order pings — they can
-    // tap a push notification weeks later and still land authenticated.
-    // The token is single-use server-side: each refresh issues a new
-    // hash and invalidates the old one (see auth.service rotation).
-    const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, config.jwtSecret, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expiresIn: config.refreshTokenExpiresIn as any,
-      algorithm: 'HS256',
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      subject: payload.userId,
-      // Unique token id. Without it, two refresh tokens minted for the same
-      // user in the same second (login immediately followed by a refresh, or a
-      // fast client) produce a byte-identical JWT -> identical SHA-256 hash ->
-      // duplicate key on refresh_tokens.token (P2002) -> 500. The jti nonce
-      // guarantees every issued token is distinct regardless of timing.
-      jwtid: crypto.randomUUID(),
-    });
+    // Access + refresh JWTs: one signer shared with the StoreDO customer flow (services/session-tokens.ts).
+    const { accessToken, refreshToken } = signSessionTokens(payload);
 
     // Store hashed refresh token in database. The DB row expiry must
     // match the JWT's own `exp` claim or rotation breaks early — 1 year

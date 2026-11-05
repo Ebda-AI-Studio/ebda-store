@@ -1,80 +1,89 @@
 'use client';
 
+import { useCallback, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { useFeatures } from '../../../../hooks/useFeatures';
-import { AreaRateEditor } from './_components/AreaRateEditor';
-import { ReturnPolicyCard } from './_components/ReturnPolicyCard';
+import { AreaRateEditor, type AreaRateEditorHandle } from './_components/AreaRateEditor';
+import { ReturnPolicyCard, type ReturnPolicyHandle } from './_components/ReturnPolicyCard';
+import { ShippingTabs } from './_components/ShippingTabs';
 
+/**
+ * "الشحن والتوصيل" > الأسعار. One Save for the whole page (rule 5): the area rates and the return policy are saved
+ * together from the sticky bar, which shows only while something changed.
+ */
 export default function ShippingSettingsPage() {
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('shipping.page');
-  const tAreaRates = useT('shipping.areaRates');
+  const tHub = useT('shippingHub');
   const { isEnabled } = useFeatures();
   const carriersEnabled = isEnabled('shipping_carriers');
+  const { success: toastSuccess } = useToast();
+
+  const ratesRef = useRef<AreaRateEditorHandle>(null);
+  const policyRef = useRef<ReturnPolicyHandle>(null);
+  const [ratesDirty, setRatesDirty] = useState(false);
+  const [policyDirty, setPolicyDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const saveAll = useCallback(async () => {
+    setSaving(true);
+    try {
+      // Policy first: it is a single quick write and a validation error there should stop before the big grid save.
+      if (policyDirty && !(await policyRef.current?.save())) return;
+      if (ratesDirty && !(await ratesRef.current?.save())) return;
+      // The rates editor toasts its own success; a policy-only save needs one too.
+      if (!ratesDirty) toastSuccess(tHub('savedTitle'), tHub('savedBody'));
+    } finally {
+      setSaving(false);
+    }
+  }, [policyDirty, ratesDirty, toastSuccess, tHub]);
+
+  const resetAll = useCallback(() => {
+    ratesRef.current?.reset();
+    policyRef.current?.reset();
+  }, []);
 
   return (
-    <AdminLayout title={tAreaRates('sectionTitle')} subtitle={tAreaRates('sectionSubtitle')}>
-      <div className="space-y-6">
+    <AdminLayout title={tHub('title')} subtitle={tHub('subtitle')}>
+      <ShippingTabs />
+      <div className="space-y-6 pb-24">
         <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
           {tPage('intro')}
         </div>
 
-        {/* Shipping Carriers callout — visible only when the feature is enabled.
-            The carriers page lives at /stores/[id]/shipping-carriers and is
-            intentionally separate (carrier credentials + shipment tracking).
-            This banner bridges discoverability since both pages share the
-            "Shipping" sidebar group. */}
         {carriersEnabled && (
-          <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-8 h-8 bg-cyan-100 rounded-full flex items-center justify-center">
-                <svg
-                  className="w-4 h-4 text-cyan-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-cyan-900">{tPage('carriersBannerTitle')}</p>
-                <p className="text-xs text-cyan-700">{tPage('carriersBannerHint')}</p>
-              </div>
-            </div>
+          <p className="text-sm text-muted-foreground">
+            {tPage('carriersBannerHint')}{' '}
             <Link
               href={`/stores/${storeId}/shipping-carriers`}
-              className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-cyan-700 border border-cyan-300 rounded-lg hover:bg-cyan-100 transition-colors"
+              className="font-medium text-primary-ink underline underline-offset-2"
             >
               {tPage('carriersBannerLink')}
             </Link>
-          </div>
+          </p>
         )}
 
-        {/* ── Area rates editor (sole shipping CRUD) ────────────────────── */}
         <div data-setting-id="shipping.area-rates">
-          <AreaRateEditor storeId={storeId} />
+          <AreaRateEditor ref={ratesRef} storeId={storeId} onDirtyChange={setRatesDirty} />
         </div>
 
-        {/* Return policy sits with shipping: both are the delivery-and-returns
-            promise a buyer (or their AI agent) evaluates before purchase. */}
-        <ReturnPolicyCard storeId={storeId} />
+        {/* Return policy sits with shipping: both are the delivery-and-returns promise a buyer (or their AI agent)
+            evaluates before purchase. */}
+        <ReturnPolicyCard ref={policyRef} storeId={storeId} onDirtyChange={setPolicyDirty} />
       </div>
+      <StickySaveBar
+        dirty={ratesDirty || policyDirty}
+        onSave={saveAll}
+        onReset={resetAll}
+        saving={saving}
+        saveLabel={tHub('saveLabel')}
+      />
     </AdminLayout>
   );
 }

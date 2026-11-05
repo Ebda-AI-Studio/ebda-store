@@ -1,4 +1,5 @@
-import { prisma, Prisma, withMoneyTx } from '@ebda/database';
+import { assertActiveVariantPrice } from '../lib/sellable-price';
+import { prisma } from '@ebda/database';
 import { GoldRateService } from './gold-rate/gold-rate.service';
 import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
@@ -7,6 +8,8 @@ import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { throwIfBundleFkViolation } from '../lib/bundle-fk-errors';
 import { withSavepoint } from '../lib/savepoint';
+import { storeMoney, storeStock, storeWriter } from '../lib/repo-factory';
+import { notifyCatalogChanged } from '../lib/wa/catalog-state';
 
 interface CreateOptionInput {
   name: string;
@@ -52,7 +55,9 @@ export class VariantService {
    * Get product with options and variants
    */
   static async getProductVariants(storeId: string, productId: string) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: {
         options: {
@@ -117,8 +122,9 @@ export class VariantService {
    * Add option to a product
    */
   static async addOption(storeId: string, productId: string, input: CreateOptionInput) {
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
     // Verify product exists
-    const product = await prisma.product.findFirst({
+    const product = await w.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { options: true },
     });
@@ -133,7 +139,7 @@ export class VariantService {
     }
 
     // Check for duplicate option name
-    const existingOption = await prisma.productOption.findFirst({
+    const existingOption = await w.productOption.findFirst({
       where: { productId, name: input.name },
     });
 
@@ -142,7 +148,7 @@ export class VariantService {
     }
 
     // Create option with values
-    const option = await prisma.productOption.create({
+    const option = await w.productOption.create({
       data: {
         productId,
         name: input.name,
@@ -165,7 +171,7 @@ export class VariantService {
 
     // Mark product as having variants if it's the first option
     if (!product.hasVariants) {
-      await prisma.product.update({
+      await w.product.update({
         where: { id: productId, storeId },
         data: { hasVariants: true },
       });
@@ -186,7 +192,8 @@ export class VariantService {
     optionId: string,
     input: { name?: string; nameAr?: string | null }
   ) {
-    const option = await prisma.productOption.findFirst({
+    const w = await storeWriter(storeId);
+    const option = await w.productOption.findFirst({
       where: {
         id: optionId,
         product: { id: productId, storeId, deletedAt: null },
@@ -197,7 +204,7 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option not found');
     }
 
-    return prisma.productOption.update({
+    return w.productOption.update({
       where: { id: optionId },
       data: {
         name: input.name,
@@ -213,7 +220,9 @@ export class VariantService {
    * Delete option (and all associated variants)
    */
   static async deleteOption(storeId: string, productId: string, optionId: string) {
-    const option = await prisma.productOption.findFirst({
+    const option = await (
+      await storeWriter(storeId)
+    ).productOption.findFirst({
       where: {
         id: optionId,
         product: { id: productId, storeId, deletedAt: null },
@@ -230,27 +239,25 @@ export class VariantService {
     // soft-delete), so the image is genuinely orphaned once deleteMany
     // runs. We collect outside the tx so the select is a plain read
     // and doesn't enlarge the transaction window.
-    const variantsToDelete = await prisma.productVariant.findMany({
+    const variantsToDelete = await (
+      await storeWriter(storeId)
+    ).productVariant.findMany({
       where: { productId },
       select: { imageUrl: true },
     });
 
     try {
-      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+      const w = await storeWriter(storeId);
+      await w.$transaction([
         // Delete all variants since they depend on options
-        await tx.productVariant.deleteMany({ where: { productId } });
-
+        w.productVariant.deleteMany({ where: { productId } }),
         // Delete option (cascade will delete values and variant option junctions)
-        await tx.productOption.delete({ where: { id: optionId } });
-
+        w.productOption.delete({ where: { id: optionId } }),
         // If no more options, mark product as not having variants
-        if (option.product.options.length <= 1) {
-          await tx.product.update({
-            where: { id: productId, storeId },
-            data: { hasVariants: false },
-          });
-        }
-      });
+        ...(option.product.options.length <= 1
+          ? [w.product.update({ where: { id: productId, storeId }, data: { hasVariants: false } })]
+          : []),
+      ]);
     } catch (err) {
       // Deleting an option takes ALL its variants with it in one deleteMany
       // — if any one of them is pinned by a bundle_items row, the whole
@@ -290,7 +297,9 @@ export class VariantService {
       swatchImageUrl?: string | null;
     }
   ) {
-    const option = await prisma.productOption.findFirst({
+    const option = await (
+      await storeWriter(storeId)
+    ).productOption.findFirst({
       where: {
         id: optionId,
         product: { id: productId, storeId, deletedAt: null },
@@ -308,7 +317,9 @@ export class VariantService {
       throw new AppError(400, 'DUPLICATE_VALUE', `Value "${input.value}" already exists`);
     }
 
-    const created = await prisma.productOptionValue.create({
+    const created = await (
+      await storeWriter(storeId)
+    ).productOptionValue.create({
       data: {
         optionId,
         value: input.value,
@@ -336,7 +347,9 @@ export class VariantService {
       swatchImageUrl?: string | null;
     }
   ) {
-    const optionValue = await prisma.productOptionValue.findFirst({
+    const optionValue = await (
+      await storeWriter(storeId)
+    ).productOptionValue.findFirst({
       where: {
         id: valueId,
         option: {
@@ -349,7 +362,9 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option value not found');
     }
 
-    const updated = await prisma.productOptionValue.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).productOptionValue.update({
       where: { id: valueId },
       data: {
         value: input.value,
@@ -366,7 +381,9 @@ export class VariantService {
    * Delete option value
    */
   static async deleteOptionValue(storeId: string, productId: string, valueId: string) {
-    const optionValue = await prisma.productOptionValue.findFirst({
+    const optionValue = await (
+      await storeWriter(storeId)
+    ).productOptionValue.findFirst({
       where: {
         id: valueId,
         option: {
@@ -391,7 +408,9 @@ export class VariantService {
 
     // Delete any variants using this value.  Select imageUrl so we can
     // clean up R2 objects after the deletes commit.
-    const variantsWithValue = await prisma.productVariant.findMany({
+    const variantsWithValue = await (
+      await storeWriter(storeId)
+    ).productVariant.findMany({
       where: {
         options: { some: { valueId } },
       },
@@ -400,7 +419,9 @@ export class VariantService {
 
     if (variantsWithValue.length > 0) {
       try {
-        await prisma.productVariant.deleteMany({
+        await (
+          await storeWriter(storeId)
+        ).productVariant.deleteMany({
           where: { id: { in: variantsWithValue.map(v => v.id) } },
         });
       } catch (err) {
@@ -412,7 +433,7 @@ export class VariantService {
       }
     }
 
-    await prisma.productOptionValue.delete({ where: { id: valueId } });
+    await (await storeWriter(storeId)).productOptionValue.delete({ where: { id: valueId } });
     await invalidateStoreProductCaches(storeId);
 
     // Fire-and-forget R2 cleanup for any variant images that were just
@@ -430,7 +451,9 @@ export class VariantService {
    * Create a new variant
    */
   static async createVariant(storeId: string, productId: string, input: CreateVariantInput) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { options: { include: { values: true } } },
     });
@@ -458,7 +481,9 @@ export class VariantService {
     }
 
     // Check for duplicate variant
-    const existingVariants = await prisma.productVariant.findMany({
+    const existingVariants = await (
+      await storeWriter(storeId)
+    ).productVariant.findMany({
       where: { productId },
       include: { options: true },
     });
@@ -472,7 +497,9 @@ export class VariantService {
     }
 
     // Generate title from option values
-    const optionValues = await prisma.productOptionValue.findMany({
+    const optionValues = await (
+      await storeWriter(storeId)
+    ).productOptionValue.findMany({
       where: { id: { in: input.optionValueIds } },
       include: { option: true },
       orderBy: { option: { position: 'asc' } },
@@ -497,6 +524,16 @@ export class VariantService {
     const typedBarcode = input.barcode?.trim() ? parseBarcodeOrThrow(input.barcode) : undefined;
     if (typedBarcode) await assertBarcodeAvailable(storeId, typedBarcode);
 
+    // QA-PRICE-ZERO-1: a new variant of an ACTIVE product is orderable at once, so its effective price (own override, else
+    // the product's) must be above zero. A draft product may hold placeholders; a gold row is the repricer's.
+    if (product.status === 'active') {
+      assertActiveVariantPrice({
+        price: input.price,
+        productPrice: product.price,
+        productPricingMode: product.pricingMode,
+      });
+    }
+
     // Create variant
     const createVariantRow = (db: Pick<typeof prisma, 'productVariant'>) =>
       db.productVariant.create({
@@ -509,7 +546,8 @@ export class VariantService {
           price: input.price,
           compareAtPrice: input.compareAtPrice,
           costPrice: input.costPrice,
-          inventory: input.inventory || 0,
+          // 0 is the column default; a non-zero opening stock is a stock write (refused on a DO store until D2)
+          ...(input.inventory ? { inventory: input.inventory } : {}),
           weight: input.weight,
           imageUrl: input.imageUrl,
           position: existingVariants.length,
@@ -528,10 +566,39 @@ export class VariantService {
         },
       });
     const variant = isGold
-      ? await GoldRateService.asRepricer(storeId, productId, tx =>
-          createVariantRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
+      ? await GoldRateService.asRepricer(
+          storeId,
+          productId,
+          tx => createVariantRow(tx as unknown as Pick<typeof prisma, 'productVariant'>),
+          // Durable Object store (Ruling CF-LAST-1): the insert and the re-price are one DO section, then the row is re-read
+          async () => {
+            const money = (await storeMoney(storeId))!;
+            const { id } = await money.goldCreateVariant({
+              productId,
+              variant: {
+                title,
+                titleAr,
+                sku: input.sku,
+                barcode: typedBarcode,
+                price: input.price,
+                compareAtPrice: input.compareAtPrice,
+                costPrice: input.costPrice,
+                inventory: input.inventory,
+                weight: input.weight,
+                imageUrl: input.imageUrl,
+                position: existingVariants.length,
+              },
+              optionValueIds: input.optionValueIds,
+            });
+            return (await storeWriter(storeId)).productVariant.findFirstOrThrow({
+              where: { id },
+              include: { options: { include: { value: { include: { option: true } } } } },
+            }) as unknown as ReturnType<typeof createVariantRow>;
+          }
         )
-      : await createVariantRow(prisma);
+      : await createVariantRow(
+          (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
+        );
 
     // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
     const autoBarcode = typedBarcode
@@ -570,15 +637,29 @@ export class VariantService {
     variantId: string,
     input: UpdateVariantInput
   ) {
-    const variant = await prisma.productVariant.findFirst({
+    const variant = await (
+      await storeWriter(storeId)
+    ).productVariant.findFirst({
       where: {
         id: variantId,
         product: { id: productId, storeId, deletedAt: null },
       },
+      include: { product: { select: { status: true, price: true, pricingMode: true } } },
     });
 
     if (!variant) {
       throw new AppError(404, 'NOT_FOUND', 'Variant not found');
+    }
+
+    // QA-PRICE-ZERO-1: the variant as it will be after this update must not be orderable for free on an active product.
+    if (variant.product.status === 'active') {
+      assertActiveVariantPrice({
+        isActive: input.isActive ?? variant.isActive,
+        price: input.price !== undefined ? input.price : variant.price,
+        productPrice: variant.product.price,
+        productPricingMode: variant.product.pricingMode,
+        variantPricingMode: variant.pricingMode,
+      });
     }
 
     // BARCODE-1: validate a changed barcode; '' clears it.
@@ -593,7 +674,9 @@ export class VariantService {
       }
     }
 
-    const updated = await prisma.productVariant.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).productVariant.update({
       where: { id: variantId },
       data: { ...input, ...barcodeUpdate },
       include: {
@@ -658,7 +741,9 @@ export class VariantService {
    * Delete a variant
    */
   static async deleteVariant(storeId: string, productId: string, variantId: string) {
-    const variant = await prisma.productVariant.findFirst({
+    const variant = await (
+      await storeWriter(storeId)
+    ).productVariant.findFirst({
       where: {
         id: variantId,
         product: { id: productId, storeId, deletedAt: null },
@@ -670,7 +755,7 @@ export class VariantService {
     }
 
     try {
-      await prisma.productVariant.delete({ where: { id: variantId } });
+      await (await storeWriter(storeId)).productVariant.delete({ where: { id: variantId } });
     } catch (err) {
       throwIfBundleFkViolation(err);
       throw err;
@@ -697,7 +782,9 @@ export class VariantService {
    * Generate all possible variants from current options
    */
   static async generateVariants(storeId: string, productId: string) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: {
         options: {
@@ -753,7 +840,6 @@ export class VariantService {
             productId,
             title,
             titleAr,
-            inventory: 0,
             position: product.variants.length + created.length,
             options: {
               create: combo.map(value => ({ valueId: value.id })),
@@ -763,10 +849,20 @@ export class VariantService {
       // Ruling B5-13: a generated variant of a gold-rate product is born priced by the repricer.
       const variant =
         product.pricingMode === 'gold_rate'
-          ? await GoldRateService.asRepricer(storeId, productId, tx =>
-              createRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
+          ? await GoldRateService.asRepricer(
+              storeId,
+              productId,
+              tx => createRow(tx as unknown as Pick<typeof prisma, 'productVariant'>),
+              async () =>
+                (await storeMoney(storeId))!.goldCreateVariant({
+                  productId,
+                  variant: { title, titleAr, position: product.variants.length + created.length },
+                  optionValueIds: combo.map(value => value.id),
+                }) as never
             )
-          : await createRow(prisma);
+          : await createRow(
+              (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
+            );
 
       created.push(variant.id);
       await ensureBarcode(storeId, { variantId: variant.id });
@@ -794,6 +890,15 @@ export class VariantService {
     productId: string,
     updates: Array<{ variantId: string; inventory: number }>
   ) {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): one section, an unknown variant fails alone.
+      const r = await stock.setVariantInventory({ productId, updates });
+      await notifyCatalogChanged({ storeId, productIds: [productId] });
+      await invalidateStoreProductCaches(storeId);
+      return { updated: r.updated, failed: r.failed };
+    }
+
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
     });
@@ -845,7 +950,9 @@ export class VariantService {
    * Reorder options
    */
   static async reorderOptions(storeId: string, productId: string, optionIds: string[]) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { options: true },
     });
@@ -866,9 +973,10 @@ export class VariantService {
       }
     }
 
-    await Promise.all(
+    const w = await storeWriter(storeId);
+    await w.$transaction(
       optionIds.map((optionId, index) =>
-        prisma.productOption.update({
+        w.productOption.update({
           where: { id: optionId },
           data: { position: index },
         })
@@ -880,7 +988,9 @@ export class VariantService {
    * Reorder variants
    */
   static async reorderVariants(storeId: string, productId: string, variantIds: string[]) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { variants: true },
     });
@@ -901,9 +1011,10 @@ export class VariantService {
       }
     }
 
-    await Promise.all(
+    const w = await storeWriter(storeId);
+    await w.$transaction(
       variantIds.map((variantId, index) =>
-        prisma.productVariant.update({
+        w.productVariant.update({
           where: { id: variantId },
           data: { position: index },
         })

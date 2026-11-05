@@ -295,6 +295,91 @@ async function embedTexts(
   return out;
 }
 
+/**
+ * A text the model rejected, for this exact product text: quarantined until the text changes (the key changes with it). An input /
+ * shape failure is permanent (no expiry); anything else is a 24 h quarantine.
+ */
+export function quarantineVectorFailure(
+  db: SyncSql,
+  storeId: string,
+  w: Pick<VectorWork, 'productId' | 'key'>,
+  kind: string,
+  now: number
+): void {
+  db.run(
+    `INSERT INTO product_vector_state (product_id, store_id, model, doc_hash, words_hash, embedded_at, fail_key, fail_until, fail_kind)
+       VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+       ON CONFLICT (product_id) DO UPDATE SET fail_key = excluded.fail_key, fail_until = excluded.fail_until, fail_kind = excluded.fail_kind`,
+    [
+      w.productId,
+      storeId,
+      EMBED_MODEL,
+      now,
+      w.key,
+      kind === 'input' || kind === 'shape' ? null : now + TEMP_QUARANTINE_MS,
+      kind,
+    ]
+  );
+}
+
+/**
+ * Commit the state of products whose vectors were just upserted, each against the CURRENT row: a product edited meanwhile stays
+ * stale (the next pass re-embeds the new text); one that stopped being indexable has its fresh vectors listed for deletion.
+ */
+export function commitVectorWork(
+  db: SyncSql,
+  storeId: string,
+  ready: VectorWork[],
+  now: number
+): { embedded: number; cleanup: string[] } {
+  let embedded = 0;
+  const cleanup: string[] = [];
+  db.transactionSync(() => {
+    const current = new Map(
+      loadProducts(
+        db,
+        storeId,
+        ready.map(w => w.productId)
+      ).map(p => [p.id, p])
+    );
+    for (const w of ready) {
+      const p = current.get(w.productId);
+      const stillSame =
+        p?.indexable === true &&
+        (!w.needDoc || (p.doc !== null && textHash(p.doc) === w.docHash)) &&
+        (!w.needWords || (p.words !== null && textHash(p.words) === w.wordsHash));
+      if (!stillSame) {
+        // edited meanwhile: stays stale (next pass re-embeds the new text); not indexable any more: drop what we just wrote
+        if (!p?.indexable) cleanup.push(idOf(w.productId, 'd'), idOf(w.productId, 'w'));
+        continue;
+      }
+      const prev = db.all(
+        'SELECT model, doc_hash, words_hash FROM product_vector_state WHERE product_id = ?',
+        [w.productId]
+      )[0];
+      const keep = prev?.model === EMBED_MODEL;
+      const docHash = w.needDoc ? w.docHash : keep ? (prev!.doc_hash as string | null) : null;
+      const wordsHash = w.needWords
+        ? w.wordsHash
+        : p.words === null
+          ? null
+          : keep
+            ? (prev!.words_hash as string | null)
+            : null;
+      db.run(
+        `INSERT INTO product_vector_state (product_id, store_id, model, doc_hash, words_hash, embedded_at, fail_key, fail_until, fail_kind)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
+         ON CONFLICT (product_id) DO UPDATE SET model = excluded.model, doc_hash = excluded.doc_hash, words_hash = excluded.words_hash,
+           embedded_at = excluded.embedded_at, fail_key = NULL, fail_until = NULL, fail_kind = NULL`,
+        [w.productId, storeId, EMBED_MODEL, docHash, wordsHash, now]
+      );
+      if (p.words === null && prev?.words_hash) cleanup.push(idOf(w.productId, 'w')); // emptied words: the old words vector goes
+      embedded++;
+    }
+  });
+  return { embedded, cleanup };
+}
+
 /** One pass: embed up to `batchLimit` stale products, delete orphaned vectors. Call again while `embedded > 0`. */
 export async function syncProductVectors(
   db: SyncSql,
@@ -359,21 +444,7 @@ export async function syncProductVectors(
       result.retry = true;
       return; // transient: stays stale, the caller schedules another pass
     }
-    // permanent for this exact text: quarantined until the text changes (the key changes with it)
-    db.run(
-      `INSERT INTO product_vector_state (product_id, store_id, model, doc_hash, words_hash, embedded_at, fail_key, fail_until, fail_kind)
-       VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
-       ON CONFLICT (product_id) DO UPDATE SET fail_key = excluded.fail_key, fail_until = excluded.fail_until, fail_kind = excluded.fail_kind`,
-      [
-        w.productId,
-        storeId,
-        EMBED_MODEL,
-        now,
-        w.key,
-        f.kind === 'input' || f.kind === 'shape' ? null : now + TEMP_QUARANTINE_MS,
-        f.kind,
-      ]
-    );
+    quarantineVectorFailure(db, storeId, w, f.kind, now);
     result.quarantined++;
   };
   const assign = (w: VectorWork, vs: number[][]) => {
@@ -438,50 +509,9 @@ export async function syncProductVectors(
     ];
   });
   if (upserts.length > 0) await deps.index.upsert(upserts); // a throw here writes NO state: the whole batch stays stale
-  const cleanup: string[] = [];
-  db.transactionSync(() => {
-    const current = new Map(
-      loadProducts(
-        db,
-        storeId,
-        ready.map(w => w.productId)
-      ).map(p => [p.id, p])
-    );
-    for (const w of ready) {
-      const p = current.get(w.productId);
-      const stillSame =
-        p?.indexable === true &&
-        (!w.needDoc || (p.doc !== null && textHash(p.doc) === w.docHash)) &&
-        (!w.needWords || (p.words !== null && textHash(p.words) === w.wordsHash));
-      if (!stillSame) {
-        // edited meanwhile: stays stale (next pass re-embeds the new text); not indexable any more: drop what we just wrote
-        if (!p?.indexable) cleanup.push(idOf(w.productId, 'd'), idOf(w.productId, 'w'));
-        continue;
-      }
-      const prev = db.all(
-        'SELECT model, doc_hash, words_hash FROM product_vector_state WHERE product_id = ?',
-        [w.productId]
-      )[0];
-      const keep = prev?.model === EMBED_MODEL;
-      const docHash = w.needDoc ? w.docHash : keep ? (prev!.doc_hash as string | null) : null;
-      const wordsHash = w.needWords
-        ? w.wordsHash
-        : p.words === null
-          ? null
-          : keep
-            ? (prev!.words_hash as string | null)
-            : null;
-      db.run(
-        `INSERT INTO product_vector_state (product_id, store_id, model, doc_hash, words_hash, embedded_at, fail_key, fail_until, fail_kind)
-         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
-         ON CONFLICT (product_id) DO UPDATE SET model = excluded.model, doc_hash = excluded.doc_hash, words_hash = excluded.words_hash,
-           embedded_at = excluded.embedded_at, fail_key = NULL, fail_until = NULL, fail_kind = NULL`,
-        [w.productId, storeId, EMBED_MODEL, docHash, wordsHash, now]
-      );
-      if (p.words === null && prev?.words_hash) cleanup.push(idOf(w.productId, 'w')); // emptied words: the old words vector goes
-      result.embedded++;
-    }
-  });
+  const committed = commitVectorWork(db, storeId, ready, now);
+  result.embedded += committed.embedded;
+  const cleanup = committed.cleanup;
   if (cleanup.length > 0) await deps.index.deleteByIds(cleanup);
   return result;
 }
@@ -512,6 +542,43 @@ export async function backfillProductVectors(
   return total;
 }
 
+/**
+ * The index line of the search-insights page ("N of M ready / N failed"), counts only. `products` = indexable products with a
+ * document; `stale` = those whose vectors are missing or out of date and that are not quarantined; `failed` = those quarantined
+ * (their text set could not be embedded). Same staleness rules as `planVectorWork`; read-only (the DO twin of `storeIndexStatus`).
+ */
+export function vectorStatus(
+  db: SyncSql,
+  storeId: string,
+  now = Date.now()
+): { products: number; indexed: number; stale: number; failed: number } {
+  const state = new Map(
+    db
+      .all('SELECT * FROM product_vector_state WHERE store_id = ?', [storeId])
+      .map(r => [r.product_id as string, r])
+  );
+  let products = 0;
+  let stale = 0;
+  let failed = 0;
+  for (const p of loadProducts(db, storeId)) {
+    if (!p.indexable) continue;
+    products++;
+    const st = state.get(p.id);
+    const sameModel = st?.model === EMBED_MODEL;
+    const needDoc = !st || !sameModel || st.doc_hash !== (p.doc ? textHash(p.doc) : null);
+    const needWords =
+      p.words !== null && (!st || !sameModel || st.words_hash !== textHash(p.words));
+    const clearWords = !!st && sameModel && p.words === null && st.words_hash !== null;
+    if (!needDoc && !needWords && !clearWords) continue;
+    const key = textHash(`${p.doc ?? ''}\u001f${p.words ?? ''}`);
+    const quarantined =
+      !!st && st.fail_key === key && (st.fail_until === null || (st.fail_until as number) > now);
+    if (quarantined) failed++;
+    else stale++;
+  }
+  return { products, indexed: products - stale - failed, stale, failed };
+}
+
 /** True while any indexable product still needs a vector (the cheap probe behind a retry alarm). */
 export const hasStaleVectors = (db: SyncSql, storeId: string, now = Date.now()): boolean => {
   const p = planVectorWork(db, storeId, 1, now);
@@ -519,6 +586,25 @@ export const hasStaleVectors = (db: SyncSql, storeId: string, now = Date.now()):
 };
 
 // ---- query ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Of the product ids a Vectorize query returned, the ones the storefront may show: active, not deleted, public audience, and
+ * vectored by THIS model. The Worker queries Vectorize (it holds the binding) and asks the DO this, so a stale or foreign vector
+ * can never surface a hidden product (`vectorVisible` op).
+ */
+export function visibleVectorProductIds(db: SyncSql, storeId: string, ids: string[]): string[] {
+  if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
+  if (ids.length === 0) return [];
+  if (ids.length > 200) throw new MoneyError('BAD_ARGS', 'ids', 400);
+  return db
+    .all(
+      `SELECT p.id FROM products p JOIN product_vector_state s ON s.product_id = p.id AND s.model = ?
+        WHERE p.store_id = ? AND p.${INDEXABLE_SQL.replace(' AND ', ' AND p.')} AND p.audience = 'public'
+          AND p.id IN (${ids.map(() => '?').join(',')})`,
+      [EMBED_MODEL, storeId, ...ids]
+    )
+    .map(r => r.id as string);
+}
 
 /**
  * The vector leg: product ids nearest to the query vector (cosine distance = 1 - Vectorize score), within
@@ -552,16 +638,7 @@ export async function semanticProductIds(
   }
   if (best.size === 0) return [];
   const ids = [...best.keys()];
-  const visible = new Set(
-    db
-      .all(
-        `SELECT p.id FROM products p JOIN product_vector_state s ON s.product_id = p.id AND s.model = ?
-          WHERE p.store_id = ? AND p.${INDEXABLE_SQL.replace(' AND ', ' AND p.')} AND p.audience = 'public'
-            AND p.id IN (${ids.map(() => '?').join(',')})`,
-        [EMBED_MODEL, storeId, ...ids]
-      )
-      .map(r => r.id as string)
-  );
+  const visible = new Set(visibleVectorProductIds(db, storeId, ids));
   return ids
     .filter(id => visible.has(id))
     .sort((a, b) => best.get(a)! - best.get(b)! || (a < b ? -1 : 1))

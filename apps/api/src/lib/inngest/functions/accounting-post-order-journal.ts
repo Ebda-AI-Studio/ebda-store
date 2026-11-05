@@ -1,5 +1,5 @@
 import type { JobDef } from '../../jobs/types';
-import { runInTenantContext } from '@ebda/database';
+import { runInStoreCtx } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postOrderPaymentJournal } from '../../../services/accounting/posting/order-posting';
@@ -55,6 +55,7 @@ export const accountingPostOrderJournal: JobDef = inngest.createFunction(
       );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
+    // PORTED (Ruling CF-JOBS-4): a store on its Durable Object posts through `journalSale` (no Postgres transaction).
     // FORCE RLS: postOrderPaymentJournal reads the order via prisma — it
     // must run inside runInTenantContext(storeId) so the GUC is set.
     // The accounting services (journal.service, account.service) already
@@ -63,7 +64,7 @@ export const accountingPostOrderJournal: JobDef = inngest.createFunction(
     // bypasses nest cleanly via separate transactions).
     await step.run('post-journal', async () => {
       try {
-        await runInTenantContext(storeId, () => postOrderPaymentJournal({ orderId }));
+        await runInStoreCtx(storeId, () => postOrderPaymentJournal({ orderId }));
       } catch (err) {
         // Surface the failure to structured logs + Sentry. Without this the
         // throw is only visible in the Inngest dashboard — a starved COA (the

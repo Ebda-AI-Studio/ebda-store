@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { runInTenantContext } from '@ebda/database';
+import { requireFeature } from '../middleware/feature-gate';
+import { runInStoreTenantContext as runInTenantContext } from '../lib/store-scoped-read';
+import { withStore } from '@ebda/database';
 import { listSlugRedirects, deleteSlugRedirect } from '../services/slug-redirect.service';
 
 // #903: SlugRedirect had no admin UI surface at all — a merchant could not
@@ -34,7 +36,7 @@ router.get(
   async (req, res, next) => {
     try {
       const { q, limit, cursor } = listQuerySchema.parse(req.query);
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const data = await withStore(req.params.storeId, () =>
         listSlugRedirects(req.params.storeId, { q, limit, cursor })
       );
       res.json({ data });
@@ -50,9 +52,10 @@ router.delete(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('seo'), // BE:S-9
   async (req, res, next) => {
     try {
-      await runInTenantContext(req.params.storeId, () =>
+      await withStore(req.params.storeId, () =>
         deleteSlugRedirect(req.params.storeId, req.params.id)
       );
       res.json({ data: { deleted: true } });

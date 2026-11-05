@@ -12,6 +12,11 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [CHANGELOG-2026-10-16-ahmad-decisions.md](CHANGELOG-2026-10-16-ahmad-decisions.md) - Changelog — Ahmad's 2026-10-16 decisions (branch `fix/ahmad-decisions-1016`)
 - [CHANGELOG-2026-10-16-followups-b0-46.md](CHANGELOG-2026-10-16-followups-b0-46.md) - Changelog — B0-46 follow-up fixes (branch `fix/followups-b0-46`)
+- [CHANGELOG-2026-11-04-admin-fix-t2-api-domain.md](CHANGELOG-2026-11-04-admin-fix-t2-api-domain.md) - Admin fix pass, T2 (API domain), 2026-11-04
+- [CHANGELOG-2026-11-04-admin-fix-pass-t3.md](CHANGELOG-2026-11-04-admin-fix-pass-t3.md) - Admin fix pass, T3 UI foundation (2026-11-04)
+- [CHANGELOG-2026-11-04-admin-fix-pass-t4.md](CHANGELOG-2026-11-04-admin-fix-pass-t4.md) - Admin fix pass, T4 store setup pages (2026-11-04)
+- [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
+- [CHANGELOG-2026-11-04-admin-fix-pass-t5.md](CHANGELOG-2026-11-04-admin-fix-pass-t5.md) - Admin fix pass, T5 UI catalog + sales (2026-11-04)
 - [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) - Database backup, restore & disaster recovery
 - [DB-INDEX-MIGRATIONS.md](DB-INDEX-MIGRATIONS.md) - DB index migrations — lock procedure
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Ebda Store - Production Deployment Guide
@@ -23,15 +28,22 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [RULINGS.md](RULINGS.md) - Rulings ledger (moved)
 - [SCALING.md](SCALING.md) - Horizontal Scaling Guide — Ebda Store API
 
+## admin - Admin app standards
+
+- [admin/ACTION-PLACEMENT-STANDARD.md](admin/ACTION-PLACEMENT-STANDARD.md) - Admin action-placement standard
+
 ## adr - Architecture decision records
 
 - [adr/0001-ebda-tenant-isolation.md](adr/0001-ebda-tenant-isolation.md) - ADR 0001 — Ebda Store tenant isolation: Postgres Row-Level Security
 
 ## api - API references
 
+- [api/auth-impersonation-and-error-contract.md](api/auth-impersonation-and-error-contract.md) - Auth, impersonation, error bodies and Server-Timing (API contract)
 - [api/b2b-wholesale.md](api/b2b-wholesale.md) - B2B wholesale pricing API
+- [api/loyalty.md](api/loyalty.md) - Loyalty API (admin and storefront)
 - [api/lifecycle-emails.md](api/lifecycle-emails.md) - Lifecycle emails (self-serve onboarding)
 - [api/openapi.yaml](api/openapi.yaml) - openapi
+- [api/studio-enquiry.md](api/studio-enquiry.md) - Studio service-enquiry form (contact page, mail-only)
 
 ## architecture - Architecture and invariants
 
@@ -44,6 +56,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [architecture/inventory-model.md](architecture/inventory-model.md) - Inventory model — where a product's stock actually lives
 - [architecture/merchant-mcp.md](architecture/merchant-mcp.md) - Merchant-admin MCP surface
 - [architecture/page-definition.md](architecture/page-definition.md) - PageDefinition — the visual builder's page document
+- [architecture/request-transaction-lifecycle.md](architecture/request-transaction-lifecycle.md) - Request transaction lifecycle (tenantContext, identity pre-check, Server-Timing)
 - [architecture/security-contracts.md](architecture/security-contracts.md) - Security Contracts
 - [architecture/slug-redirects.md](architecture/slug-redirects.md) - Slug redirects
 - [architecture/sticky-overflow-follow-up.md](architecture/sticky-overflow-follow-up.md) - Follow-up: `position: sticky` is inert storefront-wide
@@ -85,6 +98,20 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [cf/fn-map.json](cf/fn-map.json) - fn map
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
+- [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
+- [cf/neon-zero-integration.md](cf/neon-zero-integration.md) - NEON-ZERO integration branch: every merge conflict between the twelve PRs and its resolution
+- [cf/neon-zero-remaining.md](cf/neon-zero-remaining.md) - NEON-ZERO route sweep with Postgres dead: routes still failing, by owner PR
+- [cf/neon-zero-routes-b.md](cf/neon-zero-routes-b.md) - NEON-ZERO routes group B (per-store admin): sweep before/after and what is left
+- [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
+- [cf/loyalty-do-migration.md](cf/loyalty-do-migration.md) - Loyalty on Durable Object stores: one-off ledger migration (Ruling FP-2)
+- [runbooks/customer-auth-cutover.md](runbooks/customer-auth-cutover.md) - Customer auth cutover to the store Durable Object: copy, verify, flip (N-9)
+- [cf/default-category-backfill.md](cf/default-category-backfill.md) - Default category Arabic name: backfill for DO stores
+- [cf/opus-review-closure.md](cf/opus-review-closure.md) - Opus review of #356 closed item by item with the proving test and its result, the leftovers closed, and the merge point for feat/cf-r6b (INFRA-CF-1)
+- [cf/r6a-on-do.md](cf/r6a-on-do.md) - The last three Postgres-only flows on the store Durable Object: palette search, campaigns, shopper erasure; InstaPay receipts at cutover (INFRA-CF-1 PR R6a)
+- [cf/payments-on-do.md](cf/payments-on-do.md) - Payments, webhooks, refunds, ledger and gold repricing on the store Durable Object (INFRA-CF-1 PR D2b-3)
+- [cf/returns-on-do.md](cf/returns-on-do.md) - The Return lifecycle and the partial-return journal on the store Durable Object (INFRA-CF-1 R1)
+- [cf/not-on-do.json](cf/not-on-do.json) - The flip-gate inventory: every refusal and Postgres-only flow of a Durable Object store (INFRA-CF-1 PR D2b-4, `node scripts/cf/not-on-do.mjs`)
+- [cf/repo-factory.md](cf/repo-factory.md) - Repo factory: reads on the store's backend (INFRA-CF-1 PR C, Ruling CF-REPO-1)
 
 ## contracts - Service and API contracts
 
@@ -172,7 +199,11 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [merchant/README.md](merchant/README.md) - Ebda Store — Merchant Guide
 - [merchant/custom-domain.md](merchant/custom-domain.md) - Custom Domain Setup — ربط النطاق المخصص
 - [merchant/faq.md](merchant/faq.md) - FAQ — الأسئلة الشائعة
+- [merchant/acceptable-use.md](merchant/acceptable-use.md) - What you may and may not sell / ما يجوز بيعه وما لا يجوز
+- [merchant/gold-and-payments.md](merchant/gold-and-payments.md) - Gold orders and installments / طلبات الدهب والتقسيط
+- [merchant/finance.md](merchant/finance.md) - Finance pages: profit and expenses, bank statements — صفحات المالية: الأرباح والمصروفات
 - [merchant/inventory.md](merchant/inventory.md) - Inventory: variant stock, adjustments & scanning — المخزون: مخزون التنويعات والتعديلات والمسح
+- [merchant/loyalty.md](merchant/loyalty.md) - Loyalty points
 - [merchant/orders.md](merchant/orders.md) - Orders (and the Orders app) — الطلبات (وتطبيق الطلبات)
 - [merchant/product-details.md](merchant/product-details.md) - Product details: swatches, facts, personalisation, delivery time and size guides — تفاصيل المنتج
 - [merchant/provider-activation.md](merchant/provider-activation.md) - Connecting a payment or shipping service / ربط خدمة دفع أو شحن
@@ -248,6 +279,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-21-phase-b2-souq.md](plans/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/2026-10-21-phase-b3-jasmine.md](plans/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/2026-10-21-phase-b4-lamma.md](plans/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-03-sharia-gold-bnpl-aup.md](plans/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
 - [plans/2026-10-21-phase-b5-dahab-looks.md](plans/2026-10-21-phase-b5-dahab-looks.md) - Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
 - [plans/2026-10-21-search-p3-catalogue-import.md](plans/2026-10-21-search-p3-catalogue-import.md) - Search P3: Catalogue Import from Photos and PDFs Implementation Plan
 - [plans/2026-10-21-shaped-barcodes.md](plans/2026-10-21-shaped-barcodes.md) - Shaped, scannable order barcodes (2026-10-21)
@@ -267,6 +299,11 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/2026-10-28-customer-intelligence.md](plans/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
 - [plans/2026-10-28-store-on-cloudflare.md](plans/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
+- [plans/2026-11-03-admin-audit-polish.md](plans/2026-11-03-admin-audit-polish.md) - Admin impeccable-audit polish: plan gate, OneSignal opt-in, formatting, Egyptian copy, sign-in
+- [plans/2026-11-02-neon-zero.md](plans/2026-11-02-neon-zero.md) - NEON-ZERO-1: the Ebda API with zero Postgres, Neon or Hyperdrive (inventory, scale rules, design note)
+- [plans/2026-11-03-editor-theme-spacing.md](plans/2026-11-03-editor-theme-spacing.md) - SP-1..3: simplified Theme panel (tiers, presets, density) and per-section, per-device spacing in the visual editor
+- [plans/2026-11-03-contact-form.md](plans/2026-11-03-contact-form.md) - CONTACT-FORM-1: studio service-enquiry form on the contact page
+- [plans/2026-11-03-storefront-premium-defaults.md](plans/2026-11-03-storefront-premium-defaults.md) - Storefront premium defaults (audit 2026-11-03)
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something
 - [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
@@ -280,6 +317,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [runbooks/STAGING-DEPLOYMENT.md](runbooks/STAGING-DEPLOYMENT.md) - Staging deployment + promotion flow
 - [runbooks/SUPER-ADMIN-PLAYBOOK.md](runbooks/SUPER-ADMIN-PLAYBOOK.md) - Super-admin playbook
+- [runbooks/analytics-cutover.md](runbooks/analytics-cutover.md) - Per-store analytics to the StoreDO, AiUsage to D1 (controller runs it)
+- [runbooks/platform-family-cutover.md](runbooks/platform-family-cutover.md) - Platform table family cutover, Postgres to D1 (controller runs it)
 - [runbooks/drop-legacy-app-role.md](runbooks/drop-legacy-app-role.md) - Drop the unused legacy app login role (production Neon)
 - [runbooks/ebda-names-rollout.md](runbooks/ebda-names-rollout.md) - Rollout: Ebda names replace the inherited service, token and env names
 - [runbooks/google-search-console-indexing.md](runbooks/google-search-console-indexing.md) - Google Search Console — Indexing Guide for demo-merchant.com
@@ -296,7 +335,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [runbooks/support-wholesaler-sees-retail.md](runbooks/support-wholesaler-sees-retail.md) - Support: "a wholesaler sees the retail price"
 - [runbooks/tenant-routing-canary.md](runbooks/tenant-routing-canary.md) - Tenant routing canary (demo-boutique first)
 - [runbooks/whatsapp-og-preview.md](runbooks/whatsapp-og-preview.md) - WhatsApp / Social Link Preview Runbook
-- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1)
+- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1); go/no-go, write freeze, rollback replay, Neon decommission gate; rehearsed by `scripts/cf/rehearse-cutover.sh` (Ruling CUTOVER-5)
 - [runbooks/neon-decommission.md](runbooks/neon-decommission.md) - Neon decommission (INFRA-CF-1 phase 7)
 
 ## security - Security

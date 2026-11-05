@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { Button, useToast } from '@ebda/ui';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, intlLocaleForUi } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ const major = minorToMajor;
 
 function fmt(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB');
+  return new Date(iso).toLocaleDateString(intlLocaleForUi('en-GB'));
 }
 
 const MATCH_BADGE: Record<MatchStatus, string> = {
@@ -115,7 +116,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
           type="text"
           value={entryId}
           onChange={e => setEntryId(e.target.value)}
-          placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+          placeholder={t('uuidExample')}
           className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <p className="mt-1 text-xs text-muted-foreground">{t('entryIdHelp')}</p>
@@ -142,10 +143,11 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function StatementDetailPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const statementId = params?.statementId as string;
-  const router = useRouter();
+  const { error: toastError } = useToast();
   const t = useT('finance.bankRec');
   const tx_t = useT('finance.bankRec.tx');
 
@@ -260,7 +262,7 @@ export default function StatementDetailPage() {
     );
     setActionLoading(null);
     if (err) {
-      alert(err.message ?? t('errors.action'));
+      toastError(err.message ?? t('errors.action'));
       return;
     }
     setRefreshKey(k => k + 1);
@@ -272,7 +274,7 @@ export default function StatementDetailPage() {
       { action: 'match', journalEntryId }
     );
     if (err) {
-      alert(err.message ?? t('errors.match'));
+      toastError(err.message ?? t('errors.match'));
       return;
     }
     setRefreshKey(k => k + 1);
@@ -290,34 +292,21 @@ export default function StatementDetailPage() {
   ];
 
   return (
-    <AdminLayout title={stmt?.fileName ?? t('title')}>
+    <AdminLayout
+      title={stmt?.fileName ?? t('title')}
+      subtitle={
+        stmt
+          ? `${stmt.glAccount.code} — ${stmt.glAccount.nameEn}${stmt.periodStart ? ` · ${fmt(stmt.periodStart)} – ${fmt(stmt.periodEnd)}` : ''}`
+          : undefined
+      }
+      parent={{ label: t('title'), href: `/stores/${storeId}/finance/bank-reconciliation` }}
+      actions={
+        <Button className="min-h-11" onClick={handleAutoMatch} disabled={autoMatchLoading}>
+          {autoMatchLoading ? t('autoMatching') : t('autoMatch')}
+        </Button>
+      }
+    >
       <div className="space-y-6 p-4 md:p-6">
-        {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <button
-              onClick={() => router.push(`/stores/${storeId}/finance/bank-reconciliation`)}
-              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← {t('title')}
-            </button>
-            <h1 className="text-xl font-semibold text-foreground">{stmt?.fileName ?? '…'}</h1>
-            {stmt && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {stmt.glAccount.code} — {stmt.glAccount.nameEn}
-                {stmt.periodStart && ` · ${fmt(stmt.periodStart)} – ${fmt(stmt.periodEnd)}`}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={handleAutoMatch}
-            disabled={autoMatchLoading}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40"
-          >
-            {autoMatchLoading ? t('autoMatching') : t('autoMatch')}
-          </button>
-        </div>
-
         {autoMatchMsg && (
           <div className="rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm text-info-ink">
             {autoMatchMsg}
@@ -388,8 +377,8 @@ export default function StatementDetailPage() {
                   {t('difference.bankBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.bankBalanceFils < 0 ? '−' : ''}EGP{' '}
-                  {major(Math.abs(difference.bankBalanceFils))}
+                  {difference.bankBalanceFils < 0 ? '−' : ''}
+                  {tc('egp')} {major(Math.abs(difference.bankBalanceFils))}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -397,8 +386,8 @@ export default function StatementDetailPage() {
                   {t('difference.ledgerBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.ledgerBalanceFils < 0 ? '−' : ''}EGP{' '}
-                  {major(Math.abs(difference.ledgerBalanceFils))}
+                  {difference.ledgerBalanceFils < 0 ? '−' : ''}
+                  {tc('egp')} {major(Math.abs(difference.ledgerBalanceFils))}
                 </p>
               </div>
               <div
@@ -423,7 +412,7 @@ export default function StatementDetailPage() {
                   }`}
                 >
                   {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
-                  EGP {major(Math.abs(difference.differenceFils))}
+                  {tc('egp')} {major(Math.abs(difference.differenceFils))}
                 </p>
               </div>
             </div>
@@ -436,7 +425,7 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedBankSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-warning-ink font-mono">
-                    EGP {major(difference.unmatchedBankFils)}
+                    {tc('egp')} {major(difference.unmatchedBankFils)}
                   </p>
                   <p className="mt-0.5 text-xs text-warning-ink">
                     {summary?.unmatched ?? 0} {t('difference.bankLines')}
@@ -447,8 +436,8 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedLedgerSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
-                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}EGP{' '}
-                    {major(Math.abs(difference.unmatchedLedgerFils))}
+                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}
+                    {tc('egp')} {major(Math.abs(difference.unmatchedLedgerFils))}
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}

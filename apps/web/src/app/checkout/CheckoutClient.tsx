@@ -2,6 +2,7 @@
 
 import { focusFirstError } from '@/lib/focus-first-error';
 import { signedText } from '@/lib/bidi';
+import { randomUuid } from '@/lib/uuid';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
@@ -17,8 +18,8 @@ import { api } from '../../lib/api';
 import {
   buildQuoteRequest,
   quoteKey,
+  expectedTotalToSend,
   freshQuote,
-  expectedTotalFor,
   priceChangedCopy,
   type HeldQuote,
 } from '../../lib/checkout-quote';
@@ -81,7 +82,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
-import { priceChangedLines } from '@/lib/gold-display';
+import { priceChangedLines, isDeferredGoldOption } from '@/lib/gold-display';
 import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
@@ -505,7 +506,7 @@ export default function CheckoutClient() {
   const cartEmailRecorded = useRef(false);
   const showSmsOptIn = store?.smsMarketingOptIn === true;
   // "Send me offers and reminders on WhatsApp": MARKETING consent (Ruling WA-CONSENT-1). Unticked by
-  // default, shown only when the store has Ebda WhatsApp linked. Ticking records consent against
+  // default, shown only when the store has Ebda Chat linked. Ticking records consent against
   // the phone (server stores only the hashed buyer key); unticking withdraws it.
   const [whatsAppOptIn, setWhatsAppOptIn] = useState(false);
   // Needs an account: the number comes from the account, never from this form (security review).
@@ -516,6 +517,32 @@ export default function CheckoutClient() {
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
+  // SHARIA-GOLD-1: with a gold line in the cart (and the merchant not allowing it) COD and installments are
+  // hidden. Display only: the API refuses them whatever this shows.
+  const [goldPrepaidOnly, setGoldPrepaidOnly] = useState(true);
+  const cartHasGold = cartContextItems.some(i => !i.unavailable && Boolean(i.gold));
+  const shownPaymentProviders = useMemo(
+    () =>
+      cartHasGold && goldPrepaidOnly
+        ? paymentProviders.filter(o => !isDeferredGoldOption(o.id))
+        : paymentProviders,
+    [cartHasGold, goldPrepaidOnly, paymentProviders]
+  );
+  // A gold cart on a store whose only online-capable options were hidden: nothing valid is left to pay with.
+  const goldNeedsOnlinePayment =
+    cartHasGold &&
+    goldPrepaidOnly &&
+    paymentProviders.length > 0 &&
+    shownPaymentProviders.length === 0;
+  useEffect(() => {
+    if (
+      shownPaymentProviders.length > 0 &&
+      !shownPaymentProviders.some(o => o.id === selectedProvider)
+    )
+      setSelectedProvider(shownPaymentProviders[0].id);
+    // Nothing left to choose: drop the stale default ('cod'), or Place order stays live and the COD fee still shows.
+    else if (shownPaymentProviders.length === 0 && selectedProvider !== '') setSelectedProvider('');
+  }, [shownPaymentProviders, selectedProvider]);
   // COD fee settings from /payments/config — the checkout quotes the fee with
   // the SAME function the order freezes it with (codFeeForOrder, MONEYB-3).
   const [codFeeConfig, setCodFeeConfig] = useState<CodFeeConfig | null>(null);
@@ -676,6 +703,8 @@ export default function CheckoutClient() {
             /** Per online provider, the methods the merchant turned on. */
             methods?: Record<string, Array<{ code: string; name: string; nameAr: string }>>;
             defaultProvider?: string;
+            /** SHARIA-GOLD-1: true unless the merchant allowed COD / installments for gold. */
+            goldPrepaidOnly?: boolean;
             cod?: {
               fixedFee: number;
               percentBps?: number;
@@ -776,6 +805,7 @@ export default function CheckoutClient() {
           }
 
           setPaymentProviders(allProviders);
+          setGoldPrepaidOnly(paymentResult.data.goldPrepaidOnly !== false);
           if (paymentResult.data.defaultProvider) {
             // The default is a provider id; a provider shown as several methods starts on its first.
             const def = paymentResult.data.defaultProvider;
@@ -1590,7 +1620,7 @@ export default function CheckoutClient() {
         : formData.notes;
 
       // ONE key per checkout attempt, kept across retries of the same submit (double tap, timeout) and dropped once an order exists
-      checkoutKeyRef.current ??= crypto.randomUUID();
+      checkoutKeyRef.current ??= randomUuid();
       const orderResult = await api.createOrder(
         {
           shippingAddress: {
@@ -1633,9 +1663,9 @@ export default function CheckoutClient() {
           pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
           // The total the buyer is looking at, as computed by the SERVER's quote for exactly these inputs and this cart. If the
           // server prices the order differently (approval revoked, tier edited, plan changed) it answers 409 PRICE_CHANGED and
-          // nothing is charged. Undefined when no fresh quote exists (the quote request failed), in which case the server
-          // simply charges its own price as before.
-          expectedTotal: expectedTotalFor(heldQuote, currentQuoteKey),
+          // nothing is charged. With no fresh quote (the request failed or is in flight) the total on screen is sent instead,
+          // so the order is never charged more than the buyer saw (Ruling QA-COUPON-1).
+          expectedTotal: expectedTotalToSend(heldQuote, currentQuoteKey, total),
           // Only sent when the customer ticked "Use wallet balance" on a store
           // where the API reports wallet checkout as available.
           useWallet: walletApplied > 0 ? true : undefined,
@@ -2052,6 +2082,13 @@ export default function CheckoutClient() {
           friendly = t(
             "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store.",
             'مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب لسه مستني تحديث النهارده. جرّب تاني بعد شوية أو كلّم المحل.'
+          );
+          break;
+        case 'GOLD_PREPAID_ONLY':
+          // SHARIA-GOLD-1: the server refused COD / installments for a gold order. Nothing was charged.
+          friendly = t(
+            'Orders with gold are paid in full online. Cash on delivery and installments are not available for gold.',
+            'طلبات الدهب بتتدفع كاملة أونلاين. الدفع عند الاستلام والتقسيط مش متاحين للدهب.'
           );
           break;
         case 'GOLD_PRICE_DRIFT':
@@ -2779,7 +2816,8 @@ export default function CheckoutClient() {
                     formData={formData}
                     shippingNames={reviewPlaceNames}
                     onEditShipping={() => setStep(1)}
-                    paymentProviders={paymentProviders}
+                    paymentProviders={shownPaymentProviders}
+                    goldNeedsOnlinePayment={goldNeedsOnlinePayment}
                     paymentConfigError={paymentConfigError}
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}

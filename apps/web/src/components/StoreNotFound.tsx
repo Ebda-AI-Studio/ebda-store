@@ -12,22 +12,41 @@ import type { ResolvedStore } from '../lib/store-resolver';
  * platform pitch (which also linked to competing merchants). Inherits the
  * store's theme CSS vars (set by the root layout) so it matches the brand.
  */
+const LOGO_CLASS =
+  'h-14 max-h-14 w-auto max-w-[150px] object-contain md:h-20 md:max-h-20 md:max-w-[210px]';
+
 export function StoreNotFound({ store }: { store: ResolvedStore }) {
   // Every store has its own host, so its home is simply `/`.
   const homeHref = '/';
   const logo = store.logo || store.logoAr;
   const storeName = store.nameAr || store.name;
 
+  // Audit 2026-11-03 #8 (CLS 0.13): the column was vertically CENTRED in 70vh, so the categories arriving
+  // late (client fetch) pushed the logo and heading up by half their height AND grew the box, which moved
+  // the cookie-preferences row below it. Top-aligned with a full-screen floor: late content only fills space
+  // that is already reserved.
   return (
-    <main className="flex min-h-[70vh] flex-col items-center justify-center gap-8 bg-background px-6 py-20 text-center text-foreground">
+    <main className="flex min-h-[100svh] flex-col items-center justify-start gap-8 bg-background px-6 pb-20 pt-20 text-center text-foreground sm:pt-28">
       <Link href={homeHref} className="inline-flex items-center" aria-label={storeName}>
         {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logo}
-            alt={storeName}
-            className="h-14 max-h-14 w-auto max-w-[150px] object-contain md:h-20 md:max-h-20 md:max-w-[210px]"
-          />
+          <>
+            {/* PREMIUM-11: both logos when the store has both; the page direction (set from the
+                language) shows the right one, as the header does. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={store.logo || logo}
+              alt={storeName}
+              className={`${LOGO_CLASS} ${store.logo && store.logoAr ? 'rtl:hidden' : ''}`}
+            />
+            {store.logo && store.logoAr && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={store.logoAr}
+                alt={storeName}
+                className={`${LOGO_CLASS} hidden rtl:block`}
+              />
+            )}
+          </>
         ) : (
           <span className="text-2xl font-bold">{storeName}</span>
         )}

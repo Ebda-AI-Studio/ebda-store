@@ -1,9 +1,10 @@
 import { z } from 'zod/v3';
 import { isReservedSlug, isDemoShowroomSlug } from './reserved-slugs';
 import { isProtectedSlug } from '../abuse/protected-slugs';
+import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH, slugFormatError } from '../foundation/slugs';
 
-export const STORE_SLUG_MIN_LENGTH = 3;
-export const STORE_SLUG_MAX_LENGTH = 40;
+export const STORE_SLUG_MIN_LENGTH = SLUG_MIN_LENGTH;
+export const STORE_SLUG_MAX_LENGTH = SLUG_MAX_LENGTH;
 
 /** Machine-readable reasons a store slug is refused. Stable: clients key on these. */
 export type StoreSlugErrorCode =
@@ -17,8 +18,6 @@ export type StoreSlugErrorCode =
 export type StoreSlugValidation =
   | { ok: true; slug: string }
   | { ok: false; code: StoreSlugErrorCode; message: string };
-
-const SLUG_CHARS = /^[a-z0-9-]+$/;
 
 /** Human-readable text per code (English; the admin maps codes to Arabic copy). */
 export const STORE_SLUG_ERROR_MESSAGES: Record<StoreSlugErrorCode, string> = {
@@ -45,12 +44,8 @@ export function validateStoreSlugFormat(raw: string): StoreSlugValidation {
     code,
     message: STORE_SLUG_ERROR_MESSAGES[code],
   });
-  if (!SLUG_CHARS.test(slug)) return fail('SLUG_INVALID_CHARS');
-  if (slug.length < STORE_SLUG_MIN_LENGTH) return fail('SLUG_TOO_SHORT');
-  if (slug.length > STORE_SLUG_MAX_LENGTH) return fail('SLUG_TOO_LONG');
-  if (slug.startsWith('-') || slug.endsWith('-') || slug.includes('--')) {
-    return fail('SLUG_INVALID_HYPHEN');
-  }
+  const error = slugFormatError(slug);
+  if (error) return fail(error);
   return { ok: true, slug };
 }
 

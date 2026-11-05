@@ -70,7 +70,9 @@
       "empty": "No results for “{q}”",
       "error": "Search is unavailable right now. Try again.",
       "count": "{n, plural, one {{n} result} other {{n} results}}"
-    }
+    },
+    "egp": "EGP",
+    "egpParen": "(EGP)"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -185,7 +187,9 @@
         "products": "Products",
         "orders": "Orders",
         "customers": "Customers",
-        "revenue": "Revenue"
+        "revenue": "Revenue",
+        "loadFailed": "We could not load the store numbers right now.",
+        "retry": "Try again"
       },
       "accountingSummary": {
         "title": "Finance + Stock at a glance",
@@ -227,7 +231,9 @@
           "slugTooShort": "Slug must be at least 3 characters",
           "slugTooLong": "Slug must be less than 50 characters",
           "slugTaken": "This slug is already in use"
-        }
+        },
+        "activateCta": "Activate store",
+        "edit": "Edit"
       },
       "owner": {
         "title": "Store Owner",
@@ -261,11 +267,11 @@
         "columnValue": "Value"
       },
       "quickActions": {
-        "title": "Quick Actions",
-        "suspend": "Suspend Store",
-        "suspendDescription": "Temporarily disable access",
-        "activate": "Activate Store",
-        "activateDescription": "Enable store access",
+        "title": "Start here",
+        "suspend": "Suspend store",
+        "suspendDescription": "Visitors cannot open the store until you bring it back.",
+        "activate": "Activate store",
+        "activateDescription": "The store opens to visitors again.",
         "viewProducts": "View Products",
         "viewProductsCount": "{count} products",
         "viewOrders": "View Orders",
@@ -273,7 +279,17 @@
         "analytics": "Analytics",
         "analyticsDescription": "View store metrics",
         "manageFeatures": "Manage Features",
-        "manageFeaturesDescription": "Toggle store capabilities"
+        "manageFeaturesDescription": "Toggle store capabilities",
+        "addProduct": "Add a product",
+        "addProductBody": "A new product with photos and price",
+        "phoneOrder": "Record a phone order",
+        "phoneOrderBody": "Create an order for a customer who called",
+        "newCoupon": "New coupon",
+        "newCouponBody": "A discount code for your customers",
+        "shareLink": "Copy store link",
+        "shareLinkBody": "Send it on WhatsApp or Instagram",
+        "linkCopied": "Store link copied",
+        "linkCopyFailed": "Could not copy the link. Copy it from the address bar."
       },
       "settings": {
         "title": "Settings & Configuration",
@@ -316,6 +332,17 @@
         "landing": "Landing page",
         "referrer": "Referrer",
         "firstSeen": "First seen"
+      },
+      "openEditor": "Open the editor",
+      "needsAction": {
+        "title": "Needs your attention",
+        "orders": "New orders",
+        "lowStock": "Products running low",
+        "returns": "Returns waiting for you",
+        "reviews": "Reviews waiting for approval",
+        "allClear": "Nothing is waiting for you right now.",
+        "loadFailed": "We could not load what needs your attention right now.",
+        "retry": "Try again"
       }
     },
     "list": {
@@ -361,7 +388,9 @@
       "emptyTitle": "No stores found",
       "emptyHintSearch": "Try adjusting your search or filter criteria",
       "emptyHintDefault": "Get started by creating your first store on the platform",
-      "emptyCta": "Create Your First Store"
+      "emptyCta": "Create Your First Store",
+      "deleteStore": "Delete store",
+      "rowMenuLabel": "Options for store {name}"
     },
     "new": {
       "title": "Create New Store",
@@ -441,6 +470,28 @@
         "createFailed": "Failed to create store",
         "generic": "Something went wrong"
       }
+    },
+    "avatar": {
+      "logoAlt": "{name} logo"
+    },
+    "deleteStore": {
+      "title": "Delete store",
+      "consequence": "The store \"{name}\" and all its products and orders will be permanently deleted. This cannot be undone.",
+      "typeSlugLabel": "Type the store slug {slug} exactly to confirm",
+      "typeSlugPlaceholder": "Store slug",
+      "confirmObject": "Store \"{name}\"",
+      "confirmLabel": "Delete store",
+      "submit": "Delete store",
+      "cancel": "Cancel",
+      "deleting": "Deleting…",
+      "deletedToast": "Store deleted",
+      "deletedToastBody": "\"{name}\" and all its data were deleted.",
+      "errBillingParent": "This store is the billing parent of other stores. Move their billing first, then delete it.",
+      "errMoneyInFlight": "This store has money in flight (a payment or payout). Wait for it to settle and try again.",
+      "errMfaRequired": "Turn on two-step verification for your account before deleting a store.",
+      "errSession": "Your session ended. Sign in again to continue.",
+      "errNetwork": "No connection right now. Check your internet and try again.",
+      "securityLink": "Open account security"
     }
   },
   "products": {
@@ -455,7 +506,8 @@
         "bulkImport": "Bulk Import",
         "backToStore": "Back to Store",
         "orderNewArrivals": "Order New Arrivals",
-        "orderBestSellers": "Order Best Sellers"
+        "orderBestSellers": "Order Best Sellers",
+        "more": "More"
       },
       "filters": {
         "ariaLabel": "Filter products by status",
@@ -489,13 +541,19 @@
         "variants": "Variants",
         "edit": "Edit",
         "view": "View",
-        "delete": "Delete"
+        "delete": "Delete",
+        "overview": "Overview",
+        "menu": "Options for product {name}"
       },
       "empty": {
-        "title": "No products found",
-        "description": "Add your first product to get started.",
-        "descriptionFiltered": "Try adjusting your search or filters.",
-        "addProduct": "Add Product"
+        "title": "No products yet",
+        "description": "Add your first product to start selling.",
+        "descriptionFiltered": "No results. Try changing the search or filters.",
+        "titleActiveOnly": "No active products",
+        "descriptionActiveOnly": "Your products may still be drafts. Check the Drafts view, or add a product.",
+        "showDrafts": "Show drafts",
+        "addProduct": "Add Product",
+        "titleFiltered": "No matching products"
       },
       "pagination": {
         "showing": "Showing {from} to {to} of {total} products",
@@ -580,7 +638,9 @@
         "selected": "{count} selected",
         "massEdit": "Mass edit",
         "clear": "Clear selection"
-      }
+      },
+      "priceFrom": "From",
+      "selectProduct": "Select {name}"
     },
     "detail": {
       "loading": "Loading...",
@@ -726,7 +786,8 @@
         "searchTermsTruncated": "Words that will be cut to 60 characters: {count}",
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
-        "searchTermsNearLimit": "Almost at the limit"
+        "searchTermsNearLimit": "Almost at the limit",
+        "priceMinError": "The price must be more than zero."
       },
       "statusOptions": {
         "draft": "Draft",
@@ -735,7 +796,8 @@
       },
       "actions": {
         "saveChanges": "Save Changes",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "saveProduct": "Save product"
       },
       "faqs": {
         "title": "FAQs",
@@ -758,7 +820,9 @@
         "aiSuccess": "AI drafted {count} FAQs — review and save each one.",
         "reviewNote": "AI draft — review before saving",
         "saveAll": "Save all AI drafts",
-        "discardAll": "Discard AI drafts"
+        "discardAll": "Discard AI drafts",
+        "deletedToast": "Question deleted",
+        "undo": "Undo"
       },
       "seoSection": {
         "hint": "How this product appears on Google and when shared.",
@@ -809,7 +873,9 @@
         "maxLength": "Max characters",
         "required": "Required before adding to cart",
         "needLabel": "Personalisation needs a label in Arabic or English.",
-        "invalidMax": "Max characters must be a whole number from 1 to 200."
+        "invalidMax": "Max characters must be a whole number from 1 to 200.",
+        "embroideryNameArSample": "الاسم للتطريز",
+        "embroideryNameEnSample": "Name to embroider"
       },
       "fulfilment": {
         "title": "Fulfilment",
@@ -817,6 +883,37 @@
         "leadTime": "Made-to-order days",
         "placeholder": "Ready to ship",
         "invalid": "Made-to-order days must be a whole number from 0 to {max}."
+      },
+      "balanceFailed": "Balance failed — try again",
+      "balanceTitle": "Balance languages (name + description EN/AR)",
+      "retryWarn": "⚠ Retry",
+      "balanced": "✓ Balanced",
+      "balanceLanguages": "Balance languages",
+      "revertFailed": "Revert failed — try again",
+      "revertTitle": "Revert balance — restore originals",
+      "revert": "↩ Revert",
+      "faqQuestionEnSample": "e.g. What sizes are available?",
+      "faqQuestionArSample": "مثال: ما الأحجام المتوفرة؟",
+      "faqAnswerEnSample": "e.g. Available in S, M, L, XL.",
+      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL.",
+      "viewInStore": "View in store",
+      "moreMenu": "More product options",
+      "createdBanner": "Product added. Next step: add sizes or colours if it has any.",
+      "addVariants": "Add variants",
+      "toast": {
+        "saved": "Product saved"
+      },
+      "tabs": {
+        "label": "Product page sections",
+        "edit": "Edit",
+        "overview": "Overview"
+      },
+      "deleteDialog": {
+        "object": "Product “{name}”",
+        "consequence": "It is removed from the store and new orders, and cannot be restored.",
+        "confirmLabel": "Delete product",
+        "done": "Product deleted",
+        "failed": "We could not delete the product. Try again."
       }
     },
     "recommendations": {
@@ -881,6 +978,11 @@
           "title": "Promote all recommendations?",
           "body": "This will add <b>{count}</b> {count, plural, one {AI-suggested product} other {AI-suggested products}} to the manual cross-sell list.",
           "confirmButton": "Promote {count}"
+        },
+        "demoteDialog": {
+          "object": "{count} AI-promoted product(s)",
+          "consequence": "They leave the manual cross-sell list and the storefront falls back to AI picks.",
+          "confirmLabel": "Remove suggestions"
         }
       }
     },
@@ -934,32 +1036,43 @@
         "errorPriceInvalid": "Price for “{name}” must be a positive number.",
         "defaultOptionName": "Variant",
         "parentSkuNote": "Per-variant SKUs are auto-generated as “{sku}-<variant>”.",
-        "multiAxisLockNote": "Multi-axis names are locked — edit price, stock, or image only."
+        "multiAxisLockNote": "Multi-axis names are locked — edit price, stock, or image only.",
+        "deleteDialog": {
+          "object": "Variant “{name}”",
+          "consequence": "It will be removed from the product and cannot be restored.",
+          "confirmLabel": "Delete variant"
+        }
       }
     },
     "new": {
-      "title": "Add New Product",
-      "subtitle": "Create a new product for your store",
+      "title": "New product",
+      "subtitle": "Start with the essentials and finish the rest after you add the product",
       "sections": {
         "basicInformation": "Basic Information",
         "media": "Media",
-        "pricing": "Pricing",
+        "pricing": "Discount and cost",
         "inventory": "Inventory",
         "status": "Status",
-        "organization": "Organization"
+        "organization": "Organization",
+        "essentials": "Essentials",
+        "moreDetails": "More details",
+        "moreDetailsHint": "Description, discount, cost, search words and badge. Not needed now.",
+        "englishCopy": "English copy (optional)",
+        "arabicCopy": "Arabic copy (optional)",
+        "badge": "Badge on the product card"
       },
       "fields": {
-        "name": "Product Name",
+        "name": "Product name",
         "namePlaceholder": "Enter product name",
-        "nameAr": "Product Name (Arabic)",
+        "nameAr": "Product name",
         "nameArPlaceholder": "ادخل اسم المنتج",
-        "description": "Description",
+        "description": "Description in English",
         "descriptionPlaceholder": "Describe your product...",
-        "descriptionAr": "Description (Arabic)",
+        "descriptionAr": "Description in Arabic",
         "descriptionArPlaceholder": "وصف المنتج...",
-        "badgeLabel": "Card badge (English)",
+        "badgeLabel": "Badge in English",
         "badgeLabelPlaceholder": "e.g. Offer",
-        "badgeLabelAr": "Card badge (Arabic)",
+        "badgeLabelAr": "Badge in Arabic",
         "badgeLabelArPlaceholder": "مثلاً عرض",
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "searchTerms": "Search words",
@@ -987,23 +1100,29 @@
         "skuPlaceholder": "PROD-001",
         "quantity": "Quantity",
         "quantityPlaceholder": "0",
-        "productStatus": "Product Status",
+        "productStatus": "Status",
         "category": "Category",
         "noCategory": "No category",
         "lowStockThreshold": "Low-Stock Threshold",
-        "lowStockThresholdPlaceholder": "5"
+        "lowStockThresholdPlaceholder": "5",
+        "nameArOptional": "Product name in Arabic (optional)",
+        "nameOptional": "Product name in English (optional)"
       },
       "statusOptions": {
-        "draft": "Draft",
-        "active": "Active",
+        "draft": "Draft (hidden from the store)",
+        "active": "Visible in the store",
         "archived": "Archived"
       },
       "actions": {
-        "create": "Create Product",
+        "create": "Add the product",
         "cancel": "Cancel"
       },
       "errors": {
-        "createFailed": "Failed to create product. Please try again."
+        "createFailed": "We could not add the product. Try again.",
+        "priceMin": "The price must be more than zero."
+      },
+      "toast": {
+        "created": "Product added"
       }
     },
     "newArrivalsOrder": {
@@ -1111,6 +1230,11 @@
         "silver": "Silver",
         "platinum": "Platinum",
         "custom": "Custom colour"
+      },
+      "removeDialog": {
+        "object": "The product's 3D model",
+        "consequence": "Shoppers will see photos only.",
+        "confirmLabel": "Remove the model"
       }
     }
   },
@@ -1208,7 +1332,10 @@
         "refundReferencePlaceholder": "Transfer number or a short note",
         "refundFailed": "Could not record the refund. Please try again.",
         "instapayTitle": "Confirm the InstaPay transfer?",
-        "instapayDescription": "Confirm that the money for this order is in your InstaPay account. The order is then confirmed and can be shipped. Tapping twice is safe."
+        "instapayDescription": "Confirm that the money for this order is in your InstaPay account. The order is then confirmed and can be shipped. Tapping twice is safe.",
+        "markPaidLabel": "Mark order as paid",
+        "bulkMarkPaidLabel": "Mark orders as paid",
+        "instapayLabel": "Yes, the money arrived"
       },
       "toast": {
         "errorTitle": "Error",
@@ -1233,9 +1360,13 @@
         "markPaid": "Failed to mark as paid",
         "bulkMarkPaid": "Failed to bulk mark as paid",
         "retry": "Retry",
-        "confirmInstapay": "Could not confirm the InstaPay payment"
+        "confirmInstapay": "Could not confirm the InstaPay payment",
+        "invoiceLoad": "Could not open the invoice",
+        "invoiceLoadHttp": "The server returned error {status}. Try again."
       },
-      "agentBadge": "Agent"
+      "agentBadge": "Agent",
+      "newOrder": "New phone order",
+      "moreMenu": "More order options"
     },
     "status": {
       "pending": "Pending",
@@ -1376,7 +1507,7 @@
       "whatsappCustomer": "WhatsApp",
       "actions": {
         "processed": "Processed",
-        "cancel": "Cancel",
+        "cancel": "Cancel order",
         "more": "More",
         "printInvoice": "Print Invoice",
         "markPaid": "Mark Paid",
@@ -1526,7 +1657,12 @@
       "priceTier": "Wholesale price, {qty}+ units",
       "priceWholesale": "Wholesale price",
       "priceQuantity": "Quantity price, {qty}+ units",
-      "priceGroup": "Price group"
+      "priceGroup": "Price group",
+      "cancelDialog": {
+        "object": "Order {number}",
+        "consequence": "The order is cancelled and its status cannot be restored.",
+        "confirmLabel": "Cancel the order"
+      }
     },
     "layout": {
       "common": {
@@ -1615,7 +1751,10 @@
         "successTitle": "AI filled empty kicker + subtitle fields",
         "generating": "Generating…",
         "generateWithAi": "Generate with AI"
-      }
+      },
+      "fontFamilyExample": "e.g. Cairo, Inter, \"Open Sans\"",
+      "fontNameExample": "e.g. \"My Brand Sans\"",
+      "uploadFileSize": "{name} ({kb} KB)"
     },
     "devices": {
       "title": "Notification devices",
@@ -1627,7 +1766,8 @@
       "removeConfirmDescription": "Push notifications will stop arriving on this device. You can re-enable from the same browser.",
       "loading": "Loading devices…",
       "error": "Failed to load devices",
-      "removeError": "Failed to remove device"
+      "removeError": "Failed to remove device",
+      "browserFallback": "Browser"
     },
     "invoice": {
       "title": "Invoice",
@@ -1734,7 +1874,8 @@
         "noBuyersSub": "No orders yet",
         "ordersSub": "{count, plural, one {Across {count, number, latn} order} other {Across {count, number, latn} orders}}",
         "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts)"
-      }
+      },
+      "moreMenu": "More customer options"
     },
     "detail": {
       "loading": "Loading…",
@@ -1965,7 +2106,10 @@
     "errors": {
       "loadFailedTitle": "Some analytics could not be loaded",
       "loadFailedBody": "A request failed. The figures below may be incomplete.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "cashflowLockedTitle": "Cash flow is locked on your plan",
+      "cashflowLockedBody": "Cash flow and stock value are for the store owner on plans that include accounting.",
+      "cashflowLockedCta": "See plans"
     },
     "priceSource": {
       "title": "Wholesale vs retail",
@@ -1979,18 +2123,20 @@
       "group": "Wholesale group",
       "empty": "No sales in this period yet.",
       "loadFailed": "Could not load the wholesale split."
-    }
+    },
+    "dateTo": "To",
+    "dateFrom": "From"
   },
   "settings": {
     "page": {
       "title": "Store Settings",
-      "subtitle": "Configure all aspects of this store",
+      "subtitle": "Everything about your store in one place",
       "backToStore": "Back to Store"
     },
     "cards": {
       "branding": {
-        "title": "Branding",
-        "description": "Logo, colors, fonts, contact info and social links"
+        "title": "Logo and colors",
+        "description": "Your logo, store colors and contact details"
       },
       "navigation": {
         "title": "Navigation",
@@ -2002,39 +2148,39 @@
       },
       "categories": {
         "title": "Categories",
-        "description": "Manage product categories, images and display order"
+        "description": "Arrange product categories and their images"
       },
       "seo": {
-        "title": "SEO",
-        "description": "Meta titles, meta descriptions and search engine optimization"
+        "title": "Google visibility",
+        "description": "Titles and descriptions of your pages in search results"
       },
       "announcement": {
-        "title": "Announcement Bar",
-        "description": "Show a banner across the top of your store with promotions or news"
+        "title": "Announcement bar",
+        "description": "A bar above the store for offers and news"
       },
       "domain": {
         "title": "Domain",
-        "description": "Connect a custom domain to your store"
+        "description": "Connect a domain with your store name"
       },
       "paymentSettings": {
-        "title": "Payment Settings",
-        "description": "Configure payment providers: Paymob, Kashier, Fawry, InstaPay, Cash on Delivery"
+        "title": "Payments",
+        "description": "Choose the payment methods your customers use"
       },
       "shipping": {
         "title": "Shipping",
-        "description": "Delivery zones, shipping rates and carrier settings"
+        "description": "Delivery areas and shipping prices"
       },
       "taxSettings": {
-        "title": "Tax Settings",
-        "description": "Tax rates, tax calculation rules and exemptions"
+        "title": "Taxes",
+        "description": "Tax rates and exemptions"
       },
       "pwaSettings": {
-        "title": "PWA Settings",
-        "description": "Progressive Web App configuration for mobile users"
+        "title": "Mobile app",
+        "description": "Let customers install your store as an app on their phone"
       },
       "template": {
-        "title": "Template",
-        "description": "Choose and customize the storefront design template"
+        "title": "Store look",
+        "description": "Open the editor to change colors, pages and design"
       },
       "pages": {
         "title": "Footer Links",
@@ -2042,7 +2188,7 @@
       },
       "language": {
         "title": "Language",
-        "description": "Set the default language for your storefront"
+        "description": "The language your store opens in for customers"
       },
       "marketingPixels": {
         "title": "Marketing Pixels",
@@ -2050,7 +2196,7 @@
       },
       "notifications": {
         "title": "Notifications",
-        "description": "SMS and Push notification settings"
+        "description": "Customer messages and new order alerts"
       },
       "affiliates": {
         "title": "Affiliate Program",
@@ -2069,36 +2215,36 @@
         "description": "View and export the email list captured from your storefront"
       },
       "staff": {
-        "title": "Staff Members",
-        "description": "Add team members with limited access to manage orders, products, and inventory"
+        "title": "Team",
+        "description": "Add staff with limited permissions"
       },
       "waBotConfig": {
         "title": "WhatsApp Bot Config",
         "description": "Bot mode · service menu · Meta Commerce catalog credentials"
       },
       "checkoutDelivery": {
-        "title": "Delivery",
-        "description": "Delivery info note and time-window selector shown at checkout"
+        "title": "Delivery times",
+        "description": "The delivery note and time slots customers see at checkout"
       },
       "agentKey": {
         "title": "AI agent key",
-        "description": "Issue, rotate or revoke the key an AI agent needs to order from this store"
+        "description": "A key that lets an AI agent order from your store"
       },
       "merchantKeys": {
         "title": "Merchant MCP keys",
-        "description": "Issue keys so you can run this store from Claude Code or any MCP client"
+        "description": "Keys to run the store from Claude Code or any MCP tool"
       },
       "billing": {
-        "title": "Billing",
-        "description": "Plan, usage and limits"
+        "title": "Plan and billing",
+        "description": "Your current plan and usage"
       },
       "webhooks": {
         "title": "Webhooks",
         "description": "Send order and product events to your own server"
       },
       "qrCodes": {
-        "title": "QR codes & barcodes",
-        "description": "QR codes, product barcode labels and the receipt barcode, with scan checks"
+        "title": "QR codes and barcodes",
+        "description": "A QR for the store and barcodes for products and invoices"
       }
     },
     "metaCatalogCard": {
@@ -2131,15 +2277,26 @@
     "settingsSearch": {
       "placeholder": "Search settings...",
       "noResults": "No settings found"
+    },
+    "groups": {
+      "store": "Store",
+      "sales": "Selling and payments",
+      "visibility": "Visibility",
+      "team": "Team and account",
+      "developers": "For developers"
+    },
+    "rail": {
+      "label": "Settings sections",
+      "allSettings": "All settings"
     }
   },
   "branding": {
     "page": {
       "title": "Store Branding",
-      "subtitle": "Customize {name}'s visual identity"
+      "subtitle": "Name, logo, colors and contact details for {name}"
     },
     "actions": {
-      "save": "Save Changes",
+      "save": "Save branding",
       "saving": "Saving...",
       "backToStores": "Back to stores"
     },
@@ -2154,10 +2311,10 @@
       "accessDeniedBody": "You do not have permission to update this store",
       "sessionExpiredTitle": "Session expired",
       "sessionExpiredBody": "Please log in again",
-      "saveFailedPrefix": "Failed to save ",
+      "saveFailedPrefix": "Could not save the branding",
       "serverError": "Server error",
       "saveSuccessTitle": "Branding saved",
-      "saveSuccessBody": "All changes have been saved successfully"
+      "saveSuccessBody": "All the changes were saved together."
     },
     "tabs": {
       "ariaLabel": "Branding settings tabs",
@@ -2267,11 +2424,11 @@
       },
       "logoSize": {
         "title": "Logo size",
-        "hint": "How big your logo appears in the header. Auto fits each logo to its shape. S / M / L are three fixed sizes (Small is the most compact, Large matches the full default) — picking any of them changes the logo immediately. Affects only this store.",
-        "auto": "Auto",
-        "sm": "S",
-        "md": "M",
-        "lg": "L"
+        "hint": "Pick the size of the logo at the top of the store.",
+        "auto": "Automatic",
+        "sm": "Small",
+        "md": "Medium",
+        "lg": "Large"
       },
       "blog": {
         "title": "Enable blog",
@@ -2333,6 +2490,17 @@
         "generateButton": "Generate palette from brand colors",
         "smartPaletteButton": "Generate from Smart Palette",
         "editorLink": "Fine-tune colors in the editor"
+      },
+      "elsewhere": {
+        "title": "Other settings live where they belong",
+        "blog": "Turning the blog on is done from the blog page.",
+        "blogLink": "Open the blog",
+        "webPush": "Browser notifications for customers are turned on from the notifications page.",
+        "webPushLink": "Open notifications"
+      },
+      "advanced": {
+        "title": "Advanced: icon and footer looks",
+        "hint": "Rarely changed. The rest of the look details are in the editor."
       }
     },
     "preview": {
@@ -2453,7 +2621,10 @@
   "coupons": {
     "page": {
       "title": "Discount Coupons",
-      "subtitle": "Manage promotional codes and discounts"
+      "subtitle": "Manage promotional codes and discounts",
+      "loadFailed": "We could not load the coupons. Check your connection and try again.",
+      "deleteFailed": "We could not delete the coupon. Try again.",
+      "toggleFailed": "We could not change the coupon status. Try again."
     },
     "actions": {
       "create": "Create Coupon",
@@ -2462,7 +2633,13 @@
       "edit": "Edit",
       "delete": "Delete",
       "activate": "Activate",
-      "deactivate": "Deactivate"
+      "deactivate": "Deactivate",
+      "menu": "Options for coupon {code}",
+      "deleteDialog": {
+        "object": "Coupon {code}",
+        "consequence": "Customers can no longer use it and it cannot be restored.",
+        "confirmLabel": "Delete coupon"
+      }
     },
     "filters": {
       "searchPlaceholder": "Search coupons...",
@@ -2500,7 +2677,10 @@
     },
     "modal": {
       "createTitle": "Create Coupon",
-      "editTitle": "Edit Coupon"
+      "editTitle": "Edit Coupon",
+      "valueInvalid": "Enter the discount value; it must be more than zero.",
+      "valuePercentMax": "The percentage must be between 1 and 100.",
+      "saveFailed": "We could not save the coupon. Try again."
     },
     "form": {
       "codeLabel": "Coupon Code *",
@@ -2547,7 +2727,7 @@
     "page": {
       "title": "Promotions",
       "subtitle": "Automatic discounts that apply at checkout without a code.",
-      "addNew": "New promotion",
+      "addNew": "Add a promotion",
       "name": "Name",
       "nameAr": "Name (Arabic)",
       "description": "Description",
@@ -2596,14 +2776,21 @@
       "deleteConfirm": "Delete \"{name}\"?",
       "loadFailed": "Could not load promotions.",
       "saveFailed": "Could not save the promotion.",
-      "deleteFailed": "Could not delete the promotion."
+      "deleteFailed": "Could not delete the promotion.",
+      "deleteDialog": {
+        "object": "Promotion “{name}”",
+        "consequence": "It stops immediately and cannot be restored.",
+        "confirmLabel": "Delete promotion"
+      },
+      "addFirst": "Add your first promotion",
+      "rowMenu": "Options for promotion {name}"
     }
   },
   "bundles": {
     "page": {
-      "title": "Bundles",
-      "subtitle": "Sell a fixed kit of products as one item at one price.",
-      "addNew": "New bundle",
+      "title": "Product sets",
+      "subtitle": "Sell a fixed group of products as one item at one price.",
+      "addNew": "Add a set",
       "name": "Name",
       "nameAr": "Name (Arabic)",
       "slug": "Slug",
@@ -2657,7 +2844,14 @@
       "deactivateConfirm": "Deactivate \"{name}\"? It will stop selling, but existing cart/order references are kept.",
       "loadFailed": "Could not load bundles.",
       "saveFailed": "Could not save the bundle.",
-      "deactivateFailed": "Could not deactivate the bundle."
+      "deactivateFailed": "Could not deactivate the bundle.",
+      "deactivateDialog": {
+        "object": "Product set “{name}”",
+        "consequence": "It stops selling; existing carts and orders keep their reference to it.",
+        "confirmLabel": "Stop selling the set"
+      },
+      "addFirst": "Add your first set",
+      "rowMenu": "Options for set {name}"
     },
     "itemPicker": {
       "heading": "Component products",
@@ -2926,7 +3120,7 @@
       "sectionSubtitle": "Set a fee per Egypt area. This is the recommended way to price per-area delivery.",
       "applyAll": "Apply fee to all areas:",
       "applyBtn": "Apply",
-      "applyAllGlobal": "Apply to all areas (all governorates)",
+      "applyAllGlobal": "Apply one price to all governorates",
       "applyAllGlobalFee": "Flat fee",
       "applyAllGlobalThreshold": "Free-shipping threshold",
       "applyAllGlobalFeeBtn": "Apply fee to all",
@@ -2974,7 +3168,25 @@
       "addCustomLocationHint": "Add a country, province and area that aren't in the list above.",
       "remove": "Remove",
       "deleteFailed": "Couldn't delete the area",
-      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}"
+      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}",
+      "areaNameEnSample": "Area name",
+      "areaNameArSample": "اسم المنطقة",
+      "countryEnSample": "e.g. Saudi Arabia",
+      "countryArSample": "مثال: المملكة العربية السعودية",
+      "cityEnSample": "e.g. Riyadh",
+      "cityArSample": "مثال: الرياض",
+      "districtEnSample": "e.g. Al Olaya",
+      "districtArSample": "مثال: العليا",
+      "moreMenu": "More rate options",
+      "firstRunTitle": "One price for all of Egypt?",
+      "firstRunHint": "Enter the shipping fee once and it applies to every governorate. You can change a single governorate later.",
+      "firstRunFee": "Shipping fee",
+      "firstRunFeePlaceholder": "e.g. 50",
+      "firstRunFreeOver": "Free shipping when the order is over (optional)",
+      "firstRunFreeOverPlaceholder": "e.g. 1000",
+      "firstRunSave": "Save this price for all of Egypt",
+      "perGovernorateTitle": "Different prices per governorate",
+      "perGovernorateHint": "Open a governorate and set the price of each area in it."
     },
     "returnPolicy": {
       "title": "Return policy",
@@ -2993,7 +3205,13 @@
   "tax": {
     "page": {
       "title": "Tax & VAT",
-      "subtitle": "VAT registration, tax rates and settings for your store"
+      "subtitle": "VAT registration, tax rates and settings for your store",
+      "rateSaveFailed": "Could not save the rate",
+      "rateToggleFailed": "Could not change the rate status",
+      "rateDeleteFailed": "Could not delete the rate",
+      "rateDeleteObject": "The tax rate \"{name}\"",
+      "rateDeleteConsequence": "The rate is removed from the store and will not apply to any new order.",
+      "rateDeleteLabel": "Delete the rate"
     },
     "settings": {
       "title": "General Settings",
@@ -3076,6 +3294,13 @@
       "sum": "Every active rate applies to every order, and active rates are added together: 5% + 2% charges 7%. Checkout shows and charges that same combined rate.",
       "combined": "Combined rate charged now: {rate}%",
       "off": "Tax collection is off — no tax is charged, whatever rates are listed."
+    },
+    "steps": {
+      "label": "Tax setup steps",
+      "register": "Register the tax number",
+      "eta": "Connect e-invoicing",
+      "rates": "Set the rates",
+      "done": "done"
     }
   },
   "inventory": {
@@ -3196,14 +3421,17 @@
       "dismiss": "Dismiss"
     },
     "page": {
-      "title": "Progressive Web App",
-      "subtitle": "Enable app-like experience for your customers"
+      "title": "App on the customer's phone",
+      "subtitle": "Customers install your store on their phone screen like any app",
+      "advanced": "Advanced: the app file (manifest)",
+      "advancedHint": "This is what the browser reads to install the app. You rarely need to change anything here."
     },
     "actions": {
       "statusLabel": "PWA Status:",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "save": "Save Settings"
+      "enabled": "On",
+      "disabled": "Off",
+      "save": "Save the app",
+      "switchTitle": "Turn the app on for your customers"
     },
     "messages": {
       "populated": "Populated from store branding",
@@ -3492,7 +3720,18 @@
         "payout_completed": "Payout completed",
         "payout_failed": "Payout failed"
       }
-    }
+    },
+    "subtitle": "Affiliates",
+    "backToAffiliates": "Back to Affiliates",
+    "auditTrail2": "Audit Trail →",
+    "noEventsYet": "No events yet",
+    "eventHistory": "Event History",
+    "orderLabel": "Order:",
+    "commissionLabel": "Commission:",
+    "amountLabel": "Amount:",
+    "via": "via",
+    "eventsTitle": "{name} — Events",
+    "eventsTitleFallback": "Affiliate Events"
   },
   "bulk": {
     "page": {
@@ -3503,7 +3742,8 @@
     "tabs": {
       "ariaLabel": "Bulk operations tabs",
       "import": "Import Products",
-      "export": "Export Products"
+      "export": "Export Products",
+      "catalog": "From photos or PDF"
     },
     "import": {
       "instructionsTitle": "How to Import Products",
@@ -3594,6 +3834,152 @@
     "errors": {
       "network": "Network error. Please try again.",
       "importFailed": "Import failed"
+    },
+    "catalogImport": {
+      "title": "Import products from photos or PDFs",
+      "intro": "Upload photos of a menu, a shelf, a price tag or a price list, or a PDF. We read the products and prices for you to check. Nothing goes live until you publish it.",
+      "choose": "Choose files",
+      "uploading": "Uploading...",
+      "limits": "Up to 4 files, 6 MB each. PDFs up to 10 pages.",
+      "allowance": "{count} pages left this month",
+      "privacyNote": "Phone numbers, emails and links in the photo are not copied into your products. Uploaded files are deleted after 30 days.",
+      "upgradeTitle": "Not included in your plan",
+      "upgradeBody": "Importing products from photos and PDFs is available on paid plans. Upgrade to turn it on.",
+      "jobsTitle": "Your imports",
+      "noJobs": "No imports yet.",
+      "jobLine": "{files} files, {items} products",
+      "reviewLink": "Review",
+      "review": {
+        "pageTitle": "Review imported products",
+        "progress": "{done} of {total} files read",
+        "back": "Back to bulk tools",
+        "processing": "Reading your files. You can review products as they appear.",
+        "creating": "Creating drafts...",
+        "cancel": "Cancel",
+        "fileWaiting": "Waiting for allowance",
+        "fileFailed": "Could not be read",
+        "retry": "Try again",
+        "tabsAria": "Product status",
+        "tab": {
+          "pending": "To review",
+          "accepted": "Accepted",
+          "rejected": "Rejected",
+          "created": "Drafts"
+        },
+        "waiting": "Products will appear here as we read your files.",
+        "empty": "Nothing here.",
+        "selectDraft": "Select this draft",
+        "acceptHigh": "Accept all clear products",
+        "bulkAccepted": "{count} products accepted",
+        "createDrafts": "Create drafts for accepted ({count})",
+        "publishSelected": "Publish selected ({count})",
+        "published": "{published} published, {refused} not ready",
+        "draftsHidden": "{count} drafts. Shoppers cannot see drafts until you publish them.",
+        "confidenceAria": "Confidence: {level}",
+        "band": {
+          "high": "Clear",
+          "medium": "Check",
+          "low": "Unsure"
+        },
+        "flags": {
+          "price_unclear": "Price unclear",
+          "price_range": "Price is a range",
+          "price_from": "Starting price",
+          "price_per_unit": "Price per unit",
+          "currency_mismatch": "Not in EGP",
+          "no_price": "No price",
+          "phone_removed": "Phone number removed",
+          "injection_suspected": "Odd text, check it",
+          "variants_truncated": "Some options cut off",
+          "duplicate_sku": "Same SKU as an existing product",
+          "duplicate_exact": "Looks like an existing product"
+        },
+        "openSource": "Open original",
+        "printedAs": "Printed:",
+        "nameAr": "Name (Arabic)",
+        "nameEn": "Name (English)",
+        "price": "Price (EGP)",
+        "sku": "SKU",
+        "category": "Category",
+        "noCategory": "No category",
+        "noCategoryYet": "Not matched yet",
+        "createCategory": "Create category \"{name}\"",
+        "tags": "Tags (comma separated)",
+        "variants": "{count} options",
+        "variantPrice": "Price of {name}",
+        "moreDetails": "More details (SKU, tags, descriptions)",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionEn": "Description (English)",
+        "checkTitle": "Check before accepting",
+        "check": {
+          "price_from": "I checked: this is a starting price",
+          "price_per_unit": "I checked: this price is per unit",
+          "injection_suspected": "I checked this text",
+          "duplicate_exact": "I checked: add it anyway"
+        },
+        "draftCreated": "Draft created",
+        "undo": "Undo accept",
+        "accept": "Accept",
+        "reject": "Reject",
+        "errors": {
+          "GENERIC": "Could not save. Try again.",
+          "BAD_PRICE": "Enter a price like 150 or 150.50",
+          "BLOCKING_FLAG": "Tick the check box before accepting.",
+          "SKU_CONFLICT": "That SKU is already used.",
+          "PLAN_LIMIT_REACHED": "Your plan's product limit is reached.",
+          "CREATE_FAILED": "Could not create the draft.",
+          "VARIANTS_FAILED": "Could not create the options.",
+          "NAME_MISSING": "Add a name first.",
+          "CATEGORY_NOT_FOUND": "That category no longer exists."
+        }
+      },
+      "open": "Open",
+      "status": {
+        "queued": "Waiting",
+        "processing": "Reading",
+        "review": "Ready to review",
+        "creating": "Creating drafts",
+        "done": "Done",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "GENERIC": "Something went wrong. Try again.",
+        "FEATURE_NOT_AVAILABLE": "Importing from photos is not included in your plan.",
+        "UNSUPPORTED_FILE_TYPE": "Only photos (JPG, PNG, WebP, HEIC) and PDF files are supported.",
+        "FILE_TOO_LARGE": "A file is too large. Keep each file under 6 MB.",
+        "LIMIT_FILE_SIZE": "A file is too large. Keep each file under 6 MB.",
+        "TOO_MANY_FILES": "Too many files. Upload up to 4 at a time.",
+        "LIMIT_UNEXPECTED_FILE": "Too many files. Upload up to 4 at a time.",
+        "TOO_MANY_PAGES": "Too many pages. Keep each PDF to 10 pages and each import to 30.",
+        "UNREADABLE_PDF": "This PDF could not be read. Try exporting it again.",
+        "CATALOG_IMPORT_BUSY": "Finish the imports in progress first.",
+        "CATALOG_IMPORT_DISABLED": "Importing from photos is switched off for now.",
+        "RATE_LIMITED": "Too many imports this hour. Try again later.",
+        "DAILY_LIMIT": "Daily upload limit reached. Try again tomorrow.",
+        "ENQUEUE_FAILED": "We could not start processing. Try again.",
+        "NOT_STARTED": "Processing never started. Try again.",
+        "STUCK": "Processing stopped unexpectedly. Try again.",
+        "JOB_FAILED": "Processing failed. Try again.",
+        "NO_FILES": "None of the files could be read.",
+        "PLAN_PAGES_EXHAUSTED": "You used this month's pages. They renew next month, or upgrade your plan.",
+        "DAILY_PAGES_EXHAUSTED": "Today's page limit is used up. Try again tomorrow.",
+        "AI_QUOTA_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
+        "AI_QUOTA_DAILY_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
+        "AI_QUOTA_MONTHLY_EXCEEDED": "This month's smart-tools limit is used up.",
+        "AI_QUOTA_STORE_DAILY_EXCEEDED": "Today's smart-tools limit for your store is used up. Try again tomorrow.",
+        "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
+        "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
+        "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
+        "AI_BAD_RESPONSE": "Could not read this file. Try again.",
+        "BAD_RESPONSE": "Could not read this file. Try again.",
+        "FILE_UNREADABLE": "This file could not be opened.",
+        "EXTRACTION_FAILED": "Could not read this file. Try again.",
+        "TOO_MANY_RETRIES": "This file was tried too many times. Upload it again.",
+        "DRAFTS_FAILED": "Some drafts could not be created. Check the items and try again.",
+        "NETWORK": "No connection. Try again.",
+        "REQUEST_FAILED": "Something went wrong. Try again."
+      }
     }
   },
   "newsletter": {
@@ -3623,7 +4009,8 @@
       "broadcastCancel": "Cancel",
       "broadcastSent": "Broadcast sent!",
       "broadcastSentCount": "Sent to {sent} of {total} subscriber(s).",
-      "broadcastClose": "Close"
+      "broadcastClose": "Close",
+      "chunksFailed": "{count} chunk(s) failed — check server logs"
     },
     "table": {
       "email": "Email",
@@ -4161,7 +4548,7 @@
     "list": {
       "title": "Content Pages",
       "subtitle": "Edit your About, Privacy, Terms and other long-form pages",
-      "newPage": "New page",
+      "newPage": "Add a page",
       "newPagePrompt": "Page slug (lowercase letters, digits, dashes):",
       "openEditor": "Edit",
       "loadError": "Failed to load pages.",
@@ -4172,7 +4559,8 @@
       "emptyHint": "Click any page below to write your own copy. While a page has no custom content, the storefront shows the default platform text.",
       "builtInsHeading": "Standard pages",
       "customHeading": "Custom pages",
-      "customEmpty": "No custom pages yet."
+      "customEmpty": "No custom pages yet.",
+      "faqsLink": "Frequently asked questions live here."
     },
     "editor": {
       "title": "Edit page",
@@ -4219,7 +4607,16 @@
         "numbered": "Numbered list",
         "image": "Image",
         "button": "Button"
-      }
+      },
+      "aiFaqNote": "AI-generated FAQ items live in SEO Tools, not here.",
+      "aiHowToNote": "AI-generated How-To guides live in SEO Tools, not here.",
+      "wrapperNote": "This editor controls the static page wrapper (cover image, intro paragraphs, etc.). The accordion content the storefront actually renders comes from a separate surface.",
+      "openFaqInSeo": "Open FAQ items in SEO →",
+      "openHowToInSeo": "Open How-To items in SEO →"
+    },
+    "faqsPage": {
+      "title": "Questions and answers",
+      "subtitle": "The questions your customers ask and step-by-step guides. They show in the store, in search results and in AI answers."
     }
   },
   "pages": {
@@ -4320,7 +4717,12 @@
   "notifications": {
     "page": {
       "title": "Notifications",
-      "subtitle": "Configure SMS and push notification channels"
+      "subtitle": "Choose what the customer is told and on which channel",
+      "channelsTitle": "Channel setup",
+      "channelsHint": "Connection details are entered once. You will not need to come back to them.",
+      "broadcastTitle": "Send a notification to all your customers now",
+      "broadcastHint": "For one-off messages such as offers, campaigns are the better tool.",
+      "campaignsLink": "Open campaigns"
     },
     "empty": {
       "title": "No notification channels enabled",
@@ -4357,11 +4759,11 @@
       "title": "SMS",
       "subtitle": "SMS via Unifonic",
       "fields": {
-        "appSid": "App SID",
-        "senderId": "Sender ID"
+        "appSid": "App key from Unifonic",
+        "senderId": "Sender name the customer sees"
       },
       "placeholders": {
-        "appSid": "Unifonic App SID",
+        "appSid": "The key in your Unifonic account",
         "senderId": "e.g. MyStore"
       }
     },
@@ -4466,6 +4868,14 @@
       "testFailed": "Test failed.",
       "eventsSavedDescription": "Event configuration saved.",
       "eventsSaveFailed": "Failed to save event configuration."
+    },
+    "webPush": {
+      "title": "Browser notifications for customers",
+      "hint": "Off by default. When on, customers can subscribe and get notifications in their browser (needs push notifications in your plan).",
+      "onToast": "Browser notifications are on",
+      "offToast": "Browser notifications are off",
+      "failedTitle": "Could not change browser notifications",
+      "failedBody": "Try again in a moment."
     }
   },
   "loyalty": {
@@ -4479,7 +4889,8 @@
       "tabs": {
         "settings": "Settings",
         "members": "Members"
-      }
+      },
+      "transactions": "Transactions"
     },
     "stats": {
       "totalMembers": "Total Members",
@@ -4594,7 +5005,9 @@
       "dateFromAriaLabel": "From date",
       "dateToAriaLabel": "To date",
       "customerIdPlaceholder": "Customer ID...",
-      "customerIdAriaLabel": "Filter by customer ID"
+      "customerIdAriaLabel": "Filter by customer ID",
+      "loadFailed": "We could not load the points transactions.",
+      "retry": "Try again"
     }
   },
   "paymentSettings": {
@@ -4616,13 +5029,14 @@
       "loadFailed": "Could not load the current setting."
     },
     "page": {
-      "title": "Payment Settings",
-      "subtitle": "Configure payment providers for this store",
-      "intro": "Toggle a provider on to accept that payment method at checkout. Each gateway needs its own API credentials from the provider's dashboard. Cash on Delivery has no integration to set up — just enable it.",
-      "testModeNote": "Use test mode while you verify the integration. Switch to live mode before launch so real customer payments go through."
+      "title": "Payment methods",
+      "subtitle": "Choose how customers pay, and turn each method on or off",
+      "intro": "Turn on any payment method to show it at checkout. Gateways need connection details from the provider's dashboard. Cash on delivery needs no connection, just turn it on.",
+      "testModeNote": "Try the connection in test mode first, then switch to live before you open to customers."
     },
     "actions": {
-      "backToSettings": "Back to Settings"
+      "backToSettings": "Back to Settings",
+      "retry": "Try again"
     },
     "errors": {
       "loadFailed": "Failed to load payment settings",
@@ -4636,9 +5050,9 @@
     "configure": "Configure",
     "cod": {
       "displayNameLabel": "Display Name (English)",
-      "displayNamePlaceholder": "Cash on Delivery",
+      "displayNamePlaceholder": "e.g. Cash on Delivery",
       "displayNameArLabel": "Display Name (Arabic)",
-      "displayNameArPlaceholder": "الدفع عند الاستلام",
+      "displayNameArPlaceholder": "e.g. الدفع عند الاستلام",
       "fixedFeeLabel": "Surcharge Fee (EGP)",
       "fixedFeePlaceholder": "0.00",
       "fixedFeeEquals": "= {amount} EGP",
@@ -4751,6 +5165,7 @@
         "expiryInvalid": "Enter a whole number of hours between 1 and 720.",
         "save": "Save options"
       },
+      "bnplDisclosure": "Installments are financed by the provider (valU, Kashier, Aman, Masary), not by Ebda Store. The provider’s own terms, fees and any late charges apply to your customer. Check them before you turn this on.",
       "methods": {
         "card": "Card",
         "wallet": "Mobile wallet",
@@ -4761,6 +5176,15 @@
         "payatfawry": "Pay at Fawry"
       },
       "requestProvider": "Need another payment or shipping provider? Tell us"
+    },
+    "strip": {
+      "title": "On right now",
+      "none": "No payment method is on. Turn one on here or add one below.",
+      "count": "{count} methods on",
+      "on": "On",
+      "off": "Off",
+      "addTitle": "Add a payment method",
+      "addHint": "Open a method, enter the connection details and test the connection before you turn it on."
     }
   },
   "hero": {
@@ -4806,30 +5230,30 @@
   },
   "announcement": {
     "page": {
-      "title": "Announcement Bar",
-      "subtitle": "Display a banner across the top of your store",
+      "title": "Announcement bar",
+      "subtitle": "A short line above the whole store, like an offer or free shipping",
       "loading": "Loading...",
       "backToSettings": "Back to Settings",
-      "saveChanges": "Save Changes",
+      "saveChanges": "Save the announcement",
       "saving": "Saving...",
       "preview": "Preview",
       "content": "Content",
       "textEnglish": "Announcement Text (English)",
-      "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
+      "textEnglishPlaceholder": "Free shipping on orders over 500 EGP!",
       "textArabic": "Announcement Text (Arabic)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق 10 ج.م!",
+      "textArabicPlaceholder": "شحن ببلاش للطلبات فوق 500 جنيه!",
       "linkUrl": "Link URL (optional)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "The entire bar will link to this URL when clicked",
       "linkTextEnglish": "Link Text (English)",
-      "linkTextEnglishPlaceholder": "Shop Now",
+      "linkTextEnglishPlaceholder": "Shop now",
       "linkTextArabic": "Link Text (Arabic)",
-      "linkTextArabicPlaceholder": "تسوق الآن",
+      "linkTextArabicPlaceholder": "اشتري دلوقتي",
       "colors": "Colors",
       "textColor": "Text Color",
-      "successMessage": "Announcement settings saved successfully",
-      "failedMessage": "Failed to save announcement settings",
-      "connectionError": "Unable to connect to the server"
+      "successMessage": "Announcement saved",
+      "failedMessage": "Could not save the announcement",
+      "connectionError": "Cannot reach the server right now. Try again."
     }
   },
   "features": {
@@ -4965,7 +5389,7 @@
       "subtitle": "Optimize your store for search engines",
       "loading": "Loading...",
       "backToSettings": "Back to Settings",
-      "manageRedirects": "Manage Redirects",
+      "manageRedirects": "Open redirects",
       "redirectsTitle": "Slug Redirects",
       "redirectsSubtitle": "Old URLs that 301-redirect to a renamed product, category, or blog post.",
       "redirectsFromSlug": "From",
@@ -4983,7 +5407,7 @@
       "redirectsSearch": "Search",
       "redirectsSearchPlaceholder": "Search by old or new slug",
       "redirectsShowingOf": "Showing the newest {shown} of {total} redirects. Load more below, or search for an older one.",
-      "saveChanges": "Save Changes",
+      "saveChanges": "Save search settings",
       "saving": "Saving...",
       "searchPreview": "Search Result Preview",
       "previewDomain": "example.com",
@@ -5010,12 +5434,12 @@
       "googleSiteVerification": "Google Search Console verification (custom domain only)",
       "googleSiteVerificationPlaceholder": "Paste the meta tag or just the token",
       "googleSiteVerificationHint": "Your store is already verified on ebda.app — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
-      "successMessage": "SEO settings saved successfully",
-      "failedMessage": "Failed to save SEO settings",
-      "connectionError": "Unable to connect to the server",
-      "aiGenerateTooltip": "Generate SEO with AI — only fills empty fields",
-      "aeoTitle": "Answer Engine Optimization",
-      "aeoHint": "Conversational copy for AI answer engines (Perplexity, Google AI Overview, Bing Copilot). Auto-filled by the AEO sweep; you can edit per-entity.",
+      "successMessage": "Search settings saved",
+      "failedMessage": "Could not save the search settings",
+      "connectionError": "Cannot reach the server right now. Try again.",
+      "aiGenerateTooltip": "AI writes a store title and description in Arabic and English, and only fills the empty fields.",
+      "aeoTitle": "The answers shown in ChatGPT",
+      "aeoHint": "Two plain sentences that describe your store, so AI assistants quote them when someone asks about you.",
       "aeoLabelEn": "AEO meta description (EN)",
       "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Demo Shop is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "Direct-answer style, 130–160 chars. Leave blank to let the AEO sweep fill it.",
@@ -5080,21 +5504,49 @@
       "socialYoutubePlaceholder": "https://youtube.com/@yourstore",
       "socialTwitter": "X (Twitter)",
       "socialTwitterPlaceholder": "https://twitter.com/yourstore",
-      "socialSaveError": "Failed to save social links",
+      "socialSaveError": "The Wikipedia or Wikidata link is not valid",
       "socialSaveSuccess": "Social links saved",
       "socialRedirectNote": "Social platform links (Instagram, Facebook, TikTok, etc.) are managed in Branding → Social. Edit them there to keep everything in one place.",
       "socialRedirectNoteLinkText": "Go to Branding → Social",
       "redirectsLoadMore": "Load more",
-      "redirectsLoadingMore": "Loading…"
+      "redirectsLoadingMore": "Loading…",
+      "generating": "Writing...",
+      "generateWithAi": "Write the title and description for me",
+      "stepsCount": "{count, plural, one {{count} step} other {{count} steps}}",
+      "redirectsPrompt": "Want to send an old link to a new one?",
+      "faqsMovedLink": "Questions and answers are now under Content",
+      "aiFailedTitle": "Could not write the text",
+      "aiFailedBody": "Try again in a moment.",
+      "aiFilledTitle": "Text written",
+      "aiFilledBody": "Filled: {fields}. Review them, then save.",
+      "aiNothingToFillTitle": "No empty fields",
+      "aiNothingToFillBody": "Every field is filled. Clear the one you want to change and try again.",
+      "aiField": {
+        "metaTitle": "English title",
+        "metaTitleAr": "Arabic title",
+        "metaDescription": "English description",
+        "metaDescriptionAr": "Arabic description"
+      },
+      "languageGuardTitle": "An English field contains Arabic",
+      "languageGuardBody": "Write English in: {fields}. Arabic text belongs in the Arabic fields.",
+      "languageGuardField": {
+        "metaTitle": "English title",
+        "metaDescription": "English description",
+        "metaDescriptionAeo": "English AI answer"
+      },
+      "advancedGroup": "Advanced",
+      "redirectsDeleteObject": "This redirect",
+      "redirectsDeleteConsequence": "The old link stops sending visitors to the new one, and they will land on a page that does not exist.",
+      "redirectsDeleteLabel": "Delete the redirect"
     }
   },
   "language": {
     "page": {
-      "title": "Language Settings",
-      "subtitle": "Set the default language for your storefront",
+      "title": "Language",
+      "subtitle": "The language customers see first",
       "loading": "Loading...",
       "backToSettings": "Back to Settings",
-      "save": "Save Changes",
+      "save": "Save language",
       "saving": "Saving...",
       "defaultTitle": "Default Storefront Language",
       "defaultHint": "New visitors will see the storefront in this language. They can still switch languages manually.",
@@ -5102,9 +5554,9 @@
       "englishLayout": "Left-to-right layout",
       "arabicName": "العربية",
       "arabicLayout": "Right-to-left layout",
-      "successMessage": "Language settings saved successfully",
-      "failedMessage": "Failed to save language settings",
-      "connectionError": "Unable to connect to the server"
+      "successMessage": "Store language saved",
+      "failedMessage": "Could not save the language",
+      "connectionError": "Cannot reach the server right now. Try again."
     }
   },
   "domain": {
@@ -5126,8 +5578,8 @@
       "verified": "Verified",
       "pending": "Pending Verification",
       "dnsRequired": "DNS Configuration Required",
-      "dnsInstructions": "Add the following DNS record to your domain provider:",
-      "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
+      "dnsInstructions": "Add these DNS records at your domain provider:",
+      "dnsPropagation": "DNS changes can take up to 48 hours.",
       "checkDns": "Check DNS",
       "checkingDns": "Checking...",
       "claimPending": "We are waiting for DNS verification of {domain}. Add the DNS records below; it is not live yet. A claim that is not verified within 72 hours is released automatically.",
@@ -5152,15 +5604,27 @@
       "statusFailed": "Verification failed",
       "statusNotConfigured": "Not configured",
       "emailSenderError": "Failed to update email sender. Please try again.",
-      "dnsPointingTitle": "DNS not pointing at Vercel yet",
-      "dnsPointingMessage": "Vercel confirmed ownership of this domain, but the public A/CNAME records still point elsewhere. Customers visiting your domain right now will NOT land on your storefront. Update the records below at your registrar.",
+      "dnsPointingTitle": "The domain does not point to your store yet",
+      "dnsPointingMessage": "We confirmed the domain is yours, but its DNS records still point somewhere else. Anyone opening your domain now will not reach your store. Change the records below at your domain provider.",
       "dnsPropagationConfirmed": "Your store is live at https://{domain}",
       "colPriority": "Priority",
       "colTtl": "TTL",
       "wwwAutoAttachedTitle": "www subdomain handled automatically",
       "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain.",
       "copy": "Copy",
-      "copyValueAriaLabel": "Copy {type} value"
+      "copyValueAriaLabel": "Copy {type} value",
+      "ttlAuto": "1 Hour",
+      "dnsWaitingTitle": "Waiting for DNS to update",
+      "dnsWaitingMessage": "Add the records below at your domain provider. The update can take up to 48 hours and we check automatically.",
+      "dnsEmailTitle": "Email records are still missing",
+      "copyAll": "Copy all records",
+      "copiedAll": "Records copied",
+      "emailInstructions": "Email these instructions to whoever manages the domain",
+      "emailSubject": "DNS records to connect the store domain",
+      "emailBody": "Please add these DNS records at the domain provider (type, name, value):",
+      "removeObject": "The domain {domain}",
+      "removeConsequence": "The store goes back to its default link and this link will no longer open your store.",
+      "removeLabel": "Remove the domain"
     }
   },
   "categories": {
@@ -5197,7 +5661,10 @@
       "bestSellersTileShown": "Best Sellers tile shown",
       "bestSellersTileHidden": "Best Sellers tile hidden",
       "bestSellersCoverUpdated": "Best Sellers cover updated",
-      "bestSellersCoverRemoved": "Best Sellers cover removed"
+      "bestSellersCoverRemoved": "Best Sellers cover removed",
+      "countUnitEnSample": "pieces",
+      "countUnitArSample": "قطعة",
+      "moreMenu": "More category options"
     },
     "form": {
       "editTitle": "Edit Category",
@@ -5265,7 +5732,9 @@
       "edit": "Edit",
       "delete": "Delete",
       "deleting": "Deleting...",
-      "dragHandle": "Drag to reorder"
+      "dragHandle": "Drag to reorder",
+      "missingArabicName": "Arabic name missing",
+      "rowMenu": "Options for category {name}"
     },
     "productOrder": {
       "title": "Product Order",
@@ -5375,7 +5844,8 @@
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
       "searchPlaceholder": "Search reviews…"
-    }
+    },
+    "spam": "Spam"
   },
   "audit": {
     "title": "Audit Logs",
@@ -5406,15 +5876,16 @@
   },
   "auth": {
     "login": {
+      "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
-      "subtitle": "Sign in to access Ebda Store",
+      "subtitle": "Sign in and get back to your store.",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
       "passwordPlaceholder": "Enter your password",
       "signIn": "Sign in",
       "signingIn": "Signing in…",
-      "loginFailed": "Login failed",
+      "loginFailed": "We could not sign you in. Try again.",
       "footer": "Ebda Store",
       "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
@@ -5432,8 +5903,8 @@
       "mfaTotpLink": "Use authenticator app instead",
       "mfaInvalid": "Invalid or expired code. Please try again.",
       "rememberMe": "Remember my email",
-      "serverError": "Server returned an invalid response. Please try again.",
-      "accessDenied": "Access denied. Admin or staff privileges required.",
+      "serverError": "Something went wrong on our side. Try again in a moment.",
+      "accessDenied": "This account does not have access to the dashboard.",
       "mfaVerifyFailed": "Verification failed",
       "emailNotVerified": "Please verify your email first. We sent you a code.",
       "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
@@ -5441,7 +5912,14 @@
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
       "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
-      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue."
+      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue.",
+      "invalidCredentials": "The email or password is not right. Check them and try again.",
+      "invalidCode": "That code is wrong or has expired. Try again.",
+      "titleChat": "Sign in to Ebda Chat",
+      "subtitleChat": "Sign in and carry on in Ebda Chat.",
+      "footerChat": "Ebda Chat",
+      "brandTitleChat": "Ebda Chat",
+      "brandSubtitleChat": "Reply to your customers on WhatsApp from one place, with your whole team."
     },
     "forgot": {
       "title": "Reset your password",
@@ -5666,11 +6144,12 @@
     "adminLayout": {
       "navDashboard": "Dashboard",
       "navCatalog": "Catalog",
+      "navEditor": "Store look",
       "navSales": "Sales",
       "navStock": "Inventory",
       "navFinance": "Accounting",
       "navAnalytics": "Analytics",
-      "navMarketing": "Marketing",
+      "navMarketing": "Marketing and offers",
       "navSettings": "Settings",
       "navStores": "Stores",
       "navUsers": "Users",
@@ -5693,7 +6172,7 @@
         "coupons": "Coupons",
         "promotions": "Promotions",
         "loyalty": "Loyalty",
-        "bundles": "Bundles",
+        "bundles": "Product bundles",
         "stockDashboard": "Overview",
         "inventory": "Inventory",
         "warehouses": "Warehouses",
@@ -5731,7 +6210,9 @@
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
-        "wholesaleApplications": "Wholesale applications"
+        "wholesaleApplications": "Wholesale applications",
+        "customerIntelligence": "Smart hints",
+        "categories": "Categories"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -5771,7 +6252,8 @@
       "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)",
-      "wholesalePendingBadge": "{count} wholesale applications waiting"
+      "wholesalePendingBadge": "{count} wholesale applications waiting",
+      "navPlatformCiInsights": "Customer Intelligence"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -5944,7 +6426,8 @@
       "subtitleDefault": "Curated picks",
       "productNamePlaceholder": "Product",
       "addToCartLabel": "Add",
-      "headingSuffix": "{label} heading"
+      "headingSuffix": "{label} heading",
+      "samplePrice": "50.00 EGP"
     },
     "colorContrastPreview": {
       "backgroundLabel": "Background: {label}",
@@ -5960,6 +6443,45 @@
       "notTracked": "Not tracked for guest checkout",
       "registeredOnly": "Registered customers only",
       "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
+    },
+    "title": "Return Timeline",
+    "noEvents": "No timeline events yet",
+    "by": "by",
+    "reasonLabel": "Reason:",
+    "refundViaLabel": "Refund via:",
+    "orderAlerts": {
+      "title": "Order alerts on this device",
+      "body": "When a new order arrives you get an alert on this device, even when the dashboard is closed. We only ask for permission when you press the button.",
+      "cta": "Turn on order alerts on this device",
+      "enabling": "Turning on alerts…",
+      "enabled": "Alerts are on",
+      "doneHint": "Done. New order alerts will reach this device.",
+      "denied": "The browser is blocking notifications. Allow them in the site settings and try again.",
+      "unavailable": "Alerts are not available right now. Try again in a moment.",
+      "error": "We could not turn on alerts. Try again."
+    },
+    "orderAlertsPrompt": {
+      "title": "Never miss an order",
+      "body": "Turn on alerts and we'll tell you the moment a new order arrives.",
+      "cta": "Turn on alerts",
+      "enabling": "Turning on alerts…",
+      "later": "Later",
+      "error": "We couldn't turn on alerts. Try again."
+    },
+    "rowActions": {
+      "more": "More options"
+    },
+    "stickySaveBar": {
+      "regionLabel": "Save changes",
+      "dirtyMessage": "You have changes that are not saved yet",
+      "reset": "Undo changes",
+      "save": "Save"
+    },
+    "formFooter": {
+      "cancel": "Cancel"
+    },
+    "confirm": {
+      "cancel": "Cancel"
     }
   },
   "finance": {
@@ -5991,7 +6513,8 @@
       "createSubmit": "Create account",
       "creating": "Creating…",
       "createError": "Failed to create account.",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "loadFailed": "Could not load the chart of accounts. Try again."
     },
     "journal": {
       "title": "Journal Entries",
@@ -6008,7 +6531,10 @@
       "account": "Account",
       "noEntries": "No journal entries yet — they will appear here as orders complete.",
       "totalLabel": "Total",
-      "totalCount": "{total} entries"
+      "totalCount": "{total} entries",
+      "loadFailed": "Could not load journal entries. Try again.",
+      "entryNotFound": "This entry was not found.",
+      "loadEntryFailed": "Could not load the entry. Try again."
     },
     "newEntry": {
       "title": "New Manual Journal Entry",
@@ -6084,7 +6610,7 @@
     "expenses": {
       "title": "Expenses",
       "description": "Operating expenses tracked against your COA. Approved expenses post a balanced journal entry.",
-      "newButton": "+ New Expense",
+      "newButton": "Add expense",
       "number": "Number",
       "date": "Date",
       "vendor": "Vendor",
@@ -6113,8 +6639,12 @@
       "actions": {
         "approve": "Approve",
         "post": "Post",
-        "reject": "Reject",
-        "rejectConfirm": "Reject this expense? It will be marked rejected and cannot be posted."
+        "reject": "Reject expense",
+        "rejectConfirm": "Reject this expense? It will be marked rejected and cannot be posted.",
+        "rejectObject": "This expense",
+        "rejectConsequence": "It is marked rejected and does not enter the accounts.",
+        "failed": "The action did not go through. Try again.",
+        "menu": "Options for expense {number}"
       },
       "new": {
         "title": "New Expense",
@@ -6129,7 +6659,7 @@
         "notesAr": "Notes (Arabic)",
         "receiptUrl": "Receipt URL",
         "receiptHint": "Paste an R2 URL, or use the upload section above.",
-        "submit": "Create draft expense",
+        "submit": "Save expense",
         "ocr": {
           "title": "Upload receipt (AI auto-fill)",
           "selectFile": "Choose receipt image",
@@ -6156,7 +6686,8 @@
         "uploadFailedRetry": "Upload failed. Please try again.",
         "totalInBaseConverted": "Total in EGP (converted @ {rate} rate):",
         "minorUnitsSuffix": "({currency} minor units)"
-      }
+      },
+      "loadFailed": "Could not load expenses. Try again."
     },
     "reports": {
       "title": "Financial Reports",
@@ -6225,7 +6756,11 @@
         "entryCount": "{count} tax entries (sales and refunds/returns)",
         "entries": "Entries"
       },
-      "exportXlsxComing": "XLSX export coming soon"
+      "exportXlsxComing": "XLSX export coming soon",
+      "loadTrialFailed": "Could not load the trial balance. Try again.",
+      "loadPnlFailed": "Could not load the profit and loss report. Try again.",
+      "loadBalanceFailed": "Could not load the balance sheet. Try again.",
+      "loadTaxFailed": "Could not load the tax report. Try again."
     },
     "bankRec": {
       "title": "Bank Reconciliation",
@@ -6268,7 +6803,8 @@
         "error": "Import failed.",
         "fileTypesHint": "CSV, Excel (.xlsx), or OFX (max 5 MB)",
         "skippedLabel": "Skipped",
-        "viewReconciliation": "View Reconciliation"
+        "viewReconciliation": "View Reconciliation",
+        "andMore": "…and {count} more"
       },
       "tx": {
         "date": "Date",
@@ -6303,7 +6839,8 @@
         "confirm": "Link",
         "cancel": "Cancel",
         "entryIdHelp": "You can find entry IDs in Finance → Journal.",
-        "confirming": "Linking…"
+        "confirming": "Linking…",
+        "uuidExample": "e.g. 550e8400-e29b-41d4-a716-446655440000"
       },
       "difference": {
         "title": "Reconciliation Difference",
@@ -6326,7 +6863,13 @@
         "match": "Match failed"
       },
       "filterAll": "All",
-      "totalCount": "{total} statements"
+      "totalCount": "{total} statements",
+      "loadFailed": "Could not load bank statements. Try again.",
+      "deleteObject": "Bank statement \"{name}\"",
+      "deleteConsequence": "The statement and every matched transaction are removed.",
+      "deleteAction": "Delete statement",
+      "deleteFailed": "Could not delete the statement. Try again.",
+      "rowMenu": "Options for statement {name}"
     },
     "fxRates": {
       "title": "FX Rate Registry",
@@ -6354,7 +6897,8 @@
       "colRate": "Rate (EGP)",
       "colDate": "Date",
       "colRecorded": "Recorded",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "rateExample2": "e.g. 50.00"
     }
   },
   "stock": {
@@ -6404,7 +6948,16 @@
       "loadFailed": "Couldn't load products — {error}",
       "filteredLabel": "Filtered:",
       "filterLowStock": "Low stock",
-      "filterOutOfStock": "Out of stock"
+      "filterOutOfStock": "Out of stock",
+      "showingFiltered": "Showing {shown} of {total} products",
+      "backorderObject": "Backorder on {count} products",
+      "backorderEnableConsequence": "Customers can order these products even when they are out of stock.",
+      "backorderDisableConsequence": "Out-of-stock products can no longer be ordered.",
+      "backorderEnableFailed": "Could not enable backorder. Try again.",
+      "backorderDisableFailed": "Could not disable backorder. Try again.",
+      "backorderEnabledDone": "Backorder enabled on {count} products",
+      "backorderDisabledDone": "Backorder disabled on {count} products",
+      "moreActions": "Inventory options"
     },
     "scan": {
       "title": "Barcode Scan",
@@ -6431,7 +6984,8 @@
       "picking": {
         "success": "Picked {qty} of {name}. Progress: {picked}/{total}.",
         "itemNotFound": "This barcode does not match any item in the order.",
-        "alreadyPicked": "This item is already fully picked.",
+        "notInOrder": "{name} is not in this order. Put it back.",
+        "alreadyPicked": "{name} is already fully picked. Do not add another.",
         "orderComplete": "All items in this order are picked.",
         "errorGeneric": "Failed to record pick. Try again."
       },
@@ -6454,7 +7008,12 @@
         "system": "System",
         "submitLine": "Submit Count",
         "scannedAt": "Scanned {time}",
-        "errorGeneric": "Failed to submit count. Try again."
+        "errorGeneric": "Failed to submit count. Try again.",
+        "closeObject": "Close the count ({count} items counted)",
+        "closeConsequence": "You cannot add more items to this count once it is closed.",
+        "reconcileObject": "Approve count differences: {count} items differ, net {units} units",
+        "reconcileConsequence": "Stock is adjusted for every item that differs and is recorded in the accounts. This cannot be undone.",
+        "reconcileAction": "Approve differences"
       },
       "cameraPermission": "Allow camera access to scan barcodes, or enter manually below.",
       "cameraNotSupported": "Camera scanning not supported in this browser. Use manual entry.",
@@ -6470,12 +7029,20 @@
       "colItem": "Item",
       "colPicked": "Picked",
       "pickItemsTableLabel": "Order items",
-      "countLinesTableLabel": "Count lines"
+      "countLinesTableLabel": "Count lines",
+      "onHandLabel": "On hand:",
+      "countSession": "Count Session",
+      "linesSuffix": "lines",
+      "systemQtyLabel": "System qty:",
+      "adjustmentLabel": "Adjustment:",
+      "skuLabel": "SKU: {sku}",
+      "linesAdjusted": "{count, plural, one {{count} line adjusted.} other {{count} lines adjusted.}}",
+      "sessionReconciledOn": "Session reconciled on {date}."
     },
     "adjustments": {
       "title": "Stock Adjustments",
       "description": "Every manual stock change posts a balanced journal entry. Posted adjustments are immutable.",
-      "newButton": "+ New Adjustment",
+      "newButton": "New stock adjustment",
       "number": "Number",
       "type": "Type",
       "status": "Status",
@@ -6508,7 +7075,7 @@
         "selectProduct": "Select product",
         "newQty": "New quantity",
         "submitDraft": "Save as draft",
-        "submitPost": "Save and post",
+        "submitPost": "Approve adjustment",
         "typeTip": "cycle_count = routine recount correction; damage = damaged, unsellable; theft = lost to theft or shrinkage; loss = lost or misplaced (not theft or damage); write_off = deliberately removed (expired or obsolete); found = previously-missing stock located (increases quantity); return_to_supplier = sent back to supplier.",
         "glJournalTip": "GL journal = the accounting record (General Ledger). Posting auto-creates a balanced bookkeeping entry — e.g. a write-off debits a loss/expense account and credits inventory — keeping accounts accurate. Save as draft to review before it affects your books.",
         "tabCsv": "CSV Import",
@@ -6548,10 +7115,20 @@
         "csvImporting": "Importing…",
         "csvSubmit": "Import & Post ({count} rows)",
         "irreversibleNote": "Posting is irreversible — it applies inventory mutations and posts a GL journal entry. Save as draft to review first.",
-        "itemsTableLabel": "Adjustment items"
+        "itemsTableLabel": "Adjustment items",
+        "itemsRequired": "Add at least one product with a quantity.",
+        "unexpectedResponse": "The server sent an unexpected reply. Try again.",
+        "postFailedAfterDraft": "Saved as a draft but could not be approved: {error}",
+        "postObject": "Stock adjustment on {count} products",
+        "postConsequence": "Stock changes for real and cannot be undone once approved. Save as a draft first if you want to review.",
+        "cancel": "Cancel",
+        "evidencePlaceholder": "https://… (link to a photo or file that proves the reason)"
       },
       "searchPlaceholder": "Search adjustments…",
-      "emptyState": "No stock adjustments yet. Create one with the button above."
+      "emptyState": "No stock adjustments yet. Create one with the button above.",
+      "reasonEnPlaceholder": "Optional reason in English",
+      "reasonArPlaceholder": "Reason in Arabic (optional)",
+      "loadFailed": "Could not load stock adjustments. Try again."
     },
     "suppliers": {
       "title": "Suppliers",
@@ -6584,12 +7161,23 @@
         "leadTimeDays": "Net lead time (days)",
         "leadTimeDaysTip": "Number of days from placing an order with this supplier until stock arrives. Used by the reorder engine when no per-product rule overrides it."
       },
-      "searchPlaceholder": "Search suppliers…"
+      "searchPlaceholder": "Search suppliers…",
+      "supplierNameEnSample": "e.g. Al-Mutlaq Trading",
+      "supplierNameArPlaceholder": "Supplier name in Arabic",
+      "termsDaysExample": "e.g. 45",
+      "notesEnPlaceholder": "Optional notes in English",
+      "notesArPlaceholder": "Notes in Arabic (optional)",
+      "termsDays": "{count, plural, one {{count} day} other {{count} days}}",
+      "loadFailed": "Could not load suppliers. Try again.",
+      "deactivateObject": "Supplier \"{name}\"",
+      "deactivateConsequence": "It leaves new lists; existing purchase orders stay as they are.",
+      "deactivateAction": "Deactivate supplier",
+      "rowMenu": "Options for supplier {name}"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
       "description": "Track POs to suppliers. Receiving a PO updates inventory + posts to Inventory / AP accounts.",
-      "newButton": "+ New PO",
+      "newButton": "New purchase order",
       "poNumber": "PO #",
       "supplier": "Supplier",
       "status": "Status",
@@ -6622,7 +7210,10 @@
         "variant": "Variant",
         "selectProduct": "Select product",
         "selectVariant": "Select variant",
-        "variantRequired": "Choose a variant for every line whose product has variants."
+        "variantRequired": "Choose a variant for every line whose product has variants.",
+        "supplierRequired": "Select a supplier first.",
+        "linesRequired": "Add at least one line with a product, quantity and unit cost.",
+        "loadFailed": "Could not load suppliers and products. Try again."
       },
       "detail": {
         "qtyReceived": "Received",
@@ -6638,7 +7229,13 @@
         "colReceiveQty": "Receive Qty",
         "cancelling": "Cancelling…",
         "receiving": "Receiving…",
-        "itemsTableLabel": "Purchase order items"
+        "itemsTableLabel": "Purchase order items",
+        "loadFailed": "Could not load the purchase order. Try again.",
+        "qtyRequired": "Enter at least one quantity to receive.",
+        "cancelObject": "Purchase order {number}",
+        "cancelConsequence": "It is cancelled and cannot be restored. Quantities already received stay.",
+        "cancelAction": "Cancel purchase order",
+        "menuLabel": "Purchase order options"
       },
       "searchPlaceholder": "Search POs…",
       "errors": {
@@ -6648,7 +7245,10 @@
         "VARIANT_REQUIRED_RECEIVE": "This line names no variant, but its product has variants, so it cannot be received. Cancel this purchase order and draft it again per variant."
       },
       "emptyState": "No purchase orders yet. Create one with the button above.",
-      "totalCount": "{total} purchase orders"
+      "totalCount": "{total} purchase orders",
+      "backToPurchaseOrders": "← Back to purchase orders",
+      "notesArPlaceholder": "Notes in Arabic (optional)",
+      "loadFailed": "Could not load purchase orders. Try again."
     },
     "backorders": {
       "title": "Open Backorders",
@@ -6694,7 +7294,9 @@
       "draftPo": {
         "created": "Draft PO created.",
         "failed": "Could not draft PO"
-      }
+      },
+      "pagePrev": "Previous page",
+      "pageNext": "Next page"
     },
     "deadstock": {
       "title": "Dead Stock",
@@ -6714,7 +7316,9 @@
         "valueUnknown": "Unknown (no cost price)",
         "neverSold": "Never sold"
       },
-      "valueUnknownBanner": "{count, plural, one {{count, number, latn} flagged product has} other {{count, number, latn} flagged products have}} no cost price, so the stock value is unknown. Add cost prices on the product page to value them."
+      "valueUnknownBanner": "{count, plural, one {{count, number, latn} flagged product has} other {{count, number, latn} flagged products have}} no cost price, so the stock value is unknown. Add cost prices on the product page to value them.",
+      "pagePrev": "Previous page",
+      "pageNext": "Next page"
     },
     "warehouses": {
       "title": "Warehouses",
@@ -6750,7 +7354,17 @@
       },
       "validation": {
         "nameCodeRequired": "Name and code are required"
-      }
+      },
+      "warehouseNameEnSample": "Main Warehouse",
+      "warehouseNameArSample": "المستودع الرئيسي",
+      "addressSample": "Shuwaikh Industrial Area, Egypt",
+      "saveFailed": "Could not save the warehouse. Try again.",
+      "deactivateFailed": "Could not deactivate the warehouse. Try again.",
+      "defaultFailed": "Could not make it the default warehouse. Try again.",
+      "deactivateObject": "Warehouse \"{name}\"",
+      "deactivateConsequence": "It stops being used; its stock data is kept.",
+      "deactivateAction": "Deactivate warehouse",
+      "rowMenu": "Options for warehouse {name}"
     },
     "warehouseStock": {
       "title": "Warehouse Stock",
@@ -6782,7 +7396,14 @@
       "reconcileHint": "Per-warehouse counts are reconciled from your authoritative product stock.",
       "searchTruncated": "These are the closest matches only. Add a word to narrow the search.",
       "reconcileDone": "Reconciled {reconciled} SKU(s), {failed} failed",
-      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly"
+      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly",
+      "deltaExample": "+10 or -5",
+      "saveFailed": "Could not save the quantity. Try again.",
+      "adjustFailed": "Could not adjust the stock. Try again.",
+      "reconcileFailed": "Could not start the stock reconcile. Try again.",
+      "breadcrumb": "Warehouses",
+      "pagePrev": "Previous page",
+      "pageNext": "Next page"
     }
   },
   "insights": {
@@ -6804,7 +7425,10 @@
       "colSku": "SKU",
       "colName": "Name",
       "colSold7d": "Sold 7d",
-      "colVelocity": "Velocity"
+      "colVelocity": "Velocity",
+      "perDay": "/day",
+      "topSegmentCustomers": "{count, plural, one {{count} customer} other {{count} customers}}",
+      "loadFailed": "Could not load the insights. Try again."
     },
     "cohorts": {
       "title": "Customer Cohorts",
@@ -6818,7 +7442,10 @@
       "ltvByCohortTitle": "Cumulative LTV by Cohort",
       "colTotalRevenue": "Total Revenue (EGP)",
       "colLtvPerCustomer": "LTV / Customer",
-      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time."
+      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time.",
+      "cellTitle": "{active} / {total} customers active",
+      "legendNote": "Cells show % of cohort customers who placed an order in that period. Green = high retention, red = low.",
+      "loadFailed": "Could not load the returning-customers data. Try again."
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -6839,7 +7466,8 @@
       "abandonedUnit": "carts",
       "dailyBreakdownTitle": "Daily Breakdown",
       "colDate": "Date",
-      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 Cairo time."
+      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 Cairo time.",
+      "loadFailed": "Could not load the buying-journey data. Try again."
     },
     "segments": {
       "title": "Customer Segments (RFM)",
@@ -6944,10 +7572,12 @@
       "discard": "Discard",
       "discarding": "Discarding…",
       "confirmDiscard": "Discard every unreadable entry? They cannot be recovered afterwards.",
-      "discarded": "Discarded {count} unreadable entr(ies)"
+      "discarded": "Discarded {count} unreadable entr(ies)",
+      "discardObject": "The unreadable messages"
     },
     "retryKept": "{kept} could not be re-queued because Redis rejected the write — they are still in the failed list; retry again",
-    "smsQueueLink": "Failed SMS"
+    "smsQueueLink": "Failed SMS",
+    "confirmRetryObject": "Retry every failed message"
   },
   "smsQueue": {
     "title": "SMS queue — failed messages",
@@ -6982,8 +7612,10 @@
       "discard": "Discard",
       "discarding": "Discarding…",
       "confirmDiscard": "Discard every unreadable entry? They cannot be recovered afterwards.",
-      "discarded": "Discarded {count} unreadable entr(ies)"
-    }
+      "discarded": "Discarded {count} unreadable entr(ies)",
+      "discardObject": "The unreadable messages"
+    },
+    "confirmRetryObject": "Retry every failed message"
   },
   "webhookEvents": {
     "emailQueueLink": "Failed emails",
@@ -7009,7 +7641,9 @@
       "resultOk": "ok",
       "lastError": "Last error",
       "action": "Action"
-    }
+    },
+    "replayObject": "A payment event that was already processed",
+    "replayAction": "Process it again"
   },
   "aiUsage": {
     "title": "AI Usage",
@@ -7088,11 +7722,15 @@
     }
   },
   "featureUpgrade": {
+    "loadFailedTitle": "We couldn't check your plan",
+    "loadFailedBody": "The connection dropped before we could load what your plan includes. Try again in a moment.",
+    "retryCta": "Try again",
     "lockedBadge": "Locked",
     "availableOn": "Available on the {plan} plan and above.",
     "upgradeCta": "Upgrade to {plan}",
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
+    "requiresFeature": "Requires the “{feature}” feature.",
     "alsoIncluded": "Also included in this plan"
   },
   "aiTools": {
@@ -7383,7 +8021,13 @@
         "filledOfTotal": "{filled} of {total} products filled",
         "hint": "Per-product values are visible on each product's edit page under <b>Citation copy</b>."
       }
-    }
+    },
+    "replaceObject": "Forced AI sweep",
+    "replaceConsequence": "The content this sweep covers is replaced with new results.",
+    "replaceAction": "Replace content",
+    "cancelObject": "The running sweep",
+    "cancelConsequence": "It stops. Items already processed keep their changes.",
+    "cancelAction": "Stop sweep"
   },
   "account": {
     "security": {
@@ -7466,7 +8110,25 @@
       "bootstrapCodeLabel": "E-mailed code (6 digits)",
       "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
       "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
-      "savedSignInAgainButton": "Saved, sign me out"
+      "savedSignInAgainButton": "Saved, sign me out",
+      "phone": {
+        "title": "Phone number",
+        "description": "The number on your account. It is where a password-reset code goes over WhatsApp when that is switched on, so changing it needs your password (and your authenticator code if 2FA is on).",
+        "current": "Current number",
+        "none": "No number saved yet.",
+        "newLabel": "New phone number",
+        "newPlaceholder": "e.g. +20 100 123 4567",
+        "passwordLabel": "Your password",
+        "codeLabel": "Authenticator code",
+        "save": "Change number",
+        "saving": "Saving…",
+        "saved": "Phone number updated.",
+        "errorPassword": "That password is not right.",
+        "errorCode": "That authenticator code is not right.",
+        "errorInvalid": "Enter a valid phone number, with the country code if it is not an Egyptian number.",
+        "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
+        "errorGeneric": "Could not change the number. Try again."
+      }
     }
   },
   "answerEngine": {
@@ -7623,20 +8285,21 @@
       "revokeFailed": "Could not revoke the invitation",
       "sentTitle": "Invitation sent",
       "sentDesc": "{email} will get an email to accept. Nothing changes on their account until they do."
-    }
+    },
+    "removeBody": "Remove <b>{name}</b> ({email}) from this store? They will lose access immediately."
   },
   "blog": {
     "page": {
       "title": "Blog",
       "subtitle": "Write articles, news, and stories that show up on your storefront blog.",
       "backToStore": "Back to store",
-      "newPost": "+ New post",
+      "newPost": "Write a new post",
       "searchPlaceholder": "Search posts…",
       "publishedCount": "{count} published",
       "draftCount": "{count} draft",
       "draftsCount": "{count} drafts",
-      "disabledTitle": "Blog is currently disabled",
-      "disabledBody": "Your blog isn't visible on the storefront yet. Posts you create here are saved as drafts.",
+      "disabledTitle": "The blog is off right now",
+      "disabledBody": "Posts you write will not show to customers until you turn the blog on.",
       "disabledLink": "Enable it in Branding",
       "disabledSuffix": "to publish.",
       "emptyTitle": "No blog posts yet",
@@ -7648,7 +8311,17 @@
       "postDelete": "Delete",
       "postDeleting": "Deleting…",
       "postDeleteConfirm": "Delete this blog post? This cannot be undone.",
-      "postDeleteFailed": "Delete failed"
+      "postDeleteFailed": "Try again in a moment.",
+      "enableBlog": "Turn on the blog",
+      "enabledToast": "The blog is on",
+      "enableFailedTitle": "Could not turn on the blog",
+      "enableFailed": "Try again in a moment.",
+      "postDeleteObject": "The post \"{title}\"",
+      "postDeleteConsequence": "The post will be deleted for good and cannot be brought back.",
+      "postDeleteLabel": "Delete the post",
+      "postDeleted": "Post deleted",
+      "postDeleteFailedTitle": "Could not delete the post",
+      "postMenu": "Post options"
     },
     "editor": {
       "newTitle": "New blog post",
@@ -7675,7 +8348,10 @@
       "cancel": "Cancel",
       "createPost": "Create post",
       "saveChanges": "Save changes",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "titleArPlaceholder": "ما الجديد في متجرك...",
+      "excerptArPlaceholder": "جملة أو اثنتان تظهران في قائمة المدونة...",
+      "bodyArPlaceholder": "اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
     }
   },
   "checkoutDelivery": {
@@ -7684,31 +8360,31 @@
       "subtitle": "Delivery info note, time-window picker, and minimum order value for checkout",
       "loading": "Loading...",
       "backToSettings": "Back to Settings",
-      "save": "Save Changes",
+      "save": "Save delivery times",
       "saving": "Saving...",
-      "successMessage": "Delivery settings saved successfully",
-      "failedMessage": "Failed to save delivery settings",
-      "connectionError": "Unable to connect to the server",
+      "successMessage": "Delivery times saved",
+      "failedMessage": "Could not save the delivery settings. Try again.",
+      "connectionError": "Cannot reach the server right now. Try again.",
       "noteSectionTitle": "Delivery info note",
-      "noteSectionHint": "Shown to the customer at checkout, above the Pay button.",
+      "noteSectionHint": "Shown to the customer at checkout, above the pay button.",
       "noteEnable": "Show delivery note",
       "noteTextEn": "Note (English)",
       "noteTextAr": "Note (Arabic)",
       "windowsSectionTitle": "Delivery windows",
       "windowsSectionHint": "Customer picks one window at checkout. Each window closes for ordering at its own order-by time (or its start time if left blank). Once every window has closed for today, the picker rolls over to tomorrow with all windows open again.",
       "windowsEnable": "Show delivery window selector",
-      "addWindow": "+ Add window",
+      "addWindow": "Add a time slot",
       "labelEn": "Label (English)",
       "labelAr": "Label (Arabic)",
       "startTime": "Start time",
       "endTime": "End time",
       "orderByTime": "Order-by time (optional)",
       "remove": "Remove",
-      "noWindowsYet": "No delivery windows yet — add one above.",
+      "noWindowsYet": "No delivery time slots yet. Add the first one.",
       "minOrderSectionTitle": "Minimum order value",
-      "minOrderSectionHint": "Customers can't check out with an items subtotal below this amount. Leave empty or 0 to disable.",
+      "minOrderSectionHint": "The customer cannot check out if the items total is below this amount. Leave empty or enter 0 for no minimum.",
       "minOrderLabel": "Minimum order (EGP)",
-      "minOrderPlaceholder": "e.g. 500.00",
+      "minOrderPlaceholder": "e.g. 500",
       "invoiceEmailSectionTitle": "Order invoice email",
       "invoiceEmailSectionHint": "Every order in this store emails its invoice to this address (e.g. the store owner), and refund alerts go here too. Order emails never go anywhere else. Leave empty to disable.",
       "invoiceEmailLabel": "Invoice recipient email",
@@ -7737,7 +8413,8 @@
         "title": "Order barcode",
         "body": "The barcode on receipts, packing slips and invoices now lives with your other codes.",
         "link": "Open QR codes & barcodes"
-      }
+      },
+      "errorTitle": "Could not save"
     }
   },
   "customerGroups": {
@@ -7778,7 +8455,12 @@
       "modeNone": "No group discount",
       "modePercent": "Percent off the price",
       "discountPct": "Discount (%)",
-      "discountHint": "Applies when it beats any price break. Coupons do not apply to these lines."
+      "discountHint": "Applies when it beats any price break. Coupons do not apply to these lines.",
+      "deleteDialog": {
+        "object": "Group “{name}”",
+        "consequence": "{count} customer(s) become ungrouped. The customers themselves are kept.",
+        "confirmLabel": "Delete group"
+      }
     }
   },
   "agentKey": {
@@ -7949,14 +8631,14 @@
       "left": "Leftward",
       "right": "Rightward"
     },
-    "pageTitle": "Floating widget",
+    "pageTitle": "Floating WhatsApp button",
     "common": {
       "loading": "Loading…"
     },
-    "premiumSubtitle": "Premium add-on",
+    "premiumSubtitle": "Extra feature",
     "featureNotEnabledTitle": "Feature not enabled",
     "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
-    "mainSubtitle": "Sticky button group your customers see on every page",
+    "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
     "positionLabel": "Position",
@@ -7978,8 +8660,8 @@
     "moveDown": "Move down",
     "removeButtonAria": "Remove button",
     "kindLabel": "Kind",
-    "tooltipEnPlaceholder": "Tooltip (EN)",
-    "tooltipArPlaceholder": "Tooltip (AR)",
+    "tooltipEnPlaceholder": "Text in English",
+    "tooltipArPlaceholder": "Text in Arabic",
     "whatsappPhoneLabel": "Phone (international, no + or spaces)",
     "usingStoreWhatsapp": "Using store WhatsApp: {value}",
     "whatsappMessageLabel": "Pre-filled message (optional)",
@@ -8008,10 +8690,16 @@
     "buttonBackgroundColorLabel": "Background color (optional)",
     "iconColorLabel": "Icon color (optional)",
     "saveFailedFallback": "Save failed",
-    "savedToast": "Floating widget saved",
+    "savedToast": "Buttons saved",
     "saveHint": "Changes apply to the live storefront after save.",
     "saving": "Saving…",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save the buttons",
+    "menuLabelEnSample": "Open menu",
+    "menuLabelArSample": "القائمة",
+    "prefillExample": "Hi! I'd like to ask about…",
+    "handleSampleDemoShop": "demo-shop",
+    "handleSample": "mystore",
+    "emailSubjectExample": "Question about your store"
   },
   "zoneEditor": {
     "resetToDefault": "Reset to default",
@@ -8109,7 +8797,6 @@
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
     "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda Store support to turn it on.",
-    "checkoutAccounting": "Unavailable while accounting is on — the ledger does not yet record store credit as a liability, so wallet payments would be booked as cash.",
     "colCustomer": "Customer",
     "colContact": "Contact",
     "colBalance": "Balance",
@@ -8120,7 +8807,8 @@
     "loadFailed": "Could not load wallets.",
     "retry": "Retry",
     "statusOn": "On",
-    "statusOff": "Off"
+    "statusOff": "Off",
+    "emptyAction": "Go to customers"
   },
   "usageHistory": {
     "title": "Store usage history",
@@ -8319,8 +9007,12 @@
       "title": "Plan & trial",
       "chosenPlan": "Chosen plan",
       "nextCharge": "Next charge",
-      "nextChargeLine": "{amount} for {plan} on {date}",
-      "nextChargeNoAmount": "{plan} on {date}"
+      "nextChargeLine": "{amount} ({interval}) for {plan} on {date}",
+      "nextChargeNoAmount": "{plan} on {date}",
+      "instapayDue": "Payment due",
+      "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
+      "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
+      "returnsToFree": "Your plan returns to Free if it is not paid by then."
     },
     "pay": {
       "title": "Payment method",
@@ -8412,7 +9104,9 @@
     "instapayPlanFailed": "We could not start the InstaPay payment for this plan.",
     "instapayQuoteTitle": "Pay for {plan} ({interval})",
     "viewReceipt": "View receipt",
-    "receiptProcessing": "Your payment went through. Your receipt will print here in a moment."
+    "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
+    "cancelObject": "Cancelling your plan subscription",
+    "cancelAction": "Cancel subscription"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -8478,7 +9172,8 @@
         "prefix": "I agree to the ",
         "sep": ", the ",
         "lastSep": " and the "
-      }
+      },
+      "companyWebsite": "Company website"
     },
     "verify": {
       "verifying": "Verifying your email…",
@@ -8618,7 +9313,7 @@
       "retry": "Try again",
       "plan": {
         "title": "Choose your plan",
-        "trialNote": "Every plan starts with a 14-day Growth trial. On day 15 you're charged for the plan you pick.",
+        "trialNote": "Every plan starts with a 14-day Growth trial. On day 15 the plan you pick is due; if it is not paid, your store returns to the Free plan.",
         "monthly": "Monthly",
         "yearly": "Annual",
         "saveBadge": "Save 25%",
@@ -8641,7 +9336,7 @@
         "noOption": "No payment method can be set up right now. You can continue and add one from Billing before you launch.",
         "cardTitle": "Card",
         "cardSaved": "Card saved:",
-        "cardBody": "Save a card. Nothing is charged now; we charge {amount} for {plan} on {date}.",
+        "cardBody": "Save a card. Nothing is charged now; we charge {amount} ({interval}) for {plan} on {date}.",
         "cardBodyNoAmount": "Save a card. Nothing is charged now; we charge the plan you chose on {date}.",
         "cardCta": "Save a card",
         "redirecting": "Redirecting to the secure page…",
@@ -8657,7 +9352,9 @@
         "copied": "Copied",
         "instapayUnavailable": "InstaPay is not available right now.",
         "instapayFailed": "We could not set up InstaPay. Please try again.",
-        "continueAnyway": "Continue without payment for now"
+        "continueAnyway": "Continue without payment for now",
+        "intervalMonthly": "monthly",
+        "intervalYearly": "yearly"
       }
     },
     "setupGuide": {
@@ -8997,7 +9694,9 @@
         "pending": "Waiting for a billing period",
         "applied": "Applied"
       }
-    }
+    },
+    "refundObject": "Refund {amount}",
+    "refundAction": "Refund the payment"
   },
   "codReconciliation": {
     "title": "COD reconciliation",
@@ -9117,7 +9816,10 @@
       "tooLarge": "The file is larger than 10 MB.",
       "noFile": "Choose a file first.",
       "tooMany": "You can upload at most 5 documents. Delete one first.",
-      "openFailed": "Could not open the document."
+      "openFailed": "Could not open the document.",
+      "deleteObject": "The document \"{name}\"",
+      "deleteConsequence": "The document is deleted for good from your tax file.",
+      "deleteLabel": "Delete the document"
     },
     "submit": {
       "attest": "I confirm this business is registered for VAT with the Egyptian Tax Authority",
@@ -9179,13 +9881,14 @@
       "loading": "Loading the document…",
       "loadFailed": "Could not load the document.",
       "printFailed": "Could not open the print dialog."
-    }
+    },
+    "searchPlaceholder": "Search by document number"
   },
   "taxArchive": {
     "title": "Tax archive",
     "subtitle": "Fiscal documents kept for the tax authority, store by store.",
     "storeTitle": "Store documents",
-    "retention": "Fiscal documents are kept for 6 years, even after a store is deleted.",
+    "retention": "Fiscal documents are kept for 7 years, even after a store is deleted.",
     "columns": {
       "store": "Store",
       "documents": "Documents",
@@ -9254,7 +9957,8 @@
       "approved": "Approved",
       "rejected": "Rejected",
       "revoked": "Revoked",
-      "failed": "Decision failed: {message}"
+      "failed": "Decision failed: {message}",
+      "revokeObject": "Tax verification for this store"
     }
   },
   "platformSettings": {
@@ -9282,7 +9986,9 @@
       "lastSaved": "Current setting: {state}, {rate}%",
       "stateOn": "ON",
       "stateOff": "OFF",
-      "saveFailed": "Could not save: {message}"
+      "saveFailed": "Could not save: {message}",
+      "enableObject": "Turning on VAT on invoices",
+      "enableAction": "Turn on VAT"
     }
   },
   "builder": {
@@ -9328,7 +10034,7 @@
     },
     "tabs": {
       "sections": "Sections",
-      "theme": "Theme",
+      "theme": "Colours and fonts",
       "history": "History",
       "ai": "Ask AI"
     },
@@ -9475,7 +10181,28 @@
       "editProducts": "Edit products",
       "editReviews": "Open reviews",
       "editBundles": "Open bundles",
-      "editCategories": "Edit categories"
+      "editCategories": "Edit categories",
+      "spacing": {
+        "title": "Spacing",
+        "sameOnAll": "Same on all devices",
+        "devices": "Device",
+        "differs": "Different on this device",
+        "top": "Above",
+        "bottom": "Below",
+        "px": "{px}px",
+        "preset": {
+          "none": "None",
+          "tight": "Tight",
+          "normal": "Normal",
+          "loose": "Wide",
+          "xloose": "Wider",
+          "xxloose": "Widest"
+        },
+        "resetDefault": "Back to default",
+        "resetInherit": "Same as desktop",
+        "hint": "The gap between two sections is the bottom of one plus the top of the next."
+      },
+      "advanced": "Advanced: text styles and dividers"
     },
     "theme": {
       "smartPalette": "Smart Palette",
@@ -9490,16 +10217,47 @@
       "resetError": "Could not reset. Try again.",
       "headerLogo": "Logo position",
       "headerSearch": "Header search",
+      "cardHeart": "Wishlist heart on home cards",
+      "cardSwatches": "Colour dots on home cards",
+      "cardTags": "Tag chips on home cards",
+      "gridGutter": "Space between home cards",
+      "headingWeight": "Section heading weight",
+      "priceColour": "Price colour on cards",
+      "tabBar": "Bottom bar on phones",
+      "heroRatio": "Hero height on phones",
+      "headerWordmark": "Store name without a logo",
       "cardBrandBadge": "Store name on cards",
       "cardNewBadge": "\"New\" badge on cards",
       "cardQuickAdd": "Quick add (+) on carousel cards",
       "cardEvenImages": "Even product image sizes",
       "cardSaleCorner": "Keep the old sale badge corner",
-      "inherit": "Same as the look"
+      "inherit": "Same as the look",
+      "search": "Search settings",
+      "quick": "Quick look",
+      "presets": "Colour palettes",
+      "corner": {
+        "square": "Square",
+        "soft": "Soft",
+        "round": "Round"
+      },
+      "tier": {
+        "header": "Header and navigation",
+        "cards": "Buttons and cards",
+        "images": "Images",
+        "colors": "All colours"
+      },
+      "advanced": "Advanced: fonts, text styles and more",
+      "changedDot": "Has changes",
+      "resetAll": "Reset all changes",
+      "resetAllConfirm": "Reset every change to the look?",
+      "resetAllYes": "Reset",
+      "cancel": "Cancel",
+      "searchEmpty": "Nothing matches that search.",
+      "draftNote": "Changes stay a draft until you publish."
     },
     "revisions": {
       "error": "History could not be loaded.",
-      "empty": "No saved versions yet.",
+      "empty": "No saved versions yet. Each time you publish the page, a version is saved that you can go back to.",
       "rev": "Version {rev}",
       "status": {
         "draft": "draft",
@@ -9532,7 +10290,7 @@
       "open": "Page settings"
     },
     "look": {
-      "open": "Look",
+      "open": "Change template",
       "title": "Change the look",
       "intro": "Pick a look and preview it on your own page. Nothing changes until you apply it.",
       "design": "Colours, fonts and spacing",
@@ -9566,7 +10324,8 @@
       "sectionTypography": "Section text style",
       "dividers": "Section dividers",
       "video": "Background video",
-      "pageSwitcher": "Switch the page you edit"
+      "pageSwitcher": "Switch the page you edit",
+      "spacing": "Section spacing, per device"
     },
     "aiPatch": {
       "tab": "Ask AI",
@@ -9596,7 +10355,7 @@
       "added": "Add section",
       "removed": "Remove section",
       "moved_to": "Move to position {pos}",
-      "theme": "Theme",
+      "theme": "Colours and fonts",
       "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
       "on": "on",
       "off": "off"
@@ -9795,7 +10554,8 @@
       "noteRequired": "Enter a note of at least 3 characters.",
       "cancel": "Cancel",
       "working": "Working…"
-    }
+    },
+    "unknown": "unknown"
   },
   "goldRates": {
     "page": {
@@ -9837,6 +10597,17 @@
       "reject": "Reject",
       "confirm": "Confirm",
       "failed": "The decision did not save. Try again."
+    },
+    "paymentPolicy": {
+      "title": "Payment for gold",
+      "intro": "Orders with gold are paid in full online. Cash on delivery and installments are hidden at checkout for gold.",
+      "allow": "Allow cash on delivery and installments for gold",
+      "explain": "Gold bought for money is normally paid in full at the time of sale. If you allow cash on delivery or installments for gold, you take responsibility for that choice.",
+      "confirmCheck": "I understand and I confirm.",
+      "save": "Save",
+      "saved": "Saved.",
+      "failed": "It did not save. Try again.",
+      "needConfirm": "Tick the confirmation first."
     },
     "settings": {
       "title": "Settings",
@@ -9941,7 +10712,10 @@
       "deleteFailed": "Couldn't delete the chart.",
       "saveFailed": "Couldn't save the chart.",
       "shape": "{columns} columns × {rows} rows",
-      "usedBy": "{products} products · {categories} categories"
+      "usedBy": "{products} products · {categories} categories",
+      "deleteObject": "The size chart \"{name}\"",
+      "deleteConsequence": "Products and categories linked to it will show without a size chart.",
+      "deleteLabel": "Delete the chart"
     },
     "editor": {
       "createTitle": "New size chart",
@@ -9950,7 +10724,7 @@
       "templateAbaya": "Abaya (size × length)",
       "templateClothing": "Clothing (S–XXL)",
       "templateRing": "Ring size",
-      "templateReplace": "The template replaces the current table. Continue?",
+      "templateReplace": "The template replaces the chart you are writing now.",
       "nameAr": "Name (Arabic)",
       "nameEn": "Name (English)",
       "unit": "Unit",
@@ -9977,7 +10751,9 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "errorName": "Give the chart a name in at least one language.",
-      "errorInvalid": "Check the table: 2–10 columns, 1–30 rows, cells up to 24 characters."
+      "errorInvalid": "Check the table: 2–10 columns, 1–30 rows, cells up to 24 characters.",
+      "templateReplaceObject": "The ready-made template",
+      "templateReplaceLabel": "Replace with the template"
     },
     "picker": {
       "label": "Size guide",
@@ -10359,7 +11135,8 @@
       "saveError": "Could not save the tag.",
       "exists": "Another tag already uses this name.",
       "missingAr": "No Arabic label: Arabic shoppers see the English name.",
-      "manage": "Manage tags"
+      "manage": "Manage tags",
+      "emptyAction": "Go to products"
     }
   },
   "providerUnverified": {
@@ -10577,6 +11354,16 @@
     },
     "receipt": {
       "intro": "The barcode of the order number printed on receipts, packing slips and invoices."
+    },
+    "crossLink": {
+      "labels": {
+        "text": "Product labels are used while you count stock.",
+        "link": "Open stock"
+      },
+      "receipt": {
+        "text": "The receipt barcode shows on the orders you print.",
+        "link": "Open orders"
+      }
     }
   },
   "labels": {
@@ -10654,5 +11441,114 @@
     },
     "testNote": "Print one label and scan it with a phone before you print a whole sheet.",
     "loading": "Loading"
+  },
+  "customerIntelligence": {
+    "title": "Smart hints",
+    "subtitle": "Advice from how your own orders were delivered and returned. It only advises: it never holds, delays or cancels an order.",
+    "loadFailed": "Could not load the page.",
+    "retry": "Retry",
+    "saveFailed": "Could not save that change. Try again.",
+    "hints": {
+      "title": "Show smart hints",
+      "body": "A COD risk note on each order, which courier has delivered best to an area, and a shipping-fee suggestion. Every hint shows how many orders it rests on.",
+      "on": "Hints are on for this store.",
+      "off": "Hints are off. Nothing is shown until you switch them on."
+    },
+    "sharing": {
+      "title": "Learn from other stores too",
+      "body": "If you agree, your store's numbers (never a name, phone number, email or address) are counted together with other stores so the hints get more accurate for everyone. Nobody sees your store or any of your customers, and you can stop this at any time. It is off until you switch it on."
+    },
+    "fee": {
+      "title": "Shipping fee suggestion",
+      "suggestion": "COD orders with a shipping fee of {amount} or more come back {rate} of the time ({base} on average, from {n} orders). Think about lowering the shipping fee or asking for an InstaPay deposit on those orders.",
+      "none": "No shipping-fee band is returning clearly more than the rest."
+    },
+    "notEnough": "Not enough data yet. Hints appear once enough orders have been delivered or returned.",
+    "status": {
+      "title": "What the hints are based on",
+      "store": "Your store, data up to",
+      "cohort": "Other stores, data up to",
+      "none": "no data yet"
+    },
+    "shown": {
+      "title": "Hints shown in the last 30 days",
+      "features": {
+        "cod_risk": "COD risk",
+        "courier": "Courier",
+        "fee": "Shipping fee"
+      }
+    },
+    "paused": {
+      "title": "Paused for your store",
+      "item": "{feature}: this hint predicted {predicted} but {actual} actually happened over {resolved} of your orders, so it is paused for your store only. It switches itself back on once your own numbers line up again."
+    },
+    "bands": {
+      "typical": "Typical",
+      "elevated": "Higher than usual",
+      "insufficient": "Not enough data"
+    },
+    "footnote": "Hints are advice only. They never hold, delay or cancel an order, and the final decision is always yours.",
+    "order": {
+      "title": "COD risk",
+      "band": {
+        "typical": "Typical for this area.",
+        "elevated": "Returns are higher than usual here.",
+        "insufficient": "Not enough data yet."
+      },
+      "reason": {
+        "area": "Orders to this area have come back more than average.",
+        "buyer": "This customer has had several returns with your store."
+      },
+      "basedOn": "Based on {n} orders.",
+      "suggest": {
+        "confirm_by_phone": "Confirm by phone before you ship.",
+        "ask_instapay_deposit": "Ask for an InstaPay deposit."
+      },
+      "advisory": "Advice only. The order is not held."
+    },
+    "courier": {
+      "best": "Best delivery record to this area: {carrier} ({rate} delivered, {n} orders). Your selection is unchanged."
+    }
+  },
+  "ciInsights": {
+    "title": "Customer Intelligence",
+    "subtitle": "Findings from the shared numbers of opted-in stores. Nothing changes until a person accepts it.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "Nothing here.",
+    "filter": "Filter by status",
+    "status": {
+      "new": "New",
+      "accepted": "Accepted",
+      "dismissed": "Dismissed"
+    },
+    "evidence": "{n} outcomes across {stores} stores, data up to {date}.",
+    "accept": "Accept",
+    "dismiss": "Dismiss",
+    "gates": {
+      "title": "Hint switches",
+      "body": "Turning one off stops that hint for every store. Calibration only alerts: closing a switch is your decision.",
+      "close": "Turn off",
+      "open": "Turn on",
+      "features": {
+        "cod_risk": "COD risk note",
+        "courier": "Courier suggestion",
+        "fee": "Shipping fee card"
+      }
+    }
+  },
+  "shippingHub": {
+    "title": "Shipping and delivery",
+    "subtitle": "Set what you charge for shipping, who delivers, and when orders arrive",
+    "tabs": {
+      "label": "Shipping and delivery sections",
+      "rates": "Rates",
+      "carriers": "Carriers",
+      "delivery": "Delivery times",
+      "cod": "Cash-on-delivery collection"
+    },
+    "savedTitle": "Shipping saved",
+    "savedBody": "The return policy was updated.",
+    "saveLabel": "Save shipping"
   }
 }

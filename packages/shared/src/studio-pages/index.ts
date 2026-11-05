@@ -91,7 +91,7 @@ const COPY: Record<StudioLang, Copy> = {
     mapLabel: 'Site sections',
     soon: 'Coming soon',
     soonLine: {
-      whatsapp: 'Ebda WhatsApp is coming soon.',
+      whatsapp: 'Ebda Chat is coming soon.',
       crm: 'Ebda CRM is coming soon.',
       erp: 'Ebda ERP is coming soon.',
       reserved: 'This address is held for an upcoming service from Ebda AI Studio.',
@@ -107,7 +107,7 @@ const COPY: Record<StudioLang, Copy> = {
       docs: 'Developer docs',
       status: 'Service status',
     },
-    products: { whatsapp: 'Ebda WhatsApp', crm: 'Ebda CRM', erp: 'Ebda ERP' },
+    products: { whatsapp: 'Ebda Chat', crm: 'Ebda CRM', erp: 'Ebda ERP' },
   },
   ar: {
     title404: 'الصفحة مش موجودة',
@@ -119,23 +119,23 @@ const COPY: Record<StudioLang, Copy> = {
     mapLabel: 'أقسام الموقع',
     soon: 'قريباً',
     soonLine: {
-      whatsapp: 'ابدأ واتساب جاي قريب.',
+      whatsapp: 'ابدأ شات جاي قريب.',
       crm: 'ابدأ CRM جاي قريب.',
       erp: 'ابدأ ERP جاي قريب.',
-      reserved: 'العنوان ده محجوز لخدمة جاية من ابدأ استوديو للذكاء الاصطناعي.',
+      reserved: 'العنوان ده محجوز لخدمة جاية من ابدأ ستوديو للذكاء الاصطناعي.',
     },
     soonHint: 'لسه بنشتغل عليه. وده اللي شغال النهارده.',
     contact: 'تواصل معانا',
     switchTo: 'English',
     groups: { live: 'شغال النهارده', support: 'المساعدة', next: 'قريباً' },
     links: {
-      home: 'ابدأ استوديو للذكاء الاصطناعي',
+      home: 'ابدأ ستوديو للذكاء الاصطناعي',
       store: 'ابدأ ستور',
       help: 'مركز المساعدة',
       docs: 'وثائق المطوّرين',
       status: 'حالة الخدمة',
     },
-    products: { whatsapp: 'ابدأ واتساب', crm: 'ابدأ CRM', erp: 'ابدأ ERP' },
+    products: { whatsapp: 'ابدأ شات', crm: 'ابدأ CRM', erp: 'ابدأ ERP' },
   },
 };
 
@@ -269,13 +269,16 @@ ${next('erp')}
  * Response headers for a studio page: not cacheable (nothing may misfile it under another host), noindex,
  * and a locked-down CSP whose only allowances are the help typeahead script and the help/docs indexes.
  */
+/** The one HSTS policy every Ebda host sends (api, store, orders, studio pages, accounts, status). */
+export const HSTS_VALUE = 'max-age=31536000; includeSubDomains; preload';
+
 export const STUDIO_PAGE_HEADERS: Readonly<Record<string, string>> = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-store',
   Vary: 'Accept-Language',
   'X-Robots-Tag': 'noindex, nofollow',
   'X-Content-Type-Options': 'nosniff',
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  'Strict-Transport-Security': HSTS_VALUE,
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Content-Security-Policy': [
     "default-src 'none'",

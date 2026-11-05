@@ -39,7 +39,12 @@ export interface FireResult {
   started: string[];
   skipped: string[];
   failed: string[];
+  /** Due but held back by the write freeze: same due time, looked at again FREEZE_RETRY_MS later. */
+  parked: string[];
 }
+
+/** While frozen a due alarm waits this long before looking at the flag again (no attempt is spent). */
+export const FREEZE_RETRY_MS = 5 * 60_000;
 
 export const CATCH_UP_MS = 24 * 60 * 60_000;
 export const MAX_ATTEMPTS = 5;
@@ -55,6 +60,11 @@ export abstract class StoreScheduleBase<Env = unknown> extends DurableObject<Env
 
   /** An occurrence was given up on after MAX_ATTEMPTS failed starts: tell the alert channel. */
   protected async onGaveUp(_job: string, _event: AlarmEvent, _err: unknown): Promise<void> {}
+
+  /** Is the write freeze on (WRITES_FROZEN=1, Ruling CF-JOBS-2)? The base loads in a bare test worker, so it never freezes. */
+  protected isFrozen(): boolean {
+    return false;
+  }
 
   /** Structured log line. A no-op here (the base loads in a bare test worker); the deployed class logs. */
   protected log(_level: 'warn' | 'error', _fields: LogFields, _msg: string): void {}
@@ -128,11 +138,25 @@ export abstract class StoreScheduleBase<Env = unknown> extends DurableObject<Env
   /** The alarm body (also callable directly, with a clock, by tests and operators). */
   async fire(now = Date.now()): Promise<FireResult> {
     this.init();
-    const out: FireResult = { started: [], skipped: [], failed: [] };
+    const out: FireResult = { started: [], skipped: [], failed: [], parked: [] };
     const storeId = this.storeId();
     if (!storeId) return out;
     const sql = this.ctx.storage.sql;
     const due = this.rows().filter(r => (r.retry_at ?? r.next_at) <= now && r.next_at <= now);
+    if (this.isFrozen()) {
+      // Write freeze: keep every due occurrence exactly as it is (next_at, fence, attempts) and look again shortly.
+      for (const r of due) {
+        sql.exec(`UPDATE schedule SET retry_at = ? WHERE job = ?`, now + FREEZE_RETRY_MS, r.job);
+        out.parked.push(r.job);
+      }
+      if (due.length > 0)
+        this.log(
+          'warn',
+          { job: due.map(r => r.job).join(','), storeId },
+          '[store-schedule] write freeze: alarm parked'
+        );
+      return out;
+    }
     for (const r of due) {
       if (now - r.next_at > CATCH_UP_MS) {
         this.log(

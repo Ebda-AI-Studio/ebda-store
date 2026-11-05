@@ -55,7 +55,7 @@ Arabic: لينك مجاني ودومين خاص بيك
 Win back shoppers who left, talk to them after they buy, and reward them for coming back.
 
 ### Abandoned-cart recovery
-When a shopper leaves items in the cart, the store reminds them in steps and sends them back to the cart with a direct link, by notification, by email or by SMS. Email and SMS only go out when the shopper agreed at checkout, guests included. Available on: Growth and Business plans.
+When a shopper leaves items in the cart, the store reminds them in steps and sends them back to the cart with a direct link, by notification or by email. SMS is on the Business plan, through your own SMS account. Email and SMS only go out when the shopper agreed at checkout, guests included. Available on: Growth and Business plans.
 Arabic: استرجاع السلات المتروكة
 
 ### Order emails that send themselves
@@ -127,7 +127,7 @@ Q: Is there search by meaning?
 A: It is rolling out gradually and coming soon. We will not switch it on for your store until its results pass our quality check on a real catalogue.
 
 Q: Does it recover abandoned carts?
-A: Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification, and by SMS when they agreed to it.
+A: Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification. SMS is on the Business plan, through your own SMS account, when the shopper agreed to it.
 
 Q: Is there loyalty and a referral programme?
 A: Yes. Loyalty points, tiers and referral rewards are on Growth and Business, and the affiliate programme with commission is on Business.
@@ -153,7 +153,7 @@ A: No. It is 0% on every plan. You pay the subscription, and the payment gateway
 Q: What is not there yet?
 A: There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details, and what is coming soon.
 
-## Comparisons (as of October 2026)
+## Comparisons (as of November 2026)
 Competitor facts come from their public pages (Wuilt, YouCan, EasyOrders and ExpandCart were read on 22 October 2026; the others are general and say to check their sites). Check their sites before deciding.
 
 ### Ebda Store vs Zid — https://ebda.app/en/compare/zid/
@@ -166,7 +166,7 @@ Both Ebda Store and Zid let you open an online store in Arabic. The difference i
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Zid — Check Zid's site for its AI features and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Zid — Check which Egyptian gateways and carriers Zid supports for your account.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Zid — Check Zid's site for its themes and editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Zid — Check Zid's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points. Plus reminder emails when the shopper opted in at checkout, guests included. Zid — Check Zid's site for cart recovery and loyalty options.
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Zid — Check Zid's site for webhooks and integrations.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Zid — Check Zid's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Zid — Check Zid's site for email marketing options.
@@ -187,7 +187,7 @@ Shopify is a large global platform serving merchants in many countries, while Eb
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Shopify — Has AI features. Compare the current scope and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Shopify — Egyptian gateways and carriers depend on apps and integrations. Check what is available.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Shopify — A very large theme store and a theme editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Shopify — Available, built in or through apps.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points. Plus reminder emails when the shopper opted in at checkout, guests included. Shopify — Available, built in or through apps.
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Shopify — Webhooks and a developer API are available, alongside the app store.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Shopify — Check Shopify's site for B2B features and which plans include them.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Shopify — Email marketing through built-in tools or apps.
@@ -199,16 +199,16 @@ Shopify is a large global platform serving merchants in many countries, while Eb
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Shopify — An established platform with a very large merchant base and partner ecosystem.
 
 ### Ebda Store vs Wuilt — https://ebda.app/en/compare/wuilt/
-Wuilt is an Egypt-focused platform with a free store, which is a real advantage when you are starting out. This page says where Wuilt is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 22 October 2026.
+Wuilt is an Egypt-focused platform with a free store, which is a real advantage when you are starting out. This page says where Wuilt is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 2 November 2026.
 - Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. Wuilt — Egypt-focused: its homepage says Wuilt stores are free for life for Wuilt customers in Egypt.
-- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. Wuilt — There is a free store. Paid plans are billed annually and listed in dollars with pound equivalents: Personal EGP 1,250 a year, Basic EGP 7,500, Premium EGP 10,500, Professional EGP 17,500 (plan cards on its pricing page). Cheaper than Ebda Store at the entry level.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. Wuilt — There is a free store. Paid plans are billed annually and listed in dollars with pound equivalents: Personal EGP 1,250 a year, Basic EGP 7,500, Premium EGP 10,500, Business EGP 17,500 (plan cards on its pricing page; the top plan is now named Business). Cheaper than Ebda Store at the entry level.
 - Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. Wuilt — Its pricing page does not state a commission on orders. Unverified.
 - Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. Wuilt — Arabic-first: it calls itself the fastest way to design an online store in the Arab world.
 - Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. Wuilt — Check Wuilt's site for its current search features.
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Wuilt — AI features are not stated on its homepage. Unverified.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Wuilt — Says you can connect different electronic payment methods and ship with the largest carriers in Egypt. It names no gateway or carrier, and cash on delivery and InstaPay are not stated. Unverified.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Wuilt — A store builder managed from one dashboard and from your phone. Paid plans cap pages and languages: Basic has 10 pages and 2 languages, Premium 20 pages and 4.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Wuilt — Check Wuilt's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points. Plus reminder emails when the shopper opted in at checkout, guests included. Wuilt — Check Wuilt's site for cart recovery and loyalty options.
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Wuilt — Check Wuilt's site for webhooks and integrations.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Wuilt — Check Wuilt's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Wuilt — Check Wuilt's site for email marketing options.
@@ -220,16 +220,16 @@ Wuilt is an Egypt-focused platform with a free store, which is a real advantage 
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Wuilt — Its homepage claims more than 350 thousand customers worldwide (its own figure, not verified by us).
 
 ### Ebda Store vs YouCan — https://ebda.app/en/compare/youcan/
-YouCan serves merchants in many countries and charges a transaction fee on orders depending on how the customer pays. Ebda Store bills in pounds with 0% commission. Figures come from their public pages, checked 22 October 2026.
+YouCan serves merchants in many countries and bills its plans in dollars; its paid plans show no transaction fees. Ebda Store bills in pounds with 0% commission. Figures come from their public pages, checked 2 November 2026.
 - Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. YouCan — Its homepage says it serves 166+ countries. It does not say where it is based and does not mention Egypt.
-- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. YouCan — Plans are priced in dollars ($ shown): Solopreneur $29, Starter $49, Entrepreneur $89 and Premium $187 a month, with a lower yearly price. No pound price is shown.
-- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. YouCan — Transaction fees apply: cash on delivery 0.5% and online payment 1% on the first $5K, then 0.25% and 0.5% above $5K (the period the $5K is measured over is not stated). Plans also cap monthly sales, from up to $50K to unlimited.
-- Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. YouCan — The language menu lists English, French and Arabic.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. YouCan — Plans are priced in dollars ($ shown): Solopreneur $29, Starter $49, Entrepreneur $89 and Premium $149 a month, and an Unlimited plan (up to 5 stores) at $229 a month, with a lower yearly price. No pound price is shown.
+- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. YouCan — The paid subscription plans show $0 in transaction fees. The fees (cash on delivery 0.5% and online payment 1% on the first $5K, then 0.25% and 0.5% above $5K) apply only to its separate pay-as-you-go option, which has no monthly price. Plans also cap monthly sales, from up to $50K to unlimited.
+- Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. YouCan — YouCan is Arabic-first.
 - Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. YouCan — Check YouCan's site for its current search features.
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. YouCan — Check YouCan's site for its AI features and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. YouCan — YouCan Ship offers a list of local shipping companies, none named on its homepage. Cash on delivery and Egyptian gateways are not stated. Unverified.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. YouCan — Check YouCan's site for its themes and editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. YouCan — Check YouCan's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points. Plus reminder emails when the shopper opted in at checkout, guests included. YouCan — Check YouCan's site for cart recovery and loyalty options.
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. YouCan — Check YouCan's site for webhooks and integrations.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. YouCan — Check YouCan's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. YouCan — Check YouCan's site for email marketing options.
@@ -241,16 +241,16 @@ YouCan serves merchants in many countries and charges a transaction fee on order
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. YouCan — Check YouCan's site for its merchant base and partners.
 
 ### Ebda Store vs EasyOrders — https://ebda.app/en/compare/easyorders/
-EasyOrders starts free and charges $0.04 per order, which is much cheaper when you take few orders. This page says where it is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 22 October 2026.
+EasyOrders offers a free plan and a fixed plan. We could not reach its pricing page on 2 November 2026, so this page shows no prices for it: check their site for the current ones. It says where it may suit you and where Ebda Store is stronger.
 - Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. EasyOrders — Its site is in Arabic with an Egypt market selector; it also lists global, Morocco and Algeria.
-- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. EasyOrders — Prices are in dollars. The free plan has no subscription and charges $0.04 per order. A fixed plan is $100 a month with unlimited orders.
-- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. EasyOrders — The $100 plan says no commission on orders. On the free plan the $0.04 per-order fee replaces the subscription.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. EasyOrders — Prices are in dollars. A free plan and a fixed plan are listed. We could not verify the figures on 2 November 2026: check their site.
+- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. EasyOrders — The fixed plan says no commission on orders. The fee on the free plan could not be verified on 2 November 2026: check their site.
 - Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. EasyOrders — The site and its pricing page are in Arabic.
 - Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. EasyOrders — Check EasyOrders's site for its current search features.
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. EasyOrders — Check EasyOrders's site for its AI features and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. EasyOrders — Check which Egyptian gateways and carriers EasyOrders supports for your account.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. EasyOrders — Both plans list unlimited products, orders and visits, and a lifetime-active store. Theme and funnel documentation is published for developers.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. EasyOrders — Check EasyOrders's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points. Plus reminder emails when the shopper opted in at checkout, guests included. EasyOrders — Check EasyOrders's site for cart recovery and loyalty options.
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. EasyOrders — A public API is listed for developers.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. EasyOrders — Check EasyOrders's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. EasyOrders — Check EasyOrders's site for email marketing options.
@@ -262,16 +262,16 @@ EasyOrders starts free and charges $0.04 per order, which is much cheaper when y
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. EasyOrders — Check EasyOrders's site for its merchant base and partners.
 
 ### Ebda Store vs ExpandCart — https://ebda.app/en/compare/expandcart/
-ExpandCart says it takes no commission on sales, and it offers multiple currencies and many integrations. Ebda Store bills in pounds and is built for Egypt. Figures come from their public pages, checked 22 October 2026.
+ExpandCart says it takes no commission on sales, and it offers multiple currencies and many integrations. Ebda Store bills in pounds and is built for Egypt. Figures come from their public pages, checked 2 November 2026.
 - Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. ExpandCart — Where it is based is not stated on its pricing page. Unverified. The site is in English and Arabic.
-- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. ExpandCart — Plans are priced in dollars: Standard $19, Professional $39 and Ultimate $149 a month, or $199, $399 and $1,499 a year.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. ExpandCart — Served in pounds to visitors in Egypt (as of November 2026): Standard EGP 599, Professional EGP 1,199 and Ultimate EGP 4,599 a month, or EGP 5,999, 11,999 and 45,999 a year. The dollar prices were not re-checked.
 - Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. ExpandCart — Its pricing page says no commissions no matter how big your sales are.
 - Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. ExpandCart — Multi-language is listed on the Standard plan, and the site is in English and Arabic.
 - Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. ExpandCart — Check ExpandCart's site for its current search features.
 - AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. ExpandCart — Check ExpandCart's site for its AI features and which plan includes them.
 - Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. ExpandCart — Lists 100+ payment and shipping integrations. Which of them are Egyptian is not stated. Unverified.
 - Templates and design: Ebda Store — Five templates with three looks each, and a page builder. ExpandCart — Standard includes 1 template and an advanced template editor with up to 100 products; Professional has 4 templates and up to 1,000 products.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. ExpandCart — Check ExpandCart's site for cart recovery and loyalty options.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points. Plus reminder emails when the shopper opted in at checkout, guests included. ExpandCart — Check ExpandCart's site for cart recovery and loyalty options.
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. ExpandCart — Facebook Pixel on Standard and Google Analytics on Professional are listed.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. ExpandCart — Check ExpandCart's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. ExpandCart — Check ExpandCart's site for email marketing options.

@@ -214,7 +214,7 @@ export function DesignControls({
                 onChange={e =>
                   set({ cta: e.target.value ? { ...cta, text: e.target.value } : null })
                 }
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 {tt('remaining', { count: QR_CTA_MAX - cta.text.length })}
@@ -250,7 +250,7 @@ export function DesignControls({
             value={whatsappText}
             placeholder={tw('textPlaceholder')}
             onChange={e => onWhatsappText(e.target.value)}
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
           />
           <p className="text-xs text-muted-foreground">{tw('hint')}</p>
         </section>

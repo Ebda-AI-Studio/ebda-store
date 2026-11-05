@@ -1,5 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { acrossStores, prisma, runInTenantContext } from '@ebda/database';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../../customer-directory';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { acrossStoresDb, readStoreDb, withStoreDb } from '../../jobs/store-db';
+import { alarmStoreId } from '../../jobs/store-scope';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
@@ -14,7 +17,7 @@ import { WhatsAppConsentService } from '../../wa/consent';
 import { CONSENT_CHANGED_EVENT, consentChangedInput } from '../../wa/consent-state';
 
 /**
- * Store -> Ebda WhatsApp events (contract 2026-10-24, section 4): order created, COD confirmation
+ * Store -> Ebda Chat events (contract 2026-10-24, section 4): order created, COD confirmation
  * requested, order status changed, shipment updated. One function, three source events, so the
  * emit sites in the order and carrier services stay a one-line `inngest.send` and the producer
  * gets the job layer's retries and failure alerts.
@@ -76,8 +79,8 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
     locale?: string;
   };
   if (!orderId || !storeId) return [];
-  const order = await runInTenantContext(storeId, () =>
-    prisma.order.findUnique({ where: { id: orderId, storeId }, select: orderSelect })
+  const order = await readStoreDb(storeId, db =>
+    db.order.findUnique({ where: { id: orderId, storeId }, select: orderSelect })
   );
   // `order/created` can be sent from INSIDE the request transaction (Ruling WH-8): the order or its
   // COD payment may not be visible yet. Throw so the job retries (as the other fan-outs do) instead
@@ -168,8 +171,8 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
     updatedAt?: string;
   };
   if (!d.storeId || !d.orderId || !d.shipmentId || !d.status) return [];
-  const order = await runInTenantContext(d.storeId, () =>
-    prisma.order.findUnique({
+  const order = await readStoreDb(d.storeId, db =>
+    db.order.findUnique({
       where: { id: d.orderId!, storeId: d.storeId! },
       select: { orderNumber: true, shippingAddress: true, locale: true },
     })
@@ -206,8 +209,8 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
 async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   const { storeId, cartId } = (event.data ?? {}) as { storeId?: string; cartId?: string };
   if (!storeId || !cartId) return [];
-  const row = await runInTenantContext(storeId, () =>
-    prisma.abandonedCart.findFirst({
+  const row = await readStoreDb(storeId, db =>
+    db.abandonedCart.findFirst({
       where: { storeId, cartId },
       select: {
         status: true,
@@ -215,21 +218,32 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
         customerPhone: true,
         customerId: true,
         createdAt: true,
-        store: { select: { slug: true, domain: true, settings: true } },
       },
     })
   );
   if (!row) throw new Error(`abandoned cart ${cartId} not visible yet`);
+  // `Store` is a platform row, not a store-DO one: read it for either backend
+  const store = await withStoreDb(storeId, db =>
+    db.store.findUnique({
+      where: { id: storeId },
+      select: { slug: true, domain: true, settings: true },
+    })
+  );
+  if (!store) throw new Error(`store ${storeId} not found`);
   // Stop-on-convert: a shopper who already ordered must not be chased.
   if (row.status === 'recovered' || row.recoveredAt) return [];
   // A deactivated / erased account is never chased (belt and braces next to the revoke on delete).
   if (row.customerId) {
-    const owner = await runInTenantContext(storeId, () =>
-      prisma.user.findFirst({
-        where: { id: row.customerId!, storeId },
-        select: { deletedAt: true },
-      })
-    );
+    const doOwner = await customerRow(storeId, row.customerId);
+    const owner =
+      doOwner !== undefined
+        ? doOwner
+        : await runInTenantContext(storeId, () =>
+            prisma.user.findFirst({
+              where: { id: row.customerId!, storeId },
+              select: { deletedAt: true },
+            })
+          );
     if (!owner || owner.deletedAt) return [];
   }
   const phone = toE164(row.customerPhone);
@@ -239,7 +253,7 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   // Ruling WA-CONSENT-1: a cart reminder is MARKETING. No active consent = no cart.abandoned.
   // Checked here, at send time, so a revoke between capture and send also stops it.
   if (!(await WhatsAppConsentService.hasConsent(storeId, buyerKey))) return [];
-  const lang = (row.store.settings as { defaultLanguage?: unknown } | null)?.defaultLanguage;
+  const lang = (store.settings as { defaultLanguage?: unknown } | null)?.defaultLanguage;
   return [
     {
       seed: `cart:${cartId}`,
@@ -253,14 +267,14 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
           phoneE164: phone,
           locale: lang === 'en' ? 'en' : 'ar',
           // Signed, expiring, store-scoped: re-attaches THIS cart for guests too (Ruling CART-RESTORE-1).
-          recoveryUrl: `${storefrontOrigin(row.store)}/cart?restore=${encodeURIComponent(signCartRestoreToken(storeId, cartId))}`,
+          recoveryUrl: `${storefrontOrigin(store)}/cart?restore=${encodeURIComponent(signCartRestoreToken(storeId, cartId))}`,
         },
       },
     },
   ];
 }
 
-/** `customer.erased` (PDPL): Ebda WhatsApp deletes the contact and its messages. Only the hashed key travels. */
+/** `customer.erased` (PDPL): Ebda Chat deletes the contact and its messages. Only the hashed key travels. */
 async function erasedEvent(event: SourceEvent): Promise<Planned[]> {
   const { storeId, buyerKey } = (event.data ?? {}) as { storeId?: string; buyerKey?: string };
   if (!storeId || !buyerKey) return [];
@@ -286,16 +300,16 @@ async function catalogEvents(event: SourceEvent): Promise<Planned[]> {
   if (!ids) {
     // Unknown or many: resync the store's whole catalog (capped; a store past the cap is resynced by
     // the link flow's catalog read over the bridge anyway).
-    const all = await runInTenantContext(storeId, () =>
-      prisma.product.findMany({ where: { storeId }, select: { id: true }, take: CATALOG_MAX })
+    const all = await readStoreDb(storeId, db =>
+      db.product.findMany({ where: { storeId }, select: { id: true }, take: CATALOG_MAX })
     );
     ids = all.map(p => p.id);
   }
   const out: Planned[] = [];
   for (let i = 0; i < ids.length; i += CATALOG_PAGE) {
     const chunk = ids.slice(i, i + CATALOG_PAGE);
-    const rows = await runInTenantContext(storeId, () =>
-      prisma.product.findMany({
+    const rows = await readStoreDb(storeId, db =>
+      db.product.findMany({
         where: { id: { in: chunk }, storeId },
         select: { id: true, updatedAt: true, deletedAt: true, variants: { select: { id: true } } },
       })
@@ -338,8 +352,8 @@ async function statusEvent(event: SourceEvent): Promise<Planned[]> {
   // still for THIS status.
   let at = d.requestedAt ? new Date(d.requestedAt) : null;
   if (!at || Number.isNaN(at.getTime())) {
-    const order = await runInTenantContext(d.storeId, () =>
-      prisma.order.findUnique({
+    const order = await readStoreDb(d.storeId, db =>
+      db.order.findUnique({
         where: { id: d.orderId!, storeId: d.storeId! },
         select: {
           statusFanoutRequestedAt: true,
@@ -382,8 +396,8 @@ const CONSENT_BACKFILL_KEY = 'wa:consent-backfill:v1.1';
  * Used by the 12-hourly reconcile and for the one-time v1.1 backfill. Idempotent by envelope id.
  */
 export async function resendConsentFor(storeId: string, sinceMs: number): Promise<number> {
-  const rows = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppConsent.findMany({
+  const rows = await readStoreDb(storeId, db =>
+    db.storeWhatsAppConsent.findMany({
       where: {
         storeId,
         ...(sinceMs > 0 ? { updatedAt: { gte: new Date(Date.now() - sinceMs) } } : {}),
@@ -404,7 +418,7 @@ export async function resendConsentFor(storeId: string, sinceMs: number): Promis
 export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
   if (!storeId) return 0;
-  // An erasure goes to Ebda WhatsApp for any store it knows (a link row), linked or not: the
+  // An erasure goes to Ebda Chat for any store it knows (a link row), linked or not: the
   // contact may outlive an unlink, and it must be deleted either way.
   if (event.name === 'account/erased') {
     if (!(await hasWhatsAppLinkRow(storeId))) return 0;
@@ -413,7 +427,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     await sendStoreEvents(events);
     return events.length;
   }
-  // Plan state goes to Ebda WhatsApp for every store it knows (it holds a link row), including a
+  // Plan state goes to Ebda Chat for every store it knows (it holds a link row), including a
   // store that was unlinked or downgraded: that is exactly when the gate must hear about it.
   if (event.name === PLAN_CHANGED_EVENT) {
     if (!(await hasWhatsAppLinkRow(storeId))) return 0;
@@ -422,7 +436,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     await sendStoreEvents(events);
     return events.length;
   }
-  // Consent state goes to Ebda WhatsApp for every store it knows (a link row), also when unlinked:
+  // Consent state goes to Ebda Chat for every store it knows (a link row), also when unlinked:
   // an opt-out must reach it either way.
   if (event.name === CONSENT_CHANGED_EVENT) {
     const buyerKey = (event.data as { buyerKey?: string }).buyerKey;
@@ -457,7 +471,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
 export const waStoreEvents: JobDef = inngest.createFunction(
   {
     id: 'wa-store-events',
-    name: 'Store -> Ebda WhatsApp events',
+    name: 'Store -> Ebda Chat events',
     retries: 4,
     triggers: [
       { event: 'order/created' },
@@ -485,22 +499,27 @@ export const waStoreEvents: JobDef = inngest.createFunction(
 export const waPlanSync: JobDef = inngest.createFunction(
   {
     id: 'wa-plan-sync',
-    name: 'Ebda WhatsApp: plan state reconcile (12-hourly)',
+    name: 'Ebda Chat: plan state reconcile (12-hourly)',
     retries: 2,
     concurrency: { limit: 1 },
     triggers: [{ cron: '41 */12 * * *' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Idle exit BEFORE any step: most ticks find no store that ever linked WhatsApp (one execution).
-    const linked = (
-      await acrossStores(storeId =>
-        prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
-      )
-    )
-      .filter(r => r.value)
-      .map(r => r.storeId);
+    // The cron run lists the Postgres stores; a DO store runs on its own alarm and reads its link row from its DO (Ruling CF-JOBS-4).
+    const only = alarmStoreId(event);
+    const linked: string[] = [];
+    await acrossStoresDb(event, async (storeId, db) => {
+      const row = await db.storeWhatsAppLink.findUnique({
+        where: { storeId },
+        select: { storeId: true },
+      });
+      if (row) linked.push(storeId);
+    });
     if (linked.length === 0) return { sent: 0 };
-    const backfill = !(await redis.exists(CONSENT_BACKFILL_KEY));
+    // The v1.1 backfill is once per store: the cron run shares one flag for every store it visits, an alarm run (one store) keeps its own
+    const backfillKey = only ? `${CONSENT_BACKFILL_KEY}:${only}` : CONSENT_BACKFILL_KEY;
+    const backfill = !(await redis.exists(backfillKey));
     const sinceMs = backfill ? 0 : 36 * 3600 * 1000;
     const sent = await step.run('sweep', async () => {
       let n = 0;
@@ -510,7 +529,7 @@ export const waPlanSync: JobDef = inngest.createFunction(
         // ONCE, every row: the v1.1 backfill). Same state = same envelope id, so this is idempotent.
         n += await resendConsentFor(storeId, sinceMs);
       }
-      if (backfill) await redis.set(CONSENT_BACKFILL_KEY, '1', 365 * 24 * 3600);
+      if (backfill) await redis.set(backfillKey, '1', 365 * 24 * 3600);
       return n;
     });
     return { sent };

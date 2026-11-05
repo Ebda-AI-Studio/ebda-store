@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { storeDb } from '../lib/repo-factory';
 import { DEFAULT_LABEL_SETTINGS, labelSettingsSchema } from '@ebda/shared';
-import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -36,7 +36,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const store = await prisma.store.findFirst({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findFirst({
         where: { id: storeId },
         select: { slug: true, domain: true, domainStatus: true, settings: true },
       });
@@ -110,7 +112,9 @@ router.get(
     try {
       const { storeId } = req.params;
       const { search, cursor, limit } = itemsQuery.parse(req.query);
-      const products = await prisma.product.findMany({
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
         where: {
           storeId,
           deletedAt: null,

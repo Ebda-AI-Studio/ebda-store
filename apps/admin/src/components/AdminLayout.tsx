@@ -30,9 +30,11 @@ import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { TopBar } from './admin-layout/TopBar';
+import { SettingsRail } from './admin-layout/SettingsRail';
 import { DocumentTitle } from './DocumentTitle';
 import { FocusTopBar } from './admin-layout/FocusTopBar';
 import { MobileBottomNav } from './mobile/MobileBottomNav';
+import { ConfirmHost } from '../hooks/useConfirm';
 import { useFocusMode } from '../contexts/FocusModeContext';
 
 interface AdminLayoutProps {
@@ -47,6 +49,8 @@ interface AdminLayoutProps {
   /** Store's custom domain (e.g. 'mystore.com') or slug for the View Store button */
   storeDomain?: string;
   storeSlug?: string;
+  /** Breadcrumb parent shown above the title (UX:N-5). Settings pages get "الإعدادات" automatically. */
+  parent?: { label: string; href: string };
 }
 
 export function AdminLayout({
@@ -59,6 +63,7 @@ export function AdminLayout({
   storeId,
   storeDomain,
   storeSlug,
+  parent,
 }: AdminLayoutProps) {
   const t = useT('components.adminLayout');
   const tcp = useT('components.commandPalette');
@@ -104,6 +109,7 @@ export function AdminLayout({
     // Hub names (sidebar — 9 items)
     dashboard: t('navDashboard'),
     catalog: t('navCatalog'),
+    editor: t('navEditor'),
     sales: t('navSales'),
     stock: t('navStock'),
     finance: t('navFinance'),
@@ -122,6 +128,7 @@ export function AdminLayout({
     platformProviderActivation: t('navPlatformProviderActivation'),
     platformTaxArchive: t('navPlatformTaxArchive'),
     platformPolicyUpdates: t('navPlatformPolicyUpdates'),
+    platformCiInsights: t('navPlatformCiInsights'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
@@ -130,12 +137,12 @@ export function AdminLayout({
   const hubLabels: HubLabels = {
     // Catalog tabs
     products: t('hubTabs.products'),
-    editor: t('hubTabs.editor'),
     content: t('hubTabs.content'),
     blog: t('hubTabs.blog'),
     floatingWidget: t('hubTabs.floatingWidget'),
     sizeCharts: t('hubTabs.sizeCharts'),
     goldRates: t('hubTabs.goldRates'),
+    categories: t('hubTabs.categories'),
     // Sales tabs
     orders: t('hubTabs.orders'),
     invoices: t('hubTabs.invoices'),
@@ -149,6 +156,7 @@ export function AdminLayout({
     loyalty: t('hubTabs.loyalty'),
     bundles: t('hubTabs.bundles'),
     wallet: t('hubTabs.wallet'),
+    customerIntelligence: t('hubTabs.customerIntelligence'),
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),
     inventory: t('hubTabs.inventory'),
@@ -374,6 +382,13 @@ export function AdminLayout({
       : undefined);
   const isStoreAdminWithBranding = mode === 'store_admin' && !!resolvedStoreBranding;
 
+  // Settings pages (not the hub itself) get the rail on large screens and a "الإعدادات" breadcrumb everywhere.
+  const settingsRoot = navStoreId ? `/stores/${navStoreId}/settings` : '';
+  const onSettingsSubpage = activeHubKey === 'settings' && !!pathname && pathname !== settingsRoot;
+  const showSettingsRail = onSettingsSubpage && !!navStoreId && !isFocused;
+  const resolvedParent =
+    parent ?? (onSettingsSubpage ? { label: t('navSettings'), href: settingsRoot } : undefined);
+
   const sidebarContent = (
     <>
       <SidebarHeader
@@ -403,6 +418,7 @@ export function AdminLayout({
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
         <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
+          {/* i18n-gate-allow: keyboard shortcut keycap */}
           ⌘K
         </kbd>
       </button>
@@ -452,6 +468,7 @@ export function AdminLayout({
         <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-6 lg:p-6">
           {children}
         </main>
+        <ConfirmHost />
       </div>
     );
   }
@@ -460,6 +477,8 @@ export function AdminLayout({
     <div className="flex min-h-screen bg-background">
       {/* Global ⌘K command palette — renders null until opened; searches every admin page. */}
       <CommandPalette items={paletteItems} />
+      {/* The one confirmation dialog behind useConfirm(). */}
+      <ConfirmHost />
       {/* ?setting=<id> deep link: scroll to the control and highlight it. */}
       <Suspense fallback={null}>
         <SettingHighlight />
@@ -527,6 +546,7 @@ export function AdminLayout({
           onOpenSidebar={() => setIsSidebarOpen(true)}
           onBack={() => router.back()}
           viewStoreUrl={viewStoreUrl}
+          parent={resolvedParent}
         />
 
         {/* Hub tab nav — shown above page content when inside a multi-route hub
@@ -538,7 +558,14 @@ export function AdminLayout({
             fixed bottom-nav so primary actions / save buttons aren't
             hidden behind it; the sidebar shell already absorbs that
             on desktop so the padding is mobile-scoped. */}
-        <div className="p-4 pb-20 lg:p-6 lg:pb-6">{children}</div>
+        {showSettingsRail ? (
+          <div className="flex gap-6 p-4 pb-20 lg:p-6 lg:pb-6">
+            <SettingsRail storeId={navStoreId} />
+            <div className="min-w-0 flex-1">{children}</div>
+          </div>
+        ) : (
+          <div className="p-4 pb-20 lg:p-6 lg:pb-6">{children}</div>
+        )}
       </main>
 
       {/* Mobile Bottom Nav — store-scoped only. Renders nothing at

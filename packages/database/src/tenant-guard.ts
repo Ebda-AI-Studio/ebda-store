@@ -134,6 +134,8 @@ export const GLOBAL_MODELS: readonly string[] = [
   'ProviderVerification',
   'ProviderVerificationEvent',
   'SystemSetting',
+  // Ruling CI-9: platform-wide CI findings over k-anonymous cohort cells, no store_id and no identifier.
+  'CiInsight',
 ];
 
 interface ModelMeta {
@@ -557,6 +559,19 @@ const WRITE_OPERATIONS = new Set([
   'delete',
   'deleteMany',
 ]);
+/**
+ * Tell the write observer about a write that did not go through the Prisma client extension: a D1-served model call
+ * (services/platform/router.ts) or a raw D1 statement. The observer (Ebda Chat's `store.plan_changed`, catalog and
+ * consent events) must see EVERY write whichever store holds the row.
+ */
+export function notifyModelWrite(
+  model: string,
+  operation: string,
+  args: unknown,
+  result: unknown
+): void {
+  observeWrite(model, operation, args, result);
+}
 function observeWrite(model: string, operation: string, args: unknown, result: unknown): void {
   const obs = modelWriteObserver;
   if (!obs || !WRITE_OPERATIONS.has(operation)) return;
@@ -571,6 +586,18 @@ function observeWrite(model: string, operation: string, args: unknown, result: u
  * The per-operation body of the extension: the guard check, the query, then the write observer.
  * Exported so the wiring is testable without a database.
  */
+/**
+ * NEON-ZERO-1 runtime guard: a model the API has moved to D1 must never reach THIS client (Postgres) once its family is
+ * on D1; the router never calls the Postgres leg then, so any call that gets here bypassed the router (an unwrapped raw
+ * transaction, a stray client). The API registers the predicate; it throws.
+ */
+let routedModelGuard: ((model: string, operation: string) => void) | undefined;
+export function setRoutedModelGuard(
+  fn: ((model: string, operation: string) => void) | undefined
+): void {
+  routedModelGuard = fn;
+}
+
 export function guardedOperation(p: {
   model: string;
   operation: string;
@@ -578,6 +605,7 @@ export function guardedOperation(p: {
   query: QueryFn;
 }): Promise<unknown> {
   const { model, operation, args, query } = p;
+  routedModelGuard?.(model, operation);
   assertTenantScoped(model, operation, args, ambientScope());
   return observed(`db-${model}.${operation}`, () => query(args)).then(result => {
     observeWrite(model, operation, args, result);

@@ -8,12 +8,49 @@
 /en/compare/salla /en/features/ 301
 /en/compare/salla/ /en/features/ 301
 
-# Audit M-164: /pricing and /compare are linked from outside but are home sections. The compare-plans table lives in #pricing.
-/pricing /#pricing 301
-/pricing/ /#pricing 301
-/en/pricing /en/#pricing 301
-/en/pricing/ /en/#pricing 301
-/compare /#pricing 301
-/compare/ /#pricing 301
-/en/compare /en/#pricing 301
-/en/compare/ /en/#pricing 301
+# Audit M-164: /pricing and /compare are linked from outside but are Store landing sections. The compare-plans table lives in #pricing.
+# Targets carry the trailing slash (/store/#pricing), so each is ONE hop (public sites audit 2026-11-03, P1-9).
+/pricing /store/#pricing 301
+/pricing/ /store/#pricing 301
+/en/pricing /en/store/#pricing 301
+/en/pricing/ /en/store/#pricing 301
+/compare /store/#pricing 301
+/compare/ /store/#pricing 301
+/en/compare /en/store/#pricing 301
+/en/compare/ /en/store/#pricing 301
+
+# Ruling NAV-CHAT-SLUG-1: /whatsapp stays the Ebda Chat page; /chat is a one-hop alias.
+/chat /whatsapp/ 301
+/chat/ /whatsapp/ 301
+/en/chat /en/whatsapp/ 301
+/en/chat/ /en/whatsapp/ 301
+
+# Guessable studio URLs (audit P1-11). /login is 302 because it moves to the shared accounts sign-in later.
+/login https://store.ebda.app/login 302
+/login/ https://store.ebda.app/login 302
+/en/login https://store.ebda.app/login 302
+/en/login/ https://store.ebda.app/login 302
+/help https://help.ebda.app/ 301
+/help/ https://help.ebda.app/ 301
+/en/help https://help.ebda.app/en/ 301
+/en/help/ https://help.ebda.app/en/ 301
+/docs https://docs.ebda.app/ar/ 301
+/docs/ https://docs.ebda.app/ar/ 301
+/en/docs https://docs.ebda.app/ 301
+/en/docs/ https://docs.ebda.app/ 301
+/status https://status.ebda.app/ 301
+/status/ https://status.ebda.app/ 301
+/en/status https://status.ebda.app/en 301
+/en/status/ https://status.ebda.app/en 301
+# `/` is the studio home and stays 200 (never a redirect to /store); /studio is only an alias of it.
+/studio / 301
+/studio/ / 301
+/en/studio /en/ 301
+/en/studio/ /en/ 301
+/security.txt /.well-known/security.txt 301
+
+# Signup lives on the store app. Workers Static Assets keeps the query string on a redirect whose target has none.
+/signup https://store.ebda.app/signup 302
+/signup/ https://store.ebda.app/signup 302
+/en/signup https://store.ebda.app/signup 302
+/en/signup/ https://store.ebda.app/signup 302

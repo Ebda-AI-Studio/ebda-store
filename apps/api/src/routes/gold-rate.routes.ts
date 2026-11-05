@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z, ZodError } from 'zod/v3';
 import {
+  GOLD_DEFERRED_EXPLANATION,
+  goldAllowsDeferredPayment,
   goldRateInputSchema,
   goldRateSettingsSchema,
   productGoldPricingInputSchema,
@@ -11,6 +13,11 @@ import { requirePermission } from '../middleware/rbac';
 import { writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { GoldRateService } from '../services/gold-rate/gold-rate.service';
+import { StoreService } from '../services/store.service';
+import { AppError } from '../middleware/error-handler';
+import { storeDb } from '../lib/repo-factory';
+import { auditLog } from '../middleware/security';
+import { getAuthUser } from '../utils/store-helpers';
 
 /**
  * Gold-rate pricing (Phase B5 Task 10; Rulings B5-13, B5-20): /stores/:storeId/gold-rates, mounted
@@ -21,6 +28,8 @@ import { GoldRateService } from '../services/gold-rate/gold-rate.service';
  *   PUT  /                        write 1..3 rates                       store:settings
  *   POST /:rateId/decision        confirm / reject a pending feed rate   store:settings
  *   PUT  /settings                rates settings                         store:settings
+ *   GET  /payment-policy          "allow COD / installments for gold"    products:read
+ *   PUT  /payment-policy          same switch, ON needs confirm (SHARIA-GOLD-1)  store:settings
  *   PUT  /products/:productId/pricing   a product's mode + spec          products:write
  *   POST /bulk/pricing-mode       switch many products                   store:settings
  *
@@ -122,6 +131,65 @@ router.put(
         userId: req.user!.userId,
       });
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+const paymentPolicyBody = z
+  .object({ allowDeferred: z.boolean(), confirm: z.boolean().optional() })
+  .strict();
+
+router.get(
+  '/payment-policy',
+  ...readChain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const store = await (
+        await storeDb(req.params.storeId)
+      ).store.findUnique({ where: { id: req.params.storeId }, select: { settings: true } });
+      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+      res.json({
+        success: true,
+        data: { allowDeferred: goldAllowsDeferredPayment(store.settings) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/payment-policy',
+  ...settingsChain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = parse(paymentPolicyBody, req.body);
+      // Turning COD / installments ON for gold is the risky direction: it needs the explicit confirm,
+      // checked here and not only in the admin dialog. Turning it OFF never does.
+      if (input.allowDeferred && input.confirm !== true) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'CONFIRM_REQUIRED',
+            message: GOLD_DEFERRED_EXPLANATION.en,
+          },
+        });
+        return;
+      }
+      await StoreService.setGoldAllowDeferredPayment(req.params.storeId, input.allowDeferred);
+      await auditLog({
+        action: 'store.gold_allow_deferred_payment',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: req.params.storeId,
+        storeId: req.params.storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { allowDeferred: input.allowDeferred },
+      });
+      res.json({ success: true, data: { allowDeferred: input.allowDeferred } });
     } catch (error) {
       next(error);
     }

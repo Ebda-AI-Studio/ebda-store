@@ -6,6 +6,7 @@
 import crypto from 'crypto';
 import { redis } from './redis.service';
 import { EmailService, EmailOptions } from './email.service';
+import { SKIPPED_UNDELIVERABLE_ID } from './mail-transport';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { maskEmailList } from '../lib/pii-mask';
@@ -208,14 +209,20 @@ class EmailQueueService {
     email.lastAttempt = new Date().toISOString();
 
     try {
-      await withCircuitBreaker('email', async () => {
-        if (email.storeId) {
-          await EmailService.sendRaw(email.storeId, email.options);
-        } else {
-          await EmailService.sendPlatformRaw(email.options);
-        }
-      });
+      const sent = await withCircuitBreaker('email', () =>
+        email.storeId
+          ? EmailService.sendRaw(email.storeId, email.options)
+          : EmailService.sendPlatformRaw(email.options)
+      );
 
+      if (sent?.id === SKIPPED_UNDELIVERABLE_ID) {
+        // Every recipient was a reserved-TLD placeholder: nothing left the process, so it is not a send.
+        logger.warn(
+          { emailId: email.id, to: maskEmailList(email.options.to) },
+          '[EMAIL QUEUE] Email dropped, no deliverable recipient (not sent)'
+        );
+        return;
+      }
       logger.info(
         { emailId: email.id, to: maskEmailList(email.options.to) },
         '[EMAIL QUEUE] Sent email'

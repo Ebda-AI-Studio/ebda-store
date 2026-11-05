@@ -20,11 +20,13 @@ vi.mock('../../apps/api/src/lib/logger', () => ({
 
 const mockBulkAiJobFindFirst = vi.fn();
 const mockBulkAiJobCreate = vi.fn();
+const mockBulkAiJobUpdate = vi.fn();
 vi.mock('@ebda/database', () => ({
   prisma: {
     bulkAiJob: {
       findFirst: (...args: unknown[]) => mockBulkAiJobFindFirst(...args),
       create: (...args: unknown[]) => mockBulkAiJobCreate(...args),
+      update: (...args: unknown[]) => mockBulkAiJobUpdate(...args),
     },
   },
   // Outside a tenant context: withSavepoint is a pass-through, and the
@@ -51,6 +53,7 @@ beforeEach(() => {
   mockBulkAiJobFindFirst.mockResolvedValue(null);
   mockBulkAiJobCreate.mockResolvedValue({ id: 'job-1' });
   mockInngestSend.mockResolvedValue(undefined);
+  mockBulkAiJobUpdate.mockResolvedValue({});
 });
 
 describe('enqueueRecommendationsSweepForNewProduct', () => {
@@ -92,6 +95,28 @@ describe('enqueueRecommendationsSweepForNewProduct', () => {
     await expect(
       enqueueRecommendationsSweepForNewProduct(STORE_ID, PRODUCT_ID)
     ).resolves.toBeUndefined();
+  });
+
+  // Ruling JOBS-ORPHAN-1: the 2026-11-02 prod row sat `queued` for 44 h because a failed send was only logged.
+  it('send throws -> the job row is marked failed (never an orphan queued row), still non-fatal', async () => {
+    mockInngestSend.mockRejectedValue(new Error('no runner'));
+
+    await expect(
+      enqueueRecommendationsSweepForNewProduct(STORE_ID, PRODUCT_ID)
+    ).resolves.toBeUndefined();
+
+    expect(mockBulkAiJobUpdate).toHaveBeenCalledTimes(1);
+    expect(mockBulkAiJobUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job-1', storeId: STORE_ID },
+        data: expect.objectContaining({ status: 'failed', errorMessage: expect.any(String) }),
+      })
+    );
+  });
+
+  it('send succeeds -> the job row is left alone', async () => {
+    await enqueueRecommendationsSweepForNewProduct(STORE_ID, PRODUCT_ID);
+    expect(mockBulkAiJobUpdate).not.toHaveBeenCalled();
   });
 
   // Issues 2108 / 2214 / 2215: inside a request the kick must wait for the

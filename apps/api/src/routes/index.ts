@@ -45,9 +45,12 @@ import loyaltyRoutes, { publicLoyaltyRoutes } from './loyalty.routes';
 import walletRoutes from './wallet.routes';
 import pwaRoutes from './pwa.routes';
 import qrRoutes from './qr.routes';
+import ciRoutes from './ci.routes';
+import adminCiRoutes from './admin-ci.routes';
 import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
+import catalogImportRoutes from './catalog-import.routes';
 import variantRoutes from './variant.routes';
 import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
@@ -99,6 +102,7 @@ import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import lifecycleEmailsRoutes from './lifecycle-emails.routes';
 import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
+import contactEnquiryPublicRoutes from './contact-enquiry-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
 import realtimeRoutes from './realtime.routes';
@@ -195,6 +199,10 @@ router.use('/admin', fiscalArchiveRoutes);
 // Super-admin policy updates (Ruling LEGAL-4). BEFORE adminRoutes' catch-all MFA gate; it
 // carries its own authenticate -> MFA -> super_admin chain.
 router.use('/admin', adminLegalPolicyRoutes);
+
+// Customer Intelligence insights + hint kill switches (CI-2/CI-3, Rulings CI-9/CI-10). Same reachability
+// rule: before adminRoutes' catch-all MFA gate; it carries its own authenticate -> MFA -> super_admin chain.
+router.use('/admin', adminCiRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.
@@ -357,9 +365,12 @@ router.use('/stores', tenantContext, bundleRoutes);
 router.use('/stores', tenantContext, walletRoutes);
 router.use('/stores', tenantContext, pwaRoutes);
 router.use('/stores', tenantContext, qrRoutes);
+// Customer Intelligence hints + settings (CI-3, Ruling CI-10): advise only, never in a write path.
+router.use('/stores', tenantContext, ciRoutes);
 router.use('/stores', tenantContext, barcodeLabelRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
+router.use('/stores', tenantContext, catalogImportRoutes);
 router.use('/stores', tenantContext, variantRoutes);
 
 // Loyalty routes. Pulled out of the bare-'/stores'-only block above (fixed
@@ -550,9 +561,11 @@ router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 // Self-serve lifecycle emails: the merchant's log (admin) and the login-free unsubscribe link (store from the signed token).
 router.use('/stores/:storeId/lifecycle-emails', tenantContext, lifecycleEmailsRoutes);
-// Ebda WhatsApp connect / disconnect (the only request path that writes the server-owned link).
+// Ebda Chat connect / disconnect (the only request path that writes the server-owned link).
 router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
+// Studio enquiry form on the marketing site (Ruling CONTACT-FORM-1): nothing stored, mail only.
+router.use('/public/contact', contactEnquiryPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not
 // the URL, so `tenantContext` can't reach it via a mount-path param). RLS

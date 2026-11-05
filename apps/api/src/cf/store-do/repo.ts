@@ -1,10 +1,8 @@
-// StoreDO data access (Ruling INFRA-CF-2). Drizzle on Durable Object SQLite: the SYNCHRONOUS driver
-// (drizzle-orm/durable-sqlite).
-// No engine, no wasm, no per-request client construction: `drizzle(ctx.storage)` is a thin wrapper
-// created once in the DO constructor. Transactions are `ctx.storage.transactionSync` (session.ts:70).
-import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { and, desc, eq, sql } from 'drizzle-orm';
-import * as schema from './schema';
+// Phase 0 demo operations of the StoreDO (INFRA-CF-1): list products, add to cart, order. They run on the REAL
+// generated cf-schema tables (no thin spike copy any more) and the order goes through the real money core
+// (`placeOrder`, packages/repo/src/do/checkout.ts), not a stand-in. Reachable only for a store whose server-side
+// flag says 'do' (lib/store-backend.ts). Every statement is bound to `storeId` (no RLS inside a DO).
+import { MoneyError, placeOrder, type SyncSql } from '@ebda-src/repo';
 
 export class StoreError extends Error {
   constructor(
@@ -13,177 +11,194 @@ export class StoreError extends Error {
       | 'CART_NOT_FOUND'
       | 'CART_EMPTY'
       | 'OUT_OF_STOCK'
-      | 'VARIANT_REQUIRED',
+      | 'VARIANT_REQUIRED'
+      | 'STORE_CLOSED',
     public readonly status: number
   ) {
     super(code);
   }
 }
 
-export type Db = ReturnType<typeof makeDrizzle>;
-// `storage` is a DurableObjectStorage; typed loosely because this package does not load workers-types globals.
-export const makeDrizzle = (storage: unknown) => drizzle(storage as never, { schema });
+export interface SeedRows {
+  store?: { id: string; slug?: string; name?: string; currency?: string; ownerId?: string };
+  products: Array<{
+    id: string;
+    storeId: string;
+    name: string;
+    nameAr?: string | null;
+    slug: string;
+    price: number;
+    compareAtPrice?: number | null;
+    inventory?: number;
+    status?: string;
+    hasVariants?: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+  }>;
+  variants?: Array<{
+    id: string;
+    productId: string;
+    sku?: string | null;
+    price: number;
+    inventory?: number;
+    isActive?: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+  }>;
+}
 
-export function listProducts(db: Db, storeId: string, limit: number) {
+export function seed(db: SyncSql, rows: SeedRows): { products: number; variants: number } {
+  return db.transactionSync(() => {
+    // The store's identity row (what a created store has from bootstrap): lets the spike store answer the Store record read.
+    if (rows.store?.slug) {
+      db.run(
+        `INSERT OR IGNORE INTO store_profile (store_id, name, slug, owner_id, currency) VALUES (?, ?, ?, ?, ?)`,
+        [
+          rows.store.id,
+          rows.store.name ?? 'Store',
+          rows.store.slug,
+          rows.store.ownerId ?? 'owner-1',
+          rows.store.currency ?? 'EGP',
+        ]
+      );
+    }
+    for (const p of rows.products) {
+      const now = Date.now();
+      db.run(
+        `INSERT OR REPLACE INTO products
+           (id, store_id, name, name_ar, slug, price, compare_at_price, inventory, status, has_variants, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          p.id,
+          p.storeId,
+          p.name,
+          p.nameAr ?? null,
+          p.slug,
+          p.price,
+          p.compareAtPrice ?? null,
+          p.inventory ?? 0,
+          p.status ?? 'active',
+          p.hasVariants ? 1 : 0,
+          p.createdAt ?? now,
+          p.updatedAt ?? now,
+        ]
+      );
+    }
+    for (const v of rows.variants ?? []) {
+      const now = Date.now();
+      db.run(
+        `INSERT OR REPLACE INTO product_variants (id, product_id, title, sku, price, inventory, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          v.id,
+          v.productId,
+          v.sku ?? v.id,
+          v.sku ?? null,
+          v.price,
+          v.inventory ?? 0,
+          v.isActive === false ? 0 : 1,
+          v.createdAt ?? now,
+          v.updatedAt ?? now,
+        ]
+      );
+    }
+    return { products: rows.products.length, variants: rows.variants?.length ?? 0 };
+  });
+}
+
+export function listProducts(db: SyncSql, storeId: string, limit: number) {
   return db
-    .select()
-    .from(schema.products)
-    .where(and(eq(schema.products.storeId, storeId), eq(schema.products.status, 'active')))
-    .orderBy(desc(schema.products.createdAt))
-    .limit(limit)
-    .all();
+    .all(
+      `SELECT id, name, name_ar, slug, price, compare_at_price, inventory, status, has_variants, created_at
+         FROM products WHERE store_id = ? AND status = 'active' AND deleted_at IS NULL
+         ORDER BY created_at DESC LIMIT ?`,
+      [storeId, limit]
+    )
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      nameAr: r.name_ar,
+      slug: r.slug,
+      price: r.price,
+      compareAtPrice: r.compare_at_price,
+      inventory: r.inventory,
+      status: r.status,
+      hasVariants: r.has_variants === 1,
+      createdAt: r.created_at,
+    }));
 }
 
 export function addCartItem(
-  db: Db,
+  db: SyncSql,
   storeId: string,
   sessionId: string,
   productId: string,
   qty: number,
   variantId?: string
-) {
-  return db.transaction(tx => {
-    const now = Date.now();
-    const product = tx
-      .select()
-      .from(schema.products)
-      .where(and(eq(schema.products.id, productId), eq(schema.products.storeId, storeId)))
-      .get();
-    if (!product || product.status !== 'active') throw new StoreError('PRODUCT_NOT_FOUND', 404);
+): { cartId: string } {
+  return db.transactionSync(() => {
+    const product = db.all(
+      `SELECT id, has_variants FROM products WHERE id = ? AND store_id = ? AND status = 'active' AND deleted_at IS NULL`,
+      [productId, storeId]
+    )[0];
+    if (!product) throw new StoreError('PRODUCT_NOT_FOUND', 404);
     // Inventory model: a variant product is priced and stocked by its variant row, never the product row.
-    let unitPrice = product.price;
-    if (product.hasVariants) {
+    if (product.has_variants === 1) {
       if (!variantId) throw new StoreError('VARIANT_REQUIRED', 400);
-      const v = tx
-        .select()
-        .from(schema.productVariants)
-        .where(
-          and(
-            eq(schema.productVariants.id, variantId),
-            eq(schema.productVariants.productId, productId),
-            eq(schema.productVariants.isActive, true)
-          )
-        )
-        .get();
+      const v = db.all(
+        'SELECT id FROM product_variants WHERE id = ? AND product_id = ? AND is_active = 1',
+        [variantId, productId]
+      )[0];
       if (!v) throw new StoreError('PRODUCT_NOT_FOUND', 404);
-      unitPrice = v.price;
-    } else if (variantId) {
-      throw new StoreError('PRODUCT_NOT_FOUND', 404);
-    }
-    let cart = tx
-      .select()
-      .from(schema.carts)
-      .where(and(eq(schema.carts.storeId, storeId), eq(schema.carts.sessionId, sessionId)))
-      .get();
+    } else if (variantId) throw new StoreError('PRODUCT_NOT_FOUND', 404);
+    let cart = db.all('SELECT id FROM carts WHERE store_id = ? AND session_id = ?', [
+      storeId,
+      sessionId,
+    ])[0];
     if (!cart) {
-      cart = {
-        id: crypto.randomUUID(),
+      cart = { id: crypto.randomUUID() };
+      db.run('INSERT INTO carts (id, store_id, session_id) VALUES (?, ?, ?)', [
+        cart.id,
         storeId,
         sessionId,
-        status: 'active',
-        createdAt: now,
-        updatedAt: now,
-      };
-      tx.insert(schema.carts).values(cart).run();
+      ]);
     }
-    tx.insert(schema.cartItems)
-      .values({
-        id: crypto.randomUUID(),
-        cartId: cart.id,
-        storeId,
-        productId,
-        variantId: variantId ?? null,
-        quantity: qty,
-        unitPrice,
-        createdAt: now,
-      })
-      .run();
-    return { cartId: cart.id };
+    db.run(
+      'INSERT INTO cart_items (id, cart_id, product_id, variant_id, quantity) VALUES (?, ?, ?, ?, ?)',
+      [crypto.randomUUID(), cart.id as string, productId, variantId ?? null, qty]
+    );
+    return { cartId: cart.id as string };
   });
 }
 
-export function createOrder(db: Db, storeId: string, sessionId: string) {
-  return db.transaction(tx => {
-    const now = Date.now();
-    const cart = tx
-      .select()
-      .from(schema.carts)
-      .where(and(eq(schema.carts.storeId, storeId), eq(schema.carts.sessionId, sessionId)))
-      .get();
-    if (!cart) throw new StoreError('CART_NOT_FOUND', 404);
-    const items = tx
-      .select()
-      .from(schema.cartItems)
-      .where(eq(schema.cartItems.cartId, cart.id))
-      .all();
-    if (!items.length) throw new StoreError('CART_EMPTY', 409);
-    let subtotal = 0;
-    for (const it of items) {
-      // Stock lives on the variant row for a variant line, else on the product row (never both).
-      const res = it.variantId
-        ? tx
-            .update(schema.productVariants)
-            .set({
-              inventory: sql`${schema.productVariants.inventory} - ${it.quantity}`,
-              updatedAt: now,
-            })
-            .where(
-              and(
-                eq(schema.productVariants.id, it.variantId),
-                sql`${schema.productVariants.inventory} >= ${it.quantity}`
-              )
-            )
-            .returning({ id: schema.productVariants.id })
-            .all()
-        : tx
-            .update(schema.products)
-            .set({ inventory: sql`${schema.products.inventory} - ${it.quantity}`, updatedAt: now })
-            .where(
-              and(
-                eq(schema.products.id, it.productId),
-                sql`${schema.products.inventory} >= ${it.quantity}`
-              )
-            )
-            .returning({ id: schema.products.id })
-            .all();
-      if (res.length === 0) throw new StoreError('OUT_OF_STOCK', 409);
-      subtotal += it.unitPrice * it.quantity;
-    }
-    const last = tx
-      .select({ n: sql<number>`coalesce(max(${schema.orders.orderNumber}), 1000)` })
-      .from(schema.orders)
-      .where(eq(schema.orders.storeId, storeId))
-      .get();
-    const order = {
-      id: crypto.randomUUID(),
+export function createOrder(db: SyncSql, storeId: string, sessionId: string) {
+  const cart = db.all('SELECT id FROM carts WHERE store_id = ? AND session_id = ?', [
+    storeId,
+    sessionId,
+  ])[0];
+  if (!cart) throw new StoreError('CART_NOT_FOUND', 404);
+  const items = db.all(
+    'SELECT product_id, variant_id, SUM(quantity) AS quantity FROM cart_items WHERE cart_id = ? GROUP BY product_id, variant_id',
+    [cart.id as string]
+  );
+  if (!items.length) throw new StoreError('CART_EMPTY', 409);
+  try {
+    const o = placeOrder(db, {
       storeId,
-      orderNumber: (last?.n ?? 1000) + 1,
-      cartId: cart.id,
-      status: 'pending' as const,
-      paymentMethod: 'cod' as const,
-      subtotal,
-      total: subtotal,
-      createdAt: now,
-      updatedAt: now,
-    };
-    tx.insert(schema.orders).values(order).run();
-    tx.insert(schema.orderItems)
-      .values(
-        items.map(it => ({
-          id: crypto.randomUUID(),
-          orderId: order.id,
-          storeId,
-          productId: it.productId,
-          variantId: it.variantId,
-          quantity: it.quantity,
-          unitPrice: it.unitPrice,
-        }))
-      )
-      .run();
-    tx.update(schema.carts)
-      .set({ status: 'converted', updatedAt: now })
-      .where(eq(schema.carts.id, cart.id))
-      .run();
-    return { orderId: order.id, orderNumber: order.orderNumber, total: subtotal };
-  });
+      cart: { id: cart.id as string },
+      lines: items.map(i => ({
+        productId: i.product_id as string,
+        variantId: (i.variant_id as string | null) ?? undefined,
+        quantity: i.quantity as number,
+      })),
+      paymentMethod: 'cod',
+      shippingAddress: {},
+    });
+    return { orderId: o.orderId, orderNumber: o.orderNumber, total: o.total };
+  } catch (e) {
+    // The demo path keeps its own small error vocabulary; any other money error keeps its code and status.
+    if (e instanceof MoneyError && e.code === 'OUT_OF_STOCK')
+      throw new StoreError('OUT_OF_STOCK', 409);
+    throw e;
+  }
 }

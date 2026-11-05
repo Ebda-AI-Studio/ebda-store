@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -46,7 +47,6 @@ export default function WarehouseStockPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const warehouseId = params?.warehouseId as string;
-  const router = useRouter();
   const t = useT('stock.warehouseStock');
   const tc = useT('common');
   const { success: toastSuccess, error: toastError } = useToast();
@@ -139,11 +139,15 @@ export default function WarehouseStockPage() {
     }
     setSaving(s => ({ ...s, [row.id]: true }));
     try {
-      await apiPut(`/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock`, {
-        productId: row.productId,
-        variantId: row.variantId,
-        quantity: qty,
-      });
+      const { error: putError } = await apiPut(
+        `/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock`,
+        {
+          productId: row.productId,
+          variantId: row.variantId,
+          quantity: qty,
+        }
+      );
+      if (putError) throw new Error(putError.message);
       toastSuccess(t('qtyUpdated'));
       setEditing(e => {
         const copy = { ...e };
@@ -152,7 +156,7 @@ export default function WarehouseStockPage() {
       });
       setRefreshKey(k => k + 1);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Save failed';
+      const msg = e instanceof Error ? e.message : t('saveFailed');
       toastError(msg);
     } finally {
       setSaving(s => ({ ...s, [row.id]: false }));
@@ -167,17 +171,21 @@ export default function WarehouseStockPage() {
     }
     setAdjustSaving(true);
     try {
-      await apiPost(`/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock/adjust`, {
-        productId: adjustModal.row.productId,
-        variantId: adjustModal.row.variantId,
-        delta: adjustModal.delta,
-        reason: adjustModal.reason || undefined,
-      });
+      const { error: adjError } = await apiPost(
+        `/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock/adjust`,
+        {
+          productId: adjustModal.row.productId,
+          variantId: adjustModal.row.variantId,
+          delta: adjustModal.delta,
+          reason: adjustModal.reason || undefined,
+        }
+      );
+      if (adjError) throw new Error(adjError.message);
       toastSuccess(t('adjustDone'));
       setAdjustModal(null);
       setRefreshKey(k => k + 1);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Adjust failed';
+      const msg = e instanceof Error ? e.message : t('adjustFailed');
       toastError(msg);
     } finally {
       setAdjustSaving(false);
@@ -201,7 +209,7 @@ export default function WarehouseStockPage() {
         toastSuccess(t('reconcileStarted'));
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Reconcile failed';
+      const msg = e instanceof Error ? e.message : t('reconcileFailed');
       toastError(msg);
     } finally {
       setReconciling(false);
@@ -218,26 +226,18 @@ export default function WarehouseStockPage() {
       subtitle={
         warehouse ? t('subtitle', { code: warehouse.code, units: warehouse.totalUnits }) : undefined
       }
+      parent={{ label: t('breadcrumb'), href: `/stores/${storeId}/stock/warehouses` }}
       actions={
-        <div className="flex items-center gap-2">
-          {multiWarehouseEnabled && (
-            <Button
-              variant="outline"
-              onClick={handleReconcile}
-              disabled={reconciling}
-              className="min-h-[44px]"
-            >
-              {reconciling ? t('reconciling') : t('reconcileAction')}
-            </Button>
-          )}
+        multiWarehouseEnabled ? (
           <Button
-            variant="ghost"
-            onClick={() => router.push(`/stores/${storeId}/stock/warehouses`)}
+            variant="outline"
+            onClick={handleReconcile}
+            disabled={reconciling}
             className="min-h-[44px]"
           >
-            ← {t('backToWarehouses')}
+            {reconciling ? t('reconciling') : t('reconcileAction')}
           </Button>
-        </div>
+        ) : undefined
       }
     >
       {/* Search */}
@@ -410,15 +410,17 @@ export default function WarehouseStockPage() {
                   disabled={page === 1}
                   onClick={() => setPage(p => p - 1)}
                   className="min-h-[44px] rounded-md px-3 hover:bg-muted disabled:opacity-40"
+                  aria-label={t('pagePrev')}
                 >
-                  ←
+                  <ArrowStart />
                 </button>
                 <button
                   disabled={page === totalPages}
                   onClick={() => setPage(p => p + 1)}
                   className="min-h-[44px] rounded-md px-3 hover:bg-muted disabled:opacity-40"
+                  aria-label={t('pageNext')}
                 >
-                  →
+                  <ArrowEnd />
                 </button>
               </div>
             </div>
@@ -458,7 +460,7 @@ export default function WarehouseStockPage() {
                     setAdjustModal(m => m && { ...m, delta: parseInt(e.target.value) || 0 })
                   }
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  placeholder="+10 or -5"
+                  placeholder={t('deltaExample')}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t('newQtyPreview', {

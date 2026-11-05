@@ -12,6 +12,8 @@ on:
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/**'
       - 'packages/cf-schema/**'
+      - 'scripts/cf/gen-erasure-registry.mjs'
+      - 'apps/api/src/cf/erasure/registry*.ts'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +26,8 @@ concurrency:
 jobs:
   current:
     name: CF schema is current
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    # ubuntu-latest became 26.04 (2026-11); Playwright 1.60 unsupported — Ruling CI-HOSTED-2
+    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,12 +35,14 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+          cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
       - name: Install dependencies
         run: npm ci
       - name: Generate Prisma Client
         run: npm run db:generate
       - name: Generated files match schema.prisma and the migrations
         run: node packages/cf-schema/scripts/generate.mjs --check
+      - name: StoreDO erasure registry matches the classification and the schema (CF-ERASE-3)
+        run: node scripts/cf/gen-erasure-registry.mjs --check
       - name: cf-schema tests
         run: npx vitest run packages/cf-schema --reporter=verbose --retry=0 --maxWorkers=2

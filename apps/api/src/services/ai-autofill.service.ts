@@ -1,5 +1,6 @@
 import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
-import { prisma, withStore, hasTenantContext, runInTenantContext } from '@ebda/database';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
+import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
 import { containsArabic } from '../lib/ai/description-richness';
@@ -7,6 +8,7 @@ import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { withSavepoint } from '../lib/savepoint';
+import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { config } from '../config';
 import { generateProductSearchTerms } from '../lib/ai/product-search-terms-generator';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
@@ -131,7 +133,9 @@ export async function readFillPlan(
   productId: string,
   opts: FillOpts
 ): Promise<FillPlan | null> {
-  const product = await prisma.product.findFirst({
+  const product = await (
+    await storeDb(storeId)
+  ).product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     include: { categories: { select: { categoryId: true } } },
   });
@@ -149,15 +153,17 @@ export async function readFillPlan(
   const hasCategories = product.categories.length > 0;
   if (fillSet.size === 0 && hasCategories) return null;
 
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, nameAr: true },
-    })
-  );
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({
+    where: { id: storeId },
+    select: { name: true, nameAr: true },
+  });
   const categoryNames = hasCategories
     ? (
-        await prisma.category.findMany({
+        await (
+          await storeDb(storeId)
+        ).category.findMany({
           where: { storeId, id: { in: product.categories.map(c => c.categoryId) } },
           select: { name: true, nameAr: true },
         })
@@ -165,7 +171,9 @@ export async function readFillPlan(
     : [];
   const storeCategories = hasCategories
     ? []
-    : await prisma.category.findMany({
+    : await (
+        await storeDb(storeId)
+      ).category.findMany({
         where: { storeId },
         select: { id: true, name: true, nameAr: true },
       });
@@ -351,37 +359,30 @@ export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
   return out;
 }
 
-/**
- * The one guarded writer for AI content (review I1, every AI field). In ONE short transaction:
- * lock the product row, re-read it, and write a field only when its stored value still equals
- * the value the generation read AND its owner has not become 'human' since. The provenance map
- * is rebuilt from the FRESH map (a concurrent 'human' stamp on any other field is kept).
- * `extra` runs inside the same transaction, after the write, with the fresh row.
- * When a written field feeds the search embedding (name, nameAr, description, descriptionAr, searchTerms), the
- * indexer is asked to look at the store (Task 11). The event is sent only after the writes commit:
- * the request's COMMIT, the caller's `runInTenantContext` COMMIT when this joined one (review M7,
- * `requestStoreReindex`), or this function's own short transaction, which has returned by then.
- * `reindexReason` labels that event (default 'ai-autofill').
- */
-export async function writeAiFieldsGuarded(
+type GuardedOpts = {
+  extraData?: Record<string, unknown>;
+  extra?: (fresh: { categoryCount: number }) => Promise<void>;
+  reindexReason?: string;
+};
+
+/** The guarded write on Postgres: row lock, fresh re-read, per-field compare-and-set (unchanged). */
+async function guardedAiWriteOnPg(
   storeId: string,
   productId: string,
   baseline: Record<string, string | null | undefined>,
   writes: Record<string, string | null>,
-  opts: {
-    extraData?: Record<string, unknown>;
-    extra?: (fresh: { categoryCount: number }) => Promise<void>;
-    reindexReason?: string;
-  } = {}
+  opts: GuardedOpts
 ): Promise<{ written: string[]; stale: string[] }> {
   const run = <T>(fn: () => Promise<T>): Promise<T> =>
     // Inside a caller's transaction, join it (its atomicity); otherwise open a short one.
     hasTenantContext() ? fn() : runInTenantContext(storeId, fn);
-  const result = await run(async () => {
+  return run(async () => {
     // Row lock: a merchant save that starts after this waits for our COMMIT, and one that
     // committed before it is in the re-read below. store_id keeps the raw query tenant-keyed.
     await prisma.$queryRaw`SELECT id FROM products WHERE id = ${productId} AND store_id = ${storeId} FOR UPDATE`;
-    const fresh = await prisma.product.findFirst({
+    const fresh = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { categories: { select: { categoryId: true } } },
     });
@@ -408,7 +409,9 @@ export async function writeAiFieldsGuarded(
     }
     const written = Object.keys(data);
     if (written.length > 0) {
-      await prisma.product.update({
+      await (
+        await storeWriter(storeId)
+      ).product.update({
         where: { id: productId, storeId },
         data: { ...data, ...(opts.extraData ?? {}), aiFieldSources: nextSources },
       });
@@ -416,6 +419,69 @@ export async function writeAiFieldsGuarded(
     if (opts.extra) await opts.extra({ categoryCount: fresh.categories.length });
     return { written, stale };
   });
+}
+
+/**
+ * The same guarded write for a store on its Durable Object (Ruling CF-JOBS-4): ONE in-DO procedure (`guardedAiWrite`,
+ * packages/repo/src/rpc/writes.ts) re-reads the row, compares each field with the value the generation read, skips a
+ * 'human'-owned field and writes the rest with the 'ai' stamps, atomically. `extra` runs after it, on the category count the
+ * procedure saw (its own write is idempotent: `skipDuplicates`).
+ */
+async function guardedAiWriteOnDo(
+  storeId: string,
+  productId: string,
+  baseline: Record<string, string | null | undefined>,
+  writes: Record<string, string | null>,
+  opts: GuardedOpts
+): Promise<{ written: string[]; stale: string[] }> {
+  const extraKeys = Object.keys(opts.extraData ?? {});
+  if (extraKeys.some(k => k !== 'aiBalanceBackup'))
+    throw new Error(`guardedAiWrite: extraData ${extraKeys.join(',')} is not supported on the DO`);
+  const w = await storeWriter(storeId);
+  const [r] = (await w.$transaction([
+    w.$proc('guardedAiWrite', {
+      productId,
+      baseline: Object.fromEntries(Object.entries(baseline).map(([k, v]) => [k, v ?? null])),
+      writes,
+      extra: opts.extraData ?? {},
+    }),
+  ] as never)) as unknown as [
+    { found: boolean; written: string[]; stale: string[]; categoryCount: number },
+  ];
+  if (!r.found) return { written: [], stale: Object.keys(writes) };
+  if (r.stale.length > 0)
+    logger.info(
+      { storeId, productId, fields: r.stale },
+      '[ai-autofill] fields changed since the read; not overwritten'
+    );
+  if (opts.extra) await opts.extra({ categoryCount: r.categoryCount });
+  return { written: r.written, stale: r.stale };
+}
+
+/**
+ * The one guarded writer for AI content (review I1, every AI field). In ONE short transaction:
+ * lock the product row, re-read it, and write a field only when its stored value still equals
+ * the value the generation read AND its owner has not become 'human' since. The provenance map
+ * is rebuilt from the FRESH map (a concurrent 'human' stamp on any other field is kept).
+ * `extra` runs inside the same transaction, after the write, with the fresh row.
+ * When a written field feeds the search embedding (name, nameAr, description, descriptionAr, searchTerms), the
+ * indexer is asked to look at the store (Task 11). The event is sent only after the writes commit:
+ * the request's COMMIT, the caller's `runInTenantContext` COMMIT when this joined one (review M7,
+ * `requestStoreReindex`), or this function's own short transaction, which has returned by then.
+ * `reindexReason` labels that event (default 'ai-autofill').
+ */
+export async function writeAiFieldsGuarded(
+  storeId: string,
+  productId: string,
+  baseline: Record<string, string | null | undefined>,
+  writes: Record<string, string | null>,
+  opts: GuardedOpts = {}
+): Promise<{ written: string[]; stale: string[] }> {
+  const repo = await storeRepo(storeId);
+  const result =
+    repo.backend === 'do'
+      ? await guardedAiWriteOnDo(storeId, productId, baseline, writes, opts)
+      : await guardedAiWriteOnPg(storeId, productId, baseline, writes, opts);
   if (touchesEmbedDoc(result.written))
     await requestStoreReindex(storeId, opts.reindexReason ?? 'ai-autofill');
   return result;
@@ -428,8 +494,9 @@ export async function applyFill(plan: FillPlan, gen: FillGeneration): Promise<{ 
     extra: async ({ categoryCount }) => {
       // Only a product that STILL has no category gets the AI's picks.
       if (gen.pickedCategoryIds.length === 0 || categoryCount > 0) return;
+      const w = await storeWriter(storeId);
       await withSavepoint(() =>
-        prisma.productCategory.createMany({
+        w.productCategory.createMany({
           data: gen.pickedCategoryIds.map(categoryId => ({ productId, categoryId })),
           skipDuplicates: true,
         })
@@ -465,12 +532,12 @@ export async function fillProductFields(
 
 /** Read the per-store aiAutopilot toggle (default ON when unset). */
 export async function isAutopilotEnabled(storeId: string): Promise<boolean> {
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({
-      where: { id: storeId },
-      select: { theme: true },
-    })
-  );
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({
+    where: { id: storeId },
+    select: { theme: true },
+  });
   const theme = (store?.theme as Record<string, unknown>) ?? {};
   // ON by default; the master AI switch overrides it.
   return theme.aiAutopilot !== false && (await isStoreAiEnabled(storeId));
@@ -539,7 +606,9 @@ export async function balanceProductLanguages(
   calls: number;
 }> {
   let calls = 0;
-  const product = await prisma.product.findFirst({
+  const product = await (
+    await storeDb(storeId)
+  ).product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: {
       name: true,
@@ -758,7 +827,9 @@ export async function revertProductBalance(
   storeId: string,
   productId: string
 ): Promise<{ reverted: boolean }> {
-  const product = await prisma.product.findFirst({
+  const product = await (
+    await storeDb(storeId)
+  ).product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: { aiBalanceBackup: true },
   });
@@ -775,7 +846,9 @@ export async function revertProductBalance(
     return { reverted: false };
   }
 
-  await prisma.product.update({
+  await (
+    await storeWriter(storeId)
+  ).product.update({
     where: { id: productId, storeId },
     data: {
       // `name` is non-nullable, so ?? undefined (no-op when the backup happens to
@@ -857,7 +930,9 @@ export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise
   };
   if (!(await isAutopilotEnabled(storeId))) return out;
 
-  const products = await prisma.product.findMany({
+  const products = await (
+    await storeDb(storeId)
+  ).product.findMany({
     where: { storeId, status: 'active', deletedAt: null },
     select: { id: true, updatedAt: true },
   });
@@ -969,7 +1044,9 @@ export async function enqueueRecommendationsSweepForNewProduct(
 async function enqueueRecommendationsSweepNow(storeId: string, productId: string): Promise<void> {
   try {
     const jobId = await withSavepoint(async () => {
-      const existing = await prisma.bulkAiJob.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).bulkAiJob.findFirst({
         where: { storeId, kind: 'recommendations', status: { in: ['queued', 'running'] } },
         select: { id: true },
       });
@@ -980,7 +1057,9 @@ async function enqueueRecommendationsSweepNow(storeId: string, productId: string
         );
         return null;
       }
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(storeId)
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: null, // system-initiated — no authenticated user context
@@ -992,10 +1071,17 @@ async function enqueueRecommendationsSweepNow(storeId: string, productId: string
     });
     if (!jobId) return;
 
-    await inngest.send({
-      name: 'bulk-ai/recommendations-requested',
-      data: { jobId, storeId, force: false },
-    });
+    try {
+      await inngest.send({
+        name: 'bulk-ai/recommendations-requested',
+        data: { jobId, storeId, force: false },
+      });
+    } catch (sendErr) {
+      // Queue-then-send fails fast (Ruling JOBS-ORPHAN-1): nothing will start this row, so fail it
+      // rather than leave an orphan `queued` one, then fall into the non-fatal catch below.
+      await markJobFailedOnEnqueueError(storeId, jobId, sendErr);
+      throw sendErr;
+    }
 
     logger.info(
       { storeId, productId, jobId },

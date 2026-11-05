@@ -1,0 +1,246 @@
+---
+title: HTTP API
+section: "Ebda Chat"
+order: 3
+description: The Ebda Chat HTTP API for integrators: authentication, endpoints, request and response shapes, and errors.
+---
+
+Base URL: `https://wa.ebda.app/api/v1`
+
+Every store endpoint lives under `/stores/{storeId}`. `storeId` is your Ebda Store store id. All requests and responses are JSON (`content-type: application/json`), except where a file upload or CSV is noted.
+
+## Authentication
+
+Send an access token as a bearer token:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+- The token is an access token (a signed JWT) issued by the Ebda AI Studio sign-in (`accounts.ebda.app`). The service verifies the signature, the issuer and audience, and the token's age. There is no separate static API key.
+- The token names the user, the stores that user belongs to, and the user's role in each: **owner** or **staff**. A request to `/stores/{storeId}/...` succeeds only if the token lists that store. Otherwise the answer is `403 forbidden`.
+- A missing, invalid or expired token gives `401 unauthorized`.
+- Endpoints marked **owner only** answer `403 forbidden` to a staff user.
+- A store our team has suspended answers every write with `403 forbidden` and `message: "workspace_suspended"` (reading, paying and erasing a contact still work). A write with a user token whose session was revoked answers `403 forbidden` / `session_revoked`; if the accounts service cannot be reached it answers `503 unavailable` / `session_check_unavailable` (try again). Starting or resuming a campaign on a number WhatsApp has rated red or restricted answers `409 invalid_request` / `number_restricted`; the number's `health` is on `GET /numbers`.
+
+`GET /stores/{storeId}/me` returns who the token is for:
+
+```json
+{ "userId": "…", "storeId": "…", "role": "owner", "capabilities": { "codOutcome": true, "numbers": true } }
+```
+
+`role` is `owner`, `staff` or `super_admin`.
+
+### API access for your server
+Available once enabled for your store. It is not live for every store yet: it needs the sign-in service to issue server tokens and Ebda Chat to switch the feature on for your store. Until then, use the sign-in token described above.
+
+**1. The store owner creates an API client.** In the Ebda AI Studio account settings, under API clients, the owner creates a client for one store and picks its scopes. Creating, rotating or revoking a client asks for a fresh second factor, and staff cannot do it. You get a `client_id` (`cli_…`) and a `client_secret` (`ebs_…`). The secret is shown once, so store it like a password. A client belongs to one store and cannot be moved.
+
+**2. Your server asks for a token.** Never from a browser: a request that carries an `Origin` header is refused.
+
+```http
+POST https://accounts.ebda.app/oauth/token
+Authorization: Basic base64(client_id:client_secret)
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&audience=whatsapp&scope=conversations:read messages:send
+```
+
+`scope` is optional and must be a subset of the client's scopes (the default is all of them). A secret sent in the body is refused; use Basic authentication. The answer:
+
+```json
+{ "access_token": "…", "token_type": "Bearer", "expires_in": 600, "scope": "conversations:read messages:send" }
+```
+
+The token lives **10 minutes** and there is no refresh token. Ask for a new one when it expires, and a little before is fine.
+
+**3. Use it like any token.** Send `Authorization: Bearer <access_token>` to the endpoints above. `GET /stores/{storeId}/me` works with any server token and returns the store the token belongs to. Any other store answers `403 forbidden`. Server tokens are a Pro feature: on a package without `api` (or a store with no package on record) every route, `GET /me` included, answers `403 plan_feature` with `feature: "api"`.
+
+#### Scopes
+| Scope | Allows |
+|---|---|
+| `conversations:read` | Read conversations, messages, media, search, throttle and the event feed (poll `GET /events?after=`) |
+| `messages:send` | Send messages and upload media for them |
+| `templates:read` | List templates |
+| `contacts:read` | Read contacts and a contact's orders |
+| `contacts:write` | Change a contact's tags |
+| `campaigns:read` | Read campaigns and saved segments (including the audience preview) |
+
+A scope you did not hold answers `403 forbidden`.
+
+#### Routes that always refuse a server token
+These answer `403 forbidden` to every server token, whatever its scopes: the live WebSocket (a server follows the inbox by polling `/events`, so a revoked client is never left connected); connecting, registering and disconnecting numbers and the numbers list; the wallet, top-ups, InstaPay payments, statements and refunds; packages and package checkout; joining or leaving the shared number; staff changes (assigning conversations, internal notes, marking read, conversation tags); deleting a contact's data; bot and agent settings and store-link settings; connectors; creating, changing or sending campaigns and segments; template submission, sync and defaults; imports; and the operator console. A route that is not in the scope table is `403` too.
+
+#### Revocation
+The owner can revoke a client at any time. A revoked client gets `401 invalid_client` when asking for a token, and a token it already holds is refused with `401 unauthorized` within about 30 seconds (the service remembers a good answer that long). Rotating a secret keeps the old secret working for a window the owner chooses (up to 7 days), and tokens already issued stay valid until they expire. If the sign-in service cannot be reached to check a client, the API answers `503 rate_limited` with `message: "session_check_unavailable"` instead of letting the request through.
+
+#### Rate limits and errors
+- Token endpoint: 60 tokens per hour per client. Wrong credentials are limited per client and network, so someone guessing your client id from another address cannot lock your server out. Over a limit: `429` with `Retry-After`.
+- Token endpoint errors follow RFC 6749: `invalid_client` (401, the same answer for an unknown id, a wrong secret or a revoked client), `invalid_scope`, `unauthorized_client` (wrong audience).
+- API errors use the envelope below. `401 unauthorized` for a token that is invalid, expired, revoked, or sent while the feature is off for your store; `403 forbidden` for another store, a missing scope or a route in the list above; `503` when the revocation check is unavailable.
+- Every write a server token makes is logged with the client id, the store and the scope. Message text and phone numbers are never part of that log line.
+
+## Errors
+
+Every error uses one envelope:
+
+```json
+{ "error": "invalid_request", "message": "optional detail" }
+```
+
+| `error` | Typical status | Meaning |
+|---|---|---|
+| `unauthorized` | 401 | Missing or invalid token |
+| `forbidden` | 403 | The token has no access to this store, or the endpoint is owner only |
+| `not_found` | 404 | Unknown conversation, campaign, workspace and so on |
+| `invalid_request` | 400 (409 for `no_active_number`) | Body or query failed validation. A send with no connected number answers `409` with `message: "no_active_number"` |
+| `window_closed` | 409 | The 24-hour window is closed: only templates can be sent |
+| `opted_out` | 409 | The customer opted out |
+| `template_not_approved` | 409 | The template is not approved yet |
+| `unsupported_media` | 415 | The media type is not supported, or the request body is not `application/json` (uploads take `multipart/form-data`; an InstaPay proof takes its own image or PDF type) |
+| `payload_too_large` | 413 | The body is over the limit: 1 MB for JSON requests. Uploads keep their own larger limits (media 50 MB, contact imports 10 MB, transfer proofs 5 MB). Checked before the body is read, also for requests sent without a length |
+| `wallet_empty` | 409 | The wallet cannot cover the send |
+| `plan_blocked`, `funding_unknown`, `rate_unavailable` | 409 | The send is refused for plan, funding or pricing reasons |
+| `plan_required` | 403 | The store has no package in good standing (none, cancelled, expired, or past due beyond its 7-day grace), so nothing can be sent, no AI agent runs and no number can be connected. Reading, the package list, checkout and the wallet stay open. A queued message that meets this later is marked failed with `plan_required` |
+| `plan_feature` | 403 | The package does not include this feature. The body carries `feature` (`campaigns`, `order_in_chat` or `api`); upgrade the package. A store with no package on record is refused too |
+| `rate_limited` | 503 (429 on the connector test and on a flood to a public route) | A temporary condition, such as Meta being unavailable or a send that could not be queued. Retry later |
+| `registration_locked`, `number_conflict`, `signup_failed`, `signup_unavailable` | varies | Number connection problems |
+
+Not every code is returned by every endpoint. Treat the `error` string as the contract and the status as a guide.
+
+There is no general per-request rate limit documented in the code. The 24-hour window, the number's Meta messaging tier and the wallet limit what you can send.
+
+## Conversations
+
+| Method and path | Purpose |
+|---|---|
+| `GET /conversations` | List conversations. Query: `filter` (`all`, `unread`, `mine`, `unassigned`; default `all`), `q` (optional, 1 to 100 characters), `cursor`, `limit` (1 to 50, default 30). Returns `{ items, nextCursor }`. With `q` the answer is one page of conversations whose contact name starts with every typed word, whose number contains the typed digits (3 or more; Arabic-Indic digits, spaces and `+` are fine), or that have a matching message, newest first, `filter` still applies, and `nextCursor` is `null` |
+| `GET /conversations/{conversationId}/messages` | List messages, newest first. Query: `before` (a message id), `limit` (1 to 50, default 50). Returns `{ items, nextBefore }` |
+| `GET /messages/{messageId}/body` | The full text of a message longer than 1 KB |
+| `POST /conversations/{conversationId}/read` | Mark the conversation as read |
+| `POST /conversations/{conversationId}/assign` | Body `{ "userId": "…" }` or `{ "userId": null }` to unassign |
+| `PUT /conversations/{conversationId}/tags` | Body `{ "tags": ["vip"] }`, up to 10 tags of 1 to 32 characters |
+| `GET` and `POST /conversations/{conversationId}/notes` | List notes, or add one with `{ "text": "…" }` (1 to 2000 characters) |
+| `GET /search` | Search messages. Query: `q` (1 to 100 characters), `limit` (1 to 50, default 20). Returns `{ items: [{ conversationId, messageId, snippet, at }] }` |
+
+A conversation item:
+
+```json
+{
+  "id": 7,
+  "contact": { "waId": "2010…", "name": "…", "optedOut": false },
+  "lastMessage": { "preview": "…", "direction": "in", "type": "text", "status": null, "at": 1790000000000 },
+  "unread": 2,
+  "assigneeUserId": null,
+  "tags": [],
+  "windowOpenUntil": 1790086400000
+}
+```
+
+`windowOpenUntil` is epoch milliseconds, or `null` when the window is closed (templates only). Times everywhere are epoch milliseconds.
+
+A message item has: `id`, `clientId`, `wamid`, `direction` (`in` or `out`), `type` (`text`, `template`, `interactive`, `image`, `audio`, `video`, `document`, `sticker`, `location`, `order`, `unsupported`), `text`, `hasLongBody`, `media` (`{ mime, size, url }` or `null`), `template` (`{ name, language }` or `null`), `status` (`queued`, `claimed`, `accepted`, `sent`, `delivered`, `read`, `failed`, `retry`, or `null`), `errorCode`, `at`, and optionally `author` (`agent`, `bot`, `staff`, `app`).
+
+## Send a message
+
+`POST /conversations/{conversationId}/messages`
+
+The body is one of four types. `clientId` is a UUID you generate for each message.
+
+```json
+{ "type": "text", "clientId": "5b1f…", "text": "Your order is on its way" }
+```
+
+```json
+{ "type": "template", "clientId": "…", "name": "order_update", "language": "ar", "params": ["A-1042"] }
+```
+
+```json
+{ "type": "interactive", "clientId": "…", "body": "Confirm your order?", "buttons": [{ "id": "yes", "title": "Confirm" }] }
+```
+
+```json
+{ "type": "media", "clientId": "…", "uploadId": "…", "caption": "Invoice" }
+```
+
+Limits: `text` 1 to 4096 characters; `params` up to 20; `interactive` has 1 to 3 buttons, with `id` up to 256 and `title` up to 20 characters, and `body` up to 1024; `caption` up to 1024.
+
+The answer is `202 Accepted` with the message item. The message status then moves on as it is sent; read it from the messages list. A free-form message needs an open 24-hour window, otherwise you get `window_closed` and must send an approved template.
+
+To send media, first upload the file with `POST /media` (multipart form data, field name `file`; the answer is `201` with `{ uploadId, mime, size, filename }`), then send with that `uploadId`. `GET /media/{messageId}` downloads a message's media.
+
+`GET /events?after={seq}` returns `{ items, latestSeq }`: the realtime events (`message.created`, `message.status`, `conversation.updated`) after a sequence number, for polling or for catching up after a gap.
+
+## Templates
+
+| Method and path | Purpose |
+|---|---|
+| `GET /templates` | List templates: `{ items: [{ name, language, category, status, bodyText, paramCount, rejectedReason }] }`. `category` is `MARKETING`, `UTILITY` or `AUTHENTICATION`. `status` is `APPROVED`, `PENDING`, `REJECTED`, `PAUSED` or `DISABLED` |
+| `POST /templates/sync` | Pull the current templates and their review status from Meta |
+| `POST /templates` | Submit a new template for review. **Owner only** |
+| `POST /templates/install-defaults` | Submit the ready-made template set. **Owner only** |
+
+Only `APPROVED` templates can be sent.
+
+## Contacts
+
+| Method and path | Purpose |
+|---|---|
+| `GET /contacts` | List contacts. Query: `tag`, `optedOut` (`true` or `false`), `q` (1 to 100 characters), `cursor`, `limit` (1 to 100, default 50). Returns `{ items, nextCursor }` |
+| `PUT /contacts/{waId}/tags` | Body `{ "tags": [...] }`, up to 10 |
+| `DELETE /contacts/{waId}` | Erase a customer's data. **Owner only** |
+
+A contact: `waId` (digits, no `+`), `name`, `optedOut`, and optionally `tags`, `consent` (`{ source, at }` or `null`; `null` means no marketing consent is on record) and `lastInboundAt`.
+
+## Campaigns
+
+A campaign sends one approved template to an audience of customers who agreed to receive marketing. It is paced against the number's Meta tier and can be paused.
+
+| Method and path | Purpose |
+|---|---|
+| `GET /campaigns` | List. Query: `status` (`draft`, `scheduled`, `running`, `paused`, `completed`, `cancelled`), `cursor`, `limit` (1 to 50, default 20). Returns `{ items, nextCursor }` |
+| `POST /campaigns` | Create a draft. **Owner only** |
+| `GET /campaigns/{campaignId}` | One campaign, with counts, totals and a cost estimate |
+| `DELETE /campaigns/{campaignId}` | Delete. **Owner only** |
+| `POST /campaigns/{campaignId}/send` | Start now, or at `scheduledAt`. Answers `202`. **Owner only** |
+| `POST /campaigns/{campaignId}/pause` | Pause (staff may do this) |
+| `POST /campaigns/{campaignId}/resume` | Resume. **Owner only**, because it spends money again |
+| `POST /campaigns/{campaignId}/cancel` | Cancel (staff may do this) |
+
+Create body:
+
+```json
+{
+  "name": "Eid offer",
+  "template": { "name": "eid_offer", "language": "ar" },
+  "params": [{ "kind": "name", "fallback": "dear customer" }, { "kind": "text", "value": "20%" }],
+  "audience": { "criteria": { "tags": { "any": ["vip"] } } },
+  "dailySendLimit": 1000
+}
+```
+
+- `name` 1 to 80 characters. `params` up to 20, each `{ "kind": "text", "value" }`, `{ "kind": "name", "fallback" }`, `{ "kind": "link" }` or `{ "kind": "link_code" }`. The two link kinds need `linkUrl` (an https address) on the campaign.
+- `audience` is `{ "segmentId": 3 }` or `{ "criteria": { ... } }`. Criteria need at least one filter: `tags.any`, `tags.all`, `lastInboundAfter`, `lastInboundBefore` (epoch ms), `hasOrdered`, or `everyone: true`. An empty filter is refused, it never widens to everybody. Contacts who opted out or have no consent on record are never included.
+- `dailySendLimit` (1 to 1,000,000) caps how many recipients are queued per rolling 24 hours.
+- `POST /campaigns/{id}/send` takes an optional `{ "scheduledAt": <epoch ms, up to a year ahead> }`.
+
+A campaign answer carries `id`, `name`, `status`, `pauseReason` (`manual`, `wallet_empty`, `template_unavailable`, `internal_error`, `plan_blocked`, `funding_unknown`, `rate_unavailable`, or `null`), `template`, `params`, `audience`, `scheduledAt`, `dailySendLimit`, `linkUrl`, `clicks` (`{ unique, total }`), `createdAt`, `startedAt`, `finishedAt`, `counts` (per message status plus `skipped`), `totals` and an optional `estimate`.
+
+Segments (saved audiences) have their own endpoints: `GET /segments`, `GET /segments/{segmentId}`, `POST /segments/preview` and `GET /segments/{segmentId}/preview` for everyone with access; `POST /segments`, `PUT /segments/{segmentId}` and `DELETE /segments/{segmentId}` are **owner only**. A segment is `{ name (1 to 60 characters), criteria }`, with the same criteria as an audience. A preview returns `{ count, excluded: { optedOut, noConsent } }`.
+
+Campaigns are not available on the shared number.
+
+## Numbers
+
+| Method and path | Purpose |
+|---|---|
+| `GET /numbers` | List the store's numbers |
+| `GET /numbers/signup-config` | Public Meta ids the page needs to open Embedded Signup. **Owner only** |
+| `POST /numbers/connect` | Finish a connection with the code from Embedded Signup. **Owner only** |
+| `POST /numbers/{phoneNumberId}/refresh` | Re-read the number's status from Meta |
+| `POST /numbers/{phoneNumberId}/register` | Retry registration of a number that did not finish. **Owner only** |
+| `POST /numbers/{phoneNumberId}/disconnect` | Disconnect. **Owner only** |
+
+A number item has `phoneNumberId`, `wabaId`, `displayPhone`, `verifiedName`, `kind` (`own` or `platform`), `onboarding` (`cloud_api` or `business_app`), `status` (`active` or `disconnected`), `registration`, `qualityRating`, `messagingLimitTier`, `connectedAt` and other status fields.
+
+The connect body is `{ "code", "event", "wabaId", "phoneNumberId", "businessId"? }`, where `event` is `FINISH` or `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING`. The `code` comes from the Embedded Signup window and expires after 30 seconds, so this call is made by the page right after the window closes.

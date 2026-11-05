@@ -20,8 +20,18 @@
  * session IDs and store IDs in headers.
  */
 
+import { resolveErrorMessage } from './error-messages';
 import { hasSessionHintCookie, sessionHintCookieClears } from '@ebda/shared';
+import {
+  PLAN_GATE_FALLBACK,
+  RAW_PLAN_GATE_MESSAGES,
+  PERMISSION_DENIED_FALLBACK,
+  RAW_STATUS_MESSAGE,
+  isPlanGateError,
+} from './route-feature-gates';
 import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
+import { armProactiveRefresh, disarmProactiveRefresh, grantExpiryMs } from './proactive-refresh';
+import { handleSessionEnded } from './session-ended';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -190,6 +200,23 @@ function claimSessionProbe(): boolean {
   }
 }
 
+let lastGrant: { token: string; expiresAt: number } | null = null;
+
+/** Remember the newest grant and schedule the next renewal ~60 s before it expires (P0 logout audit). */
+export function rememberGrant(grant: { access_token: string; expires_at?: number }): void {
+  const expiresAt = grantExpiryMs(grant);
+  lastGrant = { token: grant.access_token, expiresAt };
+  if (typeof window !== 'undefined') {
+    armProactiveRefresh(expiresAt, { refresh: () => refreshAccessToken() });
+  }
+}
+
+/** A token with at least `minTtlMs` left: the cached one, else a refresh. null = the session is gone. */
+export async function getFreshAccessToken(minTtlMs = 60_000): Promise<string | null> {
+  if (lastGrant && lastGrant.expiresAt - Date.now() > minTtlMs) return lastGrant.token;
+  return refreshAccessToken();
+}
+
 export function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
 
@@ -202,13 +229,24 @@ export function refreshAccessToken(): Promise<string | null> {
       const grant = await accountsToken();
       await establishApiSession(grant.access_token);
       markSessionEvidence();
+      rememberGrant(grant);
       return grant.access_token;
     } catch (error) {
-      // A throttle is not "signed out": it must reach the caller or the credential-clear fires anyway.
-      if (error instanceof AccountsError && error.status === 429) throw new RefreshThrottledError();
-      // 401 NO_SESSION (signed out / revoked) and every other refusal mean there is no session to keep.
-      if (error instanceof AccountsError && error.status === 503) throw new RefreshThrottledError();
-      return null;
+      if (error instanceof AccountsError) {
+        // 401 NO_SESSION: the session is gone for good (password changed, signed out elsewhere). Say so and leave once,
+        // but ONLY when this page had a signed-in session that was revoked mid-use (`lastGrant`): the first-load session
+        // check and calls that straggle in after a deliberate sign-out are not "your session ended".
+        if (error.status === 401 && error.code === 'NO_SESSION') {
+          if (lastGrant) handleSessionEnded();
+          return null;
+        }
+        // A throttle or a server outage is not "signed out": it must reach the caller or the credential-clear fires anyway.
+        if (error.status === 429 || error.status >= 500) throw new RefreshThrottledError();
+        // Any other refusal means there is no session to keep.
+        return null;
+      }
+      // Not an answer from the service at all (offline, DNS, aborted fetch): transient, never a sign-out.
+      throw new RefreshThrottledError();
     }
   })().finally(() => {
     refreshInFlight = null;
@@ -247,6 +285,8 @@ export async function refreshSession(): Promise<RefreshOutcome> {
  */
 export function clearStoredSession(): void {
   if (typeof window === 'undefined') return;
+  disarmProactiveRefresh();
+  lastGrant = null;
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   // The session is over: nothing is left to refresh, so the next anonymous
@@ -555,7 +595,10 @@ export async function checkSessionWithMountRetries(
  */
 export async function apiRequest<T = unknown>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit & {
+    /** An optional widget call: a plan 402/403 must not open the upgrade dialog (the widget just hides). */
+    quietUpsell?: boolean;
+  } = {}
 ): Promise<{ data: T | null; error: ApiError | null }> {
   const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
 
@@ -640,7 +683,12 @@ export async function apiRequest<T = unknown>(
           data: null,
           error: {
             code: 'PARSE_ERROR',
-            message: `Server returned non-JSON response with status ${response.status}`,
+            message: resolveErrorMessage({
+              code: 'PARSE_ERROR',
+              status: response.status,
+              serverMessage: `Server returned non-JSON response with status ${response.status}`,
+              locale: adminUiLocale(),
+            }),
             status: response.status,
           },
         };
@@ -663,6 +711,8 @@ export async function apiRequest<T = unknown>(
       // every protected route. Send them straight to the enrollment page instead
       // of surfacing a dead "failed to load" error. The /account/security page
       // only calls non-gated routes (/auth/me, /auth/mfa/*) so this can't loop.
+      // The session was revoked server-side (password change, signed out elsewhere): end it visibly, once.
+      if (typeof window !== 'undefined' && errCode === 'TOKEN_REVOKED') handleSessionEnded();
       if (
         typeof window !== 'undefined' &&
         errCode === 'MFA_SETUP_REQUIRED' &&
@@ -670,21 +720,45 @@ export async function apiRequest<T = unknown>(
       ) {
         window.location.assign('/account/security');
       }
-      const message = localizedApiMessage(
+      let message = localizedApiMessage(
         errCode,
         errMessage || `Request failed with status ${response.status}`,
         errObj?.details
       );
-      if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
+      // A plan-gated call must not hand a page the raw API text (audit G-2): pages render error.message as-is.
+      if (
+        isPlanGateError({ status: response.status, code: errCode }) &&
+        (RAW_STATUS_MESSAGE.test(message) || RAW_PLAN_GATE_MESSAGES.includes(message))
+      ) {
+        message = PLAN_GATE_FALLBACK[adminUiLocale()];
+      } else if (response.status === 403 && RAW_STATUS_MESSAGE.test(message)) {
+        // A bare 403 is a permission denial (Ruling ADMIN-GATE-1), not a plan refusal: say so, never "upgrade".
+        message = PERMISSION_DENIED_FALLBACK[adminUiLocale()];
+      }
+      if (options.quietUpsell) {
+        // optional widget: no dialog
+      } else if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
       else if (response.status === 403 && errCode === 'FEATURE_DISABLED') {
         // Only when the API says the PLAN withholds it (it names the unlocking sold plan).
         const flat = data as unknown as Record<string, unknown>;
         if (flat.upgradeTo) {
           const text = adminUiLocale() === 'ar' ? flat.messageAr : flat.messageEn;
-          dispatchUpsell(errCode, typeof text === 'string' && text ? text : message, {
+          if (typeof text === 'string' && text) message = text;
+          dispatchUpsell(errCode, message, {
             upgradeTo: flat.upgradeTo,
           });
         }
+      }
+      // ERROR_AR / ERROR_EN by code (UX:C-1): English server text never reaches the Arabic UI.
+      // Plan-gate / permission fallbacks above are already localized, so they are left alone.
+      if (message === (errMessage || `Request failed with status ${response.status}`)) {
+        message = resolveErrorMessage({
+          code: errCode,
+          status: response.status,
+          serverMessage: message,
+          locale: adminUiLocale(),
+          hasBilingualDetails: hasBilingualText(errObj?.details),
+        });
       }
       return {
         data: null,
@@ -703,7 +777,12 @@ export async function apiRequest<T = unknown>(
       data: null,
       error: {
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Network request failed',
+        message: resolveErrorMessage({
+          code: 'NETWORK_ERROR',
+          status: 0,
+          serverMessage: error instanceof Error ? error.message : 'Network request failed',
+          locale: adminUiLocale(),
+        }),
         status: 0,
       },
     };
@@ -792,6 +871,11 @@ export async function apiGet<T = unknown>(
   return apiRequest<T>(endpoint, init);
 }
 
+/** GET for an optional widget: a plan refusal (402/403) never opens the upgrade dialog. */
+export async function apiGetQuiet<T = unknown>(endpoint: string) {
+  return apiRequest<T>(endpoint, { method: 'GET', quietUpsell: true });
+}
+
 /** The `meta` block list routes return beside `data` (see expenses.routes.ts). */
 export interface PageMeta {
   page: number;
@@ -828,11 +912,17 @@ export async function apiGetPage<T = unknown>(
         meta: null,
         error: {
           code: body?.error?.code || 'SERVER_ERROR',
-          message: localizedApiMessage(
-            body?.error?.code,
-            body?.error?.message || `Request failed with status ${response.status}`,
-            body?.error?.details
-          ),
+          message: resolveErrorMessage({
+            code: body?.error?.code,
+            status: response.status,
+            serverMessage: localizedApiMessage(
+              body?.error?.code,
+              body?.error?.message || `Request failed with status ${response.status}`,
+              body?.error?.details
+            ),
+            locale: adminUiLocale(),
+            hasBilingualDetails: hasBilingualText(body?.error?.details),
+          }),
           status: response.status,
           details: body?.error?.details,
         },
@@ -849,7 +939,12 @@ export async function apiGetPage<T = unknown>(
       meta: null,
       error: {
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Network request failed',
+        message: resolveErrorMessage({
+          code: 'NETWORK_ERROR',
+          status: 0,
+          serverMessage: error instanceof Error ? error.message : 'Network request failed',
+          locale: adminUiLocale(),
+        }),
         status: 0,
       },
     };
@@ -920,6 +1015,12 @@ export function localizedApiMessage(
   return typeof text === 'string' && text ? text : message;
 }
 
+/** True when the API sent the text in the admin's language itself (`details.messageAr` / `messageEn`). */
+function hasBilingualText(details: Record<string, unknown> | undefined): boolean {
+  const text = adminUiLocale() === 'ar' ? details?.messageAr : details?.messageEn;
+  return typeof text === 'string' && text.length > 0;
+}
+
 export interface UpsellEventDetail {
   code: string;
   message: string;
@@ -945,65 +1046,4 @@ function dispatchUpsell(
       },
     })
   );
-}
-
-/**
- * Get user-friendly error message based on status code
- */
-export function getErrorMessage(error: ApiError): { title: string; message: string } {
-  switch (error.status) {
-    case 400:
-      return {
-        title: 'Invalid request',
-        message: error.message || 'The request was invalid. Please check your input.',
-      };
-    case 401:
-      return {
-        title: 'Session expired',
-        message: 'Please log in again to continue.',
-      };
-    case 403:
-      return {
-        title: 'Access denied',
-        message: error.message || 'You do not have permission to perform this action.',
-      };
-    case 404:
-      return {
-        title: 'Not found',
-        message: error.message || 'The requested resource was not found.',
-      };
-    case 409:
-      return {
-        title: 'Conflict',
-        message: error.message || 'This action conflicts with existing data.',
-      };
-    case 422:
-      return {
-        title: 'Validation error',
-        message: error.message || 'Please check your input and try again.',
-      };
-    case 429:
-      return {
-        title: 'Too many requests',
-        message: 'Please wait a moment before trying again.',
-      };
-    case 500:
-    case 502:
-    case 503:
-    case 504:
-      return {
-        title: 'Server error',
-        message: 'Something went wrong on our end. Please try again later.',
-      };
-    case 0:
-      return {
-        title: 'Connection error',
-        message: 'Unable to connect to the server. Please check your internet connection.',
-      };
-    default:
-      return {
-        title: 'Error',
-        message: error.message || 'An unexpected error occurred.',
-      };
-  }
 }

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { GeminiFailoverClient } from './gemini-keys';
-import { prisma, currentStoreId } from '@ebda/database';
+import { currentStoreId } from '@ebda/database';
+import { storeDb, storeWriter } from '../repo-factory';
 import { config } from '../../config';
+import { AppError } from '../../middleware/error-handler';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
 import { rethrowAsAppError } from './gemini-errors';
@@ -60,7 +62,10 @@ function stripFences(text: string): string {
 //    Smart-skips if bodyTranslated is already set.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function translateReview(reviewId: string): Promise<void> {
-  const review = await prisma.review.findUnique({
+  // the review lives in the store's backend: its Durable Object, or Postgres under the tenant scope (Ruling CF-JOBS-4)
+  const review = await (
+    await storeDb(currentStoreId())
+  ).review.findUnique({
     where: { id: reviewId, storeId: currentStoreId() },
     select: { id: true, storeId: true, body: true, language: true, bodyTranslated: true },
   });
@@ -90,7 +95,9 @@ ${review.body}`;
   }
   const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
 
-  await prisma.review.update({
+  await (
+    await storeWriter(review.storeId)
+  ).review.update({
     where: { id: reviewId, storeId: review.storeId },
     data: { bodyTranslated: parsed.translated, bodyTranslatedAt: new Date() },
   });
@@ -110,7 +117,9 @@ export interface SpamCheckResult {
 }
 
 export async function detectSpamReview(reviewId: string): Promise<SpamCheckResult> {
-  const review = await prisma.review.findUnique({
+  const review = await (
+    await storeDb(currentStoreId())
+  ).review.findUnique({
     where: { id: reviewId, storeId: currentStoreId() },
     select: { storeId: true, body: true, title: true, rating: true, language: true },
   });
@@ -171,7 +180,9 @@ export async function summarizeProductReviews(
   // summarise a competitor's reviews and read their exact verified-purchase
   // count. ReviewService's own CRUD is store-scoped; only these AI helpers
   // were not.
-  const reviews = await prisma.review.findMany({
+  const reviews = await (
+    await storeDb(storeId)
+  ).review.findMany({
     // storeId in the WHERE is the cross-tenant fix (a product id is public, so
     // without it any store_admin could summarise a competitor's reviews);
     // storeId in the SELECT is what main added for per-store AI accounting.
@@ -231,7 +242,9 @@ export async function draftOwnerResponse(
   storeId: string,
   reviewId: string
 ): Promise<OwnerResponseDraft> {
-  const review = await prisma.review.findFirst({
+  const review = await (
+    await storeDb(storeId)
+  ).review.findFirst({
     where: { id: reviewId, storeId },
     select: {
       id: true,
@@ -240,11 +253,15 @@ export async function draftOwnerResponse(
       title: true,
       body: true,
       language: true,
-      store: { select: { name: true, nameAr: true } },
       product: { select: { name: true, nameAr: true } },
     },
   });
-  if (!review) throw new Error(`Review ${reviewId} not found`);
+  if (!review) throw new AppError(404, 'NOT_FOUND', 'Review not found');
+  // `store` lives in the platform database on a Durable Object store (an external relation prisma-lite cannot join): read it flat.
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({ where: { id: storeId }, select: { name: true, nameAr: true } });
+  if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
   const prompt = `You are helping an Egypt merchant draft a professional, warm response to a customer's product review. Match the tone (positive review → thank them genuinely; negative → empathize + offer to make it right). Keep responses concise (1-3 sentences).
 
@@ -254,7 +271,7 @@ Write BOTH versions in JSON: { "en": "...", "ar": "..." }
 
 Sign off with the store name, no other branding.
 
-Store: ${review.store.name}${review.store.nameAr ? ` (${review.store.nameAr})` : ''}
+Store: ${store.name}${store.nameAr ? ` (${store.nameAr})` : ''}
 Product: ${review.product.name}${review.product.nameAr ? ` (${review.product.nameAr})` : ''}
 Review:
 - rating: ${review.rating}/5

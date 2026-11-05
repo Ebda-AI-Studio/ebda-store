@@ -174,7 +174,7 @@ describe('scoped erase', () => {
     expect(await eraseCiOutcomes('r', undefined)).toEqual({ erased: 0 });
     clearCfBindings();
     expect(await eraseCiOutcomes('r', scope, undefined, undefined)).toEqual({ erased: 0 });
-    setCfBindings({ HYPERDRIVE: { connectionString: '' } });
+    setCfBindings({});
     await expect(eraseCiOutcomes('r', scope, undefined, undefined)).rejects.toThrow(/CI_BUCKET/);
     clearCfBindings();
   });
@@ -361,7 +361,7 @@ describe('second pass is its own job', () => {
     const gets: string[] = [];
     const realGet = r2.get.bind(r2);
     r2.get = (async (k: string) => (gets.push(k), realGet(k))) as never;
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, CI_BUCKET: r2 as never });
+    setCfBindings({ CI_BUCKET: r2 as never });
     const calls: string[] = [];
     const step = {
       sleep: async (id: string) => void calls.push(`sleep:${id}`),
@@ -418,7 +418,7 @@ describe('the prefix pass lower bound', () => {
     const tooOld = `outcomes/v1/store=${S1}/dt=2026-10-30/OLD.ndjson.gz`;
     await r2.put(dayBefore, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n'));
     await r2.put(tooOld, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n'));
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, CI_BUCKET: r2 as never });
+    setCfBindings({ CI_BUCKET: r2 as never });
     const step = {
       sleep: async () => undefined,
       run: async <T>(_id: string, fn: () => Promise<T>) => fn(),

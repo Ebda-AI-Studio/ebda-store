@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiDelete } from '@/lib/api';
 import { RedirectsTable, type SlugRedirectRow } from './RedirectsTable';
 
@@ -32,6 +32,7 @@ export default function SlugRedirectsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('seo.page');
+  const askConfirm = useConfirm();
 
   const [list, setList] = useState<SlugRedirectList | null>(null);
   // A failed LOAD has nothing to show; a failed DELETE must not take the
@@ -94,7 +95,13 @@ export default function SlugRedirectsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(t('redirectsDeleteConfirm'))) return;
+    const ok = await askConfirm({
+      object: t('redirectsDeleteObject'),
+      consequence: t('redirectsDeleteConsequence'),
+      confirmLabel: t('redirectsDeleteLabel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
     setDeletingId(id);
     setActionError(null);
     const { error: apiError } = await apiDelete(`/api/v1/stores/${storeId}/slug-redirects/${id}`);
@@ -111,14 +118,6 @@ export default function SlugRedirectsPage() {
   const header = {
     title: t('redirectsTitle'),
     subtitle: t('redirectsSubtitle'),
-    actions: (
-      <Link
-        href={`/stores/${storeId}/seo`}
-        className="text-sm text-primary hover:underline px-3 py-2"
-      >
-        {t('backToSettings')}
-      </Link>
-    ),
   };
 
   return (
@@ -139,7 +138,7 @@ export default function SlugRedirectsPage() {
             placeholder={t('redirectsSearchPlaceholder')}
             aria-label={t('redirectsSearchPlaceholder')}
             maxLength={255}
-            className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
           <button
             type="submit"

@@ -19,6 +19,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { VariantText } from '@ebda/ui';
@@ -397,7 +398,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
 
       {lookup && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          {lookup.ambiguous && <p className="text-xs text-amber-600">{t('ambiguousWarning')}</p>}
+          {lookup.ambiguous && <p className="text-xs text-warning-ink">{t('ambiguousWarning')}</p>}
           <div>
             <p className="font-semibold text-sm">{lookup.productName}</p>
             {lookup.variantTitle && (
@@ -406,9 +407,9 @@ function ReceiveMode({ storeId }: { storeId: string }) {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">
-              {lookup.sku ? `SKU: ${lookup.sku}` : ''}
+              {lookup.sku ? t('skuLabel', { sku: lookup.sku }) : ''}
               {lookup.sku ? ' · ' : ''}
-              On hand: {lookup.inventory}
+              {t('onHandLabel')} {lookup.inventory}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -465,6 +466,8 @@ function PickMode({ storeId }: { storeId: string }) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [pickResult, setPickResult] = useState<PickResult | null>(null);
   const [pickErr, setPickErr] = useState<string | null>(null);
+  // Mismatch warning: the scan was a real item but the wrong one for this order (or a surplus unit).
+  const [pickWarn, setPickWarn] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
 
   const loadOrder = async () => {
@@ -505,6 +508,7 @@ function PickMode({ storeId }: { storeId: string }) {
       setCameraOpen(false);
       setBarcode(bc);
       setPickErr(null);
+      setPickWarn(null);
       setPickResult(null);
       setPicking(true);
       const { data, error } = await apiPost<PickResult>(
@@ -512,7 +516,16 @@ function PickMode({ storeId }: { storeId: string }) {
         { barcode: bc, qty: 1 }
       );
       setPicking(false);
-      if (error || !data) {
+      if (error?.code === 'NOT_IN_ORDER' || error?.code === 'ALREADY_PICKED') {
+        const d = error.details ?? {};
+        const name = String((locale === 'ar' ? d.productNameAr : null) ?? d.productName ?? bc);
+        setPickWarn(
+          t(error.code === 'NOT_IN_ORDER' ? 'picking.notInOrder' : 'picking.alreadyPicked', {
+            name,
+          })
+        );
+        setBarcode('');
+      } else if (error || !data) {
         setPickErr(scanErrorText(t, error, 'picking.itemNotFound'));
       } else {
         setPickResult(data);
@@ -524,7 +537,7 @@ function PickMode({ storeId }: { storeId: string }) {
         if (progress) setOrder(progress);
       }
     },
-    [order, storeId, t]
+    [order, storeId, t, locale]
   );
 
   return (
@@ -673,6 +686,15 @@ function PickMode({ storeId }: { storeId: string }) {
                 </div>
               )}
               {pickErr && <p className="text-sm text-destructive-ink">{pickErr}</p>}
+              {pickWarn && (
+                <p
+                  role="alert"
+                  data-testid="pick-mismatch-warning"
+                  className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm font-medium text-destructive-ink"
+                >
+                  {pickWarn}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -687,6 +709,7 @@ function PickMode({ storeId }: { storeId: string }) {
 function CountMode({ storeId }: { storeId: string }) {
   const t = useT('stock.scan');
   const tc = useT('common');
+  const askConfirm = useConfirm();
   const cameraSupported = useBarcodeDetectorSupported();
   const [sessions, setSessions] = useState<
     | { id: string; status: string; note: string | null; lineCount: number; createdAt: string }[]
@@ -790,7 +813,13 @@ function CountMode({ storeId }: { storeId: string }) {
 
   const closeSession = async () => {
     if (!activeSession) return;
-    if (!confirm(t('counting.closeConfirm'))) return;
+    const ok = await askConfirm({
+      object: t('counting.closeObject', { count: activeSession.lines.length }),
+      consequence: t('counting.closeConsequence'),
+      confirmLabel: t('counting.closeSession'),
+      tone: 'default',
+    });
+    if (!ok) return;
     const { data } = await apiPost<{ id: string; status: string }>(
       `/api/v1/stores/${storeId}/inventory/count-sessions/${activeSession.id}/close`,
       {}
@@ -800,7 +829,17 @@ function CountMode({ storeId }: { storeId: string }) {
 
   const reconcile = async () => {
     if (!activeSession) return;
-    if (!confirm(t('counting.reconcileConfirm'))) return;
+    const changed = activeSession.lines.filter(l => l.variance !== 0);
+    const netUnits = changed.reduce((sum, l) => sum + l.variance, 0);
+    const ok = await askConfirm({
+      object: t('counting.reconcileObject', {
+        count: changed.length,
+        units: `${netUnits > 0 ? '+' : ''}${netUnits}`,
+      }),
+      consequence: t('counting.reconcileConsequence'),
+      confirmLabel: t('counting.reconcileAction'),
+    });
+    if (!ok) return;
     setReconciling(true);
     setReconcileErr(null);
     const { data, error } = await apiPost<{
@@ -835,10 +874,10 @@ function CountMode({ storeId }: { storeId: string }) {
                 onClick={() => loadSession(s.id)}
                 className="w-full text-start rounded-xl border border-border bg-card p-4 hover:bg-muted/30 min-h-[44px]"
               >
-                <p className="text-sm font-medium">{s.note || 'Count Session'}</p>
+                <p className="text-sm font-medium">{s.note || t('countSession')}</p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(s.createdAt).toLocaleString(undefined, withNumerals())} · {s.lineCount}{' '}
-                  lines
+                  {t('linesSuffix')}
                 </p>
               </button>
             ))}
@@ -877,7 +916,7 @@ function CountMode({ storeId }: { storeId: string }) {
       {/* Session header */}
       <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-medium">{activeSession.note || 'Count Session'}</p>
+          <p className="text-sm font-medium">{activeSession.note || t('countSession')}</p>
           <p className="text-xs text-muted-foreground">
             {t('counting.sessionStatus', { status: activeSession.status })} ·{' '}
             {t('counting.linesCount', { count: String(activeSession.lines.length) })}
@@ -936,7 +975,7 @@ function CountMode({ storeId }: { storeId: string }) {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  System qty: {lookupResult.inventory}
+                  {t('systemQtyLabel')} {lookupResult.inventory}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -1050,20 +1089,22 @@ function CountMode({ storeId }: { storeId: string }) {
             ? t('counting.reconciled', { id: reconcileResult.adjustmentId.slice(0, 8) + '…' })
             : t('counting.noVariances')}
           <p className="text-xs mt-1 text-green-700">
-            {reconcileResult.linesReconciled} lines adjusted.
+            {t('linesAdjusted', { count: reconcileResult.linesReconciled })}
           </p>
         </div>
       )}
 
       {sessionDone && (
         <div className="rounded-lg bg-muted/30 border border-border px-4 py-3 text-sm text-muted-foreground">
-          Session reconciled on{' '}
-          {activeSession.reconciledAt
-            ? new Date(activeSession.reconciledAt).toLocaleString(undefined, withNumerals())
-            : '—'}
-          .
+          {t('sessionReconciledOn', {
+            date: activeSession.reconciledAt
+              ? new Date(activeSession.reconciledAt).toLocaleString(undefined, withNumerals())
+              : '—',
+          })}
           {activeSession.adjustmentId && (
-            <p className="text-xs mt-1">Adjustment: {activeSession.adjustmentId.slice(0, 8)}…</p>
+            <p className="text-xs mt-1">
+              {t('adjustmentLabel')} {activeSession.adjustmentId.slice(0, 8)}…
+            </p>
           )}
         </div>
       )}

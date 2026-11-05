@@ -26,6 +26,7 @@ import { FiscalDocumentService } from '@api/services/fiscal-document.service';
 import { shippingCarrierService } from '@api/services/shipping-carrier.service';
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
+import { configureIdentityClient } from '@api/lib/identity-client';
 
 const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
 const TAG = `fiscal-${Date.now().toString(36)}-${process.pid}-${Math.random().toString(36).slice(2, 7)}`;
@@ -150,7 +151,7 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
   });
 
   afterAll(async () => {
-    // Issued documents are immutable and retained 6 years by design; the test
+    // Issued documents are immutable and retained 7 years by design; the test
     // database is disposable, so they are left in place.
   });
 
@@ -465,7 +466,19 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
       },
     });
 
-    await StoreService.delete(s.storeId, operator.id);
+    // Deleting a store flips its identity-managed owner at the identity service (store.service.ts); the Postgres tier has no
+    // ACCOUNTS binding, so answer as the service would for an active account.
+    configureIdentityClient({
+      getAccountState: async () => ({ status: 'active' }) as never,
+      setStatus: async () => undefined,
+      revokeUser: async () => undefined,
+      deleteStoreClients: async () => ({ clients: 0 }),
+    });
+    try {
+      await StoreService.delete(s.storeId, operator.id);
+    } finally {
+      configureIdentityClient(undefined);
+    }
 
     expect(await prisma.store.count({ where: { id: s.storeId } })).toBe(0);
     expect(await prisma.order.count({ where: { storeId: s.storeId } })).toBe(0);
@@ -482,9 +495,9 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
     expect(legacyPayload).not.toContain('Mona');
     expect(legacyPayload).not.toContain('+20');
     expect(legacyPayload).not.toContain('mona@example.test');
-    // Retained for 6 years.
+    // Retained for 7 years (Ruling RETENTION-1).
     expect(byType('order_record')[0].retainUntil.getUTCFullYear()).toBe(
-      legacy.createdAt.getUTCFullYear() + 6
+      legacy.createdAt.getUTCFullYear() + 7
     );
   });
 });

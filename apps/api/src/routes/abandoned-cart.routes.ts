@@ -8,7 +8,6 @@ import {
   CART_EMAIL_MIN_DELAY_MINUTES,
   CART_EMAIL_MAX_DELAY_MINUTES,
 } from '../services/cart-recovery-email.service';
-import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { tenantContext } from '../middleware/tenant-context';
 import { GUEST_CHECKOUT_LOOKBACK_DAYS, storeTakesGuestOrders } from '../lib/guest-checkout';
@@ -170,14 +169,7 @@ router.get(
     try {
       const { storeId, id } = req.params;
 
-      const abandonedCart = await prisma.abandonedCart.findUnique({
-        where: { id, storeId },
-        include: {
-          customer: {
-            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-          },
-        },
-      });
+      const abandonedCart = await abandonedCartService.getAbandoned(storeId, id);
 
       if (!abandonedCart || abandonedCart.storeId !== storeId) {
         res.status(404).json({

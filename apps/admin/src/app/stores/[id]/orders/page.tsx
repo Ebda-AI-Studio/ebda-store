@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { buttonVariants, cn, useToast } from '@ebda/ui';
+import { RowActions } from '../../../../components/RowActions';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
@@ -267,7 +268,7 @@ export default function StoreOrdersPage() {
     try {
       const res = await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}/invoice`);
       if (!res.ok) {
-        showError('Could not load invoice', `HTTP ${res.status}`);
+        showError(t('errors.invoiceLoad'), t('errors.invoiceLoadHttp', { status: res.status }));
         return;
       }
       const html = await res.text();
@@ -277,7 +278,7 @@ export default function StoreOrdersPage() {
       // Revoke after a delay so the new tab has time to consume the URL.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
-      showError('Could not load invoice', err instanceof Error ? err.message : 'Unknown error');
+      showError(t('errors.invoiceLoad'), t('errors.connection'));
     }
   };
 
@@ -421,41 +422,22 @@ export default function StoreOrdersPage() {
       subtitle={t('subtitle')}
       actions={
         <div className="flex items-center gap-2">
-          {/* Export orders to Excel: owners only (SEC-14, the sheet carries every customer's PII) */}
+          {/* Rule 2: one primary (phone order), export lives in the "..." menu (owners only: the sheet carries
+              every customer's PII, SEC-14). */}
           {canExport && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleExport}
-              disabled={isLoading || isExporting}
-            >
-              <svg
-                className="h-4 w-4 me-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              {isExporting ? t('export.exporting') : t('export.button')}
-            </Button>
+            <RowActions
+              menuLabel={t('moreMenu')}
+              items={[
+                {
+                  label: isExporting ? t('export.exporting') : t('export.button'),
+                  onSelect: handleExport,
+                  disabled: isLoading || isExporting,
+                },
+              ]}
+            />
           )}
-          {/* Admin phone-order entry. Lets merchants take an order over
-              the phone, then issue a payment link from the
-              order detail page (Ahmad 2026-05-16). */}
-          <Link href={`/stores/${storeId}/orders/new`}>
-            <Button type="button">+ New order</Button>
-          </Link>
-          <Link href={`/stores/${storeId}`}>
-            <Button type="button" variant="outline">
-              {t('backToStore')}
-            </Button>
+          <Link href={`/stores/${storeId}/orders/new`} className={cn(buttonVariants(), 'min-h-11')}>
+            {t('newOrder')}
           </Link>
         </div>
       }
@@ -537,7 +519,11 @@ export default function StoreOrdersPage() {
         open={confirmState.open && confirmState.type !== 'manualRefund'}
         title={confirmTitle}
         description={confirmDescription}
-        confirmLabel={tConfirm('confirm')}
+        confirmLabel={
+          confirmState.type === 'markPaid'
+            ? tConfirm('markPaidLabel')
+            : tConfirm('bulkMarkPaidLabel')
+        }
         cancelLabel={tConfirm('cancel')}
         onConfirm={handleConfirm}
         onClose={closeConfirm}

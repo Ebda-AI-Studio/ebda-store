@@ -22,7 +22,9 @@ const TEMPLATE_NAMES: Record<LookTemplate, { en: string; ar: string }> = {
  * `--input` token is tuned for fields on the page, not on ink, and measured 1.57-2.76:1 here.
  */
 export const DEMO_BAR_SELECT_CLASS =
-  'min-h-11 rounded border border-background/70 bg-foreground px-2 text-sm text-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background';
+  // The native chevron sat over the text of a narrow RTL select ("لوك بوك" hidden under it). The arrow is drawn as a background at the
+  // INLINE END instead (right in English, left in Arabic via rtl:) and `pe-8` reserves its room, so the text never reaches it at any width.
+  'min-h-11 appearance-none rounded border border-background/70 bg-foreground bg-no-repeat ps-2 pe-8 text-sm text-background [background-image:linear-gradient(45deg,transparent_50%,currentColor_50%),linear-gradient(135deg,currentColor_50%,transparent_50%)] [background-position:calc(100%-17px)_50%,calc(100%-12px)_50%] [background-size:5px_5px,5px_5px] rtl:[background-position:12px_50%,17px_50%] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background';
 
 /**
  * Showroom bar for the demo store (`store.isDemo`): template, then one of its BUILT looks

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { runInTenantContext, storeDirectory } from '@ebda/database';
+import { storeDirectory } from '@ebda/database';
+import { runInStoreCtx } from '../../jobs/store-db';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -59,7 +60,7 @@ export const accountingProfitAnomalyCron: JobDef = inngest.createFunction(
         // runProfitAnomalyScan uses bare prisma internally. Wrap in
         // runInTenantContext so FORCE RLS sees the correct store GUC and
         // reads/writes go to the right tenant rows.
-        return runInTenantContext(store.id, () => runProfitAnomalyScan(store.id));
+        return runInStoreCtx(store.id, () => runProfitAnomalyScan(store.id));
       });
       totalDetected += result.detected;
       totalP0 += result.p0Count;

@@ -23,6 +23,9 @@ import { useStoreUrl } from '../contexts/StoreContext';
  * buried in a sub-menu (a pattern regulators have specifically flagged
  * as "dark patterns" / non-compliant).
  */
+const CONSENT_BTN =
+  'inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-5';
+
 export function CookieConsentBanner() {
   const { hasDecided, setConsent, openPreferences } = useConsent();
   const { t, isRtl } = useLanguage();
@@ -38,6 +41,28 @@ export function CookieConsentBanner() {
     setInPreviewFrame(inIframe || hasPreviewParam);
   }, []);
 
+  // Audit 2026-11-03 #8: the strip is a fixed element in the first HTML, and the Arabic web font swapping in
+  // re-wrapped its text (+/- 23 px of height) after first paint: two layout shifts on every first visit
+  // (0.03 each). It now mounts once fonts are ready (or after 1.2 s, whichever is first), so it is laid out
+  // once, with its final text metrics. It is a consent notice, not content: 1.2 s at most is not a delay a
+  // regulator reads as hiding the choice, and no tracking runs before it either way.
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let done = false;
+    const go = () => {
+      if (!done) {
+        done = true;
+        setFontsReady(true);
+      }
+    };
+    const timer = setTimeout(go, 1200);
+    document.fonts?.ready.then(go, go);
+    return () => {
+      done = true;
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Don't render once the user has decided. The footer "Cookie preferences"
   // link is how they get back to change their mind later.
   if (hasDecided) return null;
@@ -51,24 +76,33 @@ export function CookieConsentBanner() {
   // banner normally.
   if (inPreviewFrame) return null;
 
+  if (!fontsReady) return null;
+
   return (
     <div
       role="dialog"
+      data-cookie-banner
       aria-modal="false"
       aria-labelledby="cookie-banner-title"
       aria-describedby="cookie-banner-body"
       className="fixed bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-[100] border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-6 lg:px-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="flex-1">
-            <h2 id="cookie-banner-title" className="text-base font-semibold text-foreground">
+            {/* Audit 2026-11-03 #6: on a phone the banner is a compact strip (the title is read by
+                assistive tech only, the sentence is 12 px), so it no longer takes a third of the
+                hero. From sm it is the roomy bar it was. */}
+            <h2
+              id="cookie-banner-title"
+              className="sr-only text-base font-semibold text-foreground sm:not-sr-only"
+            >
               {t('We use cookies', 'نستخدم ملفات تعريف الارتباط')}
             </h2>
             <p
               id="cookie-banner-body"
-              className="mt-1 text-sm text-muted-foreground leading-relaxed"
+              className="text-xs leading-snug text-muted-foreground sm:mt-1 sm:text-sm sm:leading-relaxed"
             >
               {t(
                 'We use essential cookies to run the store and optional marketing cookies to measure ads. You can accept, reject, or choose what to allow.',
@@ -84,27 +118,33 @@ export function CookieConsentBanner() {
             </p>
           </div>
 
-          {/* Three buttons. Accept + Reject are visually equivalent (no
-              dark-pattern hierarchy). Customize is secondary. */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3 sm:flex-shrink-0">
+          {/* Accept and Reject are the SAME control (same fill, size, weight, one tap each): a
+              regulator reads an accept-in-brand-colour / reject-outline pair as a dark pattern, and
+              the old markup did exactly that (bg-primary vs border). Both take the neutral ink fill,
+              so neither pushes the brand. Customize is the quieter outline between them. Three equal
+              columns on a phone, so nothing wraps into a stack of full-width bars. */}
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-shrink-0 sm:gap-3">
             <button
               type="button"
+              data-consent="reject"
               onClick={() => setConsent({ marketing: false })}
-              className="inline-flex items-center justify-center min-h-11 rounded-lg border border-input bg-background px-5 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              className={`${CONSENT_BTN} bg-foreground text-background hover:bg-foreground/90`}
             >
               {t('Reject all', 'رفض الكل')}
             </button>
             <button
               type="button"
+              data-consent="customize"
               onClick={openPreferences}
-              className="inline-flex items-center justify-center min-h-11 rounded-lg border border-input bg-background px-5 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              className={`${CONSENT_BTN} border border-input bg-background text-foreground hover:bg-muted`}
             >
               {t('Customize', 'تخصيص')}
             </button>
             <button
               type="button"
+              data-consent="accept"
               onClick={() => setConsent({ marketing: true })}
-              className="inline-flex items-center justify-center min-h-11 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              className={`${CONSENT_BTN} bg-foreground text-background hover:bg-foreground/90`}
             >
               {t('Accept all', 'قبول الكل')}
             </button>

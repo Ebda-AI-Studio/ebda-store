@@ -1,6 +1,6 @@
 /**
  * Ruling WA-LEGACY-1: the legacy in-Store "WBS" WhatsApp bridge was DELETED (not renamed); the separate
- * Ebda WhatsApp product replaces it through the Store contract. Nothing under apps/ or packages/ may
+ * Ebda Chat product replaces it through the Store contract. Nothing under apps/ or packages/ may
  * name it again, and nothing may carry the inherited "fwb" prefix. Case-insensitive on purpose: the
  * old code spelled it wbs, Wbs, WBS, wbsApiKey, x-wbs-api-key, fwbStoreId.
  *
@@ -35,7 +35,9 @@ const tracked = execFileSync('git', ['ls-files', '-z', 'apps', 'packages'], {
   .split('\0')
   .filter(Boolean)
   .filter(f => !f.startsWith(EXEMPT_PREFIX))
-  .filter(f => !f.endsWith('package-lock.json'));
+  .filter(f => !f.endsWith('package-lock.json'))
+  // a generated minified third-party build (pdf-lib, Ruling BUNDLE-BUDGET-7), not source
+  .filter(f => f !== 'apps/api/src/cf/modules/pdf-lib.mjs');
 
 const read = (f: string): string | null => {
   try {
@@ -55,7 +57,7 @@ describe('no WBS / FWB references in apps/ or packages/ (Ruling WA-LEGACY-1)', (
   it('the matcher catches each spelling the old code used', () => {
     for (const s of ['wbsApiKey', 'WBS_BASE_URL', 'x-wbs-api-key', 'Wbs', 'fwbStoreId', 'FWB'])
       expect(FORBIDDEN.test(s), s).toBe(true);
-    for (const s of ['webs', 'wbc', 'Ebda WhatsApp', 'whatsapp', 'wa.me'])
+    for (const s of ['webs', 'wbc', 'Ebda Chat', 'whatsapp', 'wa.me'])
       expect(FORBIDDEN.test(s), s).toBe(false);
   });
 
@@ -75,7 +77,7 @@ describe('no WBS / FWB references in apps/ or packages/ (Ruling WA-LEGACY-1)', (
     }
     expect(
       offenders,
-      'The WBS bridge is gone (WA-LEGACY-1). Do not reintroduce it; Ebda WhatsApp talks to the Store through the contract.'
+      'The WBS bridge is gone (WA-LEGACY-1). Do not reintroduce it; Ebda Chat talks to the Store through the contract.'
     ).toEqual([]);
   });
 

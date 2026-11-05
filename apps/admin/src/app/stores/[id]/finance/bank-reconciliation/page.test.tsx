@@ -21,6 +21,11 @@ vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
 vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => () => Promise.resolve(true) }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -58,7 +63,6 @@ function respond(d: Pending) {
 beforeEach(() => {
   calls.length = 0;
   deletes.length = 0;
-  vi.stubGlobal('confirm', () => true);
   apiGetPage.mockImplementation(
     (url: string) => new Promise(resolve => calls.push({ url, resolve }))
   );
@@ -79,6 +83,7 @@ describe('bank statements — post-delete refetch reads the CURRENT page (issue 
     await act(async () => respond(calls[0]));
     await screen.findByText('STATEMENT-PAGE-1');
 
+    fireEvent.click(screen.getByLabelText('rowMenu')); // row actions live in the "..." menu
     fireEvent.click(screen.getByText('delete')); // DELETE in flight, started on page 1
     await waitFor(() => expect(deletes).toHaveLength(1));
     fireEvent.click(screen.getByText('go-2')); // merchant pages on while it is in flight

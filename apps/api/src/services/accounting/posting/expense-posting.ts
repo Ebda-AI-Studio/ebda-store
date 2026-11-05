@@ -1,6 +1,7 @@
 import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
 import logger from '../../../lib/logger';
+import { storeMoney } from '../../../lib/repo-factory';
 
 export interface ExpenseJournalInput {
   storeId: string;
@@ -23,6 +24,12 @@ export interface ExpenseJournalInput {
  * Guards: skips if expense not found, accounting disabled, or not posted.
  */
 export async function postExpenseJournal(args: ExpenseJournalInput): Promise<void> {
+  // A store on its Durable Object posts in one section there (Ruling CF-JOBS-4); idempotent per source row.
+  const money = await storeMoney(args.storeId);
+  if (money) {
+    await money.journalExpense({ expenseId: args.expenseId });
+    return;
+  }
   const expense = await prisma.expense.findFirst({
     where: { id: args.expenseId, storeId: args.storeId },
     include: { store: { select: { accountingEnabled: true } } },

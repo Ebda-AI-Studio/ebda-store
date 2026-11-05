@@ -8,7 +8,7 @@ import { COPY } from '../../apps/marketing/src/lib/content';
 import sitemap from '../../apps/marketing/src/app/sitemap';
 import { LEGAL_EXTRA_SLUGS, LOCALES, pagePath } from '../../apps/marketing/src/lib/site';
 
-/** LEGAL-1: the data deletion page and the three Ebda WhatsApp documents under /legal/. */
+/** LEGAL-1: the data deletion page and the three Ebda Chat documents under /legal/. */
 const KEY = {
   'legal/data-deletion': 'dataDeletion',
   refund: 'refund',
@@ -102,7 +102,7 @@ describe('LEGAL-1 extra legal pages', () => {
     const md = readFileSync(path.resolve(__dirname, '../../docs/legal/VAT-0-clause.md'), 'utf8');
     const en = /## English\n\n(.+)\n/.exec(md)![1];
     const ar = /## العربية\n\n(.+)\n/.exec(md)![1];
-    // the Ebda WhatsApp terms (clause 6.6, WA PR #25) carry the same clause verbatim
+    // the Ebda Chat terms (clause 6.6, WA PR #25) carry the same clause verbatim
     expect(COPY.en.legalPages.waTerms.sections.flatMap(s => s.p).join('\n')).toContain(en);
     expect(COPY.ar.legalPages.waTerms.sections.flatMap(s => s.p).join('\n')).toContain(ar);
     for (const k of ['terms', 'merchant'] as const) {

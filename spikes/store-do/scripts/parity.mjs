@@ -1,6 +1,6 @@
 // Parity of the flagged demo store: Postgres path vs StoreDO path on the same production Worker (Task 0.4).
 //   node scripts/parity.mjs --store-id <uuid> [--base https://api.ebda.app]
-// The DO path is selected per request with `x-ebda-backend: do` (store id must also be in STORE_DO_ENABLED_IDS).
+// RETIRED: the per-request `x-ebda-backend` header is ignored (Ruling CF-BACKEND-1); the backend is the store's D1 flag.
 // Order create cannot be compared byte-for-byte: demo stores refuse orders on the Postgres path (Ruling LOOKS-4),
 // so the DO order total is checked against the Postgres catalogue price instead, and the Postgres refusal is asserted.
 import { randomUUID } from 'node:crypto';
@@ -17,7 +17,6 @@ const H = (doPath, extra = {}) => ({
   'x-store-id': storeId,
   accept: 'application/json',
   'content-type': 'application/json',
-  ...(doPath ? { 'x-ebda-backend': 'do' } : {}),
   ...extra,
 });
 // Minimal valid createOrderSchema body (routes/public.routes.ts): the DO path ignores it, the validator does not.

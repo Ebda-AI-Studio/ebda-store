@@ -4,6 +4,7 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { storeFilter } from '../../jobs/store-scope';
 import { sendAlert } from '../../../services/alerts.service';
+import { storeMoney } from '../../repo-factory';
 
 import { REGION } from '@ebda/shared';
 /**
@@ -36,6 +37,12 @@ export const accountingDailyClose: JobDef = inngest.createFunction(
         // Cross-tenant cron — no tenant context on this connection.
         // RLS on journal_entries/journal_lines would filter every read
         // to 0 rows. Read each store in its own scope for accurate sums.
+        // PORTED (Ruling CF-JOBS-4): a store on its Durable Object sums its own posted ledger there.
+        const money = await storeMoney(store.id);
+        if (money) {
+          const t = await money.trialBalance();
+          return { dr: t.debit, cr: t.credit, drift: t.debit - t.credit };
+        }
         const sums = await withStore(
           store.id,
           tx => tx.$queryRaw<{ total_debit: bigint; total_credit: bigint }[]>`

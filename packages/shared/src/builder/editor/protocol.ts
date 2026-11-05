@@ -14,6 +14,7 @@
  *   child  -> parent `section-op` { sectionId, blockId?, op }       toolbar button (move / duplicate / hide / remove)
  *   child  -> parent `move`       { sectionId, blockId?, toIndex }  a drag was dropped (final index in its own list)
  *   child  -> parent `request-add` { list, index }                  "+" between sections
+ *   child  -> parent `open-admin`  { target }                      a canvas hint link ("add products"): the parent opens that admin page in a new tab
  *   child  -> parent `request-media` { sectionId, blockId?, key }  "change image" (names the target; the parent picks the file)
  *
  * Both sides accept a message ONLY when it parses here AND it comes from the
@@ -36,6 +37,10 @@ const base = { protocol: z.literal(BUILDER_PROTOCOL) };
 /** Toolbar operations the canvas may ask for. `remove` always passes an in-app confirmation first. */
 export const SECTION_OPS = ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove', 'aiFill'] as const;
 export type SectionOp = (typeof SECTION_OPS)[number];
+
+/** Admin pages a canvas hint may send the merchant to (a closed list: the child never names a URL). */
+export const ADMIN_TARGETS = ['products', 'categories'] as const;
+export type AdminTarget = (typeof ADMIN_TARGETS)[number];
 
 export const parentToChildSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('render'), definition: pageDefinitionSchema }).strict(),
@@ -95,6 +100,7 @@ export const childToParentSchema = z.discriminatedUnion('type', [
       index: z.number().int().min(0).max(BUILDER_LIMITS.maxSections),
     })
     .strict(),
+  z.object({ ...base, type: z.literal('open-admin'), target: z.enum(ADMIN_TARGETS) }).strict(),
   z
     .object({
       ...base,

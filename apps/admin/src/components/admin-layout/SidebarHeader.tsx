@@ -86,12 +86,13 @@ export function SidebarHeader({
       {mode === 'super_admin' && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-primary-foreground shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-xs font-bold text-primary-foreground shadow-sm">
+              {/* i18n-gate-allow: role monogram */}
               SA
             </div>
             <div>
               <span className="text-xs font-semibold text-foreground">{t('superAdmin')}</span>
-              <p className="text-[10px] text-muted-foreground">{t('superAdminHint')}</p>
+              <p className="text-xs text-muted-foreground">{t('superAdminHint')}</p>
             </div>
           </div>
         </div>
@@ -101,12 +102,13 @@ export function SidebarHeader({
       {isStaffUser && isStoreAdminWithBranding && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground shadow-sm">
+              {/* i18n-gate-allow: role monogram */}
               ST
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-xs font-semibold text-foreground">{t('staffBadge')}</span>
-              <p className="text-[10px] text-muted-foreground truncate">{t('staffBadgeHint')}</p>
+              <p className="text-xs text-muted-foreground truncate">{t('staffBadgeHint')}</p>
             </div>
           </div>
         </div>
@@ -116,7 +118,7 @@ export function SidebarHeader({
       {isStoreAdminWithBranding && !isSuperAdminViewingStore && !isStaffUser && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-[10px] font-bold text-white shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm">
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -128,7 +130,7 @@ export function SidebarHeader({
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-xs font-semibold text-foreground">{t('storeAdmin')}</span>
-              <p className="text-[10px] text-muted-foreground truncate">{t('storeAdminHint')}</p>
+              <p className="text-xs text-muted-foreground truncate">{t('storeAdminHint')}</p>
             </div>
           </div>
         </div>
@@ -138,14 +140,15 @@ export function SidebarHeader({
       {isSuperAdminViewingStore && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-primary-foreground shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-xs font-bold text-primary-foreground shadow-sm">
+              {/* i18n-gate-allow: role monogram */}
               SA
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-xs font-semibold text-foreground">
                 {t('superAdminViewingStore')}
               </span>
-              <p className="text-[10px] text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {t('superAdminViewingStoreHint')}
               </p>
             </div>

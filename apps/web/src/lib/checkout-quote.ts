@@ -84,6 +84,20 @@ export function expectedTotalFor(held: HeldQuote | null, currentKey: string): nu
 }
 
 /**
+ * QA-COUPON-1: the total the buyer is shown, ALWAYS sent as `expectedTotal`. With a fresh server quote it is that quote's
+ * total; with none (the quote request failed, or is still in flight) it is the local estimate on screen. Either way the
+ * server compares it with what it would charge and answers 409 PRICE_CHANGED on any difference, so a dropped coupon, a
+ * stale estimate or a repricing can never become a silent charge of more than the buyer saw. Never `undefined`.
+ */
+export function expectedTotalToSend(
+  held: HeldQuote | null,
+  currentKey: string,
+  shownTotal: number
+): number {
+  return expectedTotalFor(held, currentKey) ?? Math.max(0, Math.round(shownTotal));
+}
+
+/**
  * The 409 PRICE_CHANGED message. `newTotal` is the server's new total (piastres) formatted by the caller's formatter, so the
  * buyer sees the exact figure they are being asked to confirm. Falls back to copy without a figure when none was sent.
  */

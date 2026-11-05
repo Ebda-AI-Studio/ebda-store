@@ -29,7 +29,9 @@ function fixture() {
   x(
     `INSERT INTO products (id, store_id, name, slug, price, inventory, track_inventory, status) VALUES ('free', 's1', 'Untracked', 'untracked', 500, 0, 0, 'active')`
   );
-  x(`INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`);
+  x(
+    `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', 's1', 'A', 'B', 'cust')`
+  );
   x(`INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('x1', 's2', 'E', 'F')`);
   x(
     `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 20000)`
@@ -553,10 +555,13 @@ describe('wallet entries', () => {
     for (const amount of [0, 1.5, NaN, 200_000_000])
       expect(err(() => e({ idempotencyKey: 'k3', amount })).code).toBe('INVALID_WALLET_AMOUNT');
     expect(err(() => e({ idempotencyKey: '' })).code).toBe('INVALID_IDEMPOTENCY_KEY');
-    // a credit to a customer of another store is refused (no wallet minted across stores)
+    // a credit needs NO CRM row (Ruling CF-FIX-2): the wallet is the account's, keyed by the users.id, and is minted for THIS store only
     expect(
-      err(() => e({ customerId: 'x1', amount: 100, idempotencyKey: 'k4', type: 'credit' })).code
-    ).toBe('CUSTOMER_NOT_FOUND');
+      e({ customerId: 'no-crm-user', amount: 100, idempotencyKey: 'k4', type: 'credit' }).balance
+    ).toBe(100);
+    expect(
+      f.one(`SELECT store_id FROM customer_wallets WHERE customer_id = 'no-crm-user'`).store_id
+    ).toBe('s1');
   });
 
   describe('cumulative refund bound and backorder-aware partial restock (controller findings)', () => {

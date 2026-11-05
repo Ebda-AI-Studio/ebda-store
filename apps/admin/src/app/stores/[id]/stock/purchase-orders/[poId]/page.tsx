@@ -1,13 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, minorToMajor } from '@/lib/format';
+import { Button } from '@ebda/ui';
+import { RowActions } from '@/components/RowActions';
+import { PageState } from '@/components/PageState';
+import { useConfirm } from '@/hooks/useConfirm';
 
 import { minorToDecimalString, withNumerals } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,11 +57,10 @@ export default function PurchaseOrderDetailPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const poId = params?.poId as string;
-  const router = useRouter();
   const t = useT('stock.purchaseOrders');
   const tDetail = useT('stock.purchaseOrders.detail');
-  const tc = useT('common');
   const isAr = useLocale() === 'ar';
+  const askConfirm = useConfirm();
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +94,7 @@ export default function PurchaseOrderDetailPage() {
           setReceiptQtys(defaults);
         }
       })
-      .catch(() => setError('Failed to load purchase order'));
+      .catch(() => setError(tDetail('loadFailed')));
   }, [storeId, poId]);
 
   useEffect(() => {
@@ -111,7 +114,7 @@ export default function PurchaseOrderDetailPage() {
       .filter(r => r.qtyReceived > 0);
 
     if (receipts.length === 0) {
-      setReceiveError('Enter at least one quantity to receive.');
+      setReceiveError(tDetail('qtyRequired'));
       setReceiving(false);
       return;
     }
@@ -143,7 +146,12 @@ export default function PurchaseOrderDetailPage() {
   }
 
   async function handleCancel() {
-    if (!confirm(tDetail('cancelConfirm'))) return;
+    const ok = await askConfirm({
+      object: tDetail('cancelObject', { number: po?.poNumber ?? '' }),
+      consequence: tDetail('cancelConsequence'),
+      confirmLabel: tDetail('cancelAction'),
+    });
+    if (!ok) return;
     setCancelling(true);
     try {
       const { error: apiError } = await apiPost(
@@ -162,24 +170,8 @@ export default function PurchaseOrderDetailPage() {
     }
   }
 
-  if (error) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!po) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
-      </AdminLayout>
-    );
-  }
-
-  const canReceive = ['draft', 'sent', 'partial'].includes(po.status);
-  const canCancel = po.status === 'draft';
+  const canReceive = !!po && ['draft', 'sent', 'partial'].includes(po.status);
+  const canCancel = po?.status === 'draft';
 
   const itemColumns: DataTableColumn<POItem>[] = [
     {
@@ -216,7 +208,7 @@ export default function PurchaseOrderDetailPage() {
         const remaining = item.qty - item.qtyReceived;
         return (
           <span
-            className={`font-mono text-xs ${remaining > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}
+            className={`font-mono text-xs ${remaining > 0 ? 'text-warning-ink' : 'text-muted-foreground'}`}
           >
             {remaining}
           </span>
@@ -264,92 +256,94 @@ export default function PurchaseOrderDetailPage() {
   ];
 
   return (
-    <AdminLayout title={po.poNumber} subtitle={po.supplier.name}>
-      <div className="max-w-4xl space-y-6">
-        {/* Header summary */}
-        <div className="flex flex-wrap gap-4 items-start">
-          <span
-            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-              STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
-            }`}
-          >
-            {t(`statuses.${po.status}`)}
-          </span>
-
-          <div className="text-sm text-muted-foreground space-x-4">
-            {po.expectedDate && (
-              <span>
-                {t('expectedDate')}:{' '}
-                {new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())}
-              </span>
+    <AdminLayout
+      title={po?.poNumber ?? t('title')}
+      subtitle={po?.supplier.name}
+      parent={{ label: t('title'), href: `/stores/${storeId}/stock/purchase-orders` }}
+      actions={
+        po ? (
+          <div className="flex items-center gap-2">
+            {canCancel && (
+              <RowActions
+                menuLabel={tDetail('menuLabel')}
+                items={[
+                  {
+                    label: cancelling ? tDetail('cancelling') : tDetail('cancelButton'),
+                    destructive: true,
+                    disabled: cancelling,
+                    onSelect: handleCancel,
+                  },
+                ]}
+              />
             )}
-            {po.receivedDate && (
-              <span>
-                {t('receivedDate')}:{' '}
-                {new Date(po.receivedDate).toLocaleDateString(undefined, withNumerals())}
-              </span>
+            {canReceive && (
+              <Button className="min-h-11" onClick={handleReceive} disabled={receiving}>
+                {receiving ? tDetail('receiving') : tDetail('receiveButton')}
+              </Button>
             )}
-            <span>
-              {t('total')}: <strong>{formatPrice(po.totalCost)}</strong>
-            </span>
           </div>
+        ) : undefined
+      }
+    >
+      <PageState loading={!po && !error} error={error} onRetry={loadPO}>
+        {po && (
+          <div className="max-w-4xl space-y-6">
+            {/* Header summary */}
+            <div className="flex flex-wrap gap-4 items-start">
+              <span
+                className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                  STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
+                }`}
+              >
+                {t(`statuses.${po.status}`)}
+              </span>
 
-          {canCancel && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={cancelling}
-              className="ms-auto px-3 py-1 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-40"
-            >
-              {cancelling ? tDetail('cancelling') : tDetail('cancelButton')}
-            </button>
-          )}
-        </div>
+              <div className="text-sm text-muted-foreground space-x-4">
+                {po.expectedDate && (
+                  <span>
+                    {t('expectedDate')}:{' '}
+                    {new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())}
+                  </span>
+                )}
+                {po.receivedDate && (
+                  <span>
+                    {t('receivedDate')}:{' '}
+                    {new Date(po.receivedDate).toLocaleDateString(undefined, withNumerals())}
+                  </span>
+                )}
+                <span>
+                  {t('total')}: <strong>{formatPrice(po.totalCost)}</strong>
+                </span>
+              </div>
+            </div>
 
-        {/* Items table */}
-        <div>
-          <DataTable<POItem>
-            ariaLabel={tDetail('itemsTableLabel')}
-            columns={itemColumns}
-            rows={po.items}
-            rowKey={item => item.id}
-          />
-          {/* DataTable has no footer concept, so the total is a summary bar
+            {/* Items table */}
+            <div>
+              <DataTable<POItem>
+                ariaLabel={tDetail('itemsTableLabel')}
+                columns={itemColumns}
+                rows={po.items}
+                rowKey={item => item.id}
+              />
+              {/* DataTable has no footer concept, so the total is a summary bar
               right below the table — visible on both layouts. */}
-          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
-            <span>{tDetail('totalLabel')}</span>
-            <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
-          </div>
-        </div>
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+                <span>{tDetail('totalLabel')}</span>
+                <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
+              </div>
+            </div>
 
-        {/* Receive section */}
-        {canReceive && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold">{tDetail('receiveSection')}</h3>
-            {receiveError && <div className="text-red-600 text-sm">{receiveError}</div>}
-            <button
-              type="button"
-              onClick={handleReceive}
-              disabled={receiving}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-            >
-              {receiving ? tDetail('receiving') : tDetail('receiveButton')}
-            </button>
-            <p className="text-xs text-muted-foreground">{tDetail('receiveHelp')}</p>
+            {/* Receive: the quantities are in the table; the action is the header primary. */}
+            {canReceive && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">{tDetail('receiveSection')}</h3>
+                {receiveError && <div className="text-destructive-ink text-sm">{receiveError}</div>}
+                <p className="text-xs text-muted-foreground">{tDetail('receiveHelp')}</p>
+              </div>
+            )}
           </div>
         )}
-
-        {/* Back link */}
-        <div>
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders`)}
-            className="text-sm text-muted-foreground underline underline-offset-2 hover:opacity-80"
-          >
-            ← Back to purchase orders
-          </button>
-        </div>
-      </div>
+      </PageState>
     </AdminLayout>
   );
 }

@@ -10,6 +10,8 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { Button, useToast } from '@ebda/ui';
+import { RowActions } from '@/components/RowActions';
+import { useConfirm } from '@/hooks/useConfirm';
 
 // ─── Select-all checkbox (indeterminate-aware) ─────────────────────────────────
 
@@ -133,6 +135,7 @@ export default function StockInventoryPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   // Latest-request-wins: a slower response for a previous search/page must not repaint its rows.
   const beginRequest = useLatestRequest();
+  const askConfirm = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
   // Build the inventory list URL. Lists ALL items (no status filter) so the
@@ -168,13 +171,13 @@ export default function StockInventoryPage() {
   );
 
   const handleBulkSetBackorder = async (enabled: boolean) => {
-    const verb = enabled ? 'enable' : 'disable';
     if (!products || products.length === 0) return;
-    const confirmed = window.confirm(
-      enabled
-        ? `Enable backorder on all ${products.length} active products? Customers will be able to order items even when out of stock.`
-        : `Disable backorder on all ${products.length} active products? Out-of-stock items will become unorderable.`
-    );
+    const confirmed = await askConfirm({
+      object: t('backorderObject', { count: products.length }),
+      consequence: enabled ? t('backorderEnableConsequence') : t('backorderDisableConsequence'),
+      confirmLabel: enabled ? t('bulkBackorderEnable') : t('bulkBackorderDisable'),
+      tone: 'default',
+    });
     if (!confirmed) return;
     setBulkBusy(true);
     try {
@@ -183,19 +186,19 @@ export default function StockInventoryPage() {
         { enabled }
       );
       if (apiError) {
-        toastError(`Could not ${verb} backorder`, apiError.message || '');
+        toastError(enabled ? t('backorderEnableFailed') : t('backorderDisableFailed'));
         return;
       }
       const updated = data?.updated ?? 0;
       toastSuccess(
         enabled
-          ? `Backorder enabled on ${updated} products`
-          : `Backorder disabled on ${updated} products`
+          ? t('backorderEnabledDone', { count: updated })
+          : t('backorderDisabledDone', { count: updated })
       );
       // Optimistic UI update — no need to re-fetch the whole list
       setProducts(prev => (prev ? prev.map(p => ({ ...p, allowBackorder: enabled })) : prev));
     } catch (err) {
-      toastError(`Could not ${verb} backorder`, err instanceof Error ? err.message : String(err));
+      toastError(enabled ? t('backorderEnableFailed') : t('backorderDisableFailed'));
     } finally {
       setBulkBusy(false);
     }
@@ -314,25 +317,23 @@ export default function StockInventoryPage() {
     }
   };
 
-  const bulkBackorderButton =
+  // A store-wide switch is not the page's main job: it lives in the "..." menu (rule 2), never as a header button.
+  const bulkBackorderMenu =
     products && products.length > 0 ? (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={bulkBusy}
-        onClick={() => handleBulkSetBackorder(!allBackorderEnabled)}
-        title={allBackorderEnabled ? t('bulkBackorderDisableTip') : t('bulkBackorderEnableTip')}
-      >
-        {bulkBusy
-          ? '…'
-          : allBackorderEnabled
-            ? t('bulkBackorderDisable')
-            : t('bulkBackorderEnable')}
-      </Button>
+      <RowActions
+        menuLabel={t('moreActions')}
+        items={[
+          {
+            label: allBackorderEnabled ? t('bulkBackorderDisable') : t('bulkBackorderEnable'),
+            disabled: bulkBusy,
+            onSelect: () => handleBulkSetBackorder(!allBackorderEnabled),
+          },
+        ]}
+      />
     ) : null;
 
   return (
-    <AdminLayout title={t('title')} subtitle={t('description')} actions={bulkBackorderButton}>
+    <AdminLayout title={t('title')} subtitle={t('description')} actions={bulkBackorderMenu}>
       <div className="max-w-6xl">
         {/* Search bar — same debounced component the Products page uses. */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -411,7 +412,10 @@ export default function StockInventoryPage() {
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 {activeStockFilter
-                  ? `Showing ${visibleProducts.length} of ${products?.length ?? 0} products`
+                  ? t('showingFiltered', {
+                      shown: visibleProducts.length,
+                      total: products?.length ?? 0,
+                    })
                   : t('showingCount', { shown: visibleProducts.length, total: totalSkus })}
               </span>
             </div>
@@ -478,7 +482,7 @@ export default function StockInventoryPage() {
                     return (
                       <span
                         className={`font-mono text-xs font-semibold ${
-                          onHand === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
+                          onHand === 0 ? 'text-red-600' : isLow ? 'text-warning-ink' : ''
                         }`}
                       >
                         {onHand}

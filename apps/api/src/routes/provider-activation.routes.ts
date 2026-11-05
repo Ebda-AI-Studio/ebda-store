@@ -5,7 +5,8 @@ import {
 } from '../services/provider-verification.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma, asPlatformOperator } from '@ebda/database';
+import { prisma } from '@ebda/database';
+import { asOperator } from '../lib/platform-scope';
 import { PAYMENT_PROVIDER_CODES, SHIPPING_PROVIDER_CODES } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
@@ -127,7 +128,7 @@ adminProviderActivationRoutes.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status } = parseInput(statusSchema, req.query);
-      const requests = await asPlatformOperator(req.user!.userId, () => listAllRequests(status));
+      const requests = await asOperator(req.user!.userId, () => listAllRequests(status));
       res.json({ success: true, data: { requests } });
     } catch (error) {
       next(error);

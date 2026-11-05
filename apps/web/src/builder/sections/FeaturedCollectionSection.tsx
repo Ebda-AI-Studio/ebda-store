@@ -6,6 +6,7 @@
  * hand-picked), with desktop and mobile column counts and a "view all" link.
  * Cards are the platform card, so each skin draws its own (Dahab's included).
  */
+import { fitDesktopColumns } from '../../templates/shared/grid-helpers';
 import React from 'react';
 import type { SectionPaddingMaxWidthVisibility, TemplateId } from '@ebda/shared';
 import { sanitizeUrl } from '@ebda/shared';
@@ -128,7 +129,7 @@ export function FeaturedCollectionSection({
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : undefined;
   const spacing = sectionSpacingClasses(settings, store.look);
   if (products.length === 0) return null;
-  const cols = settings.columns ?? 4;
+  const cols = fitDesktopColumns(products.length, settings.columns ?? 4);
   const centred = centredGrid(products.length, {
     base: settings.mobileColumns === 1 ? 1 : 2,
     md: cols >= 3 ? 3 : 2,
@@ -160,6 +161,7 @@ export function FeaturedCollectionSection({
           editLink={edit('buttonText')}
         />
         <div
+          data-part="product-grid"
           className={[
             'grid gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10',
             centred

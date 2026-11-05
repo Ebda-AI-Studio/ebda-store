@@ -20,7 +20,6 @@ const delivered: Array<{ kind: string; name: string; args: unknown[] }> = [];
 beforeEach(() => {
   delivered.length = 0;
   setCfBindings({
-    HYPERDRIVE: { connectionString: '' },
     STORE_REALTIME: {
       idFromName: (n: string) => n,
       get: (id: unknown) =>
@@ -82,7 +81,6 @@ describe('socketService on Workers', () => {
 
   it('a failing DO call never throws into the caller (best-effort, like socket.io)', async () => {
     setCfBindings({
-      HYPERDRIVE: { connectionString: '' },
       STORE_REALTIME: {
         idFromName: (n: string) => n,
         get: () => ({ emitStore: async () => Promise.reject(new Error('do reset')) }) as never,

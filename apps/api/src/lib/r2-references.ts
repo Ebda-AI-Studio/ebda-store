@@ -585,6 +585,17 @@ export async function assertStrictTablesVisible(
 }
 
 /** Registered columns grouped by table, in registry order. */
+/**
+ * Registry tables that are platform rows (Postgres / D1 for every store, whatever backend serves it). Every other registry table
+ * is store data: for a store on its Durable Object it is read from the DO (`r2References`), and `tests` prove the DO schema has it.
+ */
+export const PLATFORM_R2_TABLES: readonly string[] = [
+  'stores',
+  'users',
+  'system_settings',
+  'manual_payment_claims',
+];
+
 export function columnsByTable(
   columns: readonly R2ReferenceColumn[] = R2_REFERENCE_COLUMNS
 ): Map<string, R2ReferenceColumn[]> {
@@ -723,14 +734,21 @@ export const DERIVED_R2_KEY_PATTERNS: readonly RegExp[] = [
 ];
 export const DERIVED_R2_RETENTION_DAYS = 400;
 
+/**
+ * Resized WebP variants (`<original>.w480|960|1600.webp`, Ruling PREMIUM-2): referenced by NO column
+ * (the storefront derives the name from the original's), so they are never orphans. They do NOT
+ * expire by age (unlike barcodes): they live and die with their original.
+ */
+export const IMAGE_VARIANT_R2_KEY = /^stores\/[0-9a-f-]{36}\/.+\.w(480|960|1600)\.webp$/;
+
 export const isDerivedR2Key = (key: string): boolean =>
-  DERIVED_R2_KEY_PATTERNS.some(p => p.test(key));
+  DERIVED_R2_KEY_PATTERNS.some(p => p.test(key)) || IMAGE_VARIANT_R2_KEY.test(key);
 
 export function isExpiredDerivedKey(
   key: string,
   lastModified: Date | undefined,
   now: number
 ): boolean {
-  if (!isDerivedR2Key(key) || !lastModified) return false;
+  if (IMAGE_VARIANT_R2_KEY.test(key) || !isDerivedR2Key(key) || !lastModified) return false;
   return now - lastModified.getTime() > DERIVED_R2_RETENTION_DAYS * 86400_000;
 }

@@ -9,15 +9,22 @@
  *
  * The credentials never leave the server: every result here is a status, a code and a time.
  */
+import { isDemoStore } from '../lib/demo-store';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { onD1 } from './platform/billing-d1';
 import {
   acrossStoresFlat,
-  asPlatformOperator,
   prisma,
   Prisma,
   runInStoreScope,
-  runInTenantContext,
   storeDirectory,
+  withStore,
 } from '@ebda/database';
+import { storeRepo } from '../lib/repo-factory';
+import { asOperator, platformHubOnD1 } from '../lib/platform-scope';
+import { listDirectoryStores } from './platform/directory-d1';
+import { gateRead } from './platform/access-d1';
+import { getAccountsBrief } from '../lib/identity-client';
 import { BRAND, getProviderEntry, isActivationRequestable, ACTIVATION_HOURS } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
@@ -110,12 +117,16 @@ function requestableEntry(provider: string) {
 
 /** The stored connection row (credentials ciphertext included) of a store's provider, or null. */
 async function loadConnection(storeId: string, provider: string, kind: 'payments' | 'shipping') {
+  // the store's own backend (NEON-ZERO, Ruling NZ-C-8): its Durable Object for a DO store, `prisma` otherwise
+  const db = await storeDb(storeId);
   if (kind === 'payments') {
-    const row = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+    const row = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({ where: { provider, storeId } });
     if (!row) return null;
     return { kind, row, test: row.connectionTest };
   }
-  const row = await prisma.shippingCarrierConfig.findUnique({
+  const row = await db.shippingCarrierConfig.findUnique({
     where: { storeId_carrier: { storeId, carrier: provider } },
   });
   if (!row) return null;
@@ -264,8 +275,10 @@ export async function notifyOpsOfRequest(args: {
 export async function listAllRequests(
   status?: ActivationStatus
 ): Promise<AdminActivationRequest[]> {
-  const stores = new Map((await storeDirectory()).map(s => [s.id, s]));
-  const rows = await acrossStoresFlat(async storeId => {
+  const onD1 = await platformHubOnD1();
+  const directory = onD1 ? await listDirectoryStores() : await storeDirectory();
+  const stores = new Map(directory.map(s => [s.id, s]));
+  const forStore = async (storeId: string) => {
     const found = await prisma.providerActivationRequest.findMany({
       where: { storeId, ...(status ? { status } : {}) },
     });
@@ -284,7 +297,18 @@ export async function listAllRequests(
       });
     }
     return out;
-  });
+  };
+  // With the hub on D1 the requests are D1 rows and each store's connection is read from its own backend: no cross-store
+  // Postgres transaction (the explicit id list also keeps `acrossStores` off the Postgres directory definer).
+  let rows: AdminActivationRequest[] = [];
+  if (onD1) {
+    for (let i = 0; i < directory.length; i += 8) {
+      const batch = directory.slice(i, i + 8);
+      rows = rows.concat(
+        (await Promise.all(batch.map(s => withStore(s.id, () => forStore(s.id))))).flat()
+      );
+    }
+  } else rows = await acrossStoresFlat(forStore);
   return rows.sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 }
 
@@ -303,15 +327,15 @@ export async function runTestForStore(
   if (!entry || entry.manual)
     throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
   if (entry.kind === 'payments') {
-    const row = await runInTenantContext(storeId, () =>
-      prisma.paymentConfig.findFirst({ where: { provider, storeId } })
-    );
+    const row = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({ where: { provider, storeId } });
     if (!row)
       throw new AppError(404, 'NOT_FOUND', 'The store has not saved credentials for this provider');
     // The gateway call holds no transaction: read, call, then a short write.
     const { result, stored } = await runConnectionTest(row);
-    await runInTenantContext(storeId, () =>
-      prisma.paymentConfig.update({
+    await withStore(storeId, async () =>
+      (await storeWriter(storeId)).paymentConfig.update({
         where: { id: row.id, storeId },
         data: {
           connectionTest: stored as unknown as Prisma.InputJsonValue,
@@ -337,9 +361,7 @@ export async function runTestForStore(
     ip: actor.ip,
     userAgent: actor.userAgent,
   });
-  const conn = await runInTenantContext(storeId, () =>
-    loadConnection(storeId, provider, entry.kind)
-  );
+  const conn = await withStore(storeId, () => loadConnection(storeId, provider, entry.kind));
   const last = conn ? lastTestOf(conn) : null;
   if (!last) throw new AppError(500, 'TEST_NOT_RECORDED', 'The connection test left no result');
   return last;
@@ -364,7 +386,7 @@ export async function activateForStore(
   actor: ActivationActor
 ): Promise<PublicActivationRequest> {
   const entry = requestableEntry(provider);
-  const updated = await runInTenantContext(storeId, async () => {
+  const updated = await withStore(storeId, async () => {
     const req = await openRequest(storeId, provider);
     if (req.status === 'activated') return req;
     const conn = await loadConnection(storeId, provider, entry.kind);
@@ -408,7 +430,7 @@ export async function rejectForStore(
   actor: ActivationActor
 ): Promise<PublicActivationRequest> {
   requestableEntry(provider);
-  const updated = await runInTenantContext(storeId, async () => {
+  const updated = await withStore(storeId, async () => {
     const req = await openRequest(storeId, provider);
     if (req.status !== 'requested') {
       throw new AppError(409, 'ALREADY_DECIDED', 'This request is already activated');
@@ -442,12 +464,20 @@ async function notifyMerchant(
   actor: ActivationActor
 ): Promise<void> {
   try {
-    const store = await asPlatformOperator(actor.userId, () =>
-      prisma.store.findUnique({
+    if (await isDemoStore(storeId)) return; // a showroom has no merchant to tell
+    const store = await asOperator(actor.userId, async () => {
+      if (await platformHubOnD1()) {
+        // directory facts from D1, the owner's address from the identity service
+        const g = await gateRead(storeId, null);
+        if (!g) return null;
+        const [owner] = await getAccountsBrief([g.store.ownerId]);
+        return { name: g.store.name, owner: owner ? { email: owner.email } : null };
+      }
+      return prisma.store.findUnique({
         where: { id: storeId },
         select: { name: true, owner: { select: { email: true } } },
-      })
-    );
+      });
+    });
     const to = store?.owner?.email;
     if (!to) return;
     const label = getProviderEntry(provider)?.name;

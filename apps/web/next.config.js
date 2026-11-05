@@ -6,11 +6,15 @@ const { withSentryConfig } = require('@sentry/nextjs/config');
 // Cloudflare build; CF_PAGES is auto-set by Cloudflare Pages. Default (Vercel/
 // local) is false, so the Vercel deploy is unaffected by the dual-target tweaks
 // below.
+const IMAGE_VARIANTS = process.env.NEXT_PUBLIC_IMAGE_VARIANTS === '1';
 const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Dev only: hosts (comma separated) allowed to load /_next dev assets, e.g. when a demo store host is
+  // mapped to localhost for visual checks. Empty in every real build.
+  allowedDevOrigins: (process.env.DEV_ORIGINS || '').split(',').filter(Boolean),
   // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
   poweredByHeader: false,
 
@@ -35,7 +39,20 @@ const nextConfig = {
     // Workers-incompatible). Storefront images come from R2 already backend-
     // resized, so there's no quality loss. On Vercel this stays false → Vercel's
     // image optimization is unchanged (zero regression).
-    unoptimized: IS_CLOUDFLARE,
+    //
+    // PREMIUM-2 (audit 2026-11-03 #2): with NEXT_PUBLIC_IMAGE_VARIANTS=1 the Cloudflare build stays off
+    // sharp and picks among the WebP widths the API wrote at upload time (src/lib/image-loader.ts, no
+    // request-time transformation), and `next/image` emits a real srcset from each `sizes`. Off by default
+    // until the backfill has covered existing images.
+    unoptimized: IS_CLOUDFLARE && !IMAGE_VARIANTS,
+    ...(IS_CLOUDFLARE && IMAGE_VARIANTS
+      ? {
+          loader: 'custom',
+          loaderFile: './src/lib/image-loader.ts',
+          deviceSizes: [480, 960, 1600],
+          imageSizes: [160, 320],
+        }
+      : {}),
     remotePatterns: [
       // Only allow localhost image sources in non-production environments
       ...(process.env.NODE_ENV !== 'production'
@@ -54,6 +71,12 @@ const nextConfig = {
             },
           ]
         : []),
+      {
+        protocol: 'https',
+        hostname: 'media.ebda.app',
+        port: '',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'cdn.ebda.app',
@@ -88,20 +111,6 @@ const nextConfig = {
 
   // Security headers
   async headers() {
-    // The API origin the browser talks to. Production is api.ebda.app (already in
-    // the CSP below); a build with its own NEXT_PUBLIC_API_URL (local dev, an ad-hoc
-    // deploy) must be allowed too or every client-side fetch is refused by the CSP.
-    const EXTRA_API_ORIGINS = (() => {
-      try {
-        const u = new URL(process.env.NEXT_PUBLIC_API_URL || 'https://api.ebda.app');
-        if (u.origin === 'https://api.ebda.app') return '';
-        const ws = u.origin.replace(/^http/, 'ws');
-        return ` ${u.origin} ${ws}`;
-      } catch {
-        return '';
-      }
-    })();
-
     return [
       {
         source: '/:path*',
@@ -126,93 +135,8 @@ const nextConfig = {
             value: 'max-age=31536000; includeSubDomains; preload',
           },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              // ZAP 10055 (directives with no default-src fallback): base-uri,
-              // form-action and object-src must be explicit. Checkout reaches
-              // payment gateways via window.location redirects (never form
-              // POSTs), so form-action 'self' is safe.
-              "base-uri 'self'",
-              "object-src 'none'",
-              "form-action 'self'",
-              // OneSignal v16 SDK loads from cdn.onesignal.com and at runtime
-              // pulls additional scripts (jsonp sync) from api.onesignal.com.
-              // 'unsafe-eval' is required by the v16 page SDK's runtime
-              // (documented at https://documentation.onesignal.com/docs/web-push-csp).
-              // Google Ads (#1201): gtag.js with an AW- config loads its
-              // conversion runtime from www.googleadservices.com and
-              // googleads.g.doubleclick.net; without them the Ads tag loads
-              // and every conversion is silently CSP-blocked.
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://eu-assets.i.posthog.com https://eu.i.posthog.com https://static.cloudflareinsights.com",
-              // S10 (2026-10-14): inline event-handler ATTRIBUTES (onclick=, onerror=…)
-              // are never legitimate here — React attaches handlers in JS and no
-              // vendor snippet in MarketingPixels writes on* attributes. `script-src`
-              // keeps 'unsafe-inline' for Next's flight data (docs/architecture/
-              // storefront-csp.md), but this separate directive shuts the attribute
-              // half of that hole, so an injected `<img onerror=…>` no longer runs.
-              "script-src-attr 'none'",
-              // OneSignal v16 page SDK pulls a stylesheet from
-              // https://onesignal.com/sdks/... at runtime — that's the
-              // bare apex, not cdn., so include it explicitly.
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com",
-              "font-src 'self' https://fonts.gstatic.com data:",
-              "img-src 'self' data: https: blob:",
-              // Builder hero/section <video> (uploaded via POST /uploads/video into the
-              // R2 public bucket). Without this a <video> falls back to default-src
-              // 'self' and the R2 file is blocked. Same media hosts as connect-src.
-              "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
-              // media.ebda.app: the R2 public bucket's custom domain — the PDP 3D
-              // viewer fetch()es the product's .glb from it (an <img> needs no
-              // connect-src, a fetch does). docs/plans/2026-10-07-product-3d-viewer.md.
-              // OneSignal subscriptions + websocket telemetry: *.onesignal.com.
-              // ebda.app is the marketing-site origin: storefront's
-              // maintenance page + bare-root redirect can trigger a browser
-              // preconnect to it. googleadservices / googleads.g.doubleclick /
-              // www.google.com: Google Ads conversion beacons (fetch/sendBeacon
-              // transport), see script-src above.
-              "connect-src 'self' https://api.ebda.app https://*.r2.dev https://media.ebda.app https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com" +
-                EXTRA_API_ORIGINS,
-              // Required so /OneSignalSDKWorker.js can register as a service
-              // worker — Push API mandates same-origin worker scripts.
-              "worker-src 'self' blob:",
-              // Meta Pixel renders an invisible iframe to www.facebook.com
-              // for cross-domain attribution — without this directive Chrome
-              // blocks it and the pixel still fires the event API but loses
-              // the cookie-bridge piece.
-              // google.com + maps.google.com: the store Locations page embeds a
-              // key-free Google Maps preview per branch via an <iframe> (see
-              // mapsEmbedSrc()). Without these hosts Chrome blocks the frame
-              // with "This content is blocked. Contact the site owner to fix
-              // the issue." and the map renders as an empty/broken box.
-              'frame-src https://www.facebook.com https://td.doubleclick.net https://www.google.com https://maps.google.com https://google.com',
-              // Allow framing from admin origins for the page-builder live
-              // preview. Reads `STOREFRONT_FRAME_ANCESTORS` env var as a
-              // space-separated allowlist; falls back to: platform admin
-              // production domain + localhost dev. Storefront is otherwise
-              // non-frameable so clickjacking via other origins stays blocked.
-              `frame-ancestors 'self' ${
-                process.env.STOREFRONT_FRAME_ANCESTORS ??
-                // store.ebda.app is the Ebda Store merchant app — without it
-                // the page-builder live-preview iframe is CSP-blocked on CF
-                // (the storefront refuses to be framed). Kept alongside the
-                // (no legacy admin host in Ebda).
-                //
-                // S1-1 (2026-09-22 security audit): localhost:3000/3001 is
-                // dev-server scope and does not belong in a PRODUCTION
-                // header — STOREFRONT_FRAME_ANCESTORS is unset in every prod
-                // config (verified: no wrangler.toml/.env.production.example
-                // entry), so this fallback IS the live prod value. Only
-                // include the dev origins when NOT building for production;
-                // the prod value is unchanged otherwise (still 'self'
-                // https://store.ebda.app).
-                (process.env.NODE_ENV === 'production'
-                  ? 'https://store.ebda.app'
-                  : 'https://store.ebda.app http://localhost:3001 http://localhost:3000')
-              }`,
-            ].join('; '),
-          },
+          // Content-Security-Policy is NOT here: it carries a per-request nonce, so apps/web/middleware.ts
+          // builds it per request from src/lib/csp.ts (Ruling CSP-WEB-1). `headers()` is evaluated once at build time.
         ],
       },
     ];

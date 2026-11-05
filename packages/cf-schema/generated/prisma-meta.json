@@ -1240,12 +1240,38 @@
           "optional": false,
           "external": true
         },
+        "catalogImportJobs": {
+          "kind": "relation",
+          "type": "CatalogImportJob",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
+        "catalogImportFiles": {
+          "kind": "relation",
+          "type": "CatalogImportFile",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
+        "catalogImportItems": {
+          "kind": "relation",
+          "type": "CatalogImportItem",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
         "aiUsage": {
           "kind": "relation",
           "type": "AiUsage",
           "list": true,
           "optional": false,
-          "external": true
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["store_id"],
+          "toProps": ["storeId"]
         },
         "bulkAiJobs": {
           "kind": "relation",
@@ -1404,6 +1430,20 @@
         "qrScanDaily": {
           "kind": "relation",
           "type": "QrScanDaily",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
+        "ciStoreGates": {
+          "kind": "relation",
+          "type": "CiStoreGate",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
+        "ciHintLogs": {
+          "kind": "relation",
+          "type": "CiHintLog",
           "list": true,
           "optional": false,
           "external": true
@@ -3101,6 +3141,18 @@
           "list": false,
           "optional": true
         },
+        "catalogImportItems": {
+          "kind": "relation",
+          "type": "CatalogImportItem",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["category_id"],
+          "toProps": ["categoryId"]
+        },
         "createdAt": {
           "kind": "scalar",
           "type": "DateTime",
@@ -3972,7 +4024,12 @@
           "type": "ProductDailyView",
           "list": true,
           "optional": false,
-          "external": true
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["product_id"],
+          "toProps": ["productId"]
         },
         "bundleItems": {
           "kind": "relation",
@@ -4036,6 +4093,18 @@
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "SetNull"
+        },
+        "catalogImportItems": {
+          "kind": "relation",
+          "type": "CatalogImportItem",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["product_id"],
+          "toProps": ["productId"]
         }
       }
     },
@@ -5088,6 +5157,89 @@
           "fromProps": ["id"],
           "to": ["model_id"],
           "toProps": ["modelId"]
+        }
+      }
+    },
+    "SearchQueryDaily": {
+      "table": "search_query_daily",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "date", "term"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "date": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "date",
+          "list": false,
+          "optional": false
+        },
+        "term": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "term",
+          "list": false,
+          "optional": false
+        },
+        "searches": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "searches",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "zeroResults": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "zero_results",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "lastResultCount": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "last_result_count",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "default": "dbgenerated(\"CURRENT_DATE\")"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
         }
       }
     },
@@ -6850,6 +7002,18 @@
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "SetNull"
+        },
+        "ciHintLogs": {
+          "kind": "relation",
+          "type": "CiHintLog",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["order_id"],
+          "toProps": ["orderId"]
         }
       }
     },
@@ -8919,7 +9083,7 @@
     },
     "OneSignalSubscription": {
       "table": "onesignal_subscriptions",
-      "db": "store-do",
+      "db": "d1",
       "pk": ["id"],
       "uniques": [["userId", "playerId"]],
       "fields": {
@@ -8978,6 +9142,124 @@
           "owner": true,
           "from": ["user_id"],
           "fromProps": ["userId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "NotificationLog": {
+      "table": "notification_logs",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["idempotencyKey"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "channel": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "channel",
+          "list": false,
+          "optional": false
+        },
+        "event": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "event",
+          "list": false,
+          "optional": false
+        },
+        "recipientPhoneHash": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "recipient_phone_hash",
+          "list": false,
+          "optional": true
+        },
+        "recipientEmailHash": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "recipient_email_hash",
+          "list": false,
+          "optional": true
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"queued\""
+        },
+        "providerMessageId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "provider_message_id",
+          "list": false,
+          "optional": true
+        },
+        "idempotencyKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "idempotency_key",
+          "list": false,
+          "optional": true
+        },
+        "error": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "error",
+          "list": false,
+          "optional": true
+        },
+        "metadata": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "metadata",
+          "list": false,
+          "optional": false,
+          "default": "\"{}\""
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "Cascade"
@@ -13892,6 +14174,110 @@
         }
       }
     },
+    "AiUsage": {
+      "table": "ai_usage",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "feature": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "feature",
+          "list": false,
+          "optional": false
+        },
+        "inputTokens": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "input_tokens",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "outputTokens": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "output_tokens",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "cachedHit": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "cached_hit",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "model": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "model",
+          "list": false,
+          "optional": true
+        },
+        "costMicros": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "cost_micros",
+          "list": false,
+          "optional": true
+        },
+        "subjectType": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "subject_type",
+          "list": false,
+          "optional": true
+        },
+        "subjectId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "subject_id",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
     "StoreFaq": {
       "table": "store_faqs",
       "db": "store-do",
@@ -17196,6 +17582,545 @@
           "list": false,
           "optional": false,
           "external": false,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "ProductDailyView": {
+      "table": "product_daily_views",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "productId", "date"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "productId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "product_id",
+          "list": false,
+          "optional": false
+        },
+        "date": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "date",
+          "list": false,
+          "optional": false
+        },
+        "count": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "count",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "product": {
+          "kind": "relation",
+          "type": "Product",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["product_id"],
+          "fromProps": ["productId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "QrScanDaily": {
+      "table": "qr_scan_daily",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "date", "kind", "ref"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "date": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "date",
+          "list": false,
+          "optional": false
+        },
+        "kind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "kind",
+          "list": false,
+          "optional": false
+        },
+        "ref": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "ref",
+          "list": false,
+          "optional": false,
+          "default": "\"\""
+        },
+        "count": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "count",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "CiInsight": {
+      "table": "ci_insights",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [["dedupeKey"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "dedupeKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "dedupe_key",
+          "list": false,
+          "optional": false
+        },
+        "metric": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "metric",
+          "list": false,
+          "optional": false
+        },
+        "cohort": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "cohort",
+          "list": false,
+          "optional": false
+        },
+        "finding": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "finding",
+          "list": false,
+          "optional": false
+        },
+        "findingAr": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "finding_ar",
+          "list": false,
+          "optional": false
+        },
+        "evidence": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "evidence",
+          "list": false,
+          "optional": false
+        },
+        "model": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "model",
+          "list": false,
+          "optional": false,
+          "default": "\"rules-v1\""
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"new\""
+        },
+        "asOf": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "as_of",
+          "list": false,
+          "optional": false
+        },
+        "decidedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "decided_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
+    "CiHintLog": {
+      "table": "ci_hint_logs",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["orderId", "feature"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "orderId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "order_id",
+          "list": false,
+          "optional": false
+        },
+        "feature": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "feature",
+          "list": false,
+          "optional": false
+        },
+        "band": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "band",
+          "list": false,
+          "optional": false
+        },
+        "source": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source",
+          "list": false,
+          "optional": false
+        },
+        "n": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "n",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "predictedRate": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "predicted_rate",
+          "list": false,
+          "optional": true
+        },
+        "outcome": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "outcome",
+          "list": false,
+          "optional": true
+        },
+        "outcomeAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "outcome_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "order": {
+          "kind": "relation",
+          "type": "Order",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["order_id"],
+          "fromProps": ["orderId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "CiStoreGate": {
+      "table": "ci_store_gates",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "feature"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "feature": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "feature",
+          "list": false,
+          "optional": false
+        },
+        "band": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "band",
+          "list": false,
+          "optional": false
+        },
+        "predictedRate": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "predicted_rate",
+          "list": false,
+          "optional": false
+        },
+        "actualRate": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "actual_rate",
+          "list": false,
+          "optional": false
+        },
+        "resolved": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "resolved",
+          "list": false,
+          "optional": false
+        },
+        "closedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "closed_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "GscDailyMetric": {
+      "table": "gsc_daily_metrics",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "date"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "date": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "date",
+          "list": false,
+          "optional": false
+        },
+        "impressions": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "impressions",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "clicks": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "clicks",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "ctr": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "ctr",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "position": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "avg_position",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "topQueries": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "top_queries",
+          "list": false,
+          "optional": false,
+          "default": "\"[]\""
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
           "owner": true,
           "from": ["store_id"],
           "fromProps": ["storeId"],
@@ -21368,6 +22293,630 @@
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "Cascade"
+        }
+      }
+    },
+    "CatalogImportJob": {
+      "table": "catalog_import_jobs",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "createdBy": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "created_by",
+          "list": false,
+          "optional": true
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"queued\""
+        },
+        "errorCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "error_code",
+          "list": false,
+          "optional": true
+        },
+        "filesTotal": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "files_total",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "filesDone": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "files_done",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "filesFailed": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "files_failed",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "pagesTotal": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "pages_total",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "itemsTotal": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "items_total",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "draftsCreated": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "drafts_created",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "startedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "started_at",
+          "list": false,
+          "optional": true
+        },
+        "completedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "completed_at",
+          "list": false,
+          "optional": true
+        },
+        "expiresAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "expires_at",
+          "list": false,
+          "optional": false
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "files": {
+          "kind": "relation",
+          "type": "CatalogImportFile",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["job_id"],
+          "toProps": ["jobId"]
+        },
+        "items": {
+          "kind": "relation",
+          "type": "CatalogImportItem",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["job_id"],
+          "toProps": ["jobId"]
+        }
+      }
+    },
+    "CatalogImportFile": {
+      "table": "catalog_import_files",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "jobId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "job_id",
+          "list": false,
+          "optional": false
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "storageKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "storage_key",
+          "list": false,
+          "optional": false
+        },
+        "mime": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "mime",
+          "list": false,
+          "optional": false
+        },
+        "sizeBytes": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "size_bytes",
+          "list": false,
+          "optional": false
+        },
+        "sha256": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "sha256",
+          "list": false,
+          "optional": false
+        },
+        "originalName": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "original_name",
+          "list": false,
+          "optional": false
+        },
+        "pageCount": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "page_count",
+          "list": false,
+          "optional": false,
+          "default": "1"
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"stored\""
+        },
+        "attempts": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "attempts",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "errorCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "error_code",
+          "list": false,
+          "optional": true
+        },
+        "chargedPages": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "charged_pages",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "itemsFound": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "items_found",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "inputTokens": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "input_tokens",
+          "list": false,
+          "optional": true
+        },
+        "outputTokens": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "output_tokens",
+          "list": false,
+          "optional": true
+        },
+        "model": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "model",
+          "list": false,
+          "optional": true
+        },
+        "startedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "started_at",
+          "list": false,
+          "optional": true
+        },
+        "finishedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "finished_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "job": {
+          "kind": "relation",
+          "type": "CatalogImportJob",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["job_id"],
+          "fromProps": ["jobId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "items": {
+          "kind": "relation",
+          "type": "CatalogImportItem",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["file_id"],
+          "toProps": ["fileId"]
+        }
+      }
+    },
+    "CatalogImportItem": {
+      "table": "catalog_import_items",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "jobId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "job_id",
+          "list": false,
+          "optional": false
+        },
+        "fileId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "file_id",
+          "list": false,
+          "optional": false
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"pending\""
+        },
+        "name": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "name",
+          "list": false,
+          "optional": true
+        },
+        "nameAr": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "name_ar",
+          "list": false,
+          "optional": true
+        },
+        "description": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "description",
+          "list": false,
+          "optional": true
+        },
+        "descriptionAr": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "description_ar",
+          "list": false,
+          "optional": true
+        },
+        "priceMinor": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "price_minor",
+          "list": false,
+          "optional": true
+        },
+        "compareAtMinor": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "compare_at_minor",
+          "list": false,
+          "optional": true
+        },
+        "priceRaw": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "price_raw",
+          "list": false,
+          "optional": true
+        },
+        "sku": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "sku",
+          "list": false,
+          "optional": true
+        },
+        "categoryName": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "category_name",
+          "list": false,
+          "optional": true
+        },
+        "categoryId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "category_id",
+          "list": false,
+          "optional": true
+        },
+        "tags": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "tags",
+          "list": true,
+          "optional": false
+        },
+        "variants": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "variants",
+          "list": false,
+          "optional": false,
+          "default": "\"[]\""
+        },
+        "confidence": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "confidence",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "flags": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "flags",
+          "list": true,
+          "optional": false
+        },
+        "acknowledged": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "acknowledged",
+          "list": true,
+          "optional": false
+        },
+        "sourceText": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source_text",
+          "list": false,
+          "optional": true
+        },
+        "editedFields": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "edited_fields",
+          "list": true,
+          "optional": false
+        },
+        "productId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "product_id",
+          "list": false,
+          "optional": true
+        },
+        "createErrorCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "create_error_code",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "job": {
+          "kind": "relation",
+          "type": "CatalogImportJob",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["job_id"],
+          "fromProps": ["jobId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "file": {
+          "kind": "relation",
+          "type": "CatalogImportFile",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["file_id"],
+          "fromProps": ["fileId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "category": {
+          "kind": "relation",
+          "type": "Category",
+          "list": false,
+          "optional": true,
+          "external": false,
+          "owner": true,
+          "from": ["category_id"],
+          "fromProps": ["categoryId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "SetNull"
+        },
+        "product": {
+          "kind": "relation",
+          "type": "Product",
+          "list": false,
+          "optional": true,
+          "external": false,
+          "owner": true,
+          "from": ["product_id"],
+          "fromProps": ["productId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "SetNull"
         }
       }
     }

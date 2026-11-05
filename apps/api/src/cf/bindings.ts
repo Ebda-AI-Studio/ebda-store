@@ -74,7 +74,16 @@ export interface AccountsRpc {
     status: 'active' | 'inactive' | 'suspended',
     reason: string
   ): Promise<void>;
+  /** Edit name / phone of a non-customer account (apps/accounts `updateProfile`); never the e-mail, and a super_admin target only by that user. */
+  updateProfile?(
+    userId: string,
+    input: { firstName?: string; lastName?: string; phone?: string | null },
+    reason?: string,
+    actorId?: string
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'FORBIDDEN_TARGET' }>;
   getAccountState?(userId: string): Promise<AccountState | null>;
+  /** Display facts for up to 100 accounts in one call (apps/accounts `getAccountsBrief`). */
+  getAccountsBrief?(userIds: string[]): Promise<AccountBrief[]>;
   resendVerification?(email: string): Promise<void>;
   /** Store deletion: remove the store's integrator clients, secrets and trail (idempotent). */
   deleteStoreClients?(storeId: string): Promise<{ clients: number }>;
@@ -110,6 +119,17 @@ export interface AccountsRpc {
   }): Promise<{ id: string } | null>;
 }
 
+export interface AccountBrief {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: 'active' | 'inactive' | 'suspended';
+  role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
 export interface AccountState {
   id: string;
   email: string;
@@ -142,7 +162,6 @@ export interface AnalyticsEngineLike {
 }
 
 export interface CfBindings {
-  HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
   KV_CACHE?: KVNamespaceLike;
   /** Strong-consistency state: token denylist, tv, lockout / MFA counters, auth limits. */
@@ -151,9 +170,17 @@ export interface CfBindings {
   STORE_REALTIME?: DurableObjectNamespaceLike;
   /** One SQLite Durable Object per store (Phase 0 spike, flag-gated: lib/store-backend.ts). */
   STORE_DO?: DurableObjectNamespaceLike;
+  /**
+   * Vectorize index of the product vectors of stores on their Durable Object (1024 dims, cosine, namespace = store id), bound as
+   * `PRODUCT_VECTORS` in wrangler.jsonc (Ruling CF-VEC-1). Optional in the type so a missing binding fails soft: the DO product indexer
+   * skips loudly and the storefront search falls back to the keyword leg.
+   */
+  PRODUCT_VECTORS?: import('@ebda-src/repo').VectorizeLike;
+  /** D1 `ebda-platform` (task 2.4): `stores.storage_backend`, the per-store backend switch (lib/store-backend.ts). */
+  PLATFORM_DB?: import('../lib/store-backend').PlatformD1Like;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
-  /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */
+  /** Store -> Ebda Chat events (contract 2026-10-24): lib/wa/events.ts. */
   WA_EVENTS_QUEUE?: QueueProducerLike;
   /** Cloudflare Email Service `send_email` binding (G6): every outbound email (services/mail-transport.ts). */
   EMAIL?: EmailBindingLike;

@@ -227,7 +227,7 @@ export default function StockDashboardPage() {
                 className={[
                   'text-2xl font-semibold font-mono',
                   kpi.highlight ? 'text-primary' : '',
-                  kpi.warn ? 'text-amber-600' : '',
+                  kpi.warn ? 'text-warning-ink' : '',
                   kpi.errMsg ? 'text-muted-foreground' : '',
                 ]
                   .filter(Boolean)

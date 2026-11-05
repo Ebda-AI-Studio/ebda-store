@@ -1,14 +1,15 @@
-import { prisma, runInTenantContext } from '@ebda/database';
+import { readStoreDb, runInStoreCtx } from '../jobs/store-db';
+import { storeWriter } from '../repo-factory';
 import { getAutomationFlags } from '../../services/plan-entitlements';
 
 /**
- * Is Ebda WhatsApp linked AND entitled for this store? Both must hold; anything unknown fails closed.
+ * Is Ebda Chat linked AND entitled for this store? Both must hold; anything unknown fails closed.
  *
  *  - Link state: the server-only `store_whatsapp_links` row, written ONLY by `WhatsAppLinkService`
  *    (the connect / disconnect route). It is NOT a flag in `stores.settings`, which the store owner
  *    writes through the update routes (reserved key, see SERVER_OWNED_SETTINGS_KEYS).
- *  - Entitlement (contract + Ebda WhatsApp session, 2026-10-25): the store's EFFECTIVE plan includes
- *    the package (`whatsappAutomation`) OR Ebda WhatsApp reported an active entitlement
+ *  - Entitlement (contract + Ebda Chat session, 2026-10-25): the store's EFFECTIVE plan includes
+ *    the package (`whatsappAutomation`) OR Ebda Chat reported an active entitlement
  *    (`whatsapp.entitlement_changed`: automation on, status trialing|active, validUntil in the
  *    future), stored on the same server-only row. A downgrade, a lapsed subscription or an expired
  *    package stops all events at once, with no event needed.
@@ -46,8 +47,8 @@ async function entitled(
 }
 
 export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
-  const link = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
+  const link = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
   );
   if (link?.linked !== true) return false;
   // The package entitlement alone is enough: do not even read the plan in that case.
@@ -55,10 +56,10 @@ export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
   return (await entitled(storeId, link)).plan;
 }
 
-/** Does Ebda WhatsApp know this store (a link row exists: linked now, unlinked, or entitlement only)? */
+/** Does Ebda Chat know this store (a link row exists: linked now, unlinked, or entitlement only)? */
 export async function hasWhatsAppLinkRow(storeId: string): Promise<boolean> {
-  const row = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
+  const row = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
   );
   return row !== null;
 }
@@ -67,8 +68,8 @@ export async function hasWhatsAppLinkRow(storeId: string): Promise<boolean> {
 export async function whatsAppLinkState(
   storeId: string
 ): Promise<{ linked: boolean; entitled: boolean; active: boolean }> {
-  const link = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
+  const link = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
   );
   const linked = link?.linked === true;
   const e = await entitled(
@@ -84,8 +85,8 @@ export async function whatsAppLinkState(
  * WhatsApp reported an active package for it. Fail closed.
  */
 export async function canLinkWhatsApp(storeId: string): Promise<boolean> {
-  const link = await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
+  const link = await readStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({ where: { storeId }, select: linkSelect })
   );
   const e = await entitled(
     storeId,
@@ -101,8 +102,8 @@ export async function canLinkWhatsApp(storeId: string): Promise<boolean> {
  */
 export const WhatsAppLinkService = {
   async setLinked(storeId: string, linked: boolean, ownerUserId?: string): Promise<void> {
-    await runInTenantContext(storeId, () =>
-      prisma.storeWhatsAppLink.upsert({
+    await runInStoreCtx(storeId, async () =>
+      (await storeWriter(storeId)).storeWhatsAppLink.upsert({
         where: { storeId },
         create: {
           storeId,
@@ -134,7 +135,8 @@ export const WhatsAppLinkService = {
       version: number;
     }
   ): Promise<boolean> {
-    return runInTenantContext(storeId, async () => {
+    return runInStoreCtx(storeId, async () => {
+      const w = await storeWriter(storeId);
       const data = {
         entitlementVersion: e.version,
         entitlementPackageId: e.packageId,
@@ -142,18 +144,18 @@ export const WhatsAppLinkService = {
         entitlementStatus: e.status,
         entitlementValidUntil: e.validUntil,
       };
-      const updated = await prisma.storeWhatsAppLink.updateMany({
+      const updated = await w.storeWhatsAppLink.updateMany({
         where: { storeId, entitlementVersion: { lt: e.version } },
         data,
       });
       if (updated.count > 0) return true;
-      const existing = await prisma.storeWhatsAppLink.findUnique({
+      const existing = await w.storeWhatsAppLink.findUnique({
         where: { storeId },
         select: { entitlementVersion: true },
       });
       if (existing) return false; // a newer or equal version is already stored
       // No row yet (the entitlement arrives before the merchant links): create it unlinked.
-      await prisma.storeWhatsAppLink.create({ data: { storeId, linked: false, ...data } });
+      await w.storeWhatsAppLink.create({ data: { storeId, linked: false, ...data } });
       return true;
     });
   },

@@ -1,4 +1,6 @@
-import { prisma } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
+import { customersById } from '../lib/jobs/store-db';
 import {
   groupOrderLinesForDisplay,
   intlLocale,
@@ -176,26 +178,31 @@ function orderBarcodeBlock(orderNumber: string, rawShape: unknown): string {
   }
 }
 
-function loadInvoiceOrder(storeId: string, orderId: string) {
-  return prisma.order.findFirst({
+const INVOICE_STORE_SELECT = {
+  name: true,
+  email: true,
+  phone: true,
+  address: true,
+  logo: true,
+  theme: true,
+  look: true,
+  template: true,
+  currency: true,
+  timezone: true,
+  settings: true,
+} as const;
+
+/**
+ * The order an invoice prints, read through the store's backend (Ruling CF-JOBS-4). `Store` and the buyer (`User`) are platform
+ * rows a Durable Object cannot join, so they are attached after the order read, with the select and the visibility the
+ * Postgres joins had.
+ */
+async function loadInvoiceOrder(storeId: string, orderId: string) {
+  const order = await (
+    await storeDb(storeId)
+  ).order.findFirst({
     where: { id: orderId, storeId },
     include: {
-      store: {
-        select: {
-          name: true,
-          email: true,
-          phone: true,
-          address: true,
-          logo: true,
-          theme: true,
-          look: true,
-          template: true,
-          currency: true,
-          timezone: true,
-          settings: true,
-        },
-      },
-      customer: { select: { email: true, firstName: true, lastName: true } },
       items: {
         include: {
           product: {
@@ -213,6 +220,22 @@ function loadInvoiceOrder(storeId: string, orderId: string) {
       appliedPromotion: { select: { name: true, nameAr: true } },
     },
   });
+  if (!order) return null;
+  const [store, customers] = await Promise.all([
+    storeDb(storeId).then(d =>
+      d.store.findUnique({ where: { id: storeId }, select: INVOICE_STORE_SELECT })
+    ),
+    customersById(storeId, [order.customerId]),
+  ]);
+  if (!store) return null;
+  const c = customers.get(order.customerId ?? '');
+  return {
+    ...order,
+    store,
+    customer: c
+      ? { email: c.email ?? '', firstName: c.firstName ?? '', lastName: c.lastName ?? '' }
+      : null,
+  };
 }
 
 export type InvoiceOrder = NonNullable<Awaited<ReturnType<typeof loadInvoiceOrder>>>;
@@ -236,7 +259,9 @@ export interface InvoiceDocs {
 }
 
 async function loadInvoiceDocs(storeId: string, orderId: string): Promise<InvoiceDocs> {
-  const docs = await prisma.fiscalDocument.findMany({
+  const docs = await (
+    await storeDb(storeId)
+  ).fiscalDocument.findMany({
     where: { storeId, orderId },
     orderBy: [{ issuedAt: 'asc' }, { serial: 'asc' }],
     select: {

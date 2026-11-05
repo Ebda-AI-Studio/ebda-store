@@ -252,7 +252,7 @@ export function NotificationBell() {
 
             {/* Footer — only after the 3s grace window (see showReconnecting) */}
             {!isConnected && showReconnecting && (
-              <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
+              <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30">
                 <p className="text-xs text-warning-ink dark:text-warning-ink flex items-center gap-1">
                   <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />
                   {t('reconnecting')}

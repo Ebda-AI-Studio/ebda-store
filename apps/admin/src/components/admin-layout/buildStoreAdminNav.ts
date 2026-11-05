@@ -31,6 +31,8 @@ export type NavLabels = {
   // Hub names (sidebar — 9 items)
   dashboard: string;
   catalog: string;
+  /** The visual storefront editor (its own entry since T9). */
+  editor: string;
   sales: string;
   stock: string;
   finance: string;
@@ -55,6 +57,7 @@ export type NavLabels = {
   platformTaxArchive: string;
   /** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
   platformPolicyUpdates: string;
+  platformCiInsights: string;
   /** Platform-wide settings, e.g. Ebda's own VAT (super_admin only) */
   platformSettings: string;
   // Super-admin store-scoped item
@@ -121,7 +124,7 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       icon: 'M13 10V3L4 14h7v7l9-11h-7z',
     },
     {
-      // Archive-box icon — fiscal documents kept six years, deleted stores included.
+      // Archive-box icon — fiscal documents kept seven years, deleted stores included.
       name: labels.platformTaxArchive,
       href: '/tax-archive',
       icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5 M10 11.25h4 M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
@@ -131,6 +134,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformPolicyUpdates,
       href: '/policy-updates',
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+    {
+      // Light-bulb icon — Customer Intelligence findings to accept or dismiss.
+      name: labels.platformCiInsights,
+      href: '/ci-insights',
+      icon: 'M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0012 3z M10 21h4',
     },
     {
       // Cog icon — platform-wide settings (Ebda's own VAT).
@@ -150,6 +159,8 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
  * moved — all existing URLs continue to work.
  */
 export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[] {
+  // No store id yet (first render): a link built now would be `/stores//...`, which the router prefetches as a 404.
+  if (!storeId) return [];
   return [
     {
       name: labels.dashboard,
@@ -164,6 +175,13 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       hubKey: 'catalog',
       // Package / layers icon
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+    },
+    {
+      name: labels.editor,
+      href: `/stores/${storeId}/builder`,
+      hubKey: 'editor',
+      // Pencil-square icon (Heroicons v2 `pencil-square`): edit the storefront.
+      icon: 'M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10',
     },
     {
       name: labels.sales,
@@ -203,7 +221,8 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
     },
     {
       name: labels.marketing,
-      href: `/stores/${storeId}/ai-tools`,
+      // Lands on the offers overview (coupons), a page every plan can open (audit M-1, UX:N-4).
+      href: `/stores/${storeId}/coupons`,
       hubKey: 'marketing',
       // Sparkle icon
       icon: 'M5 3v4 M3 5h4 M6 17v4 M4 19h4 M13 3l3.5 7L24 13.5 16.5 17 13 24l-3.5-7L2 13.5 9.5 10z',

@@ -43,6 +43,7 @@ import { apiGet } from '../../../../../lib/api';
 import { ChromeContentPanel } from './ChromeContentPanel';
 import { DividersField } from './DividersField';
 import { SectionTypographyField } from './SectionTypographyField';
+import { SectionSpacingField } from './SectionSpacingField';
 import { MediaPicker } from './MediaPicker';
 import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
@@ -58,6 +59,8 @@ interface Props {
   doc: PageDefinition;
   selection: Selection | null;
   viewport: Viewport;
+  /** Spacing's device tabs switch the editor's device (the canvas resizes with it). */
+  onViewportChange?: (v: Viewport) => void;
   theme: StoreTheme | undefined;
   /** The store's resolved template and look: a control no renderer of it reads is not offered (EP-1). */
   template?: string | null;
@@ -81,6 +84,7 @@ export function SettingsPanel({
   doc,
   selection,
   viewport,
+  onViewportChange,
   theme,
   template,
   look,
@@ -125,6 +129,19 @@ export function SettingsPanel({
   const defs = (blockDef ? blockDef.settings : d.settings).filter(
     s => (mode === 'design' || s.group === 'content') && isShown(s, shownCtx)
   );
+  // Top / Bottom spacing is one grouped control at the top of Design (SectionSpacingField), not two
+  // loose selects; typography and dividers sit behind "Advanced" (E-3).
+  const hasSpacing = !block && d.settings.some(x => x.id === 'paddingTop' && isShown(x, shownCtx));
+  const SPACING_IDS = ['paddingTop', 'paddingBottom'];
+  const ADVANCED_TYPES = ['typography', 'dividers'];
+  const plainDefs =
+    hasSpacing && mode === 'design' ? defs.filter(x => !SPACING_IDS.includes(x.id)) : defs;
+  const mainDefs =
+    mode === 'design' && !block
+      ? plainDefs.filter(x => !ADVANCED_TYPES.includes(x.type))
+      : plainDefs;
+  const advancedDefs =
+    mode === 'design' && !block ? plainDefs.filter(x => ADVANCED_TYPES.includes(x.type)) : [];
   const values = block ? block.settings : node.settings;
   const vpOverrides =
     !block && viewport !== 'desktop' ? node.responsive?.[viewport]?.settings : undefined;
@@ -155,6 +172,31 @@ export function SettingsPanel({
     vpOverrides && s.responsive?.includes(viewport) && key in vpOverrides
       ? vpOverrides[key]
       : values[key];
+
+  const renderDef = (s: SettingDefinition) => (
+    <div key={s.id} data-field-id={s.id}>
+      <Field
+        def={s}
+        storeId={storeId}
+        theme={theme}
+        locale={locale}
+        valueOf={key => valueOf(s, key)}
+        overridden={!!(vpOverrides && s.responsive?.includes(viewport) && s.id in vpOverrides)}
+        viewport={viewport}
+        onChange={(key, v) => set(s, key, v)}
+        onReset={() =>
+          dispatch({
+            type: 'setViewportSetting',
+            id: node.id,
+            viewport,
+            key: s.id,
+            value: undefined,
+          })
+        }
+        sectionType={node.type}
+      />
+    </div>
+  );
 
   return (
     <div className="flex h-full flex-col" data-testid="settings-panel">
@@ -198,6 +240,14 @@ export function SettingsPanel({
               <li key={e.path}>{locale === 'ar' ? e.messageAr : e.messageEn}</li>
             ))}
           </ul>
+        )}
+        {hasSpacing && mode === 'design' && (
+          <SectionSpacingField
+            node={node}
+            viewport={viewport}
+            onViewportChange={onViewportChange}
+            dispatch={dispatch}
+          />
         )}
         {!block && mode === 'design' && (
           <fieldset className="space-y-2">
@@ -254,32 +304,19 @@ export function SettingsPanel({
             {t('aiFill')}
           </button>
         )}
-        {defs.map(s => (
-          <div key={s.id} data-field-id={s.id}>
-            <Field
-              def={s}
-              storeId={storeId}
-              theme={theme}
-              locale={locale}
-              valueOf={key => valueOf(s, key)}
-              overridden={
-                !!(vpOverrides && s.responsive?.includes(viewport) && s.id in vpOverrides)
-              }
-              viewport={viewport}
-              onChange={(key, v) => set(s, key, v)}
-              onReset={() =>
-                dispatch({
-                  type: 'setViewportSetting',
-                  id: node.id,
-                  viewport,
-                  key: s.id,
-                  value: undefined,
-                })
-              }
-              sectionType={node.type}
-            />
-          </div>
-        ))}
+        {mainDefs.map(renderDef)}
+        {advancedDefs.length > 0 && (
+          <details
+            data-testid="advanced-design"
+            open={advancedDefs.some(x => x.id === (focusField ? fieldDefId(focusField) : ''))}
+            className="rounded-lg border border-border p-2"
+          >
+            <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
+              {t('advanced')}
+            </summary>
+            <div className="mt-3 space-y-4">{advancedDefs.map(renderDef)}</div>
+          </details>
+        )}
       </div>
     </div>
   );

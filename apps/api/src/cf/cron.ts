@@ -10,16 +10,24 @@
  * nothing), the CSRF / view-debounce sweeps (the state is shared and TTL'd), and the
  * email/SMS queue loops (Cloudflare Queues consumers, cf/queues.ts).
  */
+import { withReachLabel } from '@ebda/database';
+import { alertIfStoreCreateMisconfigured } from '../lib/store-create-config';
 import { abandonedCartService } from '../services/abandoned-cart.service';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { loyaltyAutomationService } from '../services/loyalty-automation.service';
 import { AuthService } from '../services/auth.service';
+import { processDeferredBillingWebhooks } from '../services/billing/subscription-billing.service';
+import { reconcilePayments } from '../services/billing/payments-reconcile.service';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
-import { runBackupSweep, flaggedStoreIds, type SweepEnv } from './ops/backup-sweep';
+import { doStoreIdList } from '../lib/store-backend';
+import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
+import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
+import type { LegacyCronMessage } from '../lib/jobs/start';
 
 const isJobCron = (cron: string): boolean => allJobCronStrings().includes(cron);
 
@@ -30,9 +38,24 @@ export interface CronJob {
 
 export const CRON_SCHEDULE: Record<string, CronJob[]> = {
   // Per-store job alarms (cf/store-schedule.ts): arm every live store's schedule, hourly.
-  '0 * * * *': [{ name: 'store-schedule-sync', run: () => syncStoreSchedules() }],
+  '0 * * * *': [
+    { name: 'store-schedule-sync', run: () => syncStoreSchedules() },
+    // Hotfix N-22: repair any Postgres -> D1 store-directory drift, fail-closed (lib/store-directory-reconcile.ts).
+    { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
+  ],
   // Abandoned-cart reminder emails (was every 15 min).
-  '*/15 * * * *': [{ name: 'abandoned-cart', run: () => abandonedCartService.process() }],
+  '*/15 * * * *': [
+    { name: 'abandoned-cart', run: () => abandonedCartService.process() },
+    // Billing webhooks stored during a cutover freeze (NEON-ZERO N-10): apply them once the freeze is lifted.
+    { name: 'billing-deferred-webhooks', run: () => processDeferredBillingWebhooks() },
+    // InstaPay receipts / manual-payment claims left half-done by a dead Worker (N-10d): complete or roll back, P1 if undecidable.
+    { name: 'payments-reconcile', run: () => reconcilePayments() },
+    // NZ-PG-9: all markers set + no Hyperdrive + STORE_CREATE_ON_DO unset = every store creation fails: P1.
+    {
+      name: 'store-create-config',
+      run: async () => void (await alertIfStoreCreateMisconfigured()),
+    },
+  ],
   // Carrier tracking poll (was every 30 min).
   '*/30 * * * *': [
     { name: 'shipping-tracking', run: () => shippingCarrierService.runTrackingCron() },
@@ -50,7 +73,7 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
       run: async () => {
         const env = (cfBindings() ?? {}) as unknown as SweepEnv;
         const report = await runBackupSweep(env, {
-          listStoreIds: () => flaggedStoreIds(process.env.STORE_DO_ENABLED_IDS),
+          listStoreIds: () => doStoreIdList(),
           alert: (title, body) => sendAlert({ level: 'p1', source: 'backup-sweep', title, body }),
         });
         if (!report.ok) throw new Error('backup sweep reported failures (alert sent)');
@@ -77,10 +100,12 @@ export async function runScheduled(
     }
     return startedResults;
   }
+  const frozen = writesFrozen();
   const legacy = await Promise.all(
     jobs.map(async job => {
+      if (frozen) return deferLegacyJob(cron, job.name, scheduledTime);
       try {
-        await job.run();
+        await withReachLabel(job.name, () => job.run());
         logger.info({ cron, job: job.name }, '[cron] job done');
         return { name: job.name, ok: true };
       } catch (err) {
@@ -90,4 +115,31 @@ export async function runScheduled(
     })
   );
   return [...legacy, ...startedResults];
+}
+
+/**
+ * Write freeze (Ruling CF-JOBS-2) for a legacy cron job. A sweep (fires again within 6 h) is skipped: the next tick after the
+ * window does the work. A rarer one (loyalty-daily, backup-sweep) is PARKED on the jobs queue as a `legacy-cron` message, which
+ * the consumer runs once the freeze is off. Never dropped: a failed park is reported as a failed job.
+ */
+async function deferLegacyJob(
+  cron: string,
+  name: string,
+  scheduledTime: number
+): Promise<{ name: string; ok: boolean }> {
+  if (isSweepCron(cron, scheduledTime)) {
+    logger.warn({ cron, job: name }, '[cron] write freeze: sweep tick skipped');
+    return { name, ok: true };
+  }
+  try {
+    const q = cfBindings()?.JOBS_QUEUE;
+    if (!q) throw new Error('JOBS_QUEUE binding missing');
+    const msg: LegacyCronMessage = { kind: 'legacy-cron', name, cron };
+    await q.send(msg, { contentType: 'json', delaySeconds: 300 });
+    logger.warn({ cron, job: name }, '[cron] write freeze: job parked on the jobs queue');
+    return { name, ok: true };
+  } catch (err) {
+    logger.error({ err, cron, job: name }, '[cron] write freeze: could not park job');
+    return { name, ok: false };
+  }
 }

@@ -119,4 +119,20 @@ describe('InvoicesPage', () => {
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.queryByText('emptyTitle')).toBeNull();
   });
+
+  it('searches by document number: one debounced request with q, the type filter kept', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<InvoicesPage />);
+      await screen.findAllByText('INV-000001');
+      api.apiGet.mockClear();
+      const box = screen.getByLabelText('searchPlaceholder');
+      for (const v of ['I', 'IN', 'inv-0000']) fireEvent.change(box, { target: { value: v } });
+      await vi.advanceTimersByTimeAsync(400);
+      await waitFor(() => expect(api.apiGet).toHaveBeenCalledTimes(1));
+      expect(String(api.apiGet.mock.calls[0][0])).toContain('q=inv-0000');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

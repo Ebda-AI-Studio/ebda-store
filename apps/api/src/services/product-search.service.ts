@@ -13,6 +13,8 @@ import { hybridOrder } from '../lib/search/rrf';
 import { queryBudgetSpent, takeQueryEmbed } from '../lib/search/embed-budget';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
+import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
+import { cfBindings } from '../cf/bindings';
 
 /** Most ids a lexical search binds into the follow-up Prisma query (list, typeahead, admin). */
 export const PRODUCT_SEARCH_ID_CAP = 1000;
@@ -112,6 +114,11 @@ export async function searchProductIdSet(
   raw: string,
   opts: ProductSearchOpts
 ): Promise<ProductSearchIdSet> {
+  // A store on its Durable Object answers from the DO's own product index (Ruling CF-R6A-1): same words-AND meaning, the
+  // Arabic fold is the one shared TS function. The Postgres statement below is untouched.
+  if (searchTokens(raw).length === 0) return { ids: [], truncated: false };
+  const money = await storeMoney(storeId);
+  if (money) return money.searchProducts({ raw, opts });
   const sql = productSearchSql(storeId, raw, opts);
   if (!sql) return { ids: [], truncated: false };
   const limit = clampLimit(opts.limit);
@@ -179,6 +186,26 @@ export async function searchNameIds(
     tokens
   );
   const take = clampLimit(limit);
+  // A store on its Durable Object has no Postgres `ebda_ar_norm`: the same words-AND match runs over the store's (small) rows
+  // with the shared TS fold. The Postgres statements below are untouched.
+  if ((await storeRepo(storeId)).backend === 'do') {
+    const db = await storeDb(storeId);
+    const sel = { id: true, name: true, nameAr: true } as const;
+    const found: Array<{ id: string; name: string | null; nameAr: string | null }> =
+      table === 'bundles'
+        ? await db.bundle.findMany({ where: { storeId }, select: sel })
+        : table === 'promotions'
+          ? await db.promotion.findMany({ where: { storeId }, select: sel })
+          : await db.category.findMany({ where: { storeId, deletedAt: null }, select: sel });
+    return found
+      .filter(r => {
+        const hay = normalizeArabicSearch(`${r.name ?? ''} ${r.nameAr ?? ''}`);
+        return tokens.every(t => hay.includes(t));
+      })
+      .map(r => r.id)
+      .sort()
+      .slice(0, take);
+  }
   let rows: Array<{ id: string }>;
   if (table === 'bundles') {
     rows = await prisma.$queryRaw`
@@ -364,6 +391,52 @@ export async function semanticProductIds(
   return (await vectorLeg(storeId, raw, opts)).ids;
 }
 
+/** Vectorize returns at most this many matches for a query that asks for metadata-less ids. */
+const VECTORIZE_TOPK = 100;
+
+/**
+ * The vector leg of a DO store: Vectorize nearest vectors (cosine distance = 1 - score) within SEARCH_VECTOR_MAX_DISTANCE, a
+ * product keeping its nearer vector (doc or words), then the DO decides which of them the storefront may show (active, not
+ * deleted, public, vectored by this model). FAIL-SOFT: no binding or any Vectorize / DO error returns no ids and `degraded`, so
+ * the caller serves the keyword order and does not cache the list as the full answer.
+ */
+async function vectorLegDo(
+  storeId: string,
+  v: number[],
+  limit: number,
+  money: NonNullable<Awaited<ReturnType<typeof storeMoney>>>
+): Promise<{ ids: string[]; degraded: boolean }> {
+  const index = cfBindings()?.PRODUCT_VECTORS ?? null; // the same binding the DO indexer uses (lib/search/do-index.ts)
+  if (!index) {
+    logger.warn(
+      { storeId },
+      '[search] no Vectorize binding (PRODUCT_VECTORS); keyword results only'
+    );
+    return { ids: [], degraded: true };
+  }
+  const res = await index.query(v, {
+    topK: VECTORIZE_TOPK,
+    namespace: storeId,
+    filter: { storeId },
+    returnMetadata: 'none',
+  });
+  const maxD = vectorMaxDistance();
+  const best = new Map<string, number>();
+  for (const m of res.matches ?? []) {
+    const productId = m.id.slice(0, m.id.lastIndexOf(':'));
+    const d = 1 - m.score;
+    if (productId && d <= maxD && d < (best.get(productId) ?? Infinity)) best.set(productId, d);
+  }
+  if (best.size === 0) return { ids: [], degraded: false };
+  const { ids: visible } = await money.vectorVisible({ ids: [...best.keys()] });
+  const ok = new Set(visible);
+  const ids = [...best.keys()]
+    .filter(id => ok.has(id))
+    .sort((a, b) => best.get(a)! - best.get(b)! || (a < b ? -1 : 1))
+    .slice(0, Math.max(1, Math.floor(limit)));
+  return { ids, degraded: false };
+}
+
 /**
  * The vector leg with its mode. `degraded` = the leg was WANTED (semantic on, an embeddable query)
  * but did not answer: no searcher, a budget or the searcher's limit refused, the race was lost, the
@@ -383,6 +456,10 @@ async function vectorLeg(
   try {
     const v = await queryVector(storeId, raw, opts.searcher);
     if (!v) return { ids: [], degraded: true };
+    // A store on its Durable Object (Ruling CF-VEC-1): its vectors are in Vectorize (namespace = store id), not in halfvec.
+    // Postgres stores fall through to the halfvec query below, untouched.
+    const money = await storeMoney(storeId);
+    if (money) return await vectorLegDo(storeId, v, limit, money);
     const q = toHalfvecLiteral(v);
     const rows = await withSavepoint(
       () => prisma.$queryRaw<Array<{ id: string }>>`

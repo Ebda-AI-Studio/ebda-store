@@ -69,7 +69,12 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { onClosedTenantTxAccess, runInTenantContext } from '@ebda/database';
+import {
+  onClosedTenantTxAccess,
+  runInStoreScope,
+  runInTenantContext,
+  runInUserScope,
+} from '@ebda/database';
 import logger from './logger';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 import { sendAlert } from '../services/alerts.service';
@@ -120,6 +125,11 @@ interface DeferralScope {
 export interface TenantCommitContext {
   storeId?: string;
   userId?: string;
+  /**
+   * The request is for a store on its Durable Object (NEON-ZERO-1, Ruling NZ-TX-1): its deferred tasks run under the lazy
+   * per-query store scope with NO Postgres transaction and no pooled-connection slot.
+   */
+  noPgTx?: boolean;
 }
 
 const deferralStorage = new AsyncLocalStorage<DeferralScope>();
@@ -403,7 +413,16 @@ async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<v
 async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext): Promise<void> {
   const held = await acquireDeferredTxSlot(task.connections);
   try {
-    await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    // A DO-store request (NZ-TX-1) has no Postgres transaction to join: the task runs under the lazy per-query scope, carrying
+    // the same user. It still takes one slot, so a burst of DO-store requests cannot start unbounded deferred work at once.
+    if (ctx.noPgTx && ctx.storeId) {
+      await runInStoreScope(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    } else if (ctx.noPgTx && ctx.userId) {
+      // A platform (user-only) request, Ruling NZ-C-1: same lazy per-query scope, no store.
+      await runInUserScope(ctx.userId, () => task.run().then(() => undefined));
+    } else {
+      await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    }
   } catch (err) {
     try {
       reportDeferredFailure(task.name, err, ctx);

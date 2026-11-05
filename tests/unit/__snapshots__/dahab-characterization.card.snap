@@ -3,7 +3,7 @@
 <div>
 <a aria-label="كاجو" href="/products/cashew">
 <div data-part="card-image">
-<img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
+<img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(max-width: 640px) 46vw, (max-width: 1024px) 31vw, 300px" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
 </div>
@@ -19,7 +19,7 @@
 <span>
 <span>كان </span>300 ج.م</span>
 </p>
-<div>
+<div data-card-chrome="tags">
 <span data-testid="fact-chip">21</span>
 <span data-testid="fact-chip">4 مم</span>
 </div>
@@ -31,7 +31,7 @@
 <div>
 <a aria-label="Cashew" href="/products/cashew">
 <div data-part="card-image">
-<img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
+<img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(max-width: 640px) 46vw, (max-width: 1024px) 31vw, 300px" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
 <span aria-hidden="true">
 </span>
 </div>
@@ -47,7 +47,7 @@
 <span>
 <span>Was </span>EGP 300</span>
 </p>
-<div>
+<div data-card-chrome="tags">
 <span data-testid="fact-chip">21</span>
 <span data-testid="fact-chip">4 mm</span>
 </div>

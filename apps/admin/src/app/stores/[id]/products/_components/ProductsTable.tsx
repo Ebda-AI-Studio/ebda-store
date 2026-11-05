@@ -2,8 +2,8 @@
 
 import { useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { RowActions } from '@/components/RowActions';
 import Image from 'next/image';
-import { Button } from '@ebda/ui';
 import { formatPrice } from '../../../../../lib/format';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
@@ -47,6 +47,8 @@ interface ProductsTableProps {
   products: Product[];
   loading: boolean;
   hasActiveFilters: boolean;
+  /** Empty default Active view: switch to the Drafts view. */
+  onShowDrafts?: () => void;
   onRequestDelete: (product: Product) => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -59,6 +61,7 @@ export function ProductsTable({
   products,
   loading,
   hasActiveFilters,
+  onShowDrafts,
   onRequestDelete,
   selectedIds,
   onToggleSelect,
@@ -90,7 +93,12 @@ export function ProductsTable({
 
   if (products.length === 0) {
     return (
-      <EmptyProductsState storeId={storeId} hasActiveFilters={hasActiveFilters} listUrl={listUrl} />
+      <EmptyProductsState
+        storeId={storeId}
+        hasActiveFilters={hasActiveFilters}
+        listUrl={listUrl}
+        onShowDrafts={onShowDrafts}
+      />
     );
   }
 
@@ -139,7 +147,7 @@ export function ProductsTable({
           onChange={() => onToggleSelect(product.id)}
           onClick={e => e.stopPropagation()}
           className="rounded border-border accent-primary cursor-pointer"
-          aria-label={`Select ${product.name}`}
+          aria-label={t('selectProduct', { name: product.name })}
         />
       ),
     },
@@ -178,7 +186,7 @@ export function ProductsTable({
       cell: product => (
         <span className="text-sm font-medium">
           {product.hasVariants && (
-            <span className="text-xs text-muted-foreground me-1">{isRtl ? 'من' : 'From'}</span>
+            <span className="text-xs text-muted-foreground me-1">{t('priceFrom')}</span>
           )}
           {formatPrice(product.price)}
         </span>
@@ -238,31 +246,37 @@ export function ProductsTable({
       alignEnd: true,
       mobileActions: true,
       cell: product => (
-        <div className="flex items-center gap-2 md:justify-end md:flex-wrap">
-          {product.hasVariants && (
-            <Link href={`/stores/${storeId}/products/${product.id}/variants`}>
-              <Button variant="outline" size="sm">
-                {t('actions.variants')}
-              </Button>
-            </Link>
-          )}
-          <Link
-            href={`/stores/${storeId}/products/${product.id}/edit?returnTo=${encodeURIComponent(listUrl)}`}
-          >
-            <Button variant="outline" size="sm">
-              {t('actions.edit')}
-            </Button>
-          </Link>
-          <Link
-            href={`/stores/${storeId}/products/${product.id}?returnTo=${encodeURIComponent(listUrl)}`}
-          >
-            <Button variant="outline" size="sm">
-              {t('actions.view')}
-            </Button>
-          </Link>
-          <Button variant="destructive" size="sm" onClick={() => onRequestDelete(product)}>
-            {t('actions.delete')}
-          </Button>
+        <div className="flex items-center gap-2 md:justify-end">
+          <RowActions
+            menuLabel={t('actions.menu', { name: product.name })}
+            primary={
+              <Link
+                href={`/stores/${storeId}/products/${product.id}/edit?returnTo=${encodeURIComponent(listUrl)}`}
+                className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                {t('actions.edit')}
+              </Link>
+            }
+            items={[
+              ...(product.hasVariants
+                ? [
+                    {
+                      label: t('actions.variants'),
+                      href: `/stores/${storeId}/products/${product.id}/variants`,
+                    },
+                  ]
+                : []),
+              {
+                label: t('actions.overview'),
+                href: `/stores/${storeId}/products/${product.id}/edit?tab=overview&returnTo=${encodeURIComponent(listUrl)}`,
+              },
+              {
+                label: t('actions.delete'),
+                destructive: true,
+                onSelect: () => onRequestDelete(product),
+              },
+            ]}
+          />
         </div>
       ),
     },

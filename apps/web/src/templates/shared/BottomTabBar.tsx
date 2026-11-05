@@ -12,7 +12,7 @@ import { resolveColor, DEFAULT_THEME } from '@ebda/shared';
 import { CartIcon } from '@ebda/ui';
 import type { NavItem } from '../types';
 import { Sheet } from '../../components/ui/Sheet';
-import { tabBarShownOn } from './tab-bar-visibility';
+import { useTabBarShown } from './tab-bar-visibility';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
@@ -77,6 +77,16 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
   // storefront page wrappers animate sections (transform), which was trapping
   // this bar mid-screen on mobile instead of pinning it to the viewport bottom
   // (reported 2026-06-05). Portaling to body escapes any such containing block.
+  const shown = useTabBarShown();
+  // The body and the content reserve the bar's height on phones (layout.tsx pb-32); with no bar on this route
+  // that reserve is dead space under the footer, so mark the document and let globals.css drop it.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.tabBar = shown ? 'on' : 'off';
+    return () => {
+      delete root.dataset.tabBar;
+    };
+  }, [shown]);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -86,7 +96,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
   // desktop-only). The pathname includes the store slug prefix on path-based
   // multi-tenant URLs, so match the trailing segment(s).
   const lowered = pathname.toLowerCase();
-  if (!tabBarShownOn(pathname)) return null;
+  if (!shown) return null;
 
   const tabs: Array<{
     key: string;

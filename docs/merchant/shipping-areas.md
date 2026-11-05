@@ -12,6 +12,12 @@ At checkout, customers pick their **Governorate** (محافظة) then their **Ar
 
 ---
 
+## One page, four tabs — صفحة واحدة بأربع تبويبات
+
+**Admin → Settings → Shipping and delivery** (الشحن والتوصيل) has four tabs: **Rates** (الأسعار), **Carriers** (شركات الشحن, when your plan includes them), **Delivery times** (وقت التوصيل) and **Cash-on-delivery collection** (تحصيل الدفع عند الاستلام). The older page links still work and open the matching tab.
+
+On a new store the Rates tab opens with **"One price for all of Egypt?"** (سعر واحد لكل مصر؟): type one fee (and optionally a free-shipping amount) and press save. Different prices for a governorate are set below it under **"Different prices per governorate"**. One sticky save bar saves the rates and the return policy together; it appears only when something changed. Export and import are in the "..." menu.
+
 ## How to set fees — كيفية ضبط الرسوم
 
 1. Go to **Admin → Settings → Shipping → "Delivery areas & fees"**.

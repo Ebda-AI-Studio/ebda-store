@@ -1,10 +1,11 @@
 import type { JobDef } from '../../jobs/types';
-import { withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty, type StepLike } from '../empty-exit';
-import { goldRateWatch } from '../../definer';
+import { goldRateWatchFor } from '../../jobs/gold-stores';
 import {
   SentinelStoreUnavailableError,
   markSent,
@@ -35,16 +36,18 @@ export const WARN_BEFORE_MINUTES = 240;
  * ahead and blocks within the hour.
  */
 export async function handleGoldRateStalenessWatch(
-  { step }: { step: StepLike },
+  { step, event }: { step: StepLike; event?: { data?: unknown } },
   now: Date = new Date()
 ) {
   {
     // Read inside a step on a Workflow (no database between steps); an empty tick still costs one
     // execution on Inngest. A step result is JSON, so the date comes back as a string: rebuild it.
-    const watch = (await stepRunUnlessEmpty(step, 'watch', goldRateWatch)).map(w => ({
-      ...w,
-      appliedAt: new Date(w.appliedAt),
-    }));
+    const watch = (await stepRunUnlessEmpty(step, 'watch', () => goldRateWatchFor(event, now))).map(
+      w => ({
+        ...w,
+        appliedAt: new Date(w.appliedAt),
+      })
+    );
     if (watch.length === 0) return { stores: 0 };
 
     // one notice per (store, rate): the oldest karat decides the wording
@@ -92,8 +95,8 @@ export async function handleGoldRateStalenessWatch(
           // Marked AFTER the send (below): a send that throws leaves it unset and the next run retries.
           if (await wasSent(sentinel)) return { sent: false, kind };
 
-          const info = await withStore(storeId, tx =>
-            tx.store.findUnique({
+          const info = await withStoreDb(storeId, db =>
+            db.store.findUnique({
               where: { id: storeId },
               select: { name: true, slug: true, owner: { select: { email: true } } },
             })
@@ -164,5 +167,5 @@ export const goldRateStalenessWatchCron: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '7 * * * *' }],
   },
-  ({ step }) => handleGoldRateStalenessWatch({ step })
+  ({ step, event }) => handleGoldRateStalenessWatch({ step, event })
 );

@@ -31,9 +31,10 @@
     --success: 158 64% 40%;
     --success-light: 158 64% 95%;
     --success-foreground: 0 0% 100%;
-    --warning: 43 96% 50%;
-    --warning-light: 43 96% 95%;
-    --warning-foreground: 43 96% 15%;
+    /* Warning = muted brass/bronze (Ebda has no orange or amber). Distinct from the gold primary by lower lightness. */
+    --warning: 30 40% 58%;
+    --warning-light: 34 40% 94%;
+    --warning-foreground: 30 50% 14%;
     --info: 210 100% 50%;
     --info-light: 210 100% 95%;
     --info-foreground: 0 0% 100%;
@@ -47,7 +48,7 @@
        >= 4.5:1 in both themes by admin-tint-ink-contrast.test.ts. */
     --primary-ink: 36 50% 29%;
     --success-ink: 158 64% 24%;
-    --warning-ink: 43 96% 24%;
+    --warning-ink: 30 50% 27%;
     --info-ink: 210 100% 35%;
     --destructive-ink: 0 72% 40%;
     /* Neutral text on a SOLID `bg-muted` fill (a grey status pill, a hover
@@ -55,6 +56,10 @@
        Replaces the raw `text-gray-*` pills, which were unreadable in dark
        mode (issue 2372). Pinned by admin-tint-ink-contrast.test.ts. */
     --muted-ink: 20 10% 38%;
+
+    /* Space the fixed bottom chrome takes (mobile bottom nav + safe area). A sticky save bar / footer sits at
+       `bottom-[var(--bottom-chrome)]` so it is never hidden behind the nav (UX:M-6). Desktop has no bottom nav. */
+    --bottom-chrome: calc(3.5rem + env(safe-area-inset-bottom, 0px));
 
     /* Borders & Inputs */
     --border: 30 15% 90%;
@@ -79,6 +84,12 @@
     --shadow-primary: 0 4px 14px 0 hsl(36.4 36.03% 51.57% / 0.25);
   }
 
+  @media (min-width: 768px) {
+    :root {
+      --bottom-chrome: 0px;
+    }
+  }
+
   .dark {
     --background: 210 9% 4.3%;
     --foreground: 150 9% 96%;
@@ -96,7 +107,7 @@
     --destructive-foreground: 150 9% 96%;
     --primary-ink: 36.14 45.83% 62.35%;
     --success-ink: 158 64% 65%;
-    --warning-ink: 43 96% 62%;
+    --warning-ink: 34 48% 68%;
     --info-ink: 210 100% 72%;
     --destructive-ink: 0 72% 70%;
     --muted-ink: 165 5% 65%;
@@ -745,5 +756,36 @@ main > div {
 @media (prefers-reduced-motion: reduce) {
   .setting-highlight {
     animation: none;
+  }
+}
+
+/* Order-alerts modal entrance: 220ms fade + lift; reduced motion = fade only. */
+@keyframes ebda-alerts-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ebda-alerts-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ebda-alerts-backdrop {
+  animation: ebda-alerts-fade 220ms ease-out both;
+}
+.ebda-alerts-card {
+  animation: ebda-alerts-rise 220ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ebda-alerts-card {
+    animation: ebda-alerts-fade 220ms ease-out both;
   }
 }

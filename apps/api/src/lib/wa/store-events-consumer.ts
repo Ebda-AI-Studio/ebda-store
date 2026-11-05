@@ -5,7 +5,7 @@
  *    ONLY writer of order state: `confirmed` moves pending -> confirmed, `refused` cancels (stock
  *    restored by the normal cancel path), `no_reply` records the outcome and changes nothing. The
  *    outcome is tagged `source: whatsapp` in the audit trail, and the Store does NOT emit its own
- *    commerce outcome for it (Ebda WhatsApp already emitted `commerce_outcomes`; contract section 8).
+ *    commerce outcome for it (Ebda Chat already emitted `commerce_outcomes`; contract section 8).
  *  - `whatsapp.order_after_erasure`: an order created from chat for a buyer erased at the same
  *    moment: cancelled so it is never fulfilled for an erased customer.
  *

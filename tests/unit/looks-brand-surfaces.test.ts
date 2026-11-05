@@ -15,9 +15,15 @@ const { state, sent } = vi.hoisted(() => ({
 }));
 vi.mock('@ebda/database', () => {
   const count = async () => 0;
-  const tx = { store: { findUnique: async () => state.store } };
+  const tx = {
+    store: {
+      findUnique: async () =>
+        state.store ?? (state.order as { store?: never } | null)?.store ?? null,
+    },
+  };
   return {
     prisma: {
+      store: tx.store,
       fiscalDocument: { findMany: async () => [] },
       order: { findFirst: async () => state.order, count },
       product: { count },
@@ -27,6 +33,27 @@ vi.mock('@ebda/database', () => {
     withStore: async (_id: string, fn: (t: typeof tx) => unknown) => fn(tx),
   };
 });
+// The setup guide reads the platform store through `storeDb` too: serve THIS test's store row first, and fall back to the
+// invoice helper's "store of the last order read" (invoices), so a stale order never answers a setup-guide read.
+vi.mock('@api/lib/repo-factory', async () => {
+  const base = await (await import('./helpers/invoice-repo-mock')).repoFactoryMock();
+  return {
+    ...base,
+    storeDb: async () => {
+      const db = await base.storeDb();
+      return {
+        ...db,
+        store: {
+          findUnique: async (...a: unknown[]) =>
+            state.store ?? (db.store.findUnique as never as (...x: unknown[]) => unknown)(...a),
+        },
+      };
+    },
+  };
+});
+vi.mock('@api/lib/jobs/store-db', async () =>
+  (await import('./helpers/invoice-repo-mock')).storeDbMock()
+);
 vi.mock('@api/services/store-mailer.service', () => ({
   StoreMailer: {
     sendBrandedEmail: async (_s: string, a: { html: string }) => {

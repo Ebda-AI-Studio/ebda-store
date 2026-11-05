@@ -6,6 +6,8 @@ import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { storeOrigin } from '@ebda/shared';
+import { storeDb, storeMoney } from '../../repo-factory';
+import { customersById, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 
 /**
  * Post-purchase review request — fires when an order transitions to
@@ -52,26 +54,22 @@ export const reviewRequest: JobDef = inngest.createFunction(
     await step.sleep('wait-7-days', '7d');
 
     // ── Re-verify order state after the delay ──────────────────────────────
-    // FORCE RLS: Inngest jobs run outside HTTP — wrap in runInTenantContext.
+    // The order lives in the store's backend (its Durable Object, or Postgres under the tenant scope); the customer is a platform
+    // `User`, attached after the read (Ruling CF-JOBS-4).
     const order = await step.run('load-order', () =>
-      runInTenantContext(storeId, () =>
-        prisma.order.findUnique({
+      runInStoreCtx(storeId, async () => {
+        const row = await (
+          await storeDb(storeId)
+        ).order.findUnique({
           where: { id: orderId, storeId },
           select: {
             id: true,
             status: true,
             storeId: true,
             locale: true,
+            customerId: true,
             reviewRequestSentAt: true,
             shippingAddress: true,
-            customer: {
-              select: {
-                firstName: true,
-                lastName: true,
-                email: true,
-                language: true,
-              },
-            },
             items: {
               select: {
                 productId: true,
@@ -86,8 +84,11 @@ export const reviewRequest: JobDef = inngest.createFunction(
               },
             },
           },
-        })
-      )
+        });
+        if (!row) return null;
+        const customer = (await customersById(storeId, [row.customerId])).get(row.customerId ?? '');
+        return { ...row, customer: customer ?? null };
+      })
     );
 
     if (!order) {
@@ -135,8 +136,9 @@ export const reviewRequest: JobDef = inngest.createFunction(
 
     // ── Resolve store base URL ─────────────────────────────────────────────
     const store = await step.run('load-store', () =>
-      runInTenantContext(storeId, () =>
-        prisma.store.findUnique({
+      // `Store` is a platform row (D1), read for either backend
+      withStoreDb(storeId, db =>
+        db.store.findUnique({
           where: { id: storeId },
           select: { slug: true, domain: true },
         })
@@ -177,14 +179,17 @@ export const reviewRequest: JobDef = inngest.createFunction(
     );
 
     // ── Mark order so retries are idempotent ──────────────────────────────
-    await step.run('mark-sent', () =>
-      runInTenantContext(storeId, () =>
+    await step.run('mark-sent', async () => {
+      // A store on its Durable Object stamps through the once-only op; a Postgres store keeps the plain update
+      const money = await storeMoney(storeId);
+      if (money) return money.orderStamp({ orderId, stamp: 'reviewRequestSentAt' });
+      return runInTenantContext(storeId, () =>
         prisma.order.update({
           where: { id: orderId, storeId },
           data: { reviewRequestSentAt: new Date() },
         })
-      )
-    );
+      );
+    });
 
     logger.info({ orderId, itemCount: items.length, language }, '[REVIEW-REQUEST] sent');
     return { sent: true, itemCount: items.length, language };

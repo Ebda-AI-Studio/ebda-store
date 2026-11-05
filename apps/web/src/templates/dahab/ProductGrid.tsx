@@ -3,6 +3,7 @@
 import type { ProductGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import DahabProductCard from './ProductCard';
+import { fitDesktopColumns } from '../shared/grid-helpers';
 import { DAHAB_CONTAINER, DahabSectionHeading, cx, pick } from './ui';
 
 /** Grid density → column classes (2 on phones, 3 on tablets, N on desktop). */
@@ -38,7 +39,10 @@ export default function DahabProductGrid({
     <div className={DAHAB_CONTAINER} data-zone="products">
       <DahabSectionHeading title={pick(isRtl, title, titleAr)} />
       {products.length > 0 ? (
-        <div className={dahabGridCols(columns)}>
+        <div
+          data-part="product-grid"
+          className={dahabGridCols(fitDesktopColumns(products.length, columns))}
+        >
           {products.map(product => (
             <DahabProductCard
               key={product.id}

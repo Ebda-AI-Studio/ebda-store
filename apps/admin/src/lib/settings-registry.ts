@@ -115,7 +115,10 @@ export const PAGES: PageEntry[] = [
   }),
   page('/bulk', 'bulk.page.title', 'staff', {
     feature: 'bulk_operations',
-    syn: { en: 'import export csv excel upload', ar: 'استيراد تصدير اكسل رفع جماعي' },
+    syn: {
+      en: 'import export csv excel upload photo pdf catalogue catalog price list menu image',
+      ar: 'استيراد تصدير اكسل رفع جماعي صور PDF كتالوج قائمة أسعار منيو',
+    },
   }),
   page('/builder', `${HUB}.editor`, 'staff', {
     syn: {
@@ -125,6 +128,13 @@ export const PAGES: PageEntry[] = [
   }),
   page('/content', `${HUB}.content`, 'staff', {
     syn: { en: 'static pages about contact policy', ar: 'صفحات من نحن سياسة اتصل' },
+  }),
+  // T4: the FAQ and how-to guides moved here from the SEO page (UX:SEO-3).
+  page('/content/faqs', 'seo.page.faqsTitle', 'owner', {
+    syn: {
+      en: 'faq questions answers how to guides',
+      ar: 'اسئلة واجوبة الاسئلة الشائعة ادلة خطوات',
+    },
   }),
   page('/blog', `${HUB}.blog`, 'staff', {
     syn: { en: 'posts articles news', ar: 'مقالات اخبار مدونة' },
@@ -195,6 +205,12 @@ export const PAGES: PageEntry[] = [
   page('/wallet', `${HUB}.wallet`, 'staff', {
     feature: 'customer_wallet',
     syn: { en: 'store credit balance', ar: 'رصيد محفظة' },
+  }),
+  page('/customer-intelligence', `${HUB}.customerIntelligence`, 'staff', {
+    syn: {
+      en: 'cod risk courier suggestion returns hints intelligence sharing',
+      ar: 'تلميحات خطر الدفع عند الاستلام شركة الشحن المرتجعات',
+    },
   }),
   page('/payment-abandonments', `${HUB}.paymentAbandonments`, 'staff', {
     feature: 'payment_abandonment',
@@ -532,28 +548,14 @@ export const SETTINGS: SettingEntry[] = [
     },
     { query: 'tab=theme' }
   ),
-  setting(
-    'branding.blog',
-    '/branding',
-    'branding.theme.blog.title',
-    'owner',
-    {
-      en: 'blog show blog turn on blog',
-      ar: 'تفعيل المدونة اظهار المدونة',
-    },
-    { query: 'tab=theme' }
-  ),
-  setting(
-    'branding.web-push',
-    '/branding',
-    'branding.theme.webPush.title',
-    'owner',
-    {
-      en: 'web push notifications subscribe prompt',
-      ar: 'اشعارات الويب اشتراك اشعارات',
-    },
-    { query: 'tab=theme' }
-  ),
+  setting('branding.blog', '/blog', 'branding.theme.blog.title', 'owner', {
+    en: 'blog show blog turn on blog',
+    ar: 'تفعيل المدونة اظهار المدونة',
+  }),
+  setting('branding.web-push', '/notifications', 'branding.theme.webPush.title', 'owner', {
+    en: 'web push notifications subscribe prompt',
+    ar: 'اشعارات الويب اشتراك اشعارات',
+  }),
   setting(
     'branding.whatsapp-buttons',
     '/branding',
@@ -744,7 +746,7 @@ export const SETTINGS: SettingEntry[] = [
   ),
   setting(
     'seo.faqs',
-    '/seo',
+    '/content/faqs',
     'seo.page.faqsTitle',
     'owner',
     {
@@ -755,7 +757,7 @@ export const SETTINGS: SettingEntry[] = [
   ),
   setting(
     'seo.how-tos',
-    '/seo',
+    '/content/faqs',
     'seo.page.howtosTitle',
     'owner',
     {
@@ -849,6 +851,69 @@ export const SETTINGS: SettingEntry[] = [
         'البحث خانة بحث ايقونة الهيدر',
       ],
       [
+        'builder.header-wordmark',
+        'builder.theme.headerWordmark',
+        'select=theme',
+        'wordmark lockup store name logo designed plain header brand',
+        'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
+      ],
+      [
+        'builder.card-heart',
+        'builder.theme.cardHeart',
+        'select=theme',
+        'wishlist heart favourite button card home hide show',
+        'قلب المفضلة زر الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.card-swatches',
+        'builder.theme.cardSwatches',
+        'select=theme',
+        'colour dots swatches card variants home hide show',
+        'نقط الالوان الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.card-tags',
+        'builder.theme.cardTags',
+        'select=theme',
+        'tag chips labels material card home hide show',
+        'شارات تصنيف الخامة الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.grid-gutter',
+        'builder.theme.gridGutter',
+        'select=theme',
+        'grid gutter gap spacing space between cards home tight airy',
+        'مسافة فاصل بين الكروت الرئيسية ضيقة واسعة الشبكة',
+      ],
+      [
+        'builder.heading-weight',
+        'builder.theme.headingWeight',
+        'select=theme',
+        'heading weight bold regular section title typography',
+        'سمك عناوين الاقسام عريض عادي خط العنوان',
+      ],
+      [
+        'builder.price-colour',
+        'builder.theme.priceColour',
+        'select=theme',
+        'price colour accent text card product',
+        'لون السعر اللون المميز النص الكارت المنتج',
+      ],
+      [
+        'builder.tab-bar',
+        'builder.theme.tabBar',
+        'select=theme',
+        'bottom tab bar navigation phone home cart bag hide show',
+        'الشريط السفلي التبويبات الموبايل الرئيسية السلة شنطة اخفاء اظهار',
+      ],
+      [
+        'builder.hero-ratio',
+        'builder.theme.heroRatio',
+        'select=theme',
+        'hero height ratio tall portrait square wide banner image phone',
+        'طول الهيرو نسبة بورتريه مربع عريض البانر الصورة الرئيسية الموبايل',
+      ],
+      [
         'builder.fonts',
         'builder.search.fonts',
         'select=theme',
@@ -875,6 +940,13 @@ export const SETTINGS: SettingEntry[] = [
         'select=hero',
         'divider line ornament kicker lines separator',
         'فاصل خط زخرفة سطر',
+      ],
+      [
+        'builder.section-spacing',
+        'builder.search.spacing',
+        'select=hero',
+        'spacing padding margin gap above below tablet mobile desktop device',
+        'مسافات مسافة فوق تحت تابلت موبايل كمبيوتر جهاز',
       ],
       [
         'builder.video',
@@ -943,15 +1015,17 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/ai-usage': 0, // the switch is a component (components/ai/AiSwitchCard), anchored ai.switch
   '/branding': 43,
-  '/builder': 28, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
+  '/builder': 29, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
-  '/shipping': 20,
-  '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
+  '/shipping': 22, // T4: first-run card (fee, free-over)
+  '/payment-settings': 24, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
   '/tax': 16,
-  '/pwa': 13,
+  '/pwa': 14, // T4: the on/off switch moved from the header into the body
   '/language': 0,
   '/domain': 1,
   '/seo': 24,
   '/floating-widget': 26,
-  '/notifications': 9,
+  '/blog': 9, // T4: the blog on/off card moved here from branding
+  '/content/faqs': 13, // T4: moved from the SEO page
+  '/notifications': 10, // T4: the web-push switch moved here from branding
 };

@@ -1,9 +1,11 @@
 'use client';
 
+import { isRefusedThisSession, rememberRefusal } from '../../../../lib/plan-refusal-memo';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '../../../../lib/api';
+import { apiGetQuiet } from '../../../../lib/api';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 import { formatMoney, REGION } from '@ebda/shared';
 interface FinanceDashboard {
@@ -54,22 +56,37 @@ export function DashboardAccountingSummary({ storeId }: Props) {
   const [stock, setStock] = useState<StockSnapshot | null>(null);
   const [topSegment, setTopSegment] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  // Entitlements first (audit G-3): a store without accounting never fires the finance call just to get a 403.
+  const hasAccounting = isEnabled('accounting.basic');
 
   useEffect(() => {
+    if (featuresLoading) return;
     let cancelled = false;
     Promise.all([
-      apiGet<FinanceDashboard>(`/api/v1/stores/${storeId}/finance/dashboard`).catch(() => ({
+      (hasAccounting
+        ? apiGetQuiet<FinanceDashboard>(`/api/v1/stores/${storeId}/finance/dashboard`)
+        : Promise.resolve({ data: null, error: null })
+      ).catch(() => ({
         data: null,
         error: null,
       })),
-      apiGet<StockSnapshot>(`/api/v1/stores/${storeId}/analytics/stock-snapshot`).catch(() => ({
-        data: null,
-        error: null,
-      })),
-      // Fetch top RFM segment — graceful no-op if rollup hasn't run yet
-      apiGet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`).catch(
-        () => ({ data: null, error: null })
+      apiGetQuiet<StockSnapshot>(`/api/v1/stores/${storeId}/analytics/stock-snapshot`).catch(
+        () => ({
+          data: null,
+          error: null,
+        })
       ),
+      // Fetch top RFM segment — graceful no-op if rollup hasn't run yet
+      isRefusedThisSession('segments', storeId)
+        ? Promise.resolve({ data: null, error: null })
+        : apiGetQuiet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`)
+            .then(res => {
+              const status = (res.error as { status?: number } | null)?.status;
+              if (status === 402 || status === 403) rememberRefusal('segments', storeId);
+              return res;
+            })
+            .catch(() => ({ data: null, error: null })),
     ])
       .then(([fRes, sRes, segRes]) => {
         if (cancelled) return;
@@ -91,7 +108,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [storeId, t]);
+  }, [storeId, t, hasAccounting, featuresLoading]);
 
   if (error) return null; // silent failure — the existing StatsGrid still shows
   if (!fin && !stock) return null;

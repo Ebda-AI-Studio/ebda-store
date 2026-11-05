@@ -26,6 +26,7 @@ vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<typeof import('@ebda/database')>();
   return {
     ...actual,
+    currentStoreId: () => '11111111-1111-4111-8111-111111111111',
     prisma: {
       order: { findMany: h.orderFindMany },
       user: { findMany: h.userFindMany, findUnique: vi.fn() },
@@ -35,6 +36,16 @@ vi.mock('@ebda/database', async importOriginal => {
     },
   };
 });
+// the RFM snapshot reads follow the store's backend (Ruling CF-JOBS-4); a Postgres store reads the same mocks
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => ({
+    customerRfmSnapshot: { findMany: h.rfmFindMany, groupBy: h.rfmGroupBy },
+    order: { findMany: h.orderFindMany },
+    smsMarketingConsent: { findMany: vi.fn().mockResolvedValue([]) },
+    store: { findUnique: vi.fn() },
+  }),
+  storeRepo: async () => ({ backend: 'pg' }),
+}));
 vi.mock('@api/services/admin-search.service', () => ({
   matchingCustomers: (...a: unknown[]) => h.matching(...a),
 }));

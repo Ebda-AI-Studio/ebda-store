@@ -90,14 +90,21 @@ describe('the public router still mounts BOTH limiters', () => {
 });
 
 describe('cache-generation keys have their OWN Durable Object, never an auth shard', () => {
-  it('every generation name of one cache key routes to the one cachegen instance', () => {
+  it('every generation name of a key with no store id routes to the one base cachegen instance', () => {
+    for (const key of ['public:categories:abc', 'public:products:s1:feed:v2']) {
+      const shards = new Set(generationNamesFor(key).map(n => shardOf(`cachegen:${n}`)));
+      expect([...shards]).toEqual([CACHEGEN_SHARD]);
+    }
+  });
+  it('a store-scoped key spans the base instance plus exactly ONE store shard (NZ-D3: at most two calls per fill)', () => {
     for (const key of [
-      'public:categories:abc',
-      'public:products:s1:feed:v2',
+      'public:products:11111111-1111-4111-8111-111111111111:feed:v2',
       'public:store:resolve:h.ebda.app',
     ]) {
       const shards = new Set(generationNamesFor(key).map(n => shardOf(`cachegen:${n}`)));
-      expect([...shards]).toEqual([CACHEGEN_SHARD]);
+      expect(shards.has(CACHEGEN_SHARD)).toBe(true);
+      expect(shards.size).toBe(2);
+      expect([...shards].every(x => x <= CACHEGEN_SHARD)).toBe(true);
     }
   });
   it('the cachegen instance is outside the auth shard range, and no auth key can route to it', () => {

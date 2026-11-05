@@ -69,7 +69,7 @@ describe('checkout core: stock', () => {
     expect(stock('products', 'sku')).toBe(7);
     expect(
       count(
-        `SELECT count(*) n FROM inventory_history WHERE reference = '${o.orderId}' AND previous_stock = 10 AND new_stock = 7 AND quantity = 3`
+        `SELECT count(*) n FROM inventory_history WHERE reference = '${o.orderId}' AND previous_stock = 10 AND new_stock = 7 AND quantity = -3`
       )
     ).toBe(1);
     expect(count(`SELECT sum(total) n FROM order_items WHERE order_id = '${o.orderId}'`)).toBe(
@@ -273,7 +273,7 @@ describe('checkout core: wallet', () => {
   it('debits at most the total and the balance, records the ledger, can pay in full, never goes negative', () => {
     const { raw, db, base } = fixture();
     raw.exec(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', 's1', 'A', 'B', 'cust')`
     );
     raw.exec(
       `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 2000)`
@@ -395,7 +395,7 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
     ).toBe('COUPON_NOT_ELIGIBLE');
     raw.exec(`INSERT INTO customer_groups (id, store_id, name) VALUES ('vip', 's1', 'VIP')`);
     raw.exec(
-      `INSERT INTO customers (id, store_id, first_name, last_name, group_id) VALUES ('vipc', 's1', 'V', 'I', 'vip'), ('plain', 's1', 'P', 'L', NULL)`
+      `INSERT INTO customers (id, store_id, first_name, last_name, group_id, user_id) VALUES ('crm-vip', 's1', 'V', 'I', 'vip', 'vipc'), ('crm-plain', 's1', 'P', 'L', NULL, 'plain')`
     );
     raw.exec(
       `INSERT INTO coupons (id, store_id, code, name, type, value, customer_group_id, scope_product_ids, scope_category_ids) VALUES ('vipc1', 's1', 'VIPONLY', 'x', 'fixed', 100, 'vip', '[]', '[]')`
@@ -458,16 +458,16 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
     expect(stock('product_variants', 'v1')).toBe(2);
   });
 
-  it('backorder only when the store feature is on; a customer id must belong to this store; a key reused for a different order conflicts', () => {
+  it('backorder only when the store feature is on; a customer id is a users.id (no CRM row needed); a key reused for a different order conflicts', () => {
     const { db, base } = fixture();
     expect(
       err(() =>
         placeOrder(db, base({ lines: [{ productId: 'vprod', variantId: 'v2', quantity: 5 }] }))
       ).code
     ).toBe('OUT_OF_STOCK');
-    expect(err(() => placeOrder(db, base({ customerId: 'someone-elses' }))).code).toBe(
-      'CUSTOMER_NOT_FOUND'
-    );
+    // the customer id is the shopper's users.id: no CRM row is needed, and nothing is looked up in `customers` by it
+    expect(placeOrder(db, base({ customerId: 'user-without-crm-row' })).orderNumber).toBeTruthy();
+    expect(err(() => placeOrder(db, base({ customerId: '' }))).code).toBe('BAD_ARGS');
     placeOrder(db, base({ idempotencyKey: 'dup-key' }));
     expect(
       err(() =>
@@ -493,6 +493,8 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
         paymentMethod: 'cod',
         checkoutIp: '9.9.9.9',
         shippingAddress: { phone: `0101000000${i}` },
+        // QA-HOLDS-1: the COD IP ceiling default is now 40 per 24 h; this pins the engine's counting at an explicit 8
+        holdCaps: { ip: 8 },
       });
     for (let i = 0; i < 8; i++) placeOrder(db, ipA(i));
     expect(err(() => placeOrder(db, ipA(9))).code).toBe('TOO_MANY_OPEN_ORDERS');
@@ -501,7 +503,7 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
   it('a 100% coupon with a wallet request does not write a zero wallet transaction', () => {
     const { raw, db, base } = fixture();
     raw.exec(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', 's1', 'A', 'B', 'cust')`
     );
     raw.exec(
       `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 500)`
@@ -521,7 +523,7 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
     const { raw, db, base } = fixture();
     raw.exec(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);
     raw.exec(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', 's1', 'A', 'B', 'cust')`
     );
     raw.exec(
       `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 100000)`
