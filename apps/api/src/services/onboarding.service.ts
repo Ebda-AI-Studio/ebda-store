@@ -9,8 +9,12 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
+import { cfBindings } from '../cf/bindings';
+import { getAccountState } from '../lib/identity-client';
 import { recordReferral } from './billing/grants.service';
-import { storeDb, storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeUpdate, storeWriter, storeWritesToDo } from '../lib/repo-factory';
+import { requirePlatformDb } from '../lib/platform-db';
+import { onAccessD1, ownedStoreIdsD1 } from './platform/access-d1';
 import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
@@ -32,7 +36,8 @@ import { bustStoreCaches, StoreService } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
-import { assertOwnerMayCreateStore } from './plan-limit.service';
+import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
+import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
 import {
@@ -60,6 +65,41 @@ export type SlugAvailability =
       reason: StoreSlugErrorCode | 'SLUG_TAKEN';
       message: string;
     };
+
+/**
+ * The signed-in merchant's account facts. After the `access` cutover the account lives in the identity service (Postgres `users`
+ * is a stale copy), so it is read there; before it, the RLS-scoped Postgres read, byte for byte as before.
+ * `storeId` is null for a merchant account (a shopper account is tied to one store).
+ */
+async function merchantAccount(userId: string) {
+  if (await onAccessD1()) {
+    const a = await getAccountState(userId);
+    if (!a || a.status !== 'active') return null;
+    return {
+      id: a.id,
+      email: a.email,
+      firstName: a.firstName,
+      lastName: a.lastName,
+      emailVerified: a.emailVerified,
+      phone: a.phone,
+      storeId: a.role === 'customer' ? ('customer' as string | null) : (null as string | null),
+    };
+  }
+  return withUser(userId, tx =>
+    tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        emailVerified: true,
+        phone: true,
+        storeId: true,
+      },
+    })
+  );
+}
 
 export class OnboardingService {
   /**
@@ -91,31 +131,35 @@ export class OnboardingService {
   }
 
   static async state(userId: string) {
-    // As that user: `users` is RLS-scoped to app.current_user_id.
-    const user = await withUser(userId, tx =>
-      tx.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, firstName: true, emailVerified: true, phone: true },
-      })
-    );
+    const user = await merchantAccount(userId);
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-    const store = await withUser(userId, tx =>
-      tx.store.findFirst({
-        where: { ownerId: userId, deletedAt: null },
-        orderBy: { createdAt: 'asc' },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          domain: true,
-          status: true,
-          template: true,
-          look: true,
-          plan: true,
-        },
-      })
-    );
+    const storeSelect = {
+      id: true,
+      name: true,
+      slug: true,
+      domain: true,
+      status: true,
+      template: true,
+      look: true,
+      plan: true,
+    } as const;
+    // After the `access` cutover the owner's store row is the D1 directory row (no Postgres `users` scope to open).
+    const store = (await onAccessD1())
+      ? await (
+          await requirePlatformDb()
+        ).store.findFirst({
+          where: { ownerId: userId, deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: storeSelect,
+        })
+      : await withUser(userId, tx =>
+          tx.store.findFirst({
+            where: { ownerId: userId, deletedAt: null },
+            orderBy: { createdAt: 'asc' },
+            select: storeSelect,
+          })
+        );
 
     let productCount = 0;
     let codEnabled = false;
@@ -126,12 +170,19 @@ export class OnboardingService {
         products: await (
           await storeDb(store.id)
         ).product.count({ where: { storeId: store.id, deletedAt: null } }),
-        cod: await prisma.paymentConfig.count({
+        cod: await (
+          await storeDb(store.id)
+        ).paymentConfig.count({
           where: { storeId: store.id, provider: 'cod', isEnabled: true },
         }),
+        // a DO store's subscription row is in the platform D1; a Postgres store keeps its own table
         planCode:
           (
-            await prisma.storeSubscription.findUnique({
+            await (
+              (await storeRepo(store.id)).backend === 'do'
+                ? (await requirePlatformDb()).storeSubscription
+                : prisma.storeSubscription
+            ).findUnique({
               where: { storeId: store.id },
               select: { planCode: true },
             })
@@ -183,18 +234,17 @@ export class OnboardingService {
       ref?: string;
     }
   ) {
-    const user = await withUser(owner.userId, tx =>
-      tx.user.findUnique({
-        where: { id: owner.userId },
-        select: { email: true, firstName: true, lastName: true, storeId: true },
-      })
-    );
+    const user = await merchantAccount(owner.userId);
     if (!user || user.storeId !== null) {
       throw new AppError(403, 'FORBIDDEN', 'Only merchant accounts can create a store');
     }
 
-    const owned = await withUser(owner.userId, tx =>
-      tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+    const owned = await countOwnerStores(owner.userId, async () =>
+      (await onAccessD1())
+        ? (await ownedStoreIdsD1(owner.userId)).length
+        : withUser(owner.userId, tx =>
+            tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+          )
     );
     if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
@@ -245,10 +295,10 @@ export class OnboardingService {
       // Plan gate (locked pricing): a SECOND store needs a plan that allows it
       // (Business = 3). Also stops a Basic/Growth owner farming fresh Growth trials.
       if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId);
-      const ownedNow = await withUser(owner.userId, tx =>
-        tx.store.count({
-          where: { ownerId: owner.userId, deletedAt: null },
-        })
+      const ownedNow = await countOwnerStores(owner.userId, () =>
+        withUser(owner.userId, tx =>
+          tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+        )
       );
       try {
         const result = await ProvisioningService.provisionStore({
@@ -259,6 +309,14 @@ export class OnboardingService {
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          maxOwnedStores:
+            owner.isSuperAdmin || !storeCreateOnDo()
+              ? null
+              : Math.min(
+                  MAX_SELF_SERVE_STORES_PER_OWNER,
+                  (await ownerStoreAllowance(owner.userId)).allowance ??
+                    MAX_SELF_SERVE_STORES_PER_OWNER
+                ),
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',
@@ -333,11 +391,15 @@ export class OnboardingService {
    * "choose payment methods" item done: the merchant has now chosen.
    */
   static async setPaymentMethods(storeId: string, methods: { cod: boolean }) {
-    const existing = await prisma.paymentConfig.findFirst({
+    const existing = await (
+      await storeDb(storeId)
+    ).paymentConfig.findFirst({
       where: { storeId, provider: 'cod' },
       select: { id: true },
     });
-    const otherEnabled = await prisma.paymentConfig.count({
+    const otherEnabled = await (
+      await storeDb(storeId)
+    ).paymentConfig.count({
       where: { storeId, isEnabled: true, provider: { not: 'cod' } },
     });
     if (!methods.cod && otherEnabled === 0) {
@@ -348,12 +410,16 @@ export class OnboardingService {
       );
     }
     if (existing) {
-      await prisma.paymentConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: { isEnabled: methods.cod },
       });
     } else {
-      await prisma.paymentConfig.create({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.create({
         data: {
           storeId,
           provider: 'cod',
@@ -375,12 +441,12 @@ export class OnboardingService {
 
   /** inactive -> active. Idempotent for an already-live store; a suspended store stays suspended. */
   static async goLive(storeId: string) {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { id: true, slug: true, domain: true, status: true, name: true },
-      })
-    );
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
+      where: { id: storeId },
+      select: { id: true, slug: true, domain: true, status: true, name: true },
+    });
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
     if (store.status === 'suspended') {
       throw new AppError(403, 'STORE_SUSPENDED', 'This store is suspended');
@@ -389,13 +455,16 @@ export class OnboardingService {
       // Billing first (Ruling EBDA-FUNNEL-5): an active trial with a saved card,
       // a pay-at-trial-end trial, a paid plan, or an admin-granted plan.
       await assertStoreMayGoLive(storeId);
-      const methods = await prisma.paymentConfig.count({ where: { storeId, isEnabled: true } });
+      const methods = await (
+        await storeDb(storeId)
+      ).paymentConfig.count({ where: { storeId, isEnabled: true } });
       if (methods === 0) {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');
       }
-      await withStore(storeId, tx =>
-        storeUpdate(tx, { where: { id: storeId }, data: { status: 'active' } })
-      );
+      const statusArgs = { where: { id: storeId }, data: { status: 'active' as const } };
+      // A DO store's status lives in D1/DO: no Postgres transaction is opened for it.
+      if (await storeWritesToDo(storeId)) await storeUpdate(prisma, statusArgs);
+      else await withStore(storeId, tx => storeUpdate(tx, statusArgs));
       await bustStoreCaches(store.id, store.slug, store.domain);
       await sendOnboardingStepToCi(store.id, 'went_live');
     }

@@ -9,6 +9,7 @@
  */
 import { SlugEntityType, prisma, withStore } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
+import { analyticsMoney, analyticsOnDo } from '../lib/analytics-backend';
 import { waMeLink, regionDayStart } from '@ebda/shared';
 import {
   DEFAULT_QR_SETTINGS,
@@ -96,6 +97,18 @@ export async function recordQrScan(
 ): Promise<boolean> {
   const day = regionDayStart(now);
   try {
+    // Ruling NZ-AN-1: a Durable Object store counts in its own DO once the analytics copy flipped
+    const money = await analyticsMoney(storeId, 'write');
+    if (money) {
+      const prune = Math.floor(Math.random() * PRUNE_ONE_IN) === 0;
+      await money.qrScanRecord({
+        dayMs: day.getTime(),
+        kind,
+        ref,
+        ...(prune ? { pruneBeforeMs: day.getTime() - QR_SCAN_RETENTION_DAYS * 86_400_000 } : {}),
+      });
+      return true;
+    }
     await withStore(storeId, async tx => {
       await tx.$executeRaw`
         INSERT INTO qr_scan_daily (id, store_id, date, kind, ref, count)
@@ -129,7 +142,9 @@ export type QrStatRow = {
 /** Scans per code over the last `days` days, with product/category names for the admin list. */
 export async function qrStats(storeId: string, days: number): Promise<QrStatRow[]> {
   const since = new Date(regionDayStart().getTime() - (days - 1) * 86_400_000);
-  const rows = await prisma.qrScanDaily.groupBy({
+  // Ruling NZ-AN-1: the DO when this store's analytics moved, else Postgres (both answer the same groupBy)
+  const reader = (await analyticsOnDo(storeId, 'read')) ? await storeDb(storeId) : prisma;
+  const rows = await reader.qrScanDaily.groupBy({
     by: ['kind', 'ref'],
     where: { storeId, date: { gte: since } },
     _sum: { count: true },

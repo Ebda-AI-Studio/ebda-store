@@ -1,6 +1,14 @@
 import type { JobDef } from '../../jobs/types';
+import { customerRow, isLiveCustomer } from '../../customer-directory';
+
+/** The customer to mail: a DO-served store's customer comes from its DO and only when still active (N-9); else Postgres. */
+async function customerOf(storeId: string, id: string) {
+  const doRow = await customerRow(storeId, id);
+  if (doRow !== undefined) return doRow && isLiveCustomer(doRow) ? doRow : null;
+  return withStore(storeId, tx => tx.user.findFirst({ where: { id } }));
+}
 import { prisma, runInTenantContext, withStore, type OrderStatus } from '@ebda/database';
-import { runInStoreCtx } from '../../jobs/store-db';
+import { runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import { storeDb, storeMoney } from '../../repo-factory';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { EmailService } from '../../../services/email.service';
@@ -90,9 +98,7 @@ export async function handleOrderStatusChanged(
         await storeDb(storeId)
       ).order.findUnique({ where: { id: orderId, storeId }, include: { items: true } });
       if (!row) return null;
-      const customer = row.customerId
-        ? await withStore(storeId, tx => tx.user.findFirst({ where: { id: row.customerId! } }))
-        : null;
+      const customer = row.customerId ? await customerOf(storeId, row.customerId!) : null;
       return { ...row, customer };
     }
     return runInTenantContext(storeId, () =>
@@ -129,8 +135,8 @@ export async function handleOrderStatusChanged(
   const store = await step.run('load-store', () =>
     // Postgres: exactly as before; a DO store has no tenant transaction to open for a platform row
     (money
-      ? withStore(storeId, tx =>
-          tx.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+      ? withStoreDb(storeId, db =>
+          db.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
         )
       : runInTenantContext(storeId, () =>
           prisma.store.findUnique({

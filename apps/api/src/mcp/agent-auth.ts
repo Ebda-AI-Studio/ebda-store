@@ -2,8 +2,9 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { prisma, runInTenantContext, runInStoreScope, withStore } from '@ebda/database';
+import { runInTenantContext, runInStoreScope, withStore } from '@ebda/database';
 import { insertAuditLog } from '../lib/definer';
+import { storeDb, storeRepo, type StoreWrites } from '../lib/repo-factory';
 import type { McpStore } from './resolve-store';
 import { encryption } from '../services/encryption.service';
 import { featureService } from '../services/feature.service';
@@ -218,12 +219,12 @@ export async function resolveAgentAuth(req: Request, store: McpStore): Promise<A
   if (presented) {
     try {
       // `store_credentials` is store-scoped (RLS + tenant guard): read in the store's scope.
-      const row = await withStore(store.id, tx =>
-        tx.storeCredential.findUnique({
-          where: { storeId: store.id },
-          select: { agentApiKey: true },
-        })
-      );
+      const row = await (
+        await storeDb(store.id)
+      ).storeCredential.findUnique({
+        where: { storeId: store.id },
+        select: { agentApiKey: true },
+      });
       if (!row?.agentApiKey) {
         context.credential = 'unconfigured';
       } else {
@@ -659,8 +660,8 @@ async function createCoalescedAuditRow(
     );
   }
   let rowId: string | undefined;
-  await runInTenantContext(store.id, async () => {
-    const row = await prisma.auditLog.create({
+  await inAuditScope(store.id, async w => {
+    const row = await w.auditLog.create({
       data: {
         action,
         resourceType: 'mcp_tool',
@@ -677,6 +678,16 @@ async function createCoalescedAuditRow(
 }
 
 /**
+ * The audit table of a store lives where the store does (NEON-ZERO N-10d): its Durable Object, or Postgres inside a
+ * store-scoped context. A DO store never opens a Postgres transaction for it.
+ */
+async function inAuditScope<T>(storeId: string, fn: (w: StoreWrites) => Promise<T>): Promise<T> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend === 'do') return fn(repo.writer);
+  return runInTenantContext(storeId, () => fn(repo.writer));
+}
+
+/**
  * Flush a window's count onto its row. A single, non-transactional UPDATE by
  * primary key, inside `runInStoreScope` (one short store-scoped statement, no
  * interactive transaction held open). Returns false when the update failed.
@@ -690,12 +701,16 @@ async function flushCount(
 ): Promise<boolean> {
   try {
     // One short store-scoped statement (strict RLS: an unscoped UPDATE matches no row).
-    await runInStoreScope(store.id, () =>
-      prisma.auditLog.update({
-        where: { id: rowId, storeId: store.id },
-        data: { details: JSON.parse(JSON.stringify({ ...baseDetails, count })) },
-      })
-    );
+    const repo = await storeRepo(store.id);
+    const details = JSON.parse(JSON.stringify({ ...baseDetails, count }));
+    if (repo.backend === 'do') {
+      // the DO audit trail has no generic update: one named procedure, scoped to this row and store
+      await repo.writer.$proc('auditSetDetails', { id: rowId, storeId: store.id, details });
+    } else {
+      await runInStoreScope(store.id, () =>
+        repo.writer.auditLog.update({ where: { id: rowId, storeId: store.id }, data: { details } })
+      );
+    }
     return true;
   } catch (err) {
     logger.warn(

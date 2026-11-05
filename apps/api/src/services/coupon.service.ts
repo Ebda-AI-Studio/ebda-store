@@ -1,4 +1,7 @@
-import { prisma, Prisma } from '@ebda/database';
+import { assertCouponValue } from '../lib/sellable-price';
+import { assertCustomerGroupInStore } from '../lib/customer-group-scope';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import type { Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
@@ -93,13 +96,13 @@ export class CouponService {
     }
 
     const [coupons, total] = await Promise.all([
-      prisma.coupon.findMany({
+      (await storeDb(storeId)).coupon.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.coupon.count({ where }),
+      (await storeDb(storeId)).coupon.count({ where }),
     ]);
 
     return {
@@ -114,7 +117,9 @@ export class CouponService {
   }
 
   static async getById(storeId: string, couponId: string) {
-    const coupon = await prisma.coupon.findFirst({
+    const coupon = await (
+      await storeDb(storeId)
+    ).coupon.findFirst({
       where: { id: couponId, storeId },
     });
 
@@ -126,7 +131,9 @@ export class CouponService {
   }
 
   static async getByCode(storeId: string, code: string) {
-    const coupon = await prisma.coupon.findFirst({
+    const coupon = await (
+      await storeDb(storeId)
+    ).coupon.findFirst({
       where: {
         storeId,
         code: { equals: code, mode: 'insensitive' },
@@ -153,12 +160,22 @@ export class CouponService {
       throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
     }
 
+    // QA-COUPON-1: a legacy percentage/fixed coupon saved with value 0 would be "accepted" and then charge full price.
+    // Every public path (validate, quote, order) reads through here, so all of them refuse it the same way.
+    if (coupon.type !== 'free_shipping' && typeof coupon.value === 'number' && coupon.value <= 0) {
+      throw new AppError(400, 'COUPON_VALUE_REQUIRED', 'Coupon has no discount value');
+    }
+
     return coupon;
   }
 
   static async create(storeId: string, data: CreateCouponData) {
+    // QA-PRICE-ZERO-1: a coupon that discounts nothing (or everything) is refused at the door.
+    assertCouponValue(data.type, data.value);
     // Check for duplicate code
-    const existingCoupon = await prisma.coupon.findFirst({
+    const existingCoupon = await (
+      await storeDb(storeId)
+    ).coupon.findFirst({
       where: {
         storeId,
         code: { equals: data.code, mode: 'insensitive' },
@@ -169,7 +186,11 @@ export class CouponService {
       throw new AppError(409, 'DUPLICATE_CODE', 'A coupon with this code already exists');
     }
 
-    const coupon = await prisma.coupon.create({
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
+
+    const coupon = await (
+      await storeWriter(storeId)
+    ).coupon.create({
       data: {
         storeId,
         code: data.code.toUpperCase(),
@@ -198,11 +219,19 @@ export class CouponService {
   }
 
   static async update(storeId: string, couponId: string, data: UpdateCouponData) {
-    await this.getById(storeId, couponId);
+    const current = await this.getById(storeId, couponId);
+    // QA-PRICE-ZERO-1: judge the type/value pair the row will HAVE after this update.
+    if (data.type !== undefined || data.value !== undefined) {
+      assertCouponValue(data.type ?? current.type, data.value ?? current.value);
+    }
+
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
     // Check for duplicate code if changing code
     if (data.code) {
-      const existingCoupon = await prisma.coupon.findFirst({
+      const existingCoupon = await (
+        await storeDb(storeId)
+      ).coupon.findFirst({
         where: {
           storeId,
           code: { equals: data.code, mode: 'insensitive' },
@@ -215,7 +244,9 @@ export class CouponService {
       }
     }
 
-    const coupon = await prisma.coupon.update({
+    const coupon = await (
+      await storeWriter(storeId)
+    ).coupon.update({
       where: { id: couponId, storeId },
       data: {
         code: data.code?.toUpperCase(),
@@ -246,7 +277,9 @@ export class CouponService {
   static async delete(storeId: string, couponId: string) {
     await this.getById(storeId, couponId);
 
-    await prisma.coupon.delete({
+    await (
+      await storeWriter(storeId)
+    ).coupon.delete({
       where: { id: couponId, storeId },
     });
   }
@@ -254,7 +287,9 @@ export class CouponService {
   static async toggleActive(storeId: string, couponId: string) {
     const coupon = await this.getById(storeId, couponId);
 
-    const updatedCoupon = await prisma.coupon.update({
+    const updatedCoupon = await (
+      await storeWriter(storeId)
+    ).coupon.update({
       where: { id: couponId, storeId },
       data: { isActive: !coupon.isActive },
     });
@@ -263,7 +298,9 @@ export class CouponService {
   }
 
   static async incrementUsage(storeId: string, couponId: string) {
-    await prisma.coupon.update({
+    await (
+      await storeWriter(storeId)
+    ).coupon.update({
       where: { id: couponId, storeId },
       data: { usageCount: { increment: 1 } },
     });
@@ -280,22 +317,14 @@ export class CouponService {
     },
     orderTotal: number
   ): number {
-    let discount = 0;
-
-    if (coupon.type === 'percentage') {
-      discount = Math.round((orderTotal * coupon.value) / 100);
-      if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-        discount = coupon.maxDiscount;
-      }
-    } else if (coupon.type === 'fixed') {
-      discount = coupon.value;
-      if (discount > orderTotal) {
-        discount = orderTotal;
-      }
-    }
-    // free_shipping is handled separately
-
-    return discount;
+    // ONE formula for validate, quote and order: promotion-targeting's computeDiscount (the order and the DO twin use it
+    // too). This used to be a second copy with a different max-discount rule (QA-COUPON-1).
+    return computeDiscount(
+      coupon.type as 'percentage' | 'fixed' | 'free_shipping',
+      coupon.value,
+      coupon.maxDiscount,
+      orderTotal
+    );
   }
 
   /**

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { withStore } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
+
 import { config } from '../../../config';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -98,8 +99,8 @@ async function loadSendContext(
       })
     ),
     // `Store` is platform data on both backends (Ruling CF-WRITES-2)
-    withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT })
+    withStoreDb(storeId, db =>
+      db.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT })
     ),
   ]);
   return { campaign, store: store as CampaignStoreContext | null };

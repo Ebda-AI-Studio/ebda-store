@@ -8,6 +8,8 @@ import { SearchInput } from '@/components/SearchInput';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { Button } from '@ebda/ui';
+import { ErrorState } from '@/components/ErrorState';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
@@ -39,6 +41,7 @@ export default function StockAdjustmentsPage() {
   const [error, setError] = useState<string | null>(null);
   // Debounced search term — client-side filter over adjustment number and type.
   const [search, setSearch] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -53,8 +56,8 @@ export default function StockAdjustmentsPage() {
           setAdjustments(data ?? []);
         }
       })
-      .catch(() => setError('Failed to load stock adjustments'));
-  }, [storeId, period, customRange]);
+      .catch(() => setError(t('loadFailed')));
+  }, [storeId, period, customRange, retryKey]);
 
   // Client-side filter: match adjustment number or type (case-insensitive).
   const filteredAdjustments = useMemo(() => {
@@ -94,7 +97,7 @@ export default function StockAdjustmentsPage() {
         return (
           <span
             className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-              isDraft ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+              isDraft ? 'bg-warning/10 text-warning-ink' : 'bg-green-100 text-green-800'
             }`}
           >
             {adj.status}
@@ -130,7 +133,18 @@ export default function StockAdjustmentsPage() {
   ];
 
   return (
-    <AdminLayout title={t('title')} subtitle={t('description')}>
+    <AdminLayout
+      title={t('title')}
+      subtitle={t('description')}
+      actions={
+        <Button
+          className="min-h-11"
+          onClick={() => router.push(`/stores/${storeId}/stock/adjustments/new`)}
+        >
+          {t('newButton')}
+        </Button>
+      }
+    >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <DateRangePicker
           period={period}
@@ -149,27 +163,21 @@ export default function StockAdjustmentsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
-          {error}
-        </div>
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null);
+            setRetryKey(k => k + 1);
+          }}
+        />
       )}
 
       {!adjustments && !error && (
         <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
       )}
 
-      {adjustments && (
+      {adjustments && !error && (
         <div className="max-w-5xl space-y-4">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => router.push(`/stores/${storeId}/stock/adjustments/new`)}
-              className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
-            >
-              {t('newButton')}
-            </button>
-          </div>
-
           <DataTable<AdjustmentRow>
             ariaLabel={t('title')}
             columns={columns}

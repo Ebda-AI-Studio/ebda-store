@@ -194,6 +194,7 @@ const publicUser = (u: UserRow) => ({
   role: u.role,
   emailVerified: !!u.email_verified,
   language: u.language,
+  phone: u.phone,
   mfaEnabled: !!u.mfa_enabled,
 });
 
@@ -670,6 +671,14 @@ export async function registerPending(
 
 const STORE_SIGN_IN_URL = 'https://store.ebda.app/login';
 
+/** The Store sign-in URL carrying the caller's `product` (chat | store) and a bounded https `return`. */
+export function signInEntryUrl(product: string | undefined, ret: string | undefined): string {
+  const url = new URL(STORE_SIGN_IN_URL);
+  if (product === 'chat' || product === 'store') url.searchParams.set('product', product);
+  if (ret && ret.length <= 2048 && /^https:\/\//i.test(ret)) url.searchParams.set('return', ret);
+  return url.toString();
+}
+
 export function createApp() {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -777,8 +786,13 @@ export function createApp() {
   // This host is API-only (no UI by design, Ruling ID-1): the sign-in form is the Store app's /login, which posts to this
   // service. A person who types the bare host, /login or /sign-in lands there instead of a 404 (Ruling ACCOUNTS-ENTRY-1).
   // Cost if wrong: when a dedicated accounts UI ships, point these three at it.
+  // Ebda Chat arrives as /login?product=chat&return=<https url>: both survive the hop (Ruling SIGNIN-RETURN-1). Only
+  // those two keys travel, `product` only from the known set and `return` only as a bounded https URL; the Store
+  // sign-in page re-validates `return` against its host allowlist, which is the actual open-redirect boundary.
   for (const path of ['/', '/login', '/sign-in']) {
-    app.get(path, c => c.redirect(STORE_SIGN_IN_URL, 302));
+    app.get(path, c =>
+      c.redirect(signInEntryUrl(c.req.query('product'), c.req.query('return')), 302)
+    );
   }
 
   // ---- discovery ----
@@ -1210,6 +1224,35 @@ export function createApp() {
       .bind(user.id)
       .run();
     return c.json({ success: true, data: { enabled: false } });
+  });
+
+  // ---- account phone (Ruling PHONE-CHANGE-1) ----
+  // The phone is the WhatsApp reset-code destination (ID-WA-OTP-1), so changing it is a recovery-channel change: a stolen
+  // access token alone must not be enough. Same step-up as /mfa/disable: the current password, plus a TOTP code when the
+  // account has a second factor, and a per-user throttle. Interim: the new number is NOT proven by a code sent to it (the
+  // WhatsApp channel is flag-off); the re-authentication is the proof. Send the code to the new number here when it is on.
+  app.post('/phone', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(
+      c,
+      z.object({
+        phone: z
+          .string()
+          .trim()
+          .regex(/^\+?[0-9][0-9 ()-]{6,19}$/)
+          .transform(v => v.replace(/[ ()-]/g, '')),
+        password: z.string(),
+        code: z.string().optional(),
+      })
+    );
+    if (!(await hit(c.env.DB, user.id, 'n/a', PER_EMAIL('phone-change', 5))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
+    await requirePassword(c, user, body.password);
+    await requireSecondFactor(c, user, body.code);
+    await c.env.DB.prepare(`UPDATE users SET phone = ?2, updated_at = ?3 WHERE id = ?1`)
+      .bind(user.id, body.phone, iso())
+      .run();
+    return c.json({ success: true, data: { phone: body.phone } });
   });
 
   // ---- passkeys ----

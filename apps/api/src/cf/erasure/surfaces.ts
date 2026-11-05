@@ -228,14 +228,70 @@ export function storeDoSurface(
       return { surface: 'store-do', ndjson: ndjson(rows), records: rows.length };
     },
     async eraseSubject(s) {
+      const storeIds = await storesOf(s);
+      // ALL-OR-NOTHING (Ruling NZ-D20): a merchant's stores are gated TOGETHER before any is touched. One store with money in flight
+      // refuses the whole erasure, so no clean sibling is anonymised and sealed while the job halts before identity / media / CI.
+      if (s.kind === 'merchant') {
+        let inFlight = 0;
+        for (const storeId of storeIds) {
+          const gate = await stubFor(storeId).moneyInFlight();
+          inFlight += Object.values(gate).reduce((a, b) => a + b, 0);
+        }
+        if (inFlight > 0)
+          return {
+            surface: 'store-do',
+            erased: 0,
+            remaining: inFlight,
+            note: 'refused: money in flight (settle it, then retry)',
+          };
+      }
       let erased = 0;
       let remaining = 0;
-      for (const storeId of await storesOf(s)) {
+      let refused = false;
+      for (const storeId of storeIds) {
         const r = await stubFor(storeId).eraseSubject(s);
         erased += Object.values(r.erased).reduce((a, b) => a + b, 0);
         remaining += r.remaining;
+        if (r.refused) refused = true;
       }
-      return { surface: 'store-do', erased, remaining };
+      return {
+        surface: 'store-do',
+        erased,
+        remaining,
+        ...(refused ? { note: 'refused: money in flight (settle it, then retry)' } : {}),
+      };
+    },
+  };
+}
+
+// ---------------------------------------------------------------- platform payments (N-27)
+/** The platform-side payer PII of a merchant's InstaPay receipts and manual-payment claims (services/billing/payments-erasure.ts). */
+export interface PaymentsErasurePort {
+  /** Anonymise (never delete) the payer fields of these stores' rows; idempotent. */
+  scrub(storeIds: string[], requestId: string, now?: Date): Promise<{ erased: number }>;
+  /** Rows of these stores still holding a payer value. */
+  remaining(storeIds: string[]): Promise<number>;
+}
+
+/**
+ * Merchant erasure of the platform payments tables. It must run AFTER the `store-do` surface (cf/erasure/job.ts runs that
+ * one first, as the money gate, and stops the job when it refuses), so payer PII is never anonymised while money is in
+ * flight. A customer subject has no platform payer rows of its own (order receipts live in the StoreDO).
+ */
+export function paymentsSurface(
+  port: PaymentsErasurePort,
+  storesOf: (s: Subject) => Promise<string[]>
+): ErasureSurface {
+  return {
+    name: 'platform-payments',
+    async exportSubject(): Promise<ExportPart> {
+      return { surface: 'platform-payments', ndjson: '', records: 0 };
+    },
+    async eraseSubject(s) {
+      if (s.kind !== 'merchant') return { surface: 'platform-payments', erased: 0, remaining: 0 };
+      const storeIds = await storesOf(s);
+      const { erased } = await port.scrub(storeIds, s.requestId);
+      return { surface: 'platform-payments', erased, remaining: await port.remaining(storeIds) };
     },
   };
 }

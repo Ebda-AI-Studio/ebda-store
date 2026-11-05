@@ -137,7 +137,7 @@ export function ZoneEditor({
             <button
               type="button"
               onClick={onReset}
-              className="text-[11px] text-destructive-ink hover:underline shrink-0"
+              className="text-xs text-destructive-ink hover:underline shrink-0"
             >
               {t('resetToDefault')}
             </button>
@@ -150,7 +150,7 @@ export function ZoneEditor({
           <button
             type="button"
             onClick={onReset}
-            className="text-[11px] text-destructive-ink hover:underline shrink-0"
+            className="text-xs text-destructive-ink hover:underline shrink-0"
           >
             {t('resetToDefault')}
           </button>
@@ -210,7 +210,7 @@ export function ZoneEditor({
             placeholder={ph('fontSize') === t('inherit') ? t('fontSizeExample') : ph('fontSize')}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
-          <span className="text-[11px] text-muted-foreground/80">{t('fontSizeHint')}</span>
+          <span className="text-xs text-muted-foreground/80">{t('fontSizeHint')}</span>
         </label>
 
         {/* Font weight */}
@@ -225,7 +225,7 @@ export function ZoneEditor({
             }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
-          <span className="text-[11px] text-muted-foreground/80">{t('fontWeightHint')}</span>
+          <span className="text-xs text-muted-foreground/80">{t('fontWeightHint')}</span>
         </label>
 
         {/* Letter spacing */}

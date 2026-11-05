@@ -76,7 +76,7 @@ Estimated Monthly Cost (current scale): ~$26/mo
 
 1. Click "New Project"
 2. Select "Deploy from GitHub repo"
-3. Choose `Whisky-11/ebda-store`
+3. Choose `Ebda-AI-Studio/ebda-store`
 4. Select the `main` branch
 
 ### 1.3 Configure Service
@@ -151,7 +151,7 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 Two gates exist because a Worker that throws only on workerd (`Prisma.dmmf`, 2026-10-08, error 1101 on every request for ~4 minutes) passes every Node test.
 
-1. **Refuse to deploy a Worker that cannot boot.** `scripts/ci/workerd-smoke.sh` migrates a throwaway Postgres from scratch, boots the API Worker with `wrangler dev --local` and requires `/health` 200, a seeded store 200, an unknown store 404 and an unknown route 404, with no 5xx. It runs as the `api-workerd-smoke` job on every PR and in `cf-api-deploy.yml` before the production migrate and deploy. Locally: create an empty database, `SMOKE_OWNER_DATABASE_URL=postgresql://<owner>@localhost:5432/<db> bash scripts/ci/workerd-smoke.sh` (needs the packages built: `npm run db:generate && npm run build -w packages/shared -w packages/database`). No storefront smoke yet (DEPLOY-SAFETY-4a). The same PR job then runs `npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts`: the search embedding provider inside workerd with `SEARCH_SEMANTIC_ENABLED=true` and a fake `AI` binding, because the smoke strips that binding (search Task 11 review M8).
+1. **Refuse to deploy a Worker that cannot boot.** `scripts/ci/workerd-smoke.sh` boots the API Worker with `wrangler dev --local` and a local D1 (no Postgres since NEON-ZERO N-17) and requires `/health` 200, a directory row still flagged `pg` 410, an unknown store 404 and an unknown route 404, with no 5xx. It runs as the `api-workerd-smoke` job on every PR and in `cf-api-deploy.yml` before the deploy. Locally: `bash scripts/ci/workerd-smoke.sh` (needs the packages built: `npm run db:generate && npm run build -w packages/shared -w packages/database`). No storefront smoke yet (DEPLOY-SAFETY-4a). The same PR job then runs `npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts`: the search embedding provider inside workerd with `SEARCH_SEMANTIC_ENABLED=true` and a fake `AI` binding, because the smoke strips that binding (search Task 11 review M8).
 2. **Roll back automatically when production health fails.** Each deploy workflow records the live version (`node scripts/ci/deploy-guard.mjs previous --name <worker>`), deploys, then `deploy-guard.mjs verify` polls its probes (api: `/health` on this commit + an unknown-store 404; web: this build's manifest + the unknown-store host 404; admin: manifest + `/signup` + `/login`; orders: manifest + `/login`; marketing: `/` + `/sitemap.xml`). On failure it runs `wrangler rollback <recorded version> --yes`, polls again to confirm the old version serves, and fails the job: exit 1 = rolled back and serving, exit 2 = NOT confirmed restored (act now). Tests: `tests/unit/deploy-guard.test.ts`, `tests/unit/workerd-smoke.test.ts`.
 3. **A code rollback does not undo migrations.** The API migrates production first, so migrations stay expand-then-contract (CF-MIGRATE-1); the rollback path prints this warning. After an auto-rollback, fix forward on `main` and redeploy (run history cannot see the rollback).
 
@@ -490,7 +490,7 @@ Sentry / Axiom / PostHog each have their own native notification channels (email
 
 Replaces the Axiom drain (section 5) at cutover: once the API is no longer on Railway nothing writes to that transport.
 
-- **Workers Logs (searchable, short retention):** `observability: { enabled: true, head_sampling_rate: 1 }` and `"logpush": true` on all NINE Ebda Workers: `ebda-api`, `ebda-web`, `ebda-admin`, `ebda-marketing`, `ebda-orders`, `ebda-accounts` (identity), `ebda-help`, `ebda-docs`, `ebda-status` (`apps/*/wrangler.jsonc`; the OpenNext generator `scripts/cf-setup-local.sh` emits the same for web/admin/orders, which it regenerates at every deploy). Query them in the dashboard: Workers & Pages, the Worker, Logs. The assets-only Workers (marketing, help, docs) run no script for static hits, so those produce no log lines; the flags keep config parity. `tests/unit/ops/worker-logs-config.test.ts` fails a PR that drops either setting on any of the nine.
+- **Workers Logs (searchable, short retention):** `observability: { enabled: true, head_sampling_rate: 1 }` (**0.1 on `ebda-api` and `ebda-web`, the public high-traffic Workers, since the launch sampling change (PERF-SAMPLING): Workers Logs keep 1 in 10 invocations; the Logpush archive below and Sentry error capture are separate pipelines. Inferred from Cloudflare's docs, not measured: confirm the archive volume after the first launch day**) and `"logpush": true` on all NINE Ebda Workers: `ebda-api`, `ebda-web`, `ebda-admin`, `ebda-marketing`, `ebda-orders`, `ebda-accounts` (identity), `ebda-help`, `ebda-docs`, `ebda-status` (`apps/*/wrangler.jsonc`; the OpenNext generator `scripts/cf-setup-local.sh` emits the same for web/admin/orders, which it regenerates at every deploy). Query them in the dashboard: Workers & Pages, the Worker, Logs. The assets-only Workers (marketing, help, docs) run no script for static hits, so those produce no log lines; the flags keep config parity. `tests/unit/ops/worker-logs-config.test.ts` fails a PR that drops either setting on any of the nine.
 - **Logpush (30 days, in our bucket):** ONE account-level job **`ebda-workers-trace`** (id 1986363, dataset `workers_trace_events`, filter `ScriptName in [the nine]`) writes gzip NDJSON to R2 bucket **`ebda-logs`**, objects `workers/<YYYYMMDD>/<start>_<end>_<id>.log.gz` (plus `workers/00010101/test.txt.gz`, Logpush's ownership check). A lifecycle rule deletes objects after 30 days (created and read back 2026-10-24). Verified 2026-10-25: the job has `last_complete` set with no `last_error`, and real log files were listed with the bucket-scoped read key. Logs carry `console.log` lines and uncaught exceptions, never request bodies; the PII masking rules of section 5 still apply to what we log.
 - **Which token can do what (never print them):**
 
@@ -701,7 +701,7 @@ harmless to leave in place.
 
 ## CI deploy token: minimum scope, and where it can be reached from (Ruling DEPLOY-PARITY-1)
 
-`Whisky-11/ebda-store` is a Free-plan private repo: GitHub offers no required reviewers, no environment protection and no
+`Ebda-AI-Studio/ebda-store` is a Free-plan private repo: GitHub offers no required reviewers, no environment protection and no
 enforced CODEOWNERS here, so the controls are in code. They are enforced by tests and a required check:
 
 - **A pull request can never reach a deploy secret.** `tests/unit/deploy-secrets-never-on-pr.test.ts` fails the build if any
@@ -710,7 +710,7 @@ enforced CODEOWNERS here, so the controls are in code. They are enforced by test
   only on push to `main` or manual dispatch; `db-backup.yml` only on schedule or dispatch.
 - **A change to how production deploys needs a human label.** The required check "Deploy workflow changes need the
   deploy-change label" (`.github/workflows/deploy-change-label.yml`, `scripts/ci/deploy-change-label.mjs`) fails a PR that edits
-  `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
+  `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/deploy-plan.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
   `scripts/ebda-cf-api-config.mjs` unless it carries the `deploy-change` label, which only a person applies after reading the diff.
 - **The CI Cloudflare token is `ebda-github-deploy` (`CLOUDFLARE_API_TOKEN`, production environment secret).** Checked in the
   Cloudflare dashboard on 2026-10-27 by the controller: it is scoped to **1 account (Ebda's) and 1 zone (`ebda.app`)**, never
@@ -724,7 +724,7 @@ enforced CODEOWNERS here, so the controls are in code. They are enforced by test
   | Account · D1                 | account         | `Apply D1 migrations (ebda-identity)` and the D1 bindings                                                                          |
   | Account · Workers R2 Storage | account         | the nightly `db-backup.yml` upload to `ebda-db-backups`, and R2 bindings (cache, uploads)                                          |
   | Account · Queues             | account         | the queue producer/consumer bindings on the API Worker                                                                             |
-  | Account · Hyperdrive         | account         | the Hyperdrive binding (`EBDA_HYPERDRIVE_ID`) to Neon                                                                              |
+  | Account · Hyperdrive         | account         | retired (NEON-ZERO N-17): the API Worker has no Hyperdrive binding; delete the config with the Neon project                        |
   | Account · Account Settings   | account         | wrangler resolves the account and its subdomain on deploy (the broadest line here: review it first if the token is ever tightened) |
   | Zone · Workers Routes        | zone `ebda.app` | the `<host>/*` zone routes in the `wrangler.jsonc` files, including the storefront `*/*` for merchant custom domains               |
   | Zone · DNS                   | zone `ebda.app` | Workers **Custom Domains** create their DNS records on deploy                                                                      |

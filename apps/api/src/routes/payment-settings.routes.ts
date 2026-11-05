@@ -1,7 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { prisma, Prisma } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
@@ -58,22 +60,29 @@ const paymentConfigSchema = z.object({
     .refine(code => PAYMENT_PROVIDER_CODES.includes(code), { message: 'Unknown payment provider' }),
   isEnabled: z.boolean().default(false),
   isDefault: z.boolean().default(false),
-  displayName: z.string().optional(),
-  displayNameAr: z.string().optional(),
+  // BE:S-10: bounded display strings and method/currency lists (they used to spread unconstrained into the row).
+  displayName: z.string().max(120).optional(),
+  displayNameAr: z.string().max(120).optional(),
   apiKey: z.string().optional(),
   secretKey: z.string().optional(),
   merchantId: z.string().optional(),
   webhookSecret: z.string().optional(),
   testMode: z.boolean().default(true),
-  supportedMethods: z.array(z.string()).default([]),
-  supportedCurrencies: z.array(z.string()).default([REGION.currency]),
+  supportedMethods: z.array(z.string().min(1).max(40)).max(20).default([]),
+  supportedCurrencies: z
+    .array(z.string().regex(/^[A-Za-z]{3}$/))
+    .max(10)
+    .default([REGION.currency]),
   fixedFee: z.number().int().min(0).default(0),
   percentageFee: z.number().min(0).max(100).default(0),
   /** Non-secret per-provider settings (InstaPay handle/phone/expiry, COD percentage). */
   settings: z.record(z.string(), z.unknown()).optional(),
 });
 
-const updateConfigSchema = paymentConfigSchema.partial();
+// BE:S-3: the provider is the URL segment and NEVER updatable. With `provider` in the body a cod/instapay row could be renamed
+// into an enabled paymob row, skipping the credentials/test/activation gate keyed on the URL provider. Zod strips the unknown
+// key, so a UI that echoes the whole row still works and the rename is simply ignored.
+const updateConfigSchema = paymentConfigSchema.omit({ provider: true }).partial();
 
 // ==========================================
 // Helper Functions
@@ -242,6 +251,8 @@ router.use(
 router.get(
   '/store/:storeId',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -252,6 +263,7 @@ router.get(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -274,7 +286,9 @@ router.get(
       }
 
       // Get store-specific configs
-      const storeConfigs = await prisma.paymentConfig.findMany({
+      const storeConfigs = await (
+        await storeDb(storeId)
+      ).paymentConfig.findMany({
         where: { storeId },
         orderBy: { provider: 'asc' },
       });
@@ -312,6 +326,8 @@ router.get(
 router.post(
   '/store/:storeId',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -325,6 +341,7 @@ router.post(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -345,7 +362,9 @@ router.post(
       }
 
       // Check if provider already exists for this store
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: data.provider,
           storeId,
@@ -358,14 +377,6 @@ router.post(
           error: { code: 'ALREADY_EXISTS', message: 'Provider already configured for this store' },
         });
         return;
-      }
-
-      // If setting as default, unset other defaults for this store
-      if (data.isDefault) {
-        await prisma.paymentConfig.updateMany({
-          where: { storeId, isDefault: true },
-          data: { isDefault: false },
-        });
       }
 
       refuseLegacyGatewayCredentials(data.provider, req.body ?? {});
@@ -383,34 +394,44 @@ router.post(
       // Encrypt credentials before storing
       const encryptedCreds = encryptCredentials(data);
 
-      const config = await prisma.paymentConfig.create({
-        data: {
-          storeId,
-          provider: data.provider,
-          isEnabled: data.isEnabled,
-          isDefault: data.isDefault,
-          displayName: data.displayName,
-          displayNameAr: data.displayNameAr,
-          apiKey: encryptedCreds.apiKey,
-          apiKeyLast4: encryptedCreds.apiKeyLast4,
-          secretKey: encryptedCreds.secretKey,
-          merchantId: encryptedCreds.merchantId,
-          merchantIdLast4: encryptedCreds.merchantIdLast4,
-          webhookSecret: encryptedCreds.webhookSecret,
-          testMode: data.testMode,
-          supportedMethods: data.supportedMethods,
-          supportedCurrencies: data.supportedCurrencies,
-          fixedFee: data.fixedFee,
-          percentageFee: data.percentageFee,
-          settings: normalizeProviderSettings(
-            data.provider,
-            data.settings,
-            data.isEnabled
-          ) as Prisma.InputJsonValue,
-          createdBy: userId,
-          updatedBy: userId,
-        },
-      });
+      // Unsetting the other default and creating this row are ONE atomic unit (a failed create must not leave the
+      // store with no default). On a DO store it is one mutate RPC; on Postgres the request transaction.
+      const w = await storeWriter(storeId);
+      const [, config] = await w.$transaction([
+        // no-op (`id in []` matches nothing) unless this row becomes the default
+        w.paymentConfig.updateMany({
+          where: data.isDefault ? { storeId, isDefault: true } : { storeId, id: { in: [] } },
+          data: { isDefault: false },
+        }),
+        w.paymentConfig.create({
+          data: {
+            storeId,
+            provider: data.provider,
+            isEnabled: data.isEnabled,
+            isDefault: data.isDefault,
+            displayName: data.displayName,
+            displayNameAr: data.displayNameAr,
+            apiKey: encryptedCreds.apiKey,
+            apiKeyLast4: encryptedCreds.apiKeyLast4,
+            secretKey: encryptedCreds.secretKey,
+            merchantId: encryptedCreds.merchantId,
+            merchantIdLast4: encryptedCreds.merchantIdLast4,
+            webhookSecret: encryptedCreds.webhookSecret,
+            testMode: data.testMode,
+            supportedMethods: data.supportedMethods,
+            supportedCurrencies: data.supportedCurrencies,
+            fixedFee: data.fixedFee,
+            percentageFee: data.percentageFee,
+            settings: normalizeProviderSettings(
+              data.provider,
+              data.settings,
+              data.isEnabled
+            ) as Prisma.InputJsonValue,
+            createdBy: userId,
+            updatedBy: userId,
+          },
+        }),
+      ]);
 
       await auditLog({
         action: 'store_payment_config.created',
@@ -447,6 +468,8 @@ router.post(
 router.put(
   '/store/:storeId/:provider',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -460,6 +483,7 @@ router.put(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -479,7 +503,9 @@ router.put(
         return;
       }
 
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: provider,
           storeId,
@@ -492,14 +518,6 @@ router.put(
           error: { code: 'NOT_FOUND', message: 'Payment provider not configured for this store' },
         });
         return;
-      }
-
-      // If setting as default, unset other defaults for this store
-      if (data.isDefault) {
-        await prisma.paymentConfig.updateMany({
-          where: { storeId, isDefault: true, id: { not: existing.id } },
-          data: { isDefault: false },
-        });
       }
 
       // Only encrypt credentials if they're being updated
@@ -559,10 +577,17 @@ router.put(
         );
       }
 
-      const config = await prisma.paymentConfig.update({
-        where: { id: existing.id, storeId },
-        data: updateData,
-      });
+      // Unsetting the other default and updating this row are ONE atomic unit (see the create route).
+      const w = await storeWriter(storeId);
+      const [, config] = await w.$transaction([
+        w.paymentConfig.updateMany({
+          where: data.isDefault
+            ? { storeId, isDefault: true, id: { not: existing.id } }
+            : { storeId, id: { in: [] } },
+          data: { isDefault: false },
+        }),
+        w.paymentConfig.update({ where: { id: existing.id, storeId }, data: updateData }),
+      ]);
 
       await auditLog({
         action: 'store_payment_config.updated',
@@ -599,6 +624,8 @@ router.put(
 router.delete(
   '/store/:storeId/:provider',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -611,6 +638,7 @@ router.delete(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -630,7 +658,9 @@ router.delete(
         return;
       }
 
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: provider,
           storeId,
@@ -645,7 +675,9 @@ router.delete(
         return;
       }
 
-      await prisma.paymentConfig.delete({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.delete({
         where: { id: existing.id, storeId },
       });
 
@@ -679,6 +711,8 @@ router.delete(
 router.post(
   '/store/:storeId/:provider/toggle',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -692,6 +726,7 @@ router.post(
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
         where: { id: storeId },
+        select: { id: true, ownerId: true },
       });
 
       if (!store) {
@@ -711,7 +746,9 @@ router.post(
         return;
       }
 
-      const existing = await prisma.paymentConfig.findFirst({
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: {
           provider: provider,
           storeId,
@@ -734,7 +771,9 @@ router.post(
         throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
       }
 
-      const config = await prisma.paymentConfig.update({
+      const config = await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: {
           isEnabled: enabled,
@@ -783,7 +822,10 @@ const credentialUpdateSchema = z.object({
 
 /** Loads the store and repeats the inline ownership check the other store routes make. */
 async function loadOwnedStore(req: Request, storeId: string) {
-  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { id: true, ownerId: true },
+  });
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   const user = getAuthUser(req);
   if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
@@ -801,6 +843,8 @@ async function loadOwnedStore(req: Request, storeId: string) {
 router.put(
   '/store/:storeId/:provider/credentials',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -812,7 +856,9 @@ router.put(
       const entry = connectableEntry(provider);
       assertMayConfigure(provider, user.role);
 
-      const existing = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({ where: { provider, storeId } });
       const update = applyCredentialUpdate(entry, existing, {
         mode: body.mode,
         fields: body.fields,
@@ -830,8 +876,12 @@ router.put(
         updatedBy: user.userId,
       };
       const config = existing
-        ? await prisma.paymentConfig.update({ where: { id: existing.id, storeId }, data })
-        : await prisma.paymentConfig.create({
+        ? await (
+            await storeWriter(storeId)
+          ).paymentConfig.update({ where: { id: existing.id, storeId }, data })
+        : await (
+            await storeWriter(storeId)
+          ).paymentConfig.create({
             data: {
               ...data,
               storeId,
@@ -873,7 +923,9 @@ router.put(
         // Only the ACTIVE mode's proof is stored (the enable gate reads it); checking the other
         // mode just reports, so it can neither void a live proof nor mark a live gateway down.
         if ((body.mode === 'sandbox') === config.testMode) {
-          finalConfig = await prisma.paymentConfig.update({
+          finalConfig = await (
+            await storeWriter(storeId)
+          ).paymentConfig.update({
             where: { id: config.id, storeId },
             data: {
               connectionTest: stored as unknown as Prisma.InputJsonValue,
@@ -931,6 +983,8 @@ router.put(
 router.post(
   '/store/:storeId/:provider/test',
   authenticate,
+  requireMfaEnrolled,
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -940,7 +994,9 @@ router.post(
       const { user } = await loadOwnedStore(req, storeId);
       connectableEntry(provider);
       assertMayConfigure(provider, user.role);
-      const existing = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+      const existing = await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({ where: { provider, storeId } });
       if (!existing) {
         throw new AppError(404, 'NOT_FOUND', 'Save the credentials before testing the connection');
       }
@@ -949,7 +1005,9 @@ router.post(
       const latency = Date.now() - startedAt;
       await reportConnectionCheck({ storeId, provider, mode: stored.mode, code: result.code });
 
-      await prisma.paymentConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).paymentConfig.update({
         where: { id: existing.id, storeId },
         data: {
           connectionTest: stored as unknown as Prisma.InputJsonValue,

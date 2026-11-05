@@ -13,7 +13,7 @@ import { hybridOrder } from '../lib/search/rrf';
 import { queryBudgetSpent, takeQueryEmbed } from '../lib/search/embed-budget';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
-import { storeMoney } from '../lib/repo-factory';
+import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { cfBindings } from '../cf/bindings';
 
 /** Most ids a lexical search binds into the follow-up Prisma query (list, typeahead, admin). */
@@ -186,6 +186,26 @@ export async function searchNameIds(
     tokens
   );
   const take = clampLimit(limit);
+  // A store on its Durable Object has no Postgres `ebda_ar_norm`: the same words-AND match runs over the store's (small) rows
+  // with the shared TS fold. The Postgres statements below are untouched.
+  if ((await storeRepo(storeId)).backend === 'do') {
+    const db = await storeDb(storeId);
+    const sel = { id: true, name: true, nameAr: true } as const;
+    const found: Array<{ id: string; name: string | null; nameAr: string | null }> =
+      table === 'bundles'
+        ? await db.bundle.findMany({ where: { storeId }, select: sel })
+        : table === 'promotions'
+          ? await db.promotion.findMany({ where: { storeId }, select: sel })
+          : await db.category.findMany({ where: { storeId, deletedAt: null }, select: sel });
+    return found
+      .filter(r => {
+        const hay = normalizeArabicSearch(`${r.name ?? ''} ${r.nameAr ?? ''}`);
+        return tokens.every(t => hay.includes(t));
+      })
+      .map(r => r.id)
+      .sort()
+      .slice(0, take);
+  }
   let rows: Array<{ id: string }>;
   if (table === 'bundles') {
     rows = await prisma.$queryRaw`

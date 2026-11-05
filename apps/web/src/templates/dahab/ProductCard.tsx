@@ -38,6 +38,8 @@ import { cx, BagIcon } from './ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
 import { useRenderNow } from '../../contexts/RenderClockContext';
+import { MissingImage } from '../shared/MissingImage';
+import { CARD_GRID_SIZES } from '../../lib/image-sizes';
 
 export interface DahabProductCardProps extends ProductCardProps {
   /** `sizes` hint for the image (grid density decides it). */
@@ -54,7 +56,7 @@ export default function DahabProductCard({
   showCardPrice,
   showLabel,
   showHover,
-  imageSizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw',
+  imageSizes = CARD_GRID_SIZES,
 }: DahabProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store } = useStore();
@@ -140,7 +142,7 @@ export default function DahabProductCard({
                 className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:group-hover/card:scale-[1.03]"
               />
             ) : (
-              <div aria-hidden="true" className="absolute inset-0 bg-muted" />
+              <MissingImage label={name} />
             )}
             {showHover !== false && canHover && secondary?.url && (
               <Image

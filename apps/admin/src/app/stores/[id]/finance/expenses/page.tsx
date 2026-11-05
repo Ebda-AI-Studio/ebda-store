@@ -6,6 +6,9 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
+import { Button, useToast } from '@ebda/ui';
+import { RowActions } from '@/components/RowActions';
+import { useConfirm } from '@/hooks/useConfirm';
 import { apiGetPage, apiPost, type PageMeta } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -57,6 +60,8 @@ export default function ExpensesPage() {
   const router = useRouter();
   const t = useT('finance.expenses');
   const tc = useT('common');
+  const askConfirm = useConfirm();
+  const { error: toastError } = useToast();
 
   // `?status=draft&hasOcr=true` deep links (finance dashboard → "Pending receipt
   // drafts (any date)" → View all) land on the SAME slice the card counted: the
@@ -123,7 +128,7 @@ export default function ExpensesPage() {
       .catch(() => {
         if (!isLatest()) return;
         setExpenses(null);
-        setError('Failed to load expenses');
+        setError(t('loadFailed'));
       });
   }, [storeId, period, customRange, statusFilter, receiptOnly, page, beginRequest]);
 
@@ -133,7 +138,12 @@ export default function ExpensesPage() {
 
   async function performAction(expenseId: string, action: 'approve' | 'post' | 'reject') {
     if (action === 'reject') {
-      if (!window.confirm(t('actions.rejectConfirm'))) return;
+      const ok = await askConfirm({
+        object: t('actions.rejectObject'),
+        consequence: t('actions.rejectConsequence'),
+        confirmLabel: t('actions.reject'),
+      });
+      if (!ok) return;
     }
     setActionLoading(expenseId + ':' + action);
     try {
@@ -141,12 +151,12 @@ export default function ExpensesPage() {
         `/api/v1/stores/${storeId}/expenses/${expenseId}/${action}`
       );
       if (apiError) {
-        alert(apiError.message);
+        toastError(apiError.message);
       } else {
         setRefreshKey(k => k + 1);
       }
     } catch {
-      alert('Action failed');
+      toastError(t('actions.failed'));
     } finally {
       setActionLoading(null);
     }
@@ -206,36 +216,41 @@ export default function ExpensesPage() {
       cell: exp => {
         const isActing = actionLoading?.startsWith(exp.id + ':');
         return (
-          <div className="flex gap-1">
+          <div className="flex items-center justify-end gap-1">
             {(exp.status === 'draft' || exp.status === 'pending') && (
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 md:min-h-9"
                 disabled={isActing}
                 onClick={() => performAction(exp.id, 'approve')}
-                className="max-md:min-h-11 px-2 py-1 max-md:px-3 text-xs border border-border rounded hover:bg-muted disabled:opacity-50"
               >
                 {t('actions.approve')}
-              </button>
+              </Button>
             )}
             {exp.status === 'approved' && (
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 md:min-h-9"
                 disabled={isActing}
                 onClick={() => performAction(exp.id, 'post')}
-                className="max-md:min-h-11 px-2 py-1 max-md:px-3 text-xs border border-border rounded hover:bg-muted disabled:opacity-50"
               >
                 {t('actions.post')}
-              </button>
+              </Button>
             )}
             {exp.status !== 'posted' && exp.status !== 'rejected' && (
-              <button
-                type="button"
-                disabled={isActing}
-                onClick={() => performAction(exp.id, 'reject')}
-                className="max-md:min-h-11 px-2 py-1 max-md:px-3 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
-              >
-                {t('actions.reject')}
-              </button>
+              <RowActions
+                menuLabel={t('actions.menu', { number: exp.expenseNumber })}
+                items={[
+                  {
+                    label: t('actions.reject'),
+                    destructive: true,
+                    disabled: isActing,
+                    onSelect: () => performAction(exp.id, 'reject'),
+                  },
+                ]}
+              />
             )}
           </div>
         );
@@ -248,13 +263,12 @@ export default function ExpensesPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        <button
-          type="button"
+        <Button
+          className="min-h-11"
           onClick={() => router.push(`/stores/${storeId}/finance/expenses/new`)}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium"
         >
           {t('newButton')}
-        </button>
+        </Button>
       }
     >
       {receiptOnly ? (

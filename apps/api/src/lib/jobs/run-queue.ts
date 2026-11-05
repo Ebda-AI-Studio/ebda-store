@@ -28,6 +28,19 @@ import {
   type LegacyCronMessage,
 } from './start';
 import { cfBindings } from '../../cf/bindings';
+import { sendAlert } from '../../services/alerts.service';
+import {
+  applyAuditRetry,
+  isAuditWriteRetry,
+  parkDeadAuditRow,
+  type AuditWriteRetryMessage,
+} from '../../services/audit-sink';
+import {
+  applyStoreUpdateRetry,
+  isStoreUpdateRetry,
+  type StoreUpdateRetryMessage,
+} from '../store-update-retry';
+import { isPgCopyScrub, scrubPgCustomerCopy } from '../customer-pg-scrub';
 
 const GATE_MAX_WAITS = 120;
 
@@ -68,6 +81,25 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   }
   if (isLegacyCronMessage(msg.body)) {
     await runLegacyCron(msg, msg.body);
+    return;
+  }
+  if (isStoreUpdateRetry(msg.body)) {
+    await handleStoreUpdateRetry(msg, msg.body);
+    return;
+  }
+  if (isPgCopyScrub(msg.body)) {
+    // N-9: the erased customer's stale Postgres copy; idempotent, retried with backoff until the queue dead-letters it.
+    try {
+      await scrubPgCustomerCopy(msg.body.userId, msg.body.storeId);
+      msg.ack();
+    } catch (err) {
+      logger.warn({ err, userId: msg.body.userId }, '[jobs] pg-copy-scrub failed, will retry');
+      msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+    }
+    return;
+  }
+  if (isAuditWriteRetry(msg.body)) {
+    await handleAuditRetry(msg, msg.body);
     return;
   }
   if (!isJobQueueMessage(msg.body)) {
@@ -215,9 +247,63 @@ async function parkForGate(msg: QueueMessageLike, body: JobQueueMessage, gate: G
 }
 
 /** Retries exhausted at the platform level (a crash loop): same failure path, once. */
+/**
+ * A post-commit D1 / DO Store write that failed once (lib/store-update-retry.ts): re-sync the CURRENT committed state with backoff (Ruling NZ-D20); otherwise the delivery is retried until the queue dead-letters it (alerted there).
+ */
+async function handleStoreUpdateRetry(
+  msg: QueueMessageLike,
+  m: StoreUpdateRetryMessage
+): Promise<void> {
+  const out = await applyStoreUpdateRetry(m, {
+    sync: async storeId => {
+      const { syncStoreEntitlement } = await import('../repo-factory.js');
+      await syncStoreEntitlement(storeId);
+    },
+  });
+  if (out === 'done') msg.ack();
+  else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+}
+
+/** An audit row that could not be written inline (services/audit-sink.ts): retried with backoff, parked + paged at the DLQ. */
+async function handleAuditRetry(msg: QueueMessageLike, m: AuditWriteRetryMessage): Promise<void> {
+  const { replayAuditRowPg } = await import('../definer.js');
+  const out = await applyAuditRetry(m, { pgInsert: replayAuditRowPg });
+  if (out === 'done') msg.ack();
+  else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
+}
+
 async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
   if (writesFrozen()) {
     msg.retry({ delaySeconds: 3600 });
+    return;
+  }
+  if (isPgCopyScrub(msg.body)) {
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'customer.erase.pg_copy_exhausted',
+      title: 'Erased customer still has a Postgres copy: scrub retries exhausted',
+      body: `user ${msg.body.userId} store ${msg.body.storeId}: scrub the users row, tokens and passkeys by hand.`,
+      context: { userId: msg.body.userId, storeId: msg.body.storeId },
+    }).catch(() => undefined);
+    msg.ack();
+    return;
+  }
+  if (isAuditWriteRetry(msg.body)) {
+    await parkDeadAuditRow(msg.body.row);
+    msg.ack();
+    return;
+  }
+  if (isStoreUpdateRetry(msg.body)) {
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'store.update.retry_exhausted',
+      title: 'Store update retry exhausted: D1/DO still behind Postgres',
+      body: `store ${msg.body.storeId}: re-sync its plan / billing / status to D1 and the StoreDO by hand.`,
+      context: { storeId: msg.body.storeId },
+    }).catch(() => undefined);
+    msg.ack();
     return;
   }
   if (isJobQueueMessage(msg.body)) {

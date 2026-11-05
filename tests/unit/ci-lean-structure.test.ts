@@ -107,7 +107,7 @@ describe('ci.yml triggers', () => {
     // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
     const uncached = steps.filter(
       b =>
-        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ vars\.EBDA_RUNS_ON == '' && 'npm' \|\| '' \}\}/.test(
+        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ \(!contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci-umbra'\) && vars\.EBDA_RUNS_ON == ''\) && 'npm' \|\| '' \}\}/.test(
           b.split('\n\n')[0] + '\n'
         )
     );
@@ -237,7 +237,7 @@ describe('scripts/ci-affected.mjs', () => {
       expect.arrayContaining(['web', 'admin', 'orders', 'marketing', 'docs', 'help'])
     );
     // a root config can change any build
-    expect(run('package-lock.json').buildApps.length).toBeGreaterThanOrEqual(6);
+    expect(run('package-lock.json').buildApps.length).toBeGreaterThanOrEqual(4); // 6 before N-17 removed the deploy + smoke Postgres services
   });
 
   it('OPS-2: docs, api-only and test-only changes build no app', () => {
@@ -360,7 +360,7 @@ describe('postgres image parity', () => {
   const PINNED = 'pgvector/pgvector:0.8.0-pg17';
   const FILES = [
     '.github/workflows/ci.yml',
-    '.github/workflows/cf-api-deploy.yml',
+    // cf-api-deploy.yml has no Postgres service any more (NEON-ZERO N-17).
     'docker-compose.yml',
     'docker/docker-compose.yml',
     'scripts/buy-flow-parity/run.mjs',
@@ -423,7 +423,7 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
     const all = files.map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
     expect(
       [...all.matchAll(/--tmpfs \/var\/lib\/postgresql\/data/g)].length
-    ).toBeGreaterThanOrEqual(6);
+    ).toBeGreaterThanOrEqual(4); // 6 before N-17 removed the deploy + smoke Postgres services
   });
 });
 

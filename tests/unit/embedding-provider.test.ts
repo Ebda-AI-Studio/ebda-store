@@ -24,7 +24,7 @@ afterEach(() => {
 const vec = () => Array.from({ length: EMBED_DIMS }, (_, i) => i / EMBED_DIMS);
 const withAi = (
   run: (model: string, input: Record<string, unknown>, opts?: unknown) => Promise<unknown>
-) => setCfBindings({ HYPERDRIVE: { connectionString: '' }, AI: { run } } as never);
+) => setCfBindings({ AI: { run } } as never);
 
 describe('embedding provider', () => {
   it('uses the AI binding when present', async () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert } from '../../../../../components/Alert';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@ebda/shared';
@@ -60,6 +61,7 @@ export function ProviderCard({
   onSave,
 }: ProviderCardProps) {
   const t = useT('paymentSettings');
+  const isAr = useLocale() === 'ar';
 
   return (
     <div
@@ -77,8 +79,13 @@ export function ProviderCard({
             {provider.id[0].toUpperCase()}
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">{provider.name}</h3>
-            <p className="text-xs text-muted-foreground">{provider.nameAr}</p>
+            {/* The provider name leads in the admin's own language; the other is the secondary line (audit S-6). */}
+            <h3 className="font-semibold text-foreground">
+              {isAr ? provider.nameAr : provider.name}
+            </h3>
+            <p className="text-xs text-muted-foreground" lang={isAr ? 'en' : 'ar'}>
+              {isAr ? provider.name : provider.nameAr}
+            </p>
           </div>
         </div>
 
@@ -180,7 +187,7 @@ function CodFields({
             value={form.displayName || ''}
             onChange={e => onUpdateField('displayName', e.target.value)}
             placeholder={t('displayNamePlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
@@ -194,7 +201,7 @@ function CodFields({
             value={form.displayNameAr || ''}
             onChange={e => onUpdateField('displayNameAr', e.target.value)}
             placeholder={t('displayNameArPlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div className="sm:col-span-2">

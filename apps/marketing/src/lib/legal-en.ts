@@ -28,7 +28,9 @@ export const LEGAL_EN: LegalPages = {
         p: [
           '"Ebda Store" («ابدأ ستور»), available at ebda.app, is an online store builder for merchants in Egypt (the "Service"). The Service is a technology platform owned and operated by ' +
             OP +
-            ' ("we", "us"). Ebda AI Studio is our company brand.',
+            ' ("we", "us"). The operating legal entity is ' +
+            BRAND.company.legalNameEn +
+            '. Ebda AI Studio is our company brand.',
         ],
       },
       {
@@ -212,7 +214,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '5. Payments and funds',
         p: [
-          "Ebda Store does not process, hold or settle the Merchant's sales proceeds. Customers pay the Merchant directly by the methods the Merchant enables (such as cash on delivery, the Merchant's own InstaPay account or a gateway the Merchant has contracted with). Any payment provider is bound by its own terms, and the Merchant is responsible for fees, chargebacks, reversals, fraud and reconciliation. Ebda Store is not liable for non-payment, failed or disputed payments, or provider errors.",
+          "Ebda Store does not process, hold or settle the Merchant's sales proceeds. Customers pay the Merchant directly by the methods the Merchant enables (such as cash on delivery, the Merchant's own InstaPay account or a gateway the Merchant has contracted with). Installment (buy now, pay later) services are off by default and are financed by the provider, not by Ebda Store; the Merchant who enables one is responsible for telling customers that the provider's own terms and fees apply. For orders that include gold, cash on delivery and installments are off by default and the order is paid in full online, unless the Merchant switches that setting on, in which case the choice is the Merchant's. Any payment provider is bound by its own terms, and the Merchant is responsible for fees, chargebacks, reversals, fraud and reconciliation. Ebda Store is not liable for non-payment, failed or disputed payments, or provider errors.",
         ],
       },
       {
@@ -224,7 +226,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '7. Prohibited products and conduct',
         p: [
-          'The Merchant must not sell or promote anything prohibited by the Acceptable Use Policy or by law. We may review, remove or block any product, store or Content, but we have no duty to monitor, and not acting is not approval.',
+          'The Merchant must not sell or promote anything prohibited by the Acceptable Use Policy or by law, including alcohol, pork products, paid-entry prize draws, mystery boxes sold for chance, fake reviews, and fake scarcity or countdown timers. We may review, remove or block any product, store or Content, but we have no duty to monitor, and not acting is not approval.',
         ],
       },
       {
@@ -300,13 +302,15 @@ export const LEGAL_EN: LegalPages = {
         h: '2. General rules',
         p: [
           'Do not use the Service to break any law or regulation of Egypt or of the places you sell to; to deceive, defraud or mislead customers; to infringe intellectual property, privacy or other rights; to publish defamatory, hateful, harassing, threatening or sexually explicit material; to send spam or unsolicited messages; to spread malware; or to harm people, especially minors.',
+          'Sell honestly and openly. The following are not allowed: charging an entry fee or a purchase for a chance to win a prize (paid-entry prize draws, raffles and lotteries); selling a mystery box or any item whose contents or value are decided by chance; fake, purchased, invented or incentivised-for-rating reviews and testimonials; fake scarcity, such as a countdown timer that restarts, a stock count or "X people are viewing" notice that is not true, or a discount shown against a price that was never charged.',
         ],
       },
       {
         h: '3. Prohibited products and services',
         p: [
-          'It is not allowed to sell, offer or promote: illegal drugs, narcotics and psychoactive substances; weapons, ammunition and explosives; counterfeit, pirated or stolen goods; antiquities and cultural property; human organs, trafficked persons or any exploitation of people; adult or pornographic material; gambling and betting; pyramid, Ponzi or deceptive "get-rich" schemes; unlicensed financial services, deposit-taking, investment offers, and crypto-asset services; stolen, hacked or leaked personal data or accounts; services that facilitate fraud, forgery or cheating on exams; and anything whose sale is prohibited under Egyptian law.',
-          'The following may be sold only if the Merchant holds every licence the law requires and shows it on request: medicines, medical devices and supplements; alcohol; tobacco and vaping products; cosmetics and food products that require registration or approval; and any other regulated or restricted goods. If in doubt, ask us first.',
+          'It is not allowed to sell, offer or promote: illegal drugs, narcotics and psychoactive substances; weapons, ammunition and explosives; counterfeit, pirated or stolen goods; antiquities and cultural property; human organs, trafficked persons or any exploitation of people; adult or pornographic material; gambling and betting; alcoholic drinks and any intoxicating drink or substance; pork and any product made from or containing pork; pyramid, Ponzi or deceptive "get-rich" schemes; unlicensed financial services, deposit-taking, investment offers, and crypto-asset services; stolen, hacked or leaked personal data or accounts; services that facilitate fraud, forgery or cheating on exams; and anything whose sale is prohibited under Egyptian law.',
+          'The following may be sold only if the Merchant holds every licence the law requires and shows it on request: medicines, medical devices and supplements; tobacco and vaping products; cosmetics and food products that require registration or approval; and any other regulated or restricted goods. If in doubt, ask us first.',
+          'The bans on alcohol and pork apply to everything sold, offered or promoted through any Ebda AI Studio product, including Ebda Store and Ebda Chat, whatever licence the Merchant holds. Listings, images, descriptions, categories and advertising for them are removed.',
           "Through Ebda Chat, Meta's WhatsApp Commerce Policy also applies, and these may not be sold or promoted at all, whatever licence you hold: tobacco and vaping products; prescription drugs; adult products and services; gambling and betting; dating services; and weapons, ammunition and explosives.",
         ],
       },

@@ -30,6 +30,7 @@ vi.mock('@ebda/database', async () =>
 );
 vi.mock('@api/lib/repo-factory', () => {
   const db = {
+    store: { findUnique: async () => ({ name: 'Dahab', slug: 'dahab' }) },
     bulkAiJob: {
       findMany: async (a: { where: Record<string, any> }) =>
         h.jobs.filter(

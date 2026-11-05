@@ -207,7 +207,7 @@ function SectionShell({
             <p className="mt-1 text-sm text-muted-foreground leading-snug">{subtitle}</p>
           )}
           {whereShows && (
-            <p className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+            <p className="mt-2 text-xs uppercase tracking-wide text-muted-foreground/70">
               {whereShows}
             </p>
           )}

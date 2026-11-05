@@ -9,11 +9,26 @@
     }
   },
   "baseline": {
-    "apps/api/src/routes/admin.routes.ts": {
-      "kind": "platform",
-      "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
+    "apps/api/src/lib/audit-read.ts": {
+      "kind": "pg-branch",
+      "reason": "readAuditByResource: a DO store returns early from storeDb; the prisma read is the Postgres store's audit trail (actor joined)",
       "models": {
-        "product": 3
+        "auditLog": 1
+      }
+    },
+    "apps/api/src/lib/definer.ts": {
+      "kind": "pg-branch",
+      "reason": "platform audit viewer: a DO store is read through storeRepo(...).db; the withStore read is a Postgres store's own rows",
+      "models": {
+        "auditLog": 2
+      }
+    },
+    "apps/api/src/routes/notification.routes.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: notification log list/count/stats. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "notificationLog": 4
       }
     },
     "apps/api/src/services/abandoned-cart.service.ts": {
@@ -32,13 +47,22 @@
         "productVariant": 1
       }
     },
+    "apps/api/src/services/accounting/analytics-rollup.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: daily product-view total of the analytics rollup. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "productDailyView": 1
+      }
+    },
     "apps/api/src/services/accounting/assert-store-owns.ts": {
       "kind": "pg-branch",
       "reason": "assertStoreOwns takes the client it checks against: assertStoreOwnsInTenantScope hands it the DO read client for a store on its Durable Object (CF-R7-1), so the prisma default is the Postgres branch.",
       "models": {
         "product": 1,
         "productVariant": 1,
-        "category": 1
+        "category": 1,
+        "supplier": 1
       }
     },
     "apps/api/src/services/accounting/purchase-order.service.ts": {
@@ -49,6 +73,14 @@
         "product": 1
       }
     },
+    "apps/api/src/services/accounting/reorder-scan.service.ts": {
+      "kind": "pg-branch",
+      "reason": "the reorder scan: a store on its Durable Object takes the storeMoney() reorderUpsert section (Ruling NZ-A-1); the remaining tx read is the Postgres upsert branch inside its tenant transaction.",
+      "models": {
+        "reorderSuggestion": 1,
+        "supplier": 1
+      }
+    },
     "apps/api/src/services/accounting/stock-adjustment.service.ts": {
       "kind": "pg-branch",
       "reason": "createAdjustment / postAdjustment: after the `storeStock()` early return (CF-R7-1); the remaining reads are the Postgres branch.",
@@ -57,11 +89,21 @@
         "product": 1
       }
     },
+    "apps/api/src/services/answer-engine/gsc-dashboard.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: GSC dashboard trend read. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "gscDailyMetric": 1
+      }
+    },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
-      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO.",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route.",
       "models": {
-        "campaignRecipient": 1
+        "campaignRecipient": 1,
+        "address": 1,
+        "wholesaleApplication": 1
       }
     },
     "apps/api/src/services/barcode-scan.service.ts": {
@@ -89,12 +131,21 @@
         "product": 1
       }
     },
+    "apps/api/src/services/bundle.service.ts": {
+      "kind": "platform",
+      "reason": "resolveBundle / listBundles / listBundleSavings take the CALLER's client (`client.bundle`, `client.bundleItem`): every caller passes `storeDb(storeId)` (cart, public routes) or the bundle routes' `bundleDb`, which is the DO read client for a DO store and `prisma` for a Postgres store; the service itself never picks a backend.",
+      "models": {
+        "bundle": 3,
+        "bundleItem": 1
+      }
+    },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {
       "kind": "pg-branch",
       "reason": "setProductPricing / bulkSwitchMode: after `storeMoney()` early return (CF-PAY-1 gold ops); the tx body is the Postgres branch.",
       "models": {
         "product": 4,
-        "productPriceTier": 1
+        "productPriceTier": 1,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/gold-rate/repricer.ts": {
@@ -110,7 +161,8 @@
       "reason": "adjustInventory / bulkAdjustInventory / setInventory: after `if (stock)` early return (CF-STOCK-1); the remaining reads are the Postgres branch.",
       "models": {
         "product": 3,
-        "productVariant": 1
+        "productVariant": 1,
+        "wishlistItem": 1
       }
     },
     "apps/api/src/services/notification-config.service.ts": {
@@ -136,7 +188,9 @@
         "cartBundle": 1,
         "productVariant": 1,
         "abandonedCart": 1,
-        "cart": 1
+        "cart": 1,
+        "bundle": 1,
+        "bundleItem": 1
       }
     },
     "apps/api/src/services/product.service.ts": {
@@ -144,6 +198,28 @@
       "reason": "update(): the `tx` body is the Postgres transaction path; a DO store takes updateOnDo (CF-WRITES-2).",
       "models": {
         "productCategory": 1
+      }
+    },
+    "apps/api/src/services/provider-verification.service.ts": {
+      "kind": "platform",
+      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
+      "models": {
+        "shippingCarrierConfig": 1
+      }
+    },
+    "apps/api/src/services/shipping-carrier.service.ts": {
+      "kind": "platform",
+      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
+      "models": {
+        "shippingCarrierConfig": 3
+      }
+    },
+    "apps/api/src/services/sms-queue.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: SMS idempotency lookup. The Postgres read is the `() => prisma...` fallback of analyticsRead / analyticsWrite, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "notificationLog": 1
       }
     },
     "apps/api/src/services/variant.service.ts": {
@@ -159,7 +235,7 @@
       "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1).",
       "models": {
         "product": 2,
-        "productVariant": 1
+        "productVariant": 2
       }
     }
   }

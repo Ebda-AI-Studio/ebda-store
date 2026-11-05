@@ -3,6 +3,7 @@
 // Orchestrates carrier integrations: shipment creation, tracking, webhooks
 // ==========================================
 
+import { customerRow, customerRows } from '../lib/customer-directory';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import { CI_SHIPMENT_BOOKED_EVENT, CI_SHIPMENT_TRACKED_EVENT } from '../lib/ci/events';
 import { shipmentStamps } from '../lib/ci/shipment-stamps';
@@ -12,12 +13,13 @@ import {
   currentStoreId,
   prisma,
   Prisma,
-  runInTenantContext,
   withStore,
   runInStoreScope,
   withMoneyTx,
 } from '@ebda/database';
-import { storeDb, storeMoney, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeMoney, storeRepo, storeWriter } from '../lib/repo-factory';
+import { platformDb } from '../lib/platform-directory';
+import { listDirectoryStores } from './platform/directory-d1';
 import { runInStoreCtx } from '../lib/jobs/store-db';
 import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { config as appConfig } from '../config';
@@ -370,7 +372,9 @@ class ShippingCarrierService {
     /** false: report only (a non-active mode's check must not replace the active proof). */
     persist = true
   ) {
-    const row = await prisma.shippingCarrierConfig.findUnique({
+    const row = await (
+      await storeDb(storeId)
+    ).shippingCarrierConfig.findUnique({
       where: { storeId_carrier: { storeId, carrier } },
     });
     if (!row) {
@@ -389,7 +393,9 @@ class ShippingCarrierService {
     );
     const latency = Date.now() - startedAt;
     if (persist) {
-      await prisma.shippingCarrierConfig.update({
+      await (
+        await storeWriter(storeId)
+      ).shippingCarrierConfig.update({
         where: { id: row.id, storeId },
         data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
       });
@@ -477,8 +483,10 @@ class ShippingCarrierService {
         payments: { select: { provider: true, status: true, amount: true, createdAt: true } },
       },
     });
-    const customerRow =
-      orderRow?.customerId != null
+    const doCustomer =
+      orderRow?.customerId != null ? await customerRow(storeId, orderRow.customerId) : undefined;
+    const pgCustomer =
+      doCustomer === undefined && orderRow?.customerId != null
         ? await withStore(storeId, tx =>
             tx.user.findFirst({
               where: { id: orderRow.customerId! },
@@ -486,7 +494,7 @@ class ShippingCarrierService {
             })
           ).catch(() => null)
         : null;
-    const order = orderRow ? { ...orderRow, customer: customerRow } : null;
+    const order = orderRow ? { ...orderRow, customer: doCustomer ?? pgCustomer } : null;
     if (!order) {
       throw new AppError(404, 'NOT_FOUND', `Order ${orderId} not found in store ${storeId}`);
     }
@@ -1252,9 +1260,19 @@ class ShippingCarrierService {
     if (!impl || !impl.capabilities.webhooks) return 'unauthorized';
     if (!/^[0-9a-f-]{36}$/i.test(storeId)) return 'unauthorized';
 
-    return runInTenantContext(storeId, async () => {
-      // Straight from Prisma (not the 300 s cache): a rotated secret must stop working at once.
-      const row = await prisma.shippingCarrierConfig.findUnique({
+    // NEON-ZERO (Ruling NZ-C-9): the directory (D1) decides whether the store exists, with no Postgres. An unknown store is the
+    // same `unauthorized` as a wrong token (no oracle); an unreadable directory is a 503 (the route answers 500, Bosta retries).
+    try {
+      await storeRepo(storeId);
+    } catch (err) {
+      if (err instanceof AppError && err.statusCode === 404) return 'unauthorized';
+      throw err;
+    }
+    return withStore(storeId, async () => {
+      // From the store's own backend, not the 300 s cache: a rotated secret must stop working at once.
+      const row = await (
+        await storeDb(storeId)
+      ).shippingCarrierConfig.findUnique({
         where: { storeId_carrier: { storeId, carrier } },
         select: { credentials: true, settings: true },
       });
@@ -1385,14 +1403,16 @@ class ShippingCarrierService {
       const ids = [
         ...new Set(rows.map(r => (r.order as any)?.customerId).filter(Boolean)),
       ] as string[];
-      const users = ids.length
-        ? await withStore(storeId, tx =>
-            tx.user.findMany({
-              where: { id: { in: ids } },
-              select: { id: true, email: true, firstName: true, lastName: true },
-            })
-          )
-        : [];
+      const users =
+        (await customerRows(storeId, ids)) ??
+        (ids.length
+          ? await withStore(storeId, tx =>
+              tx.user.findMany({
+                where: { id: { in: ids } },
+                select: { id: true, email: true, firstName: true, lastName: true },
+              })
+            )
+          : []);
       const byId = new Map(users.map(u => [u.id, u]));
       shipments = rows.map(r => ({
         ...r,
@@ -1467,7 +1487,10 @@ class ShippingCarrierService {
     const RUN_CAP = 200; // safety limit per run
     // Strict RLS: one tenant transaction per store finds the due shipments; each is then
     // polled in its own store scope (the carrier call holds no transaction).
+    // With the platform D1 bound the store list is D1's (the Postgres directory definer needs a connection).
+    const storeIds = platformDb() ? (await listDirectoryStores()).map(s => s.id) : undefined;
     const active = await sweepAcrossStores({
+      storeIds,
       fetch: async storeId =>
         (await storeDb(storeId)).shipment.findMany({
           where: {

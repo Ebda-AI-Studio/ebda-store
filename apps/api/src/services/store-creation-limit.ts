@@ -7,6 +7,7 @@
  * `super_admin` provisioning is operator-controlled and never goes through here.
  */
 import { withUser } from '@ebda/database';
+import { countOwnerStoresCreatedSince } from '../lib/store-create-do';
 import { abuseConfig } from '../lib/abuse-config';
 import { AppError } from '../middleware/error-handler';
 import { redis } from './redis.service';
@@ -18,10 +19,10 @@ export async function assertStoreCreationBudget(
   now: Date = new Date()
 ): Promise<void> {
   const cap = abuseConfig.storesPerAccountPerDay();
-  const recent = await withUser(ownerId, tx =>
-    tx.store.count({
-      where: { ownerId, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
-    })
+  const since = new Date(now.getTime() - DAY_MS);
+  // N-18: with STORE_CREATE_ON_DO on, the larger of the Postgres and D1 counts; off = Postgres only.
+  const recent = await countOwnerStoresCreatedSince(ownerId, since, () =>
+    withUser(ownerId, tx => tx.store.count({ where: { ownerId, createdAt: { gte: since } } }))
   );
   if (recent >= cap) {
     throw new AppError(

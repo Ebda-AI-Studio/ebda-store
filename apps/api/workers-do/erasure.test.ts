@@ -232,21 +232,62 @@ describe('surface: store-do (customer rows, registry driven)', () => {
       ).toBe('2 Nile St');
     });
   });
-  it('merchant erase wipes the whole DO: rows, tables and alarm', async () => {
+  it('merchant erase ANONYMISES and keeps the records (Rulings NZ-D16, RETENTION-1): nothing wiped, store closed, backup alarm kept', async () => {
     await seed('er-store');
     const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-store'));
     await stub.ensureBackupAlarm();
+    const before = await stub.rowCounts();
     const r = await stub.eraseSubject(merchant());
-    expect(r.erased.products).toBe(1);
     expect(r.remaining).toBe(0);
+    expect(r.refused).toBeUndefined();
+    const after = await stub.rowCounts();
+    expect(after.products).toBe(before.products); // not personal data: kept
+    expect(Object.keys(after)).toEqual(Object.keys(before)); // no table dropped
     await runInDurableObject(stub, async (_i, state) =>
-      expect(await state.storage.getAlarm()).toBeNull()
+      expect(await state.storage.getAlarm()).not.toBeNull()
     );
+  });
+  it('merchant erasure is ALL-OR-NOTHING across stores: money in flight on B leaves clean store A untouched (Ruling NZ-D20)', async () => {
+    await seed('nz-a');
+    await seed('nz-b');
+    const stubOf = (id: string) => e.STORE_DO.get(e.STORE_DO.idFromName(id));
+    await runInDurableObject(stubOf('nz-b'), async (_i, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO orders (id, store_id, buyer_key, order_number, status, payment_status, subtotal, total, shipping_address, billing_address)
+         VALUES ('nz-b-o', 'nz-b', '${BK}', 'nz-b-o', 'confirmed', 'paid', 1, 1, '{}', '{}')`
+      );
+    });
+    const closed = (id: string) =>
+      runInDurableObject(
+        stubOf(id),
+        async (_i, state) =>
+          state.storage.sql.exec("SELECT count(*) AS n FROM do_flags WHERE name = 'closed'").one().n
+      );
+    const surf = storeDoSurface(
+      id => stubOf(id) as never,
+      async () => ['nz-a', 'nz-b']
+    );
+    const refused = await surf.eraseSubject(merchant());
+    expect(refused.note).toMatch(/money in flight/);
+    expect(refused.remaining).toBeGreaterThan(0);
+    expect(refused.erased).toBe(0);
+    expect(await closed('nz-a')).toBe(0); // A was NOT anonymised or sealed
+    expect(await closed('nz-b')).toBe(0);
+    // settle B's order: the retry now erases both
+    await runInDurableObject(stubOf('nz-b'), async (_i, state) => {
+      state.storage.sql.exec("UPDATE orders SET status = 'delivered' WHERE id = 'nz-b-o'");
+    });
+    const ok = await surf.eraseSubject(merchant());
+    expect(ok.remaining).toBe(0);
+    expect(await closed('nz-a')).toBe(1);
+    expect(await closed('nz-b')).toBe(1);
+    expect((await surf.eraseSubject(merchant())).remaining).toBe(0); // re-erasing sealed stores is a no-op
   });
   it('the surface fans out over the subject stores and sums the stub results', async () => {
     const calls: string[] = [];
     const surf = storeDoSurface(
       id => ({
+        moneyInFlight: async () => ({}),
         exportSubject: async () => ({ tables: { t: [{ a: id }] } }),
         eraseSubject: async () => (
           calls.push(id),

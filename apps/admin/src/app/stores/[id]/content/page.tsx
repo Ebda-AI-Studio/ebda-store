@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -92,15 +93,21 @@ export default function ContentListPage() {
         <button
           type="button"
           onClick={handleNewPage}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
         >
-          + {t('newPage')}
+          {t('newPage')}
         </button>
       }
     >
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
         <p className="mb-6 rounded-xl bg-muted/40 p-4 text-sm text-muted-foreground">
-          {t('emptyHint')}
+          {t('emptyHint')}{' '}
+          <Link
+            href={`/stores/${storeId}/content/faqs`}
+            className="font-medium text-primary-ink underline underline-offset-2"
+          >
+            {t('faqsLink')}
+          </Link>
         </p>
 
         {isLoading ? (
@@ -190,6 +197,10 @@ function PageRowCard({
   const authored = row ? hasContent(row) : false;
   const titleEn = row?.title?.trim() || defaultTitleEn;
   const titleAr = row?.titleAr?.trim() || defaultTitleAr;
+  // The title in the admin's own language leads; the other language is the secondary line (audit S-5).
+  const isAr = useLocale() === 'ar';
+  const primaryTitle = isAr ? titleAr : titleEn;
+  const secondaryTitle = isAr ? titleEn : titleAr;
   return (
     <Link
       href={`/stores/${storeId}/content/${encodeURIComponent(slug)}`}
@@ -197,13 +208,13 @@ function PageRowCard({
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-foreground">{titleEn}</span>
+          <span className="text-base font-semibold text-foreground">{primaryTitle}</span>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
             {slug}
           </span>
         </div>
-        <p className="mt-0.5 text-sm text-muted-foreground" dir="rtl">
-          {titleAr}
+        <p className="mt-0.5 text-sm text-muted-foreground" dir={isAr ? 'ltr' : 'rtl'}>
+          {secondaryTitle}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span

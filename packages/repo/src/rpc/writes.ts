@@ -28,6 +28,14 @@ export type WriteOp = (typeof WRITE_OPS)[number];
 
 /** Non-money catalogue, content and cart models whose writes the StoreDO accepts in D1 (and R2). Everything else is a money op. */
 export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
+  // a store's payment gateway configuration; `credentials` is ciphertext written by the route (Ruling NEON-ZERO-2)
+  'PaymentConfig',
+  'ShippingCarrierConfig', // the provider connection-test result lives on this row (Test connection re-run for a DO store)
+  // the store's VAT registration profile and its evidence rows (Ruling NEON-ZERO-2; status transitions stay in TaxProfileService)
+  'StoreTaxProfile',
+  // the VAT rates the order tax sums (ruling TAX-1); the admin CRUD writes the table checkout reads (Ruling NEON-ZERO-2)
+  'TaxRate',
+  'StoreTaxDocument',
   'Product',
   'ProductVariant',
   'ProductOption',
@@ -85,12 +93,47 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AnswerEngineCheck',
   // the carrier booking job claims and updates the shipment row (INFRA-CF-1, Ruling CF-JOBS-4)
   'Shipment',
+  // merchant shipping zones and per-area rates (NEON-ZERO-1 group A, Ruling NZ-A-1)
+  'ShippingZone',
+  'ShippingAreaRate',
+  // reorder suggestions: the merchant dismisses / accepts them (NEON-ZERO-1 group A, Ruling NZ-A-1)
+  'ReorderSuggestion',
+  // suppliers (NEON-ZERO-1 group A, Ruling NZ-A-1)
+  'Supplier',
   // catalogue import (#329) job / file / item rows and the Customer Intelligence hint log and per-store gate (#336) (Ruling INTEG-1)
   'CatalogImportJob',
   'CatalogImportFile',
   'CatalogImportItem',
   'CiHintLog',
   'CiStoreGate',
+  // the per-store audit trail (NEON-ZERO N-10d): appended by services/audit-sink.ts, which only ever `create`s
+  'AuditLog',
+  // per-store analytics (Ruling NZ-AN-1): the gsc ingest upserts and the notification log write through the generic path; the counters use the analytics ops
+  'SearchQueryDaily',
+  'ProductDailyView',
+  'QrScanDaily',
+  'NotificationLog',
+  'GscDailyMetric',
+  // storefront wishlist and merchant bundles (NEON-ZERO-1 N-3, Ruling NZ-SF-4)
+  'Wishlist',
+  'WishlistItem',
+  'Bundle',
+  'BundleItem',
+  // shopper address book (Ruling NZ-SF-5) and the platform tax-verification decision (group C, Ruling NZ-C-7: StoreTaxProfile)
+  // per-store admin CRUD (NEON-ZERO-1 N-11 group B, Ruling NZ-N11-1): merchant-edited config/marketing rows, never a stock column
+  'CustomerGroup',
+  'Address',
+  'StoreTaxProfile',
+  'CustomerAddress',
+  'Coupon',
+  'Promotion',
+  'TaxRate',
+  'StoreTaxDocument',
+  'WholesaleApplication',
+  'ProductModel',
+  'ProductModelBinding',
+  'StoreWhatsAppLink',
+  'GoldRateSettings',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */
@@ -109,7 +152,107 @@ const WRITE_GUARD: WriteGuard = { writable: DO_WRITABLE_MODELS, stock: STOCK_COL
 export const PROC_MODEL = '$proc';
 const KEY = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 type Proc = (sql: SqlRunner, args: Record<string, unknown>) => unknown;
+export const AUDIT_MIN_PURGE_AGE_MS = 30 * 86_400_000;
 export const DO_PROCS: Record<string, Proc> = {
+  /** Replace the `details` JSON of ONE audit row of this store (the MCP denial-count flush). Returns rows changed. */
+  auditSetDetails(sql, a) {
+    const { id, storeId, details } = a as { id: unknown; storeId: unknown; details: unknown };
+    if (typeof id !== 'string' || !id) throw procErr('id');
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (!details || typeof details !== 'object' || Array.isArray(details)) throw procErr('details');
+    const count = (details as { count?: unknown }).count;
+    if (!Number.isInteger(count) || (count as number) < 1) throw procErr('details.count');
+    const json = JSON.stringify(details);
+    if (json.length > 16_384) throw procErr('details');
+    // only the coalesced agent-denial rows carry a count: any other row (or one without `count`) is never rewritten
+    sql.run(
+      `UPDATE audit_logs SET details = ? WHERE id = ? AND store_id = ? AND action LIKE 'agent.%' AND json_extract(details, '$.count') IS NOT NULL`,
+      [json, id, storeId]
+    );
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /**
+   * Customer -> group membership (NEON-ZERO N-11): the ONLY customers columns the admin path may write on a DO store is
+   * `group_id` (assign / wholesale approve & revoke), so it is a named op and `Customer` stays out of the generic writer.
+   * Runs inside the caller's `$transaction` batch next to its audit row. The group must belong to the same store.
+   * Returns the row in the shape the services select (`id`, `groupId`, `group`), or throws CUSTOMER_NOT_FOUND / GROUP_NOT_FOUND.
+   */
+  customerSetGroup(sql, a) {
+    const { storeId, customerId, groupId } = a as {
+      storeId: unknown;
+      customerId: unknown;
+      groupId: unknown;
+    };
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (typeof customerId !== 'string' || !customerId) throw procErr('customerId');
+    if (groupId !== null && (typeof groupId !== 'string' || !groupId)) throw procErr('groupId');
+    const group = groupIn(sql, storeId, groupId);
+    sql.run('UPDATE customers SET group_id = ?, updated_at = ? WHERE id = ? AND store_id = ?', [
+      groupId,
+      Date.now(),
+      customerId,
+      storeId,
+    ]);
+    if (sql.all('SELECT changes() AS n', [])[0]?.n !== 1)
+      throw Object.assign(new Error('customer not found'), { code: 'CUSTOMER_NOT_FOUND' });
+    return { id: customerId, groupId, group };
+  },
+  /** The wholesale-approval / identity-assign insert of a CRM row that is born inside a group. Same contract as above. */
+  customerCreateInGroup(sql, a) {
+    const r = a as Record<string, unknown>;
+    const str = (k: string, nullable: boolean) => {
+      const v = r[k];
+      if (v === null || v === undefined) {
+        if (nullable) return null;
+        throw procErr(k);
+      }
+      if (typeof v !== 'string' || v.length > 320) throw procErr(k);
+      return v;
+    };
+    const id = str('id', false) as string;
+    const storeId = str('storeId', false) as string;
+    const groupId = str('groupId', false) as string;
+    const group = groupIn(sql, storeId, groupId);
+    try {
+      sql.run(
+        'INSERT INTO customers (id, store_id, email, first_name, last_name, phone, user_id, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          storeId,
+          str('email', true),
+          str('firstName', false),
+          str('lastName', false),
+          str('phone', true),
+          str('userId', true),
+          groupId,
+          Date.now(),
+          Date.now(),
+        ]
+      );
+    } catch (e) {
+      if (/UNIQUE constraint failed/i.test(String((e as Error)?.message)))
+        throw Object.assign(new Error('customer already exists'), { code: 'P2002' });
+      throw e;
+    }
+    return { id, groupId, group };
+  },
+  /** Retention: delete rows older than `before` (epoch ms, at least 30 days ago) up to and including `upToId`. */
+  auditPurge(sql, a) {
+    const { before, upToId } = a as { before: unknown; upToId: unknown };
+    if (typeof before !== 'number' || !Number.isFinite(before)) throw procErr('before');
+    if (before > Date.now() - AUDIT_MIN_PURGE_AGE_MS)
+      throw procErr('before (younger than 30 days)');
+    if (typeof upToId !== 'string') throw procErr('upToId');
+    sql.run('DELETE FROM audit_logs WHERE created_at < ? AND id <= ?', [before, upToId]);
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /** Erasure: null `user_id` on every audit row of one user (the row stays, the person goes). */
+  auditUnlinkUser(sql, a) {
+    const { userId } = a as { userId: unknown };
+    if (typeof userId !== 'string' || !userId) throw procErr('userId');
+    sql.run('UPDATE audit_logs SET user_id = NULL WHERE user_id = ?', [userId]);
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
   /**
    * products.ai_field_sources: merge `set` (field -> 'ai'|'human') into the row AS IT IS NOW and drop `remove`, so a stamp
    * another writer committed on a different key survives (review N1). Returns the merged map, or null when no such row.
@@ -211,10 +354,86 @@ function procErr(what: string): Error {
   return Object.assign(new Error(`bad procedure argument: ${what}`), { code: 'BAD_PROC_ARGS' });
 }
 
+function groupIn(
+  sql: SqlRunner,
+  storeId: string,
+  groupId: unknown
+): { id: string; name: string; nameAr: string | null } | null {
+  if (groupId === null) return null;
+  const g = sql.all('SELECT id, name, name_ar FROM customer_groups WHERE id = ? AND store_id = ?', [
+    groupId,
+    storeId,
+  ])[0] as { id: string; name: string; name_ar: string | null } | undefined;
+  if (!g) throw Object.assign(new Error('group not found'), { code: 'GROUP_NOT_FOUND' });
+  return { id: g.id, name: g.name, nameAr: g.name_ar };
+}
+
 export interface DoMutation {
   /** Optional replay key (8-128 chars of [A-Za-z0-9._:-]). */
   key?: string;
   ops: DoQuery[];
+  /**
+   * The role of the authenticated caller, set by the API Worker from the verified access token (never from a request body).
+   * Only the tax-profile review guard reads it: the DO is reachable only through the API's service binding.
+   */
+  actorRole?: string;
+}
+
+/** The Postgres trigger `tax_profile_review_guard`, reproduced on the DO (Ruling NEON-ZERO-2). */
+const TAX_REVIEW_STATUSES = new Set(['verified', 'rejected', 'revoked']);
+const TAX_EDITABLE_STATUSES = new Set(['none', 'rejected', 'revoked']);
+type TaxRow = {
+  store_id: string;
+  status: string;
+  tax_registration_number: unknown;
+  legal_name: unknown;
+};
+const taxState = (sql: SqlRunner) => ({
+  profiles: new Map(
+    (
+      sql.all(
+        'SELECT store_id, status, tax_registration_number, legal_name FROM store_tax_profiles',
+        []
+      ) as TaxRow[]
+    ).map(r => [r.store_id, r])
+  ),
+  docs: (sql.all('SELECT id FROM store_tax_documents ORDER BY id', []) as Array<{ id: string }>)
+    .map(r => r.id)
+    .join(','),
+});
+/**
+ * Compares the state before and after a batch that touched the VAT profile. Runs inside the batch's transaction, so a refusal
+ * rolls everything back. By STATE DIFF, not by parsing the ops, so no nested write shape can step around it:
+ *  - a move INTO verified / rejected / revoked, or an edit of a verified identity (TRN, legal name): super_admin only;
+ *  - evidence documents added or removed while the profile is not editable (pending / verified): super_admin only.
+ */
+function assertTaxProfileGuard(
+  sql: SqlRunner,
+  before: ReturnType<typeof taxState>,
+  actorRole: string | undefined
+): void {
+  if (actorRole === 'super_admin') return;
+  const after = taxState(sql);
+  for (const [storeId, now] of after.profiles) {
+    const old = before.profiles.get(storeId);
+    const oldStatus = old?.status ?? 'none';
+    if (now.status !== oldStatus && TAX_REVIEW_STATUSES.has(now.status))
+      throw new Error(`tax profile: only a super_admin may set status ${now.status}`);
+    if (
+      old &&
+      old.status === 'verified' &&
+      now.status === 'verified' &&
+      (now.tax_registration_number !== old.tax_registration_number ||
+        now.legal_name !== old.legal_name)
+    )
+      throw new Error('tax profile: a verified identity is changed only by a super_admin');
+  }
+  if (after.docs !== before.docs)
+    for (const now of after.profiles.values())
+      if (!TAX_EDITABLE_STATUSES.has(now.status))
+        throw new Error(
+          'tax profile: evidence of a pending or verified profile is changed only by a super_admin'
+        );
 }
 
 const KEY_RE = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -255,6 +474,8 @@ export function checkMutation(m: DoMutation): DoQueryResult | undefined {
     return refuse('BAD_BATCH', 'ops must be 1..200');
   if (m.key !== undefined && (typeof m.key !== 'string' || !KEY_RE.test(m.key)))
     return refuse('BAD_IDEMPOTENCY_KEY', 'key');
+  if (m.actorRole !== undefined && (typeof m.actorRole !== 'string' || m.actorRole.length > 32))
+    return refuse('BAD_ACTOR', 'actorRole');
   for (const q of m.ops) {
     if (q?.model === PROC_MODEL) {
       if (!Object.prototype.hasOwnProperty.call(DO_PROCS, q.op as string))
@@ -267,6 +488,13 @@ export function checkMutation(m: DoMutation): DoQueryResult | undefined {
     if (!isWrite(q.op)) return refuse('OP_NOT_ALLOWED', `op ${String(q.op)}`);
     if (!DO_WRITABLE_MODELS.has(q.model))
       return refuse('MODEL_NOT_WRITABLE', `${q.model} is not ported to the StoreDO write path`);
+    // the audit trail is APPEND-ONLY on the generic path: `create` and nothing else. The three narrow edits it needs
+    // (count flush, retention purge, erasure unlink) are named procedures below (NEON-ZERO N-10d security review).
+    if (q.model === 'AuditLog' && q.op !== 'create')
+      return refuse(
+        'AUDIT_APPEND_ONLY',
+        `AuditLog.${String(q.op)} is not allowed on the generic write path`
+      );
     const a = (q.args ?? {}) as Record<string, unknown>;
     // only the VALUES a write stores are checked (a `where: { inventory: 0 }` filter is a read of stock, not a write)
     if ([a.data, a.create, a.update].some(v => touchesStock(q.model, v)))
@@ -315,6 +543,11 @@ export async function runWrites(
         if (prior) sql.run('DELETE FROM _idempotency WHERE k = ?', [m.key]);
       }
       const out: unknown[] = [];
+      const taxBefore = m.ops.some(
+        q => q.model === 'StoreTaxProfile' || q.model === 'StoreTaxDocument'
+      )
+        ? taxState(sql)
+        : null;
       for (const q of m.ops) {
         if (q.model === PROC_MODEL) {
           out.push(DO_PROCS[q.op as string](sql, (q.args ?? {}) as Record<string, unknown>));
@@ -326,6 +559,7 @@ export async function runWrites(
         >;
         out.push(await d[q.op](q.args));
       }
+      if (taxBefore) assertTaxProfileGuard(sql, taxBefore, m.actorRole);
       const json = encodeRpc(out);
       if (m.key) {
         sql.run('DELETE FROM _idempotency WHERE at < ?', [now() - KEY_TTL_MS]);

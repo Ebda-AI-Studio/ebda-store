@@ -232,6 +232,7 @@ const noteSchema = z.object({ note: z.string().trim().max(500).nullish() }).stri
 merchantWholesaleRouter.get(
   base,
   ...guard,
+  requireFeature('b2b.wholesale'), // BE:S-29 / D7
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const q = listSchema.parse(req.query);
@@ -284,6 +285,7 @@ merchantWholesaleRouter.post(
 merchantWholesaleRouter.post(
   `${base}/:id/reject`,
   ...guard,
+  requireFeature('b2b.wholesale'), // BE:S-29 / D7 (revoke / lapse stay open: a downgraded merchant can still end access)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { note } = noteSchema.parse(req.body ?? {});

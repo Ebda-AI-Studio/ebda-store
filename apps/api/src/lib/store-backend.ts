@@ -6,8 +6,9 @@
  * `x-ebda-backend: do` is ignored (and stripped at the Worker edge), because letting a visitor move a store's money,
  * stock and writes onto the Durable Object while its real backend is Postgres is split-brain money state.
  *
- *   - D1 bound: the column decides. A store without a directory row is not flagged ('pg'); an unreadable or malformed
- *     flag is a 503 (fail closed - a flagged store is never defaulted to pg on a read error).
+ *   - D1 bound: the column decides. A store without a directory row does not exist: 404 STORE_NOT_FOUND (NEON-ZERO-1 N-14,
+ *     the directory holds every store, so "unknown" is never "Postgres"); an unreadable or malformed flag is a 503
+ *     (fail closed - a flagged store is never defaulted to pg on a read error).
  *   - D1 unbound (Node, unit tests, local dev): the `STORE_DO_ENABLED_IDS` env list decides - but only outside
  *     production. In production an unbound D1 with a listed store is a 503, never a silent fallback.
  *
@@ -15,6 +16,7 @@
  */
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
+import { isWorkers } from './runtime';
 
 export type StoreBackend = 'do' | 'pg';
 
@@ -69,7 +71,11 @@ interface ListD1 {
 const unavailable = () =>
   new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend flag is unavailable');
 
-/** The backend that serves `storeId`, from server-side state only (see the file header). Takes no request. */
+/**
+ * The backend that serves `storeId`, from server-side state only (see the file header). Takes no request.
+ * N-14b (Ruling NZ-D7) NOT done here: the D1 read doubles as the store-exists / soft-delete gate and Node, tests and local dev
+ * still resolve `pg`; the constant-`do` collapse belongs to the N-16 dead-code PR together with the pg branches it removes.
+ */
 export async function backendFor(storeId: string): Promise<StoreBackend> {
   const d1 = (cfBindings() as { PLATFORM_DB?: FlagD1 } | undefined)?.PLATFORM_DB;
   if (!d1) {
@@ -86,7 +92,11 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
   } catch {
     throw unavailable();
   }
-  if (!row) return 'pg';
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  // NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres. A directory row still saying `pg` (only the soft-deleted QA
+  // store) is gone for good: 410, a clean answer instead of a Prisma call that throws POSTGRES_REMOVED.
+  if (row.storage_backend === 'pg' && isWorkers)
+    throw new AppError(410, 'STORE_STORAGE_REMOVED', 'This store is no longer available');
   if (row.storage_backend === 'do' || row.storage_backend === 'pg') return row.storage_backend;
   throw unavailable();
 }
@@ -106,9 +116,35 @@ export async function doStoreIdList(): Promise<string[]> {
   }
   try {
     const rows = (
-      await d1.prepare("SELECT id FROM stores WHERE storage_backend = 'do'").all<{ id?: unknown }>()
+      await d1
+        .prepare("SELECT id FROM stores WHERE storage_backend = 'do' AND deleted_at IS NULL")
+        .all<{ id?: unknown }>()
     ).results;
     return (rows ?? []).map(r => r.id).filter((id): id is string => typeof id === 'string' && !!id);
+  } catch {
+    throw unavailable();
+  }
+}
+
+/**
+ * Is there at least one live store on `backend`? One indexed EXISTS ... LIMIT 1 (never the full scan of `doStoreIdList`), for the
+ * per-webhook / per-callback "does the fleet contain X" question. D1 unbound: the env list for `do`, always true for `pg`.
+ */
+export async function hasStoresOnBackend(backend: StoreBackend): Promise<boolean> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: FlagD1 } | undefined)?.PLATFORM_DB;
+  if (!d1) {
+    if (backend === 'pg') return true;
+    if (enabledStoreIds().size > 0 && process.env.NODE_ENV === 'production') throw unavailable();
+    return enabledStoreIds().size > 0;
+  }
+  try {
+    const row = await d1
+      .prepare(
+        'SELECT 1 AS one FROM stores WHERE storage_backend = ?1 AND deleted_at IS NULL LIMIT 1'
+      )
+      .bind(backend)
+      .first<{ one?: unknown }>();
+    return !!row;
   } catch {
     throw unavailable();
   }
@@ -133,6 +169,11 @@ interface StoreDoStub {
     sessionId: string
   ): Promise<DoResult<{ orderId: string; orderNumber: string; total: number }>>;
   seed(rows: unknown): Promise<DoResult<{ products: number; variants: number }>>;
+  /** N-18: first-time bootstrap of a store created on its DO (store_profile + store_config + default rows). Idempotent. */
+  bootstrapStore(
+    storeId: string,
+    inputJson: string
+  ): Promise<DoResult<{ profile: string[]; config: string[]; directoryOnly: string[] }>>;
   rowCounts(): Promise<Record<string, number>>;
   ensureBackupAlarm(): Promise<number>;
   backupNow(storeId: string): Promise<unknown>;
@@ -141,6 +182,13 @@ interface StoreDoStub {
     day: string
   ): Promise<DoResult<Record<string, { rows: number; sha256: string; ok: boolean }>>>;
   pitrBookmark(): Promise<string>;
+  authOp(
+    storeId: string,
+    op: string,
+    argsJson: string
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
+  >;
 }
 
 /** The StoreDO stub for a store. Throws when the binding is absent (Node / tests): never silently falls back. */

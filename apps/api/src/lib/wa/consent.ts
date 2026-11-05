@@ -6,6 +6,7 @@
  * language, revocable (the buyer, the merchant, or a STOP on WhatsApp), exported with the account and
  * erased with it. It is keyed by the suite buyer key, so it holds no raw phone.
  */
+import { customerRow, customerRows } from '../../lib/customer-directory';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { storeDb } from '../../lib/repo-factory';
 import { readStoreDb } from '../jobs/store-db';
@@ -211,10 +212,14 @@ export const WhatsAppConsentService = {
       });
       // GRANTING is tied to this session's cart; WITHDRAWING needs no cart (any device, any time).
       if (!cart && input.consent) return { status: 'no_cart' as const };
-      const user = await prisma.user.findFirst({
-        where: { id: userId, storeId },
-        select: { phone: true },
-      });
+      const doUser = await customerRow(storeId, userId);
+      const user =
+        doUser !== undefined
+          ? doUser
+          : await prisma.user.findFirst({
+              where: { id: userId, storeId },
+              select: { phone: true },
+            });
       if (!user?.phone) return { status: 'no_phone' as const };
       // A profile phone is self-declared (WA-CONSENT-PROOF-1), so BOTH directions need it: GRANTING needs
       // proof the number is theirs (a delivered order of THIS customer), and so does WITHDRAWING, unless
@@ -251,10 +256,11 @@ export const WhatsAppConsentService = {
     storeId: string,
     userId: string
   ): Promise<{ granted: boolean; proven: boolean }> {
-    const user = await prisma.user.findFirst({
-      where: { id: userId, storeId },
-      select: { phone: true },
-    });
+    const doUser = await customerRow(storeId, userId);
+    const user =
+      doUser !== undefined
+        ? doUser
+        : await prisma.user.findFirst({ where: { id: userId, storeId }, select: { phone: true } });
     // The profile phone is self-declared: report consent ONLY for a proven number, otherwise a user
     // could type someone else's number and learn whether that person opted in.
     if (!user?.phone || !(await phoneOnOwnOrder(storeId, userId, user.phone))) {

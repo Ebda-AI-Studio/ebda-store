@@ -19,6 +19,12 @@ interface FeaturesContextType {
   isEnabled: (key: string) => boolean;
   isLoading: boolean;
   /**
+   * The very first entitlements fetch failed (outage / offline) and there are no known flags. `isEnabled` then answers
+   * true (the API still enforces), and `<PlanGate>` shows a retry state: a locked card means the server CONFIRMED the
+   * feature is off, never "we could not ask".
+   */
+  loadFailed: boolean;
+  /**
    * Re-fetch the flags now. Call it after ANY write that can change what the
    * store has access to (a feature toggle, a reset, a plan change) — the
    * provider is mounted once in `stores/[id]/layout.tsx` and survives every
@@ -60,6 +66,8 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
   const { user } = useAuth();
   const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const hasFlags = useRef(false);
   // Monotonic request id: a slow earlier response (e.g. the mount fetch)
   // must never overwrite a newer one (e.g. the refresh after a toggle).
   const requestSeq = useRef(0);
@@ -83,6 +91,10 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
     // A failed refresh keeps the last known flags rather than blanking them.
     if (data?.features) {
       setFeatures(data.features);
+      hasFlags.current = true;
+      setLoadFailed(false);
+    } else if (!hasFlags.current) {
+      setLoadFailed(true);
     }
     setIsLoading(false);
   }, [storeId, userId, role]);
@@ -126,13 +138,15 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
   function isEnabled(key: string): boolean {
     // While loading, default to true so items aren't hidden prematurely.
     if (isLoading) return true;
+    // No flags could be loaded: do not claim anything is off (the server still enforces every gated route).
+    if (loadFailed) return true;
     // If a key is absent from the map it means it was never explicitly enabled;
     // treat as disabled.
     return features[key] === true;
   }
 
   return (
-    <FeaturesContext.Provider value={{ isEnabled, isLoading, refresh: fetchFeatures }}>
+    <FeaturesContext.Provider value={{ isEnabled, isLoading, loadFailed, refresh: fetchFeatures }}>
       {children}
     </FeaturesContext.Provider>
   );
@@ -154,6 +168,7 @@ export function useFeatures(): FeaturesContextType {
     return {
       isEnabled: () => true,
       isLoading: false,
+      loadFailed: false,
       refresh: async () => {},
     };
   }

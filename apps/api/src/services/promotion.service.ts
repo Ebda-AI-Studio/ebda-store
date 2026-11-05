@@ -5,7 +5,8 @@
  * scope) shared with coupons. Eligibility evaluation lives in the shared
  * targeting evaluator (Task 2), not here — this is persistence only.
  */
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { assertCustomerGroupInStore } from '../lib/customer-group-scope';
 import { AppError } from '../middleware/error-handler';
 import { searchNameIds } from './product-search.service';
 
@@ -55,13 +56,13 @@ export class PromotionService {
     }
 
     const [promotions, total] = await Promise.all([
-      prisma.promotion.findMany({
+      (await storeDb(storeId)).promotion.findMany({
         where,
         skip,
         take: limit,
         orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
       }),
-      prisma.promotion.count({ where }),
+      (await storeDb(storeId)).promotion.count({ where }),
     ]);
 
     return {
@@ -76,7 +77,9 @@ export class PromotionService {
   }
 
   static async getById(storeId: string, promotionId: string) {
-    const promotion = await prisma.promotion.findFirst({
+    const promotion = await (
+      await storeDb(storeId)
+    ).promotion.findFirst({
       where: { id: promotionId, storeId },
     });
 
@@ -89,8 +92,11 @@ export class PromotionService {
 
   static async create(storeId: string, data: CreatePromotionData) {
     this.validateValue(data.type, data.value);
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
-    const promotion = await prisma.promotion.create({
+    const promotion = await (
+      await storeWriter(storeId)
+    ).promotion.create({
       data: {
         storeId,
         name: data.name,
@@ -125,8 +131,11 @@ export class PromotionService {
     const type = data.type ?? (existing.type as CreatePromotionData['type']);
     const value = data.value ?? existing.value;
     this.validateValue(type, value);
+    await assertCustomerGroupInStore(storeId, data.customerGroupId); // BE:S-25
 
-    const promotion = await prisma.promotion.update({
+    const promotion = await (
+      await storeWriter(storeId)
+    ).promotion.update({
       where: { id: promotionId, storeId },
       data: {
         name: data.name,
@@ -155,7 +164,9 @@ export class PromotionService {
   static async delete(storeId: string, promotionId: string) {
     await this.getById(storeId, promotionId);
 
-    await prisma.promotion.delete({
+    await (
+      await storeWriter(storeId)
+    ).promotion.delete({
       where: { id: promotionId, storeId },
     });
   }
@@ -163,7 +174,9 @@ export class PromotionService {
   static async toggleActive(storeId: string, promotionId: string) {
     const promotion = await this.getById(storeId, promotionId);
 
-    const updatedPromotion = await prisma.promotion.update({
+    const updatedPromotion = await (
+      await storeWriter(storeId)
+    ).promotion.update({
       where: { id: promotionId, storeId },
       data: { isActive: !promotion.isActive },
     });

@@ -12,6 +12,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { intlLocaleForUi } from '@/lib/format';
 
 interface User {
   id: string;
@@ -98,7 +99,7 @@ export default function UsersPage() {
 
   function formatDate(date: string | null) {
     if (!date) return t('neverLoggedIn');
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString(intlLocaleForUi(), {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

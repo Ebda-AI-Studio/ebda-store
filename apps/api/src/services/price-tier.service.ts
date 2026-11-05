@@ -4,8 +4,7 @@
  * TIER_NOT_MONOTONE, TIER_VARIANT_ABOVE_PRODUCT (B2B-12), TIER_DUPLICATE, TIER_LIMIT, below-cost warning.
  * Every write invalidates the cached public payload after commit (lib/b2b-invalidate).
  */
-import { storeWriter } from '../lib/repo-factory';
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { validateTierWrite, isStaleTier, type TierInput } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
@@ -92,7 +91,9 @@ async function validate(
     variantCost = variant.costPrice;
   }
   if (tier.groupId) {
-    const group = await prisma.customerGroup.findFirst({
+    const group = await (
+      await storeDb(storeId)
+    ).customerGroup.findFirst({
       where: { id: tier.groupId, storeId },
       select: { id: true },
     });

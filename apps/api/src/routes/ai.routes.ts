@@ -6,6 +6,7 @@
  * `writeLimiter` per-IP rate limiter on top of the AI service's own
  * per-store daily token budget.
  */
+import { aiUsageCost, aiUsageLast30Days } from '../services/usage-aggregates.service';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
@@ -32,7 +33,7 @@ import {
   balanceProductLanguages,
   revertProductBalance,
 } from '../services/ai-autofill.service';
-import { withSavepoint } from '../lib/savepoint';
+import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 import { storeUpdate } from '../lib/repo-factory';
 
@@ -133,7 +134,9 @@ router.post(
       const { storeId } = req.params;
       const { section, existingTitle, existingTitleAr } = sectionSchema.parse(req.body);
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
@@ -278,7 +281,9 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
     const { storeId } = req.params;
     const { kind, id } = seoSchema.parse(req.body);
 
-    const store = await prisma.store.findUnique({
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({
       where: { id: storeId },
       select: { name: true, nameAr: true, description: true, descriptionAr: true },
     });
@@ -401,7 +406,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true },
       });
@@ -487,7 +494,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { logo: true },
       });
@@ -517,24 +526,11 @@ const bulkTranslateSchema = z.object({
   direction: z.enum(['to_ar', 'to_en']),
 });
 
-// Helper: when inngest is unreachable (DNS / outage / wrong key), the
-// job row was created but no one will ever process it. Mark it failed
-// so the merchant sees an actionable error instead of a stuck "queued"
-// row that lingers forever.
-async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
-  const message = err instanceof AppError ? err.message : 'Failed to enqueue job';
-  try {
-    // Savepointed: best-effort inside the request's tenant transaction — a
-    // swallowed failure must not abort it (issue 2215's class).
-    await withSavepoint(async () =>
-      (await storeWriter(currentStoreId())).bulkAiJob.update({
-        where: { id: jobId, storeId: currentStoreId() },
-        data: { status: 'failed', errorMessage: message, completedAt: new Date() },
-      })
-    );
-  } catch {
-    // best-effort
-  }
+// Helper: when the job start fails (Cloudflare Workflows/Queues unreachable or unbound), the job
+// row was created but no one will ever process it. Mark it failed so the merchant sees an
+// actionable error instead of a stuck "queued" row that lingers forever (lib/jobs/enqueue-fail.ts).
+function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
+  return markJobFailedOnEnqueueError(currentStoreId(), jobId, err);
 }
 
 router.post(
@@ -733,7 +729,9 @@ router.post(
         throw new AppError(404, 'NOT_FOUND', 'Product not found');
       }
 
-      const store = await prisma.store.findUnique({
+      const store = await (
+        await storeDb(storeId)
+      ).store.findUnique({
         where: { id: storeId },
         select: { name: true, nameAr: true },
       });
@@ -1051,27 +1049,10 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
       // costMicros is NULL for a model with no configured rate, which SUM
       // and COUNT(cost_micros) both correctly ignore — null (unpriced) must
       // never be folded into 0 (genuinely free) when reporting spend. See
-      // lib/ai-pricing.ts's doc comment.
-      prisma.$queryRaw<Array<{ total: bigint | null; unpriced: bigint }>>`
-          SELECT SUM(cost_micros) AS total, COUNT(*) FILTER (WHERE cost_micros IS NULL) AS unpriced
-          FROM ai_usage
-          WHERE store_id = ${storeId} AND created_at >= ${startOfDay}
-        `,
-      prisma.$queryRaw<Array<{ total: bigint | null; unpriced: bigint }>>`
-          SELECT SUM(cost_micros) AS total, COUNT(*) FILTER (WHERE cost_micros IS NULL) AS unpriced
-          FROM ai_usage
-          WHERE store_id = ${storeId} AND created_at >= ${startOfMonth}
-        `,
-      prisma.$queryRaw<Array<{ day: Date; total: bigint }>>`
-          SELECT
-            DATE_TRUNC('day', created_at) AS day,
-            COUNT(*) AS total
-          FROM ai_usage
-          WHERE store_id = ${storeId}
-            AND created_at >= NOW() - INTERVAL '30 days'
-          GROUP BY day
-          ORDER BY day ASC
-        `,
+      // lib/ai-pricing.ts's doc comment. (Ruling NZ-AN-1: no raw SQL; the router serves D1 or Postgres.)
+      aiUsageCost(storeId, startOfDay),
+      aiUsageCost(storeId, startOfMonth),
+      aiUsageLast30Days(storeId, now),
     ]);
 
     res.json({
@@ -1085,15 +1066,12 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
         // window has a configured rate. unpriced*Count is how many rows
         // that total excludes, so the admin surface can label it a partial
         // figure rather than implying it covers every call.
-        todayCostMicros: todayCost[0]?.total != null ? Number(todayCost[0].total) : null,
-        todayUnpricedCount: Number(todayCost[0]?.unpriced ?? 0),
-        monthCostMicros: monthCost[0]?.total != null ? Number(monthCost[0].total) : null,
-        monthUnpricedCount: Number(monthCost[0]?.unpriced ?? 0),
+        todayCostMicros: todayCost.total,
+        todayUnpricedCount: todayCost.unpriced,
+        monthCostMicros: monthCost.total,
+        monthUnpricedCount: monthCost.unpriced,
         // Convert bigint → number so JSON.stringify works.
-        last30Days: last30.map(r => ({
-          day: r.day.toISOString().slice(0, 10),
-          total: Number(r.total),
-        })),
+        last30Days: last30,
       },
     });
   } catch (error) {
@@ -1726,7 +1704,7 @@ router.get('/results/geo', async (req: Request, res: Response, next: NextFunctio
     const storeId = (req.params as { storeId: string }).storeId;
 
     const [store, totalProducts, productsWithCitation] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { llmsTxt: true, aboutJson: true },
       }),
@@ -1838,17 +1816,14 @@ router.get(
     try {
       const storeId = (req.params as { storeId: string }).storeId;
 
-      const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
-        (await storeDb(storeId)).product.count({ where: { storeId, deletedAt: null } }),
-        (await storeDb(currentStoreId())).aiRecommendation
-          .findMany({
-            where: { storeId },
-            distinct: ['sourceProductId'],
-            select: { sourceProductId: true },
-          })
-          .then(rows => rows.length),
-        (await storeDb(currentStoreId())).aiRecommendation.count({ where: { storeId } }),
+      const db = await storeDb(storeId);
+      const [totalProducts, recSources] = await Promise.all([
+        db.product.count({ where: { storeId, deletedAt: null } }),
+        // no `distinct` (not served by the DO client): the distinct sources are counted in memory
+        db.aiRecommendation.findMany({ where: { storeId }, select: { sourceProductId: true } }),
       ]);
+      const totalRecs = recSources.length;
+      const distinctSourcesWithRecs = new Set(recSources.map(r => r.sourceProductId)).size;
 
       res.json({
         success: true,
@@ -1953,7 +1928,7 @@ router.get('/results/seo', async (req: Request, res: Response, next: NextFunctio
       categoriesWithMeta,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaTitle: true, metaDescription: true },
       }),
@@ -2148,7 +2123,7 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
       categoriesWithAeo,
       recentProducts,
     ] = await Promise.all([
-      prisma.store.findUnique({
+      (await storeDb(storeId)).store.findUnique({
         where: { id: storeId },
         select: { metaDescriptionAeo: true },
       }),

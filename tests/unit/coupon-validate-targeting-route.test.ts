@@ -44,7 +44,8 @@ vi.mock('@api/middleware/auth', () => ({
   // Stand-in for a verified storefront token: `x-test-customer: <userId>`.
   optionalAuthenticate: (req: any, _res: any, next: any) => {
     const id = req.headers['x-test-customer'];
-    if (id) req.user = { userId: id, role: 'customer' };
+    if (id)
+      req.user = { userId: id, role: 'customer', storeId: '11111111-1111-1111-1111-111111111111' };
     next();
   },
   customerUserId: (req: any) => (req.user?.role === 'customer' ? req.user.userId : undefined),

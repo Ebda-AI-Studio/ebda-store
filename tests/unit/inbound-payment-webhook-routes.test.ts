@@ -34,6 +34,7 @@ vi.mock('@api/lib/definer', () => ({
   findOrderByIdempotencyKey: m.findOrder,
   getOrderStoreId: vi.fn(),
   getStorefrontForPaymentRef: vi.fn(),
+  storefrontForStoreId: m.storeFind,
   resolveStoreFromWebhookRef: m.resolveStore,
   webhookInbox: { record: m.inboxRecord, update: m.inboxUpdate },
 }));
@@ -440,7 +441,7 @@ describe('payment callback redirect (GET /payment/callback)', () => {
       expect(m.resolveStore).toHaveBeenCalledWith({ transactionId: 'ref-1', provider });
       // the status read and the storefront come from the SAME store
       expect(m.getStatus).toHaveBeenCalledWith('ref-1', undefined, STORE);
-      expect(m.storeFind).toHaveBeenCalledWith(expect.objectContaining({ where: { id: STORE } }));
+      expect(m.storeFind).toHaveBeenCalledWith(STORE);
       expect(res.headers.location).toContain('/checkout/success');
       expect(res.headers.location).toContain('shop-a');
     }

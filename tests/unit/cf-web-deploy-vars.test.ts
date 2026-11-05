@@ -15,5 +15,11 @@ it('web deploy turns language-in-the-URL on for every store host, overridable by
   expect(y).toContain(
     `--var "STOREFRONT_LOCALE_PATHS_STORES:\${{ vars.STOREFRONT_LOCALE_PATHS_STORES || 'all' }}"`
   );
-  expect(y).toContain('npx wrangler deploy "${VARS[@]}"');
+  // Ruling DEPLOY-R2-POPULATE-2: REST populate, then the plain wrangler deploy with OpenNext's recursion guard.
+  expect(y).toContain('node ../../scripts/ci/populate-r2-cache.mjs');
+  expect(y).toContain('OPEN_NEXT_DEPLOY=true npx wrangler deploy "${VARS[@]}"');
+  expect(y).not.toContain('opennextjs-cloudflare deploy');
+  expect(y.indexOf('node ../../scripts/ci/populate-r2-cache.mjs')).toBeLessThan(
+    y.indexOf('OPEN_NEXT_DEPLOY=true npx')
+  );
 });

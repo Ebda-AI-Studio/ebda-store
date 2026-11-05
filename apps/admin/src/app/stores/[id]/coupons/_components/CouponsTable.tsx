@@ -3,6 +3,8 @@
 import { useT } from '@/i18n/useT';
 import { formatPrice } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { RowActions } from '@/components/RowActions';
+import { useConfirm } from '@/hooks/useConfirm';
 import type { Coupon } from './types';
 
 interface CouponsTableProps {
@@ -67,6 +69,7 @@ export function CouponsTable({
   const tType = useT('coupons.type');
   const tEmpty = useT('coupons.empty');
   const tActions = useT('coupons.actions');
+  const askConfirm = useConfirm();
 
   function formatValue(coupon: Coupon): string {
     if (coupon.type === 'percentage') return `${coupon.value}%`;
@@ -138,69 +141,36 @@ export function CouponsTable({
       mobileActions: true,
       cell: coupon => (
         <div className="flex items-center gap-2 md:justify-end">
-          <button
-            type="button"
-            onClick={() => onToggleActive(coupon.id)}
-            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-              coupon.isActive
-                ? 'text-warning-ink hover:bg-warning/10'
-                : 'text-success-ink hover:bg-success/5'
-            }`}
-            title={coupon.isActive ? tActions('deactivate') : tActions('activate')}
-            aria-label={coupon.isActive ? tActions('deactivate') : tActions('activate')}
-          >
-            {coupon.isActive ? (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => onEdit(coupon)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
-            title={tActions('edit')}
-            aria-label={tActions('edit')}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(coupon.id)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-destructive hover:bg-destructive/5"
-            title={tActions('delete')}
-            aria-label={tActions('delete')}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
+          <RowActions
+            menuLabel={tActions('menu', { code: coupon.code })}
+            primary={
+              <button
+                type="button"
+                onClick={() => onEdit(coupon)}
+                className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                {tActions('edit')}
+              </button>
+            }
+            items={[
+              {
+                label: coupon.isActive ? tActions('deactivate') : tActions('activate'),
+                onSelect: () => onToggleActive(coupon.id),
+              },
+              {
+                label: tActions('delete'),
+                destructive: true,
+                onSelect: async () => {
+                  const ok = await askConfirm({
+                    object: tActions('deleteDialog.object', { code: coupon.code }),
+                    consequence: tActions('deleteDialog.consequence'),
+                    confirmLabel: tActions('deleteDialog.confirmLabel'),
+                  });
+                  if (ok) onDelete(coupon.id);
+                },
+              },
+            ]}
+          />
         </div>
       ),
     },

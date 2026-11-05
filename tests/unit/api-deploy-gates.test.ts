@@ -48,8 +48,10 @@ describe('cf-api-deploy.yml gates', () => {
       expect(hit.length).toBeGreaterThan(0);
     }
   );
-  it('asserts the Hyperdrive and KV ids before deploying', () => {
-    expect(wf).toMatch(/test -n "\$EBDA_HYPERDRIVE_ID"/);
+  it('asserts the KV id before deploying and no longer needs a Hyperdrive id or a Postgres migrate step (N-17)', () => {
+    expect(wf).not.toMatch(
+      /HYPERDRIVE|prisma migrate|EBDA_MIGRATE_DATABASE_URL|DATABASE_URL|services:\s*\n\s+postgres/
+    );
     expect(wf).toMatch(/test -n "\$EBDA_KV_CACHE_ID"/);
   });
   it('verify/rollback still runs when the deploy step fails after uploading (M-007)', () => {

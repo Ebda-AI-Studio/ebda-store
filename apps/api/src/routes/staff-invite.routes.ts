@@ -20,6 +20,13 @@ import { redis } from '../services/redis.service';
 import { getAccountState, setAccountRole } from '../lib/identity-client';
 import { verifyStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
+import { getEntitlements } from '../services/plan-entitlements';
+import {
+  acceptInviteWithinCap,
+  gateRead,
+  inAccessScope,
+  onAccessD1,
+} from '../services/platform/access-d1';
 import { featureService } from '../services/feature.service';
 import logger from '../lib/logger';
 
@@ -87,16 +94,24 @@ router.post(
           'This store does not use staff accounts at the moment.'
         );
       }
-      const store = await withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { id: true, deletedAt: true } })
-      );
+      const d1Access = await onAccessD1();
+      // After the `access` cutover the directory row (D1 `stores`) answers; a soft-deleted store is marked inactive there.
+      const store = d1Access
+        ? await gateRead(storeId, null).then(g =>
+            g
+              ? { id: g.store.id, deletedAt: g.store.status === 'inactive' ? new Date() : null }
+              : null
+          )
+        : await withStore(storeId, tx =>
+            tx.store.findUnique({ where: { id: storeId }, select: { id: true, deletedAt: true } })
+          );
       const invalid = () =>
         new AppError(400, 'INVITE_INVALID', 'This invitation link is invalid, used or revoked.');
       if (!store || store.deletedAt) throw invalid();
 
       // Read-only pre-validation, BEFORE anything about the account changes. The link must be pending and unexpired, or be
       // this very account's earlier accept whose membership still stands (finishing a half-done role switch).
-      const pre = await withStore(storeId, async tx => {
+      const pre = await inAccessScope(storeId, async tx => {
         const row = await tx.staffInvite.findFirst({
           where: { id: claims.jti, storeId, email: claims.email },
           select: { status: true, expiresAt: true, acceptedBy: true },
@@ -145,36 +160,65 @@ router.post(
       // Consume the invitation and create the membership in ONE transaction, with the seat check locked on the store row.
       let alreadyMember = false;
       try {
-        await withStore(storeId, async tx => {
-          const consumed = await tx.staffInvite.updateMany({
-            where: {
-              id: claims.jti,
-              storeId,
-              email: claims.email,
-              status: 'pending',
-              expiresAt: { gt: new Date() },
-            },
-            data: { status: 'accepted', acceptedBy: userId, decidedAt: new Date() },
+        if (d1Access) {
+          // D1 has no interactive transaction: the insert-under-cap and the consume are ONE atomic batch (access-d1.ts).
+          const e = await getEntitlements(storeId);
+          if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+          const cap = typeof e.limits.maxStaff === 'number' ? e.limits.maxStaff : null;
+          const r = await acceptInviteWithinCap({
+            inviteId: claims.jti,
+            storeId,
+            email: claims.email,
+            userId,
+            cap,
           });
-          const membership = await tx.storeStaff.findUnique({
-            where: { userId_storeId: { userId, storeId } },
-          });
-          if (consumed.count === 1) {
-            if (membership) {
-              alreadyMember = true;
+          if (r.consumed) {
+            alreadyMember = !r.added;
+          } else {
+            const [prior, member] = await inAccessScope(storeId, async tx => [
+              await tx.staffInvite.findFirst({
+                where: { id: claims.jti, storeId, status: 'accepted', acceptedBy: userId },
+                select: { id: true },
+              }),
+              await tx.storeStaff.findUnique({ where: { userId_storeId: { userId, storeId } } }),
+            ]);
+            if (prior && member) alreadyMember = true;
+            else {
+              if (!member && pending) await assertWithinLimit(storeId, 'maxStaff'); // the full-seats 402
+              throw invalid();
+            }
+          }
+        } else
+          await withStore(storeId, async tx => {
+            const consumed = await tx.staffInvite.updateMany({
+              where: {
+                id: claims.jti,
+                storeId,
+                email: claims.email,
+                status: 'pending',
+                expiresAt: { gt: new Date() },
+              },
+              data: { status: 'accepted', acceptedBy: userId, decidedAt: new Date() },
+            });
+            const membership = await tx.storeStaff.findUnique({
+              where: { userId_storeId: { userId, storeId } },
+            });
+            if (consumed.count === 1) {
+              if (membership) {
+                alreadyMember = true;
+                return;
+              }
+              await assertWithinLimit(storeId, 'maxStaff', { tx });
+              await tx.storeStaff.create({ data: { storeId, userId } });
               return;
             }
-            await assertWithinLimit(storeId, 'maxStaff', { tx });
-            await tx.storeStaff.create({ data: { storeId, userId } });
-            return;
-          }
-          const prior = await tx.staffInvite.findFirst({
-            where: { id: claims.jti, storeId, status: 'accepted', acceptedBy: userId },
-            select: { id: true },
+            const prior = await tx.staffInvite.findFirst({
+              where: { id: claims.jti, storeId, status: 'accepted', acceptedBy: userId },
+              select: { id: true },
+            });
+            if (!prior || !membership) throw invalid();
+            alreadyMember = true;
           });
-          if (!prior || !membership) throw invalid();
-          alreadyMember = true;
-        });
       } catch (e) {
         if (requiresSignIn) await undoRoleSwitch();
         throw e;

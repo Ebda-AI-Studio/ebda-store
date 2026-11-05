@@ -18,7 +18,7 @@ import { roundToMinor } from '@ebda/shared';
  * correct in memory — and `JSON.stringify` then DROPS that key, leaving the
  * server's shallow merge to resurrect the stale value it was spread over.
  *
- * For `orderInvoiceEmail` that was a live data-exposure bug, not a cosmetic
+ * (Historical: the page used to spread the store's `settings` first.) For `orderInvoiceEmail` that was a live data-exposure bug, not a cosmetic
  * one: a merchant who removed the order-invoice address kept having every
  * order's invoice emailed to it (a possibly-former employee), because the
  * cleared key never reached `StoreService.update`.
@@ -108,8 +108,6 @@ export function hasSavedOffDays(raw: unknown): boolean {
 }
 
 export interface CheckoutDeliveryForm {
-  /** The store's current `settings` JSON, spread through untouched. */
-  existingSettings: Record<string, unknown>;
   config: CheckoutDeliverySettings;
   /** Raw EGP string the merchant typed; empty = no minimum. */
   minimumOrderMajor: string;
@@ -121,9 +119,13 @@ export interface CheckoutDeliveryForm {
   deliveryOffDays?: number[] | null;
 }
 
+/**
+ * ONLY this page's keys (BE:F-2). The page no longer reads the whole `settings` blob and spreads it back: that
+ * read-modify-write of every key let a stale tab revert another page's save (branding, widget, ...). The server
+ * merges `settings` shallowly against the live row, so a key not sent here is simply left alone.
+ */
 export function buildCheckoutDeliverySettings(form: CheckoutDeliveryForm): Record<string, unknown> {
   return {
-    ...form.existingSettings,
     checkoutDelivery: form.config,
     minimumOrderFils: majorInputToMinor(form.minimumOrderMajor),
     // 'update' — this page only ever edits an existing store, so an emptied

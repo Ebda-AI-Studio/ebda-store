@@ -48,6 +48,7 @@ vi.mock('@api/services/redis.service', () => ({
 // file is about the handlers, so the wrapper is a pass-through (it has its own DB-backed coverage).
 vi.mock('@api/middleware/tenant-context', () => ({
   userContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  platformUserContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 // A super_admin request is wrapped in the named 'platform-operator' guard hatch (R-EBDA-003);

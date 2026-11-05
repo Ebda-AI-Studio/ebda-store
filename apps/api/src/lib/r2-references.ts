@@ -734,14 +734,21 @@ export const DERIVED_R2_KEY_PATTERNS: readonly RegExp[] = [
 ];
 export const DERIVED_R2_RETENTION_DAYS = 400;
 
+/**
+ * Resized WebP variants (`<original>.w480|960|1600.webp`, Ruling PREMIUM-2): referenced by NO column
+ * (the storefront derives the name from the original's), so they are never orphans. They do NOT
+ * expire by age (unlike barcodes): they live and die with their original.
+ */
+export const IMAGE_VARIANT_R2_KEY = /^stores\/[0-9a-f-]{36}\/.+\.w(480|960|1600)\.webp$/;
+
 export const isDerivedR2Key = (key: string): boolean =>
-  DERIVED_R2_KEY_PATTERNS.some(p => p.test(key));
+  DERIVED_R2_KEY_PATTERNS.some(p => p.test(key)) || IMAGE_VARIANT_R2_KEY.test(key);
 
 export function isExpiredDerivedKey(
   key: string,
   lastModified: Date | undefined,
   now: number
 ): boolean {
-  if (!isDerivedR2Key(key) || !lastModified) return false;
+  if (IMAGE_VARIANT_R2_KEY.test(key) || !isDerivedR2Key(key) || !lastModified) return false;
   return now - lastModified.getTime() > DERIVED_R2_RETENTION_DAYS * 86400_000;
 }

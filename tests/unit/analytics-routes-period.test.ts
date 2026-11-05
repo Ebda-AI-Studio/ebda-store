@@ -27,7 +27,15 @@ const { svc } = vi.hoisted(() => ({
 
 vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/services/analytics.service', () => ({ AnalyticsService: svc }));
+vi.mock('@api/middleware/require-mfa', () => ({
+  requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/middleware/feature-gate', () => ({
+  requireFeature: () => (_q: any, _s: any, n: any) => n(),
+}));
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
+  authorize: () => (_q: any, _s: any, n: any) => n(),
   authenticate: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/rbac', () => ({

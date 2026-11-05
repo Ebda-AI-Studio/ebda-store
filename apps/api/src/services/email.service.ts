@@ -6,6 +6,7 @@ import {
 import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { isDemoStore } from '../lib/demo-store';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 import { StoreMailer } from './store-mailer.service';
 import { sendMail } from './mail-transport';
@@ -44,6 +45,12 @@ import {
   inlineEmailStyles,
   type EmailDir,
 } from './email-templates/_layout';
+import {
+  contactEnquiryHtml,
+  contactEnquiryReceipt,
+  contactEnquiryText,
+  type ContactEnquiryData,
+} from './email-templates/contact-enquiry';
 import { orderRefundedTemplate } from './email-templates/order-refunded';
 import {
   orderCancelledNotChargedTemplate,
@@ -433,6 +440,24 @@ export class EmailService {
   }
 
   /**
+   * THE choke point for every merchant-facing store mail (owner/staff notices: gold rate, low stock, plan limit, webhook,
+   * billing, wholesale). A demo store (`is_demo`, the looks showroom) has no merchant: nothing is sent and the skip is logged
+   * at info. Customer-facing mail keeps `sendForStore` (a demo refuses every order and customer signup, so none exists).
+   * Add every new merchant notice here, never straight to `sendForStore`.
+   */
+  private static async sendMerchantNotice(
+    storeId: string,
+    args: Parameters<typeof EmailService.sendForStore>[1],
+    opts?: { queue?: boolean }
+  ): Promise<void> {
+    if (await isDemoStore(storeId)) {
+      logger.info({ storeId, subject: args.subject }, 'merchant notice skipped: demo store');
+      return;
+    }
+    await this.sendForStore(storeId, args, opts);
+  }
+
+  /**
    * Platform-level send (Ebda sender, no store branding): a store's refund alert to its own
    * order address (FU46-1a). (The old contact-form fallback to Ebda's inbox is gone — FU46-1c.)
    */
@@ -489,8 +514,8 @@ export class EmailService {
    * Replay a queued email that already has a storeId — ships via
    * StoreMailer so the store's verified sender is used.
    */
-  static async sendRaw(storeId: string, options: EmailOptions): Promise<void> {
-    await StoreMailer.sendBrandedEmail(storeId, {
+  static async sendRaw(storeId: string, options: EmailOptions): Promise<{ id: string }> {
+    return StoreMailer.sendBrandedEmail(storeId, {
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -501,8 +526,8 @@ export class EmailService {
   /**
    * Replay a queued email with no store context — platform sender.
    */
-  static async sendPlatformRaw(options: EmailOptions): Promise<void> {
-    await sendMail({
+  static async sendPlatformRaw(options: EmailOptions): Promise<{ id: string }> {
+    return sendMail({
       from: brandFrom(options.fromName),
       to: options.to,
       subject: options.subject,
@@ -635,7 +660,11 @@ export class EmailService {
       pendingCount: args.pendingCount,
       adminUrl: args.adminUrl,
     });
-    await this.sendForStore(storeId, { to, subject, content, language: lang }, { queue: true });
+    await this.sendMerchantNotice(
+      storeId,
+      { to, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   static async sendWholesaleNotice(
@@ -1128,7 +1157,7 @@ export class EmailService {
     };
     const subject = lowStockAlertTemplate.subject[lang](alertData);
     const content = lowStockAlertTemplate[lang](alertData);
-    await this.sendForStore(storeId, { to: data.to, subject, content, language: lang });
+    await this.sendMerchantNotice(storeId, { to: data.to, subject, content, language: lang });
   }
 
   /**
@@ -1150,7 +1179,7 @@ export class EmailService {
         (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     const tpl = GOLD_RATE_NOTICES[kind];
-    await this.sendForStore(storeId, {
+    await this.sendMerchantNotice(storeId, {
       to: data.to,
       subject: tpl.subject[lang](),
       content: tpl[lang](data),
@@ -1168,7 +1197,7 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     const lang: 'en' | 'ar' = language ?? 'en';
-    await this.sendForStore(storeId, {
+    await this.sendMerchantNotice(storeId, {
       to: data.to,
       subject: planLimitReachedTemplate.subject[lang](data),
       content: planLimitReachedTemplate[lang](data),
@@ -1183,7 +1212,7 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     const lang: 'en' | 'ar' = language ?? 'ar';
-    await this.sendForStore(
+    await this.sendMerchantNotice(
       storeId,
       {
         to: data.to,
@@ -1205,7 +1234,7 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     const lang: 'en' | 'ar' = language ?? 'en';
-    await this.sendForStore(
+    await this.sendMerchantNotice(
       storeId,
       {
         to: data.to,
@@ -1280,6 +1309,35 @@ export class EmailService {
       subject: `Contact Form: ${oneLine(data.subject)}`,
       content: this.contactFormTemplate(data),
       replyTo: data.email,
+    });
+  }
+
+  /**
+   * A studio service enquiry from the public /contact form (Ruling CONTACT-FORM-1), to the studio inbox
+   * (`BRAND.supportEmail`), reply-to the visitor. Sent directly, NOT through the retry queue: the caller
+   * answers the visitor from this promise, so a failed send must reject (never claim success).
+   */
+  static async sendContactEnquiry(data: ContactEnquiryData): Promise<void> {
+    await this.sendPlatform({
+      to: BRAND.supportEmail,
+      subject: `Studio enquiry: ${oneLine(data.topicLabel)} - ${oneLine(data.name)}`,
+      content: contactEnquiryHtml(data),
+      text: contactEnquiryText(data),
+      replyTo: data.email,
+      language: 'en',
+    });
+  }
+
+  /** The visitor's short receipt for the enquiry above, in the language of the page they used. */
+  static async sendContactEnquiryReceipt(
+    to: string,
+    data: Pick<ContactEnquiryData, 'name' | 'requestId' | 'lang'>
+  ): Promise<void> {
+    await this.sendPlatform({
+      to,
+      subject: contactEnquiryReceipt.subject[data.lang],
+      content: contactEnquiryReceipt[data.lang](data),
+      language: data.lang,
     });
   }
 

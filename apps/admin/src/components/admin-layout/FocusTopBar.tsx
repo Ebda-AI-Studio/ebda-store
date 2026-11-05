@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import OneSignal from 'react-onesignal';
 import { NotificationBell } from '../NotificationBell';
 import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
@@ -17,45 +15,11 @@ interface FocusTopBarProps {
  * Surfaces:
  *  - Store name (or "Orders" fallback)
  *  - Notification bell (reused as-is)
- *  - OneSignal opt-in nudge when the device isn't subscribed
  *  - Exit focus mode button
  */
 export function FocusTopBar({ storeBranding }: FocusTopBarProps) {
   const t = useT('components.adminLayout');
   const { exitFocusMode } = useFocusMode();
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
-  const [isSubscribing, setIsSubscribing] = useState(false);
-
-  // Check OneSignal subscription state once on mount. We can't read
-  // this synchronously because OneSignalInit runs async; wait a tick.
-  useEffect(() => {
-    const check = () => {
-      try {
-        const optedIn = OneSignal.User?.PushSubscription?.optedIn ?? null;
-        setIsSubscribed(optedIn === true);
-      } catch {
-        // OneSignal SDK not yet available — skip nudge silently.
-        setIsSubscribed(null);
-      }
-    };
-
-    const timer = window.setTimeout(check, 1_000);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  async function handleEnableNotifications() {
-    if (isSubscribing) return;
-    setIsSubscribing(true);
-    try {
-      await OneSignal.User?.PushSubscription?.optIn();
-      setIsSubscribed(true);
-    } catch {
-      // Permission denied or SDK error — fail silently.
-    } finally {
-      setIsSubscribing(false);
-    }
-  }
-
   const storeName = storeBranding?.name ?? t('focusMode.ordersOnly');
 
   return (
@@ -76,36 +40,8 @@ export function FocusTopBar({ storeBranding }: FocusTopBarProps) {
         </span>
       </div>
 
-      {/* Right: bell + nudge + exit */}
+      {/* Right: bell + exit */}
       <div className="flex shrink-0 items-center gap-2">
-        {/* OneSignal opt-in nudge — only when we know the device isn't
-            subscribed yet. Null means we haven't checked yet (hide). */}
-        {isSubscribed === false && (
-          <button
-            type="button"
-            onClick={handleEnableNotifications}
-            disabled={isSubscribing}
-            className="hidden items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink transition-colors hover:bg-primary/10 disabled:opacity-60 sm:flex"
-            aria-label={t('focusMode.enableNotifications')}
-          >
-            <svg
-              className="h-3.5 w-3.5 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-            {isSubscribing ? '…' : t('focusMode.enableNotifications')}
-          </button>
-        )}
-
         <NotificationBell />
 
         {/* Exit focus mode */}

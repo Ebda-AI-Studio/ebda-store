@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
 import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
@@ -92,13 +92,22 @@ interface MasterSweep {
 const POLL_MS = 4000;
 
 export default function AiToolsPage() {
+  const t = useT('aiTools');
+  const askConfirm = useConfirm();
+  const confirmCancelSweep = () =>
+    askConfirm({
+      object: t('cancelObject'),
+      consequence: t('cancelConsequence'),
+      confirmLabel: t('cancelAction'),
+    });
   // Feature gate: bulk_operations covers AI catalogue sweeps; absent from
   // PLAN_BASELINE by default and enabled via super-admin override per store.
-  const { gate } = useRequireFeature('bulk_operations');
+  const { gate } = useRequireFeature('bulk_operations', {
+    pageTitle: t('title'),
+  });
 
   const params = useParams();
   const storeId = params?.id as string;
-  const t = useT('aiTools');
 
   const [jobs, setJobs] = useState<BulkAiJob[]>([]);
   const [activeJob, setActiveJob] = useState<BulkAiJobDetail | null>(null);
@@ -218,7 +227,12 @@ export default function AiToolsPage() {
   /** Shared single-job starter. Handles smart-skip (default) and force paths. */
   async function start(endpoint: string, key: StartingKey, body: object = {}, force = false) {
     if (force) {
-      if (!confirm(t('confirmReplace'))) return;
+      const ok = await askConfirm({
+        object: t('replaceObject'),
+        consequence: t('replaceConsequence'),
+        confirmLabel: t('replaceAction'),
+      });
+      if (!ok) return;
     }
     setError(null);
     setStarting(key);
@@ -265,7 +279,7 @@ export default function AiToolsPage() {
     (!!activeMaster && activeMaster.jobs.some(j => !isTerminal(j.status)));
 
   async function cancelJob(jobId: string) {
-    if (!confirm(t('confirmCancel'))) return;
+    if (!(await confirmCancelSweep())) return;
     setCancelling(jobId);
     try {
       await apiPost(`/api/v1/stores/${storeId}/ai/jobs/${jobId}/cancel`, {});
@@ -280,7 +294,7 @@ export default function AiToolsPage() {
   }
 
   async function cancelMasterSweep(sweep: MasterSweep) {
-    if (!confirm(t('confirmCancel'))) return;
+    if (!(await confirmCancelSweep())) return;
     // Cancel all child jobs in parallel.
     await Promise.allSettled(
       sweep.jobIds.map(id => apiPost(`/api/v1/stores/${storeId}/ai/jobs/${id}/cancel`, {}))
@@ -345,17 +359,7 @@ export default function AiToolsPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout
-      title={t('title')}
-      subtitle={t('subtitle')}
-      actions={
-        <Link href={`/stores/${storeId}`}>
-          <Button type="button" variant="outline">
-            {t('backToStore')}
-          </Button>
-        </Link>
-      }
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="mb-4">
         <AiSwitchCard storeId={storeId} />
       </div>
@@ -773,7 +777,7 @@ function ReplaceCheckbox({
       <span className="text-xs text-muted-foreground">{label}</span>
       <span
         title={tooltip}
-        className="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
+        className="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground"
         aria-label={tooltip}
       >
         {/* i18n-gate-allow: info glyph, not copy */}i
@@ -910,7 +914,7 @@ function StatusBadge({ status, t }: { status: string; t: TFn }) {
         : status === 'cancelled'
           ? 'bg-muted text-muted-foreground'
           : status === 'running'
-            ? 'bg-amber-100 text-amber-700'
+            ? 'bg-warning/10 text-warning-ink'
             : 'bg-muted text-foreground';
 
   const label = (() => {
@@ -1016,7 +1020,7 @@ function ActiveJobCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 text-sm">
+      <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
         <Stat label={t('stats.filled')} value={job.filled} tone="ok" />
         <Stat label={t('stats.skipped')} value={job.skipped} tone="muted" />
         <Stat
@@ -1165,7 +1169,7 @@ function MasterSweepCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 text-sm">
+      <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
         <Stat label={t('stats.filled')} value={totals.filled} tone="ok" />
         <Stat label={t('stats.skipped')} value={totals.skipped} tone="muted" />
         <Stat
@@ -1209,7 +1213,7 @@ function Stat({
   return (
     <div className="rounded-lg bg-white px-3 py-2">
       <div className={`text-lg font-bold ${color}`}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
     </div>
   );
 }

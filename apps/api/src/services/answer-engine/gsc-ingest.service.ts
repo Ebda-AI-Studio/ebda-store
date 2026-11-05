@@ -34,7 +34,9 @@
  * `gsc-client` module functions) so integration tests never make a live GSC
  * call — see tests/integration/answer-engine/gsc-ingest.test.ts.
  */
-import { prisma, Prisma, withStore } from '@ebda/database';
+import { prisma, Prisma } from '@ebda/database';
+import { storeDb } from '../../lib/repo-factory';
+import { analyticsWrite } from '../../lib/analytics-backend';
 import logger from '../../lib/logger';
 import {
   gscSiteUrlsForDomain,
@@ -87,12 +89,12 @@ export async function runGscIngest(
   const client = opts.client ?? defaultClient;
   const date = opts.date ?? yesterdayUtc();
 
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({
-      where: { id: storeId },
-      select: { domain: true },
-    })
-  );
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({
+    where: { id: storeId },
+    select: { domain: true },
+  });
 
   if (!store?.domain) {
     logger.info({ storeId, date }, 'gsc-ingest: store has no domain configured, skipping');
@@ -134,7 +136,7 @@ export async function runGscIngest(
   const ctr = dateRow?.ctr ?? 0;
   const position = dateRow?.position ?? 0;
 
-  await prisma.gscDailyMetric.upsert({
+  const upsertArgs = {
     where: { storeId_date: { storeId, date: new Date(`${date}T00:00:00.000Z`) } },
     create: {
       storeId,
@@ -152,7 +154,13 @@ export async function runGscIngest(
       position,
       topQueries: result.topQueries as unknown as Prisma.InputJsonValue,
     },
-  });
+  };
+  // Ruling NZ-AN-1: the store's DO once its analytics moved, else Postgres (the ambient tenant transaction)
+  await analyticsWrite(
+    storeId,
+    w => w.gscDailyMetric.upsert(upsertArgs),
+    () => prisma.gscDailyMetric.upsert(upsertArgs)
+  );
 
   return { date };
 }

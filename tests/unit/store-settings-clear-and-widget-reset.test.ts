@@ -22,9 +22,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { updateMock, findUniqueMock } = vi.hoisted(() => ({
+const { updateMock, findUniqueMock, rawState } = vi.hoisted(() => ({
   updateMock: vi.fn(),
   findUniqueMock: vi.fn(),
+  // The Postgres path writes `settings` with ONE atomic SQL statement (BE:F-2, Ruling FP-5): merge (`||`) or `jsonb_set`.
+  // The fake applies each statement to this object, which is what the database row would hold afterwards.
+  rawState: { settings: {} as Record<string, unknown> },
 }));
 
 vi.mock('@ebda/database', () => ({
@@ -41,6 +44,19 @@ vi.mock('@ebda/database', () => ({
     fn({
       // the transaction client is the same fake client, plus the zero counts
       ...(await import('@ebda/database')).prisma,
+      $queryRaw: async (s: TemplateStringsArray, ...v: unknown[]) => {
+        if (s.join('?').includes('jsonb_set'))
+          rawState.settings = {
+            ...rawState.settings,
+            [v[0] as string]: JSON.parse(v[1] as string),
+          };
+        else rawState.settings = { ...rawState.settings, ...JSON.parse(v[0] as string) };
+        return [{ settings: rawState.settings }];
+      },
+      $executeRaw: async (_s: TemplateStringsArray, ...v: unknown[]) => {
+        rawState.settings = { ...rawState.settings, [v[0] as string]: JSON.parse(v[1] as string) };
+        return 1;
+      },
       product: { count: async () => 0 },
       category: { count: async () => 0 },
       order: { count: async () => 0 },
@@ -85,6 +101,7 @@ const STORE_ID = '11111111-1111-1111-1111-111111111111';
 
 /** Everything the delivery/floating-widget writers read off the store row. */
 function mockStore(settings: Record<string, unknown>) {
+  rawState.settings = structuredClone(settings);
   findUniqueMock.mockResolvedValue({
     id: STORE_ID,
     slug: 'demo',
@@ -113,7 +130,7 @@ describe('StoreService.update — settings is a shallow merge, so null is the on
       settings: overTheWire({ currency: 'EGP', orderInvoiceEmail: null }),
     } as never);
 
-    const written = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const written = rawState.settings;
     expect(written.orderInvoiceEmail).toBeNull();
   });
 
@@ -126,7 +143,7 @@ describe('StoreService.update — settings is a shallow merge, so null is the on
       settings: overTheWire({ currency: 'EGP', orderInvoiceEmail: undefined }),
     } as never);
 
-    const written = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const written = rawState.settings;
     expect(written.orderInvoiceEmail).toBe('former.employee@store.com');
   });
 
@@ -137,7 +154,7 @@ describe('StoreService.update — settings is a shallow merge, so null is the on
       settings: overTheWire({ orderInvoiceEmail: 'owner@store.com' }),
     } as never);
 
-    const written = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const written = rawState.settings;
     expect(written.navMenu).toEqual([{ label: 'Shop', href: '/products' }]);
     expect(written.currency).toBe('EGP');
   });
@@ -161,7 +178,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
 
     await StoreService.updateFloatingWidget(STORE_ID, body);
 
-    const settings = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const settings = rawState.settings;
     const widget = settings.floatingWidget as Record<string, unknown>;
     expect('toggleBgColor' in widget).toBe(false);
 
@@ -181,7 +198,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
 
     await StoreService.updateFloatingWidget(STORE_ID, body);
 
-    const settings = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const settings = rawState.settings;
     const widget = settings.floatingWidget as { buttons: Record<string, unknown>[] };
     expect('bgColor' in widget.buttons[0]).toBe(false);
     expect('iconColor' in widget.buttons[0]).toBe(false);
@@ -195,7 +212,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
       overTheWire({ ...STORED_WIDGET, toggleBgColor: 'token:primary' })
     );
 
-    const settings = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const settings = rawState.settings;
     expect((settings.floatingWidget as Record<string, unknown>).toggleBgColor).toBe(
       'token:primary'
     );
@@ -206,7 +223,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
 
     await StoreService.updateFloatingWidget(STORE_ID, overTheWire({ enabled: false }));
 
-    const settings = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
+    const settings = rawState.settings;
     expect(settings.currency).toBe('EGP');
     expect(settings.orderInvoiceEmail).toBe('owner@store.com');
   });

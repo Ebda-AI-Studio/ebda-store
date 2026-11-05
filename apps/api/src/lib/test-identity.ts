@@ -17,6 +17,7 @@ import type { AccountsRpc } from '../cf/bindings';
 import logger from './logger';
 import { configureAccountsVerifier, configureRevocationCheck } from './accounts-token';
 import { configureIdentityClient } from './identity-client';
+import { withUser } from '@ebda/database';
 import { getUserState } from './definer';
 
 /** sid = `t.<userId>.<issuedAtMs>.<rand>`: revoking a user revokes every session issued up to that instant. */
@@ -53,11 +54,20 @@ export function installTestIdentity(env: NodeJS.ProcessEnv = process.env): boole
     getAccountState: async userId => {
       const u = await getUserState(userId);
       if (!u || u.deletedAt) return null;
+      // The row IS the identity here, so the account facts are the row's: with no cutover marker set the answer must equal
+      // what the Postgres path reads (`require-mfa`, `require-verified-email`). A hard-coded `mfaEnabled: false` made an
+      // enrolled super admin look un-enrolled the moment the live check started feeding those gates.
+      const facts = await withUser(userId, tx =>
+        tx.user.findUnique({
+          where: { id: userId },
+          select: { mfaEnabled: true, emailVerified: true },
+        })
+      );
       return {
         id: u.id,
         email: '',
-        emailVerified: true,
-        mfaEnabled: false,
+        emailVerified: facts?.emailVerified ?? false,
+        mfaEnabled: facts?.mfaEnabled ?? false,
         mfaEnrolledAt: null,
         status: u.status as 'active' | 'inactive' | 'suspended',
         role: u.role as 'customer' | 'store_admin' | 'super_admin' | 'staff',

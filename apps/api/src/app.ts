@@ -33,8 +33,10 @@ import billingWebhookRoutes from './routes/billing-webhook.routes';
 import { assertBillingConfigAtBoot, billingProviderUnsetWarning } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
-import { prisma, setDbHopObserver } from '@ebda/database';
+import { prisma, setCommitHookErrorReporter, setDbHopObserver } from '@ebda/database';
 import { lookupStore } from './lib/definer';
+import './services/platform/router';
+import './lib/store-scope-resolver';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
@@ -62,6 +64,8 @@ import { healthPayload } from './lib/health-payload';
 import { storageBackendCounts } from './lib/store-backend';
 import { cfBindings } from './cf/bindings';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
+import { serverTiming } from './lib/request-timing';
+import { localizeRateLimited } from './lib/localized-error';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 import { repoScope } from './lib/repo-factory';
 assertBillingConfigAtBoot();
@@ -134,6 +138,18 @@ export const lifecycle = { isShuttingDown: false };
 // See lib/after-tenant-commit.ts.
 installClosedTenantTxAlerting();
 setDbHopObserver(recordHop);
+// An after-commit hook that throws is REPORTED through the app logger, never swallowed (Ruling NZ-D19). A partial `@ebda/database`
+// mock (unit tests) has no setter; the real package always does.
+try {
+  setCommitHookErrorReporter(err =>
+    logger.error(
+      { err },
+      '[tx-hooks] an after-commit hook failed (the transaction already committed)'
+    )
+  );
+} catch {
+  /* test double */
+}
 
 // The backend of a store is server-side state only (Ruling CF-BACKEND-1): a client `x-ebda-backend` never reaches a handler.
 app.use((req, _res, next) => {
@@ -147,6 +163,10 @@ app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
+// Server-Timing: auth / identity / db-wait / handler (BE:E-1) next to request-tx.
+app.use(serverTiming);
+// RATE_LIMITED bodies from every limiter carry details.messageAr/messageEn (BE:E-3).
+app.use(localizeRateLimited);
 // Per-request repo scope (lib/repo-factory.ts, Ruling CF-REPO-1): lets a service ask for its store's backend by store id.
 app.use(repoScope);
 
@@ -462,12 +482,18 @@ app.get(
     const checks: Record<string, { status: string; latency?: number }> = {};
 
     // Check database
+    // NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres; it is reported as removed, never probed (a probe throws
+    // POSTGRES_REMOVED and would page a P1 every call). Node (tests, local dev) still probes.
     const dbStart = Date.now();
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      checks.database = { status: 'connected', latency: Date.now() - dbStart };
-    } catch {
-      checks.database = { status: 'disconnected' };
+    if (isWorkers) {
+      checks.database = { status: 'removed' };
+    } else {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        checks.database = { status: 'connected', latency: Date.now() - dbStart };
+      } catch {
+        checks.database = { status: 'disconnected' };
+      }
     }
 
     // Check Redis
@@ -492,7 +518,8 @@ app.get(
     // Determine overall status. Database disconnect is treated as the
     // load-bearing failure (we can't serve anything without it). Redis
     // being unavailable degrades caching but the API still works.
-    const isHealthy = checks.database.status === 'connected';
+    const isHealthy =
+      checks.database.status === 'connected' || checks.database.status === 'removed';
     const status = isHealthy ? 'healthy' : 'degraded';
 
     // P1 alert when the deep health check reports degraded. Throttled

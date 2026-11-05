@@ -76,6 +76,8 @@ jobs:
         working-directory: apps/help
         run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-help
       - name: Deploy help Worker
+        # Ruling DEPLOY-TIMEOUT-1: a hung wrangler/OpenNext R2 populate must fail the step, not hold the runner.
+        timeout-minutes: 10
         working-directory: apps/help
         run: npx wrangler deploy
       - name: Verify the live host, roll back automatically if it is unhealthy

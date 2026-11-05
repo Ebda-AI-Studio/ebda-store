@@ -73,6 +73,7 @@ vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn(), set: vi.fn(), delete: vi.fn(), getClient: vi.fn(() => null) },
 }));
 
+vi.mock('@api/utils/store-helpers', () => ({ resolvePublicStoreId: async () => undefined }));
 vi.mock('@api/lib/cors-cache', () => ({ isPlatformOrigin: vi.fn(() => true) }));
 
 // Ruling B1-13: the routes refuse the demo store first; not this suite's concern (it is pinned in

@@ -1,18 +1,26 @@
+import { readAuditByResource } from '../lib/audit-read';
 import { storeDb } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { authenticate, customerUserId } from '../middleware/auth';
+import { authenticate, customerUserId, rejectImpersonated } from '../middleware/auth';
 import { requirePermission, hasPermission, type Role } from '../middleware/rbac';
 import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
+import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireFeature } from '../middleware/feature-gate';
-import { prisma } from '@ebda/database';
+import { listAuditWithActors } from '../lib/audit-actors';
 import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
 
 // Validation schemas
+// BE:S-28: the free text of the admin actions lands in the audit log and in the customer's email, so it is bounded.
+const approveBodySchema = z.object({ notes: z.string().trim().max(1000).optional() });
+const rejectBodySchema = z.object({ reason: z.string().trim().min(1).max(1000) });
+const trackingBodySchema = z.object({ trackingNumber: z.string().trim().min(1).max(100) });
+const completeBodySchema = z.object({ refundMethod: z.string().trim().min(1).max(50) });
+
 /** Task 8b: per RETURN ITEM id, the refund the merchant chose instead of the computed one. Strict; the service checks the range. */
 const overridesSchema = z.record(
   z.string().uuid(),
@@ -82,6 +90,7 @@ const createReturnSchema = z
 router.get(
   '/',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -121,6 +130,7 @@ router.get(
 router.post(
   '/',
   authenticate,
+  requireCustomerStoreMatch,
   writeLimiter,
   requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -166,6 +176,7 @@ router.post(
 router.get(
   '/:id',
   authenticate,
+  requireCustomerStoreMatch,
   requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -182,12 +193,9 @@ router.get(
       //     for) the storeId in the URL
       const role = req.user!.role;
       if (role === 'customer') {
+        // Another customer's return answers exactly like a missing one: no existence oracle.
         if (returnRequest.customerId !== req.user!.userId) {
-          res.status(403).json({
-            success: false,
-            error: { code: 'FORBIDDEN', message: 'Access denied' },
-          });
-          return;
+          throw new AppError(404, 'NOT_FOUND', 'Return request not found');
         }
       } else if (role === 'store_admin' || role === 'super_admin') {
         const access = await checkStoreAccess(storeId, req.user!);
@@ -279,7 +287,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { notes } = req.body;
+      const { notes } = approveBodySchema.parse(req.body ?? {});
 
       const returnRequest = await ReturnService.approve(storeId, id, req.user!.userId, notes);
 
@@ -315,15 +323,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { reason } = req.body;
+      const { reason: rawReason } = req.body ?? {};
 
-      if (!reason) {
+      if (!rawReason) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Rejection reason is required' },
         });
         return;
       }
+
+      const { reason } = rejectBodySchema.parse({ reason: rawReason });
 
       const returnRequest = await ReturnService.reject(storeId, id, req.user!.userId, reason);
 
@@ -421,6 +431,7 @@ router.get(
 router.post(
   '/admin/:id/complete',
   authenticate,
+  rejectImpersonated, // Ruling FP-3: completing a return sends money back; an impersonated session is read-only here
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
@@ -428,15 +439,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { refundMethod } = req.body;
+      const { refundMethod: rawMethod } = req.body ?? {};
 
-      if (!refundMethod) {
+      if (!rawMethod) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Refund method is required' },
         });
         return;
       }
+
+      const { refundMethod } = completeBodySchema.parse({ refundMethod: rawMethod });
 
       // Reject an unrecognised method instead of passing it through. The
       // service branches on a known set, and anything outside it silently took
@@ -544,7 +557,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { trackingNumber } = req.body;
+      const { trackingNumber } = trackingBodySchema.parse(req.body ?? {});
 
       const returnRequest = await ReturnService.updateTracking(storeId, id, trackingNumber);
 
@@ -605,16 +618,11 @@ router.get(
       // Audit rows keyed by resourceId=returnId, scoped to the store (the tenant
       // guard refuses an OR over storeId; store-less legacy rows are not visible
       // to a store scope under strict RLS anyway).
-      const auditRows = await prisma.auditLog.findMany({
-        where: {
-          resourceType: 'return',
-          resourceId: returnId,
-          storeId,
-        },
-        include: { user: { select: { firstName: true, lastName: true, role: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
+      const auditRows = await listAuditWithActors(
+        storeId,
+        { resourceType: 'return', resourceId: returnId },
+        200
+      );
 
       const timeline = auditRows.map(row => {
         const details = row.details as Record<string, unknown>;

@@ -178,11 +178,24 @@ async function fixtures(): Promise<Fx> {
   const v2 = await prisma.productVariant.create({
     data: { productId: shirt.id, title: 'L', sku: `l-${k}`, price: 100, inventory: 4 },
   });
+  // One default per store, as WarehouseService.createWarehouse keeps it: an earlier fixture's 'Main' would otherwise stay
+  // the store default (resolveDefaultWarehouse takes the OLDEST isDefault), and w1 / w2 created in the same millisecond
+  // left the deficit order to a random id tie-break (WAREHOUSE-NEG-1 read [1, 2] instead of [0, 3] in CI).
+  await prisma.warehouse.updateMany({
+    where: { storeId: STORE, isDefault: true },
+    data: { isDefault: false },
+  });
+  sqlite.exec('UPDATE warehouses SET is_default = 0');
   const w1 = await prisma.warehouse.create({
     data: { storeId: STORE, name: 'Main', code: `MAIN-${k}`, isDefault: true },
   });
   const w2 = await prisma.warehouse.create({
-    data: { storeId: STORE, name: 'Second', code: `SEC-${k}` },
+    data: {
+      storeId: STORE,
+      name: 'Second',
+      code: `SEC-${k}`,
+      createdAt: new Date(w1.createdAt.getTime() + 1000),
+    },
   });
   insertSqlite(sqlite, 'Product', [plain, shirt] as never);
   insertSqlite(sqlite, 'ProductVariant', [v1, v2] as never);

@@ -38,6 +38,7 @@ import { META, canon, insertSqlite, openSqlite } from '../../packages/repo/test/
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
 import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
+import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 const sfx = Date.now().toString(36);
 let STORE = '';
@@ -61,7 +62,7 @@ function doRepo() {
   return {
     storeId: STORE,
     backend: 'do' as const,
-    db: c as StoreReads,
+    db: withPgStoreDelegate(c) as StoreReads,
     writer: c as StoreWrites,
     money,
   };

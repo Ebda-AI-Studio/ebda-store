@@ -12,7 +12,7 @@ import {
   webhookEndpointCreateSchema,
   webhookEndpointUpdateSchema,
 } from '@ebda/shared';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
@@ -265,6 +265,7 @@ router.post(
   '/:id/rotate-secret',
   writeLimiter,
   requireWebhooksPlan,
+  rejectImpersonated, // BE:S-2 (Ruling FP-3)
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

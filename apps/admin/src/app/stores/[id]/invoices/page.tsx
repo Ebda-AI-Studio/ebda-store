@@ -6,6 +6,7 @@ import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { SearchInput } from '../../../../components/SearchInput';
 import { FiscalDocumentsTable } from '../../../../components/fiscal/FiscalDocumentsTable';
 import { apiGet } from '../../../../lib/api';
 import { FISCAL_DOC_TYPES, type FiscalDocument } from '../../../../lib/fiscal-documents';
@@ -29,6 +30,8 @@ export default function InvoicesPage() {
   const { store } = useCurrentStore(storeId);
 
   const [docType, setDocType] = useState('');
+  // Committed (already debounced by the shared SearchInput) document-number search.
+  const [search, setSearch] = useState('');
   const [documents, setDocuments] = useState<FiscalDocument[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,10 +42,11 @@ export default function InvoicesPage() {
     async (cursor: string | null) => {
       const qs = new URLSearchParams({ limit: String(PAGE_SIZE) });
       if (docType) qs.set('docType', docType);
+      if (search.trim()) qs.set('q', search.trim());
       if (cursor) qs.set('cursor', cursor);
       return apiGet<ListResponse>(`/api/v1/stores/${storeId}/fiscal-documents?${qs}`);
     },
-    [storeId, docType]
+    [storeId, docType, search]
   );
 
   useEffect(() => {
@@ -76,6 +80,13 @@ export default function InvoicesPage() {
   return (
     <AdminLayout mode="store_admin" storeId={storeId} title={t('title')} subtitle={t('subtitle')}>
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-4 sm:px-6">
+        <SearchInput
+          value={search}
+          onSearch={setSearch}
+          placeholder={t('searchPlaceholder')}
+          ariaLabel={t('searchPlaceholder')}
+          className="w-full sm:w-72"
+        />
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">{t('filterLabel')}</span>
           <select

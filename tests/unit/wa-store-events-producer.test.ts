@@ -28,6 +28,7 @@ const dbMock = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: dbMock,
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  runInStoreScope: (_s: string, fn: () => unknown) => fn(),
   // the cart event reads `Store` (a platform row) with withStore
   withStore: (_s: string, fn: (tx: unknown) => unknown) => fn(dbMock),
 }));
@@ -106,7 +107,7 @@ beforeEach(() => {
   });
   h.send.mockReset().mockResolvedValue(undefined);
   clearCfBindings();
-  setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, WA_EVENTS_QUEUE: { send: h.send } });
+  setCfBindings({ WA_EVENTS_QUEUE: { send: h.send } });
 });
 
 const send_clear = () => h.send.mockClear();
@@ -348,10 +349,9 @@ describe('helpers', () => {
 
   it('boot guard: the WhatsApp queue bound without the secret throws; unbound is fine', () => {
     delete process.env.SUITE_BUYER_KEY_SECRET;
-    expect(() => assertWhatsAppLinkConfig({ HYPERDRIVE: { connectionString: 'x' } })).not.toThrow();
+    expect(() => assertWhatsAppLinkConfig({})).not.toThrow();
     expect(() =>
       assertWhatsAppLinkConfig({
-        HYPERDRIVE: { connectionString: 'x' },
         WA_EVENTS_QUEUE: { send: h.send },
       })
     ).toThrow(/SUITE_BUYER_KEY_SECRET/);

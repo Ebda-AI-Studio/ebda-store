@@ -32,14 +32,24 @@
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
+import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
-import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/database';
+import {
+  afterTenantTxCommit,
+  afterTxCommit,
+  currentStoreId,
+  prisma,
+  withStore,
+  type AppPrismaClient,
+  type Prisma,
+} from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
 import { d1StorePatch } from './store-columns';
+import { reportAndRetryStoreUpdate, reportStoreUpdateFailure } from './store-update-retry';
 import { getAccountState } from './identity-client';
 
 type WriteOp =
@@ -69,6 +79,11 @@ export type StoreReads = {
 
 /** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
 export type WritableModel =
+  | 'paymentConfig'
+  | 'shippingCarrierConfig'
+  | 'storeTaxProfile'
+  | 'taxRate'
+  | 'storeTaxDocument'
   | 'product'
   | 'productVariant'
   | 'productOption'
@@ -115,11 +130,35 @@ export type WritableModel =
   | 'customerRfmSnapshot'
   | 'answerEngineCheck'
   | 'shipment'
+  | 'shippingZone'
+  | 'shippingAreaRate'
+  | 'reorderSuggestion'
+  | 'supplier'
   | 'catalogImportJob'
   | 'catalogImportFile'
   | 'catalogImportItem'
   | 'ciHintLog'
-  | 'ciStoreGate';
+  | 'ciStoreGate'
+  | 'searchQueryDaily'
+  | 'productDailyView'
+  | 'qrScanDaily'
+  | 'notificationLog'
+  | 'gscDailyMetric'
+  | 'wishlist'
+  | 'wishlistItem'
+  | 'bundle'
+  | 'bundleItem'
+  | 'auditLog'
+  | 'customerGroup'
+  | 'address'
+  | 'customerAddress'
+  | 'coupon'
+  | 'promotion'
+  | 'wholesaleApplication'
+  | 'productModel'
+  | 'productModelBinding'
+  | 'storeWhatsAppLink'
+  | 'goldRateSettings';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -349,6 +388,19 @@ export interface StockClient {
   }>;
 }
 
+/** A `loyalty_points` row as the DO returns it (Prisma field names, epoch-ms timestamps). */
+export interface DoLoyaltyPointsRow {
+  id: string;
+  storeId: string;
+  customerId: string;
+  points: number;
+  totalEarned: number;
+  totalRedeemed: number;
+  tier: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** An InstaPay order receipt as the DO returns it (`ReceiptRow` of `do/instapay-receipts.ts`). */
 export type DoReceipt = import('@ebda-src/repo').InstapayReceiptRow;
 
@@ -366,6 +418,104 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+  /** L-1 (Ruling FP-2): the admin / storefront reads and manual awards, on the DO ledger. Row timestamps are epoch ms. */
+  loyaltyAward(
+    a: {
+      customerId: string;
+      points: number;
+      type: string;
+      description?: string | null;
+      featureEnabled: boolean;
+    },
+    key?: string
+  ): Promise<{ newBalance: number }>;
+  loyaltyInit(
+    a: { customerId: string; giveSignupBonus: boolean; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ row: DoLoyaltyPointsRow; settings: Record<string, any> }>;
+  loyaltyReviewBonus(
+    a: { customerId: string; productId: string; reviewId: string; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ awarded: boolean; points: number }>;
+  loyaltyBirthdays(a: {
+    month: number;
+    day: number;
+    yearStart: number;
+    featureEnabled: boolean;
+  }): Promise<{ awarded: number; points: number }>;
+  loyaltyExpire(a: { after?: string | null; limit?: number }): Promise<{
+    members: number;
+    expired: number;
+    last: string | null;
+    more: boolean;
+  }>;
+  loyaltyCustomerPoints(a: {
+    customerId: string;
+    featureEnabled: boolean;
+  }): Promise<{ row: DoLoyaltyPointsRow; settings: Record<string, any> } | null>;
+  loyaltyHistory(a: { customerId: string; page?: number; limit?: number }): Promise<{
+    transactions: Array<{
+      id: string;
+      storeId: string;
+      customerId: string;
+      orderId: string | null;
+      type: string;
+      points: number;
+      description: string | null;
+      expiresAt: number | null;
+      createdAt: number;
+      order: { id: string; orderNumber: string } | null;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
+  loyaltyMembers(a: { page?: number; limit?: number; tier?: string }): Promise<{
+    members: DoLoyaltyPointsRow[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
+  loyaltyStats(a?: Record<string, never>): Promise<{
+    totalMembers: number;
+    tierBreakdown: { bronze: number; silver: number; gold: number; platinum: number };
+    totalPointsIssued: number;
+    totalPointsRedeemed: number;
+    outstandingPoints: number;
+  }>;
+  loyaltyStoreTransactions(a: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    customerId?: string;
+    from?: number | null;
+    to?: number | null;
+  }): Promise<{
+    transactions: Array<{
+      id: string;
+      storeId: string;
+      customerId: string;
+      orderId: string | null;
+      type: string;
+      points: number;
+      description: string | null;
+      expiresAt: number | null;
+      createdAt: number;
+      order: { id: string; orderNumber: string } | null;
+    }>;
+    total: number;
+  }>;
+  loyaltyImportState(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyMarkImported(a: { customerId?: string }): Promise<{ done: boolean }>;
+  loyaltyImport(a: {
+    customerId: string;
+    markDone?: boolean;
+    rows: Array<{
+      id: string;
+      orderId?: string | null;
+      type: string;
+      points: number;
+      description?: string | null;
+      expiresAt?: number | null;
+      createdAt: number;
+    }>;
+  }): Promise<{ inserted: number; skipped: number; newBalance: number; disabled?: true }>;
   /** WalletService.applyEntry on the DO (Ruling WALLET-GL-1): ledger row + balance + GL in one section. */
   walletEntry(
     a: {
@@ -626,12 +776,127 @@ export interface MoneyClient {
   }): Promise<{ recorded: true }>;
   /** The payment-abandonment stamp: once, only while the order is unpaid and unstamped. */
   abandonStamp(a: { orderId: string }): Promise<{ stamped: boolean }>;
+  /** COD mark-paid (single and bulk) in ONE section; skips paid / cancelled / refunded / non-COD orders (Ruling NZ-A-2). */
+  codMarkPaid(a: { orderIds: string[] }): Promise<{
+    updated: Array<{ orderId: string; paymentId: string; fromStatus: string; orderNumber: string }>;
+  }>;
   /** Stamp an order once for a job (`reviewRequestSentAt`): false when an earlier run already did (Ruling CF-JOBS-4). */
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** Per-store analytics counters and reads on the DO (Ruling NZ-AN-1). */
+  searchLogRecord(a: {
+    dayMs: number;
+    term: string;
+    count: number;
+    zero: number;
+    cap: number;
+  }): Promise<{ counted: boolean }>;
+  searchLogPurge(a: { cutoffMs: number }): Promise<{ deleted: number }>;
+  searchInsights(a: {
+    sinceMs: number;
+    minShown: number;
+    zeroOnly: boolean;
+    limit?: number;
+  }): Promise<{
+    totals: { searches: number; zero: number };
+    terms: Array<{
+      term: string;
+      searches: number;
+      zero_results: number;
+      last_result_count: number;
+    }>;
+  }>;
+  qrScanRecord(a: {
+    dayMs: number;
+    kind: string;
+    ref: string;
+    pruneBeforeMs?: number;
+  }): Promise<{ counted: true }>;
+  viewRecord(a: { dayMs: number; productId: string }): Promise<{ counted: true }>;
+  /** Merchant analytics reads on the DO (analytics-reads.ts); the Postgres twins are raw SQL in analytics.service.ts. */
+  analyticsPeriod(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    revenue: number;
+    orders: number;
+    customers: number;
+    profit: number | null;
+    costedLines: number;
+    missingLines: number;
+    missingRevenue: number;
+  }>;
+  analyticsSales(a: {
+    startMs: number;
+    endMs: number;
+    offsetMinutes: number;
+    granularity: 'day' | 'week' | 'month';
+  }): Promise<Array<{ key: string; revenue: number; orders: number }>>;
+  analyticsItems(
+    a:
+      | { by: 'product'; startMs: number; endMs: number; nonRevenue: string[]; limit?: number }
+      | { by: 'priceSource'; startMs: number; endMs: number; nonRevenue: string[] }
+  ): Promise<
+    Array<{
+      productId?: string;
+      priceSource?: string | null;
+      priceGroupApplied?: boolean | null;
+      quantity: number;
+      total: number;
+    }>
+  >;
+  analyticsOrdersBy(a: {
+    by: 'status' | 'paymentStatus';
+    startMs: number;
+    endMs: number;
+    nonRevenue?: string[];
+  }): Promise<Array<{ key: string; count: number; total: number }>>;
+  analyticsCustomers(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
+    newCustomers: number;
+    returningCustomers: number;
+    top: Array<{ customerId: string | null; total: number; count: number }>;
+  }>;
+  analyticsStock(a: Record<string, never>): Promise<{
+    stockValue: number;
+    backorderCount: number;
+    backorderValue: number;
+  }>;
+  analyticsCashflow(a: {
+    fromMs: number;
+    toMs: number;
+  }): Promise<Array<{ dayMs: number; net: number }>>;
+  analyticsLowStock(a: { threshold: number }): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      sku: string | null;
+      inventory: number;
+      imageUrl: string | null;
+    }>
+  >;
+  analyticsImportStatus(a: Record<string, never>): Promise<{
+    done: boolean;
+    batches: number;
+    tables: Record<string, { rows: number; sums: Record<string, number> }>;
+  }>;
+  analyticsImport(a: {
+    batchId: string;
+    table: string;
+    rows: Array<Record<string, unknown>>;
+  }): Promise<{ applied: number; replayed: boolean }>;
+  analyticsImportReset(a: {
+    confirm: string;
+  }): Promise<{ reset: true; deleted: Record<string, number> }>;
+  analyticsImportFinish(a: {
+    expect: Record<string, { rows: number; sums: Record<string, number> }>;
+  }): Promise<{ done: true; tables: Record<string, number> }>;
   /** True while any indexable product still needs a vector. */
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
+  vectorStatus(a: Record<string, never>): Promise<{
+    products: number;
+    indexed: number;
+    stale: number;
+    failed: number;
+  }>;
   /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
   vectorVisible(a: { ids: string[] }): Promise<{ ids: string[] }>;
   /** An expense's status step: approve (draft/pending), post (approved) or reject, one conditional UPDATE (Ruling CF-EXP-1). */
@@ -1009,7 +1274,11 @@ interface QueryStub {
   >;
   mutate(
     storeId: string,
-    m: { key?: string; ops: Array<{ model: string; op: string; args?: Record<string, unknown> }> }
+    m: {
+      key?: string;
+      actorRole?: string;
+      ops: Array<{ model: string; op: string; args?: Record<string, unknown> }>;
+    }
   ): Promise<
     { ok: true; json: string } | { ok: false; code: string; message: string; json?: string }
   >;
@@ -1076,6 +1345,19 @@ export function makeMoneyClient(
     loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+    loyaltyAward: (a, key) => call('loyaltyAward', a, key),
+    loyaltyInit: (a, key) => call('loyaltyInit', a, key),
+    loyaltyReviewBonus: (a, key) => call('loyaltyReviewBonus', a, key),
+    loyaltyBirthdays: a => call('loyaltyBirthdays', a),
+    loyaltyExpire: a => call('loyaltyExpire', a),
+    loyaltyCustomerPoints: a => call('loyaltyCustomerPoints', a),
+    loyaltyHistory: a => call('loyaltyHistory', a),
+    loyaltyMembers: a => call('loyaltyMembers', a),
+    loyaltyStats: a => call('loyaltyStats', a ?? {}),
+    loyaltyStoreTransactions: a => call('loyaltyStoreTransactions', a),
+    loyaltyImport: a => call('loyaltyImport', a),
+    loyaltyImportState: a => call('loyaltyImportState', a),
+    loyaltyMarkImported: a => call('loyaltyMarkImported', a),
     walletEntry: (a, key) => call('walletEntry', a, key),
     receiptCreate: a => call('receiptCreate', a),
     receiptExtraction: a => call('receiptExtraction', a),
@@ -1112,12 +1394,31 @@ export function makeMoneyClient(
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
     paymentEventRecord: a => call('paymentEventRecord', a),
     abandonStamp: a => call('abandonStamp', a),
+    codMarkPaid: a => call('codMarkPaid', a),
     trialBalance: () => call('trialBalance', {}),
     orderStamp: a => call('orderStamp', a),
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    searchLogRecord: a => call('searchLogRecord', a),
+    searchLogPurge: a => call('searchLogPurge', a),
+    searchInsights: a => call('searchInsights', a),
+    qrScanRecord: a => call('qrScanRecord', a),
+    viewRecord: a => call('viewRecord', a),
+    analyticsImportStatus: a => call('analyticsImportStatus', a),
+    analyticsImport: a => call('analyticsImport', a),
+    analyticsImportFinish: a => call('analyticsImportFinish', a),
+    analyticsPeriod: a => call('analyticsPeriod', a),
+    analyticsSales: a => call('analyticsSales', a),
+    analyticsItems: a => call('analyticsItems', a),
+    analyticsOrdersBy: a => call('analyticsOrdersBy', a),
+    analyticsCustomers: a => call('analyticsCustomers', a),
+    analyticsLowStock: a => call('analyticsLowStock', a),
+    analyticsStock: a => call('analyticsStock', a),
+    analyticsCashflow: a => call('analyticsCashflow', a),
+    analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
+    vectorStatus: a => call('vectorStatus', a),
     vectorVisible: a => call('vectorVisible', a),
     expenseTransition: a => call('expenseTransition', a),
     vectorCommit: a => call('vectorCommit', a),
@@ -1262,10 +1563,19 @@ async function doClients(
       createDoClient(send as never) as unknown as StoreReads,
       doStoreDelegate(storeId, stub, decodeRpc as never)
     ),
-    writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
+    writer: createDoClient(send as never, m =>
+      // the caller's role, from the verified token of THIS request (the DO's tax-profile review guard reads it)
+      stub.mutate(storeId, { ...m, actorRole: currentActorRole() })
+    ) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
   };
+}
+
+/** The authenticated role of the current request, or undefined outside one (jobs, crons: never a super_admin). */
+function currentActorRole(): string | undefined {
+  const role = (scopes.getStore()?.req as { user?: { role?: unknown } } | undefined)?.user?.role;
+  return typeof role === 'string' ? role : undefined;
 }
 
 /** The DO read client plus the split-aware `store` delegate (the DO tables have no `Store`). */
@@ -1275,8 +1585,72 @@ function withStoreDelegate(base: StoreReads, store: object): StoreReads {
   }) as StoreReads;
 }
 
-/** pg writer: the `prisma` proxy, minus the DO-only second argument of `$transaction`. */
-function pgWriter(): StoreWrites {
+/**
+ * True ONLY when there is definitely no ambient store scope (no request transaction, `withStore` or `runInStoreScope`): then a
+ * Postgres store's model call must open its own. With an ambient scope the call is made as-is: for the same store it is the
+ * request's own atomic scope, for ANOTHER store the tenant guard must still refuse it (a service handed a foreign store id from
+ * inside store B's scope is a cross-tenant call, never silently re-scoped). Any other answer (the helper unavailable, a mocked
+ * module) also means "call as-is", which is the behaviour before the scoped client existed.
+ */
+const STORE_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function needsOwnScope(): boolean {
+  try {
+    currentStoreId();
+    return false;
+  } catch (e) {
+    return e instanceof Error && /no ambient store/.test(e.message);
+  }
+}
+
+/**
+ * One model call made with no ambient store scope. It stays UNSTARTED (like a PrismaPromise): awaited, it runs in its own short
+ * `withStore(storeId, ...)`; handed to `$transaction([ ...ops ])`, the whole array is built and run inside ONE `withStore` so the
+ * batch is still atomic and still tenant-scoped.
+ */
+class ScopedCall implements PromiseLike<unknown> {
+  private started?: Promise<unknown>;
+  constructor(
+    readonly storeId: string,
+    readonly call: () => unknown
+  ) {}
+  then<R1 = unknown, R2 = never>(
+    onfulfilled?: ((v: unknown) => R1 | PromiseLike<R1>) | null,
+    onrejected?: ((e: unknown) => R2 | PromiseLike<R2>) | null
+  ): Promise<R1 | R2> {
+    this.started ??= withStore(this.storeId, async () => this.call());
+    return this.started.then(onfulfilled, onrejected);
+  }
+  catch<R = never>(onrejected?: ((e: unknown) => R | PromiseLike<R>) | null): Promise<unknown> {
+    return this.then(undefined, onrejected);
+  }
+  finally(f?: (() => void) | null): Promise<unknown> {
+    return Promise.resolve(this).finally(f);
+  }
+}
+
+function scopedTransaction(storeId: string, args: unknown[]): unknown {
+  const ops = args[0];
+  if (Array.isArray(ops) && ops.some(o => o instanceof ScopedCall)) {
+    return withStore(storeId, async () =>
+      (prisma as any).$transaction(
+        ops.map(o => (o instanceof ScopedCall ? o.call() : o)),
+        ...args.slice(1)
+      )
+    );
+  }
+  return (prisma as any).$transaction(...args);
+}
+
+/**
+ * The Postgres client of ONE store, tenant-scoped on its own (Ruling NZ-INTEG-1). Services moved to `storeDb(id)` /
+ * `storeWriter(id)` read through it from places with no request transaction (MCP, jobs, webhooks, the hub), and the tenant guard
+ * REFUSES an unscoped model call, so for a Postgres store every call made with no ambient store scope runs in a short
+ * `withStore(storeId, ...)` (BEGIN + set_config, as before the port). Inside a scope it is the plain, LAZY `prisma` delegate call,
+ * so request atomicity and `$transaction([ ...ops ])` arrays are unchanged. `$`-methods other than `$transaction` stay the raw
+ * proxy's. A Durable Object store never comes through here.
+ */
+function scopedPg(storeId: string, singleArgTransaction = false): object {
   return new Proxy({} as object, {
     get(_t, prop) {
       if (prop === '$proc')
@@ -1285,10 +1659,30 @@ function pgWriter(): StoreWrites {
             '$proc exists on the Durable Object writer only (the service keeps its Postgres statement)'
           );
         };
-      if (prop === '$transaction') return (ops: unknown) => (prisma as any).$transaction(ops);
-      return (prisma as any)[prop];
+      if (prop === '$transaction')
+        return singleArgTransaction
+          ? (ops: unknown) => scopedTransaction(storeId, [ops])
+          : (...a: unknown[]) => scopedTransaction(storeId, a);
+      if (typeof prop !== 'string' || prop.startsWith('$')) return (prisma as any)[prop];
+      return new Proxy({} as object, {
+        get(_d, method) {
+          if (typeof method !== 'string') return undefined;
+          return (...args: unknown[]) => {
+            const call = () => (prisma as any)[prop][method](...args);
+            // an id that is not a UUID can never be scoped (`withStore` refuses it); the call goes as-is and the guard decides
+            return STORE_ID_SHAPE.test(storeId) && needsOwnScope()
+              ? new ScopedCall(storeId, call)
+              : call();
+          };
+        },
+      });
     },
-  }) as unknown as StoreWrites;
+  });
+}
+
+/** pg writer: the store-scoped `prisma` client, minus the DO-only second argument of `$transaction`. */
+function pgWriter(storeId: string): StoreWrites {
+  return scopedPg(storeId, true) as unknown as StoreWrites;
 }
 
 async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
@@ -1296,7 +1690,12 @@ async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
   if (backend === 'do') {
     return { storeId, backend, ...(await doClients(storeId)) };
   }
-  return { storeId, backend: 'pg', db: prisma as unknown as StoreReads, writer: pgWriter() };
+  return {
+    storeId,
+    backend: 'pg',
+    db: scopedPg(storeId) as unknown as StoreReads,
+    writer: pgWriter(storeId),
+  };
 }
 
 /** The repo for a store: pg (default) or its Durable Object, per the store's flag. Memoised per request. */
@@ -1436,16 +1835,10 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
-  const d1 = d1StorePatch(data);
-  if (Object.keys(d1).length > 0) {
-    const platform = await requirePlatformDb();
-    await platform.store.update({ where: { id: storeId }, data: d1, select: { id: true } });
-  } else {
-    // no D1 column in the patch: still prove the store exists in the directory (fail closed, never a blind DO write)
-    const platform = await requirePlatformDb();
-    const found = await platform.store.findUnique({ where: { id: storeId }, select: { id: true } });
-    if (!found) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  }
+  await mirrorEntitlementToPg(storeId, data); // NZ-D21: Postgres sources the entitlement copy-back
+  // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await copyStoreSettings(storeId, data);
   const stub = storeDo(storeId) as unknown as QueryStub;
   const { decodeRpc } = await import('@ebda-src/repo');
@@ -1470,14 +1863,211 @@ export async function storeUpdateOnDo(
   return row;
 }
 
+/**
+ * Defer a DO store's update to the commit of the surrounding transaction (Ruling NZ-D18). Returns the PROJECTED row (the current
+ * record with the patch laid over it) without writing anything. 501 when there is no post-commit hook on this path.
+ */
+/**
+ * THE one writer of D1 `stores` (Ruling NZ-D20): every Store directory / entitlement write to D1 goes through here (an immediate DO
+ * update, a compare-and-set, a post-commit sync, a retry). Returns the number of rows written (for an empty patch: matched).
+ */
+async function d1StoreWrite(
+  where: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Promise<number> {
+  const platform = await requirePlatformDb();
+  if (Object.keys(patch).length === 0) return (await platform.store.count({ where })) as number;
+  return ((await platform.store.updateMany({ where, data: patch })) as { count: number }).count;
+}
+
+/**
+ * Re-sync a DO store's ENTITLEMENT state from its committed authoritative row (Ruling NZ-D20). Plan, billing suspension, status and
+ * deletion are decided in Postgres (the write that the transaction committed); this reads the CURRENT row there and copies the
+ * full current state to D1 and the DO. It replays no patch and carries no version: idempotent and latest-state-wins, so a late or
+ * duplicated retry, or two concurrent ones, converge on whatever Postgres holds NOW (a deleted or suspended store copies its
+ * restrictive state). Throws when the row cannot be read or either copy fails (the caller retries).
+ */
+export async function syncStoreEntitlement(storeId: string): Promise<void> {
+  const select = Object.fromEntries(ENTITLEMENT_FIELDS.map(f => [f, true]));
+  if (await platformFamilyOnD1('access')) {
+    // D1 is the source: copy ITS current row to the Durable Object (nothing is read from Postgres, nothing is written to D1).
+    const d1Row = (await (
+      await requirePlatformDb()
+    ).store.findUnique({
+      where: { id: storeId },
+      select,
+    })) as Record<string, unknown> | null;
+    if (!d1Row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+    await copyStoreSettings(storeId, d1Row);
+    return;
+  }
+  const row = (await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select })
+  )) as Record<string, unknown> | null;
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(row))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found in the directory');
+  await copyStoreSettings(storeId, row);
+}
+
+/**
+ * The post-commit D1 / DO write of a deferred update. Postgres has already committed it. Entitlement fields are re-synced from the
+ * committed row (`syncStoreEntitlement`); a failure is logged, alerted and put on the jobs queue as `{storeId}` only
+ * (lib/store-update-retry.ts), the handler re-syncs the CURRENT state. Other fields of the same patch are absolute profile / config
+ * values written once through the same D1 writer; a failure there is alerted (P1) with no retry (residual, NZ-D20).
+ */
+async function applyPostCommit(storeId: string, patch: Record<string, unknown>): Promise<void> {
+  const rest = Object.fromEntries(
+    Object.entries(patch).filter(([k]) => !(ENTITLEMENT_FIELDS as readonly string[]).includes(k))
+  );
+  if (touchesEntitlement(patch)) {
+    try {
+      await syncStoreEntitlement(storeId);
+    } catch (err) {
+      await reportAndRetryStoreUpdate(storeId, err);
+    }
+  }
+  if (Object.keys(rest).length > 0) {
+    try {
+      await d1StoreWrite({ id: storeId }, d1StorePatch(rest));
+      await copyStoreSettings(storeId, rest);
+    } catch (err) {
+      await reportStoreUpdateFailure(storeId, Object.keys(rest), err);
+    }
+  }
+}
+
+/** Fields whose rollback must not leave a D1 / DO change behind: plan (entitlements), billing suspension, lifecycle status. */
+const ENTITLEMENT_FIELDS: readonly string[] = [
+  'plan',
+  'billingSuspendedReason',
+  'billingSuspendedAt',
+  'status',
+  'deletedAt',
+];
+const touchesEntitlement = (data: Record<string, unknown>): boolean =>
+  ENTITLEMENT_FIELDS.some(f => data[f] !== undefined);
+
+/**
+ * Postgres is the SOURCE of the entitlement fields that `syncStoreEntitlement` copies to D1 / the DO and that the hourly reconciler
+ * reads (Ruling NZ-D21). An IMMEDIATE D1 + DO write of plan / billing suspension / status / deletion (`storeUpdateOnDo`, the
+ * compare-and-set `storeUpdateMany`) therefore also writes them to Postgres, FIRST (a failure here changes nothing), so a later
+ * copy-back or repair sources the value that was just written, never a stale one. Only those fields; absent row = no-op.
+ */
+async function mirrorEntitlementToPg(
+  storeId: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const patch = Object.fromEntries(
+    ENTITLEMENT_FIELDS.filter(f => data[f] !== undefined).map(f => [f, data[f]])
+  );
+  if (Object.keys(patch).length === 0) return;
+  // The access family is on D1: D1 `stores` IS the record of the entitlement fields, there is no Postgres copy to keep in step.
+  if (await platformFamilyOnD1('access')) return;
+  await withStore(storeId, async tx => {
+    await (tx as unknown as StoreUpdateManyClient).store.updateMany({
+      where: { id: storeId },
+      data: patch,
+    });
+  });
+}
+
+/** The row an update WILL produce (current record with the patch laid over it), read without writing. */
+async function projectStoreUpdate(
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<Record<string, unknown>> {
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const selected = args.select
+    ? Object.keys(args.select as object).filter(k => (args.select as any)[k])
+    : undefined;
+  const current = await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({
+    where: { id: storeId },
+    ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
+  });
+  if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  const projected: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(args.data))
+    if (v !== undefined && (!selected || selected.includes(k))) projected[k] = v;
+  return projected;
+}
+
+export async function storeUpdateAfterCommit(
+  tx: object,
+  storeId: string,
+  args: { data: Record<string, unknown>; select?: unknown; include?: { owner?: unknown } }
+): Promise<any> {
+  // The hook is bound to THIS transaction object (Ruling NZ-D19), not to the ambient tenant scope: a separate money transaction can
+  // roll back while the outer tenant transaction commits. A transaction with no hook registry cannot take it: refused (fail closed).
+  const pending: { write?: () => Promise<void> } = {};
+  if (!afterTxCommit(tx, () => pending.write?.()))
+    throw new AppError(
+      501,
+      'STORE_TX_WRITE_UNSUPPORTED',
+      'A Store update inside this database transaction has no post-commit hook for a Durable Object store'
+    );
+  const stub = storeDo(storeId) as unknown as QueryStub;
+  const { decodeRpc } = await import('@ebda-src/repo');
+  const delegate = doStoreDelegate(storeId, stub, decodeRpc as never);
+  const data = Object.fromEntries(Object.entries(args.data).filter(([, v]) => v !== undefined));
+  const selected = args.select
+    ? Object.keys(args.select as object).filter(k => (args.select as any)[k])
+    : undefined;
+  const current = await delegate.findUnique({
+    where: { id: storeId },
+    ...(selected ? { select: Object.fromEntries(selected.map(k => [k, true])) } : {}),
+  });
+  if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  // Postgres owns the entitlement fields: the committed intent lives in THIS transaction, so it commits or rolls back with it and a
+  // retry can re-read it (NZ-D20). Never a bare patch held only in memory.
+  await (tx as StoreUpdateClient).store.update({
+    where: { id: storeId },
+    data,
+    select: { id: true },
+  });
+  pending.write = () => applyPostCommit(storeId, data);
+  const projected: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(data))
+    if (!selected || selected.includes(k)) projected[k] = v;
+  return projected;
+}
+
 export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
   db: StoreUpdateClient,
   args: Prisma.SelectSubset<A, Prisma.StoreUpdateArgs>
 ): Promise<Prisma.StoreGetPayload<A>> {
   const a = args as Prisma.StoreUpdateArgs;
   const id = a.where.id as string;
-  if (await storeWritesToDo(id))
+  if (await storeWritesToDo(id)) {
+    // Ruling NZ-D18: a D1 / DO write is NOT in the caller's Postgres transaction. Called with a TRANSACTION client (a billing / money
+    // tx), applying it now would leave a plan or entitlement change that a later rollback never undoes (a free upgrade). So it is
+    // applied after the tx COMMITS (dropped on rollback), and the caller gets the projected row; with no post-commit hook available
+    // (a job's own transaction) it is refused, so that caller gets a proper port.
+    if ((db as unknown) !== (prisma as unknown))
+      return (await storeUpdateAfterCommit(
+        db as object,
+        id,
+        a as never
+      )) as Prisma.StoreGetPayload<A>;
+    // The base `prisma` proxy writes into the AMBIENT tenant transaction (`withStore` hands callers `prisma` itself, not a registered
+    // tx object). An ENTITLEMENT / lifecycle change (plan, billing suspension, status) made there must not outlive that transaction's
+    // rollback (a free upgrade, a re-activation): it applies after the AMBIENT transaction commits, when one with a hook registry
+    // exists. Every other field, and a write with no ambient transaction, is applied now (like every other DO write in a request).
+    if (touchesEntitlement(a.data as Record<string, unknown>)) {
+      let write: (() => Promise<void>) | undefined;
+      if (afterTenantTxCommit(() => write?.())) {
+        const projected = await projectStoreUpdate(id, a as never);
+        const patch = Object.fromEntries(
+          Object.entries(a.data as object).filter(([, v]) => v !== undefined)
+        );
+        await db.store.update({ where: { id }, data: patch, select: { id: true } });
+        write = () => applyPostCommit(id, patch);
+        return projected as Prisma.StoreGetPayload<A>;
+      }
+    }
     return (await storeUpdateOnDo(id, a as never)) as Prisma.StoreGetPayload<A>;
+  }
   const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
   await copyStoreSettings(id, a.data as Record<string, unknown>);
   return row;
@@ -1488,6 +2078,14 @@ export async function storeUpdateMany(
   args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
 ): Promise<Prisma.BatchPayload> {
   if (await storeWritesToDo(args.where.id)) {
+    // Ruling NZ-D18: a compare-and-set returns its count NOW, so it cannot be deferred past a transaction's commit: refused for a
+    // transaction client (the caller ports it), allowed for the base client.
+    if ((db as unknown) !== (prisma as unknown))
+      throw new AppError(
+        501,
+        'STORE_TX_WRITE_UNSUPPORTED',
+        'Store.updateMany inside a database transaction is not served for a Durable Object store'
+      );
     // Compare-and-set stays ONE atomic D1 statement: the filter may name only D1 columns (id + directory / mirror fields); a
     // filter on a DO-only column is refused. The DO copy follows only when the row matched.
     const filter = args.where as Record<string, unknown>;
@@ -1503,35 +2101,18 @@ export async function storeUpdateMany(
     const data = Object.fromEntries(
       Object.entries(args.data as object).filter(([, v]) => v !== undefined)
     );
-    const platform = await requirePlatformDb();
-    const patch = d1StorePatch(data);
-    const res =
-      Object.keys(patch).length > 0
-        ? ((await platform.store.updateMany({
-            where: args.where,
-            data: patch,
-          })) as Prisma.BatchPayload)
-        : { count: (await platform.store.count({ where: args.where })) as number };
-    if (res.count > 0) await copyStoreSettings(args.where.id, data);
+    const res = {
+      count: await d1StoreWrite(args.where as Record<string, unknown>, d1StorePatch(data)),
+    } as Prisma.BatchPayload;
+    if (res.count > 0) {
+      await mirrorEntitlementToPg(args.where.id, data); // NZ-D21
+      await copyStoreSettings(args.where.id, data);
+    }
     return res;
   }
   const res = await db.store.updateMany(args);
   if (res.count > 0) await copyStoreSettings(args.where.id, args.data as Record<string, unknown>);
   return res;
-}
-
-/**
- * For a raw-SQL write to `stores` (jsonb_set on `settings`): re-read the named columns from the authoritative row and copy
- * them, so a partial JSON write reaches the DO as the whole resulting value.
- */
-export async function syncStoreFields(storeId: string, fields: string[]): Promise<void> {
-  if ((await storeRepo(storeId)).backend !== 'do') return;
-  const select = Object.fromEntries(fields.map(f => [f, true]));
-  const row = (await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select })
-  )) as Record<string, unknown> | null;
-  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
-  await copyStoreSettings(storeId, row);
 }
 
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */
@@ -1551,4 +2132,45 @@ export function withRepo<T>(repo: StoreRepo, fn: () => T, req: RequestLike = NO_
  */
 export function runInJobRepoScope<T>(fn: () => T): T {
   return scopes.run({ req: NO_REQUEST, repos: new Map() }, fn);
+}
+
+/**
+ * ATOMIC money gate + close of a DO store's deletion (Ruling NZ-D17): ONE DO call checks money in flight and sets the closed flag, so
+ * nothing can slip in between. Refused -> 409 STORE_HAS_MONEY_IN_FLIGHT with the counts (nothing was changed). `token` is
+ * a closure token when THIS call closed the store (null when it was already closed): only that token can reopen it.
+ */
+export async function closeDoIfNoMoney(storeId: string): Promise<{ token: string | null }> {
+  const stub = storeDo(storeId) as unknown as {
+    closeIfNoMoneyInFlight(id: string): Promise<
+      | {
+          ok: true;
+          data:
+            | { closed: true; token: string | null }
+            | { refused: true; counts: Record<string, number> };
+        }
+      | { ok: false; code: string; status: number }
+    >;
+  };
+  const r = await stub.closeIfNoMoneyInFlight(storeId);
+  if (!r.ok) throw new AppError(r.status, r.code, `store close refused: ${r.code}`);
+  if ('refused' in r.data)
+    throw new AppError(
+      409,
+      'STORE_HAS_MONEY_IN_FLIGHT',
+      'This store still has money in flight (paid orders not delivered, transfers awaiting confirmation, open returns, cash on delivery not settled, payments in dispute, unsettled payouts or wallet balances). Settle them before deleting the store.',
+      { ...r.data.counts }
+    );
+  return { token: r.data.token };
+}
+
+/** Compensating rollback (Ruling NZ-D17): reopen a DO that THIS delete closed, when the delete then failed. Clears only its own flag. */
+export async function reopenDoAfterFailedDelete(storeId: string, token: string): Promise<void> {
+  const stub = storeDo(storeId) as unknown as {
+    reopenAfterFailedDelete(
+      id: string,
+      token: string
+    ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
+  };
+  const r = await stub.reopenAfterFailedDelete(storeId, token);
+  if (!r.ok) throw new AppError(r.status, r.code, `store reopen refused: ${r.code}`);
 }

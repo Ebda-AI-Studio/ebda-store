@@ -153,6 +153,15 @@ export function kashierSignature(
     .digest('hex');
 }
 
+/**
+ * The `allowedMethods` token list of a session. A prepaid-only (gold) order drops `bnpl` (Ruling
+ * SHARIA-GOLD-1); if that leaves nothing, the hosted page falls back to card + wallet.
+ */
+export function allowedMethodsFor(methods: readonly string[], excludeBnpl: boolean): string {
+  const kept = excludeBnpl ? methods.filter(m => m !== 'bnpl') : [...methods];
+  return (kept.length > 0 ? kept : ['card', 'wallet']).join(',');
+}
+
 const capabilities: ProviderCapabilities = {
   methods: ['card', 'wallet'],
   instructions: ['redirect'],
@@ -523,7 +532,10 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
                 email: req.customer.email || undefined,
                 reference: kashierCustomerReference(req.customer.id, req.orderId),
               },
-              allowedMethods: settings.methods.join(','),
+              allowedMethods: allowedMethodsFor(
+                settings.methods,
+                req.metadata?.excludeBnpl === 'true'
+              ),
               failureRedirect: false,
               serverWebhook: req.webhookUrl,
               metaData: { orderId: req.orderId },

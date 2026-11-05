@@ -1,0 +1,5 @@
+# DEPLOY-TIMEOUT-1
+
+> Section: 2026-11-03 - Hung storefront deploy (branch `feat/admin-batch-2026-11-03`)
+
+Ruling DEPLOY-TIMEOUT-1 - every job of every `cf-*-deploy.yml` workflow carries `timeout-minutes`, and the `wrangler deploy` step carries its own (15 min for web/admin/orders, 10 min for the rest, about 2x their normal duration). On 2026-11-03 the storefront deploy job hung for 17+ minutes retrying OpenNext's R2 incremental-cache populate ("Failed to send request to R2 worker: aborted due to timeout"), holding the single self-hosted Umbra runner and queueing every other CI run behind it. A step timeout fails the hang fast (the verify and rollback steps still run on their own conditions) instead of waiting for the job ceiling. `tests/unit/deploy-workflows-timeout.test.ts` fails when a job or a `Deploy ...` step in any `cf-*-deploy.yml` has no `timeout-minutes`. Cost if wrong: a deploy that is merely slow (cold R2 populate over 15 min) is killed and must be re-run by hand; raise the step value in the workflow and in this ruling.

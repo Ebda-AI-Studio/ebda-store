@@ -38,10 +38,14 @@ import {
 } from './gate';
 import { repriceProduct, repriceStore, withRepriceFlag, type RateLookup } from './repricer';
 
-/** `forcePending`: store every feed rate PENDING whatever the gate says (the sources disagreed). */
+/**
+ * `forcePending`: store every feed rate PENDING whatever the gate says (the sources disagreed).
+ * `skipJumpGate`: apply a feed rate even over the jump gate (a demo store: no merchant exists to confirm a pending rate).
+ * `forcePending` wins over it.
+ */
 export type RateActor =
   | { userId: string }
-  | { feed: Record<string, unknown>; forcePending?: boolean };
+  | { feed: Record<string, unknown>; forcePending?: boolean; skipJumpGate?: boolean };
 
 export interface RateRow {
   id: string;
@@ -77,10 +81,12 @@ export class GoldRateService {
   /** Current rates, settings, ages, pending rows: what the admin rate page reads. Never cached. */
   static async getState(storeId: string) {
     const now = new Date();
+    // Plain model reads on the store's own backend (the Durable Object, or the `prisma` proxy for a Postgres store).
+    const db = await storeDb(storeId);
     const [settings, current, pending, goldProducts] = await Promise.all([
-      loadSettings(root(), storeId),
-      loadCurrentRates(root(), storeId),
-      prisma.goldRate.findMany({
+      loadSettings(db as unknown as Prisma.TransactionClient, storeId),
+      loadCurrentRates(db as unknown as Prisma.TransactionClient, storeId),
+      db.goldRate.findMany({
         where: { storeId, status: 'pending' },
         orderBy: { createdAt: 'desc' },
         take: 6,
@@ -94,7 +100,7 @@ export class GoldRateService {
           feedReference: true,
         },
       }),
-      (await storeDb(storeId)).product.count({
+      db.product.count({
         where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
       }),
     ]);
@@ -142,7 +148,9 @@ export class GoldRateService {
         OR: [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: id } }],
       };
     }
-    const rows = await prisma.goldRate.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).goldRate.findMany({
       where: { storeId, ...(opts.karat ? { karat: opts.karat } : {}), ...cursorWhere },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -191,7 +199,11 @@ export class GoldRateService {
       const done = await money.goldApplyRates({
         input,
         ...(isFeed
-          ? { feed: actor.feed, forcePending: actor.forcePending === true }
+          ? {
+              feed: actor.feed,
+              forcePending: actor.forcePending === true,
+              skipJumpGate: actor.skipJumpGate === true,
+            }
           : { userId: actor.userId }),
       });
       for (const row of [...done.applied, ...done.pending] as RateRow[])
@@ -255,7 +267,8 @@ export class GoldRateService {
       await withRepriceFlag(tx, async () => {
         const newRates = new Map<GoldKarat, { id: string; ratePerGram: number }>();
         for (const v of verdicts) {
-          const isPending = isFeed && (v.over || actor.forcePending === true);
+          const isPending =
+            isFeed && ((v.over && actor.skipJumpGate !== true) || actor.forcePending === true);
           if (isPending) {
             // one pending rate per karat: a newer one supersedes the older
             await tx.goldRate.updateMany({

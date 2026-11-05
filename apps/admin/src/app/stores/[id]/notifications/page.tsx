@@ -11,9 +11,12 @@ import { useT } from '@/i18n/useT';
 import { NotificationsEmptyState } from './_components/NotificationsEmptyState';
 import { SmsChannelCard } from './_components/SmsChannelCard';
 import { PushChannelCard } from './_components/PushChannelCard';
+import { EnableOrderAlertsButton } from '../../../../components/EnableOrderAlertsButton';
 import { BroadcastComposerCard } from './_components/BroadcastComposerCard';
 import { EventConfigTable } from './_components/EventConfigTable';
 import { NotificationsLog } from './_components/NotificationsLog';
+import { WebPushToggleCard } from './_components/WebPushToggleCard';
+import Link from 'next/link';
 import {
   DEFAULT_CONFIGS,
   DEFAULT_EVENTS,
@@ -257,11 +260,17 @@ export default function NotificationsPage() {
   }
 
   const logsPages = Math.max(1, Math.ceil(logsTotal / logsLimit));
+  // Open the credentials group only while a channel the plan includes still has nothing configured.
+  const needsChannelSetup =
+    (smsEnabled && !configs.sms.enabled) || (pushEnabled && !configs.push_notifications.enabled);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
+      <div className="mb-6">
+        <EnableOrderAlertsButton />
+      </div>
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -270,32 +279,7 @@ export default function NotificationsPage() {
         <NotificationsEmptyState />
       ) : (
         <div className="space-y-6">
-          {smsEnabled && (
-            <SmsChannelCard
-              config={configs.sms}
-              saving={savingChannel === 'sms'}
-              testing={testingChannel === 'sms'}
-              testStatus={testStatus.sms}
-              onConfigChange={patch => updateConfig('sms', patch)}
-              onSave={() => handleSaveChannel('sms')}
-              onTest={() => handleTestConnection('sms')}
-            />
-          )}
-
-          {pushEnabled && (
-            <PushChannelCard
-              config={configs.push_notifications}
-              saving={savingChannel === 'push_notifications'}
-              testing={testingChannel === 'push_notifications'}
-              testStatus={testStatus.push_notifications}
-              onConfigChange={patch => updateConfig('push_notifications', patch)}
-              onSave={() => handleSaveChannel('push_notifications')}
-              onTest={() => handleTestConnection('push_notifications')}
-            />
-          )}
-
-          {pushEnabled && <BroadcastComposerCard storeId={storeId} />}
-
+          {/* 1. What the customer is told, and on which channel: the question merchants come here with */}
           <EventConfigTable
             events={events}
             smsEnabled={smsEnabled}
@@ -304,6 +288,62 @@ export default function NotificationsPage() {
             onToggleEventChannel={toggleEventChannel}
             onSave={handleSaveEvents}
           />
+
+          {pushEnabled && <WebPushToggleCard storeId={storeId} />}
+
+          {/* 2. Channel credentials: set once, then out of the way */}
+          <details className="rounded-xl border border-border bg-card p-4" open={needsChannelSetup}>
+            <summary className="cursor-pointer text-sm font-semibold text-foreground">
+              {tPage('channelsTitle')}
+            </summary>
+            <p className="mt-1 text-xs text-muted-foreground">{tPage('channelsHint')}</p>
+            <div className="mt-4 space-y-6">
+              {smsEnabled && (
+                <SmsChannelCard
+                  config={configs.sms}
+                  saving={savingChannel === 'sms'}
+                  testing={testingChannel === 'sms'}
+                  testStatus={testStatus.sms}
+                  onConfigChange={patch => updateConfig('sms', patch)}
+                  onSave={() => handleSaveChannel('sms')}
+                  onTest={() => handleTestConnection('sms')}
+                />
+              )}
+
+              {pushEnabled && (
+                <PushChannelCard
+                  config={configs.push_notifications}
+                  saving={savingChannel === 'push_notifications'}
+                  testing={testingChannel === 'push_notifications'}
+                  testStatus={testStatus.push_notifications}
+                  onConfigChange={patch => updateConfig('push_notifications', patch)}
+                  onSave={() => handleSaveChannel('push_notifications')}
+                  onTest={() => handleTestConnection('push_notifications')}
+                />
+              )}
+            </div>
+          </details>
+
+          {/* 3. A one-off message to every subscriber is a campaign, not a setting */}
+          {pushEnabled && (
+            <details className="rounded-xl border border-border bg-card p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                {tPage('broadcastTitle')}
+              </summary>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tPage('broadcastHint')}{' '}
+                <Link
+                  href={`/stores/${storeId}/campaigns`}
+                  className="font-medium text-primary-ink underline underline-offset-2"
+                >
+                  {tPage('campaignsLink')}
+                </Link>
+              </p>
+              <div className="mt-4">
+                <BroadcastComposerCard storeId={storeId} />
+              </div>
+            </details>
+          )}
 
           <NotificationsLog
             logs={logs}

@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
+import { storeCustomerWhere } from '../lib/store-customer';
 import {
   currentStoreId,
   prisma,
@@ -94,20 +96,7 @@ async function onClient<T>(
   return withMoneyTx(prisma, fn);
 }
 
-/**
- * Prisma `where` for "this user is a customer of this store". Customer
- * accounts are store-scoped (`users.store_id`). Never matches an admin/staff
- * row, and never matches another store's shopper.
- */
-export function storeCustomerWhere(storeId: string, customerId: string): Prisma.UserWhereInput {
-  return {
-    id: customerId,
-    role: 'customer',
-    // Top-level `storeId` (the tenant guard refuses an `OR`). A legacy customer row with
-    // `store_id` NULL is invisible from any store scope under RLS, so it never matched here.
-    storeId,
-  };
-}
+export { storeCustomerWhere };
 
 function assertValidInput(input: ApplyEntryInput): void {
   if (!Number.isSafeInteger(input.amount) || input.amount === 0) {
@@ -204,10 +193,14 @@ export class WalletService {
           // account OF THIS STORE — customer accounts are store-scoped users,
           // and a store must never be able to mint a wallet row against
           // another store's shopper.
-          const customer = await c.user.findFirst({
-            where: storeCustomerWhere(storeId, customerId),
-            select: { id: true },
-          });
+          const doCustomer = await customerRow(storeId, customerId);
+          const customer =
+            doCustomer !== undefined
+              ? doCustomer
+              : await c.user.findFirst({
+                  where: storeCustomerWhere(storeId, customerId),
+                  select: { id: true },
+                });
           if (!customer) {
             throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found in this store');
           }

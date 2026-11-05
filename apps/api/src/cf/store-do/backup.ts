@@ -14,6 +14,12 @@ export interface BackupManifest {
   storeId: string;
   takenAt: string;
   tables: Record<string, TableManifest>;
+  /**
+   * The storefront customers' credentials (`_cauth_users`, `_cauth_passkeys`), ENCRYPTED (AES-256-GCM, envelope key from the
+   * Worker secret CUSTOMER_AUTH_BACKUP_KEY) in `customer-auth.enc`. Refresh and one-time token rows are never backed up:
+   * sessions and links are re-issued. Absent when the store has no customer accounts.
+   */
+  customerAuth?: { file: string; sha256: string; users: number; passkeys: number };
 }
 
 export interface SqlLike {
@@ -104,5 +110,118 @@ export async function verifyWritten(
       throw new Error(`backup verify: ${t} checksum differs`);
     if (body.split('\n').filter(Boolean).length - 1 !== want.rows)
       throw new Error(`backup verify: ${t} line count differs from manifest rows`);
+  }
+  if (manifest.customerAuth) {
+    const f = await r2.get(backupKey(storeId, day, manifest.customerAuth.file));
+    if (!f) throw new Error('backup verify: customer-auth.enc missing after write');
+    if ((await sha256Hex(await f.text())) !== manifest.customerAuth.sha256)
+      throw new Error('backup verify: customer-auth.enc checksum differs');
+  }
+}
+
+// ---- customer credentials (N-9, Ruling NZ-N9-3): encrypted, never plaintext in R2 -----------------------------------------
+export const CUSTOMER_AUTH_FILE = 'customer-auth.enc';
+const CAUTH_BACKUP_TABLES = ['_cauth_users', '_cauth_passkeys'] as const;
+
+const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
+const unb64 = (t: string) => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+
+async function aesKey(
+  secret: string | undefined
+): Promise<Awaited<ReturnType<typeof crypto.subtle.importKey>>> {
+  const raw = secret ? unb64(secret.trim()) : new Uint8Array(0);
+  if (raw.length !== 32)
+    throw new Error(
+      'CUSTOMER_AUTH_BACKUP_KEY must be 32 bytes, base64 (customer credentials are backed up encrypted only)'
+    );
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+/** `iv.ciphertext` (base64), AES-256-GCM with a fresh random IV per file. */
+export async function encryptBlob(secret: string | undefined, plaintext: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      await aesKey(secret),
+      new TextEncoder().encode(plaintext)
+    )
+  );
+  return `${b64(iv)}.${b64(ct)}`;
+}
+
+export async function decryptBlob(secret: string | undefined, blob: string): Promise<string> {
+  const [iv, ct] = blob.trim().split('.');
+  if (!iv || !ct) throw new Error('customer-auth backup is malformed');
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: unb64(iv) },
+    await aesKey(secret),
+    unb64(ct)
+  );
+  return new TextDecoder().decode(pt);
+}
+
+/** Synchronous read of the two credential tables (same snapshot discipline as `dumpTables`). */
+export function dumpCustomerAuth(
+  sql: SqlLike
+): Record<string, { columns: string[]; lines: string[] }> {
+  const out: Record<string, { columns: string[]; lines: string[] }> = {};
+  for (const t of CAUTH_BACKUP_TABLES) {
+    const cur = sql.exec(`SELECT * FROM "${t}" ORDER BY "${t === '_cauth_users' ? 'id' : 'id'}"`);
+    const rows = cur.toArray();
+    const columns = rows.length ? Object.keys(rows[0]) : (cur.columnNames ?? []);
+    out[t] = { columns, lines: rows.map(r => JSON.stringify(columns.map(c => r[c]))) };
+  }
+  return out;
+}
+
+/** Encrypted file + its manifest entry, or null when the store has no customer accounts. Throws without a usable key. */
+export async function buildCustomerAuthBackup(
+  dump: ReturnType<typeof dumpCustomerAuth>,
+  secret: string | undefined
+): Promise<{ blob: string; entry: NonNullable<BackupManifest['customerAuth']> } | null> {
+  const users = dump._cauth_users.lines.length;
+  if (users === 0 && dump._cauth_passkeys.lines.length === 0) return null;
+  const blob = await encryptBlob(secret, JSON.stringify(dump));
+  return {
+    blob,
+    entry: {
+      file: CUSTOMER_AUTH_FILE,
+      sha256: await sha256Hex(blob),
+      users,
+      passkeys: dump._cauth_passkeys.lines.length,
+    },
+  };
+}
+
+/** Decrypt + checksum-verify the file named by the manifest. Throws on a wrong key, a tampered blob or a checksum difference. */
+export async function readCustomerAuthBackup(
+  blob: string,
+  entry: NonNullable<BackupManifest['customerAuth']>,
+  secret: string | undefined
+): Promise<ReturnType<typeof dumpCustomerAuth>> {
+  if ((await sha256Hex(blob)) !== entry.sha256)
+    throw new Error('customer-auth backup checksum differs from manifest');
+  const dump = JSON.parse(await decryptBlob(secret, blob)) as ReturnType<typeof dumpCustomerAuth>;
+  if (
+    dump._cauth_users.lines.length !== entry.users ||
+    dump._cauth_passkeys.lines.length !== entry.passkeys
+  )
+    throw new Error('customer-auth backup row counts differ from manifest');
+  return dump;
+}
+
+/** Insert a decoded dump into EMPTY `_cauth_*` tables (caller's transaction). Refresh / one-time token rows are not restored. */
+export function loadCustomerAuth(sql: SqlLike, dump: ReturnType<typeof dumpCustomerAuth>): void {
+  for (const t of CAUTH_BACKUP_TABLES) {
+    const n = Number(sql.exec(`SELECT count(*) AS n FROM "${t}"`).toArray()[0].n);
+    if (n !== 0) throw new Error('restore target must be empty');
+    const { columns, lines } = dump[t];
+    const ph = columns.map(() => '?').join(',');
+    for (const line of lines)
+      sql.exec(
+        `INSERT INTO "${t}" (${columns.map(c => `"${c}"`).join(',')}) VALUES (${ph})`,
+        ...(JSON.parse(line) as unknown[])
+      );
   }
 }

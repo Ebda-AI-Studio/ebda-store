@@ -14,6 +14,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   assertStockHoldCapNotExceeded,
+  resolveStoreHoldCaps,
+  openUnpaidHoldIpCap,
+  openUnpaidHoldIpWindowHours,
   openUnpaidHoldCap,
   openUnpaidGatewayHoldCap,
   HOLD_CAPPED_PAYMENT_METHODS,
@@ -130,19 +133,19 @@ describe('stock-hold-cap', () => {
     });
 
     it('does NOT reject on a shared IP alone until the much looser IP cap is reached (CGNAT tolerance)', async () => {
-      // Identity cap is 2 (default); IP cap defaults to 4x = 8. 3 unrelated
-      // shoppers sharing one carrier-NAT IP must not block each other.
-      const t = tx(0, 3);
+      // Identity cap is 2 (default); the COD IP cap is 40 per 24 h (QA-HOLDS-1). Thirty-nine unrelated
+      // shoppers sharing one carrier-NAT IP must not block each other (the QA run was refused at 8).
+      const t = tx(0, 39);
       await expect(
         assertStockHoldCapNotExceeded(t, 'store1', 'cod', { ip: '1.2.3.4' })
       ).resolves.toBeUndefined();
     });
 
     it('still rejects once the looser IP-only cap is reached', async () => {
-      const t = tx(0, 8);
+      const t = tx(0, 40);
       await expect(
         assertStockHoldCapNotExceeded(t, 'store1', 'cod', { ip: '1.2.3.4' })
-      ).rejects.toMatchObject({ statusCode: 429 });
+      ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
     });
 
     it('respects a configured IP cap independently of the identity cap', async () => {
@@ -185,6 +188,96 @@ describe('stock-hold-cap', () => {
       expect(callArgs.slice(1)).toEqual(
         expect.arrayContaining(['+201000000000', 'a@b.com', '1.2.3.4', 'store1'])
       );
+    });
+  });
+
+  describe('QA-HOLDS-1: COD behind a shared IP', () => {
+    afterEach(() => {
+      delete process.env.OPEN_UNPAID_HOLD_IP_CAP;
+      delete process.env.OPEN_UNPAID_HOLD_IP_WINDOW_HOURS;
+    });
+    const tx = (phoneOrEmail: number, ip = 0) => ({
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi
+        .fn()
+        .mockResolvedValue([{ phone_or_email_count: BigInt(phoneOrEmail), ip_count: BigInt(ip) }]),
+    });
+
+    it('defaults: COD IP ceiling 40, counted over the last 24 hours', () => {
+      expect(openUnpaidHoldIpCap()).toBe(40);
+      expect(openUnpaidHoldIpWindowHours()).toBe(24);
+      expect(resolveStoreHoldCaps(null)).toEqual({
+        manual: 2,
+        gateway: 5,
+        ip: 40,
+        ipWindowHours: 24,
+      });
+    });
+
+    it('the eight-orders-one-IP case from the QA run is no longer refused (distinct phones)', async () => {
+      await expect(
+        assertStockHoldCapNotExceeded(tx(1, 8), 'store1', 'cod', {
+          phone: '+201000000009',
+          ip: '41.1.1.1',
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it('still refuses ONE phone that already holds the identity cap, behind any IP (abuse protection kept)', async () => {
+      await expect(
+        assertStockHoldCapNotExceeded(tx(2, 0), 'store1', 'cod', {
+          phone: '+201000000009',
+          ip: '41.1.1.1',
+        })
+      ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+    });
+
+    it('a refusal on the IP ceiling says so in Arabic and differs from the identity refusal', async () => {
+      const ipHit = await assertStockHoldCapNotExceeded(tx(0, 40), 'store1', 'cod', {
+        ip: '41.1.1.1',
+      }).catch(e => e);
+      const idHit = await assertStockHoldCapNotExceeded(tx(2, 0), 'store1', 'cod', {
+        phone: '+201000000009',
+      }).catch(e => e);
+      expect(ipHit.details.messageAr).toMatch(/الشبكة/);
+      expect(idHit.details.messageAr).toMatch(/طلبات/);
+      expect(ipHit.message).not.toBe(idHit.message);
+    });
+
+    it('the IP count is bounded by the window: the window hours go to the SQL as a parameter', async () => {
+      const t = tx(0, 0);
+      await assertStockHoldCapNotExceeded(
+        t,
+        'store1',
+        'cod',
+        { ip: '41.1.1.1' },
+        { manual: 2, gateway: 5, ip: 40, ipWindowHours: 6 }
+      );
+      expect(t.$queryRaw.mock.calls[0].slice(1)).toContain(6);
+      expect(String(t.$queryRaw.mock.calls[0][0])).toContain('created_at');
+    });
+
+    it('a per-store override applies, and an out-of-range one cannot switch the protection off', async () => {
+      const caps = resolveStoreHoldCaps({
+        stockHoldCaps: { manual: 3, ip: 100, ipWindowHours: 48 },
+      });
+      expect(caps).toMatchObject({ manual: 3, ip: 100, ipWindowHours: 48, gateway: 5 });
+      await expect(
+        assertStockHoldCapNotExceeded(
+          tx(2, 99),
+          'store1',
+          'cod',
+          { phone: '+2010', ip: '1.1.1.1' },
+          caps
+        )
+      ).resolves.toBeUndefined();
+      await expect(
+        assertStockHoldCapNotExceeded(tx(0, 100), 'store1', 'cod', { ip: '1.1.1.1' }, caps)
+      ).rejects.toMatchObject({ statusCode: 429 });
+      const hostile = resolveStoreHoldCaps({
+        stockHoldCaps: { manual: 0, gateway: 9999, ip: 1, ipWindowHours: 100000 },
+      });
+      expect(hostile).toEqual({ manual: 2, gateway: 5, ip: 40, ipWindowHours: 24 });
     });
   });
 });

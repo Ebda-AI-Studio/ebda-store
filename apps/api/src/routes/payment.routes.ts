@@ -1,14 +1,21 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeDb } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
-import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@ebda/shared';
+import {
+  INSTAPAY_DEFAULT_EXPIRY_HOURS,
+  goldAllowsDeferredPayment,
+  storefrontOrigin,
+} from '@ebda/shared';
+import { assertGoldPaymentAllowed } from '../services/gold-rate/payment-policy';
 import { z } from 'zod/v3';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
@@ -24,6 +31,8 @@ import {
   resolveStoreFromWebhookRef,
 } from '../lib/definer';
 import { OrderService } from '../services/order.service';
+import { checkStoreAccess } from '../middleware/store-access';
+import { onAccessD1 } from '../services/platform/access-d1';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
@@ -51,6 +60,7 @@ import { isProviderAvailable } from '../services/payment-providers/provider-heal
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 const router = Router();
 
 // ==========================================
@@ -105,12 +115,16 @@ const createPaymentSchema = z.object({
 });
 
 const refundSchema = z.object({
-  transactionId: z.string(),
+  // BE:S-12: bounded, both land in the audit log and the provider call.
+  transactionId: z.string().min(1).max(128),
   /** Narrows the lookup when two providers hold the same reference string (Ruling ITEST-14). */
   provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
   amount: z.number().int().positive().optional(),
-  reason: z.string().optional(),
+  reason: z.string().max(500).optional(),
 });
+
+// BE:S-13: the retry body names at most a provider.
+const retryBodySchema = z.object({ provider: z.enum(['paymob', 'kashier', 'fawry']).optional() });
 
 // ==========================================
 // Helper Functions
@@ -132,10 +146,10 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
     // resolved first (validated X-Store-ID / host, the same resolver the public
     // routes use) and every read below runs inside its scope.
     const storeId = await resolvePublicStoreId(req);
+    // BE:S-22: no resolvable store is a 404, never the platform default (and never "first store").
+    if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
-    const data = await (storeId
-      ? withStore(storeId, () => loadCheckoutPaymentConfig(storeId))
-      : loadCheckoutPaymentConfig(undefined));
+    const data = await runInStoreCtx(storeId, () => loadCheckoutPaymentConfig(storeId));
 
     res.json({ success: true, data });
   } catch (error) {
@@ -185,7 +199,9 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     displayNameAr: string | null;
   } | null = null;
   const codRecord = storeId
-    ? await prisma.paymentConfig.findFirst({
+    ? await (
+        await storeDb(storeId)
+      ).paymentConfig.findFirst({
         where: { storeId, provider: 'cod' as const, isEnabled: true },
       })
     : null;
@@ -228,8 +244,18 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
       ? envDefault
       : (providers[0] ?? (codConfig ? 'cod' : instapayConfig ? 'instapay' : null));
 
+  // Ruling SHARIA-GOLD-1: a cart with gold hides COD + installments unless the merchant allowed them. The
+  // storefront only hides the options; the API refuses them (assertGoldPaymentAllowed) whatever it shows.
+  const goldStore = storeId
+    ? await (
+        await storeDb(storeId)
+      ).store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    : null;
+  const goldPrepaidOnly = !goldAllowsDeferredPayment(goldStore?.settings);
+
   return {
     providers,
+    goldPrepaidOnly,
     /** Per online provider, the methods the merchant enabled. */
     methods: methodsByProvider,
     cod: codConfig,
@@ -254,6 +280,7 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
     const currency = (req.query.currency as Currency) || REGION.currency;
     const provider = req.query.provider as PaymentProvider | undefined;
     const storeId = await resolvePublicStoreId(req);
+    if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // BE:S-22
 
     const methods = await PaymentService.getPaymentMethods(amount, currency, provider, storeId);
 
@@ -425,6 +452,27 @@ router.post(
         // daily auto-cancel reconciler.
       }
 
+      // Ruling SHARIA-GOLD-1: the second server-side gate. An order priced from gold lines can only be paid
+      // up front online unless the store allows COD / installments; the provider and the method the shopper
+      // picked are judged here even if the checkout was bypassed.
+      const orderHasGold = order.items.some(
+        (i: { goldSnapshot?: unknown }) => i.goldSnapshot !== null && i.goldSnapshot !== undefined
+      );
+      let goldPrepaidOnly = false;
+      if (orderHasGold) {
+        const storeRow = await withStore(order.storeId, tx =>
+          tx.store.findUnique({ where: { id: order.storeId }, select: { settings: true } })
+        );
+        goldPrepaidOnly = !goldAllowsDeferredPayment(storeRow?.settings);
+        assertGoldPaymentAllowed({
+          hasGold: true,
+          storeSettings: storeRow?.settings,
+          provider: data.provider,
+          // Fawry's adapter defaults to settings.methods[0] (`payatfawry`, a reference paid at an outlet later) when no method is sent.
+          method: data.method ?? (data.provider === 'fawry' ? 'payatfawry' : undefined),
+        });
+      }
+
       // Customer wallet (D1): `order.total` is the order VALUE; the part paid
       // from the wallet at checkout is `order.walletAmount`, and only the
       // remainder is ever charged here. 0 for every order that did not use the
@@ -487,7 +535,7 @@ router.post(
 
       if (data.provider === 'cod' || data.provider === 'instapay') {
         // No network: one short tenant transaction.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -546,7 +594,9 @@ router.post(
           // ==========================================
           // Look up COD config for fee
           // The store's own COD row only (no platform-level row exists for the app role, R-EBDA-007).
-          const codConfig = await prisma.paymentConfig.findFirst({
+          const codConfig = await (
+            await storeDb(order.storeId)
+          ).paymentConfig.findFirst({
             where: { storeId: order.storeId, provider: 'cod', isEnabled: true },
           });
 
@@ -784,7 +834,15 @@ router.post(
               : data.errorUrl
             : `${storefrontBaseUrl}/checkout/error`,
           webhookUrl: paymentWebhookUrl(providerName, order.storeId),
-          ...(data.method ? { metadata: { method: data.method } } : {}),
+          ...(data.method || goldPrepaidOnly
+            ? {
+                metadata: {
+                  ...(data.method ? { method: data.method } : {}),
+                  // Gold, prepaid only: a gateway page that offers every method must leave installments out.
+                  ...(goldPrepaidOnly ? { excludeBnpl: 'true' } : {}),
+                },
+              }
+            : {}),
         };
 
         // THE PROVIDER CALL — no transaction is open. It throws on provider-not-
@@ -812,7 +870,7 @@ router.post(
         };
 
         // Short transaction to record: the Payment row + its audit event + the audit log.
-        paymentResponse = await runInTenantContext<{
+        paymentResponse = await runInStoreCtx<{
           status: number;
           body: Record<string, unknown>;
         }>(order.storeId, async () => {
@@ -878,7 +936,7 @@ router.post(
         // under ebda_app the rollback would read no rows and do nothing
         // (PR 2301 audit, same class as the MCP place_order rollbacks).
         const rb = rollbackContext;
-        await runInTenantContext(rb.storeId, () =>
+        await runInStoreCtx(rb.storeId, () =>
           OrderService.rollbackForPaymentFailure(rb.storeId, rb.orderId, rb.sessionId)
         ).catch(rbErr =>
           logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
@@ -1130,6 +1188,9 @@ router.get(
 router.post(
   '/refund',
   authenticate,
+  // BE:S-2 / S-11 (Ruling FP-3): money out is never done from an impersonated session; super_admin needs MFA.
+  requireMfaEnrolled,
+  rejectImpersonated,
   requirePermission('orders:refund'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1158,19 +1219,24 @@ router.post(
         });
         return;
       }
-      if (user.role === 'store_admin' && paymentRow.order.store.ownerId !== user.userId) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment not found' },
-        });
-        return;
+      // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
+      // `orders:refund` (on any store) passed with no membership check at all.
+      if (user.role !== 'super_admin') {
+        const access = await checkStoreAccess(paymentRow.order.store.id, user);
+        if (!access.ok) {
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Payment not found' },
+          });
+          return;
+        }
       }
 
       const refundStoreId = paymentRow.order.store.id;
 
       // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
       // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
-      const refund = await runInTenantContext(refundStoreId, () =>
+      const refund = await runInStoreCtx(refundStoreId, () =>
         PaymentService.refund({
           transactionId: data.transactionId,
           amount: data.amount,
@@ -1182,7 +1248,7 @@ router.post(
       // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
       // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
       // a pre-refund snapshot.
-      await runInTenantContext(refundStoreId, async () => {
+      await runInStoreCtx(refundStoreId, async () => {
         await auditLog({
           action: 'payment.refunded',
           userId: user.userId,
@@ -1253,12 +1319,15 @@ router.post(
 router.post(
   '/retry/:paymentId',
   authenticate,
+  rejectImpersonated,
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { paymentId } = req.params;
       const user = getAuthUser(req);
-      const provider = req.body.provider as PaymentProvider | undefined;
+      const provider = retryBodySchema.parse(req.body ?? {}).provider as
+        | PaymentProvider
+        | undefined;
 
       // The store is not known yet (strict RLS shows a contextless read nothing): a definer
       // maps the payment id to its store, then the ownership check reads inside that scope.
@@ -1373,6 +1442,17 @@ router.get(
  * payment with its store ownerId, then accept the request only when
  * the requester is super_admin or is the store owner.
  */
+/** D1 twin of `resolvePaymentEventsStore`: unknown payment and denied access are the same "not found". */
+async function resolvePaymentEventsStoreD1(
+  user: { userId: string; role: string },
+  paymentId: string
+): Promise<{ storeId: string; paymentId: string } | null> {
+  const storeId = await getPaymentStoreId(paymentId);
+  if (!storeId) return null;
+  const access = await checkStoreAccess(storeId, user);
+  return access.ok ? { storeId, paymentId } : null;
+}
+
 router.get('/:id/events', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = getAuthUser(req);
@@ -1381,7 +1461,11 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
     // The payment's store is found by a GUARDED definer (an active super_admin, or the owner /
     // staff of that payment's store; anyone else sees "not found"), then the events are read
     // inside that store's scope. Under strict RLS a contextless read would see no row at all.
-    const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
+    // After the `access` cutover the Postgres definer's staff branch reads a frozen/emptied copy, so access is decided from
+    // D1 instead: the payment's store by exact id, then the same gate every admin route uses (owner, live staff, super_admin).
+    const owner = (await onAccessD1())
+      ? await resolvePaymentEventsStoreD1(user, paymentId)
+      : await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
     if (!owner) {
       res.status(404).json({
         success: false,
@@ -1439,7 +1523,16 @@ router.get(
         return;
       }
       const { eventId } = req.params;
-      const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
+      // Ruling NZ-PG-2: after the `access` cutover the Postgres definer is gone; the caller is already a verified super_admin
+      // (the role gate above), so the event's store is found by a primary-key probe of the stores' own DOs.
+      const owner = (await onAccessD1())
+        ? await (async () => {
+            const storeId = await (
+              await import('../lib/entity-store-fanout.js')
+            ).entityStoreByFanout('payment_event', eventId);
+            return storeId ? { storeId } : null;
+          })()
+        : await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
       const event = owner
         ? await withStore(owner.storeId, () =>
             prisma.paymentEvent.findUnique({

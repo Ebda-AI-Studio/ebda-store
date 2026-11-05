@@ -37,7 +37,6 @@ vi.mock('@ebda/database', async () => {
     store: h.platformStore,
     aiUsage: { aggregate: vi.fn(async () => ({ _sum: { tokens: 0 } })), create: vi.fn() },
     // analytics-tier tables are platform rows (model-split.json: target analytics), not the store's
-    productDailyView: { aggregate: vi.fn(async () => ({ _sum: { views: 0 } })) },
     $queryRaw: async () => [{ now: new Date() }],
   });
   return (await import('./helpers/database-mock')).databaseMock({
@@ -80,6 +79,11 @@ vi.mock('@ebda/database', async () => {
     },
   });
 });
+// Ruling NZ-AN-1: the day's product views are read from the store's own DO once its analytics moved (Postgres THROWS)
+vi.mock('@api/lib/analytics-backend', () => ({
+  analyticsRead: async (_id: string, onDo: (r: unknown) => Promise<unknown>) =>
+    onDo({ productDailyView: { aggregate: async () => ({ _sum: { count: 0 } }) } }),
+}));
 vi.mock('@api/lib/repo-factory', () => ({
   storeRepo: async (storeId: string) => ({
     storeId,
@@ -584,7 +588,8 @@ describe('watchers, scans and rollups on the DO', () => {
   it('ai-autofill-sweep lists the DO store itself and sweeps it through its DO, FBT recompute included', async () => {
     const { sweepAutofillStore } = await import('@api/lib/inngest/functions/ai-autofill-sweep');
     const d = h.doBox.current;
-    h.platformStore.findUnique.mockResolvedValue({ theme: {}, aiFeaturesEnabled: true });
+    // The autopilot toggle and the merchant AI switch are read through the store's own backend (NZ-INTEG-1): the DO's profile row.
+    d.seed('store', { id: DO_STORE, theme: {}, aiFeaturesEnabled: true });
     const res = await sweepAutofillStore(DO_STORE);
     expect(res).toMatchObject({ products: 0 });
     expect(h.recalcFbt).toHaveBeenCalledWith(DO_STORE);
@@ -689,7 +694,11 @@ describe('the ported sources do not touch a store-do model through `prisma`', ()
     'lib/ci/source.ts',
   ];
   /** a Postgres-only branch reached only when `storeMoney()` is null: the job's own pg path, kept as it was */
-  const PG_BRANCH: Record<string, number> = { 'lib/ci/source.ts': 1 };
+  const PG_BRANCH: Record<string, number> = {
+    'lib/ci/source.ts': 1,
+    // the `() => prisma.productDailyView.aggregate(...)` fallback of analyticsRead, taken only before the analytics marker (NZ-AN-1)
+    'services/accounting/analytics-rollup.service.ts': 1,
+  };
 
   it.each([...fns, ...services])('%s', f => {
     const hits = [

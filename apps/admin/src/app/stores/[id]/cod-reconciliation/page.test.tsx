@@ -26,6 +26,7 @@ vi.mock('../../../../hooks/useRequireFeature', () => ({
   useRequireFeature: () => ({ gate: null }),
 }));
 vi.mock('../../../../lib/api', () => api);
+vi.mock('../shipping/_components/ShippingTabs', () => ({ ShippingTabs: () => null }));
 
 import { ToastProvider } from '@ebda/ui';
 import CodReconciliationPage from './page';

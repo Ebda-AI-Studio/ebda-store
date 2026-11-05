@@ -130,7 +130,7 @@ export function InstapayReceiptReview({
             <li key={flag}>
               <Badge
                 variant="warning"
-                className={flag === 'AMOUNT_MISMATCH' ? 'ring-2 ring-amber-500' : ''}
+                className={flag === 'AMOUNT_MISMATCH' ? 'ring-2 ring-warning' : ''}
               >
                 {tFlags(flag)}
               </Badge>
@@ -188,7 +188,7 @@ export function InstapayReceiptReview({
                       {r.submitted ?? '—'}
                     </td>
                     <td
-                      className={`py-1 ${differs ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}
+                      className={`py-1 ${differs ? 'font-semibold text-warning-ink' : 'text-muted-foreground'}`}
                       dir={r.dir}
                     >
                       {r.read ?? '—'}

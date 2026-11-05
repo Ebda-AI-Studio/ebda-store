@@ -12,21 +12,51 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { withStore, withUser, UserRole } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
-import { getAccountState, inviteIdentity } from '../lib/identity-client';
+import { getAccountState, getAccountsBrief, inviteIdentity } from '../lib/identity-client';
 import { STAFF_INVITE_TTL_MINUTES, signStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
+import { getEntitlements } from '../services/plan-entitlements';
+import {
+  addStaffWithinCap,
+  inAccessScope,
+  onAccessD1,
+  removeStaffMember,
+} from '../services/platform/access-d1';
+import { sendAlert } from '../services/alerts.service';
 import { RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
 import { sendStaffInviteEmail } from '../services/platform-mailer';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
+
+/**
+ * Add a membership on D1 under the plan seat cap, atomically (access-d1.ts). `null` from the insert means: already a member
+ * (409), no such store (404) or the cap is full (the plan-limit guard then raises the standard 402 with the upsell).
+ */
+async function addStaffMemberD1(storeId: string, userId: string): Promise<{ id: string }> {
+  const e = await getEntitlements(storeId);
+  if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // never "unlimited" for an unknown store
+  const raw = e.limits.maxStaff;
+  const cap = typeof raw === 'number' ? raw : null; // null = unlimited
+  const id = await addStaffWithinCap(storeId, userId, cap);
+  if (id) return { id };
+  const again = await inAccessScope(storeId, tx =>
+    tx.storeStaff.findUnique({ where: { userId_storeId: { userId, storeId } } })
+  );
+  if (again) {
+    throw new AppError(409, 'ALREADY_MEMBER', 'This user is already a staff member of this store.');
+  }
+  await assertWithinLimit(storeId, 'maxStaff'); // throws the 402 when the seats are full
+  throw new AppError(409, 'STAFF_SEAT_CONFLICT', 'Could not add the staff member, try again.');
+}
 
 /** A customer or platform-admin account can never be staff; the identity's REAL role decides, not a literal. */
 function assertInvitableRole(role: string): void {
@@ -49,6 +79,64 @@ const inviteStaffSchema = z.object({
 
 // ─── List staff members ────────────────────────────────────────────────────
 
+interface StaffListUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  lastLoginAt: Date | string | null;
+  createdAt: Date | string;
+}
+
+/**
+ * Memberships plus the people behind them. Before the `access` cutover: the Postgres join, unchanged. After it the
+ * membership rows are D1 (no relation to the identity-owned user) and the display facts come from the identity service in
+ * ONE batched call; a member the identity no longer knows (erased) is not listed.
+ */
+async function listStaffWithUsers(
+  storeId: string
+): Promise<Array<{ id: string; createdAt: Date; user: StaffListUser }>> {
+  if (!(await onAccessD1())) {
+    return withStore(storeId, tx =>
+      tx.storeStaff.findMany({
+        where: { storeId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              status: true,
+              lastLoginAt: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+    );
+  }
+  const rows = await inAccessScope(storeId, tx =>
+    tx.storeStaff.findMany({
+      where: { storeId },
+      select: { id: true, userId: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+      take: 500,
+    })
+  );
+  const briefs = new Map(
+    (await getAccountsBrief(rows.map((r: { userId: string }) => r.userId))).map(b => [b.id, b])
+  );
+  const out: Array<{ id: string; createdAt: Date; user: StaffListUser }> = [];
+  for (const r of rows as Array<{ id: string; userId: string; createdAt: Date }>) {
+    const b = briefs.get(r.userId);
+    if (b) out.push({ id: r.id, createdAt: r.createdAt, user: b });
+  }
+  return out;
+}
+
 router.get(
   '/',
   authenticate,
@@ -59,25 +147,7 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const members = await withStore(storeId, tx =>
-        tx.storeStaff.findMany({
-          where: { storeId },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                status: true,
-                lastLoginAt: true,
-                createdAt: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'asc' },
-        })
-      );
+      const members = await listStaffWithUsers(storeId);
 
       res.json({
         success: true,
@@ -101,6 +171,9 @@ router.get(
 router.post(
   '/',
   authenticate,
+  requireMfaEnrolled,
+  // BE:S-2 (Ruling FP-3): adding a staff member grants durable access; not from an impersonated session.
+  rejectImpersonated,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),
@@ -116,7 +189,12 @@ router.post(
       // scope, so find-or-create goes through the `ebda_admin_user_ensure`
       // definer: it returns the existing account untouched, or creates a staff
       // account. The password is only hashed when no account exists yet.
-      const exists = await findUserIdByEmail(input.email, null, { includeDeleted: true });
+      // After the `access` cutover the identity service is the only place that knows an address: it creates the account or
+      // answers that it exists (then the invitation + ACCEPT step below), so the Postgres lookup/creation is skipped.
+      const d1Access = await onAccessD1();
+      const exists = d1Access
+        ? null
+        : await findUserIdByEmail(input.email, null, { includeDeleted: true });
       const storeNameForInvite = req.store?.name ?? 'your store';
       const requestedId = crypto.randomUUID();
       // ONE rule for an address that already has an account (Ruling ID-13): a store is never attached to someone else's
@@ -142,21 +220,29 @@ router.post(
           if (invited.id !== requestedId) {
             throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
           }
-          await withUser(invited.id, tx =>
-            tx.user.create({
-              data: {
-                id: invited.id,
-                storeId: null,
-                email: input.email,
-                passwordHash: '!pending',
-                firstName: input.firstName,
-                lastName: input.lastName,
-                role: UserRole.staff,
-                emailVerified: false,
-                language: 'ar',
-              },
-            })
-          );
+          const createShadow = () =>
+            withUser(invited.id, tx =>
+              tx.user.create({
+                data: {
+                  id: invited.id,
+                  storeId: null,
+                  email: input.email,
+                  passwordHash: '!pending',
+                  firstName: input.firstName,
+                  lastName: input.lastName,
+                  role: UserRole.staff,
+                  emailVerified: false,
+                  language: 'ar',
+                },
+              })
+            );
+          // The Postgres profile row is a shadow of the identity (never authoritative). After the cutover it must not
+          // block the invite when Postgres is down; the identity service already holds the account.
+          if (d1Access)
+            await createShadow().catch(err =>
+              logger.warn({ err: (err as Error).message }, 'staff shadow profile not written')
+            );
+          else await createShadow();
           staffUser = {
             id: invited.id,
             created: true,
@@ -197,7 +283,7 @@ router.post(
         // superseded, and the row is consumed by the accept in the same transaction that creates the membership.
         const inviteEmail = input.email.toLowerCase();
         const inviteId = crypto.randomUUID();
-        await withStore(storeId, async tx => {
+        await inAccessScope(storeId, async tx => {
           await tx.staffInvite.updateMany({
             where: { storeId, email: inviteEmail, status: 'pending' },
             data: { status: 'revoked', decidedAt: new Date() },
@@ -249,7 +335,7 @@ router.post(
       }
 
       // Prevent double-add
-      const existing = await withStore(storeId, tx =>
+      const existing = await inAccessScope(storeId, tx =>
         tx.storeStaff.findUnique({
           where: { userId_storeId: { userId: staffUser.id, storeId } },
         })
@@ -264,12 +350,14 @@ router.post(
 
       // The seat check and the insert are ONE atomic step (store row locked FOR UPDATE), so two simultaneous adds or
       // accepts cannot both take the last seat.
-      const membership = await withStore(storeId, async tx => {
-        await assertWithinLimit(storeId, 'maxStaff', { tx });
-        return tx.storeStaff.create({
-          data: { storeId, userId: staffUser.id },
-        });
-      });
+      const membership = d1Access
+        ? await addStaffMemberD1(storeId, staffUser.id)
+        : await withStore(storeId, async tx => {
+            await assertWithinLimit(storeId, 'maxStaff', { tx });
+            return tx.storeStaff.create({
+              data: { storeId, userId: staffUser.id },
+            });
+          });
 
       // Consent/notice (lens-2, 2026-09-22 audit): every staff add now mails the
       // invitee, instead of leaving it to the owner to tell them out of band. A
@@ -297,9 +385,10 @@ router.post(
       void deferAfterTenantCommit(
         'staff.invite.notify',
         async () => {
+          // Language is a nicety: a failed profile read (Postgres down after the cutover) falls back to the default.
           const existingUser = await withUser(staffUser.id, tx =>
             tx.user.findUnique({ where: { id: staffUser.id }, select: { language: true } })
-          );
+          ).catch(() => null);
           const language = (existingUser?.language as 'en' | 'ar' | undefined) ?? undefined;
           // A brand-new account already received its invitation (with the set-password code) from the identity service.
           if (staffUser.created) return;
@@ -337,11 +426,13 @@ router.post(
         success: true,
         data: {
           membershipId: membership.id,
+          // BE:S-20: echo what the OWNER typed, never fields read from a pre-existing account (its stored name is that
+          // person's data, and showing it confirmed whose account the address belongs to).
           user: {
             id: staffUser.id,
-            email: staffUser.email,
-            firstName: staffUser.firstName,
-            lastName: staffUser.lastName,
+            email: input.email,
+            firstName: input.firstName,
+            lastName: input.lastName,
             role: staffUser.role,
           },
         },
@@ -363,7 +454,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const invites = await withStore(storeId, tx =>
+      const invites = await inAccessScope(storeId, tx =>
         tx.staffInvite.findMany({
           where: { storeId, status: 'pending', expiresAt: { gt: new Date() } },
           select: { id: true, email: true, createdAt: true, expiresAt: true },
@@ -387,7 +478,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, inviteId } = req.params;
-      const { count } = await withStore(storeId, tx =>
+      const { count } = await inAccessScope(storeId, tx =>
         tx.staffInvite.updateMany({
           where: { id: inviteId, storeId, status: 'pending' },
           data: { status: 'revoked', decidedAt: new Date() },
@@ -422,45 +513,98 @@ router.delete(
     try {
       const { storeId, userId } = req.params;
 
-      const membership = await withStore(storeId, tx =>
-        tx.storeStaff.findUnique({
-          where: { userId_storeId: { userId, storeId } },
-          include: { user: { select: { email: true } } },
-        })
-      );
+      const d1Access = await onAccessD1();
+      const found = d1Access
+        ? await inAccessScope(storeId, tx =>
+            tx.storeStaff.findUnique({
+              where: { userId_storeId: { userId, storeId } },
+              select: { id: true },
+            })
+          )
+        : await withStore(storeId, tx =>
+            tx.storeStaff.findUnique({
+              where: { userId_storeId: { userId, storeId } },
+              include: { user: { select: { email: true } } },
+            })
+          );
 
-      if (!membership) {
+      if (!found) {
         throw new AppError(404, 'NOT_FOUND', 'Staff member not found in this store.');
       }
+      const membership = { id: (found as { id: string }).id };
+      // The address whose pending invitations die with the membership: from the profile row before the cutover, from the
+      // identity service after it (an erased account has no address left, and no live invitation can name it).
+      const memberEmail = d1Access
+        ? ((await getAccountsBrief([userId]))[0]?.email ?? null)
+        : (found as unknown as { user: { email: string } }).user.email;
 
       // Ruling PASSKEY-11: this ends the person's access to THIS store and nothing else. Sessions and
       // passkeys are per user, not per store; access is the membership row, re-checked on every request,
       // so deleting it is immediate. Signing them out (or touching their passkeys) here would let store A's
       // owner kick the same person out of store B or out of a store they own.
-      await withStore(storeId, tx =>
-        tx.storeStaff.delete({
-          where: { userId_storeId: { userId, storeId } },
-        })
-      );
+      if (d1Access) {
+        // One atomic batch: the membership and every pending invitation that could bring the member back (Ruling ID-13).
+        if (!memberEmail)
+          logger.warn(
+            { storeId, userId },
+            'staff removal: no address for the member, invites matched by user only'
+          );
+        await removeStaffMember(storeId, userId, memberEmail);
+      } else {
+        await inAccessScope(storeId, tx =>
+          tx.storeStaff.delete({
+            where: { userId_storeId: { userId, storeId } },
+          })
+        );
 
-      // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
-      // cannot come back through an old link.
-      await withStore(storeId, tx =>
-        tx.staffInvite.updateMany({
-          where: { storeId, email: membership.user.email.toLowerCase(), status: 'pending' },
-          data: { status: 'expired', decidedAt: new Date() },
-        })
-      );
+        // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
+        // cannot come back through an old link.
+        await inAccessScope(storeId, tx =>
+          tx.staffInvite.updateMany({
+            where: { storeId, email: memberEmail!.toLowerCase(), status: 'pending' },
+            data: { status: 'expired', decidedAt: new Date() },
+          })
+        );
+      }
 
       // Their merchant-MCP keys die with the membership. verifyMerchantKey already
       // refuses a non-member on every call; revoking here also stops a key
       // resurrecting if the same person is later re-added to this store.
-      await withStore(storeId, tx =>
-        tx.merchantApiKey.updateMany({
-          where: { storeId, userId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        })
-      );
+      // Access has already ended (membership gone, atomically). The key rows are a Postgres write: after the cutover a failure
+      // is retried and, if it persists, raised as a P1 (never swallowed) so a later re-add cannot resurrect a live key.
+      const revokeKeys = () =>
+        withStore(storeId, tx =>
+          tx.merchantApiKey.updateMany({
+            where: { storeId, userId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          })
+        );
+      if (!d1Access) await revokeKeys();
+      else {
+        let lastErr: unknown;
+        let revoked = false;
+        for (let attempt = 0; attempt < 3 && !revoked; attempt++) {
+          try {
+            await revokeKeys();
+            revoked = true;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        if (!revoked) {
+          logger.error(
+            { err: lastErr, storeId, userId },
+            'staff removal: merchant key revoke failed'
+          );
+          void sendAlert({
+            level: 'p1',
+            source: 'staff.remove.key_revoke_failed',
+            title: 'Removed staff member still has live merchant MCP keys',
+            body: 'Membership was removed but the key revoke failed 3 times. Revoke the keys before the user is ever re-added to this store.',
+            context: { storeId, userId },
+          }).catch(() => undefined);
+        }
+      }
 
       await auditLog({
         action: 'staff.removed',

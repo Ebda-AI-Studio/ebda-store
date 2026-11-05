@@ -112,15 +112,26 @@ describe.skipIf(!hasDb)(
     // expression indexes of 20261027000100 (the per-key indexes still serve `ebda_order_search_ids`).
     const g = 5000; // a guest order (orders 1..2000 are registered)
     const r = 77; // a registered customer's index (it has orders r and r+1000)
+    // Each name / email term is the fixture's letter prefix + 8 hex chars, so it can never come out all digits: a digit-only
+    // term is a phone / order-number search and never matches a name or an email (customer-patterns.ts), and a random
+    // all-digit hex slice failed this probe on both attempts (PR 396 CI, customer email term 0676037783).
     const cases: Array<[string, string, string | null]> = [
       ['order number', md5(tag + 'o' + g).slice(2, 12), 'orders_order_number_trgm_idx'],
-      ['guest first name', md5(tag + 'gf' + g).slice(2, 12), 'orders_guest_name_norm_trgm_idx'],
-      ['guest last name', md5(tag + 'gl' + g).slice(2, 12), 'orders_guest_name_norm_trgm_idx'],
-      ['guest email', md5(tag + 'ge' + g).slice(2, 12), 'orders_guest_email_trgm_idx'],
+      [
+        'guest first name',
+        'gf' + md5(tag + 'gf' + g).slice(0, 8),
+        'orders_guest_name_norm_trgm_idx',
+      ],
+      [
+        'guest last name',
+        'gl' + md5(tag + 'gl' + g).slice(0, 8),
+        'orders_guest_name_norm_trgm_idx',
+      ],
+      ['guest email', 'ge' + md5(tag + 'ge' + g).slice(0, 8), 'orders_guest_email_trgm_idx'],
       ['guest phone', String(g).padStart(8, '0') + '', 'orders_guest_phone_digits_trgm_idx'],
-      ['customer first name', md5(tag + 'uf' + r).slice(2, 12), null],
-      ['customer last name', md5(tag + 'ul' + r).slice(2, 12), null],
-      ['customer email', md5(tag + 're' + r).slice(2, 12), null],
+      ['customer first name', 'uf' + md5(tag + 'uf' + r).slice(0, 8), null],
+      ['customer last name', 'ul' + md5(tag + 'ul' + r).slice(0, 8), null],
+      ['customer email', 'ru' + md5(tag + 're' + r).slice(0, 8), null],
       ['customer phone', String(r).padStart(8, '0'), null],
     ];
 
@@ -139,8 +150,8 @@ describe.skipIf(!hasDb)(
     }
 
     it('customer search: a registered customer and a guest are found, the guest through its index', async () => {
-      const regTerm = md5(tag + 'uf' + r).slice(2, 12);
-      const guestTerm = md5(tag + 'ge' + g).slice(2, 12);
+      const regTerm = 'uf' + md5(tag + 'uf' + r).slice(0, 8);
+      const guestTerm = 'ge' + md5(tag + 'ge' + g).slice(0, 8);
       const guests = await planner!.idxScans('orders_guest_email_trgm_idx');
       const reg = await planner!.inStore(storeId, () => searchOrderCustomers(storeId, regTerm));
       expect(reg.map(c => [c.isGuest, c.email])).toEqual([

@@ -39,7 +39,9 @@ import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
 import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
 import { GoldRateService } from '../../apps/api/src/services/gold-rate/gold-rate.service';
 import { InstapayService } from '../../apps/api/src/services/payment-providers/instapay.service';
-import { createProduct, ownerPool } from '../helpers/gold-sql';
+import { OWNER_URL, createProduct, ownerPool } from '../helpers/gold-sql';
+import { reportAndEndStaleTransactions } from '../helpers/teardown-diagnostics';
+import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 const sfx = Date.now().toString(36);
 let STORE = '';
@@ -65,7 +67,7 @@ function doRepo() {
   return {
     storeId: STORE,
     backend: 'do' as const,
-    db: c as StoreReads,
+    db: withPgStoreDelegate(c) as StoreReads,
     writer: c as StoreWrites,
     money,
   };
@@ -298,10 +300,42 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.spyOn(featureService, 'isFeatureEnabled').mockResolvedValue(false);
 });
+// Teardown only closes connections and takes milliseconds when nothing is left open (measured: ownerPg.end 0 ms,
+// prisma.$disconnect 1-2 ms, against Postgres 17 locally, alone and inside the full tier, node 22 and 26). On the hosted runner
+// it hung for 30 s and then 90 s (PR 437 runs 42051542716, 42056044397) with every test green, and `pool.end()` /
+// `$disconnect()` wait for exactly one thing: a connection that is still checked out, i.e. a transaction that never finished.
+// So after 8 s the hook names it (pool counters and the live pg_stat_activity rows, from a fresh connection) and ends any
+// backend left inside an open transaction doing nothing, then lets the close finish; the evidence lands in the CI log.
 afterAll(async () => {
   vi.restoreAllMocks();
-  await ownerPg.end();
-  await prisma.$disconnect();
+  const timer = setTimeout(() => {
+    reportAndEndStaleTransactions(OWNER_URL, ownerPg).then(
+      r => console.error('[orders-contract teardown] still closing after 8 s; open work:', r),
+      e => console.error('[orders-contract teardown] could not inspect pg_stat_activity:', e)
+    );
+  }, 8_000);
+  // CI run 42067641601 named it: an `idle in transaction` BEGIN left by Prisma's driver adapter when startTransaction
+  // failed with "Unknown transaction status" under the concurrent-submit case (noteOrderCreated, logged and swallowed).
+  // Ending that backend frees Postgres, but Prisma still counts the lost client, so $disconnect would wait forever:
+  // bound it at 20 s and say so. Ruling NZ-TEARDOWN-DIAG-1; the adapter defect is tracked, not hidden.
+  const settle = (p: Promise<unknown>, what: string) =>
+    Promise.race([
+      p,
+      new Promise(resolve =>
+        setTimeout(() => {
+          console.error(`[orders-contract teardown] ${what} did not finish in 20 s; moving on`);
+          resolve(undefined);
+        }, 20_000)
+      ),
+    ]);
+  try {
+    await Promise.all([
+      settle(ownerPg.end(), 'ownerPg.end'),
+      settle(prisma.$disconnect(), 'prisma.$disconnect'),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 });
 
 /** Gold: a product priced by rate (raw SQL, the price guard needs it) mirrored into the DO, and the store's rates mirrored. */
@@ -331,6 +365,15 @@ const moveRate = async () => {
   await applyRate();
 };
 async function goldWorld(mirror: boolean): Promise<World> {
+  // The gold cases pay by COD, so the store opts in to deferred payment for gold (Ruling SHARIA-GOLD-1), on BOTH backends:
+  // Postgres reads stores.settings, the DO checkout reads store_config.settings.
+  await prisma.$executeRaw`update stores set settings = coalesce(settings, '{}'::jsonb) || '{"goldAllowDeferredPayment": true}'::jsonb where id = ${STORE}`;
+  if (mirror)
+    sqlite.exec(
+      // accounting_enabled = 0 so a NEW row reads exactly like the missing one (the DO ledger treats no row as accounting off)
+      `INSERT INTO store_config (store_id, settings, accounting_enabled) VALUES ('${STORE}', '{"goldAllowDeferredPayment":true}', 0)
+       ON CONFLICT(store_id) DO UPDATE SET settings = json_set(settings, '$.goldAllowDeferredPayment', json('true'))`
+    );
   const id = await createProduct(ownerPg, STORE, {
     mode: 'gold_rate',
     karat: 21,

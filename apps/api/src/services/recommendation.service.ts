@@ -1,6 +1,7 @@
 import { prisma } from '@ebda/database';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { redis } from './redis.service';
+import { AppError } from '../middleware/error-handler';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
@@ -451,7 +452,7 @@ class RecommendationService {
     });
 
     if (!relation) {
-      throw Object.assign(new Error('Relation not found'), { statusCode: 404 });
+      throw new AppError(404, 'NOT_FOUND', 'Relation not found');
     }
 
     await (

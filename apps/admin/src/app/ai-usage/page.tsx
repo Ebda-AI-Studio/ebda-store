@@ -21,8 +21,10 @@ import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { PageState } from '@/components/PageState';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
+import { intlLocaleForUi } from '@/lib/format';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -69,7 +71,7 @@ interface SummaryResponse {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-GB', {
+  return new Date(iso).toLocaleString(intlLocaleForUi('en-GB'), {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -85,7 +87,7 @@ const PLAN_COLORS: Record<string, string> = {
   free: 'bg-muted text-muted-foreground',
   starter: 'bg-blue-100 text-blue-700',
   professional: 'bg-primary/10 text-primary-ink',
-  enterprise: 'bg-amber-100 text-amber-700',
+  enterprise: 'bg-warning/10 text-warning-ink',
 };
 
 function PlanBadge({ plan }: { plan: string }) {
@@ -102,7 +104,7 @@ function PctBar({ pct, warn }: { pct: number; warn?: boolean }) {
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full ${warn || pct >= 90 ? 'bg-destructive' : pct >= 70 ? 'bg-amber-400' : 'bg-primary'}`}
+          className={`h-full rounded-full ${warn || pct >= 90 ? 'bg-destructive' : pct >= 70 ? 'bg-warning' : 'bg-primary'}`}
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
@@ -142,7 +144,6 @@ function StatCard({
 
 function PlatformAiUsagePageInner() {
   const t = useT('aiUsage.platform');
-  const tCommon = useT('common');
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -177,30 +178,20 @@ function PlatformAiUsagePageInner() {
     fetchData();
   }, [fetchData]);
 
-  // ── Loading ─────────────────────────────────────────────────────────
+  // ── Loading / error (one wrapper, CU-1) ─────────────────────────────
 
-  if (loading) {
+  if (loading || error || !data) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  // ── Error ───────────────────────────────────────────────────────────
-
-  if (error || !data) {
-    return (
-      <div className="rounded-xl border bg-card p-8 text-center">
-        <p className="text-sm text-destructive-ink">{t('loadError')}</p>
-        <button
-          type="button"
-          onClick={fetchData}
-          className="mt-4 text-sm text-primary hover:underline"
-        >
-          {tCommon('retry')}
-        </button>
-      </div>
+      <PageState
+        loading={loading}
+        error={error || !data ? t('loadError') : null}
+        onRetry={() => {
+          setLoading(true);
+          fetchData();
+        }}
+      >
+        {null}
+      </PageState>
     );
   }
 
@@ -272,10 +263,7 @@ function PlatformAiUsagePageInner() {
         <div className="tabular-nums">
           <div className="font-medium text-foreground">{formatSpend(store.monthCostMicros)}</div>
           {store.monthUnpricedCalls > 0 && (
-            <div
-              className="text-[11px] text-amber-600 dark:text-amber-500"
-              title={t('unpricedTooltip')}
-            >
+            <div className="text-xs text-warning-ink" title={t('unpricedTooltip')}>
               +{store.monthUnpricedCalls.toLocaleString(undefined, withNumerals())}{' '}
               {t('unpricedRowSuffix')}
             </div>
@@ -322,25 +310,21 @@ function PlatformAiUsagePageInner() {
           rather than letting a confident-looking number stand in for one that
           was never actually priced. */}
       {!platform.ratesConfigured ? (
-        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
           <strong>{t('noRatesConfiguredTitle')}</strong>{' '}
           {t.rich('noRatesConfiguredBody', {
-            code: chunks => (
-              <code className="mx-1 rounded bg-amber-100 px-1 dark:bg-amber-900/60">{chunks}</code>
-            ),
+            code: chunks => <code className="mx-1 rounded bg-warning/10 px-1">{chunks}</code>,
           })}
         </div>
       ) : platform.monthUnpricedCalls > 0 ? (
-        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
           <strong>
             {t('unpricedCallsTitle', {
               count: platform.monthUnpricedCalls.toLocaleString(undefined, withNumerals()),
             })}
           </strong>{' '}
           {t.rich('unpricedCallsBody', {
-            code: chunks => (
-              <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">{chunks}</code>
-            ),
+            code: chunks => <code className="rounded bg-warning/10 px-1">{chunks}</code>,
           })}
         </div>
       ) : null}

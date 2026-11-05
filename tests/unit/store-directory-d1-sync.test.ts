@@ -352,4 +352,179 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
       n: 1,
     });
   });
+
+  it('NEON-ZERO: with Postgres unreachable the tick never throws and reconciles D1 against the StoreDO only', async () => {
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    const alerts: string[] = [];
+    const down = async () => {
+      throw new Error('connect ECONNREFUSED');
+    };
+    // the DO says suspended: D1 (active) is less restrictive, so it is closed; the DO slug mismatch is alert-only
+    const r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ slug: 'alpha', status: 'suspended' }),
+      alert: t => void alerts.push(t),
+    });
+    expect(r.postgresSkipped).toBe(true);
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(d1Status()).toBe('suspended');
+    expect(alerts).toHaveLength(1);
+    // an unreadable DO is reported, never thrown
+    const r2 = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => {
+        throw new Error('DO unavailable');
+      },
+      alert: () => undefined,
+    });
+    expect(r2.alertOnly.map(c => c.id)).toEqual([A]);
+  });
+
+  it('PG says suspended or deleted for a do store: the RESTRICTIVE direction is applied (status / deleted_at only) and alerted (NZ-D14)', async () => {
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    const alerts: string[] = [];
+    const pgRow = (status: string) => [
+      { id: A, slug: 'alpha', status, plan: 'starter', hasDomain: false, hasPendingDomain: false },
+    ];
+    let r = await reconcileStoreDirectory({
+      pgAll: async () => pgRow('suspended'),
+      pgLive: async () => [{ id: A }],
+      alert: t => void alerts.push(t),
+    });
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(d1Status()).toBe('suspended');
+    expect(d1Backend()).toBe('do');
+    expect(await lookupStore({ slug: 'alpha' })).toBeNull();
+    expect(alerts).toHaveLength(1);
+    // Postgres deleted: the D1 row gets a deleted_at and stops resolving
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    r = await reconcileStoreDirectory({
+      pgAll: async () => pgRow('active'),
+      pgLive: async () => [],
+      alert: t => void alerts.push(t),
+    });
+    expect(r.corrected).toHaveLength(1);
+    expect(await lookupStore({ id: A }, ['active', 'inactive', 'suspended'])).toBeNull();
+    expect(
+      (
+        sqlite.prepare('SELECT deleted_at FROM stores WHERE id=?').get(A) as {
+          deleted_at: number | null;
+        }
+      ).deleted_at
+    ).not.toBeNull();
+  });
+  it('a do store ABSENT from Postgres: D1 untouched, alert only (never a delete)', async () => {
+    const alerts: string[] = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [],
+      pgLive: async () => [],
+      alert: t => void alerts.push(t),
+    });
+    expect(r.alertOnly.map(a => a.id)).toEqual([A]);
+    expect(r.corrected).toEqual([]);
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM stores WHERE id=?').get(A)).toMatchObject({
+      n: 1,
+    });
+    expect(alerts).toHaveLength(1);
+  });
+
+  it('NZ-D18: a domain moved A -> B (both flags stay true) is detected by VALUE and re-synced for a Postgres store', async () => {
+    sqlite.prepare("UPDATE stores SET storage_backend='pg', status='active' WHERE id=?").run(A);
+    commit({ domain: 'a.example.com', domainStatus: 'active' });
+    await syncStoreDirectoryFromPg(A);
+    commit({ domain: 'b.example.com', domainStatus: 'active' }); // Postgres moved it; the D1 mirror never ran
+    const alerts: string[] = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: true,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      pgDomains: async () => ({ domain: 'B.Example.com', pendingDomain: null }),
+      alert: t => void alerts.push(t),
+    });
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(r.corrected[0].why).toMatch(/domain values/);
+    expect((await lookupStore({ domain: 'b.example.com' }))?.id).toBe(A);
+    expect(await lookupStore({ domain: 'a.example.com' })).toBeNull();
+    expect(alerts).toHaveLength(1);
+  });
+  it('NZ-D18: equal domains (case-insensitive) are not drift', async () => {
+    sqlite.prepare("UPDATE stores SET storage_backend='pg' WHERE id=?").run(A);
+    commit({ domain: 'a.example.com', domainStatus: 'active' });
+    await syncStoreDirectoryFromPg(A);
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: true,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      pgDomains: async () => ({ domain: 'A.EXAMPLE.COM', pendingDomain: null }),
+      alert: () => undefined,
+    });
+    expect(r.corrected).toEqual([]);
+  });
+  it('NZ-D21: a do store domain is NEVER compared with Postgres (stale by design): no alert, no Postgres read', async () => {
+    sqlite
+      .prepare("UPDATE stores SET domain='mine.example.com', domain_status='active' WHERE id=?")
+      .run(A);
+    let reads = 0;
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: true,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [{ id: A }],
+      pgDomains: async () => (reads++, { domain: 'stale.example.com', pendingDomain: null }),
+      alert: () => undefined,
+    });
+    expect(reads).toBe(0);
+    expect(r.alertOnly).toEqual([]);
+    expect(r.corrected).toEqual([]);
+    expect(sqlite.prepare('SELECT domain FROM stores WHERE id=?').get(A)).toMatchObject({
+      domain: 'mine.example.com',
+    });
+  });
+  it('NZ-D21: closing a do row for a deleted Postgres store never LOOSENS a stricter D1 status', async () => {
+    sqlite.prepare("UPDATE stores SET status='suspended' WHERE id=?").run(A);
+    await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'active',
+          plan: 'starter',
+          hasDomain: false,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [], // deleted in Postgres, status still `active` there
+      alert: () => undefined,
+    });
+    expect(d1Status()).toBe('suspended');
+    expect(
+      (sqlite.prepare('SELECT deleted_at FROM stores WHERE id=?').get(A) as { deleted_at: unknown })
+        .deleted_at
+    ).not.toBeNull();
+  });
 });

@@ -93,8 +93,14 @@ export interface SuppressionPort {
 }
 
 export interface StoreDoStub {
+  /** READ-ONLY money-in-flight gate of one store (Ruling NZ-D20): counts only, writes nothing, closes nothing. */
+  moneyInFlight(): Promise<Record<string, number>>;
   exportSubject(s: Subject): Promise<{ tables: Record<string, Array<Record<string, unknown>>> }>;
-  eraseSubject(s: Subject): Promise<{ erased: Record<string, number>; remaining: number }>;
+  eraseSubject(s: Subject): Promise<{
+    erased: Record<string, number>;
+    remaining: number;
+    refused?: Record<string, number>;
+  }>;
 }
 
 export interface ErasureEnv {

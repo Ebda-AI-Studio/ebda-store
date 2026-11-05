@@ -83,6 +83,23 @@ Suspension is for missed renewals + AUP violations. **Super-admin only.**
 
 Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.
 
+## How to delete a store
+
+Permanent. Use it for test or abandoned stores only.
+
+1. Open `/stores` (the platform store list, super admin only). On the store row or card, tap the "..." menu and choose **Delete store** (last item, red). Or open the store (`/stores/<id>`) and use **Delete store** in the danger zone at the bottom.
+2. Type the store slug exactly (for example `qa-merchant-test`). The button stays disabled until it matches character for character.
+3. Confirm the final prompt. The row disappears and a "store deleted" toast shows; the audit log records `STORE_DELETED`.
+
+Refusals you may see (nothing is deleted):
+
+- **Billing parent** (409 `STORE_IS_BILLING_PARENT`): other stores bill through this one. Move their billing first.
+- **Money in flight** (409 `STORE_HAS_MONEY_IN_FLIGHT`): a payment or payout is still settling. Wait, then retry.
+- **403 `MFA_SETUP_REQUIRED`**: turn on two-step verification at `/account/security` first; the dialog links there.
+- **401**: the session ended, sign in again.
+
+Backed by `DELETE /api/v1/stores/:id` (`authenticate`, `requireMfaEnrolled`, `authorize('super_admin')`, `requireStoreAccess`).
+
 ## Ebda AI Studio WhatsApp side
 
 Ebda AI Studio WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.
@@ -136,3 +153,7 @@ accepted what: Users -> the merchant -> **Policy acceptances**. Rulings LEGAL-4/
 
 - [`ROLLBACK.md`](../ROLLBACK.md) — code + DB rollback
 - [`STAGING-DEPLOYMENT.md`](STAGING-DEPLOYMENT.md) — promotion flow
+
+## Platform queue pages (email-queue, sms-queue, webhook-events) — 2026-11-04
+
+These three super-admin pages used to call `/admin/...` without the `/api/v1` prefix, so they 404ed in production (UX:PL-1 / BE:F-1). They now call `/api/v1/admin/email-queue/*`, `/api/v1/admin/sms-queue/*` and `/api/v1/admin/webhook-events/*`; `tests/unit/admin-api-prefix.test.ts` fails the build for any admin `api*()` call (quoted or template literal) whose path does not start with `/api/v1`. Retry-all, discard-corrupt, refund, replay-an-already-processed-webhook, VAT enable, tax-verification revoke and cancel-subscription now ask through the shared confirm dialog (named object, one-sentence consequence, outcome-named button) instead of the browser's native `confirm()`.

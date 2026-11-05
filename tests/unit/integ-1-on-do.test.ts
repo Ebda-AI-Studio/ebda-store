@@ -58,10 +58,15 @@ vi.mock('@api/lib/repo-factory', () => ({
     writer: h.doBox.current.writer,
     money: h.money,
   }),
-  storeDb: async () => h.doBox.current.db,
+  // `Store` is the split-aware delegate on a real DO read client; here it is the platform-store mock
+  storeDb: async () =>
+    new Proxy(h.doBox.current.db as object, {
+      get: (t, p, r) => (p === 'store' ? h.platformStore : Reflect.get(t, p, r)),
+    }),
   storeWriter: async () => h.doBox.current.writer,
   storeMoney: async () => h.money,
   storeUpdateMany: vi.fn(async () => ({ count: 1 })),
+  storeWritesToDo: async () => false, // platform gate rows: the prisma mock (no D1 binding in unit tests)
   runInJobRepoScope: <T>(fn: () => T) => fn(),
 }));
 vi.mock('@api/lib/inngest/client', () => ({

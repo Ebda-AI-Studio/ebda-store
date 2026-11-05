@@ -1,4 +1,6 @@
 import { InstapayReceiptService } from '../../../services/payment-providers/instapay-receipt.service';
+import { customerAuthRoute } from '../../customer-auth';
+import { doStoreIdList } from '../../store-backend';
 import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
 import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
@@ -180,8 +182,8 @@ export const softDeletedUserAnonymize: JobDef = inngest.createFunction(
     // erase transaction is idempotent but wastes a write per row.
     // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
     // Customers live in their store's scope: found store by store.
-    const candidates = await step.run('find-candidates', async () =>
-      (
+    const candidates = await step.run('find-candidates', async () => {
+      const found: Array<{ id: string; storeId?: string }> = (
         await acrossStoresFlat(storeId =>
           prisma.user.findMany({
             where: {
@@ -194,8 +196,20 @@ export const softDeletedUserAnonymize: JobDef = inngest.createFunction(
             take: USER_ANONYMIZE_BATCH_CAP,
           })
         )
-      ).slice(0, USER_ANONYMIZE_BATCH_CAP)
-    );
+      ).slice(0, USER_ANONYMIZE_BATCH_CAP);
+      // N-9: customers of stores served by their StoreDO are that DO's; their Postgres rows are stale copies.
+      for (const storeId of await doStoreIdList()) {
+        if (found.length >= USER_ANONYMIZE_BATCH_CAP) break;
+        const route = await customerAuthRoute(storeId, { write: false });
+        if (route.kind !== 'do') continue;
+        const ids = await route.client.call<string[]>('expiredDeleted', {
+          before: cutoff.getTime(),
+          limit: USER_ANONYMIZE_BATCH_CAP - found.length,
+        });
+        for (const id of ids) found.push({ id, storeId });
+      }
+      return found;
+    });
 
     if (candidates.length === 0) {
       logger.info({ cutoff }, 'soft-deleted-user-anonymize: nothing to anonymize');
@@ -204,14 +218,17 @@ export const softDeletedUserAnonymize: JobDef = inngest.createFunction(
 
     let anonymized = 0;
     let failed = 0;
-    for (const { id } of candidates) {
+    for (const { id, storeId: doStore } of candidates) {
       // Each user gets its own step.run so a single failure doesn't
       // abort the whole batch — Inngest retries the failed step
       // independently per the function-level `retries: 2`.
       try {
         await step.run(`anonymize-${id}`, async () => {
           // Retention erasure spans every store (Ruling W-7); actor is 'system'.
-          const outcome = await AuthService.eraseAccount(id, { actorId: 'system' });
+          const outcome = await AuthService.eraseAccount(id, {
+            actorId: 'system',
+            ...(doStore ? { storeHint: doStore } : {}),
+          });
           await auditLog({
             action: 'user.account.anonymized_by_retention_cron',
             userId: id,

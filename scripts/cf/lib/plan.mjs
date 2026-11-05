@@ -152,7 +152,6 @@ export function bindTable(t, pgCols, covered = new Set()) {
  */
 export const USER_SCOPED = {
   addresses: 'user_id',
-  onesignal_subscriptions: 'user_id',
 };
 export const userScopeWhere = (alias, col = 'user_id') =>
   `(EXISTS (SELECT 1 FROM customers uc WHERE uc.user_id = ${alias}.${q(col)} AND uc.store_id = $1)` +

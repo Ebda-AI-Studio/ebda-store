@@ -98,6 +98,8 @@ jobs:
         working-directory: apps/admin
         run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-admin
       - name: Deploy ebda-admin Worker
+        # Ruling DEPLOY-TIMEOUT-1: a hung wrangler/OpenNext R2 populate must fail the step, not hold the runner.
+        timeout-minutes: 15
         working-directory: apps/admin
         run: |
           npx wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA

@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { Button, useToast } from '@ebda/ui';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, intlLocaleForUi } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ const major = minorToMajor;
 
 function fmt(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB');
+  return new Date(iso).toLocaleDateString(intlLocaleForUi('en-GB'));
 }
 
 const MATCH_BADGE: Record<MatchStatus, string> = {
@@ -146,7 +147,7 @@ export default function StatementDetailPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const statementId = params?.statementId as string;
-  const router = useRouter();
+  const { error: toastError } = useToast();
   const t = useT('finance.bankRec');
   const tx_t = useT('finance.bankRec.tx');
 
@@ -261,7 +262,7 @@ export default function StatementDetailPage() {
     );
     setActionLoading(null);
     if (err) {
-      alert(err.message ?? t('errors.action'));
+      toastError(err.message ?? t('errors.action'));
       return;
     }
     setRefreshKey(k => k + 1);
@@ -273,7 +274,7 @@ export default function StatementDetailPage() {
       { action: 'match', journalEntryId }
     );
     if (err) {
-      alert(err.message ?? t('errors.match'));
+      toastError(err.message ?? t('errors.match'));
       return;
     }
     setRefreshKey(k => k + 1);
@@ -291,34 +292,21 @@ export default function StatementDetailPage() {
   ];
 
   return (
-    <AdminLayout title={stmt?.fileName ?? t('title')}>
+    <AdminLayout
+      title={stmt?.fileName ?? t('title')}
+      subtitle={
+        stmt
+          ? `${stmt.glAccount.code} — ${stmt.glAccount.nameEn}${stmt.periodStart ? ` · ${fmt(stmt.periodStart)} – ${fmt(stmt.periodEnd)}` : ''}`
+          : undefined
+      }
+      parent={{ label: t('title'), href: `/stores/${storeId}/finance/bank-reconciliation` }}
+      actions={
+        <Button className="min-h-11" onClick={handleAutoMatch} disabled={autoMatchLoading}>
+          {autoMatchLoading ? t('autoMatching') : t('autoMatch')}
+        </Button>
+      }
+    >
       <div className="space-y-6 p-4 md:p-6">
-        {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <button
-              onClick={() => router.push(`/stores/${storeId}/finance/bank-reconciliation`)}
-              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← {t('title')}
-            </button>
-            <h1 className="text-xl font-semibold text-foreground">{stmt?.fileName ?? '…'}</h1>
-            {stmt && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {stmt.glAccount.code} — {stmt.glAccount.nameEn}
-                {stmt.periodStart && ` · ${fmt(stmt.periodStart)} – ${fmt(stmt.periodEnd)}`}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={handleAutoMatch}
-            disabled={autoMatchLoading}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40"
-          >
-            {autoMatchLoading ? t('autoMatching') : t('autoMatch')}
-          </button>
-        </div>
-
         {autoMatchMsg && (
           <div className="rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm text-info-ink">
             {autoMatchMsg}

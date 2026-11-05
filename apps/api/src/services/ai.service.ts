@@ -18,7 +18,7 @@
  */
 import { GeminiFailoverClient } from '../lib/ai/gemini-keys';
 import { z } from 'zod/v3';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { redis } from './redis.service';
@@ -180,6 +180,9 @@ const SEO_INSTRUCTION =
   'You write SEO meta for Egyptian e-commerce stores. Output only valid JSON ' +
   'matching this shape exactly: {"title": string, "titleAr": string, ' +
   '"description": string, "descriptionAr": string, "keywords": string[]}. ' +
+  // BE:F-4: the fields are language-typed. Without this the model put Arabic into the English fields (QA P2-2).
+  '"title" and "description" MUST be written in ENGLISH. "titleAr" and "descriptionAr" MUST be written in ARABIC script. ' +
+  'Never put Arabic text in "title" or "description", and never put English sentences in "titleAr" or "descriptionAr". ' +
   `Title under ${META_TITLE_MAX} characters. Description under ${META_DESCRIPTION_MAX} characters. ` +
   'Keywords: 5-10 short Egypt + GCC search phrases. Do not mention prices ' +
   'or out-of-stock status. Match how Egyptian shoppers actually search. ' +
@@ -287,21 +290,35 @@ export async function recordUsage(
     // in the request's single tenant transaction, and the catch below
     // swallows — an unguarded failure would abort that transaction and turn
     // the handler's 2xx into a silent rollback (issue 2215's class).
-    await withSavepoint(() =>
-      prisma.aiUsage.create({
-        data: {
-          storeId,
-          feature,
-          inputTokens,
-          outputTokens,
-          cachedHit,
-          model,
-          costMicros,
-          subjectType: provenance.subjectType ?? null,
-          subjectId: provenance.subjectId ?? null,
-        },
-      })
-    );
+    const row = {
+      // client-side id (Ruling NZ-AN-1): the row is append-only and a retried insert of the same id is one row
+      id: randomUUID(),
+      storeId,
+      feature,
+      inputTokens,
+      outputTokens,
+      cachedHit,
+      model,
+      costMicros,
+      subjectType: provenance.subjectType ?? null,
+      subjectId: provenance.subjectId ?? null,
+    };
+    try {
+      await withSavepoint(() => prisma.aiUsage.create({ data: row }));
+    } catch (err) {
+      // The ai-usage cutover freeze refuses D1/Postgres-routed writes for a minute or so. The call ALREADY consumed provider
+      // spend, so the usage row is never dropped (that would be free AI and an undercounted quota): while the family is frozen the
+      // row goes to Postgres, the still-authoritative table, with a raw statement the router does not intercept, and the cutover
+      // script copies those rows into D1 after the thaw (cutover-platform-family.mjs, delta sweep). Idempotent by id.
+      if ((err as { code?: unknown } | null)?.code !== 'PLATFORM_FAMILY_FROZEN') throw err;
+      await withSavepoint(
+        () =>
+          prisma.$executeRaw`
+            INSERT INTO ai_usage (id, store_id, feature, input_tokens, output_tokens, cached_hit, model, cost_micros, subject_type, subject_id)
+            VALUES (${row.id}, ${row.storeId}, ${row.feature}, ${row.inputTokens}, ${row.outputTokens}, ${row.cachedHit}, ${row.model}, ${row.costMicros}, ${row.subjectType}, ${row.subjectId})
+            ON CONFLICT (id) DO NOTHING`
+      );
+    }
   } catch (err) {
     // Never fail the user-facing request because we couldn't log usage.
     logger.warn({ err, storeId, feature }, 'Failed to record AI usage');
@@ -350,6 +367,51 @@ export const seoSuggestionSchema = z.object({
   descriptionAr: z.string().max(2000),
   keywords: z.array(z.string().max(120)).max(50),
 });
+
+/**
+ * Share of the letters in `text` that are Arabic script; `null` when it has no letters at all (nothing to judge).
+ * Latin words that are part of the product / store name (brand, model: "Nike Air Max 90") are ignored: they belong in the
+ * Arabic copy as they are written.
+ */
+function arabicLetterShare(
+  text: string,
+  ignoreWords: ReadonlySet<string> = new Set()
+): number | null {
+  const kept = text
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(w => w && !ignoreWords.has(w.toLowerCase()))
+    .join('');
+  const letters = kept.match(/\p{L}/gu);
+  if (!letters || letters.length === 0) return null;
+  const arabic = letters.filter(c => /[\u0600-\u06FF]/.test(c)).length;
+  return arabic / letters.length;
+}
+
+/**
+ * BE:F-4: `title` / `description` must be English and the `*Ar` pair Arabic. A field with no letters is not judged. The
+ * thresholds are loose on purpose (brand names and product codes stay Latin inside Arabic copy and vice versa): English
+ * fields at most 30% Arabic letters, Arabic fields at least 25%, after dropping the words of `names` (product / store).
+ */
+export function seoLanguagesOk(
+  s: { title: string; titleAr: string; description: string; descriptionAr: string },
+  names: readonly string[] = []
+): boolean {
+  const ignore = new Set(
+    names
+      .flatMap(n => n.split(/[^\p{L}\p{N}]+/u))
+      .filter(Boolean)
+      .map(w => w.toLowerCase())
+  );
+  for (const en of [s.title, s.description]) {
+    const share = arabicLetterShare(en);
+    if (share !== null && share > 0.3) return false;
+  }
+  for (const ar of [s.titleAr, s.descriptionAr]) {
+    const share = arabicLetterShare(ar, ignore);
+    if (share !== null && share < 0.25) return false;
+  }
+  return true;
+}
 
 export const sectionContentSchema = z.object({
   kicker: z.string().max(200),
@@ -536,27 +598,44 @@ export class AIService {
       systemInstruction,
       generationConfig: { responseMimeType: 'application/json' },
     });
-    let res;
-    try {
-      res = await model.generateContent(userPrompt);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI SEO generation failed');
+    // One retry when the model puts the wrong language in a field (BE:F-4); every attempt is metered.
+    let parsed: SeoSuggestion | null = null;
+    for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+      let res;
+      try {
+        res = await model.generateContent(userPrompt);
+      } catch (err) {
+        rethrowAsAppError(err, 'AI SEO generation failed');
+      }
+      const raw = stripJsonFences(res.response.text());
+
+      const candidate: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
+        storeId: input.storeId,
+        kind: 'SEO',
+      });
+
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'seo',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+      if (seoLanguagesOk(candidate, [input.entityName, input.storeName])) parsed = candidate;
+      else
+        logger.warn(
+          { storeId: input.storeId, kind: input.kind, attempt },
+          '[AI] SEO suggestion had the wrong language in a field'
+        );
     }
-    const raw = stripJsonFences(res.response.text());
-
-    const parsed: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
-      storeId: input.storeId,
-      kind: 'SEO',
-    });
-
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'seo',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
+    if (!parsed) {
+      throw new AppError(
+        422,
+        'AI_WRONG_LANGUAGE',
+        'The AI answered in the wrong language. Try again.'
+      );
+    }
 
     await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
     return { suggestion: parsed, cached: false };

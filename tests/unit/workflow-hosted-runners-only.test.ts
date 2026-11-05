@@ -57,12 +57,19 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
   // when the repo variable EBDA_RUNS_ON is set; with the variable unset every job
   // falls back to GitHub-hosted `ubuntu-24.04`. This is the ONLY allowed form,
   // so deleting the variable is the single switch back to hosted runners.
-  const ALLOWED = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  // Ruling CI-ROUTE-1: a pull_request labelled `ci-umbra` routes its WHOLE run to Umbra; every other event is unchanged.
+  const ROUTE = `contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]'`;
+  const ROUTED = `\${{ fromJSON(${ROUTE} || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  // Push-to-main deploy workflows (cf-*-deploy.yml) keep the plain selector: no PR label can reach them.
+  const PLAIN = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
   it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-24.04 fallback', () => {
     // Ruling OFFMACHINE-1: the off-machine database backup must NOT depend on the Umbra fleet (the Mac and the CI guest are
     // exactly what it protects against), so db-backup.yml alone pins the literal GitHub-hosted runner.
     const bad = runsOnValues().filter(
-      r => r.value !== ALLOWED && !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
+      r =>
+        r.value !== ROUTED &&
+        r.value !== PLAIN &&
+        !(r.file === 'db-backup.yml' && r.value === 'ubuntu-24.04')
     );
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
@@ -70,6 +77,8 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
     ).toEqual([]);
   });
 });
+
+const CI_ROUTE = `contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]'`;
 
 describe('nothing under .github mentions a self-hosted runner or its switches', () => {
   // Comments are prose and may explain WHY a switch is gone; only code counts.
@@ -89,12 +98,23 @@ describe('nothing under .github mentions a self-hosted runner or its switches', 
     expect(files.length).toBeGreaterThan(4);
   });
 
+  // Ruling CI-NODE-MODULES-1 (Umbra-only CI, Ahmad 2026-11-03): the npm-ci composite action may branch on
+  // `runner.environment == 'self-hosted'` to reuse node_modules on the runner. That exact expression in that one
+  // file is the only exemption; a runs-on label, the old switches or any other self-hosted mention still fails.
+  const EXEMPT: Record<string, RegExp> = {
+    '.github/actions/npm-ci/action.yml': /runner\.environment\s*==\s*'self-hosted'/g,
+  };
+
   it.each(files.map(f => [path.relative(ROOT, f), f] as const))('%s', (_rel, file) => {
-    const code = fs
+    let code = fs
       .readFileSync(file, 'utf8')
       .split('\n')
       .filter(l => !/^\s*#/.test(l))
       .join('\n');
+    const exempt = EXEMPT[_rel.split(path.sep).join('/')];
+    if (exempt) code = code.replace(exempt, '');
+    // Ruling CI-ROUTE-1: the one whole-PR label route (exact string) is the only allowed self-hosted/umbra mention in code.
+    code = code.split(CI_ROUTE).join('').split("'ci-umbra'").join('');
     for (const re of FORBIDDEN) {
       expect(code, `${_rel} matches ${re}`).not.toMatch(re);
     }

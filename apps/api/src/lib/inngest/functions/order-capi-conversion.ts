@@ -28,9 +28,9 @@
 
 import type { JobDef } from '../../jobs/types';
 import { storefrontOrigin } from '@ebda/shared';
-import { withStore } from '@ebda/database';
+
 import { storeDb } from '../../repo-factory';
-import { customersById, runInStoreCtx } from '../../jobs/store-db';
+import { customersById, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import {
@@ -80,8 +80,8 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
     // with runInTenantContext so RLS doesn't filter it out.
     const store = await step.run('load-store-pixels', () =>
       // `Store` is a platform row (D1): the same read for a Postgres store and a store on its Durable Object
-      withStore(storeId, tx =>
-        tx.store.findUnique({
+      withStoreDb(storeId, db =>
+        db.store.findUnique({
           where: { id: storeId },
           select: {
             marketingPixels: true,
@@ -106,10 +106,10 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
     // an HTTP request context, so there's no middleware-set tenant GUC).
     const order = await step.run('load-order', () =>
       runInStoreCtx(storeId, async () => {
-        const row = await (
-          await storeDb(storeId)
-        ).order
-          .findUnique({
+        // `Promise.resolve`: a Durable Object store's read client returns a thenable with no `.catch` (the sweep found the
+        // uncaught TypeError after every order create); a Postgres PrismaPromise has one. Either way a failed read is "no row".
+        const row = await Promise.resolve(
+          (await storeDb(storeId)).order.findUnique({
             where: { id: orderId, storeId },
             select: {
               id: true,
@@ -119,7 +119,7 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
               customerId: true,
             },
           })
-          .catch(() => null);
+        ).catch(() => null);
         if (!row) return null;
         // the buyer is a platform `User`, attached after the read (Ruling CF-JOBS-4)
         const c = (await customersById(storeId, [row.customerId])).get(row.customerId ?? '');

@@ -1,5 +1,5 @@
 import type { Locale } from './site';
-import { HOME, absoluteUrl } from './site';
+import { STORE_HOME, absoluteUrl } from './site';
 
 /** The verticals of the 3D section (Ruling MKT-2). Qamar shows the sneaker, Souq the brass lantern, Lamma its own clay pot (MKT-13), Jasmine a serum bottle and Dahab a solitaire ring (ASSETS-AI-1: procedural models of our own). */
 export const MODEL3D_IDS = ['qamar', 'souq', 'lamma', 'jasmine', 'dahab'] as const;
@@ -117,7 +117,7 @@ export function stillBase(id: Model3dId, variant: string | null): string {
 
 /** Where a phone lands after scanning the desktop QR: this page, this vertical, this section. */
 export function arPageUrl(locale: Locale, id: Model3dId): string {
-  return `${absoluteUrl(HOME[locale])}?m=${id}#model3d`;
+  return `${absoluteUrl(STORE_HOME[locale])}?m=${id}#model3d`;
 }
 
 /** Published path of the build-time QR image for a vertical + locale (scripts/3d/make-qr.ts). */

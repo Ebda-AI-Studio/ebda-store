@@ -124,7 +124,7 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       icon: 'M13 10V3L4 14h7v7l9-11h-7z',
     },
     {
-      // Archive-box icon — fiscal documents kept six years, deleted stores included.
+      // Archive-box icon — fiscal documents kept seven years, deleted stores included.
       name: labels.platformTaxArchive,
       href: '/tax-archive',
       icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5 M10 11.25h4 M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
@@ -159,6 +159,8 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
  * moved — all existing URLs continue to work.
  */
 export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[] {
+  // No store id yet (first render): a link built now would be `/stores//...`, which the router prefetches as a 404.
+  if (!storeId) return [];
   return [
     {
       name: labels.dashboard,
@@ -219,7 +221,8 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
     },
     {
       name: labels.marketing,
-      href: `/stores/${storeId}/ai-tools`,
+      // Lands on the offers overview (coupons), a page every plan can open (audit M-1, UX:N-4).
+      href: `/stores/${storeId}/coupons`,
       hubKey: 'marketing',
       // Sparkle icon
       icon: 'M5 3v4 M3 5h4 M6 17v4 M4 19h4 M13 3l3.5 7L24 13.5 16.5 17 13 24l-3.5-7L2 13.5 9.5 10z',

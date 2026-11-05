@@ -252,6 +252,9 @@ const ALLOWLIST = new Set<string>([
   'apiGet',
   'subs.length && (',
   'row.active ? (',
+  // ThemeSettingsPanel tier list: JSX expression code between tags, not copy.
+  'renderBlock( s,',
+  'changed(String(s.id))) && (',
 ]);
 
 const findHardcodedHits = (source: string) => findStrictHits(source, ALLOWLIST);

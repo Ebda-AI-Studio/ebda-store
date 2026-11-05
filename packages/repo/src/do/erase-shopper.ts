@@ -213,6 +213,29 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
       flag(0);
     }
 
+    // 3c. delivery log rows (NZ-AN-1, security review): `recipient_phone_hash` is the hash of a phone the shopper merely TYPED on
+    //     an order, so deleting by every order buyer key would erase ANOTHER person's history (A enters B's number). Only rows
+    //     provably tied to this shopper go: (a) rows whose idempotency key ends `_<order number>` of one of THEIR orders (the
+    //     dispatcher keys a message `sms_<store>_<event>_<order number>`), and (b) rows keyed by the buyer key PROVEN to be theirs
+    //     (`provenBuyerKey`: a verified phone). Never by an unverified order phone alone.
+    const orderNumbers = orderIds.length
+      ? db
+          .all(
+            'SELECT order_number FROM orders WHERE store_id = ? AND id IN (SELECT value FROM json_each(?)) AND order_number IS NOT NULL',
+            [storeId, JSON.stringify(orderIds)]
+          )
+          .map(r => r.order_number as string)
+      : [];
+    if (orderNumbers.length > 0 || provenKey)
+      db.run(
+        `DELETE FROM notification_logs WHERE store_id = ? AND (
+           (? IS NOT NULL AND recipient_phone_hash = ?)
+           OR EXISTS (SELECT 1 FROM json_each(?) j
+                      WHERE idempotency_key IS NOT NULL
+                        AND substr(idempotency_key, -(length(j.value) + 1)) = '_' || j.value))`,
+        [storeId, provenKey ?? null, provenKey ?? null, JSON.stringify(orderNumbers)]
+      );
+
     // 4. orders keep money history, lose identity
     db.run(
       `UPDATE orders SET customer_id = NULL, shipping_address = ?, billing_address = ?, customer_notes = NULL,
@@ -228,7 +251,7 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
 
     // 6. pure-PII rows
     db.run('DELETE FROM addresses WHERE user_id = ?', [userId]);
-    db.run('DELETE FROM onesignal_subscriptions WHERE user_id = ?', [userId]);
+    // onesignal_subscriptions: admin/staff push devices live on the platform D1 (Ruling NZ-C-11); a shopper has none.
     db.run('DELETE FROM abandoned_carts WHERE store_id = ? AND customer_id = ?', [storeId, userId]);
     db.run('DELETE FROM carts WHERE store_id = ? AND customer_id = ?', [storeId, userId]);
     db.run('DELETE FROM wishlists WHERE store_id = ? AND user_id = ?', [storeId, userId]);

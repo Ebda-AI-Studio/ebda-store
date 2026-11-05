@@ -10,7 +10,7 @@ import { prisma } from '@ebda/database';
 import { invalidateCached } from '../lib/public-cache';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import logger from '../lib/logger';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeUpdate, storeDb } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -29,7 +29,9 @@ router.get(
       // every environment runs that migration, swallow P2022 and serve
       // an empty config so the admin page doesn't 500 on first visit.
       try {
-        const store = await prisma.store.findUnique({
+        const store = await (
+          await storeDb(storeId)
+        ).store.findUnique({
           where: { id: storeId },
           select: { typography: true },
         });
@@ -66,7 +68,9 @@ router.put(
       // when a font gets removed from the library.
       let previous: { fonts?: Array<{ type: string; url?: string }> } = {};
       try {
-        const existing = await prisma.store.findUnique({
+        const existing = await (
+          await storeDb(storeId)
+        ).store.findUnique({
           where: { id: storeId },
           select: { typography: true },
         });

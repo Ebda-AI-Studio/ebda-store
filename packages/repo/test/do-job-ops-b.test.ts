@@ -341,6 +341,14 @@ describe('vectorPlan / vectorCommit / vectorStale (Ruling CF-JOBS-4B)', () => {
     return r;
   }
 
+  it('vectorStatus counts indexable / ready / stale / failed (Ruling NZ-PG-7)', async () => {
+    const { op } = await vrig();
+    expect(op('vectorStatus', {})).toEqual({ products: 1, indexed: 0, stale: 1, failed: 0 });
+    const plan = op('vectorPlan', { limit: 10 });
+    op('vectorCommit', { ready: plan.work, failures: [], forget: [], texts: 1 });
+    expect(op('vectorStatus', {})).toEqual({ products: 1, indexed: 1, stale: 0, failed: 0 });
+  });
+
   it('plans the stale product, commits it against the current text, then has nothing left', async () => {
     const { op } = await vrig();
     expect(op('vectorStale', {})).toEqual({ stale: true });
@@ -394,5 +402,46 @@ describe('vectorPlan / vectorCommit / vectorStale (Ruling CF-JOBS-4B)', () => {
     expect(op('vectorPlan', { limit: 10 }).work).toHaveLength(1);
     const capped = op('vectorPlan', { limit: 10, dailyCap: 0 });
     expect(capped).toMatchObject({ work: [], capped: true });
+  });
+});
+
+describe('codMarkPaid (NEON-ZERO-1 group A, Ruling NZ-A-2)', () => {
+  const addCod = (raw: any, orderId: string, id = 'pay-cod') =>
+    raw
+      .prepare(
+        "INSERT INTO payments (id, order_id, provider, amount, currency, status, created_at, updated_at) VALUES (?, ?, 'cod', 1000, 'EGP', 'cod_pending', 1, 1)"
+      )
+      .run(id, orderId);
+  const order = (raw: any, id: string) =>
+    raw.prepare('SELECT status, payment_status FROM orders WHERE id = ?').get(id) as any;
+
+  it('is registered', () => expect(MONEY_OP_NAMES).toContain('codMarkPaid'));
+
+  it('completes the COD payment, marks the order paid, confirms a pending one, and a repeat books nothing', () => {
+    const { raw, op, orderId } = rig();
+    addCod(raw, orderId);
+    const r = op('codMarkPaid', { orderIds: [orderId] });
+    expect(r.updated).toHaveLength(1);
+    expect(order(raw, orderId)).toMatchObject({ status: 'confirmed', payment_status: 'paid' });
+    expect(
+      (raw.prepare("SELECT status FROM payments WHERE id = 'pay-cod'").get() as any).status
+    ).toBe('completed');
+    expect(op('codMarkPaid', { orderIds: [orderId] }).updated).toHaveLength(0);
+  });
+
+  it('keeps a further-along status, skips cancelled and non-COD orders, and refuses another store', () => {
+    const { raw, op, orderId } = rig();
+    addCod(raw, orderId);
+    raw.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(orderId);
+    expect(op('codMarkPaid', { orderIds: [orderId] }, 's2').updated).toHaveLength(0);
+    expect(op('codMarkPaid', { orderIds: [orderId] }).updated).toHaveLength(1);
+    expect(order(raw, orderId)).toMatchObject({ status: 'shipped', payment_status: 'paid' });
+    const b = rig();
+    addCod(b.raw, b.orderId);
+    b.raw.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(b.orderId);
+    expect(b.op('codMarkPaid', { orderIds: [b.orderId] }).updated).toHaveLength(0);
+    const c = rig();
+    expect(c.op('codMarkPaid', { orderIds: [c.orderId] }).updated).toHaveLength(0);
+    expect(() => c.op('codMarkPaid', { orderIds: [] })).toThrow();
   });
 });

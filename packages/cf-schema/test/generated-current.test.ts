@@ -18,7 +18,11 @@ describe('generated schema is current', () => {
   });
   it('store migrations module carries both SQL files verbatim, in order', async () => {
     const { STORE_MIGRATIONS } = await import('../src/store/migrations.generated');
-    expect(STORE_MIGRATIONS.map(m => m.id)).toEqual(['cf-0001_init', 'cf-0002_invariants']);
+    expect(STORE_MIGRATIONS.map(m => m.id)).toEqual([
+      'cf-0001_init',
+      'cf-0002_invariants',
+      'cf-0003_analytics',
+    ]);
     expect(STORE_MIGRATIONS[0].sql).toBe(read('migrations/store/0001_init.sql'));
     expect(STORE_MIGRATIONS[1].sql).toBe(read('migrations/store/0002_invariants.sql'));
     expect(typeof emitStoreMigrationsTs).toBe('function');

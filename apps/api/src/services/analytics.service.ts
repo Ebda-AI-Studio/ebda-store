@@ -1,6 +1,7 @@
 import { currentStoreId, prisma, Prisma } from '@ebda/database';
+import { customerRows } from '../lib/customer-directory';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
@@ -13,6 +14,9 @@ import {
   type AnalyticsPeriod,
   type SalesGranularity,
 } from '@ebda/shared';
+
+/** Revenue-population filter, shared with the Postgres queries below (the DO ops take it as a parameter). */
+const NON_REVENUE: string[] = [...NON_REVENUE_ORDER_STATUSES];
 
 /**
  * "This month / this year / today" start in the REGION's zone (Africa/Cairo, DST-aware), not the runtime's.
@@ -211,6 +215,36 @@ interface CustomerStats {
   }[];
 }
 
+/**
+ * The DO twin of the two `user.count` statements in `getCustomerStats` (the `user.orders` relation is in another database):
+ * the buyers with an order in the period are read flat, then split by whether they also ordered before it.
+ */
+async function doNewAndReturning(
+  odb: Awaited<ReturnType<typeof storeDb>>,
+  storeId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<{ newCustomers: number; returningCustomers: number }> {
+  const inPeriod = await odb.order.groupBy({
+    by: ['customerId'],
+    where: {
+      storeId,
+      customerId: { not: null },
+      createdAt: { gte: startDate, lte: endDate },
+    },
+  });
+  const ids = inPeriod.map(g => g.customerId).filter((id): id is string => id != null);
+  let returning = 0;
+  for (let i = 0; i < ids.length; i += 500) {
+    const before = await odb.order.groupBy({
+      by: ['customerId'],
+      where: { storeId, customerId: { in: ids.slice(i, i + 500) }, createdAt: { lt: startDate } },
+    });
+    returning += before.length;
+  }
+  return { newCustomers: ids.length - returning, returningCustomers: returning };
+}
+
 export class AnalyticsService {
   /**
    * Get dashboard overview stats
@@ -353,6 +387,16 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date
   ): Promise<number> {
+    // Ruling NZ-INTEG-1: a Durable Object store answers from its DO (no Postgres)
+    const money = await storeMoney(storeId);
+    if (money)
+      return (
+        await money.analyticsPeriod({
+          startMs: startDate && endDate ? startDate.getTime() : 0,
+          endMs: startDate && endDate ? endDate.getTime() : 8_640_000_000_000_000,
+          nonRevenue: NON_REVENUE,
+        })
+      ).customers;
     const windowSql =
       startDate && endDate
         ? Prisma.sql`AND o.created_at >= ${startDate} AND o.created_at <= ${endDate}`
@@ -402,6 +446,23 @@ export class AnalyticsService {
       status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
       paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
     };
+
+    const money = await storeMoney(storeId);
+    if (money) {
+      const d = await money.analyticsPeriod({
+        startMs: startDate.getTime(),
+        endMs: endDate.getTime(),
+        nonRevenue: NON_REVENUE,
+      });
+      return {
+        revenue: d.revenue,
+        orders: d.orders,
+        customers: d.customers,
+        profit: d.costedLines === 0 ? (d.missingLines > 0 ? null : 0) : (d.profit ?? 0),
+        itemsMissingCost: d.missingLines,
+        revenueMissingCost: d.missingRevenue,
+      };
+    }
 
     // Use aggregate for revenue and order count — avoids loading all rows into JS
     const [aggregate, customerCount, profitRows] = await Promise.all([
@@ -514,9 +575,20 @@ export class AnalyticsService {
     const granularity = pickSalesGranularity(startDate, endDate);
     const offsetMs = tzOffsetMinutes * 60 * 1000;
 
-    const aggregated = await prisma.$queryRaw<
-      Array<{ period: Date; revenue: number; orders: bigint }>
-    >`
+    const salesMap = new Map<string, { revenue: number; orders: number }>();
+    const money = await storeMoney(storeId);
+    if (money) {
+      for (const r of await money.analyticsSales({
+        startMs: startDate.getTime(),
+        endMs: endDate.getTime(),
+        offsetMinutes: tzOffsetMinutes,
+        granularity,
+      }))
+        salesMap.set(r.key, { revenue: r.revenue, orders: r.orders });
+    }
+    const aggregated = money
+      ? []
+      : await prisma.$queryRaw<Array<{ period: Date; revenue: number; orders: bigint }>>`
       SELECT
         date_trunc(${granularity}, "created_at" + (${tzOffsetMinutes}::int * interval '1 minute')) AS period,
         COALESCE(SUM(total), 0) AS revenue,
@@ -531,7 +603,6 @@ export class AnalyticsService {
       ORDER BY period ASC
     `;
 
-    const salesMap = new Map<string, { revenue: number; orders: number }>();
     for (const row of aggregated) {
       salesMap.set(salesBucketKey(new Date(row.period), granularity), {
         revenue: Number(row.revenue),
@@ -573,18 +644,32 @@ export class AnalyticsService {
     const now = new Date();
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
-    const grouped = await prisma.orderItem.groupBy({
-      by: ['priceSource', 'priceGroupApplied'],
-      where: {
-        order: {
-          storeId,
-          createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-          paymentStatus: { not: 'failed' },
-        },
-      },
-      _sum: { quantity: true, total: true },
-    });
+    const money = await storeMoney(storeId);
+    const grouped = money
+      ? (
+          await money.analyticsItems({
+            by: 'priceSource',
+            startMs: startDate.getTime(),
+            endMs: endDate.getTime(),
+            nonRevenue: NON_REVENUE,
+          })
+        ).map(r => ({
+          priceSource: r.priceSource ?? null,
+          priceGroupApplied: r.priceGroupApplied ?? null,
+          _sum: { quantity: r.quantity, total: r.total },
+        }))
+      : await prisma.orderItem.groupBy({
+          by: ['priceSource', 'priceGroupApplied'],
+          where: {
+            order: {
+              storeId,
+              createdAt: { gte: startDate, lte: endDate },
+              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+              paymentStatus: { not: 'failed' },
+            },
+          },
+          _sum: { quantity: true, total: true },
+        });
     const bucket = { revenue: 0, units: 0 };
     const out = { retail: { ...bucket }, tier: { ...bucket }, group: { ...bucket } };
     for (const g of grouped) {
@@ -618,21 +703,35 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
-    // Aggregate quantity sold and revenue per product at the DB level
-    const grouped = await prisma.orderItem.groupBy({
-      by: ['productId'],
-      where: {
-        order: {
-          storeId,
-          createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-          paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
-        },
-      },
-      _sum: { quantity: true, total: true },
-      orderBy: { _sum: { total: 'desc' } },
-      take: limit,
-    });
+    // Aggregate quantity sold and revenue per product at the DB level (a DO store: the DO op, same population and order)
+    const money = await storeMoney(storeId);
+    const grouped = money
+      ? (
+          await money.analyticsItems({
+            by: 'product',
+            startMs: startDate.getTime(),
+            endMs: endDate.getTime(),
+            nonRevenue: NON_REVENUE,
+            limit,
+          })
+        ).map(r => ({
+          productId: r.productId as string,
+          _sum: { quantity: r.quantity, total: r.total },
+        }))
+      : await prisma.orderItem.groupBy({
+          by: ['productId'],
+          where: {
+            order: {
+              storeId,
+              createdAt: { gte: startDate, lte: endDate },
+              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+              paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
+            },
+          },
+          _sum: { quantity: true, total: true },
+          orderBy: { _sum: { total: 'desc' } },
+          take: limit,
+        });
 
     if (grouped.length === 0) return [];
 
@@ -687,19 +786,29 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
-    // Step 1: aggregate revenue per product at the DB level
-    const grouped = await prisma.orderItem.groupBy({
-      by: ['productId'],
-      where: {
-        order: {
-          storeId,
-          createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-          paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
-        },
-      },
-      _sum: { total: true },
-    });
+    // Step 1: aggregate revenue per product at the DB level (a DO store: the DO op)
+    const money = await storeMoney(storeId);
+    const grouped = money
+      ? (
+          await money.analyticsItems({
+            by: 'product',
+            startMs: startDate.getTime(),
+            endMs: endDate.getTime(),
+            nonRevenue: NON_REVENUE,
+          })
+        ).map(r => ({ productId: r.productId as string, _sum: { total: r.total } }))
+      : await prisma.orderItem.groupBy({
+          by: ['productId'],
+          where: {
+            order: {
+              storeId,
+              createdAt: { gte: startDate, lte: endDate },
+              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+              paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
+            },
+          },
+          _sum: { total: true },
+        });
 
     if (grouped.length === 0) return [];
 
@@ -752,15 +861,24 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
-    const orders = await prisma.order.groupBy({
-      by: ['status'],
-      where: {
-        storeId,
-        deletedAt: null,
-        createdAt: { gte: startDate, lte: endDate },
-      },
-      _count: { id: true },
-    });
+    const money = await storeMoney(storeId);
+    const orders = money
+      ? (
+          await money.analyticsOrdersBy({
+            by: 'status',
+            startMs: startDate.getTime(),
+            endMs: endDate.getTime(),
+          })
+        ).map(r => ({ status: r.key, _count: { id: r.count } }))
+      : await prisma.order.groupBy({
+          by: ['status'],
+          where: {
+            storeId,
+            deletedAt: null,
+            createdAt: { gte: startDate, lte: endDate },
+          },
+          _count: { id: true },
+        });
 
     const total = orders.reduce((sum, o) => sum + o._count.id, 0);
 
@@ -783,41 +901,80 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
-    // New customers: those whose very first order for this store falls inside the period
-    const [newCustomers, returningCustomers, topOrderGroups] = await Promise.all([
-      // Customers with at least one order in the period who had no earlier orders
-      prisma.user.count({
-        where: {
-          storeId,
-          orders: {
-            some: { storeId, createdAt: { gte: startDate, lte: endDate } },
-          },
-          NOT: {
-            orders: {
-              some: { storeId, createdAt: { lt: startDate } },
-            },
-          },
-        },
-      }),
+    const odb = await storeDb(storeId);
+    const onDo = (await storeRepo(storeId)).backend === 'do';
+    const money = await storeMoney(storeId);
+    if (money) {
+      const d = await money.analyticsCustomers({
+        startMs: startDate.getTime(),
+        endMs: endDate.getTime(),
+        nonRevenue: NON_REVENUE,
+      });
+      const ids = d.top.map(g => g.customerId).filter((id): id is string => id != null);
+      const details = (await customerRows(storeId, ids)) ?? [];
+      const byId = new Map(details.map(c => [c.id, c]));
+      const topCustomers = d.top
+        .map(g => {
+          const c = g.customerId ? byId.get(g.customerId) : undefined;
+          if (!c) return null;
+          return {
+            id: c.id,
+            name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Anonymous',
+            email: c.email,
+            totalSpent: g.total,
+            orderCount: g.count,
+          };
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null);
+      return {
+        newCustomers: d.newCustomers,
+        returningCustomers: d.returningCustomers,
+        topCustomers,
+      };
+    }
 
-      // Customers with more than one order in this store (returning buyers)
-      prisma.user.count({
-        where: {
-          storeId,
-          orders: {
-            some: { storeId },
-          },
-          AND: [
-            // At least two orders exist: one before or at endDate and one more
-            // We approximate "returning" as having orders both before and after startDate
-            { orders: { some: { storeId, createdAt: { lt: startDate } } } },
-            { orders: { some: { storeId, createdAt: { gte: startDate, lte: endDate } } } },
-          ],
-        },
-      }),
+    // New customers: those whose very first order for this store falls inside the period
+    const [{ newCustomers, returningCustomers }, topOrderGroups] = await Promise.all([
+      onDo
+        ? doNewAndReturning(odb, storeId, startDate, endDate)
+        : (async () => {
+            const [newCustomers, returningCustomers] = await Promise.all([
+              // Customers with at least one order in the period who had no earlier orders
+              prisma.user.count({
+                where: {
+                  storeId,
+                  orders: {
+                    some: { storeId, createdAt: { gte: startDate, lte: endDate } },
+                  },
+                  NOT: {
+                    orders: {
+                      some: { storeId, createdAt: { lt: startDate } },
+                    },
+                  },
+                },
+              }),
+
+              // Customers with more than one order in this store (returning buyers)
+              prisma.user.count({
+                where: {
+                  storeId,
+                  orders: {
+                    some: { storeId },
+                  },
+                  AND: [
+                    // At least two orders exist: one before or at endDate and one more
+                    // We approximate "returning" as having orders both before and after startDate
+                    { orders: { some: { storeId, createdAt: { lt: startDate } } } },
+                    { orders: { some: { storeId, createdAt: { gte: startDate, lte: endDate } } } },
+                  ],
+                },
+              }),
+            ]);
+            return { newCustomers, returningCustomers };
+          })(),
 
       // Top customers by total spend — aggregate at DB level, return top 10
-      prisma.order.groupBy({
+      odb.order.groupBy({
         by: ['customerId'],
         where: {
           storeId,
@@ -836,10 +993,12 @@ export class AnalyticsService {
     const topCustomerIds = topOrderGroups
       .map(g => g.customerId)
       .filter((id): id is string => id != null);
-    const customerDetails = await prisma.user.findMany({
-      where: { id: { in: topCustomerIds }, storeId },
-      select: { id: true, email: true, firstName: true, lastName: true },
-    });
+    const customerDetails =
+      (await customerRows(storeId, topCustomerIds)) ??
+      (await prisma.user.findMany({
+        where: { id: { in: topCustomerIds }, storeId },
+        select: { id: true, email: true, firstName: true, lastName: true },
+      }));
 
     const customerById = new Map(customerDetails.map(c => [c.id, c]));
 
@@ -868,6 +1027,29 @@ export class AnalyticsService {
    * Get recent orders
    */
   static async getRecentOrders(storeId: string, limit = 10) {
+    if (await storeMoney(storeId)) {
+      // A DO store: the order and its first lines come from the DO; the buyer (a platform account) is attached from the
+      // customer directory, the way the order list does it. Same output shape as the Postgres include below.
+      const db = await storeDb(storeId);
+      const orders = await db.order.findMany({
+        where: { storeId, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: { items: { take: 3, include: { product: { select: { name: true } } } } },
+      });
+      const people = await customerRows(
+        storeId,
+        orders.map(o => o.customerId)
+      );
+      const byId = new Map((people ?? []).map(c => [c.id, c]));
+      return orders.map(o => {
+        const c = o.customerId ? byId.get(o.customerId) : undefined;
+        return {
+          ...o,
+          customer: c ? { firstName: c.firstName, lastName: c.lastName, email: c.email } : null,
+        };
+      });
+    }
     return prisma.order.findMany({
       where: { storeId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -903,6 +1085,16 @@ export class AnalyticsService {
     // rendered as "0 units left". See lib/effective-inventory.ts.
     //
     // Raw SQL because the filter and the sort both need the computed on-hand.
+    const money = await storeMoney(storeId);
+    if (money)
+      return (await money.analyticsLowStock({ threshold })).map(r => ({
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        sku: r.sku,
+        inventory: r.inventory,
+        images: r.imageUrl ? [{ url: r.imageUrl }] : [],
+      }));
     const rows = await prisma.$queryRaw<
       Array<{
         id: string;
@@ -947,17 +1139,27 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
-    const orders = await prisma.order.groupBy({
-      by: ['paymentStatus'],
-      where: {
-        storeId,
-        deletedAt: null,
-        createdAt: { gte: startDate, lte: endDate },
-        status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-      },
-      _sum: { total: true },
-      _count: true,
-    });
+    const money = await storeMoney(storeId);
+    const orders = money
+      ? (
+          await money.analyticsOrdersBy({
+            by: 'paymentStatus',
+            startMs: startDate.getTime(),
+            endMs: endDate.getTime(),
+            nonRevenue: NON_REVENUE,
+          })
+        ).map(r => ({ paymentStatus: r.key, _sum: { total: r.total }, _count: r.count }))
+      : await prisma.order.groupBy({
+          by: ['paymentStatus'],
+          where: {
+            storeId,
+            deletedAt: null,
+            createdAt: { gte: startDate, lte: endDate },
+            status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+          },
+          _sum: { total: true },
+          _count: true,
+        });
 
     const total = orders.reduce((sum, o) => sum + (o._sum?.total || 0), 0);
 
@@ -995,6 +1197,19 @@ export class AnalyticsService {
    * and active reorder rules count.
    */
   static async stockSnapshot(storeId: string) {
+    const money = await storeMoney(storeId);
+    if (money) {
+      const [d, rulesCount] = await Promise.all([
+        money.analyticsStock({}),
+        (await storeDb(storeId)).reorderRule.count({ where: { storeId, isActive: true } }),
+      ]);
+      return {
+        stockValue: d.stockValue,
+        openBackorderCount: d.backorderCount,
+        backorderedDemandValue: d.backorderValue,
+        reorderRulesCount: rulesCount,
+      };
+    }
     const [stockValue, backorderRow, rulesCount] = await Promise.all([
       // Variant-aware quantity AND cost, active variants only — the finance
       // dashboard's own query (storeStockValueFils), so the two cannot drift.
@@ -1025,6 +1240,14 @@ export class AnalyticsService {
    * over the given window. Used for the cashflow trend chart.
    */
   static async cashflowTrend(storeId: string, from: Date, to: Date) {
+    const money = await storeMoney(storeId);
+    if (money)
+      return (await money.analyticsCashflow({ fromMs: from.getTime(), toMs: to.getTime() })).map(
+        r => ({
+          day: new Date(r.dayMs),
+          net: r.net,
+        })
+      );
     const rows = await prisma.$queryRaw<Array<{ day: Date; net: bigint }>>`
       SELECT DATE_TRUNC('day', e.posted_at) AS day,
              COALESCE(SUM(l.debit), 0) - COALESCE(SUM(l.credit), 0) AS net

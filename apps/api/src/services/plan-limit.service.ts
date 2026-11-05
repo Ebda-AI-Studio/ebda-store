@@ -44,11 +44,14 @@ import {
   type GatedLimitKey,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
-import { storeRepo } from '../lib/repo-factory';
+import { storeRepo, storeDb } from '../lib/repo-factory';
+import { backendFor } from '../lib/store-backend';
+import { onAccessD1 } from './platform/access-d1';
 import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlements';
 import { socketService } from './socket.service';
 import { EmailService } from './email.service';
 import { config } from '../config';
+import { ownerStores } from '../lib/store-create-do';
 import logger from '../lib/logger';
 
 type Tx = Prisma.TransactionClient;
@@ -72,6 +75,9 @@ export async function countUsage(
       });
     }
   }
+  // NEON-ZERO-1 (N-7): seats are D1 rows after the `access` cutover; count them without opening a Postgres transaction.
+  if (limitKey === 'maxStaff' && (await onAccessD1()))
+    return (prisma as unknown as Tx).storeStaff.count({ where: { storeId } });
   const run = async (db: Tx): Promise<number | null> => {
     switch (limitKey) {
       case 'maxProducts':
@@ -138,30 +144,48 @@ function limitError(
  * subscription resolves to the hidden free plan (1 store), so a lapsed Business
  * owner cannot keep adding stores.
  */
-export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+export async function ownerStoreAllowance(ownerId: string): Promise<{
+  /** null = unlimited. */
+  allowance: number | null;
+  count: number;
+  entitlements: Entitlements | null;
+}> {
   // The OLDEST live store is the billing parent: its plan sets the allowance
   // (Ruling EBDA-FUNNEL-13; same rule as account.service ownerStoreAllowance).
   // An additional store's own subscription never grants more stores, so a
   // lapsed parent cannot be worked around through a child.
+  // N-18: with STORE_CREATE_ON_DO on, the union of Postgres and the D1 directory (a store created on its DO exists only in D1);
+  // with it off, Postgres only, exactly as before.
   const stores = sortOwnerStores(
-    await withUser(ownerId, tx =>
-      tx.store.findMany({
-        where: { ownerId, deletedAt: null },
-        select: { id: true, createdAt: true },
-      })
+    await ownerStores(ownerId, () =>
+      withUser(ownerId, tx =>
+        tx.store.findMany({
+          where: { ownerId, deletedAt: null },
+          select: { id: true, createdAt: true },
+        })
+      )
     )
   );
-  if (stores.length === 0) return;
+  if (stores.length === 0) return { allowance: 1, count: 0, entitlements: null };
   const e = await getEntitlements(stores[0].id);
   const max = e?.limits.maxStores;
-  if (max === null) return;
-  const allowance = typeof max === 'number' && max >= 1 ? max : 1;
-  if (stores.length + 1 > allowance) {
+  if (max === null) return { allowance: null, count: stores.length, entitlements: e };
+  return {
+    allowance: typeof max === 'number' && max >= 1 ? max : 1,
+    count: stores.length,
+    entitlements: e,
+  };
+}
+
+export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+  const { allowance, count, entitlements: e } = await ownerStoreAllowance(ownerId);
+  if (allowance === null || count === 0) return;
+  if (count + 1 > allowance) {
     throw limitError(
       (e ?? { planCode: 'unknown' }) as Entitlements,
       'maxStores',
       allowance,
-      stores.length,
+      count,
       1
     );
   }
@@ -243,9 +267,13 @@ export function ordersOpenFor(
  * `withStore`, so it runs under the caller's tenant guard + RLS like any other store read.
  */
 export async function assertOrderAllowed(storeId: string): Promise<void> {
-  const row = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
-  );
+  // A Durable Object store's record is its DO (NEON-ZERO-1 N-4); a Postgres store keeps the withStore read.
+  const demoQuery = { where: { id: storeId }, select: { isDemo: true } } as const;
+  const repo = await storeRepo(storeId);
+  const row =
+    repo.backend === 'do'
+      ? await repo.db.store.findUnique(demoQuery)
+      : await withStore(storeId, tx => tx.store.findUnique(demoQuery));
   if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (row.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {
@@ -288,9 +316,15 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
  * is not this guard's business: the caller keeps its own not-found behaviour.
  */
 export async function assertNotDemoStore(storeId: string): Promise<void> {
-  const row = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
-  );
+  // N-9: a store served by its StoreDO is read through the split-aware store client (DO profile + D1 directory), not Postgres.
+  const row =
+    (await backendFor(storeId)) === 'do'
+      ? await (
+          await storeDb(storeId)
+        ).store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+      : await withStore(storeId, tx =>
+          tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+        );
   if (row?.isDemo) {
     throw new AppError(403, 'DEMO_STORE', 'This is a demo store; this action is disabled', {
       messageEn: 'This is a demo store: this is turned off here',

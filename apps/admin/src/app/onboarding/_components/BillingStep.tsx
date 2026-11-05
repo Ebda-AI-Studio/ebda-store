@@ -157,6 +157,9 @@ export function BillingStep({
                 {nextCharge && nextCharge.amountMinor !== null
                   ? t('cardBody', {
                       amount: formatMoney(nextCharge.amountMinor, locale, { fixedDecimals: true }),
+                      interval: t(
+                        billing?.billingInterval === 'yearly' ? 'intervalYearly' : 'intervalMonthly'
+                      ),
                       plan: chargePlan,
                       date: chargeDate,
                     })

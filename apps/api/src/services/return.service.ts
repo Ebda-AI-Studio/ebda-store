@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { prisma, Prisma, ReturnStatus, ReturnType, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -256,12 +257,15 @@ async function withCustomer<T extends { customerId: string }>(
   select: Prisma.UserSelect
 ): Promise<Array<T & { customer: unknown }>> {
   const ids = Array.from(new Set(rows.map(r => r.customerId)));
-  const users = ids.length
-    ? await prisma.user.findMany({
-        where: { id: { in: ids }, storeId },
-        select: { id: true, ...select },
-      })
-    : [];
+  const doRows = await customerRows(storeId, ids);
+  const users: Array<{ id: string }> = doRows
+    ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
+    : ids.length
+      ? await prisma.user.findMany({
+          where: { id: { in: ids }, storeId },
+          select: { id: true, ...select },
+        })
+      : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => {
     const u = byId.get(r.customerId) as ({ id: string } & Record<string, unknown>) | undefined;
@@ -332,10 +336,17 @@ export class ReturnService {
       where: { id: data.orderId, storeId },
       select: { orderNumber: true, locale: true },
     });
-    const customer = await prisma.user.findFirst({
-      where: { id: data.customerId, storeId },
-      select: { email: true, firstName: true, lastName: true },
-    });
+    const doCustomer = await customerRow(storeId, data.customerId);
+    // a deleted / erased / suspended customer is not mailed (N-9)
+    const customer =
+      doCustomer !== undefined
+        ? doCustomer && isLiveCustomer(doCustomer)
+          ? doCustomer
+          : null
+        : await prisma.user.findFirst({
+            where: { id: data.customerId, storeId },
+            select: { email: true, firstName: true, lastName: true },
+          });
     const order = orderRow ? { ...orderRow, customer } : null;
     const store = await withStore(storeId, tx =>
       tx.store.findFirst({ where: { id: storeId }, select: { name: true } })

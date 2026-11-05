@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { StoreTheme } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { AutoPopulateBanner } from './_components/AutoPopulateBanner';
 import { PwaBenefits } from './_components/PwaBenefits';
 import { PwaBranding } from './_components/PwaBranding';
@@ -41,8 +43,16 @@ export default function PWASettingsPage() {
     toggleEnabled(tMessages('toggleError'));
   };
 
-  const handleSaveSettings = () => {
-    saveSettings(tMessages('saveSuccess'), tMessages('saveError'));
+  // Sticky Save shows only while the settings differ from what was loaded/saved.
+  const [baseline, setBaseline] = useState<string | null>(null);
+  const snapshot = JSON.stringify(settings);
+  useEffect(() => {
+    if (!loading && baseline === null) setBaseline(snapshot);
+  }, [loading, baseline, snapshot]);
+  const dirty = pwaEnabled && baseline !== null && snapshot !== baseline;
+
+  const handleSaveSettings = async () => {
+    if (await saveSettings(tMessages('saveSuccess'), tMessages('saveError'))) setBaseline(snapshot);
   };
 
   const handlePopulate = () => {
@@ -52,45 +62,37 @@ export default function PWASettingsPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout
-      title={tPage('title')}
-      subtitle={tPage('subtitle')}
-      actions={
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">{tActions('statusLabel')}</span>
-          <button
-            type="button"
-            onClick={handleToggleEnabled}
-            disabled={saving}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              pwaEnabled
-                ? 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink hover:bg-success/20'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            {pwaEnabled ? tActions('enabled') : tActions('disabled')}
-          </button>
-        </div>
-      }
-    >
+    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24">
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">
+                {tActions('switchTitle')}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {pwaEnabled ? tActions('enabled') : tActions('disabled')}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={pwaEnabled}
+              disabled={saving}
+              onChange={handleToggleEnabled}
+              className="h-5 w-9 cursor-pointer accent-primary"
+            />
+          </label>
+
           {storeInfo && <AutoPopulateBanner storeInfo={storeInfo} onPopulate={handlePopulate} />}
 
           <PwaBenefits />
 
           <PwaBranding settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
-
-          <PwaManifestPreview
-            settings={settings}
-            pwaEnabled={pwaEnabled}
-            onChange={setSettings}
-            theme={storeInfo?.theme as StoreTheme | undefined}
-          />
 
           <PwaIconUploader
             storeId={storeId}
@@ -108,25 +110,31 @@ export default function PWASettingsPage() {
             theme={storeInfo?.theme as StoreTheme | undefined}
           />
 
-          {message && <PwaStatusMessage message={message} />}
-
-          {pwaEnabled && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleSaveSettings}
-                disabled={saving}
-                className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                )}
-                {tActions('save')}
-              </button>
+          <details className="rounded-xl border border-border bg-card p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-foreground">
+              {tPage('advanced')}
+            </summary>
+            <p className="mt-1 text-xs text-muted-foreground">{tPage('advancedHint')}</p>
+            <div className="mt-4">
+              <PwaManifestPreview
+                settings={settings}
+                pwaEnabled={pwaEnabled}
+                onChange={setSettings}
+                theme={storeInfo?.theme as StoreTheme | undefined}
+              />
             </div>
-          )}
+          </details>
+
+          {message && <PwaStatusMessage message={message} />}
         </div>
       )}
+      <StickySaveBar
+        dirty={dirty || saving}
+        onSave={handleSaveSettings}
+        onReset={() => baseline && setSettings(JSON.parse(baseline))}
+        saving={saving}
+        saveLabel={tActions('save')}
+      />
     </AdminLayout>
   );
 }

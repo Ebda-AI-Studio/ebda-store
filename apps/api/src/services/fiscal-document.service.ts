@@ -1,4 +1,5 @@
 import { prisma, type Prisma } from '@ebda/database';
+import { RETENTION_YEARS } from '../config/retention';
 import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -22,7 +23,7 @@ import { storeDb } from '../lib/repo-factory';
  * and the document commit or roll back together. Never the random order number.
  *
  * Documents are immutable (DB trigger) and have no FK to stores/orders, so a
- * store deletion leaves them in place for 6 years (`retain_until`).
+ * store deletion leaves them in place for 7 years (`retain_until`).
  */
 
 export type FiscalDocTypeValue =
@@ -43,8 +44,8 @@ export const FISCAL_NUMBER_PREFIX: Record<
   refund_receipt: 'RFR',
 };
 
-/** 6 years: UTPL Art. 38 (5 years after the tax period) + Art. 44 (6 for evasion). */
-export const FISCAL_RETENTION_YEARS = 6;
+/** 7 years from the order date (Ruling RETENTION-1; the legal minimum is 5, see config/retention.ts). */
+export const FISCAL_RETENTION_YEARS = RETENTION_YEARS; // Ruling RETENTION-1: one constant (config/retention.ts)
 
 export function fiscalNumber(docType: keyof typeof FISCAL_NUMBER_PREFIX, serial: number): string {
   return `${FISCAL_NUMBER_PREFIX[docType]}-${String(serial).padStart(6, '0')}`;
@@ -556,13 +557,25 @@ export class FiscalDocumentService {
   /** Paged list for the merchant's Invoices page. */
   static async list(
     storeId: string,
-    opts: { cursor?: string; limit?: number; docType?: FiscalDocTypeValue } = {}
+    opts: { cursor?: string; limit?: number; docType?: FiscalDocTypeValue; q?: string } = {}
   ) {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
     const rows = await (
       await storeDb(storeId)
     ).fiscalDocument.findMany({
-      where: { storeId, ...(opts.docType ? { docType: opts.docType } : {}) },
+      where: {
+        storeId,
+        ...(opts.docType ? { docType: opts.docType } : {}),
+        // Document numbers are issued upper-case (INV-000042), so an upper-cased substring needs no case-insensitive mode.
+        ...(opts.q
+          ? {
+              OR: [
+                { number: { contains: opts.q.toUpperCase() } },
+                { originalNumber: { contains: opts.q.toUpperCase() } },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ issuedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),

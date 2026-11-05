@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { BlogService } from '../services/blog.service';
 import { writeLimiter } from '../middleware/security';
 import { tenantContext } from '../middleware/tenant-context';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Blog routes (Bucket E1, 2026-05-17).
@@ -51,7 +51,9 @@ const blogPostPatchSchema = blogPostSchema.partial();
  * Returns true when handled (caller should `return`).
  */
 async function gateBlogEnabled(storeId: string, res: Response): Promise<boolean> {
-  const store = await prisma.store.findUnique({
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({
     where: { id: storeId },
     select: { blogEnabled: true },
   });

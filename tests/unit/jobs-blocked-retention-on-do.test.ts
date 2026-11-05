@@ -93,7 +93,7 @@ import {
   softDeletedUserAnonymize,
 } from '@api/lib/inngest/functions/data-retention';
 import { InstapayReceiptService } from '@api/services/payment-providers/instapay-receipt.service';
-import { NO_STORE_DATA_JOBS, PORTED_JOBS } from '@api/lib/jobs/job-data';
+import { ALL_STORES_JOBS, NO_STORE_DATA_JOBS, PORTED_JOBS } from '@api/lib/jobs/job-data';
 import { ALARM_READY } from '@api/lib/jobs/alarm-flag';
 import { decideRunForStore } from '@api/lib/jobs/do-guard';
 
@@ -127,13 +127,18 @@ describe('classification', () => {
       expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
     }
   );
-  it.each(['search-log-purge-daily', 'soft-deleted-user-anonymize-monthly'])(
-    '%s opens no store table',
-    async id => {
-      expect(NO_STORE_DATA_JOBS.has(id)).toBe(true);
-      expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
-    }
-  );
+  it('soft-deleted-user-anonymize-monthly opens no store table', async () => {
+    const id = 'soft-deleted-user-anonymize-monthly';
+    expect(NO_STORE_DATA_JOBS.has(id)).toBe(true);
+    expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+  });
+  // Ruling NZ-AN-1: the search log is a per-store DO table now, so its purge is a ported all-stores cron
+  it('search-log-purge-daily is ported and covers every store from its one cron run', async () => {
+    const id = 'search-log-purge-daily';
+    expect(PORTED_JOBS.has(id)).toBe(true);
+    expect(ALL_STORES_JOBS.has(id)).toBe(true);
+    expect(await decideRunForStore({ id } as never, DO_STORE)).toEqual({ run: true });
+  });
 });
 
 describe('order-anonymize-5y-monthly on a DO store', () => {

@@ -15,6 +15,7 @@
  *
  * Must run with the store's tenant context available: every read/write goes through `withStore`.
  */
+import { isDemoStore } from '../lib/demo-store';
 import { prisma, withStore } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
 import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
@@ -151,6 +152,8 @@ export async function processLifecycleEmail(
   const { store, sub } = ctx;
   // Not a self-serve store (super-admin provisioned, "done for you"): these emails are not for it.
   if (!sub?.trialEndsAt) return { status: 'ignored', reason: 'not_self_serve' };
+  // A showroom has no merchant to nudge (its owner address is the operator's own).
+  if (await isDemoStore(storeId)) return { status: 'ignored', reason: 'demo_store' };
 
   const record_ = (status: LifecycleStatus, reason: string | null) =>
     record(storeId, kind, status, reason);

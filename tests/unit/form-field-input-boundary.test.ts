@@ -167,7 +167,11 @@ describe('interactive control boundaries use --input, never the hairline (VT-05)
   it('filter trigger and the desktop filter panel frame', () => {
     const f = read('app/products/ProductsFilterSidebar.tsx');
     expect(f).not.toContain('border-border');
-    expect(f).toContain('lg:border lg:border-input');
+    // PREMIUM-20 (audit 2026-11-03 #9): the PANEL frame is a container, not a control, so it is a
+    // hairline of the panel's own ink, not the --input boundary. The CONTROLS inside it (chips,
+    // slider thumbs, selects) keep real boundaries: chips border-input-class, thumbs border-primary.
+    expect(f).toContain('lg:border lg:border-[hsl(var(--filter-fg)/0.12)]');
+    expect(f).toContain('border-input'); // the mobile trigger + selects still read --input
   });
   it('the PLP view and density toggles and the PDP quantity stepper', () => {
     expect(read('app/products/ProductsClient.tsx')).toContain(

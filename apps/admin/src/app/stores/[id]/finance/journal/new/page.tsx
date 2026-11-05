@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { FormFooter } from '@/components/FormFooter';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
@@ -136,7 +137,7 @@ export default function NewJournalEntryPage() {
     return (
       <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
         <div className="max-w-4xl">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <div className="rounded-xl border border-warning/30 bg-warning/10 p-6 text-sm text-warning-ink">
             <p className="font-semibold mb-1">{tNew('superAdminOnly')}</p>
             <p>{tNew('superAdminNotice')}</p>
           </div>
@@ -291,27 +292,21 @@ export default function NewJournalEntryPage() {
           </button>
         </div>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!balanced || submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded disabled:opacity-50"
-          >
-            {submitting ? tNew('submitting') : tNew('submit')}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/finance/journal`)}
-            className="px-4 py-2 border border-border rounded"
-          >
-            {tNew('cancel')}
-          </button>
-        </div>
+        {error && (
+          <div role="alert" className="text-destructive-ink text-sm">
+            {error}
+          </div>
+        )}
 
         <p className="text-xs text-muted-foreground">{tNew('superAdminNotice')}</p>
+
+        <FormFooter
+          primaryLabel={tNew('submit')}
+          cancelHref={`/stores/${storeId}/finance/journal`}
+          onPrimary={submit}
+          saving={submitting}
+          disabled={!balanced}
+        />
       </div>
     </AdminLayout>
   );

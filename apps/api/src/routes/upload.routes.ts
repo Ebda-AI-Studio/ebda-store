@@ -1,3 +1,4 @@
+import { generateImageVariants } from '../services/image-variants.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
@@ -273,6 +274,9 @@ router.post(
             storeId: resolved.storeId,
           }
         );
+
+        // PREMIUM-2: resized WebP variants, once, at upload. Never fails the upload.
+        await generateImageVariants(uploaded.key, resizedBuffer);
 
         await auditLog({
           action: 'file.uploaded',
@@ -666,7 +670,9 @@ const fontUpload = multer({
 router.post(
   '/font',
   authenticate,
-  requirePermission('settings:write'),
+  // BE:S-18: `settings:write` is super_admin only, so every merchant got 403 on the typography page. The store owner's own
+  // permission is `store:settings`; `checkStoreAccess` below still pins the upload to a store the caller can manage.
+  requirePermission('store:settings'),
   uploadLimiter,
   dailyUploadLimiter,
   fontUpload.single('file'),

@@ -40,7 +40,9 @@ import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 import { CardTestingGuard } from './card-testing-guard.service';
 import { OneSignalService } from './onesignal.service';
-import { recordPaymentEvent } from './payment-event.service';
+import { recordPaymentEvent, recordPaymentEventForStore } from './payment-event.service';
+import { storeDb, storeMoney } from '../lib/repo-factory';
+import { AppError } from '../middleware/error-handler';
 import type { PaymentStatusResponse } from './payment-providers/types';
 import { recordPaymentSettled } from './provider-verification.service';
 import { invalidateCustomersCache } from '../lib/public-cache';
@@ -84,6 +86,8 @@ export interface ConfirmPaymentInput {
     /** Payment.currency (default 'EGP'). Used only to gate the amount
      *  reconciliation to same-currency comparisons — see below. */
     currency?: string;
+    /** The provider reference (a Durable Object store settles by it); read from the row when absent. */
+    transactionId?: string | null;
   };
   /** The Order the payment belongs to. */
   order: {
@@ -134,6 +138,10 @@ export async function confirmPaymentFromProviderStatus(
       statusChanged: false,
     };
   }
+
+  // A store on its Durable Object settles through the same `paymentWebhook` section a delivered webhook uses (Ruling NZ-A-4);
+  // the Postgres reconciliation below is untouched for every other store.
+  if (await storeMoney(order.storeId)) return confirmOnDo(input);
 
   // Determine whether this is a genuine transition vs a redundant call.
   // We compare against the ORDER's current paymentStatus (the durable
@@ -407,7 +415,12 @@ export async function confirmPaymentFromProviderStatus(
     const failedClaim = await claimOrderFailed(order.id, order.storeId);
     if (failedClaim !== 'claimed') {
       return {
-        paymentStatus: failedClaim === 'already_failed' ? 'failed' : 'paid',
+        paymentStatus:
+          failedClaim === 'already_failed'
+            ? 'failed'
+            : failedClaim === 'not_found'
+              ? 'unpaid'
+              : 'paid',
         providerStatus: status,
         statusChanged: false,
       };
@@ -472,5 +485,124 @@ export async function confirmPaymentFromProviderStatus(
     paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
     providerStatus: status,
     statusChanged: false,
+  };
+}
+
+/**
+ * The Durable Object twin of `confirmPaymentFromProviderStatus` (Ruling NZ-A-4). Same idempotency signal (the order's
+ * `paymentStatus`), same paid-amount gate (an underpayment is held unpaid and alerted, never marked paid); the transition
+ * itself, its claim, the order status guard, the payment row and the audit event are ONE section in the DO, and the
+ * post-commit fan-out is the webhook's (`afterWebhookOnDo`). A terminal order throws the engine's INVALID_STATUS_TRANSITION,
+ * as `assertValidTransition` did.
+ */
+async function confirmOnDo(input: ConfirmPaymentInput): Promise<ConfirmPaymentResult> {
+  const { payment, order, providerStatus, source, triggeredByUserId = null } = input;
+  const status = providerStatus.status;
+  const failure = status === 'failed' || status === 'expired' || status === 'cancelled';
+  if (status !== 'completed' && !failure)
+    return {
+      paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+      providerStatus: status,
+      statusChanged: false,
+    };
+  if (status === 'completed' && order.paymentStatus === 'paid')
+    return { paymentStatus: 'paid', providerStatus: status, statusChanged: false };
+  if (failure && order.paymentStatus !== 'unpaid')
+    return {
+      paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+      providerStatus: status,
+      statusChanged: false,
+    };
+
+  if (status === 'completed') {
+    const paidAmount = providerStatus.paidAmount;
+    const sameCurrency =
+      !providerStatus.paidCurrency || !providerStatus.currency
+        ? true
+        : providerStatus.paidCurrency === providerStatus.currency;
+    if (
+      typeof paidAmount === 'number' &&
+      Number.isFinite(paidAmount) &&
+      typeof payment.amount === 'number' &&
+      sameCurrency &&
+      Math.abs(payment.amount - paidAmount) > AMOUNT_TOLERANCE_FILS &&
+      paidAmount < payment.amount
+    ) {
+      logger.error(
+        {
+          paymentId: payment.id,
+          orderId: order.id,
+          expectedFils: payment.amount,
+          paidAmountFils: paidAmount,
+          source,
+        },
+        '[PAYMENT CONFIRM] provider-reported paid amount is less than expected - holding order unpaid'
+      );
+      await recordPaymentEventForStore({
+        paymentId: payment.id,
+        storeId: order.storeId,
+        orderId: order.id,
+        eventType: 'reconciliation',
+        fromStatus: payment.status as PaymentStatus,
+        toStatus: null,
+        provider: payment.provider,
+        triggeredByUserId,
+        details: {
+          source,
+          reason: 'paid_amount_mismatch',
+          expectedFils: payment.amount,
+          paidAmountFils: paidAmount,
+          providerStatus: status,
+        },
+      });
+      void sendAlert({
+        level: 'p0',
+        scope: 'store',
+        store: { id: order.storeId, name: order.storeId },
+        source: 'payment.confirm.amount_mismatch',
+        title: 'payment.confirm.amount_mismatch',
+        body: `Order ${order.id}: ${payment.provider} reports paid ${paidAmount} piastres but the order total is ${payment.amount} piastres. Order was NOT marked as paid - investigate before fulfilling.`,
+        context: {
+          orderId: order.id,
+          paymentId: payment.id,
+          provider: payment.provider,
+          expectedFils: payment.amount,
+          paidAmountFils: paidAmount,
+          source,
+        },
+      }).catch(() => undefined);
+      return { paymentStatus: 'unpaid', providerStatus: status, statusChanged: false };
+    }
+  }
+
+  // the reference the payment was created with: the caller's, else the stored row's
+  const transactionId =
+    payment.transactionId ??
+    (
+      await (
+        await storeDb(order.storeId)
+      ).payment.findUnique({ where: { id: payment.id }, select: { transactionId: true } })
+    )?.transactionId;
+  if (!transactionId)
+    throw new AppError(400, 'NO_PAYMENT_RECORD', 'This payment has no provider reference to check');
+  // lazy: the factory pulls the whole provider layer, which the Postgres reconciliation never needs
+  const { PaymentService } = await import('./payment-providers/payment.factory.js');
+  const r = await PaymentService.applyPolledStatusOnDo(
+    order.storeId,
+    {
+      provider: payment.provider,
+      transactionId,
+      amount: payment.amount,
+      currency: payment.currency,
+    },
+    status as 'completed' | 'failed' | 'expired' | 'cancelled',
+    providerStatus,
+    source
+  );
+  const applied = r.outcome === 'applied';
+  return {
+    paymentStatus: status === 'completed' ? 'paid' : applied ? 'failed' : 'unpaid',
+    providerStatus: status,
+    statusChanged: applied,
   };
 }

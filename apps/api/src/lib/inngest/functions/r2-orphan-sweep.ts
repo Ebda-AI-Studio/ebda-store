@@ -8,6 +8,8 @@ import {
   storeDirectory,
   withoutHiddenStores,
 } from '@ebda/database';
+import { platformDb } from '../../platform-directory';
+import { platformD1ReferencedKeys } from '../../r2-platform-d1-references';
 import { collectDoStoreReferencedKeys } from '../../r2-do-references';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -160,7 +162,10 @@ export const r2OrphanSweep: JobDef = inngest.createFunction(
     // at all (no read, no delete, no alert): it needs a privileged job runner
     // (SP5). The per-URL check on replace/delete (`r2-cleanup.service`) is a
     // different, store-by-store path and is unaffected.
-    if (!(await isOwnerRole())) {
+    // NEON-ZERO (Ruling NZ-PG-2): where the platform D1 is bound Postgres is gone - there is no owner-role connection to
+    // need and no Postgres row to read. The references are the D1 platform tables + every store's DO (both collected below).
+    const pgGone = !!platformDb();
+    if (!pgGone && !(await isOwnerRole())) {
       logger.warn(
         'r2-orphan-sweep: skipped — needs an owner-role DB connection; the strict-RLS app role cannot see every reference'
       );
@@ -218,14 +223,20 @@ export const r2OrphanSweep: JobDef = inngest.createFunction(
 
     // ── Step 2: collect DB-referenced keys ───────────────────────────────
     // Array over the wire; Set rebuilt here for the O(1) lookup below.
-    const referencedList = await step.run('collect-referenced-keys', async () =>
-      Array.from(await collectReferencedKeys())
-    );
+    const referencedList = pgGone
+      ? []
+      : await step.run('collect-referenced-keys', async () =>
+          Array.from(await collectReferencedKeys())
+        );
     // + the references held on the Durable Object of every DO store (their Postgres rows are not the truth any more)
     const doReferenced = await step.run('collect-do-referenced-keys', () =>
       collectDoReferencedKeys()
     );
-    const referenced = new Set([...referencedList, ...doReferenced]);
+    // + the platform tables that moved to D1 (their Postgres rows are stale)
+    const d1Referenced = await step.run('collect-d1-referenced-keys', async () =>
+      Array.from(await platformD1ReferencedKeys(urlToR2Key))
+    );
+    const referenced = new Set([...referencedList, ...doReferenced, ...d1Referenced]);
     logger.info({ count: referenced.size }, 'r2-orphan-sweep: collected referenced keys from DB');
 
     // ── Step 3: compute orphans ───────────────────────────────────────────
@@ -277,7 +288,7 @@ export const r2OrphanSweep: JobDef = inngest.createFunction(
     // loudly and nothing is deleted. In report-only mode the report is still
     // sent, marked as untrustworthy, because the operator acts on it.
     let visibilityError: string | null = null;
-    if (orphans.length > 0) {
+    if (orphans.length > 0 && !pgGone) {
       visibilityError = await step.run('assert-strict-tables-visible', async () => {
         try {
           await assertStrictTablesVisible(fn => withOwnerTx(tx => fn(tx)), prisma);

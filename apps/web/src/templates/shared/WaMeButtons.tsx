@@ -99,6 +99,26 @@ function WaLink({
   );
 }
 
+/**
+ * True when `WaMeProductButton` renders for this store (number valid, toggle on). The PDP's
+ * share row reads it to drop its own WhatsApp pill, so one page never carries two WhatsApp
+ * rows doing the same job (audit 2026-11-03 #13).
+ */
+export function useHasWaMeProductButton(product: { slug: string; name: string }): boolean {
+  const { store, locale, visibility } = useWaMe();
+  if (!visibility.productShare) return false;
+  const href = waMeLink(
+    store.whatsapp,
+    buildProductShareMessage({
+      locale,
+      productName: product.name,
+      priceMinor: null,
+      url: productUrl(store, product.slug),
+    })
+  );
+  return Boolean(href);
+}
+
 /** Product page: ask the merchant about / share this product on WhatsApp. */
 export function WaMeProductButton({
   product,

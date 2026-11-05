@@ -44,6 +44,8 @@ export async function accessToken(claims: {
   jti: string;
   tv?: number;
   role?: string;
+  /** An impersonation session minted by POST /admin/impersonate carries this claim. */
+  impersonatedBy?: string;
 }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
@@ -53,7 +55,9 @@ export async function accessToken(claims: {
       email: 'tester@exit-test.invalid',
       role: claims.role ?? 'store_admin',
       tv: claims.tv ?? 0,
+      ...(claims.storeId ? { storeId: claims.storeId } : {}),
       jti: claims.jti,
+      ...(claims.impersonatedBy ? { impersonatedBy: claims.impersonatedBy } : {}),
       iss: JWT_ISSUER,
       aud: JWT_AUDIENCE,
       iat: now,

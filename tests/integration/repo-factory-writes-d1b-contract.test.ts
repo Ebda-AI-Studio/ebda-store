@@ -32,6 +32,7 @@ import {
 import { META, canon, insertSqlite, openSqlite } from '../../packages/repo/test/diff-harness';
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
+import { withPgStoreDelegate } from '../helpers/do-store-delegate';
 
 vi.mock('../../apps/api/src/lib/b2b-invalidate', async importOriginal => ({
   ...(await importOriginal<typeof import('../../apps/api/src/lib/b2b-invalidate')>()),
@@ -51,7 +52,12 @@ function doRepo() {
     q => runReads(lite, q),
     m => runWrites(lite, sql, m)
   ) as never;
-  return { storeId: STORE, backend: 'do' as const, db: c as StoreReads, writer: c as StoreWrites };
+  return {
+    storeId: STORE,
+    backend: 'do' as const,
+    db: withPgStoreDelegate(c) as StoreReads,
+    writer: c as StoreWrites,
+  };
 }
 const pgRepo = () => ({
   storeId: STORE,

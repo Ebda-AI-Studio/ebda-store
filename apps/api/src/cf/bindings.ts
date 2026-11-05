@@ -74,6 +74,13 @@ export interface AccountsRpc {
     status: 'active' | 'inactive' | 'suspended',
     reason: string
   ): Promise<void>;
+  /** Edit name / phone of a non-customer account (apps/accounts `updateProfile`); never the e-mail, and a super_admin target only by that user. */
+  updateProfile?(
+    userId: string,
+    input: { firstName?: string; lastName?: string; phone?: string | null },
+    reason?: string,
+    actorId?: string
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'FORBIDDEN_TARGET' }>;
   getAccountState?(userId: string): Promise<AccountState | null>;
   /** Display facts for up to 100 accounts in one call (apps/accounts `getAccountsBrief`). */
   getAccountsBrief?(userIds: string[]): Promise<AccountBrief[]>;
@@ -155,7 +162,6 @@ export interface AnalyticsEngineLike {
 }
 
 export interface CfBindings {
-  HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
   KV_CACHE?: KVNamespaceLike;
   /** Strong-consistency state: token denylist, tv, lockout / MFA counters, auth limits. */

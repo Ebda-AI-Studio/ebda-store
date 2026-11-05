@@ -40,9 +40,10 @@ vi.mock('@ebda/database', () => ({
   LoyaltyTransactionType: {},
 }));
 
-let currentUser: { userId: string; role: string } | undefined = {
+let currentUser: { userId: string; role: string; storeId?: string } | undefined = {
   userId: 'customer-1',
   role: 'customer',
+  storeId: '11111111-1111-1111-1111-111111111111',
 };
 
 vi.mock('@api/middleware/auth', () => ({
@@ -50,6 +51,7 @@ vi.mock('@api/middleware/auth', () => ({
     req.user = currentUser;
     next();
   },
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
   authorize:
     (..._roles: string[]) =>
     (_req: any, _res: any, next: any) =>
@@ -216,7 +218,11 @@ describe('storefront loyalty client paths resolve on the real API router', () =>
 
   beforeEach(() => {
     vi.clearAllMocks();
-    currentUser = { userId: 'customer-1', role: 'customer' };
+    currentUser = {
+      userId: 'customer-1',
+      role: 'customer',
+      storeId: '11111111-1111-1111-1111-111111111111',
+    };
     loyaltyService.getCustomerPoints.mockResolvedValue(null);
     loyaltyService.getTransactionHistory.mockResolvedValue({ transactions: [], meta: {} });
     loyaltyService.initializeCustomerPoints.mockResolvedValue({ points: 100 });
@@ -254,7 +260,11 @@ describe('public/customer loyalty routes — behavior + tenancy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    currentUser = { userId: 'customer-1', role: 'customer' };
+    currentUser = {
+      userId: 'customer-1',
+      role: 'customer',
+      storeId: '11111111-1111-1111-1111-111111111111',
+    };
     loyaltyService.getCustomerPoints.mockResolvedValue(null);
     loyaltyService.getTransactionHistory.mockResolvedValue({ transactions: [], meta: {} });
     loyaltyService.initializeCustomerPoints.mockResolvedValue({ points: 100 });

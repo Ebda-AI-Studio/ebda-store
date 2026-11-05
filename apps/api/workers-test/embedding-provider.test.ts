@@ -13,7 +13,7 @@ import {
 // binding call shape — with SEARCH_SEMANTIC_ENABLED=true and a fake `AI` binding (no network).
 type Run = NonNullable<CfBindings['AI']>['run'];
 function bindAi(run: Run) {
-  setCfBindings({ HYPERDRIVE: { connectionString: 'postgres://unused' }, AI: { run } });
+  setCfBindings({ AI: { run } });
 }
 const vec = (seed: number) => Array.from({ length: EMBED_DIMS }, (_, i) => ((seed + i) % 7) / 7);
 const silentLog = { info: () => undefined };

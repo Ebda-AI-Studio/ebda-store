@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { writeLimiter } from '../middleware/security';
 import { LocationsService } from '../services/locations.service';
 import { locationInputSchema } from '@ebda/shared';
 import { tenantContext } from '../middleware/tenant-context';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Locations routes (Store Locations / Branches feature, 2026-06-16).
@@ -33,7 +33,9 @@ router.param('storeId', tenantContext);
  * Returns true when the response has been handled (caller should `return`).
  */
 async function gateLocationsEnabled(storeId: string, res: Response): Promise<boolean> {
-  const store = await prisma.store.findUnique({
+  const store = await (
+    await storeDb(storeId)
+  ).store.findUnique({
     where: { id: storeId },
     select: { locationsEnabled: true },
   });

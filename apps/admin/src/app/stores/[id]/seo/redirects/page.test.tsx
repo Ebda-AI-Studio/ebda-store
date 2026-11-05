@@ -28,6 +28,12 @@ vi.mock('@/i18n/useT', () => {
   return { useT: () => t };
 });
 
+// The delete step asks through useConfirm(): answer yes.
+vi.mock('@/hooks/useConfirm', () => {
+  const yes = async () => true;
+  return { useConfirm: () => yes };
+});
+
 import SlugRedirectsPage from './page';
 
 const row = (id: string, fromSlug = `old-${id}`) => ({
@@ -40,7 +46,6 @@ const row = (id: string, fromSlug = `old-${id}`) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 afterEach(() => cleanup());
 

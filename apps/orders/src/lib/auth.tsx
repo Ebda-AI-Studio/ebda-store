@@ -21,6 +21,7 @@ import {
   markSessionEvidence,
   clearStoredSession,
 } from './api';
+import { signInMessageKey } from './sign-in-error';
 import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
 
 /**
@@ -197,14 +198,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/orders');
   }
 
-  function signInError(e: unknown, fallback: string): Error {
-    if (e instanceof AccountsError) {
-      if (e.code === 'EMAIL_NOT_VERIFIED') return new Error('Please verify your email first.');
-      if (e.status === 429)
-        return new Error('Too many attempts. Please wait a few minutes and try again.');
-      return new Error(e.message || fallback);
-    }
-    return e instanceof Error ? e : new Error(fallback);
+  /** The page owns the wording (and the language): throw a CODE, never the service's raw English (audit A-1). */
+  function signInError(e: unknown, _fallback: string): Error {
+    if (e instanceof AccountsError) return new Error(signInMessageKey(e.status, e.code));
+    return new Error('serverError');
   }
 
   async function login(email: string, password: string): Promise<void | MfaChallenge> {

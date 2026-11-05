@@ -14,6 +14,8 @@ Point `yourstore.com` at Ebda Store in ~10 minutes. ربط نطاقك بالمت
 
 **Admin → Settings → Custom Domain**
 
+The page now tells apart three states: **"Waiting for DNS to update"** (records not seen yet), **"The domain does not point to your store yet"** (ownership confirmed but the records still go elsewhere) and **"Email records are still missing"**. "Copy all records" and "Email these instructions" help you hand the records to whoever manages the domain. Removing the domain asks for a confirmation first.
+
 - Click **Add Custom Domain**
 - Type your domain: `yourstore.com` (without `https://` or `www.`)
 - Click **Save**

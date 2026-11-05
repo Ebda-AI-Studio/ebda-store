@@ -95,7 +95,7 @@ module.exports = {
       user: 'deploy',
       host: ['server1.example.com'],
       ref: 'origin/main',
-      repo: 'git@github.com:Whisky-11/ebda-store.git',
+      repo: 'git@github.com:Ebda-AI-Studio/ebda-store.git',
       path: '/var/www/ebda',
       'pre-deploy-local': '',
       'post-deploy':
@@ -109,7 +109,7 @@ module.exports = {
       user: 'deploy',
       host: ['staging.example.com'],
       ref: 'origin/develop',
-      repo: 'git@github.com:Whisky-11/ebda-store.git',
+      repo: 'git@github.com:Ebda-AI-Studio/ebda-store.git',
       path: '/var/www/ebda-staging',
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env staging',
       env: {

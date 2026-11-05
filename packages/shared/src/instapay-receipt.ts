@@ -7,6 +7,7 @@
  * the admin (approver view) and the storefront (payer form).
  */
 import { z } from 'zod/v3';
+import { toAsciiDigits } from './ascii-digits';
 
 /** Largest screenshot accepted (a phone screenshot is 0.2-3 MB). */
 export const INSTAPAY_RECEIPT_MAX_BYTES = 8 * 1024 * 1024;
@@ -40,12 +41,7 @@ export const INSTAPAY_RECEIPT_FLAGS = [
 ] as const;
 export type InstapayReceiptFlag = (typeof INSTAPAY_RECEIPT_FLAGS)[number];
 
-/** Eastern Arabic (and Persian) digits to ASCII. */
-export function toAsciiDigits(input: string): string {
-  return input
-    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06f0));
-}
+export { toAsciiDigits };
 
 /**
  * The comparable form of a transfer reference: its digits only. Null when it is

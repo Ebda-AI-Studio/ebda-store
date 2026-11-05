@@ -25,6 +25,7 @@ export type HubLabels = {
   floatingWidget: string;
   sizeCharts: string;
   goldRates: string;
+  categories: string;
   // Sales tabs
   orders: string;
   invoices: string;
@@ -95,12 +96,17 @@ export const HUBS: HubDefinition[] = [
       '/content',
       '/blog',
       '/catalog',
+      '/categories',
+      '/tags',
+      '/bulk',
       '/floating-widget',
       '/size-charts',
       '/gold-rates',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.products, href: `/stores/${storeId}/products` },
+      // Categories, tags and bulk edit are catalog pages (UX:N-2): they used to highlight no hub at all.
+      { label: labels.categories, href: `/stores/${storeId}/categories` },
       // Size charts sit with the products they describe (B0 Task 9).
       { label: labels.sizeCharts, href: `/stores/${storeId}/size-charts` },
       // Gold rate pricing sits with the products it prices (B5 Task 13).
@@ -118,6 +124,8 @@ export const HUBS: HubDefinition[] = [
     buildTabs: () => [],
   },
   {
+    // Sales = the fulfil job (orders, invoices, returns) plus the people who buy (customers divider group).
+    // Coupons, promotions, loyalty, bundles and the wallet moved to the Marketing hub (UX:N-1).
     key: 'sales',
     urlPrefixes: [
       '/orders',
@@ -128,11 +136,6 @@ export const HUBS: HubDefinition[] = [
       '/sales',
       '/reviews',
       '/returns',
-      '/coupons',
-      '/promotions',
-      '/loyalty',
-      '/bundles',
-      '/wallet',
       '/customer-intelligence',
     ],
     buildTabs: (storeId, labels) => [
@@ -140,12 +143,14 @@ export const HUBS: HubDefinition[] = [
       // Fiscal documents (tax invoices, receipts, credit notes): issued automatically per
       // sale / refund, so this is a read-only list, not a gated feature.
       { label: labels.invoices, href: `/stores/${storeId}/invoices` },
+      { label: labels.returns, href: `/stores/${storeId}/returns` },
       // B2B review I5: both tabs carry the count of wholesale applications waiting for a decision. The Wholesale
       // applications tab is not feature-keyed (the page shows the upgrade prompt when the plan lacks b2b.wholesale).
       {
         label: labels.customers,
         href: `/stores/${storeId}/customers`,
         badgeKey: 'wholesalePending',
+        groupStart: true,
       },
       { label: labels.customerGroups, href: `/stores/${storeId}/customer-groups` },
       {
@@ -154,25 +159,6 @@ export const HUBS: HubDefinition[] = [
         badgeKey: 'wholesalePending',
       },
       { label: labels.reviews, href: `/stores/${storeId}/reviews` },
-      { label: labels.returns, href: `/stores/${storeId}/returns` },
-      // Coupons and loyalty are feature-gated at the page level via
-      // useRequireFeature('coupons') / loyalty gating. HubTab has no
-      // per-tab featureKey mechanism so the tab always renders; the page
-      // itself redirects/blocks when the feature is disabled.
-      { label: labels.coupons, href: `/stores/${storeId}/coupons` },
-      // Promotions are automatic discounts (no code) — ungated, same
-      // reasoning as customer-groups (dependency root for targeting).
-      { label: labels.promotions, href: `/stores/${storeId}/promotions` },
-      { label: labels.loyalty, href: `/stores/${storeId}/loyalty` },
-      // Bundles are feature-gated (`bundles` is in NO plan baseline) via
-      // useRequireFeature('bundles') — same "tab always renders, the page
-      // itself gates" pattern as coupons/loyalty above.
-      { label: labels.bundles, href: `/stores/${storeId}/bundles` },
-      // Customer wallet (store credit, D1). Unlike the tabs above it is hidden
-      // outright for a store without the feature — it is OFF for every store
-      // at launch, and a new upsell tab appearing for every merchant on deploy
-      // is exactly the visible change the launch must not make.
-      { label: labels.wallet, href: `/stores/${storeId}/wallet`, featureKey: 'customer_wallet' },
       // Smart hints (Customer Intelligence). Always listed: the page is where the merchant switches them on.
       { label: labels.customerIntelligence, href: `/stores/${storeId}/customer-intelligence` },
     ],
@@ -186,10 +172,16 @@ export const HUBS: HubDefinition[] = [
       { label: labels.warehouses, href: `/stores/${storeId}/stock/warehouses` },
       { label: labels.scan, href: `/stores/${storeId}/stock/scan` },
       { label: labels.adjustments, href: `/stores/${storeId}/stock/adjustments` },
-      { label: labels.suppliers, href: `/stores/${storeId}/stock/suppliers` },
+      // Purchasing group (suppliers, purchase orders, backorders), then the planning group: dividers keep the
+      // 10-tab strip readable (audit 2.4).
+      {
+        label: labels.suppliers,
+        href: `/stores/${storeId}/stock/suppliers`,
+        groupStart: true,
+      },
       { label: labels.purchaseOrders, href: `/stores/${storeId}/stock/purchase-orders` },
       { label: labels.backorders, href: `/stores/${storeId}/stock/backorders` },
-      { label: labels.reorder, href: `/stores/${storeId}/stock/reorder` },
+      { label: labels.reorder, href: `/stores/${storeId}/stock/reorder`, groupStart: true },
       { label: labels.deadstock, href: `/stores/${storeId}/stock/deadstock` },
     ],
   },
@@ -198,7 +190,11 @@ export const HUBS: HubDefinition[] = [
     urlPrefixes: ['/finance'],
     buildTabs: (storeId, labels) => [
       { label: labels.financeDashboard, href: `/stores/${storeId}/finance/dashboard` },
-      { label: labels.accounts, href: `/stores/${storeId}/finance/accounts` },
+      {
+        label: labels.accounts,
+        href: `/stores/${storeId}/finance/accounts`,
+        groupStart: true,
+      },
       { label: labels.journal, href: `/stores/${storeId}/finance/journal` },
       { label: labels.expenses, href: `/stores/${storeId}/finance/expenses` },
       { label: labels.reports, href: `/stores/${storeId}/finance/reports` },
@@ -219,14 +215,21 @@ export const HUBS: HubDefinition[] = [
     ],
   },
   {
+    // Marketing and offers (UX:N-1): the offers the merchant runs (coupons, promotions, bundles, loyalty, wallet),
+    // then the campaigns that tell customers about them. Notifications live in Settings (UX:N-4).
     key: 'marketing',
     urlPrefixes: [
+      '/coupons',
+      '/promotions',
+      '/loyalty',
+      '/bundles',
+      '/wallet',
       '/ai-tools',
       '/ai-usage',
       '/marketing',
       '/marketing-pixels',
-      '/notifications',
       '/newsletter',
+      '/notifications',
       '/campaigns',
       '/affiliates',
       '/abandoned-carts',
@@ -235,20 +238,30 @@ export const HUBS: HubDefinition[] = [
       '/answer-engine',
     ],
     buildTabs: (storeId, labels) => [
-      { label: labels.aiTools, href: `/stores/${storeId}/ai-tools` },
-      { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
-      { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
-      { label: labels.notifications, href: `/stores/${storeId}/notifications` },
-      { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
-      // Feature-gated (`email_campaigns` is Growth + Business, not Basic) via
-      // useRequireFeature('email_campaigns') — same "tab always renders,
-      // the page itself gates" pattern as bundles/coupons/loyalty above.
+      // Coupons are in every plan, so the hub lands on a page everyone can open (audit M-1).
+      { label: labels.coupons, href: `/stores/${storeId}/coupons` },
+      // Promotions are automatic discounts (no code) and ungated: same reasoning as customer-groups.
+      { label: labels.promotions, href: `/stores/${storeId}/promotions` },
+      // Bundles are feature-gated (`bundles` is in NO plan baseline) via useRequireFeature('bundles'):
+      // the tab always renders, the page itself gates. Same for loyalty.
+      { label: labels.bundles, href: `/stores/${storeId}/bundles` },
+      { label: labels.loyalty, href: `/stores/${storeId}/loyalty` },
+      // Customer wallet (store credit, D1) is hidden outright for a store without the feature: it is OFF for
+      // every store at launch, and a new upsell tab appearing on deploy is exactly the visible change to avoid.
+      { label: labels.wallet, href: `/stores/${storeId}/wallet`, featureKey: 'customer_wallet' },
+      { label: labels.newsletter, href: `/stores/${storeId}/newsletter`, groupStart: true },
+      // Feature-gated (`email_campaigns` is Growth + Business, not Basic): the layout shows the locked card.
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
       { label: labels.paymentAbandonments, href: `/stores/${storeId}/payment-abandonments` },
       { label: labels.lifecycleEmails, href: `/stores/${storeId}/lifecycle-emails` },
+      // Staff may manage order alerts, and the Settings hub is owner-only, so Notifications stays here (Ruling T3-1).
+      { label: labels.notifications, href: `/stores/${storeId}/notifications` },
+      { label: labels.affiliates, href: `/stores/${storeId}/affiliates`, groupStart: true },
       { label: labels.marketingPixels, href: `/stores/${storeId}/marketing-pixels` },
-      { label: labels.affiliates, href: `/stores/${storeId}/affiliates` },
+      { label: labels.aiTools, href: `/stores/${storeId}/ai-tools`, groupStart: true },
+      { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
+      { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
     ],
   },
   {
@@ -274,6 +287,8 @@ export const HUBS: HubDefinition[] = [
       '/template',
       '/announcement',
       '/billing',
+      '/delivery',
+      '/staff',
     ],
     // Settings pages share one hub for nav highlighting; they have no sub-tabs.
     buildTabs: () => [],

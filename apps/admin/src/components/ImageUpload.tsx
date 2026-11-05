@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { localizeSizeHint } from '../lib/size-hint';
 import { IMAGE_UPLOAD_ACCEPT } from '@ebda/shared';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { apiDelete } from '../lib/api';
@@ -169,6 +171,7 @@ export function ImageUpload({
           ? 'aspect-square max-w-xs'
           : '';
   const t = useT('components.imageUpload');
+  const locale = useLocale();
   const resolvedLabel = label ?? t('label');
   const { uploading, progress, error, setError, uploadSingle } = useImageUpload();
   const [localError, setLocalError] = useState<string | null>(null);
@@ -230,7 +233,9 @@ export function ImageUpload({
       <div className={className}>
         <UploadPreview value={value} alt={resolvedLabel} onRemove={handleRemoveWithR2} />
         {recommendedSizeHint && (
-          <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {localizeSizeHint(recommendedSizeHint, locale)}
+          </p>
         )}
       </div>
     );
@@ -270,7 +275,9 @@ export function ImageUpload({
         </UploadDropzone>
       </div>
       {recommendedSizeHint && (
-        <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {localizeSizeHint(recommendedSizeHint, locale)}
+        </p>
       )}
 
       {displayError && <p className="mt-1 text-xs text-destructive-ink">{displayError}</p>}
@@ -289,6 +296,7 @@ export function MultiImageUpload({
   recommendedSizeHint,
 }: MultiImageUploadProps) {
   const t = useT('components.imageUpload');
+  const locale = useLocale();
   const resolvedLabel = label ?? t('multiLabel');
   const { uploading, progress, error, setError, uploadMulti } = useImageUpload();
   const [localError, setLocalError] = useState<string | null>(null);
@@ -392,7 +400,9 @@ export function MultiImageUpload({
       )}
 
       {recommendedSizeHint && (
-        <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {localizeSizeHint(recommendedSizeHint, locale)}
+        </p>
       )}
       {displayError && <p className="mt-1 text-xs text-destructive-ink">{displayError}</p>}
     </div>

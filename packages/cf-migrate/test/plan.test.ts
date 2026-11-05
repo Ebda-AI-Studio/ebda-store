@@ -67,7 +67,7 @@ describe('plan against the generated schema', () => {
       expect(() => scopeWhere(t, plan.store), t.name).not.toThrow();
       expect(tableQuery(t, plan.store, 'store')).toMatch(/^SELECT .* ORDER BY /);
     }
-    expect(Object.keys(USER_SCOPED).sort()).toEqual(['addresses', 'onesignal_subscriptions']);
+    expect(Object.keys(USER_SCOPED).sort()).toEqual(['addresses']);
   });
   it('the scope of a child table without store_id climbs to its parent', () => {
     const items = plan.store.find(t => t.name === 'order_items')!;

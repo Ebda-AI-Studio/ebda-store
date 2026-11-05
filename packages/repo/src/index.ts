@@ -8,6 +8,16 @@ export { splitSql } from './prisma-lite/split-sql';
 export { doSqlRunner, doSyncSql, type DoStorageLike } from './prisma-lite/do-runner';
 export { placeOrder, type CheckoutInput, type PlacedOrder } from './do/checkout';
 export { MoneyError, type SyncSql } from './do/sync-sql';
+export {
+  moneyInFlightOnDo,
+  totalInFlight,
+  isStoreClosed,
+  closeStore,
+  closeIfNoMoneyInFlight,
+  reopenAfterFailedDelete,
+  type CloseResult,
+  type DoMoneyInFlight,
+} from './do/closure';
 export { ensureSearchIndex } from './do/search';
 export { ensurePaymentSchema } from './do/payments';
 export { trialBalance, postEntry as postJournalEntry } from './do/ledger';
@@ -32,11 +42,18 @@ export {
   type DoMutation,
   type WriteOp,
 } from './rpc/writes';
-export { applyStoreSettings, readStoreRecord } from './rpc/settings';
+export { applyStoreSettings, bootstrapStoreRows, readStoreRecord } from './rpc/settings';
 export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } from './do/stock-ops';
 export { answerStockOp, type StockAnswer } from './rpc/stock';
 export { runMoneyOp, ensureMoneyOpsSchema, MONEY_OP_NAMES, type MoneyOpName } from './do/money-ops';
 export { answerMoneyOp, type MoneyAnswer } from './rpc/money';
+export { answerAuthOp, AUTH_OP_NAMES, type AuthAnswer } from './rpc/customer-auth';
+export {
+  ensureCustomerAuthSchema,
+  purgeCustomerAuth,
+  CAUTH_TABLES,
+  IMPORT_COLUMNS as CAUTH_IMPORT_COLUMNS,
+} from './do/customer-auth';
 
 export {
   routePaymentWebhook,

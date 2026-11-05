@@ -1,12 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { platformDb } from '../lib/platform-directory';
 import { z } from 'zod/v3';
-import { withUser } from '@ebda/database';
 import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
-import { TaxProfileService } from '../services/tax-profile.service';
+import {
+  TaxProfileService,
+  inReviewScope,
+  listProfilesForReview,
+} from '../services/tax-profile.service';
+import { withPlatformUser } from '../lib/platform-scope';
 import { getPlatformVat, updatePlatformVat } from '../services/platform-vat.service';
-import { taxProfilesForReview } from '../lib/definer';
 import { sendTaxDocument } from './tax.routes';
 import { parseInput } from '../lib/parse-input';
 
@@ -43,7 +47,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status } = parseInput(queueQuerySchema, req.query);
-      const profiles = await withUser(req.user!.userId, () => taxProfilesForReview(status ?? null));
+      const profiles = await withPlatformUser(req.user!.userId, () =>
+        listProfilesForReview(status ?? null)
+      );
       res.json({ success: true, data: { profiles } });
     } catch (error) {
       next(error);
@@ -57,10 +63,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = parseInput(UUID, req.params.storeId);
-      const profile = await withUser(
-        req.user!.userId,
-        () => TaxProfileService.get(storeId),
-        storeId
+      const profile = await inReviewScope(req.user!.userId, storeId, () =>
+        TaxProfileService.get(storeId)
       );
       res.json({ success: true, data: { profile } });
     } catch (error) {
@@ -76,10 +80,8 @@ router.get(
     try {
       const storeId = parseInput(UUID, req.params.storeId);
       const documentId = parseInput(UUID, req.params.documentId);
-      const file = await withUser(
-        req.user!.userId,
-        () => TaxProfileService.readDocument(storeId, documentId),
-        storeId
+      const file = await inReviewScope(req.user!.userId, storeId, () =>
+        TaxProfileService.readDocument(storeId, documentId)
       );
       sendTaxDocument(res, file);
     } catch (error) {
@@ -108,7 +110,7 @@ router.get(
   ...superAdmin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vat = await withUser(req.user!.userId, () => getPlatformVat());
+      const vat = await withPlatformUser(req.user!.userId, () => getPlatformVat());
       res.json({ success: true, data: { vat } });
     } catch (error) {
       next(error);

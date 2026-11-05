@@ -20,7 +20,7 @@ const CANDIDATES = {
   email: ['email', 'guest_email', 'customer_email'],
   phone: ['phone', 'customer_phone'],
   userId: ['user_id'],
-  buyerKey: ['buyer_key'],
+  buyerKey: ['buyer_key', 'recipient_phone_hash'],
   customerId: ['customer_id'],
 };
 /** A table that reaches the subject only through its parent order (no customer column of its own). */
@@ -158,6 +158,17 @@ export async function generate() {
       scrub: e.scrub,
     };
   }
+  // Merchant erasure (Ruling NZ-D16): the merchant-pii tables and the columns to anonymise IN PLACE (never a row delete, never a
+  // `retain` table). Every listed column must exist, so a schema change cannot silently skip one.
+  const merchantPlan = [];
+  for (const t of tables) {
+    const e = entries[t];
+    if (e.class !== 'merchant-pii' || e.action === 'retain' || !e.piiColumns?.length) continue;
+    const names = new Set(db.prepare(`PRAGMA table_info("${t}")`).all().map(c => c.name));
+    for (const c of e.piiColumns)
+      if (!names.has(c)) throw new Error(`${t}.${c} (merchant-pii) is not a column`);
+    merchantPlan.push({ table: t, columns: [...e.piiColumns] });
+  }
   const sorted = Object.fromEntries(Object.entries(out).sort(([a], [b]) => (a < b ? -1 : 1)));
   const body = JSON.stringify(sorted, null, 2)
     .replace(/"([a-z_A-Z][a-zA-Z_0-9]*)":/g, '$1:')
@@ -168,6 +179,8 @@ export async function generate() {
 import type { TableClass } from './registry';
 
 export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = ${body};
+
+export const GENERATED_MERCHANT_PII_PLAN: Array<{ table: string; columns: string[] }> = ${JSON.stringify(merchantPlan).replace(/"([a-z_A-Z][a-zA-Z_0-9]*)":/g, '$1:').replace(/"/g, "'")};
 `;
   // formatted with the repo's own prettier config so the committed file is a fixed point of lint-staged
   const prettier = await import('prettier');

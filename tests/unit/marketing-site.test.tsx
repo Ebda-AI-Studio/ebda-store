@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { BRAND, productBar } from '../../packages/shared/src/brand';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
 import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
@@ -44,36 +45,51 @@ const en = renderToStaticMarkup(<Home locale="en" />);
 
 describe('marketing nav', () => {
   it('names the product (not the studio) in both marketing page titles', () => {
-    expect(pageMetadata('ar', '').title).toContain('ابدأ ستور');
-    expect(pageMetadata('en', '').title).toContain('Ebda Store');
+    expect(pageMetadata('ar', 'store').title).toContain('ابدأ ستور');
+    expect(pageMetadata('en', 'store').title).toContain('Ebda Store');
     // the product leads and the studio is not named in the title (the brand line is in OG + JSON-LD)
     for (const l of ['ar', 'en'] as const) {
-      const t = String(pageMetadata(l, '').title);
+      const t = String(pageMetadata(l, 'store').title);
       expect(t.length).toBeLessThanOrEqual(60);
-      expect(t).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
+      expect(t).not.toMatch(/Ebda AI Studio|ابدأ ستوديو/);
     }
   });
-  it('has the five links in page order with correct targets (en)', () => {
-    const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
-    const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 5);
-    expect(labels.map(m => m[2])).toEqual([
+  it('the Store page carries the product bar: five links in page order, one hop each (en)', () => {
+    const bar = en.match(/<ul class="product-links">.*?<\/ul>/s)![0];
+    const links = [...bar.matchAll(/<a [^>]*?href="([^"]+)"[^>]*>([^<]+)<\/a>/g)];
+    expect(links.map(m => m[2])).toEqual([
       'How it works',
       'Templates',
       'Features',
       'Pricing',
       'FAQ',
     ]);
-    expect(labels.map(m => m[1])).toEqual(['#story', '#looks', '/en/features', '#pricing', '#faq']);
-    // every nav target exists on the page, in the same order as the sections
+    // anchors are written /store/#id (the canonical trailing slash, so a click costs no redirect hop; audit P1-10). next/link
+    // drops the slash outside a Next build (trailingSlash is a build flag), so compare without it and pin the data separately.
+    const bare = (h: string) => h.replace(/\/(#|$)/, '$1');
+    expect(links.map(m => bare(m[1]))).toEqual([
+      '/en/store#story',
+      '/en/store#looks',
+      '/en/features',
+      '/en/store#pricing',
+      '/en/store#faq',
+    ]);
+    expect(productBar('store', 'en').links.map(l => l.path)).toEqual([
+      '/en/store/#story',
+      '/en/store/#looks',
+      '/en/features/',
+      '/en/store/#pricing',
+      '/en/store/#faq',
+    ]);
+    // every anchor target exists on the page, in the same order as the sections
     const at = (id: string) => en.indexOf(`<section id="${id}"`);
-    // "Features" is the real /features page, not a home section
-    const pos = labels.filter(m => m[1].startsWith('#')).map(m => at(m[1].slice(1)));
+    const pos = links.filter(m => m[1].includes('#')).map(m => at(m[1].split('#')[1]));
     expect(pos.every(p => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   });
   it('header: the master brand lockup plus a Products menu naming only the live products, Ebda Store and Ebda Chat (BRAND-ARCH-1)', () => {
     for (const [html, studio, store, wa, soon] of [
-      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ شات', /قريب/],
+      [ar, 'ابدأ ستوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ شات', /قريب/],
       [en, 'Ebda AI Studio', 'Ebda Store', 'Ebda Chat', /coming soon/i],
     ] as const) {
       const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
@@ -92,23 +108,27 @@ describe('marketing nav', () => {
       expect(footer).not.toMatch(/href="[^"]*\/compare\//);
     }
   });
-  it('Log in -> app login, Start now -> app signup, in both locales', () => {
+  it('Log in lists each product login; the Store page CTA is its own signup (NAV-CTA-1: product pages keep their CTA)', () => {
     expect(LOGIN_URL).toBe('https://store.ebda.app/login');
     expect(SIGNUP_URL).toBe('https://store.ebda.app/signup');
     for (const html of [ar, en]) {
       // the conversion path continues in the SAME tab (audit UI-15): no target, no new-tab note
-      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/login" class="link-login">/);
+      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/login">/);
+      // a Store page logs in to the Store only (the studio's own pages list both products)
+      expect(html).not.toContain('wa.ebda.app');
       expect(html).toMatch(
-        /<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary header-start">/
+        /<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary btn-sm product-cta">/
       );
     }
     expect(en).toContain('>Log in<');
-    expect(en).toContain('>Start now<');
-    expect(ar).toContain('>ابدأ دلوقتي<');
+    expect(en).toContain('>Open your store<');
+    expect(ar).toContain('>افتح متجرك<');
   });
   it('has a language toggle between / and /en', () => {
-    expect(ar).toMatch(/href="\/en\/?"[^>]*hrefLang="en"|hrefLang="en"[^>]*href="\/en\/?"/i);
-    expect(en).toMatch(/href="\/"[^>]*hrefLang="ar"|hrefLang="ar"[^>]*href="\/"/i);
+    expect(ar).toMatch(
+      /href="\/en\/store\/?"[^>]*hrefLang="en"|hrefLang="en"[^>]*href="\/en\/store\/?"/i
+    );
+    expect(en).toMatch(/href="\/store"[^>]*hrefLang="ar"|hrefLang="ar"[^>]*href="\/store"/i);
   });
 });
 
@@ -136,7 +156,7 @@ describe('marketing hero and structure', () => {
       expect(hero).not.toMatch(/look-phone|class="scr"|id="hp-/);
       // the retired hero furniture is gone: particles, poster, studio kicker, slug pill
       expect(hero).not.toMatch(/nile|hero-poster|hero-brand|slug-pill|<canvas/);
-      expect(hero).not.toMatch(/ابدأ استوديو للذكاء|Ebda AI Studio/);
+      expect(hero).not.toMatch(/ابدأ ستوديو للذكاء|Ebda AI Studio/);
     }
   });
   it('the retired sections and their assets are gone; the story stays with the new Dahab frames (MKT-1)', () => {
@@ -303,19 +323,16 @@ describe('marketing honesty', () => {
   it('footer ownership line, studio credit and Western digits everywhere', () => {
     // the studio's line moved off the home page to /about (MKT-1); the footer carries a one-line credit
     expect(renderToStaticMarkup(<AboutPage locale="ar" />)).toContain(
-      'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.'
+      'ابدأ ستوديو — بابك لبدء مشروعك.'
     );
     expect(renderToStaticMarkup(<AboutPage locale="en" />)).toContain(
       'Ebda AI Studio — Your doorway to business.'
     );
-    expect(en).toContain('<p class="footer-credit">Ebda Store — a product of Ebda AI Studio</p>');
-    expect(ar).toContain('منتج من ابدأ استوديو للذكاء الاصطناعي</p>');
-    expect(en).toContain(
-      'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
-    );
-    expect(ar).toContain(
-      'ابدأ ستور منتج من ابدأ استوديو للذكاء الاصطناعي. © 2026 ابدأ استوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.'
-    );
+    // one footer on every page: the studio's brand column and a (c) line, never a per-product ownership sentence
+    const year = new Date().getUTCFullYear();
+    expect(en).toContain(`© ${year} Ebda AI Studio. All rights reserved.`);
+    expect(ar).toContain(`© ${year} ابدأ ستوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.`);
+    expect(en).toContain('<p class="sf-mission">Your doorway to business.</p>');
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
     expect(en).not.toMatch(/[٠-٩]/);
@@ -332,7 +349,7 @@ describe('marketing honesty', () => {
       'The Service is a technology platform owned and operated by Ebda AI Studio'
     );
     const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
-    expect(lar).toContain('اتفاق بينك وبين ابدأ استوديو للذكاء الاصطناعي');
+    expect(lar).toContain('اتفاق بينك وبين ابدأ ستوديو');
     for (const l of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
@@ -496,7 +513,7 @@ describe('marketing honesty', () => {
     for (const html of [ar, en, ...pages]) expect(html).not.toMatch(/whisky/i);
     const org = jsonLd('en')['@graph'][0] as Record<string, unknown>;
     expect(org.name).toBe('Ebda AI Studio');
-    expect(org.alternateName).toBe('ابدأ استوديو للذكاء الاصطناعي');
+    expect(org.alternateName).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(org.url).toBe('https://ebda.app');
     expect(org).not.toHaveProperty('parentOrganization');
     expect(JSON.stringify(org)).not.toMatch(/whisky/i);
@@ -504,13 +521,21 @@ describe('marketing honesty', () => {
   it('the about page carries the company line, the story and both contact addresses', () => {
     for (const l of ['ar', 'en'] as const) {
       const html = renderToStaticMarkup(<AboutPage locale={l} />);
+      // a STUDIO page: AI, software and digital marketing, the two products with their names, one account (not a Store page)
       expect(html).toContain(
         l === 'en'
-          ? 'owned and operated by Ebda AI Studio'
-          : 'مملوكة لابدأ استوديو للذكاء الاصطناعي'
+          ? 'an Egyptian studio for AI, software and digital marketing'
+          : 'ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي'
       );
+      expect(html).toMatch(l === 'en' ? /One account opens both/ : /حساب واحد يفتح الاتنين/);
+      expect(html).toContain(l === 'en' ? 'href="/en/store' : 'href="/store');
+      expect(html).toContain(l === 'en' ? 'href="/en/whatsapp' : 'href="/whatsapp');
+      // the legal entity is one small line linking to the legal notice, not in the hero
+      expect(html).toContain(l === 'en' ? BRAND.company.legalNameEn : BRAND.company.legalNameAr);
+      expect(html.indexOf('ab-legal')).toBeGreaterThan(html.indexOf('ab-hero') + 1000);
       expect(html).toContain('ahlan@ebda.app');
       expect(html).toContain('security@ebda.app');
+      expect(html).toContain('+20 151 419 1411');
       expect(html).not.toMatch(/whisky/i);
     }
   });
@@ -528,9 +553,12 @@ describe('marketing honesty', () => {
 
 describe('marketing SEO and trust surface', () => {
   it('emits hreflang alternates + canonical per locale', () => {
-    const a = pageMetadata('ar', '').alternates!;
-    expect(a.languages).toEqual({ ar: '/', en: '/en', 'x-default': '/' });
-    expect(a.canonical).toBe('/');
+    const a = pageMetadata('ar', 'store').alternates!;
+    expect(a.languages).toEqual({ ar: '/store', en: '/en/store', 'x-default': '/store' });
+    expect(a.canonical).toBe('/store');
+    const h = pageMetadata('ar', '', 'x', 'y', 'studio').alternates!;
+    expect(h.languages).toEqual({ ar: '/', en: '/en', 'x-default': '/' });
+    expect(h.canonical).toBe('/');
     expect(pageMetadata('en', 'privacy').alternates!.languages).toMatchObject({
       ar: '/privacy',
       en: '/en/privacy',

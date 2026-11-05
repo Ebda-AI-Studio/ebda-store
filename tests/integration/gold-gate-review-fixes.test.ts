@@ -98,6 +98,12 @@ describe.skipIf(!hasDb)('gold gate: review fixes', () => {
   beforeAll(async () => {
     owner = ownerPool();
     fx = await seedBundleStore(`gold-gf-${suffix}`);
+    // These gold suites pay by cash on delivery to stay off the gateway, so the store opts in to deferred payment for gold
+    // (Ruling SHARIA-GOLD-1: the merchant switch). The prepaid-only default has its own tests (gold payment policy).
+    await owner.query(
+      `update stores set settings = coalesce(settings, '{}'::jsonb) || '{"goldAllowDeferredPayment": true}'::jsonb where id = $1`,
+      [fx.storeId]
+    );
     gold = await createProduct(owner, fx.storeId, { ...SPEC, price: 1 });
     await setRate(576323);
     await owner.query(`update products set inventory = 50 where id = $1`, [gold]);
@@ -210,6 +216,41 @@ describe.skipIf(!hasDb)('gold gate: review fixes', () => {
     }
     expect(fired).toBe(true);
     expect(await orderCount()).toBe(orders);
+  });
+
+  it('2e. SHARIA-GOLD-1 end to end: with the merchant switch OFF a gold cart cannot be ordered cash on delivery, and nothing is written', async () => {
+    const flag = (on: boolean) =>
+      owner.query(
+        `update stores set settings = coalesce(settings, '{}'::jsonb) || jsonb_build_object('goldAllowDeferredPayment', $2::boolean) where id = $1`,
+        [fx.storeId, on]
+      );
+    const s = cartSessionId('gf2e');
+    await CartService.addItem(fx.storeId, s, gold, 1);
+    const orders = await orderCount();
+    await flag(false);
+    try {
+      await expect(
+        OrderService.create(fx.storeId, undefined, s, {
+          shippingAddress: testShippingAddress(),
+          paymentMethod: 'cod',
+          locale: 'ar',
+          source: 'web',
+        } as never)
+      ).rejects.toMatchObject({ statusCode: 409, code: 'GOLD_PREPAID_ONLY' });
+      expect(await orderCount()).toBe(orders);
+    } finally {
+      await flag(true);
+    }
+    // control: the same cart, switch back ON, is accepted (so the refusal above came from the switch, nothing else)
+    await expect(
+      OrderService.create(fx.storeId, undefined, s, {
+        shippingAddress: testShippingAddress(),
+        paymentMethod: 'cod',
+        locale: 'ar',
+        source: 'web',
+      } as never)
+    ).resolves.toBeTruthy();
+    expect(await orderCount()).toBe(orders + 1);
   });
 
   it('3. a fixed variant with no own price is refused; a legacy one does not ratchet the product price down', async () => {

@@ -20,7 +20,12 @@ export function openDb(target: 'store' | 'platform', times = 1): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   for (let i = 0; i < times; i++)
-    for (const f of migrationFiles(target)) db.exec(fs.readFileSync(f, 'utf8'));
+    for (const f of migrationFiles(target)) {
+      const sql = fs.readFileSync(f, 'utf8');
+      // `-- @once` files (generated ALTER TABLE ADD COLUMN) are not idempotent: a real database applies them once
+      if (i > 0 && /^-- @once\b/m.test(sql)) continue;
+      db.exec(sql);
+    }
   return db;
 }
 

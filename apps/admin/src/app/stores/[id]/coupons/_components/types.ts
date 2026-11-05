@@ -34,7 +34,8 @@ export interface CouponFormData {
   description: string;
   descriptionAr: string;
   type: CouponType;
-  value: number;
+  /** The value as typed (percent, or EGP for fixed). Text, so an unreadable entry is never turned into 0. */
+  value: string;
   minOrderAmount: string;
   maxDiscount: string;
   usageLimit: string;
@@ -58,7 +59,7 @@ export const INITIAL_FORM_DATA: CouponFormData = {
   description: '',
   descriptionAr: '',
   type: 'percentage',
-  value: 0,
+  value: '',
   minOrderAmount: '',
   maxDiscount: '',
   usageLimit: '',

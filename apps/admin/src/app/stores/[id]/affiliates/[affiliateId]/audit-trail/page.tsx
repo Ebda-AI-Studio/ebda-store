@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 
 // ---------------------------------------------------------------------------
@@ -338,12 +338,12 @@ export default function AffiliateAuditTrailPage() {
                       <time
                         dateTime={event.occurredAt}
                         className="mt-1 block text-xs text-muted-foreground"
-                        title={new Date(event.occurredAt).toLocaleString('en-GB', {
+                        title={new Date(event.occurredAt).toLocaleString(intlLocaleForUi('en-GB'), {
                           dateStyle: 'medium',
                           timeStyle: 'short',
                         })}
                       >
-                        {new Date(event.occurredAt).toLocaleString('en-GB', {
+                        {new Date(event.occurredAt).toLocaleString(intlLocaleForUi('en-GB'), {
                           dateStyle: 'medium',
                           timeStyle: 'short',
                         })}

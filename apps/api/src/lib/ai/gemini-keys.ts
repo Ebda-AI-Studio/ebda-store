@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, type GenerativeModel, type ModelParams } from '@google/generative-ai';
 import logger from '../logger';
+import { LLM_FETCH_TIMEOUT_MS } from '../fetch-timeout';
 
 /**
  * Gemini key failover (Ruling GEMINI-FAILOVER-1).
@@ -154,7 +155,9 @@ export class GeminiFailoverClient {
       generateContent: (...args: GenerateArgs) =>
         withGeminiFailover(
           apiKey =>
-            new GoogleGenerativeAI(apiKey).getGenerativeModel(params).generateContent(...args),
+            new GoogleGenerativeAI(apiKey)
+              .getGenerativeModel(params, { timeout: LLM_FETCH_TIMEOUT_MS })
+              .generateContent(...args),
           this.firstKey
         ),
     };

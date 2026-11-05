@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@ebda/ui';
+import { useLocale } from 'next-intl';
 import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -16,6 +16,7 @@ import {
 } from './_components/ProviderCard';
 import { GatewayConnectCard, type GatewayConfig } from './_components/GatewayConnectCard';
 import { InstalmentsCard } from './_components/InstalmentsCard';
+import { ActiveMethodsStrip, type ActiveMethodRow } from './_components/ActiveMethodsStrip';
 
 // Gateways (Paymob, Kashier, Fawry...) are schema-driven from the catalog; only the manual
 // methods (COD, InstaPay) keep the hand-built card.
@@ -46,6 +47,7 @@ export default function StorePaymentSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('paymentSettings');
+  const isAr = useLocale() === 'ar';
 
   const [configs, setConfigs] = useState<AnyConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +58,7 @@ export default function StorePaymentSettingsPage() {
   const [saveMessages, setSaveMessages] = useState<Record<string, ProviderSaveMessage>>({});
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [gatewayBusy, setGatewayBusy] = useState<string | null>(null);
 
   const fetchConfigs = useCallback(async () => {
     if (!storeId) return;
@@ -197,6 +200,42 @@ export default function StorePaymentSettingsPage() {
     }
   }
 
+  // A gateway can be turned off from the strip any time; turning it ON needs a saved, tested connection.
+  async function toggleGateway(code: string, enabled: boolean) {
+    setGatewayBusy(code);
+    const { error: toggleError } = await apiPost(
+      `/api/v1/payment-settings/store/${storeId}/${code}/toggle`,
+      { enabled }
+    );
+    setGatewayBusy(null);
+    if (toggleError) setError(toggleError.message || t('errors.loadFailed'));
+    await fetchConfigs();
+  }
+
+  const stripRows: ActiveMethodRow[] = [
+    ...PROVIDERS.map(p => ({
+      id: p.id,
+      name: isAr ? p.nameAr : p.name,
+      enabled: forms[p.id]?.isEnabled ?? false,
+      busy: saving === p.id,
+      onToggle: (on: boolean) => handleToggle(p.id, on),
+    })),
+    ...GATEWAYS.flatMap(g => {
+      const c = configs.find(x => x.provider === g.code);
+      const connected = Boolean(c?.connectionTestCurrent && c?.connectionTest?.ok);
+      if (!c?.isEnabled && !connected) return [];
+      return [
+        {
+          id: g.code,
+          name: isAr ? g.name.ar : g.name.en,
+          enabled: Boolean(c?.isEnabled),
+          busy: gatewayBusy === g.code,
+          onToggle: (on: boolean) => toggleGateway(g.code, on),
+        },
+      ];
+    }),
+  ];
+
   if (isLoading) {
     return (
       <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
@@ -210,23 +249,13 @@ export default function StorePaymentSettingsPage() {
   }
 
   return (
-    <AdminLayout
-      title={t('page.title')}
-      subtitle={t('page.subtitle')}
-      actions={
-        <Link href={`/stores/${storeId}/settings`}>
-          <Button type="button" variant="outline">
-            {t('actions.backToSettings')}
-          </Button>
-        </Link>
-      }
-    >
+    <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
-          <button type="button" className="ms-4 font-medium underline" onClick={fetchConfigs}>
+          <Button type="button" variant="outline" className="ms-4 min-h-11" onClick={fetchConfigs}>
             {t('errors.retry')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -235,6 +264,10 @@ export default function StorePaymentSettingsPage() {
         <p className="mt-1.5 text-xs">{t('page.testModeNote')}</p>
       </div>
 
+      <ActiveMethodsStrip rows={stripRows} />
+
+      <h2 className="mb-1 text-base font-semibold text-foreground">{t('strip.addTitle')}</h2>
+      <p className="mb-3 text-sm text-muted-foreground">{t('strip.addHint')}</p>
       <div className="space-y-4">
         {GATEWAYS.map(entry => (
           <GatewayConnectCard

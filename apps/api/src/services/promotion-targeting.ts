@@ -69,8 +69,11 @@ export function computeDiscount(
   base: number
 ): number {
   if (type === 'percentage') {
-    const d = Math.round((base * value) / 100);
-    return maxDiscount != null && d > maxDiscount ? maxDiscount : d;
+    const d = Math.min(base, Math.round((base * value) / 100)); // never more than the goods (a legacy value above 100)
+    // A cap of 0 (or less) is "no cap", exactly as the admin form says for a blank field: QA-COUPON-1 found validate
+    // (calculateDiscount) ignoring a 0 cap while the order capped the discount AT 0, so the shopper was shown a
+    // discount the order never gave.
+    return maxDiscount != null && maxDiscount > 0 && d > maxDiscount ? maxDiscount : d;
   }
   if (type === 'fixed') {
     return value > base ? base : value;

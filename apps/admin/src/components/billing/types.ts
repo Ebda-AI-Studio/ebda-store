@@ -48,6 +48,8 @@ export interface BillingInfo {
   } | null;
   /** The card option is offered only when 'card_on_file'. */
   trialCardMode: 'card_on_file' | 'pay_at_trial_end' | null;
+  /** false = BILLING_PROVIDER=none (InstaPay only): nothing is ever charged to a card (BILLING-NONE-COPY-1). */
+  cardBilling?: boolean;
   billingMethod: 'card' | 'instapay' | null;
   instapay: {
     available: boolean;
