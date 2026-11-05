@@ -607,3 +607,19 @@ describe('StoreDO replay order + stray tables (drill 3: FOREIGN KEY constraint f
     expect(res!.status).toBe(503); // past auth: STORE_DO is not bound in this test
   });
 });
+
+describe('local worker boot verdict (drill 4: every replay "fetch failed" in 1 ms, no boot output)', () => {
+  it('a benign [ERROR] log line is not a failed boot; a bundle or runtime failure is', () => {
+    const benign =
+      '\u001b[31m✘ [ERROR]\u001b[0m {"err":"POSTGRES_REMOVED: Postgres was removed from the Worker"}';
+    expect(D.fatalBootLine(benign)).toBeNull();
+    expect(D.fatalBootLine('[ERROR] Could not resolve "zod/v3"')).toBe('Could not resolve');
+    expect(D.fatalBootLine('\u001b[31mThe Workers runtime failed to start.\u001b[0m')).toBe(
+      'The Workers runtime failed to start'
+    );
+    expect(D.fatalBootLine('Error: listen EADDRINUSE: address already in use 127.0.0.1:8798')).toBe(
+      'EADDRINUSE'
+    );
+    expect(D.fatalBootLine('')).toBeNull();
+  });
+});

@@ -28,7 +28,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { parseArgs } from 'node:util';
-import { runDrill, formatReport, assertLoopback, apiChecksForStore } from './lib/cf-drill.mjs';
+import {
+  fatalBootLine,
+  runDrill,
+  formatReport,
+  assertLoopback,
+  apiChecksForStore,
+} from './lib/cf-drill.mjs';
 import { assertPlatformTables, digestSqlite } from './lib/cf-backup.mjs';
 import {
   ageDecrypt,
@@ -147,75 +153,91 @@ function preflight() {
   }
 }
 
+const say = m => console.log(`[boot] ${m}`);
+let exited = null;
+let spawnError = null;
 async function waitUp(pathname) {
+  say(`waiting for ${base}${pathname} (pid ${child?.pid ?? '?'}), up to 180 s`);
   for (let i = 0; i < 90; i++) {
-    // `wrangler dev` keeps listening after a failed bundle: a logged build error is the answer, not a reason to wait.
-    if (/\[ERROR\]|Build failed|Could not resolve/.test(logAll().replace(/\x1b\[[0-9;]*m/g, '')))
-      throw new Error('wrangler dev logged a build/boot error');
+    if (spawnError) throw new Error(`could not start wrangler: ${spawnError.message}`);
+    if (exited !== null) throw new Error(`wrangler dev exited (${exited}) before serving`);
+    const fatal = fatalBootLine(logAll());
+    if (fatal) throw new Error(`wrangler dev logged a fatal boot error: "${fatal}"`);
+    let probe = 'no answer';
     try {
-      if ((await fetch(base + pathname, { signal: AbortSignal.timeout(3000) })).status) return;
-    } catch {}
+      const r = await fetch(base + pathname, { signal: AbortSignal.timeout(3000) });
+      probe = `HTTP ${r.status}`;
+      if (r.status) {
+        say(`ready: GET ${pathname} -> ${probe} after ~${i * 2} s`);
+        return;
+      }
+    } catch (e) {
+      probe = `${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''}`;
+    }
+    if (i % 5 === 0) say(`probe ${i + 1}: ${probe}`);
     await new Promise(r => setTimeout(r, 2000));
   }
-  throw new Error(`worker did not come up on ${base}${pathname}`);
+  throw new Error(`worker did not come up on ${base}${pathname} within 180 s`);
 }
 function boot(args, cwd, pathname) {
+  // A log left by an earlier run in a reused --workdir must never be read as this boot's verdict.
+  writeFileSync(path.join(work, 'wrangler.log'), '');
   const logf = createWriteStream(path.join(work, 'wrangler.log'));
-  child = spawn(
-    'npx',
-    [
-      'wrangler',
-      'dev',
-      '--local',
-      '--port',
-      a.port,
-      '--persist-to',
-      path.join(work, 'state'),
-      ...args,
-    ],
-    {
-      cwd,
-      detached: true,
-      env: { ...process.env, NO_PROXY: '127.0.0.1,localhost' },
-    }
-  );
+  const argv = [
+    'wrangler',
+    'dev',
+    '--local',
+    '--port',
+    a.port,
+    '--persist-to',
+    path.join(work, 'state'),
+    ...args,
+  ];
+  say(`start: (cd ${cwd} && npx ${argv.join(' ')})`);
+  child = spawn('npx', argv, {
+    cwd,
+    detached: true,
+    env: { ...process.env, NO_PROXY: '127.0.0.1,localhost' },
+  });
+  say(`pid ${child.pid}, log ${path.join(work, 'wrangler.log')}`);
+  child.on('error', e => (spawnError = e));
+  child.on('exit', c => (exited = c ?? 'signal'));
   child.stdout.pipe(logf);
   child.stderr.pipe(logf);
   return waitUp(pathname);
 }
 
-const post = async (p, body, ctype) => {
-  let res;
+/** One request to the local worker: 3 attempts on a dropped connection (every page is idempotent), and an error that explains itself. */
+async function req(method, p, body, ctype) {
   for (let attempt = 1; ; attempt++) {
     try {
-      res = await fetch(base + p, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
+      const res = await fetch(base + p, {
+        method,
+        headers: {
+          authorization: `Bearer ${cutoverSecret}`,
+          ...(ctype ? { 'content-type': ctype } : {}),
+        },
         body,
       });
-      break;
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok)
+        throw Object.assign(new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`), { http: true });
+      return j;
     } catch (e) {
-      // an import page is idempotent (batch, table, page), so a dropped connection is retried; the final error says why
+      if (e.http) throw e;
       if (attempt < 3 && /ECONNRESET|UND_ERR|socket/i.test(`${e.cause?.code} ${e.message}`)) {
         await new Promise(r => setTimeout(r, 500 * attempt));
         continue;
       }
       throw new Error(
-        `${p}: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''} after ${attempt} attempt(s) - the local worker is not answering${bootError ? `; it never came up: ${bootError}` : `; worker log tail: ${logTail()}`}`
+        `${p}: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''} after ${attempt} attempt(s) - the local worker at ${base} is not answering; ` +
+          `${bootError ? `it never came up: ${bootError}` : exited !== null ? `wrangler exited (${exited})` : child ? `pid ${child.pid} is running, log tail: ${logTail()}` : 'it was never started'}`
       );
     }
   }
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
-  return j;
-};
-
-const get = async p => {
-  const res = await fetch(base + p, { headers: { authorization: `Bearer ${cutoverSecret}` } });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
-  return j;
-};
+}
+const post = (p, body, ctype) => req('POST', p, body, ctype);
+const get = p => req('GET', p);
 const targets = { decrypt: ageDecrypt(identity), post, get };
 if (a.target === 'harness') {
   targets.loadD1 = async sql => {
@@ -327,6 +349,7 @@ if (a.target === 'harness') {
       await boot(['--config', '.wrangler.drill.jsonc'], API, '/health');
     } catch (e) {
       bootError = `${e.message}; wrangler log tail: ${logTail()}`;
+      console.log(`[boot] FAILED: ${bootError}`);
     }
     if (loadErr) throw loadErr;
     return r;

@@ -4,6 +4,17 @@ import { fetchBackupSet, parseStoreDump, compareTables } from './cf-backup.mjs';
 
 export const IMPORT_PAGE_ROWS = 1000;
 
+const ANSI = /\x1b\[[0-9;]*m/g;
+// Only these end the wait for the local worker early. A bare "[ERROR]" line is NOT one of them: wrangler logs benign errors (a request
+// that reaches a removed Postgres path, optional bindings) while the Worker still serves.
+const FATAL_BOOT =
+  /Build failed|Could not resolve|The Workers runtime failed to start|Uncaught \w*Error|EADDRINUSE|address already in use/;
+/** The fatal boot line in a wrangler dev log, or null. */
+export function fatalBootLine(logText) {
+  const m = FATAL_BOOT.exec(String(logText).replace(ANSI, ''));
+  return m ? m[0] : null;
+}
+
 /** The drill only ever writes to a loopback worker. A remote URL is a misuse, not an option. */
 export function assertLoopback(url) {
   const h = new URL(url).hostname;
