@@ -473,3 +473,36 @@ describe('D1 export is restorable in any order (first real drill: "no such table
     expect(row.h).toBe('FF00');
   });
 });
+
+describe('a foreign key that targets a column made unique by a SEPARATE index (drill 2: "foreign key mismatch")', () => {
+  // store_subscriptions.plan_code REFERENCES plans(code); plans.code is unique only through CREATE UNIQUE INDEX.
+  const raw =
+    "CREATE TABLE plans (id TEXT PRIMARY KEY, code TEXT NOT NULL);\nINSERT INTO plans VALUES ('p1','pro');\n" +
+    "CREATE TABLE store_subscriptions (id TEXT PRIMARY KEY, plan_code TEXT REFERENCES plans(code));\nINSERT INTO store_subscriptions VALUES ('s1','pro');\n" +
+    'CREATE UNIQUE INDEX plans_code_key ON plans(code);\nCREATE INDEX subs_plan ON store_subscriptions(plan_code);\n' +
+    'CREATE TRIGGER t AFTER INSERT ON plans BEGIN SELECT 1; END;\n';
+  it('the unique index precedes every row; plain indexes and triggers stay last; it loads with foreign keys enforced', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    // @ts-expect-error plain ESM
+    const io = await import('../../../scripts/ops/lib/cf-backup-io.mjs');
+    const norm: string = io.normalizeD1Sql(raw);
+    const at = (needle: string) => norm.indexOf(needle);
+    expect(at('CREATE UNIQUE INDEX')).toBeGreaterThan(at('CREATE TABLE store_subscriptions'));
+    expect(at('CREATE UNIQUE INDEX')).toBeLessThan(at('INSERT INTO'));
+    expect(at('CREATE INDEX subs_plan')).toBeGreaterThan(at('INSERT INTO "store_subscriptions"'));
+    expect(at('CREATE TRIGGER')).toBeGreaterThan(at('INSERT INTO "store_subscriptions"'));
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec(norm);
+    expect((db.prepare('SELECT count(*) AS n FROM store_subscriptions').get() as any).n).toBe(1);
+    // the shape the previous rewrite produced (all indexes last) is exactly what fails
+    const bad =
+      norm
+        .split('\n')
+        .filter(l => !/UNIQUE INDEX/.test(l))
+        .join('\n') + '\nCREATE UNIQUE INDEX plans_code_key ON plans(code);\n';
+    const d2 = new DatabaseSync(':memory:');
+    d2.exec('PRAGMA foreign_keys = ON');
+    expect(() => d2.exec(bad)).toThrow(/foreign key mismatch/);
+  });
+});

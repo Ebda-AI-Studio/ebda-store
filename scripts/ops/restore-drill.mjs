@@ -11,6 +11,7 @@
 //        [--workdir d] [--port 8798] [--report out.txt]
 // Exit 0 = DRILL PASS (every check), 1 = FAIL.
 import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
   existsSync,
   mkdirSync,
@@ -93,6 +94,13 @@ if (a.extract) {
 
 let child = null;
 let bootError = null;
+const logAll = () => {
+  try {
+    return readFileSync(path.join(work, 'wrangler.log'), 'utf8');
+  } catch {
+    return '';
+  }
+};
 const logTail = () => {
   try {
     return readFileSync(path.join(work, 'wrangler.log'), 'utf8')
@@ -117,8 +125,33 @@ const stop = () => {
 process.on('exit', stop);
 process.on('SIGINT', () => process.exit(130));
 
+/** The API Worker bundle needs the workspace's installed + built packages; say so in one line instead of waiting 3 minutes. */
+function preflight() {
+  const need = [
+    [
+      'zod/v3',
+      'dependencies are not installed here (run `bash ~/.claude/scripts/wt-deps.sh <worktree>` or `npm ci`)',
+    ],
+    [
+      '@ebda/shared',
+      'packages are not built (run `npm run db:generate && npm run build -w packages/shared -w packages/database`)',
+    ],
+  ];
+  const req = createRequire(path.join(API, 'package.json'));
+  for (const [id, fix] of need) {
+    try {
+      req.resolve(id);
+    } catch {
+      throw new Error(`preflight: cannot resolve "${id}" from apps/api: ${fix}`);
+    }
+  }
+}
+
 async function waitUp(pathname) {
   for (let i = 0; i < 90; i++) {
+    // `wrangler dev` keeps listening after a failed bundle: a logged build error is the answer, not a reason to wait.
+    if (/\[ERROR\]|Build failed|Could not resolve/.test(logAll().replace(/\x1b\[[0-9;]*m/g, '')))
+      throw new Error('wrangler dev logged a build/boot error');
     try {
       if ((await fetch(base + pathname, { signal: AbortSignal.timeout(3000) })).status) return;
     } catch {}
@@ -153,16 +186,24 @@ function boot(args, cwd, pathname) {
 
 const post = async (p, body, ctype) => {
   let res;
-  try {
-    res = await fetch(base + p, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
-      body,
-    });
-  } catch (e) {
-    throw new Error(
-      `${p}: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''} - the local worker is not answering${bootError ? `; it never came up: ${bootError}` : ' (it was never started or has died)'}`
-    );
+  for (let attempt = 1; ; attempt++) {
+    try {
+      res = await fetch(base + p, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${cutoverSecret}`, 'content-type': ctype },
+        body,
+      });
+      break;
+    } catch (e) {
+      // an import page is idempotent (batch, table, page), so a dropped connection is retried; the final error says why
+      if (attempt < 3 && /ECONNRESET|UND_ERR|socket/i.test(`${e.cause?.code} ${e.message}`)) {
+        await new Promise(r => setTimeout(r, 500 * attempt));
+        continue;
+      }
+      throw new Error(
+        `${p}: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''} after ${attempt} attempt(s) - the local worker is not answering${bootError ? `; it never came up: ${bootError}` : `; worker log tail: ${logTail()}`}`
+      );
+    }
   }
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${p}: HTTP ${res.status} ${j.error ?? ''}`);
@@ -276,6 +317,7 @@ if (a.target === 'harness') {
       loadErr = e;
     }
     try {
+      preflight();
       await boot(['--config', '.wrangler.drill.jsonc'], API, '/health');
     } catch (e) {
       bootError = `${e.message}; wrangler log tail: ${logTail()}`;
