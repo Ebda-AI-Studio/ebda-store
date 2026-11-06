@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
-import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
+import { DEFAULT_PLAN_SEEDS, FEATURE_KEYS_ARRAY } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
 import ALL_ROUTES from './route-table.json';
 import ALL_CRONS from './cron-list.json';
@@ -148,6 +148,7 @@ describe.skipIf(e.E2E_DB === '1')(
   'route sweep, Postgres unreachable, all cutover markers set',
   () => {
     let storeId = '';
+    let jobsStoreId = '';
     let owner = '';
     let sa = '';
     let su = '';
@@ -188,6 +189,28 @@ describe.skipIf(e.E2E_DB === '1')(
       });
       expect(created.status).toBe(200);
       storeId = ((await created.json()) as { id: string }).id;
+      // #465: a SECOND fixture store with every feature on (D1 `store_features`, the override row super-admin's toggle writes) for
+      // the cron group. A job body that checks a feature returns BEFORE its store reads when the store lacks it, so a broken
+      // read behind the gate stayed green (the #463 low-stock `owner` fix could be reverted with the sweep still passing).
+      // Every store runs through /__dev/run-jobs. The route fixture above stays feature-default: with all features on, ~33 gated
+      // routes (finance, loyalty, warehouses, affiliates, wallets...) answer 500 - a separate defect class, not hidden here.
+      const jobsShop = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
+        method: 'POST',
+        body: JSON.stringify({
+          ownerId: owner,
+          name: 'Jobs Shop',
+          slug: 'sweep-jobs-shop',
+          operator: true,
+        }),
+      });
+      expect(jobsShop.status).toBe(200);
+      jobsStoreId = ((await jobsShop.json()) as { id: string }).id;
+      for (const key of FEATURE_KEYS_ARRAY)
+        await e.PLATFORM_DB.prepare(
+          'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
+        )
+          .bind(`sweep-feat-${key}`, jobsStoreId, key, Date.now())
+          .run();
       for (const u of [owner, 'super-sweep', 'cust-sweep'])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
       sa = await accessToken({ userId: owner, jti: 'j-owner', role: 'store_admin', storeId });
@@ -727,6 +750,10 @@ describe.skipIf(e.E2E_DB === '1')(
           jobs: Array<{ id: string; ok: boolean; error?: string }>;
         };
         console.log('SWEEP_JOBS_RAN ' + JSON.stringify(ranBody));
+        expect(
+          ranBody.jobs.some(j => j.id.endsWith(`@${jobsStoreId}`)),
+          'the feature-complete fixture store was driven through the alarm jobs'
+        ).toBe(true);
         // A job body (cron run AND each DO store's alarm run) that answers a store-read refusal or a removed-Postgres error is a
         // port defect (2026-11-06: stock-low-stock-alert-cron, STORE_RECORD_REFUSED). Other failures (provider keys...) are not ours.
         const portDefects = ranBody.jobs.filter(
