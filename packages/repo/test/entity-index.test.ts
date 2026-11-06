@@ -8,6 +8,9 @@ import { createPayment, indexEntity } from '../src/do/payments';
 import { placeOrder } from '../src/do/checkout';
 import {
   MAX_ATTEMPTS,
+  ABANDON_ATTEMPTS,
+  deadLetterReport,
+  nextOutboxAttempt,
   awaitEntityIndexed,
   createPaymentIndexed,
   webhookHttpResponse,
@@ -195,6 +198,61 @@ describe('entity index', () => {
       now += 2 * 3600_000;
     }
     expect(newly).toBe(3);
+  });
+
+  it('issue 458: a dead row is retried hourly up to ABANDON_ATTEMPTS, then abandoned once - no more wakes, no more retries', async () => {
+    const s = store();
+    const d = d1({ failFirst: 100_000 });
+    let now = Date.now() + 1000;
+    let abandoned = 0;
+    for (let i = 0; i < ABANDON_ATTEMPTS + 10; i++) {
+      abandoned += (await drainEntityIndexOutbox(s.db, d.like, { now, includeDead: true }))
+        .newlyAbandoned;
+      now += 2 * 3600_000;
+    }
+    expect(abandoned).toBe(3); // the three queued rows, each exactly once
+    // abandoned rows no longer wake the DO and no longer retry
+    expect(nextOutboxAttempt(s.db)).toBeNull();
+    expect(await drainEntityIndexOutbox(s.db, d.like, { now, includeDead: true })).toMatchObject({
+      written: 0,
+      failed: 0,
+    });
+    expect(deadLetterReport(s.db)).toMatchObject({ dead: 3, abandoned: 3 });
+    // ...but a forced drain still writes one on demand (a payment about to be handed out is never refused for it)
+    const up = d1();
+    expect((await drainEntityIndexOutbox(s.db, up.like, { onlyIds: ['paymob:T1'] })).written).toBe(
+      1
+    );
+  });
+
+  it('issue 458: a malformed payload can never be written - abandoned at once, alerted once', async () => {
+    const s = store();
+    s.raw.exec('DELETE FROM d1_outbox; ');
+    s.raw
+      .prepare(
+        "INSERT INTO d1_outbox (kind, payload, attempts, next_attempt_at) VALUES ('entity_index', ?, 0, 0)"
+      )
+      .run(JSON.stringify({ kind: 'nonsense', id: 'x', storeId: 's1' }));
+    const d = d1();
+    const first = await drainEntityIndexOutbox(s.db, d.like, { now: Date.now() });
+    expect(first).toMatchObject({ failed: 1, newlyAbandoned: 1 });
+    const again = await drainEntityIndexOutbox(s.db, d.like, {
+      now: Date.now() + 9e9,
+      includeDead: true,
+    });
+    expect(again).toMatchObject({ failed: 0, newlyAbandoned: 0 });
+    expect(nextOutboxAttempt(s.db)).toBeNull();
+  });
+
+  it('issue 458: deadLetterReport lists only rows at or past the dead-letter limit', async () => {
+    const s = store();
+    expect(deadLetterReport(s.db)).toEqual({ dead: 0, abandoned: 0, rows: [] });
+    s.raw
+      .prepare('UPDATE d1_outbox SET attempts = ? WHERE id = (SELECT MIN(id) FROM d1_outbox)')
+      .run(MAX_ATTEMPTS);
+    const r = deadLetterReport(s.db);
+    expect(r).toMatchObject({ dead: 1, abandoned: 0 });
+    expect(r.rows[0]).toMatchObject({ storeId: 's1', attempts: MAX_ATTEMPTS, abandoned: false });
   });
 
   it('DB-2: a callback that arrives BEFORE the alarm drains the outbox is answered non-2xx (retry) and alerted, never "ignored"; after the drain it routes', async () => {

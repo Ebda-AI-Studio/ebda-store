@@ -318,6 +318,13 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
   if (path === '/__dev/dispatched' && env.DEV_STATS === '1') {
     return Response.json({ events: dispatchedEvents() });
   }
+  // Test only: run every cron job body + the Postgres-adjacent queue messages (workers-test/route-sweep.test.ts, cron group).
+  if (path === '/__dev/run-jobs' && request.method === 'POST' && env.DEV_STATS === '1') {
+    return withWorkerContext(env, ctx, async () => {
+      const { runEveryJobBody } = await import('./lib/jobs/dev-run-all.js');
+      return Response.json(await runEveryJobBody());
+    });
+  }
   // Dev/test only (DEV_STATS=1, never set in wrangler.jsonc): create a store through StoreService.create (N-18's pg-unreachable test).
   if (path === '/__dev/create-store' && request.method === 'POST' && env.DEV_STATS === '1') {
     const body = (await request.json()) as {

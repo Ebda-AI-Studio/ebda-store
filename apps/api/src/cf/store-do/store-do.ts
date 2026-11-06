@@ -23,6 +23,7 @@
  * and lock paths are not here (PR D2).
  */
 import { DurableObject } from 'cloudflare:workers';
+import { publishIndexHealth } from './index-health';
 import { handleStoreAdmin } from '../../../../../packages/cf-migrate/src/store-admin.mjs';
 import {
   createPrismaLite,
@@ -36,6 +37,7 @@ import {
   paymentIndexIds,
   outboxRowsAfter,
   nextOutboxAttempt,
+  deadLetterReport,
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
@@ -463,6 +465,33 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     }
   }
 
+  /**
+   * Record the dead-lettered / abandoned rows where the API Worker's hourly health cron reads them (cf/store-do/index-health.ts):
+   * this DO cannot call sendAlert. A D1 call only when the set changed.
+   */
+  private async publishIndexHealth(d1: unknown): Promise<void> {
+    try {
+      const report = deadLetterReport(this.sync);
+      const storeId = report.rows[0]?.storeId || this.boundStoreId();
+      if (!storeId) return;
+      const lastRaw = this.sync.all("SELECT v FROM _identity WHERE k = 'index_health_sig'", [])[0]
+        ?.v as string | undefined;
+      const sig = await publishIndexHealth(
+        d1 as Parameters<typeof publishIndexHealth>[0],
+        storeId,
+        report,
+        lastRaw || null
+      );
+      if ((sig ?? null) !== (lastRaw || null))
+        this.sync.run(
+          "INSERT INTO _identity (k, v) VALUES ('index_health_sig', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v",
+          [sig ?? '']
+        );
+    } catch (err) {
+      console.error('entity index health failed', err);
+    }
+  }
+
   /** Write up to `limit` due `d1_outbox` entity-index rows to D1 (idempotent; nothing due = no D1 call). Never throws. */
   private async drainIndex(limit = 100, includeDead = false): Promise<void> {
     const d1 = this.env.PLATFORM_DB;
@@ -476,6 +505,11 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         );
       if (r.failed > 0 || r.conflicts.length > 0)
         console.error('entity index drain incomplete', JSON.stringify(r));
+      if (r.newlyAbandoned > 0)
+        console.error(
+          `[P1] entity index rows abandoned: ${r.newlyAbandoned} (past the retry cap, no more background wakes; the health cron alerts)`
+        );
+      await this.publishIndexHealth(d1);
     } catch (err) {
       console.error('[P1] entity index drain failed', err);
     }
