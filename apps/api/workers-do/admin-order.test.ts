@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
@@ -134,5 +134,75 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
     expect(codes(answers)).toEqual({ ok: 40, OUT_OF_STOCK: 20 });
     expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(0);
     expect(await num(stub, `SELECT count(DISTINCT serial) AS n FROM fiscal_documents`)).toBe(40);
+  });
+
+  // Issue 459: the order number's random suffix collided inside one second (workerd freezes the clock in a burst) and the
+  // INSERT died on orders_order_number_key: MONEY_OP_FAILED 500 for a paying shopper. Force the collision deterministically.
+  it('a phone order and a checkout that draw the same order number in one second both succeed, with distinct numbers', async () => {
+    const stub = await seed('adm-ordnum');
+    const real = crypto.getRandomValues.bind(crypto);
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-06T10:00:00.250Z') }); // one second for both orders
+    let forced = 3; // order 1 draws 0; order 2 draws 0 (taken), 0 (taken), then a real one
+    const spy = vi
+      .spyOn(crypto, 'getRandomValues')
+      .mockImplementation(<T extends ArrayBufferView | null>(a: T) => {
+        if (a instanceof Uint32Array && a.length === 1 && forced > 0) {
+          forced--;
+          a[0] = 0;
+          return a;
+        }
+        return real(a as never) as T;
+      });
+    try {
+      const answers = await Promise.all([
+        op(stub, 'adm-ordnum', 'createAdminOrder', admin()),
+        op(stub, 'adm-ordnum', 'createOrder', {
+          lines: [{ productId: 'p1', quantity: 1 }],
+          shippingAddress: { name: 'A' },
+        }),
+      ]);
+      expect(codes(answers)).toEqual({ ok: 2 });
+      expect(forced).toBe(0);
+    } finally {
+      spy.mockRestore();
+      vi.useRealTimers();
+    }
+    const nums = await runInDurableObject(stub, (_i, s) =>
+      s.storage.sql
+        .exec(`SELECT order_number FROM orders`)
+        .toArray()
+        .map(r => r.order_number as string)
+    );
+    expect(new Set(nums).size).toBe(2);
+    expect(nums.filter(n => n.endsWith('-00000'))).toHaveLength(1);
+    expect(nums.every(n => /^ORD-[0-9A-Z]{6}-[0-9A-Z]{5}$/.test(n))).toBe(true);
+  });
+
+  it('a random source that only ever repeats a taken number: a clean 503 refusal, nothing written, no 500', async () => {
+    const stub = await seed('adm-ordnum-dead');
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-06T10:00:00.250Z') }); // one second for both orders
+    const spy = vi
+      .spyOn(crypto, 'getRandomValues')
+      .mockImplementation(<T extends ArrayBufferView | null>(a: T) => {
+        if (a instanceof Uint32Array) a.fill(0);
+        return a;
+      });
+    let answers: Answer[];
+    try {
+      answers = [await op(stub, 'adm-ordnum-dead', 'createAdminOrder', admin())];
+      answers.push(
+        await op(stub, 'adm-ordnum-dead', 'createOrder', {
+          lines: [{ productId: 'p1', quantity: 1 }],
+          shippingAddress: { name: 'A' },
+        })
+      );
+    } finally {
+      spy.mockRestore();
+      vi.useRealTimers();
+    }
+    expect(answers[0]!.ok).toBe(true);
+    expect(answers[1]).toMatchObject({ ok: false, code: 'ORDER_NUMBER_UNAVAILABLE', status: 503 });
+    expect(await num(stub, `SELECT count(*) AS n FROM orders`)).toBe(1);
+    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(10);
   });
 });

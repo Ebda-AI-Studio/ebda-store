@@ -515,7 +515,11 @@ async function processWebhookInline(args: {
 }): Promise<{ success: boolean; status?: string; orderId?: string }> {
   const { provider, idempotencyKey, storeId, payload, rawBody, signature } = args;
   let result: { success: boolean; status?: string; orderId?: string };
-  if (storeId) {
+  if (storeId && (await storeMoney(storeId))) {
+    // A store on its Durable Object (same branch as the payment-webhook-process job): the DO applies and dedupes the signed
+    // event in ONE section (`payment_event_log`); there is no Postgres transaction to open (NEON-ZERO).
+    result = await PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody);
+  } else if (storeId) {
     result = await runInTenantContext(storeId, () =>
       PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody)
     );
@@ -1015,12 +1019,18 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
     // Under strict RLS the payment is found inside its store's scope (the store comes from
     // the same definer the webhooks use).
     const callbackStoreId = await resolveCallbackStore();
+    // No store owns the reference (yet): nothing to ask a gateway about, and a storeless status read could only consult
+    // Postgres, gone from the Worker. The shopper lands on the pending page, which polls the order (the webhook decides).
+    if (!callbackStoreId) {
+      res.redirect(
+        `${config.webUrl}/checkout/pending?transaction=${encodeURIComponent(transactionId)}`
+      );
+      return;
+    }
     const [status, baseUrl] = await Promise.all([
-      callbackStoreId
-        ? withStore(callbackStoreId, () =>
-            PaymentService.getPaymentStatus(transactionId, undefined, callbackStoreId)
-          )
-        : PaymentService.getPaymentStatus(transactionId),
+      withStore(callbackStoreId, () =>
+        PaymentService.getPaymentStatus(transactionId, callbackProvider, callbackStoreId)
+      ),
       getStorefrontUrl(callbackStoreId),
     ]);
 

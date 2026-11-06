@@ -74,6 +74,11 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
       response: await h.createPayment(...a),
     }),
     recordProviderPayment: vi.fn().mockResolvedValue(undefined),
+    // the COD row (+ its created event) is written by the service (NEON-ZERO: one DO section on a Durable Object store)
+    recordCodPayment: async (...a: unknown[]) => ({
+      id: ((await h.paymentCreate(...a)) as { id: string }).id,
+      replayed: false,
+    }),
     getDefaultProvider: async () => 'kashier',
     getAvailableProviders: async () => [],
   },

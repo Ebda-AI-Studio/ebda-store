@@ -440,7 +440,8 @@ describe('payment callback redirect (GET /payment/callback)', () => {
       expect(m.resolveStore).toHaveBeenCalledTimes(1);
       expect(m.resolveStore).toHaveBeenCalledWith({ transactionId: 'ref-1', provider });
       // the status read and the storefront come from the SAME store
-      expect(m.getStatus).toHaveBeenCalledWith('ref-1', undefined, STORE);
+      // within the provider the store was resolved for (no storeless / Postgres lookup of the provider)
+      expect(m.getStatus).toHaveBeenCalledWith('ref-1', provider, STORE);
       expect(m.storeFind).toHaveBeenCalledWith(STORE);
       expect(res.headers.location).toContain('/checkout/success');
       expect(res.headers.location).toContain('shop-a');
@@ -453,6 +454,8 @@ describe('payment callback redirect (GET /payment/callback)', () => {
     const res = await request(app).get('/api/v1/webhooks/payment/callback?order=ref-2');
     expect(res.status).toBe(302);
     expect(m.storeFind).not.toHaveBeenCalled();
+    // no store: no status read at all (it could only be a Postgres lookup), the pending page polls
+    expect(m.getStatus).not.toHaveBeenCalled();
     expect(res.headers.location).toContain('/checkout/pending');
   });
 });

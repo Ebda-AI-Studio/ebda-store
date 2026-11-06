@@ -36,6 +36,7 @@ import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
+import { dispatchedEvents, trackDispatches } from './lib/jobs/dispatch';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { parkIfFrozen, type ParkableBatch } from './cf/queue-freeze';
 import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
@@ -158,7 +159,10 @@ let whatsAppConfigChecked = false;
 function prepare(env: CfBindings): void {
   setCfBindings(env);
   // Test only (workers-test route sweep): count every access to the Postgres client. Never set on a deployed Worker.
-  if (env.DEV_STATS === '1') trackPostgresReaches(true);
+  if (env.DEV_STATS === '1') {
+    trackPostgresReaches(true);
+    trackDispatches(true);
+  }
   // Fail loud on a semantic-search config with no provider (cached on success only, like the
   // role guard: a throwing isolate 500s every request until the config is fixed or rolled back).
   if (!embeddingConfigChecked) {
@@ -309,6 +313,10 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
       const { runEveryJobBody } = await import('./lib/jobs/dev-run-all.js');
       return Response.json(await runEveryJobBody());
     });
+  }
+  // Test only: the job events this isolate dispatched (workers-test/money-path.test.ts counts order/created).
+  if (path === '/__dev/dispatched' && env.DEV_STATS === '1') {
+    return Response.json({ events: dispatchedEvents() });
   }
   // Dev/test only (DEV_STATS=1, never set in wrangler.jsonc): create a store through StoreService.create (N-18's pg-unreachable test).
   if (path === '/__dev/create-store' && request.method === 'POST' && env.DEV_STATS === '1') {

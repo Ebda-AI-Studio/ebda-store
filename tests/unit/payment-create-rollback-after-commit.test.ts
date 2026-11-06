@@ -33,6 +33,8 @@ vi.mock('@ebda/database', () => ({
       create: (...a: unknown[]) => h.paymentCreate(...a),
     },
     paymentConfig: { findFirst: (...a: unknown[]) => h.paymentConfigFindFirst(...a) },
+    // the storefront is read beside the order (NEON-ZERO: a Durable Object order cannot join the Store row)
+    store: { findUnique: async () => ({ domain: null, slug: 'demo', ownerId: 'owner-1' }) },
   },
   runInTenantContext: async (_s: string, fn: () => unknown) => {
     const out = await fn();
@@ -72,6 +74,8 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
       response: await h.createPayment(...a),
     }),
     recordProviderPayment: vi.fn().mockResolvedValue(undefined),
+    // the COD row (+ its created event) is written by the service, inside the payment wrap
+    recordCodPayment: async (...a: unknown[]) => ({ id: (await h.paymentCreate(...a)).id }),
     getDefaultProvider: async () => 'paymob',
     getAvailableProviders: async () => [],
   },

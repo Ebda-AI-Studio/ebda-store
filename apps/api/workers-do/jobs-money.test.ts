@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
+import { ensurePlatformIndex } from './platform-index';
 
 // Ruling CF-JOBS-4: the job operations on real workerd. A job delivered twice (an at-least-once queue, an alarm re-fire, a
 // cron tick that overlaps) runs ONCE: the abandonment stamp lands once, a cancel-if-unpaid restocks once, and a payment that
 // landed first beats the auto-cancel sweep.
 const e = env as unknown as { STORE_DO: DurableObjectNamespace<StoreDO> };
+beforeAll(ensurePlatformIndex);
+/** the gateway reference of the store the current test set up */
+let currentRef = 'tx-1';
 const stubFor = (name: string) => e.STORE_DO.get(e.STORE_DO.idFromName(name));
 type Answer = { ok: true; json: string } | { ok: false; code: string; status: number };
 const op = async (
@@ -77,7 +81,8 @@ async function seed(store: string) {
       orderId: o.orderId,
       provider: 'paymob',
       amount: o.total,
-      transactionId: 'tx-1',
+      // unique per store: the D1 entity index is shared by every store of this file and refuses a reused reference
+      transactionId: (currentRef = `tx-${store}`),
     })
   );
   return { stub, o, p };
@@ -86,10 +91,11 @@ const hook = (eventId: string) => ({
   input: {
     provider: 'paymob',
     eventId,
-    providerRef: 'tx-1',
+    providerRef: currentRef,
     kind: 'payment',
     status: 'completed',
     amount: 3000,
+    currency: 'EGP',
   },
 });
 

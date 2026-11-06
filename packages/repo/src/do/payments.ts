@@ -101,6 +101,7 @@ interface OrderRow {
   status: string;
   payment_status: string;
   total: number;
+  wallet_amount: number;
   order_number: string;
   payment_confirmation_expires_at: number | null;
 }
@@ -115,7 +116,7 @@ function loadPayment(db: SyncSql, storeId: string, paymentId: string): PaymentRo
 }
 function loadOrder(db: SyncSql, storeId: string, orderId: string): OrderRow {
   const o = db.all(
-    'SELECT id, status, payment_status, total, order_number, payment_confirmation_expires_at FROM orders WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
+    'SELECT id, status, payment_status, total, wallet_amount, order_number, payment_confirmation_expires_at FROM orders WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
     [orderId, storeId]
   )[0];
   if (!o) throw err('ORDER_NOT_FOUND', 'order not found', 404);
@@ -201,7 +202,22 @@ export interface Alert {
 
 // ---- payment rows --------------------------------------------------------------------------------------------------
 
-/** Create the payment row of an order (amount must equal the order total, like PaymentService.createPayment). */
+/** The JSON a caller may store on a payment row: a plain object, bounded (it is shown back, never interpreted). */
+function paymentMetadata(v: unknown): string {
+  if (v === undefined || v === null) return '{}';
+  if (typeof v !== 'object' || Array.isArray(v))
+    throw err('PAYMENT_METADATA_INVALID', 'metadata must be an object', 400);
+  const json = JSON.stringify(v);
+  if (json.length > 4096) throw err('PAYMENT_METADATA_INVALID', 'metadata is too large', 400);
+  return json;
+}
+
+/**
+ * The payment row of an order (PaymentService.recordCreatedPayment, and the COD branch of POST /payments/create). The amount
+ * is the amount DUE: the order total less the customer-wallet part paid at checkout (the Postgres callers all charge
+ * `order.total - order.walletAmount`). A COD payment is created at most once while one is open: an open (`cod_pending` /
+ * `completed`...) COD row of the order is returned instead, in the same section, so a double-click cannot mint two.
+ */
 export function createPayment(
   db: SyncSql,
   a: {
@@ -214,25 +230,41 @@ export function createPayment(
     transactionId?: string | null;
     invoiceId?: string | null;
     paymentUrl?: string | null;
+    metadata?: unknown;
     paymentId?: string;
     now?: number;
   }
-): { paymentId: string } {
+): { paymentId: string; replayed?: boolean } {
   need(a.storeId, 'storeId');
   need(a.orderId, 'orderId');
   need(a.provider, 'provider');
   const now = a.now ?? Date.now();
+  const metadata = paymentMetadata(a.metadata);
   return db.transactionSync(() => {
     const o = loadOrder(db, a.storeId, a.orderId);
-    if (!isInt(a.amount, 1) || a.amount !== o.total)
-      throw err('PAYMENT_AMOUNT_MISMATCH', 'payment amount must equal the order total', 409, {
-        total: o.total,
-      });
+    const due = o.total - (o.wallet_amount ?? 0);
+    if (!isInt(a.amount, 1) || a.amount !== due)
+      throw err(
+        'PAYMENT_AMOUNT_MISMATCH',
+        'payment amount must equal the amount due on the order',
+        409,
+        {
+          total: o.total,
+          due,
+        }
+      );
+    if (a.provider === 'cod') {
+      const open = db.all(
+        "SELECT id FROM payments WHERE order_id = ? AND provider = 'cod' AND status NOT IN ('failed', 'cancelled', 'expired') ORDER BY created_at DESC LIMIT 1",
+        [o.id]
+      )[0];
+      if (open) return { paymentId: open.id as string, replayed: true };
+    }
     const id = a.paymentId ?? crypto.randomUUID();
     const status = a.provider === 'cod' ? 'cod_pending' : 'pending';
     db.run(
       `INSERT INTO payments (id, order_id, provider, method, status, amount, currency, transaction_id, invoice_id, payment_url, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         o.id,
@@ -244,6 +276,7 @@ export function createPayment(
         a.transactionId ?? null,
         a.invoiceId ?? null,
         a.paymentUrl ?? null,
+        metadata,
         now,
         now,
       ]
@@ -261,6 +294,98 @@ export function createPayment(
     for (const ref of [a.transactionId, a.invoiceId])
       if (ref) indexEntity(db, a.storeId, 'webhook', `${a.provider}:${ref}`, now);
     return { paymentId: id };
+  });
+}
+
+/**
+ * InstapayService.initiate on the DO (POST /payments/create, provider instapay): put a freshly created `pending`, unpaid
+ * order on hold for a transfer and write its pending InstaPay payment, ONE section. A replay while the order is already
+ * awaiting returns the SAME payment (`created: false`) and writes nothing. Same refusals as the Postgres path.
+ */
+export function initiateInstapay(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    orderId: string;
+    expiresAt: number;
+    providerRef: string | null;
+    metadata: unknown;
+    actorUserId: string | null;
+    now?: number;
+  }
+): {
+  created: boolean;
+  paymentId: string;
+  amountMinor: number;
+  metadata: Record<string, unknown>;
+  expiresAt: number;
+} {
+  need(a.storeId, 'storeId');
+  need(a.orderId, 'orderId');
+  if (!isInt(a.expiresAt, 1)) throw err('INVALID_ARGS', 'expiresAt is required', 400);
+  const now = a.now ?? Date.now();
+  const metadata = paymentMetadata(a.metadata);
+  return db.transactionSync(() => {
+    const o = loadOrder(db, a.storeId, a.orderId);
+    if (o.status === AWAITING_PAYMENT_CONFIRMATION) {
+      const existing = db.all(
+        "SELECT id, amount, metadata FROM payments WHERE order_id = ? AND provider = 'instapay' AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+        [o.id]
+      )[0];
+      if (existing)
+        return {
+          created: false,
+          paymentId: existing.id as string,
+          amountMinor: existing.amount as number,
+          metadata: parse(existing.metadata),
+          expiresAt: o.payment_confirmation_expires_at ?? a.expiresAt,
+        };
+    }
+    if (o.status !== 'pending' || o.payment_status !== 'unpaid')
+      throw err('ORDER_NOT_PAYABLE', 'This order can no longer be paid by InstaPay');
+    const amountMinor = o.total - (o.wallet_amount ?? 0);
+    if (amountMinor <= 0) throw err('ORDER_ALREADY_PAID', 'Nothing is due on this order');
+    const claimed = db.run(
+      "UPDATE orders SET status = ?, payment_confirmation_expires_at = ?, updated_at = ? WHERE id = ? AND store_id = ? AND status = 'pending' AND payment_status = 'unpaid'",
+      [AWAITING_PAYMENT_CONFIRMATION, a.expiresAt, now, o.id, a.storeId]
+    );
+    if (claimed.changes < 1)
+      throw err('ORDER_NOT_PAYABLE', 'This order can no longer be paid by InstaPay');
+    const id = crypto.randomUUID();
+    db.run(
+      `INSERT INTO payments (id, order_id, provider, method, status, amount, currency, transaction_id, metadata, created_at, updated_at)
+       VALUES (?, ?, 'instapay', 'instapay', 'pending', ?, (SELECT currency FROM orders WHERE id = ?), ?, ?, ?, ?)`,
+      [id, o.id, amountMinor, o.id, a.providerRef, metadata, now, now]
+    );
+    addOrderEvent(
+      db,
+      a.storeId,
+      o.id,
+      'pending',
+      AWAITING_PAYMENT_CONFIRMATION,
+      { via: 'instapay_initiate', expiresAt: new Date(a.expiresAt).toISOString() },
+      now,
+      a.actorUserId
+    );
+    addPaymentEvent(db, {
+      storeId: a.storeId,
+      paymentId: id,
+      orderId: o.id,
+      eventType: 'created',
+      to: 'pending',
+      provider: 'instapay',
+      userId: a.actorUserId,
+      details: { amount: amountMinor, expiresAt: new Date(a.expiresAt).toISOString() },
+      now,
+    });
+    indexEntity(db, a.storeId, 'payment', id, now);
+    return {
+      created: true,
+      paymentId: id,
+      amountMinor,
+      metadata: parse(metadata),
+      expiresAt: a.expiresAt,
+    };
   });
 }
 
@@ -937,15 +1062,22 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
     });
     return finish('ignored', 'no downgrade');
   }
-  // Paid-amount reconciliation (money-integrity F3): a short payment never confirms the order.
-  const under =
-    status === 'completed' &&
-    typeof input.amount === 'number' &&
-    Number.isFinite(input.amount) &&
-    input.currency === p.currency &&
-    Math.abs(p.amount - input.amount) > AMOUNT_TOLERANCE_FILS &&
-    input.amount < p.amount;
-  if (under) {
+  // Paid-amount reconciliation (money-integrity F3, review I-4 of PR 455): a `completed` delivery confirms the order ONLY when
+  // it states the amount due (within the tolerance) in the payment's currency. Short, over, a missing amount or another
+  // currency is an external money fact: recorded in full on the payment (never rejected, never lost), the order NOT marked
+  // paid, a P1 raised for a human.
+  const amountGiven = typeof input.amount === 'number' && Number.isFinite(input.amount);
+  const mismatch: null | 'paid_amount_missing' | 'paid_currency_mismatch' | 'paid_amount_mismatch' =
+    status !== 'completed'
+      ? null
+      : !amountGiven
+        ? 'paid_amount_missing'
+        : input.currency !== p.currency
+          ? 'paid_currency_mismatch'
+          : Math.abs(p.amount - (input.amount as number)) > AMOUNT_TOLERANCE_FILS
+            ? 'paid_amount_mismatch'
+            : null;
+  if (mismatch) {
     addPaymentEvent(db, {
       storeId: input.storeId,
       paymentId: p.id,
@@ -955,9 +1087,11 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
       provider: input.provider,
       payload: input.rawPayload,
       details: {
-        reason: 'paid_amount_mismatch',
+        reason: mismatch,
         expectedFils: p.amount,
-        paidAmountFils: input.amount,
+        expectedCurrency: p.currency,
+        paidAmountFils: amountGiven ? input.amount : null,
+        paidCurrency: input.currency ?? null,
         webhookEvent: input.event ?? null,
       },
       now,
@@ -967,9 +1101,10 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
         ...meta,
         webhookEvent: input.event ?? null,
         paymentMethod: input.paymentMethod ?? null,
-        paidCurrency: input.currency,
-        paidAmount: input.amount,
+        paidCurrency: input.currency ?? null,
+        paidAmount: amountGiven ? input.amount : null,
         amountMismatch: true,
+        mismatchReason: mismatch,
       }),
       now,
       p.id,
@@ -978,10 +1113,16 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
       kind: 'amount_mismatch',
       paymentId: p.id,
       orderId: p.order_id,
-      body: `Order ${o.order_number}: ${input.provider} webhook reports paid ${input.amount} piastres but the order total is ${p.amount}. NOT marked paid.`,
-      context: { expected: p.amount, paid: input.amount },
+      body: `Order ${o.order_number}: ${input.provider} webhook reports paid ${amountGiven ? input.amount : 'no amount'} ${input.currency ?? '(no currency)'} but the amount due is ${p.amount} ${p.currency} (${mismatch}). NOT marked paid.`,
+      context: {
+        expected: p.amount,
+        expectedCurrency: p.currency,
+        paid: amountGiven ? input.amount : null,
+        paidCurrency: input.currency ?? null,
+        reason: mismatch,
+      },
     });
-    return finish('held', 'underpaid');
+    return finish('held', mismatch);
   }
   let orderStatus: 'pending' | 'confirmed' = 'pending';
   let orderPay: 'unpaid' | 'paid' | 'failed' | 'refunded' = 'unpaid';

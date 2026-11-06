@@ -44,6 +44,29 @@ vi.mock('@ebda/database', () => ({
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
 
+// NEON-ZERO: the route reads through `storeDb` (the `prisma` proxy for a Postgres store, mocked as the same object here) and
+// attaches the shopper with `customersById` (Order -> User is a platform join a Durable Object order cannot do).
+vi.mock('@api/lib/repo-factory', () => ({ storeDb: async () => mockPrisma }));
+vi.mock('@api/lib/jobs/store-db', () => ({
+  runInStoreCtx: (_storeId: string, fn: () => unknown) => fn(),
+  customersById: async (_storeId: string, ids: Array<string | null>) =>
+    new Map(
+      ids
+        .filter((id): id is string => id === 'cust-1')
+        .map(id => [
+          id,
+          {
+            id,
+            firstName: 'Sara',
+            lastName: 'Al-Fulan',
+            email: 'sara@example.com',
+            phone: '+965 9876 5432',
+            language: null,
+          },
+        ])
+    ),
+}));
+
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'staff-1', role: 'store_admin' };
@@ -138,6 +161,7 @@ function abandonedOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
     ],
     _count: { items: 1 },
     ...overrides,
+    customerId: overrides.customer === null ? null : 'cust-1',
   };
 }
 
