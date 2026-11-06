@@ -1303,7 +1303,7 @@ interface QueryStub {
     fields?: string[]
   ): Promise<
     | { ok: true; data: { json: string; missing: string[] } }
-    | { ok: false; code: string; status?: number }
+    | { ok: false; code: string; status?: number; message?: string }
   >;
   mutate(
     storeId: string,
@@ -1539,14 +1539,24 @@ export function doStoreDelegate(
       throw new AppError(501, 'STORE_READ_UNSUPPORTED', 'Store include is not served by the DO');
     const { id, ...rest } = (a.where ?? {}) as Record<string, any>;
     if (id !== undefined && id !== storeId) return null;
-    const selected: string[] | undefined = a.select
+    const requested: string[] | undefined = a.select
       ? Object.keys(a.select).filter(k => a.select[k])
       : undefined;
-    const need = selected ? [...new Set([...selected, ...Object.keys(rest)])] : undefined;
+    // `owner` is the only relation served here: the DO record carries `ownerId`, the account is the platform's (D1). Any other
+    // relation is refused by the DO record, and the refusal now carries its message (see StoreDO.storeRecord).
+    const wantsOwner = !!requested?.includes('owner');
+    const selected = requested?.filter(k => k !== 'owner');
+    const need = selected
+      ? [...new Set([...selected, ...Object.keys(rest), ...(wantsOwner ? ['ownerId'] : [])])]
+      : undefined;
     const r = await stub.storeRecord(storeId, need);
     if (!r.ok) {
       if (r.code === 'STORE_NOT_FOUND') return null;
-      throw new AppError(r.status ?? 502, r.code, `store record refused: ${r.code}`);
+      throw new AppError(
+        r.status ?? 502,
+        r.code,
+        `store record refused: ${r.code}${'message' in r && r.message ? ` (${String(r.message)})` : ''}`
+      );
     }
     const rec = decodeRpc(r.data.json) as Record<string, any>;
     if (r.data.missing.length) {
@@ -1560,7 +1570,24 @@ export function doStoreDelegate(
     }
     if (!matches(rec, rest)) return null;
     if (!selected) return rec;
-    return Object.fromEntries(selected.map(k => [k, rec[k]]));
+    const out: Record<string, any> = Object.fromEntries(selected.map(k => [k, rec[k]]));
+    if (wantsOwner) {
+      const acc = rec.ownerId ? await getAccountState(String(rec.ownerId)) : null;
+      const sub = a.select.owner as { select?: Record<string, boolean> } | true;
+      const ownerSel = typeof sub === 'object' && sub.select ? sub.select : undefined;
+      const full = acc
+        ? { id: acc.id, email: acc.email, firstName: acc.firstName, lastName: acc.lastName }
+        : null;
+      out.owner =
+        full && ownerSel
+          ? Object.fromEntries(
+              Object.keys(ownerSel)
+                .filter(k => ownerSel[k])
+                .map(k => [k, (full as Record<string, unknown>)[k]])
+            )
+          : full;
+    }
+    return out;
   };
   const orThrow = async (args: any) => {
     const row = await read(args);

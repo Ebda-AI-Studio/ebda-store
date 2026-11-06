@@ -24,6 +24,9 @@ import { createServer } from 'node:http';
 import app from './app';
 import {
   createPostgresRemovedClient,
+  currentReachLabel,
+  postgresRemovedWhere,
+  withReachLabel,
   postgresReaches,
   runWithRequestDb,
   trackPostgresReaches,
@@ -115,17 +118,21 @@ let postgresRemovedReported = false;
 function reportPostgresRemoved(err: Error): void {
   if (postgresRemovedReported) return;
   postgresRemovedReported = true;
+  const where = postgresRemovedWhere(err, currentReachLabel());
   logger.error(
-    { err: err.message },
+    { err: err.message, caller: where.caller, frames: where.frames },
     '[database] POSTGRES_REMOVED: a Prisma call reached the Worker'
   );
-  Sentry.captureException(err, { tags: { site: 'postgres-removed' } });
+  Sentry.captureException(err, {
+    tags: { site: 'postgres-removed', caller: where.caller },
+    extra: { frames: where.frames },
+  });
   void sendAlert({
     level: 'p1',
     scope: 'platform',
     source: 'api.worker.postgres_removed',
-    title: 'POSTGRES_REMOVED: a Prisma call reached the Worker',
-    body: `${err.message} The path must be ported to the StoreDO / D1 (NEON-ZERO).`,
+    title: `POSTGRES_REMOVED: a Prisma call reached the Worker (${where.caller})`,
+    body: `${err.message} Caller: ${where.caller}. The path must be ported to the StoreDO / D1 (NEON-ZERO).\n${where.frames.join('\n')}`,
   }).catch(() => undefined);
 }
 
@@ -300,6 +307,13 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
     const reset = new URL(request.url).searchParams.get('reset') === '1';
     return Response.json({ reaches: postgresReaches(reset) });
   }
+  // Test only: run every cron job body + the Postgres-adjacent queue messages (workers-test/route-sweep.test.ts, cron group).
+  if (path === '/__dev/run-jobs' && request.method === 'POST' && env.DEV_STATS === '1') {
+    return withWorkerContext(env, ctx, async () => {
+      const { runEveryJobBody } = await import('./lib/jobs/dev-run-all.js');
+      return Response.json(await runEveryJobBody());
+    });
+  }
   // Test only: the job events this isolate dispatched (workers-test/money-path.test.ts counts order/created).
   if (path === '/__dev/dispatched' && env.DEV_STATS === '1') {
     return Response.json({ events: dispatchedEvents() });
@@ -357,7 +371,10 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
     return withWorkerContext(
       env,
       ctx,
-      () => handleAsNodeRequest(PORT, forwarded, env, ctx),
+      () =>
+        withReachLabel(`http ${req.method} ${new URL(req.url).pathname}`, () =>
+          handleAsNodeRequest(PORT, forwarded, env, ctx)
+        ),
       req.signal
     );
   };
@@ -384,12 +401,14 @@ async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promis
   setCfBindings(env);
   if (await parkIfFrozen(batch as unknown as ParkableBatch, env)) return;
   await withWorkerContext(env, ctx, () =>
-    // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
-    batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ
-      ? handleStoreEventsBatch(batch)
-      : batch.queue === CI_EVENTS_QUEUE || batch.queue === CI_EVENTS_DLQ
-        ? handleCiEventsBatch(batch, env)
-        : handleQueueBatch(batch)
+    withReachLabel(`queue ${batch.queue}`, () =>
+      // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
+      batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ
+        ? handleStoreEventsBatch(batch)
+        : batch.queue === CI_EVENTS_QUEUE || batch.queue === CI_EVENTS_DLQ
+          ? handleCiEventsBatch(batch, env)
+          : handleQueueBatch(batch)
+    )
   );
 }
 
@@ -399,7 +418,9 @@ async function scheduled(
   ctx: Ctx
 ): Promise<void> {
   await withWorkerContext(env, ctx, async () => {
-    await runScheduled(controller.cron, controller.scheduledTime);
+    await withReachLabel(`cron ${controller.cron}`, () =>
+      runScheduled(controller.cron, controller.scheduledTime)
+    );
   });
 }
 

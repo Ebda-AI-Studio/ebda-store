@@ -38,10 +38,16 @@ export {
   type IsolateDb,
   type IsolateDbOptions,
 } from './request-db';
-export { trackPostgresReaches, postgresReaches, withReachLabel } from './request-db';
+export {
+  trackPostgresReaches,
+  postgresReaches,
+  withReachLabel,
+  currentReachLabel,
+} from './request-db';
 export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
 export {
   createPostgresRemovedClient,
+  postgresRemovedWhere,
   PostgresRemovedError,
   POSTGRES_REMOVED,
 } from './postgres-removed';

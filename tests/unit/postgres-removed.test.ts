@@ -47,3 +47,16 @@ describe('Postgres-removed client', () => {
     expect(onFirst).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('POSTGRES_REMOVED reporter is actionable (2026-11-06 P1)', () => {
+  it('names the caller and carries at most 8 stack frames', async () => {
+    const { postgresRemovedWhere } = await import('../../packages/database/src');
+    const err = new PostgresRemovedError('$transaction');
+    const named = postgresRemovedWhere(err, 'cron 0 3 * * *');
+    expect(named.caller).toBe('cron 0 3 * * *');
+    expect(named.frames.length).toBeGreaterThan(0);
+    expect(named.frames.length).toBeLessThanOrEqual(8);
+    expect(named.frames.every(f => f.startsWith('at '))).toBe(true);
+    expect(postgresRemovedWhere(err, undefined).caller).toMatch(/unlabelled/);
+  });
+});
