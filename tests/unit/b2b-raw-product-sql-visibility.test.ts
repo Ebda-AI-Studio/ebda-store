@@ -62,10 +62,11 @@ const CLASSIFIED: Record<
     kind: 'admin',
     reason: 'merchant inventory reports',
   },
-  'routes/finance.routes.ts': {
+  // the finance dashboard's stock-value statement moved out of the route into its Postgres twin (Ruling NZ-FEAT-1)
+  'services/accounting/dashboard-stock.ts': {
     statements: 1,
     kind: 'admin',
-    reason: 'merchant P&L / balance sheet',
+    reason: 'merchant P&L / balance sheet (finance dashboard stock value)',
   },
   'services/analytics.service.ts': { statements: 2, kind: 'admin', reason: 'merchant analytics' },
   'services/warehouse.service.ts': {

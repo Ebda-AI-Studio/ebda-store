@@ -1,5 +1,7 @@
-import { prisma, Prisma, withMoneyTx, hasTenantContext } from '@ebda/database';
+import { prisma, Prisma, withMoneyTx, hasTenantContext, type DbClient } from '@ebda/database';
 import logger from '../../lib/logger';
+import { AppError } from '../../middleware/error-handler';
+import { storeDb, storeMoney } from '../../lib/repo-factory';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import { OrderService } from '../order.service';
 import { allocatePartialReturn } from './posting/partial-return-allocation';
@@ -15,7 +17,8 @@ import {
  * "Open" = not yet fulfilled and not cancelled.
  */
 export async function listOpenBackorders(storeId: string) {
-  return prisma.backorderLine.findMany({
+  // The store's backend: a DO store's checkout writes its backorder lines in its StoreDO (do/checkout.ts).
+  return (await storeDb(storeId)).backorderLine.findMany({
     where: {
       storeId,
       fulfilledAt: null,
@@ -87,6 +90,10 @@ export async function cancelBackorder(
   reason: string,
   userId?: string
 ) {
+  // A store on its Durable Object (Ruling NZ-FEAT-1): claim, flag, stock heal and marker are ONE section there.
+  const money = await storeMoney(storeId);
+  if (money) return cancelBackorderOnDo(storeId, backorderId, reason, userId, money);
+
   // Load the line + its orderItem to verify store ownership + get orderId
   const bo = await prisma.backorderLine.findFirst({
     where: { id: backorderId, storeId, cancelledAt: null, fulfilledAt: null },
@@ -278,8 +285,93 @@ export async function cancelBackorder(
   };
 }
 
+/**
+ * The DO twin of `cancelBackorder`. Steps 1-4 run in the `backorderCancel` money op (one section; a re-cancel of the same
+ * line is a replay that writes and sends nothing and answers 200 with the first cancel's figures). The allocation is then computed from the
+ * committed rows exactly as the Postgres path computes it inside its transaction (the marker it just wrote is excluded by key),
+ * and the same item-level `order/refunded` event goes out.
+ */
+async function cancelBackorderOnDo(
+  storeId: string,
+  backorderId: string,
+  reason: string,
+  userId: string | undefined,
+  money: NonNullable<Awaited<ReturnType<typeof storeMoney>>>
+) {
+  const r = await money.backorderCancel({
+    backorderLineId: backorderId,
+    reason,
+    userId: userId ?? null,
+  });
+  if (!r.found) throw notFound();
+  const now = new Date();
+  if (!r.replayed && r.stockRestored > 0) await invalidateStoreProductCaches(storeId);
+  if (r.quantity === 0) {
+    logger.info(
+      { storeId, backorderId, orderId: r.orderId, userId },
+      'backorder.cancel: line already fully fulfilled — nothing to reverse'
+    );
+    return { id: backorderId, cancelledAt: now, cancelledReason: reason, owedToCustomer: 0 };
+  }
+  const refundKey = backorderRefundKey(backorderId);
+  const db = (await storeDb(storeId)) as unknown as DbClient;
+  const order = await db.order.findUniqueOrThrow({
+    where: { id: r.orderId, storeId },
+    select: {
+      subtotal: true,
+      discount: true,
+      tax: true,
+      taxIncludedInPrice: true,
+      paymentStatus: true,
+      items: { select: { id: true, quantity: true, price: true, priceSource: true } },
+    },
+  });
+  const { prevQty, prevAdjustment } = await loadPriorReversedQty(db, {
+    storeId,
+    orderId: r.orderId,
+    excludeKey: refundKey,
+  });
+  const alloc = allocatePartialReturn({
+    subtotal: order.subtotal,
+    discount: order.discount,
+    tax: order.tax,
+    taxIncludedInPrice: order.taxIncludedInPrice,
+    lines: order.items,
+    prevQty,
+    requested: [{ orderItemId: r.orderItemId, quantity: r.quantity }],
+    prevAdjustment,
+  });
+  const notify = order.paymentStatus === 'paid' && alloc.cashCredit > 0;
+  // A replay (the line was already cancelled, by this or another admin) answers the same figures and sends nothing: the
+  // item-level event went out with the cancel that wrote the marker (Ruling NZ-FEAT-1).
+  if (r.replayed)
+    return {
+      id: backorderId,
+      cancelledAt: now,
+      cancelledReason: reason,
+      owedToCustomer: notify ? alloc.cashCredit : 0,
+      replayed: true,
+    };
+  await OrderService.applyRefundEffects(storeId, r.orderId, {
+    restoreInventory: false,
+    reverseWallet: false,
+    fireRefundNotification: notify,
+    partial: {
+      items: [{ orderItemId: r.orderItemId, quantity: r.quantity }],
+      refundKey,
+      refundAmount: alloc.cashCredit,
+      backorderLineId: backorderId,
+    },
+  });
+  return {
+    id: backorderId,
+    cancelledAt: now,
+    cancelledReason: reason,
+    owedToCustomer: notify ? alloc.cashCredit : 0,
+  };
+}
+
+// An AppError: the error handler reads `AppError.statusCode`; a plain Error carrying a `statusCode` property answered 500.
 function notFound(): Error {
-  const err: Error & { statusCode?: number } = new Error('backorder_not_found');
-  err.statusCode = 404;
-  return err;
+  return new AppError(404, 'BACKORDER_NOT_FOUND', 'backorder_not_found');
 }

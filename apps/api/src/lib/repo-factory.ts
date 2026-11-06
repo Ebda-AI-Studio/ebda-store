@@ -158,7 +158,17 @@ export type WritableModel =
   | 'productModel'
   | 'productModelBinding'
   | 'storeWhatsAppLink'
-  | 'goldRateSettings';
+  | 'goldRateSettings'
+  | 'warehouse'
+  | 'affiliateConfig'
+  | 'affiliate'
+  | 'affiliateEvent'
+  | 'affiliateReferral'
+  // finance admin (Ruling NZ-FEAT-1): never the ledger (JournalEntry / JournalLine use the journal money ops)
+  | 'account'
+  | 'fxRateEntry'
+  | 'bankStatement'
+  | 'bankTransaction';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -386,6 +396,30 @@ export interface StockClient {
     more: boolean;
     nextKey: string | null;
   }>;
+  /** Scan-to-pick: one section reads the order's lines, increments the first open one (capped), counts what is left. */
+  pickOrderItem(a: {
+    orderId: string;
+    productId: string;
+    variantId?: string | null;
+    qty: number;
+  }): Promise<
+    | { kind: 'not_in_order' | 'already_picked' }
+    | {
+        kind: 'picked';
+        item: {
+          id: string;
+          orderId: string;
+          productId: string;
+          variantId: string | null;
+          productName: string;
+          personalisation: string | null;
+          quantity: number;
+        };
+        pickedQtyBefore: number;
+        pickedQtyAfter: number;
+        orderFullyPicked: boolean;
+      }
+  >;
 }
 
 /** A `loyalty_points` row as the DO returns it (Prisma field names, epoch-ms timestamps). */
@@ -998,6 +1032,51 @@ export interface MoneyClient {
     poId: string;
     clearedBackorders: Array<Record<string, unknown>>;
   }): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  /**
+   * Finance admin (Ruling NZ-FEAT-1): a manual adjusting entry (balanced, active store accounts, one section), the ledger side of a
+   * bank reconciliation difference, and the on-hand / disabled-variant stock value of the finance dashboard.
+   */
+  /** cancelBackorder on the DO (Ruling NZ-FEAT-1): claim + flag + stock heal + marker in ONE section; a re-cancel is a replay. */
+  backorderCancel(
+    a: { backorderLineId: string; reason: string; userId?: string | null },
+    key?: string
+  ): Promise<
+    | { found: false }
+    | {
+        found: true;
+        /** true: the line was already cancelled; nothing was written, the figures are that cancel's */
+        replayed: boolean;
+        orderId: string;
+        orderItemId: string;
+        quantity: number;
+        stockRestored: number;
+      }
+  >;
+  journalManual(
+    a: {
+      memo?: string | null;
+      memoAr?: string | null;
+      postedAtMs?: number | null;
+      postedBy?: string | null;
+      lines: Array<{
+        accountId: string;
+        debit: number;
+        credit: number;
+        lineMemo?: string | null;
+        currency?: string;
+        fxRate?: number | null;
+        originalAmount?: number;
+      }>;
+    },
+    key?: string
+  ): Promise<{ id: string; entryNumber: string }>;
+  bankLedgerSide(a: {
+    accountId: string;
+    statementId: string;
+    asOfMs: number;
+    startMs?: number | null;
+  }): Promise<{ debit: number; credit: number; unmatchedCount: number; unmatchedNet: number }>;
+  stockValue(): Promise<{ value: number; disabledValue: number }>;
   /** Order fan-out claims, refund notification markers and affiliate commission writes (Ruling CF-JOBS-4). */
   orderNotifyClaim(a: { orderId: string }): Promise<{ claimed: boolean }>;
   statusFanoutClaim(a: { orderId: string; status: string }): Promise<{ claimed: boolean }>;
@@ -1367,6 +1446,7 @@ export function makeStockClient(
     importCodRemittances: a => call('importCodRemittances', a),
     reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
     reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
+    pickOrderItem: a => call('pickOrderItem', a),
   };
 }
 
@@ -1467,6 +1547,10 @@ export function makeMoneyClient(
     journalExpense: a => call('journalExpense', a),
     journalStockAdjustment: a => call('journalStockAdjustment', a),
     journalPoReceive: a => call('journalPoReceive', a),
+    journalManual: (a, key) => call('journalManual', a, key),
+    backorderCancel: (a, key) => call('backorderCancel', a, key),
+    bankLedgerSide: a => call('bankLedgerSide', a),
+    stockValue: () => call('stockValue', {}),
     orderNotifyClaim: a => call('orderNotifyClaim', a),
     statusFanoutClaim: a => call('statusFanoutClaim', a),
     statusFanoutComplete: a => call('statusFanoutComplete', a),

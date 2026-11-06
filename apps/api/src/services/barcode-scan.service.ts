@@ -310,6 +310,42 @@ export async function pickOrderItemByBarcode(
     throw new AppError(404, 'BARCODE_NOT_FOUND', `Barcode not found: ${barcode}`);
   }
 
+  // A store on its Durable Object (Ruling NZ-FEAT-1): the line choice, the capped increment and the remaining count are ONE section.
+  const stock = await storeStock(storeId);
+  if (stock) {
+    const r = await stock.pickOrderItem({
+      orderId,
+      productId: lookup.productId,
+      variantId: lookup.variantId ?? null,
+      qty: qtyToPick,
+    });
+    if (r.kind === 'not_in_order')
+      throw new AppError(409, 'NOT_IN_ORDER', `${lookup.productName} is not in this order`, {
+        productName: lookup.productName,
+        productNameAr: lookup.productNameAr,
+        barcode,
+      });
+    if (r.kind !== 'picked')
+      throw new AppError(409, 'ALREADY_PICKED', `${lookup.productName} is already fully picked`, {
+        productName: lookup.productName,
+        productNameAr: lookup.productNameAr,
+        barcode,
+      });
+    return {
+      orderItemId: r.item.id,
+      orderId: r.item.orderId,
+      productId: r.item.productId,
+      variantId: r.item.variantId,
+      productName: r.item.productName,
+      personalisation: r.item.personalisation,
+      qtyOrdered: r.item.quantity,
+      pickedQtyBefore: r.pickedQtyBefore,
+      pickedQtyAfter: r.pickedQtyAfter,
+      fullyPicked: r.pickedQtyAfter >= r.item.quantity,
+      orderFullyPicked: r.orderFullyPicked,
+    };
+  }
+
   // Find the matching order item. One product/variant can sit on SEVERAL lines
   // of one order — personalised lines ("Sara" / "Omar" on the same abaya), or a
   // loose line plus a bundle component — so take the first line still short of
@@ -847,7 +883,10 @@ export async function getOrderPickProgress(
     pickedAt: Date | null;
   }[];
 }> {
-  const order = await prisma.order.findFirst({
+  // The store's backend (a DO store's orders live in its StoreDO).
+  const order = await (
+    await storeDb(storeId)
+  ).order.findFirst({
     where: { id: orderId, storeId },
     select: {
       id: true,

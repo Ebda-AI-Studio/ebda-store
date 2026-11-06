@@ -828,6 +828,56 @@ export function receiveVariant(db: SyncSql, storeId: string, a: Args) {
   return { productId, variantId, previousInventory, newInventory, qtyReceived: quantity };
 }
 
+/**
+ * pickOrderItemByBarcode (scan-to-pick) on a DO store (Ruling NZ-FEAT-1). The Postgres twin is a conditional UPDATE under a row
+ * lock; here the whole read-check-write is one section: the first line of this order for the product (+ variant) still short of
+ * its quantity takes the units, capped at its quantity, `picked_at` set when it is full. Two scanners can never push a line past
+ * its quantity. `not_in_order` / `already_picked` are answers (the service turns them into its 409s), nothing is written.
+ */
+export function pickOrderItem(db: SyncSql, storeId: string, a: Args) {
+  const orderId = str(a.orderId, 'orderId');
+  const productId = str(a.productId, 'productId');
+  const variantId = a.variantId == null ? null : str(a.variantId, 'variantId');
+  const qty = int(a.qty, 'qty', 1);
+  const candidates = db.all(
+    `SELECT oi.id, oi.order_id, oi.product_id, oi.variant_id, oi.product_name, oi.personalisation, oi.quantity, oi.picked_qty
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE oi.order_id = ? AND o.store_id = ? AND oi.product_id = ?${variantId ? ' AND oi.variant_id = ?' : ''}
+      ORDER BY oi.id ASC`,
+    variantId ? [orderId, storeId, productId, variantId] : [orderId, storeId, productId]
+  );
+  if (candidates.length === 0) return { kind: 'not_in_order' as const };
+  const line = candidates.find(c => (c.picked_qty as number) < (c.quantity as number));
+  if (!line) return { kind: 'already_picked' as const };
+  const before = line.picked_qty as number;
+  const quantity = line.quantity as number;
+  const after = Math.min(before + qty, quantity);
+  db.run('UPDATE order_items SET picked_qty = ?, picked_at = ? WHERE id = ?', [
+    after,
+    after >= quantity ? Date.now() : null,
+    line.id,
+  ]);
+  const remaining = db.all(
+    'SELECT COUNT(*) AS n FROM order_items WHERE order_id = ? AND picked_qty < quantity',
+    [orderId]
+  )[0];
+  return {
+    kind: 'picked' as const,
+    item: {
+      id: line.id as string,
+      orderId: line.order_id as string,
+      productId: line.product_id as string,
+      variantId: (line.variant_id as string | null) ?? null,
+      productName: line.product_name as string,
+      personalisation: (line.personalisation as string | null) ?? null,
+      quantity,
+    },
+    pickedQtyBefore: before,
+    pickedQtyAfter: after,
+    orderFullyPicked: Number(remaining?.n ?? 0) === 0,
+  };
+}
+
 const sessionRow = (db: SyncSql, storeId: string, id: string): Row | undefined =>
   db.all('SELECT id, status FROM count_sessions WHERE id = ? AND store_id = ?', [id, storeId])[0];
 
@@ -1060,5 +1110,6 @@ export const BOOKS_OPS = {
   reconcileCountSession,
   bulkSetInventory,
   importCodRemittances,
+  pickOrderItem,
 } as const;
 export type BooksOpName = keyof typeof BOOKS_OPS;

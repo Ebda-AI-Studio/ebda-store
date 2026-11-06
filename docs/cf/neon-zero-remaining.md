@@ -4,7 +4,7 @@ Input for the final PRs N-15 (workers-test sweep with PG dead), N-16 (delete dea
 
 ## N-15 runtime route sweep (Postgres dead, all markers set)
 
-Last run (`SWEEP_STRICT=1`) on `integ/neon-zero` after #439, #441 and `origin/main`: **923 requests, 255 2xx, 666 expected 4xx, 0 failing (5xx)**; the cron group runs every expression against a DO store with no Postgres reach (allowlist empty) and the 03:00 backup sweep report is `ok` (each fixture store is given yesterday's manifest, so the job is measured, not the age of the fixture). History: 269 -> 26 -> 11 -> 2 -> 0. The optional-provider 503s (`PUSH_NOT_CONFIGURED`, `STORAGE_NOT_CONFIGURED`, `alerts_not_configured`) are the correct answer of a Worker without those services and are not counted.
+Last run (`SWEEP_STRICT=1`) on `integ/neon-zero` after #439, #441 and `origin/main`: **923 requests, 255 2xx, 666 expected 4xx, 0 failing (5xx)**; the cron group runs every expression against a DO store with no Postgres reach (allowlist empty) and the 03:00 backup sweep report is `ok` (each fixture store is given yesterday's manifest, so the job is measured, not the age of the fixture). History: 269 -> 26 -> 11 -> 2 -> 0. **Ruling NZ-FEAT-1 (2026-11-06):** the route fixture store now has EVERY feature key on; that unmasked 33 gated 500s (#466), all ported: **957 requests, 338 2xx, 617 expected 4xx, 0 failing** (finance, loyalty, wallets, warehouses, affiliates, backorders, pick, campaign test-send, abandoned-cart stats, feed). The optional-provider 503s (`PUSH_NOT_CONFIGURED`, `STORAGE_NOT_CONFIGURED`, `alerts_not_configured`) are the correct answer of a Worker without those services and are not counted.
 
 Reproduce: `cd apps/api && npm run cf:dry-run && SWEEP_STRICT=1 EBDA_WORKERS_TEST_DB_URL=postgresql://ebda_app:x@127.0.0.1:1/x npx vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts --silent=false --reporter=verbose`.
 
@@ -14,7 +14,7 @@ Every payment / refund / payout / webhook / checkout route was traced on the Wor
 
 Found on the way and fixed: the StoreDO never drained its `d1_outbox` entity-index rows (no caller of `drainEntityIndexOutbox` existed), so no new order, payment or gateway reference of a DO store was ever resolvable from D1; `moneyOp` now drains before it answers, the alarm retries. The DO `paymentCreate` required the full order total, so a wallet-part-paid order could not record its gateway payment (it now takes the amount due).
 
-Still unported (not money-reachable from a route on a DO store, or a whole subsystem): the rest of `services/affiliate.service.ts` (affiliate CRUD, referrals, config, stats), `services/payment-providers/instapay.service.ts` Postgres branches behind `storeMoney`, and the generated rows below.
+Still unported (not money-reachable from a route on a DO store, or a whole subsystem): `services/payment-providers/instapay.service.ts` Postgres branches behind `storeMoney`, and the generated rows below.
 
 ## Method and limits (read first)
 

@@ -9,7 +9,7 @@ import {
   hasTenantContext,
   type WalletTransactionType,
 } from '@ebda/database';
-import { storeMoney } from '../lib/repo-factory';
+import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
@@ -124,6 +124,61 @@ const ERASURE_FORFEIT_NOTE = 'Forfeited on account erasure';
 /** The `expire` entry `forfeitOnErasure` writes — and only that one (issue 2126). */
 export function isErasureWriteOff(t: { type: string; note: string | null }): boolean {
   return t.type === 'expire' && t.note === ERASURE_FORFEIT_NOTE;
+}
+
+/**
+ * The wallet page for a store on its Durable Object: the wallet rows from the DO, the customer's name/email/phone from the
+ * store's customer directory (identity is not a DO relation; SEC-CUSTOMER-SCOPE-1: only this store's customers). The summary
+ * sums the positive balances in the DO (prisma-lite has no `aggregate`): one column over the store's wallets with a balance.
+ */
+async function listWalletsOnDo(
+  db: Awaited<ReturnType<typeof storeDb>>,
+  storeId: string,
+  limit: number,
+  cursor: string | undefined
+) {
+  const where = { storeId, balance: { gt: 0 } };
+  const [rows, balances] = await Promise.all([
+    db.customerWallet.findMany({
+      where,
+      orderBy: [{ balance: 'desc' }, { id: 'asc' }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: { id: true, customerId: true, balance: true, updatedAt: true },
+    }),
+    db.customerWallet.findMany({ where, select: { balance: true } }),
+  ]);
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const directory =
+    (await customerRows(
+      storeId,
+      page.map(w => w.customerId)
+    )) ?? [];
+  const byId = new Map(directory.map(c => [c.id, c]));
+  return {
+    wallets: page.map(w => {
+      const c = byId.get(w.customerId);
+      return {
+        ...w,
+        customer: c
+          ? {
+              id: c.id,
+              firstName: c.firstName,
+              lastName: c.lastName,
+              email: c.email,
+              phone: c.phone,
+            }
+          : // a balance whose account is gone from the directory still lists (the money is real); the page shows a dash
+            { id: w.customerId, firstName: '', lastName: '', email: '', phone: null },
+      };
+    }),
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+    summary: {
+      outstandingTotal: balances.reduce((n, w) => n + w.balance, 0),
+      walletsWithBalance: balances.length,
+    },
+  };
 }
 
 export class WalletService {
@@ -288,7 +343,10 @@ export class WalletService {
   // ==========================================
 
   static async getBalance(storeId: string, customerId: string): Promise<number> {
-    const wallet = await prisma.customerWallet.findUnique({
+    // The store's backend (its StoreDO holds the wallet rows the DO money op writes; Postgres for a pg store).
+    const wallet = await (
+      await storeDb(storeId)
+    ).customerWallet.findUnique({
       where: { storeId_customerId: { storeId, customerId } },
       select: { balance: true },
     });
@@ -302,7 +360,9 @@ export class WalletService {
     options: { cursor?: string; limit?: number } = {}
   ) {
     const limit = Math.min(100, Math.max(1, options.limit ?? 25));
-    const rows = await prisma.walletTransaction.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).walletTransaction.findMany({
       where: { storeId, customerId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -330,6 +390,8 @@ export class WalletService {
   /** Store wallet page: customers holding a balance, largest first. */
   static async listWallets(storeId: string, options: { cursor?: string; limit?: number } = {}) {
     const limit = Math.min(100, Math.max(1, options.limit ?? 25));
+    const repo = await storeRepo(storeId);
+    if (repo.backend === 'do') return listWalletsOnDo(repo.db, storeId, limit, options.cursor);
     const [rows, summary] = await Promise.all([
       prisma.customerWallet.findMany({
         where: { storeId, balance: { gt: 0 } },

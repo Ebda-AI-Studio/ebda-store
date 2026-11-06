@@ -1,4 +1,5 @@
 import { storeDb, storeWriter } from '../../lib/repo-factory';
+import { AppError } from '../../middleware/error-handler';
 import type { Prisma, Supplier, SupplierPaymentTerms } from '@prisma/client';
 
 import { REGION } from '@ebda/shared';
@@ -80,7 +81,8 @@ export async function updateSupplier(
     where: { id, storeId, deletedAt: null },
     select: { id: true },
   });
-  if (!owned) throw new Error(`Supplier ${id} not found in store ${storeId}`);
+  if (!owned)
+    throw new AppError(404, 'SUPPLIER_NOT_FOUND', `Supplier ${id} not found in store ${storeId}`);
   return w.supplier.update({
     where: { id, storeId },
     data: {
@@ -116,7 +118,8 @@ export async function softDeleteSupplier(storeId: string, id: string): Promise<v
     where: { id, storeId, deletedAt: null },
     select: { id: true },
   });
-  if (!owned) throw new Error(`Supplier ${id} not found in store ${storeId}`);
+  if (!owned)
+    throw new AppError(404, 'SUPPLIER_NOT_FOUND', `Supplier ${id} not found in store ${storeId}`);
   await w.supplier.update({
     where: { id, storeId },
     data: { deletedAt: new Date(), isActive: false },

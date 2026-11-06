@@ -659,7 +659,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
       // feed byte-for-byte (buildProductFeed's `bundles` param defaults to
       // `[]` too — the explicit `[]` here just makes the branch visible).
       const bundles = bundlesEnabled
-        ? (await listSellableBundles(prisma, storeId)).map(b => {
+        ? (
+            await listSellableBundles((await storeDb(storeId)) as unknown as typeof prisma, storeId)
+          ).map(b => {
             const { description, descriptionAr } = describeBundleContents(b);
             return { ...b, description, descriptionAr };
           })

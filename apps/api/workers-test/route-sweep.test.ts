@@ -192,8 +192,7 @@ describe.skipIf(e.E2E_DB === '1')(
       // #465: a SECOND fixture store with every feature on (D1 `store_features`, the override row super-admin's toggle writes) for
       // the cron group. A job body that checks a feature returns BEFORE its store reads when the store lacks it, so a broken
       // read behind the gate stayed green (the #463 low-stock `owner` fix could be reverted with the sweep still passing).
-      // Every store runs through /__dev/run-jobs. The route fixture above stays feature-default: with all features on, ~33 gated
-      // routes (finance, loyalty, warehouses, affiliates, wallets...) answer 500 - a separate defect class, not hidden here.
+      // Every store runs through /__dev/run-jobs.
       const jobsShop = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
         method: 'POST',
         body: JSON.stringify({
@@ -205,12 +204,18 @@ describe.skipIf(e.E2E_DB === '1')(
       });
       expect(jobsShop.status).toBe(200);
       jobsStoreId = ((await jobsShop.json()) as { id: string }).id;
-      for (const key of FEATURE_KEYS_ARRAY)
-        await e.PLATFORM_DB.prepare(
-          'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
-        )
-          .bind(`sweep-feat-${key}`, jobsStoreId, key, Date.now())
-          .run();
+      // The route fixture store ALSO runs with every feature on: a gated route answers 403/404 before its store reads when the
+      // feature is off, so a feature-default fixture hid 33 unported gated routes (finance, loyalty, wallets, affiliates...).
+      for (const [sid, tag] of [
+        [jobsStoreId, 'jobs'],
+        [storeId, 'route'],
+      ] as const)
+        for (const key of FEATURE_KEYS_ARRAY)
+          await e.PLATFORM_DB.prepare(
+            'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
+          )
+            .bind(`sweep-feat-${tag}-${key}`, sid, key, Date.now())
+            .run();
       for (const u of [owner, 'super-sweep', 'cust-sweep'])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
       sa = await accessToken({ userId: owner, jti: 'j-owner', role: 'store_admin', storeId });

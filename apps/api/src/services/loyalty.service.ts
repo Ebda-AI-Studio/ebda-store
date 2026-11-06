@@ -12,6 +12,32 @@ import {
 } from '../lib/repo-factory';
 import { assertStoreCustomer } from '../lib/store-customer';
 import { withStoreRead } from '../lib/store-read';
+import { customerRows } from '../lib/customer-directory';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
+
+/**
+ * Name/email of this store's customers for the admin loyalty lists (SEC-CUSTOMER-SCOPE-1). A store whose customers are on its
+ * StoreDO (customer-auth cutover, Ruling NZ-N9-6) reads its directory there; a soft-deleted customer is dropped like a
+ * Postgres row that no longer matches. Otherwise the unchanged Postgres `users` read, scoped to the store's customer accounts.
+ */
+async function storeCustomerIdentities(
+  storeId: string,
+  ids: string[]
+): Promise<Map<string, { id: string; email: string; firstName: string; lastName: string }>> {
+  const unique = [...new Set(ids)];
+  const fromDo = await customerRows(storeId, unique);
+  const rows = fromDo
+    ? fromDo
+        .filter(c => c.deletedAt === null)
+        .map(c => ({ id: c.id, email: c.email, firstName: c.firstName, lastName: c.lastName }))
+    : await withStore(storeId, tx =>
+        tx.user.findMany({
+          where: { id: { in: unique }, role: 'customer', storeId },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      );
+  return new Map(rows.map(c => [c.id, c]));
+}
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -213,6 +239,9 @@ export class LoyaltyService {
     const m = money ?? (await storeMoney(storeId));
     if (!m) return;
     if (!opts.trusted) await assertStoreCustomer(storeId, customerId);
+    // No Postgres on this Worker (NEON-ZERO N-17): nothing can be read to import, so nothing is imported AND the done flag is
+    // NOT written (a one-way door if a store still had Postgres-only history; that import runs where Postgres is reachable).
+    if (postgresRemovedOnThisWorker()) return;
     if ((await m.loyaltyImportState({ customerId })).done) {
       importedSeen.add(key);
       return;
@@ -268,6 +297,8 @@ export class LoyaltyService {
   static async ensureDoStoreHistory(storeId: string, money: MoneyClient): Promise<void> {
     const key = `${storeId}:*`;
     if (importedSeen.has(key)) return;
+    // No Postgres on this Worker (NEON-ZERO N-17): nothing to read, so no import and no done flag (see ensureDoHistory).
+    if (postgresRemovedOnThisWorker()) return;
     if ((await money.loyaltyImportState({})).done) {
       importedSeen.add(key);
       return;
@@ -1432,13 +1463,10 @@ export class LoyaltyService {
       await LoyaltyService.ensureDoStoreHistory(storeId, money);
       const r = await money.loyaltyMembers({ page, limit, tier: options?.tier });
       // SEC-CUSTOMER-SCOPE-1: the name/email join is Postgres identity, scoped to this store's customer accounts.
-      const customers = await withStore(storeId, tx =>
-        tx.user.findMany({
-          where: { id: { in: r.members.map(m => m.customerId) }, role: 'customer', storeId },
-          select: { id: true, email: true, firstName: true, lastName: true },
-        })
+      const byId = await storeCustomerIdentities(
+        storeId,
+        r.members.map(m => m.customerId)
       );
-      const byId = new Map(customers.map(c => [c.id, c]));
       return {
         members: r.members.flatMap(m => {
           const customer = byId.get(m.customerId);
@@ -1514,17 +1542,10 @@ export class LoyaltyService {
         from: q.from ? q.from.getTime() : null,
         to: q.to ? q.to.getTime() : null,
       });
-      const customers = await withStore(storeId, tx =>
-        tx.user.findMany({
-          where: {
-            id: { in: [...new Set(r.transactions.map(t => t.customerId))] },
-            role: 'customer',
-            storeId,
-          },
-          select: { id: true, firstName: true, lastName: true, email: true },
-        })
+      const byId = await storeCustomerIdentities(
+        storeId,
+        r.transactions.map(t => t.customerId)
       );
-      const byId = new Map(customers.map(c => [c.id, c]));
       return {
         total: r.total,
         transactions: r.transactions.flatMap(t => {
