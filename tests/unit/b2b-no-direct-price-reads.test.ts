@@ -155,8 +155,9 @@ const ALLOW: Record<string, AllowEntry> = {
   },
   'services/accounting/backorder.service.ts': {
     category: 'persisted',
-    reason: 'backorder lines of persisted orders',
-    reads: { cancelBackorder: 1, listOpenBackorders: 1 },
+    reason:
+      'backorder lines of persisted orders (cancelBackorderOnDo: the same allocation read of the order lines on a DO store)',
+    reads: { cancelBackorder: 1, cancelBackorderOnDo: 1, listOpenBackorders: 1 },
   },
   'services/accounting/posting/partial-return-allocation.ts': {
     category: 'persisted',
