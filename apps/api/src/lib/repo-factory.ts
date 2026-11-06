@@ -609,20 +609,42 @@ export interface MoneyClient {
     a: { orderId: string; proofSubmitted?: boolean },
     key?: string
   ): Promise<'expired' | 'skipped'>;
+  /** The payment's index rows are in D1 (written now if queued), else a 503 ENTITY_INDEX_UNAVAILABLE (Ruling NZ-MONEY-2). */
+  paymentIndexCheck(a: { paymentId: string }): Promise<{ paymentId: string }>;
+  /** InstapayService.initiate on the DO: the hold + its pending payment, one section; a replay returns the same payment. */
+  instapayInitiate(
+    a: {
+      orderId: string;
+      /** epoch ms */
+      expiresAt: number;
+      providerRef: string | null;
+      metadata: Record<string, unknown>;
+      actorUserId: string | null;
+    },
+    key?: string
+  ): Promise<{
+    created: boolean;
+    paymentId: string;
+    amountMinor: number;
+    metadata: Record<string, unknown>;
+    expiresAt: number;
+  }>;
   /** Payments, webhooks, refunds, the ledger and gold repricing (Rulings CF-PAY-1, CF-LEDGER-1). Results are the engine's. */
   paymentCreate(
     a: {
       orderId: string;
       provider: string;
+      /** the amount DUE: order total less the wallet part */
       amount: number;
       method?: string | null;
       currency?: string;
       transactionId?: string | null;
       invoiceId?: string | null;
       paymentUrl?: string | null;
+      metadata?: Record<string, unknown>;
     },
     key?: string
-  ): Promise<{ paymentId: string }>;
+  ): Promise<{ paymentId: string; replayed?: boolean }>;
   paymentWebhook(
     a: { input: DoWebhookInput; confirmed?: { kind: string; status: string } | null },
     key?: string
@@ -995,6 +1017,17 @@ export interface MoneyClient {
     rate?: number;
   }): Promise<{ claimed: boolean }>;
   affiliateReverse(a: { orderId: string }): Promise<{ amount: number | null }>;
+  /** AffiliateService.createPayout: balance debit + payout row + event, one section (INSUFFICIENT_BALANCE when it does not cover). */
+  affiliatePayout(
+    a: {
+      affiliateId: string;
+      amount: number;
+      method?: string;
+      notes?: string | null;
+      payoutId?: string;
+    },
+    key?: string
+  ): Promise<{ payout: Record<string, unknown> }>;
   /** Reorder scan phase 1: expire stale / unit-gone suggestions (Ruling CF-JOBS-4). */
   reorderExpire(a: {
     thresholdMs: number;
@@ -1375,6 +1408,8 @@ export function makeMoneyClient(
     confirmPayment: (a, key) => call('confirmPayment', a, key),
     cancel: (a, key) => call('cancel', a, key),
     expireHold: (a, key) => call('expireHold', a, key),
+    instapayInitiate: (a, key) => call('instapayInitiate', a, key),
+    paymentIndexCheck: a => call('paymentIndexCheck', a),
     paymentCreate: (a, key) => call('paymentCreate', a, key),
     paymentWebhook: (a, key) => call('paymentWebhook', a, key),
     refundBegin: (a, key) => call('refundBegin', a, key),
@@ -1442,6 +1477,7 @@ export function makeMoneyClient(
     reversalClaim: a => call('reversalClaim', a),
     affiliateCommission: a => call('affiliateCommission', a),
     affiliateReverse: a => call('affiliateReverse', a),
+    affiliatePayout: (a, key) => call('affiliatePayout', a, key),
     reorderExpire: a => call('reorderExpire', a),
     reorderUpsert: a => call('reorderUpsert', a),
     orderStatus: (a, key) => call('orderStatus', a, key),

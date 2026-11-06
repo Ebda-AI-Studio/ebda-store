@@ -745,7 +745,10 @@ export class OrderService {
 
   /** The order a previous request with this checkout key created, in the shape `create` returns; null when none. */
   static async findCheckoutReplay(storeId: string, idemHash: string, reqHash: string) {
-    // (a DO store's keyed retry is answered by its engine, which keys on `idempotency_key`: see `createOnDo`)
+    // A DO store's keyed retry is answered by its engine, which keys on `idempotency_key` (see `createOnDo`): there is no
+    // Postgres row to look up, and asking Postgres for it threw POSTGRES_REMOVED on every keyed checkout (the storefront always
+    // sends an Idempotency-Key). Found by money-path.test.ts (review NEW-2 of PR 455).
+    if (await storeMoney(storeId)) return null;
     const found = await prisma.order.findFirst({
       where: { storeId, checkoutIdempotencyKey: idemHash },
       select: { id: true, checkoutRequestHash: true },

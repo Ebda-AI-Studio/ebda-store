@@ -155,6 +155,48 @@ describe('entity index', () => {
     });
   });
 
+  it('NEW-3 (Ruling NZ-MONEY-2): a FORCED drain neither counts nor reschedules a failure, revives a dead-lettered row, and the alarm (includeDead) keeps retrying it', async () => {
+    const s = store();
+    const down = d1({ failFirst: 10_000 });
+    const ids = ['T1'].map(r => `paymob:${r}`);
+    const attempts = () =>
+      s.raw
+        .prepare("SELECT attempts AS a FROM d1_outbox WHERE json_extract(payload, '$.id') = ?")
+        .get(ids[0]) as { a: number };
+    for (let i = 0; i < 40; i++) {
+      const r = await drainEntityIndexOutbox(s.db, down.like, { onlyIds: ids });
+      expect(r.failed).toBe(1);
+    }
+    expect(attempts().a).toBe(0); // 40 shopper retries during the outage: not one counted
+    // dead-letter it the paced way, then a forced drain on a healthy D1 still writes it (revived on demand)
+    s.raw
+      .prepare("UPDATE d1_outbox SET attempts = ? WHERE json_extract(payload, '$.id') = ?")
+      .run(MAX_ATTEMPTS, ids[0]);
+    const up = d1();
+    expect((await drainEntityIndexOutbox(s.db, up.like, { onlyIds: ids })).written).toBe(1);
+    expect(await resolveStoreId(up.like, 'webhook', ids[0]!)).toBe('s1');
+    // the alarm path: a dead-lettered row that is due is retried with includeDead, skipped without it
+    const s2 = store();
+    s2.raw.prepare('UPDATE d1_outbox SET attempts = ?').run(MAX_ATTEMPTS);
+    const later = Date.now() + 10 * 3600_000;
+    expect((await drainEntityIndexOutbox(s2.db, up.like, { now: later })).written).toBe(0);
+    expect(
+      (await drainEntityIndexOutbox(s2.db, up.like, { now: later, includeDead: true })).written
+    ).toBe(3);
+  });
+
+  it('a paced drain reports a row crossing the dead-letter limit once (newlyDead)', async () => {
+    const s = store();
+    const d = d1({ failFirst: 10_000 });
+    let now = Date.now() + 1000;
+    let newly = 0;
+    for (let i = 0; i < MAX_ATTEMPTS + 3; i++) {
+      newly += (await drainEntityIndexOutbox(s.db, d.like, { now, includeDead: true })).newlyDead;
+      now += 2 * 3600_000;
+    }
+    expect(newly).toBe(3);
+  });
+
   it('DB-2: a callback that arrives BEFORE the alarm drains the outbox is answered non-2xx (retry) and alerted, never "ignored"; after the drain it routes', async () => {
     const s = store(); // payment created, outbox row queued, alarm has NOT run
     const d = d1();

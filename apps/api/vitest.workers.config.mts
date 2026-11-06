@@ -37,6 +37,8 @@ const apiVars = {
   // StoreDO spike (lib/store-backend.ts): one flagged id + the operator seed secret.
   STORE_DO_ENABLED_IDS: 'spike-store-1',
   STORE_DO_SEED_TOKEN: 'workers-test-seed-token',
+  // Ruling NZ-MONEY-2: the index-retry alarm floor (30 s in production), short so money-path.test.ts watches a retry drain.
+  STORE_DO_INDEX_RETRY_MS: '500',
   // The alerts webhook bridge fails closed without a token; a sweep request carries none, so it answers 401, not 503.
   ALERTS_WEBHOOK_TOKEN: 'workers-test-alerts-token',
 };
@@ -124,7 +126,36 @@ export default defineConfig(async () => {
                 }`,
             },
             {
+              // The payment gateways, as the API Worker's outbound fetch sees them (workers-test/money-path.test.ts). Kashier's
+              // transaction-details read (confirm-before-apply, PROVIDERS-17) answers SUCCESS for the id asked, a Fawry charge
+              // answers a fresh reference number; any other call to a
+              // gateway host is a 503 outage (never the real internet); everything else passes through untouched.
+              name: 'gateway-stub',
+              modules: true,
+              compatibilityDate: '2026-08-01',
+              script: `
+                const GATEWAYS = /(^|\\.)(kashier\\.io|paymob\\.com|fawrystaging\\.com|atfawry\\.com)$/;
+                export default {
+                  async fetch(request) {
+                    const u = new URL(request.url);
+                    if (!GATEWAYS.test(u.hostname)) return fetch(request);
+                    const m = u.pathname.match(/\\/v2\\/aggregator\\/transactions\\/([^/]+)$/);
+                    if (m && u.hostname.endsWith('kashier.io')) {
+                      const id = decodeURIComponent(m[1]);
+                      return Response.json({ status: 'SUCCESS', body: { transactionId: id, status: 'SUCCESS', trxType: 'pay',
+                        transactions: [{ transactionId: id, operation: 'pay', status: 'SUCCESS' }] } });
+                    }
+                    // Fawry PayAtFawry charge: a fresh reference number per call (a second call = a second live reference)
+                    if (u.pathname.endsWith('/ECommerceWeb/Fawry/payments/charge') && request.method === 'POST')
+                      return Response.json({ statusCode: 200, statusDescription: 'Operation done successfully',
+                        referenceNumber: String(Math.floor(1e8 + Math.random() * 9e8)) });
+                    return Response.json({ message: 'gateway stub: not answered' }, { status: 503 });
+                  }
+                }`,
+            },
+            {
               name: 'api',
+              outboundService: 'gateway-stub',
               modulesRoot: here('./dist-cf'),
               modules: [
                 { type: 'ESModule', path: BUNDLE },

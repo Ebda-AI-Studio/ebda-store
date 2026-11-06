@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { storeDb, storeMoney } from '../lib/repo-factory';
+import { opKey } from '../lib/money-idempotency';
 import logger from '../lib/logger';
 import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';
 
@@ -305,7 +306,10 @@ class AffiliateService {
   // ---- Get by ID ----
 
   async getById(storeId: string, id: string) {
-    const affiliate = await prisma.affiliate.findFirst({
+    // the store's own backend (NEON-ZERO); the `prisma` proxy for a Postgres store
+    const affiliate = await (
+      await storeDb(storeId)
+    ).affiliate.findFirst({
       where: { id, storeId },
       include: {
         _count: { select: { referrals: true, payouts: true } },
@@ -693,14 +697,15 @@ class AffiliateService {
 
     const where: Prisma.AffiliatePayoutWhereInput = { storeId, affiliateId };
 
+    const db = await storeDb(storeId); // the store's own backend (NEON-ZERO); the `prisma` proxy for a Postgres store
     const [payouts, total] = await Promise.all([
-      prisma.affiliatePayout.findMany({
+      db.affiliatePayout.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.affiliatePayout.count({ where }),
+      db.affiliatePayout.count({ where }),
     ]);
 
     return {
@@ -709,7 +714,39 @@ class AffiliateService {
     };
   }
 
-  async createPayout(storeId: string, affiliateId: string, data: CreatePayoutData) {
+  async createPayout(
+    storeId: string,
+    affiliateId: string,
+    data: CreatePayoutData,
+    /** The client's Idempotency-Key, already validated: same key -> the same payout, never a second (review M-6). */
+    idempotencyKey?: string
+  ) {
+    // A store on its Durable Object (NEON-ZERO): the affiliate row, the debit, the payout and its event are ONE section there;
+    // the balance is re-checked inside it, so the refusals are the same (404 / INVALID_AMOUNT / INSUFFICIENT_BALANCE).
+    const money = await storeMoney(storeId);
+    if (money) {
+      if (data.amount <= 0) {
+        throw new AppError(400, 'INVALID_AMOUNT', 'Payout amount must be greater than zero');
+      }
+      // keyed: the DO mints the id inside the section (an id minted here would differ per retry and the replay would refuse
+      // it as a reused key); unkeyed: the id is minted here, as on Postgres
+      const { payout } = await money.affiliatePayout(
+        {
+          affiliateId,
+          amount: data.amount,
+          method: data.method ?? 'manual',
+          notes: data.notes ?? null,
+          ...(idempotencyKey ? {} : { payoutId: randomUUID() }),
+        },
+        // a keyed section replays its first answer (the first payout), whatever this call's body says
+        idempotencyKey ? opKey(`payout:${storeId}:${affiliateId}`, idempotencyKey) : undefined
+      );
+      logger.info(
+        { storeId, affiliateId, payoutId: payout.id, amount: data.amount },
+        '[AffiliateService] Payout created'
+      );
+      return payout;
+    }
     const affiliate = await this.getById(storeId, affiliateId);
 
     if (data.amount <= 0) {
