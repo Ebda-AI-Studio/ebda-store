@@ -21,12 +21,14 @@
  * re-matched to a second row (enforced by the exclusion query).
  */
 
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
-import { assertStoreOwns } from './assert-store-owns';
+import { assertStoreOwns, assertStoreOwnsInTenantScope } from './assert-store-owns';
 import { AppError } from '../../middleware/error-handler';
 import { COUNTED_STATUSES_SQL } from './reports.service';
+import { storeDb, storeMoney, storeRepo, storeWriter } from '../../lib/repo-factory';
+import { runInStoreCtx } from '../../lib/jobs/store-db';
 
 import { minorToDecimalString } from '@ebda/shared';
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -158,6 +160,52 @@ export async function importBankStatement(
   const periodStart = dates.length ? new Date(Math.min(...dates)) : null;
   const periodEnd = dates.length ? new Date(Math.max(...dates)) : null;
 
+  // A store on its Durable Object persists the statement and its rows in ONE atomic batch (Ruling NZ-FEAT-1); the Postgres
+  // transaction below is unchanged.
+  if ((await storeRepo(storeId)).backend === 'do') {
+    await assertStoreOwnsInTenantScope(storeId, { accountIds: [glAccountId] });
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
+    // one row per hash, like the upsert-per-row loop below (a repeated hash in the file is a no-op)
+    const byHash = new Map<string, ParsedRow>();
+    for (const row of rows) if (!byHash.has(row.rowHash)) byHash.set(row.rowHash, row);
+    const have = new Set(
+      (
+        await db.bankTransaction.findMany({
+          where: { storeId, rowHash: { in: [...byHash.keys()] } },
+          select: { rowHash: true },
+        })
+      ).map(r => r.rowHash)
+    );
+    const fresh = [...byHash.values()].filter(r => !have.has(r.rowHash));
+    const statementId = crypto.randomUUID();
+    const ops: Promise<unknown>[] = [
+      w.bankStatement.create({
+        data: {
+          id: statementId,
+          storeId,
+          glAccountId,
+          fileName,
+          periodStart,
+          periodEnd,
+          status: 'pending',
+        },
+        select: { id: true },
+      }) as Promise<unknown>,
+    ];
+    const CHUNK = 100;
+    for (let i = 0; i < fresh.length; i += CHUNK)
+      ops.push(
+        w.bankTransaction.createMany({
+          data: fresh.slice(i, i + CHUNK).map(r => buildBankTxCreateData(r, statementId, storeId)),
+        }) as Promise<unknown>
+      );
+    await w.$transaction(ops as never);
+    await runAutoMatch(statementId, storeId);
+    // the Postgres loop counts every row (an upsert returns the existing one too)
+    return { statementId, imported: rows.length, skipped, parseErrors };
+  }
+
   // ── Persist (transactional) ──
   let statementId: string;
   let imported = 0;
@@ -271,6 +319,8 @@ export async function runAutoMatch(
   statementId: string,
   storeId: string
 ): Promise<{ matched: number; unmatched: number; ambiguous: number }> {
+  if ((await storeRepo(storeId)).backend === 'do') return runAutoMatchOnDo(statementId, storeId);
+
   // -------------------------------------------------------------------------
   // Step 1: short tx — reset prior auto-matches + fetch the rows to match +
   // fetch the "already matched" baseline ONCE (was re-fetched every loop
@@ -418,6 +468,109 @@ export async function runAutoMatch(
   return { matched, unmatched, ambiguous };
 }
 
+/**
+ * `runAutoMatch` on a store's Durable Object (Ruling NZ-FEAT-1): the same rules and confidence math, the reads on the DO read
+ * client, the reset / per-chunk updates / status as atomic DO batches. Bank rows are bookkeeping, not GL: a concurrent
+ * auto-match can at worst match one entry twice, which a re-run (it resets auto matches first) repairs.
+ */
+async function runAutoMatchOnDo(
+  statementId: string,
+  storeId: string
+): Promise<{ matched: number; unmatched: number; ambiguous: number }> {
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  await w.bankTransaction.updateMany({
+    where: { statementId, storeId, matchStatus: 'auto_matched' },
+    data: { matchStatus: 'unmatched', matchedJournalEntryId: null, confidence: 0 },
+  });
+  const bankTxs = await db.bankTransaction.findMany({
+    where: { statementId, storeId, matchStatus: 'unmatched' },
+    select: { id: true, date: true, amountFils: true, direction: true },
+  });
+  assertWithinRowCap(bankTxs.length);
+  const alreadyMatchedIds = (
+    await db.bankTransaction.findMany({
+      where: {
+        storeId,
+        matchStatus: { in: ['auto_matched', 'manual_matched'] },
+        matchedJournalEntryId: { not: null },
+      },
+      select: { matchedJournalEntryId: true },
+    })
+  )
+    .map(r => r.matchedJournalEntryId!)
+    .filter(Boolean);
+
+  const claimedEntries = new Set<string>();
+  let matched = 0;
+  let unmatched = 0;
+  let ambiguous = 0;
+
+  for (let chunkStart = 0; chunkStart < bankTxs.length; chunkStart += MATCH_CHUNK_SIZE) {
+    const updates: Promise<unknown>[] = [];
+    for (const btx of bankTxs.slice(chunkStart, chunkStart + MATCH_CHUNK_SIZE)) {
+      const from = new Date(btx.date.getTime() - DATE_TOLERANCE_MS);
+      const to = new Date(btx.date.getTime() + DATE_TOLERANCE_MS);
+      const minFils = btx.amountFils - AMOUNT_TOLERANCE_FILS;
+      const maxFils = btx.amountFils + AMOUNT_TOLERANCE_FILS;
+      const excludedIds = [...alreadyMatchedIds, ...Array.from(claimedEntries)];
+      const lines = await db.journalLine.findMany({
+        where: {
+          account: { storeId },
+          ...(btx.direction === 'debit'
+            ? { debit: { gte: minFils, lte: maxFils } }
+            : { credit: { gte: minFils, lte: maxFils } }),
+          entry: {
+            storeId,
+            status: { in: ['posted', 'reversed'] },
+            postedAt: { gte: from, lte: to },
+            id: excludedIds.length > 0 ? { notIn: excludedIds } : undefined,
+          },
+        },
+        select: { entryId: true, debit: true, credit: true },
+      });
+      // `distinct: ['entryId']` is not in the DO read surface: one candidate per entry, here
+      const candidates = [...new Map(lines.map(l => [l.entryId, l])).values()];
+      if (candidates.length === 0) {
+        unmatched++;
+        continue;
+      }
+      if (candidates.length > 1) {
+        ambiguous++;
+        continue;
+      }
+      const candidate = candidates[0];
+      const exactAmt = btx.direction === 'debit' ? candidate.debit : candidate.credit;
+      updates.push(
+        w.bankTransaction.update({
+          where: { id: btx.id, storeId },
+          data: {
+            matchStatus: 'auto_matched',
+            matchedJournalEntryId: candidate.entryId,
+            confidence: computeConfidence(btx.amountFils, exactAmt),
+          },
+        }) as Promise<unknown>
+      );
+      claimedEntries.add(candidate.entryId);
+      matched++;
+    }
+    if (updates.length > 0) await w.$transaction(updates as never);
+  }
+
+  const totalTx = await db.bankTransaction.count({ where: { statementId, storeId } });
+  const matchedTotal = await db.bankTransaction.count({
+    where: { statementId, storeId, matchStatus: { in: ['auto_matched', 'manual_matched'] } },
+  });
+  await w.bankStatement.update({
+    where: { id: statementId, storeId },
+    data: {
+      status:
+        matchedTotal === totalTx ? 'reconciled' : matchedTotal > 0 ? 'reconciling' : 'pending',
+    },
+  });
+  return { matched, unmatched, ambiguous };
+}
+
 /** Confidence 0–100: 100 = exact piastres match, lower as difference grows. */
 function computeConfidence(txFils: number, ledgerFils: number): number {
   const diff = Math.abs(txFils - ledgerFils);
@@ -448,6 +601,8 @@ export interface ManualMatchInput {
  */
 export async function applyManualMatch(input: ManualMatchInput): Promise<BankTransaction> {
   const { storeId, transactionId, action, journalEntryId } = input;
+
+  if ((await storeRepo(storeId)).backend === 'do') return applyManualMatchOnDo(input);
 
   return withStore(storeId, async tx => {
     // Verify the bank transaction belongs to this store
@@ -518,6 +673,74 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
   });
 }
 
+/**
+ * `applyManualMatch` on a store's Durable Object (Ruling NZ-FEAT-1): the same checks and errors. The checks and the update are
+ * separate RPCs (residual of CF-WRITES-1): two admins matching one entry to two rows at the same instant could both pass the
+ * "already matched" check; the entry still shows on both rows and an unmatch repairs it. No GL is touched.
+ */
+async function applyManualMatchOnDo(input: ManualMatchInput): Promise<BankTransaction> {
+  const { storeId, transactionId, action, journalEntryId } = input;
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  const btx = await db.bankTransaction.findFirst({
+    where: { id: transactionId, storeId },
+    select: { id: true, storeId: true, statementId: true },
+  });
+  if (!btx) throw new AppError(404, 'not_found', 'not_found');
+
+  let data: Prisma.BankTransactionUncheckedUpdateInput;
+  if (action === 'unmatch') {
+    data = { matchStatus: 'unmatched', matchedJournalEntryId: null, confidence: 0 };
+  } else if (action === 'ignore') {
+    data = { matchStatus: 'ignored', matchedJournalEntryId: null, confidence: 0 };
+  } else {
+    if (!journalEntryId) {
+      throw new AppError(400, 'bad_request', 'journalEntryId required for match action');
+    }
+    const entry = await db.journalEntry.findFirst({
+      where: { id: journalEntryId, storeId },
+      select: { id: true },
+    });
+    if (!entry) throw new AppError(404, 'journal_entry_not_found', 'journal_entry_not_found');
+    const existing = await db.bankTransaction.findFirst({
+      where: { storeId, matchedJournalEntryId: journalEntryId, id: { not: transactionId } },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new AppError(409, 'journal_entry_already_matched', 'journal_entry_already_matched');
+    }
+    data = {
+      matchStatus: 'manual_matched',
+      matchedJournalEntryId: journalEntryId,
+      confidence: 100,
+    };
+  }
+  const updated = await w.bankTransaction.update({ where: { id: transactionId, storeId }, data });
+
+  const totalTx = await db.bankTransaction.count({
+    where: { statementId: btx.statementId, storeId },
+  });
+  const matchedTotal = await db.bankTransaction.count({
+    where: {
+      statementId: btx.statementId,
+      storeId,
+      matchStatus: { in: ['auto_matched', 'manual_matched', 'ignored'] },
+    },
+  });
+  await w.bankStatement.update({
+    where: { id: btx.statementId, storeId },
+    data: {
+      status:
+        matchedTotal === totalTx && totalTx > 0
+          ? 'reconciled'
+          : matchedTotal > 0
+            ? 'reconciling'
+            : 'pending',
+    },
+  });
+  return updated as BankTransaction;
+}
+
 async function refreshStatementStatus(
   tx: Prisma.TransactionClient,
   statementId: string,
@@ -551,8 +774,9 @@ export async function getReconciliationSummary(
   statementId: string,
   storeId: string
 ): Promise<ReconciliationSummary> {
-  return runInTenantContext(storeId, async () => {
-    const txs = await prisma.bankTransaction.findMany({
+  const db = await storeDb(storeId);
+  return runInStoreCtx(storeId, async () => {
+    const txs = await db.bankTransaction.findMany({
       where: { statementId, storeId },
       select: { matchStatus: true, amountFils: true },
     });
@@ -634,6 +858,33 @@ export async function getReconciliationDifference(
   statementId: string,
   storeId: string
 ): Promise<ReconciliationDifference> {
+  // A store on its Durable Object reads the statement from its read client and the ledger side from the `bankLedgerSide` op
+  // (the same two aggregates, one statement each, in the DO); the figures and advice come from the shared composer.
+  const money = await storeMoney(storeId);
+  if (money) {
+    const db = await storeDb(storeId);
+    const stmt = await db.bankStatement.findFirst({
+      where: { id: statementId, storeId },
+      select: { glAccountId: true, periodStart: true, periodEnd: true },
+    });
+    if (!stmt) throw new AppError(404, 'statement_not_found', 'statement_not_found');
+    const bankTxs = await db.bankTransaction.findMany({
+      where: { statementId, storeId },
+      select: { amountFils: true, direction: true, matchStatus: true },
+    });
+    const side = await money.bankLedgerSide({
+      accountId: stmt.glAccountId,
+      statementId,
+      asOfMs: (stmt.periodEnd ?? new Date()).getTime(),
+      startMs: stmt.periodStart ? stmt.periodStart.getTime() : null,
+    });
+    return composeDifference(
+      bankTxs,
+      side.debit - side.credit,
+      side.unmatchedCount,
+      side.unmatchedNet
+    );
+  }
   return withStore(storeId, async tx => {
     // Fetch statement meta (linked GL account + period)
     const stmt = await tx.bankStatement.findFirst({
@@ -655,22 +906,6 @@ export async function getReconciliationDifference(
       where: { statementId, storeId },
       select: { amountFils: true, direction: true, matchStatus: true },
     });
-
-    let bankBalanceFils = 0;
-    let unmatchedBankFils = 0;
-
-    for (const btx of bankTxs) {
-      // From the bank account's perspective: a credit from the bank (money in) = debit to
-      // the asset account; a debit from the bank (money out) = credit to the asset account.
-      // We express bankBalance in asset-account terms: credits to account = positive.
-      const signedAmount = btx.direction === 'credit' ? btx.amountFils : -btx.amountFils;
-      bankBalanceFils += signedAmount;
-
-      const status = btx.matchStatus as BankMatchStatus;
-      if (status === 'unmatched') {
-        unmatchedBankFils += btx.amountFils; // absolute piastres (sign context is per bank tx)
-      }
-    }
 
     // ── Ledger side ──
     // Sum every COUNTED journal line (posted + reversed — a reversal pair only
@@ -734,64 +969,82 @@ export async function getReconciliationDifference(
       statementId
     );
 
-    let unmatchedLedgerFils = 0;
-    for (const row of unmatched) {
-      // Net contribution of the unmatched ledger line (DR positive for asset account)
-      unmatchedLedgerFils += Number(row.debit) - Number(row.credit);
-    }
-
-    // ── Difference ──
-    const differenceFils = bankBalanceFils - ledgerBalanceFils;
-    const isReconciled = differenceFils === 0;
-
-    // ── Suggested action ──
-    const baseBank = minorToDecimalString(Math.abs(bankBalanceFils));
-    const baseLedger = minorToDecimalString(Math.abs(ledgerBalanceFils));
-    const baseDiff = minorToDecimalString(Math.abs(differenceFils));
-    const unmatchedCount = bankTxs.filter(b => b.matchStatus === 'unmatched').length;
-    const unmatchedLedgerCount = unmatched.length;
-
-    let suggestedActionEn: string;
-    let suggestedActionAr: string;
-
-    if (isReconciled) {
-      suggestedActionEn =
-        'Bank and ledger agree — this statement is fully reconciled. No action required.';
-      suggestedActionAr = 'البنك والدفتر متطابقان — تم إغلاق كشف الحساب بالكامل. لا يلزم أي إجراء.';
-    } else if (differenceFils > 0) {
-      suggestedActionEn =
-        `Bank balance (EGP ${baseBank}) exceeds ledger balance (EGP ${baseLedger}) by EGP ${baseDiff}. ` +
-        `${unmatchedCount} unmatched bank line(s) totalling EGP ${minorToDecimalString(unmatchedBankFils)} have no ledger entry. ` +
-        `Suggested action: record journal entries for the missing bank transactions, ` +
-        `or post an adjusting entry of EGP ${baseDiff} (debit bank account, credit appropriate account).`;
-      suggestedActionAr =
-        `رصيد البنك (${baseBank} ج.م) يتجاوز رصيد الدفتر (${baseLedger} ج.م) بفارق ${baseDiff} ج.م ` +
-        `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${minorToDecimalString(unmatchedBankFils)} ج.م لا يقابلها قيود في الدفتر. ` +
-        `الإجراء المقترح: سجّل قيوداً محاسبية للحركات البنكية الغائبة، ` +
-        `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (مدين: حساب البنك، دائن: الحساب المناسب).`;
-    } else {
-      suggestedActionEn =
-        `Ledger balance (EGP ${baseLedger}) exceeds bank balance (EGP ${baseBank}) by EGP ${baseDiff}. ` +
-        `${unmatchedLedgerCount} unmatched ledger entry/entries totalling EGP ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} have no bank confirmation. ` +
-        `Suggested action: verify the ${unmatchedLedgerCount} unmatched ledger entries — reverse any duplicates, ` +
-        `or post an adjusting entry of EGP ${baseDiff} (credit bank account, debit appropriate account).`;
-      suggestedActionAr =
-        `رصيد الدفتر (${baseLedger} ج.م) يتجاوز رصيد البنك (${baseBank} ج.م) بفارق ${baseDiff} ج.م ` +
-        `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} ج.م لا يقابلها حركات بنكية. ` +
-        `الإجراء المقترح: راجع القيود ${unmatchedLedgerCount} غير المطابقة — اعكس أي قيود مكررة، ` +
-        `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (دائن: حساب البنك، مدين: الحساب المناسب).`;
-    }
-
-    return {
-      bankBalanceFils,
+    return composeDifference(
+      bankTxs,
       ledgerBalanceFils,
-      differenceFils,
-      unmatchedBankFils,
-      unmatchedLedgerFils,
-      unmatchedLedgerCount,
-      suggestedActionEn,
-      suggestedActionAr,
-      isReconciled,
-    };
+      unmatched.length,
+      unmatched.reduce((sum, row) => sum + Number(row.debit) - Number(row.credit), 0)
+    );
   });
+}
+
+/**
+ * Bank side (from the statement's rows) + ledger side (already summed by the caller: Postgres raw SQL or the DO's
+ * `bankLedgerSide`) -> the difference panel. Pure; shared by both backends so the figures and the EN / AR advice cannot drift.
+ */
+function composeDifference(
+  bankTxs: Array<{ amountFils: number; direction: string; matchStatus: string }>,
+  ledgerBalanceFils: number,
+  unmatchedLedgerCount: number,
+  unmatchedLedgerFils: number
+): ReconciliationDifference {
+  let bankBalanceFils = 0;
+  let unmatchedBankFils = 0;
+  for (const btx of bankTxs) {
+    // credit from the bank (money in) = debit to the asset account; expressed in asset-account terms: credits positive
+    bankBalanceFils += btx.direction === 'credit' ? btx.amountFils : -btx.amountFils;
+    if ((btx.matchStatus as BankMatchStatus) === 'unmatched') unmatchedBankFils += btx.amountFils;
+  }
+  // ── Difference ──
+  const differenceFils = bankBalanceFils - ledgerBalanceFils;
+  const isReconciled = differenceFils === 0;
+
+  // ── Suggested action ──
+  const baseBank = minorToDecimalString(Math.abs(bankBalanceFils));
+  const baseLedger = minorToDecimalString(Math.abs(ledgerBalanceFils));
+  const baseDiff = minorToDecimalString(Math.abs(differenceFils));
+  const unmatchedCount = bankTxs.filter(b => b.matchStatus === 'unmatched').length;
+
+  let suggestedActionEn: string;
+  let suggestedActionAr: string;
+
+  if (isReconciled) {
+    suggestedActionEn =
+      'Bank and ledger agree — this statement is fully reconciled. No action required.';
+    suggestedActionAr = 'البنك والدفتر متطابقان — تم إغلاق كشف الحساب بالكامل. لا يلزم أي إجراء.';
+  } else if (differenceFils > 0) {
+    suggestedActionEn =
+      `Bank balance (EGP ${baseBank}) exceeds ledger balance (EGP ${baseLedger}) by EGP ${baseDiff}. ` +
+      `${unmatchedCount} unmatched bank line(s) totalling EGP ${minorToDecimalString(unmatchedBankFils)} have no ledger entry. ` +
+      `Suggested action: record journal entries for the missing bank transactions, ` +
+      `or post an adjusting entry of EGP ${baseDiff} (debit bank account, credit appropriate account).`;
+    suggestedActionAr =
+      `رصيد البنك (${baseBank} ج.م) يتجاوز رصيد الدفتر (${baseLedger} ج.م) بفارق ${baseDiff} ج.م ` +
+      `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${minorToDecimalString(unmatchedBankFils)} ج.م لا يقابلها قيود في الدفتر. ` +
+      `الإجراء المقترح: سجّل قيوداً محاسبية للحركات البنكية الغائبة، ` +
+      `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (مدين: حساب البنك، دائن: الحساب المناسب).`;
+  } else {
+    suggestedActionEn =
+      `Ledger balance (EGP ${baseLedger}) exceeds bank balance (EGP ${baseBank}) by EGP ${baseDiff}. ` +
+      `${unmatchedLedgerCount} unmatched ledger entry/entries totalling EGP ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} have no bank confirmation. ` +
+      `Suggested action: verify the ${unmatchedLedgerCount} unmatched ledger entries — reverse any duplicates, ` +
+      `or post an adjusting entry of EGP ${baseDiff} (credit bank account, debit appropriate account).`;
+    suggestedActionAr =
+      `رصيد الدفتر (${baseLedger} ج.م) يتجاوز رصيد البنك (${baseBank} ج.م) بفارق ${baseDiff} ج.م ` +
+      `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} ج.م لا يقابلها حركات بنكية. ` +
+      `الإجراء المقترح: راجع القيود ${unmatchedLedgerCount} غير المطابقة — اعكس أي قيود مكررة، ` +
+      `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (دائن: حساب البنك، مدين: الحساب المناسب).`;
+  }
+
+  return {
+    bankBalanceFils,
+    ledgerBalanceFils,
+    differenceFils,
+    unmatchedBankFils,
+    unmatchedLedgerFils,
+    unmatchedLedgerCount,
+    suggestedActionEn,
+    suggestedActionAr,
+    isReconciled,
+  };
 }

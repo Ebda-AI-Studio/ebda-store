@@ -2,7 +2,8 @@ import { prisma, withStore, DbClient } from '@ebda/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
-import { storeRepo, storeStock } from '../../lib/repo-factory';
+import { storeDb, storeRepo, storeStock, storeWriter } from '../../lib/repo-factory';
+import { AppError } from '../../middleware/error-handler';
 
 /**
  * Seed the Egypt-retail Chart of Accounts for a store. Idempotent — existing
@@ -258,21 +259,35 @@ export interface CreateChildAccountInput {
  *   - code collides with an existing account in this store
  */
 export async function createChildAccount(input: CreateChildAccountInput) {
-  const parent = await prisma.account.findFirst({
+  // Reads and the write follow the store's backend (Ruling NZ-FEAT-1): a Durable Object store keeps its chart there. On Postgres
+  // both clients are the `prisma` proxy, so the request transaction and the tenant guard are unchanged.
+  const db = await storeDb(input.storeId);
+  const parent = await db.account.findFirst({
     where: { id: input.parentId, storeId: input.storeId },
     select: { id: true, type: true, isSystem: true, code: true },
   });
-  if (!parent) throw new Error('Parent account not found in this store');
+  if (!parent)
+    throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Parent account not found in this store');
   if (!parent.isSystem) {
-    throw new Error('Custom children are only allowed under system accounts (one-level deep)');
+    throw new AppError(
+      409,
+      'ACCOUNT_PARENT_NOT_SYSTEM',
+      'Custom children are only allowed under system accounts (one-level deep)'
+    );
   }
-  const collision = await prisma.account.findUnique({
-    where: { storeId_code: { storeId: input.storeId, code: input.code } },
+  const collision = await db.account.findFirst({
+    where: { storeId: input.storeId, code: input.code },
     select: { id: true },
   });
-  if (collision) throw new Error(`Account code ${input.code} already exists in this store`);
+  if (collision)
+    throw new AppError(
+      409,
+      'ACCOUNT_CODE_EXISTS',
+      `Account code ${input.code} already exists in this store`
+    );
 
-  return prisma.account.create({
+  const w = await storeWriter(input.storeId);
+  return w.account.create({
     data: {
       storeId: input.storeId,
       parentId: input.parentId,
@@ -292,13 +307,17 @@ export async function createChildAccount(input: CreateChildAccountInput) {
  * cannot be used as new journal-line targets.
  */
 export async function setAccountActive(storeId: string, accountId: string, isActive: boolean) {
-  const acct = await prisma.account.findFirst({
+  const acct = await (
+    await storeDb(storeId)
+  ).account.findFirst({
     where: { id: accountId, storeId },
     select: { isSystem: true },
   });
-  if (!acct) throw new Error('Account not found');
-  if (acct.isSystem) throw new Error('System accounts cannot be disabled');
-  return prisma.account.update({ where: { id: accountId, storeId }, data: { isActive } });
+  if (!acct) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Account not found');
+  if (acct.isSystem)
+    throw new AppError(409, 'ACCOUNT_SYSTEM', 'System accounts cannot be disabled');
+  const w = await storeWriter(storeId);
+  return w.account.update({ where: { id: accountId, storeId }, data: { isActive } });
 }
 
 /**
@@ -307,7 +326,9 @@ export async function setAccountActive(storeId: string, accountId: string, isAct
  * self-relation. Sorted by code ascending within each branch.
  */
 export async function listAccountsTree(storeId: string): Promise<AccountsTree> {
-  const all = await prisma.account.findMany({
+  const all = await (
+    await storeDb(storeId)
+  ).account.findMany({
     where: { storeId },
     orderBy: { code: 'asc' },
   });

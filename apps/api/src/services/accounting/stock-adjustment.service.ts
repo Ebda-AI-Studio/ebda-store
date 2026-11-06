@@ -295,7 +295,8 @@ export async function postAdjustment(
   // Most stores have no warehouses, and reconcile's own fast path is a
   // warehouse COUNT per call — 5,000 of them for a full CSV import (#225).
   // Ask once; skip the loop when there is nothing to reconcile.
-  const hasWarehouses = (await prisma.warehouse.count({ where: { storeId } })) > 0;
+  const hasWarehouses =
+    (await (await storeDb(storeId)).warehouse.count({ where: { storeId } })) > 0;
   for (const item of hasWarehouses ? adjustment.items : []) {
     try {
       await WarehouseService.reconcileWarehouseStockToAggregate(

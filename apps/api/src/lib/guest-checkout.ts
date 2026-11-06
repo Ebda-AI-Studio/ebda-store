@@ -1,4 +1,4 @@
-import { prisma } from '@ebda/database';
+import { storeDb } from './repo-factory';
 
 /**
  * Whether a store takes GUEST orders (no customer account), within a window.
@@ -15,7 +15,10 @@ import { prisma } from '@ebda/database';
  * already run in the store's tenant context.
  */
 export async function storeTakesGuestOrders(storeId: string, since: Date): Promise<boolean> {
-  const row = await prisma.order.findFirst({
+  // The store's backend (a DO store's orders are in its StoreDO; the prisma proxy for a pg store).
+  const row = await (
+    await storeDb(storeId)
+  ).order.findFirst({
     where: { storeId, customerId: null, createdAt: { gte: since } },
     select: { id: true },
   });

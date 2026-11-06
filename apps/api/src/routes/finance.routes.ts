@@ -15,12 +15,8 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import {
-  DISABLED_VARIANT_STOCK_VALUE_SQL,
-  storeStockValueFils,
-} from '../lib/effective-inventory-sql';
 import { z } from 'zod/v3';
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -44,8 +40,9 @@ import {
   setAccountActive,
   seedCoaForStore,
 } from '../services/accounting/account.service';
-import { postEntry } from '../services/accounting/journal.service';
+import { postManualEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
+import { dashboardStockValues } from '../services/accounting/dashboard-stock';
 import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse, summarizeExportFilters } from '../lib/exports/xlsx';
 import multer from 'multer';
@@ -157,9 +154,10 @@ router.get(
         if (q.to) where.postedAt.lte = new Date(q.to);
       }
 
+      const db = await storeDb(req.params.storeId);
       const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
-          prisma.journalEntry.findMany({
+          db.journalEntry.findMany({
             where,
             include: {
               lines: {
@@ -172,7 +170,7 @@ router.get(
             skip: (q.page - 1) * q.perPage,
             take: q.perPage,
           }),
-          prisma.journalEntry.count({ where }),
+          db.journalEntry.count({ where }),
         ])
       );
 
@@ -206,8 +204,9 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await storeDb(req.params.storeId);
       const entry = await runInStoreCtx(req.params.storeId, () =>
-        prisma.journalEntry.findFirst({
+        db.journalEntry.findFirst({
           where: { id: req.params.entryId, storeId: req.params.storeId },
           include: {
             lines: { include: { account: true } },
@@ -323,7 +322,7 @@ router.post(
       });
 
       const entry = await runInStoreCtx(req.params.storeId, () =>
-        postEntry({
+        postManualEntry({
           storeId: req.params.storeId,
           source: 'manual',
           memo: body.memo,
@@ -633,24 +632,14 @@ router.get(
       const to = parseFinanceDate(req.query.to, now, 'end', tz);
 
       const data = await runInStoreCtx(req.params.storeId, async () => {
-        const [pnl, bs, stockValue, disabledValueRows] = await Promise.all([
+        const [pnl, bs, stock] = await Promise.all([
           profitAndLoss(req.params.storeId, from, to),
           balanceSheet(req.params.storeId, to),
-          // Variant-aware quantity AND cost, active variants only — the same
-          // query the analytics inventory snapshot uses. See
-          // storeStockValueFils in lib/effective-inventory-sql.ts.
-          storeStockValueFils(req.params.storeId),
-          // issue 2146: value on DISABLED variants — not stock, so not in
-          // stockValue (owner decision 2026-10-01, #2078), but shown beside it
-          // rather than vanishing.
-          prisma.$queryRaw<{ total: bigint }[]>`
-            SELECT COALESCE(SUM(${DISABLED_VARIANT_STOCK_VALUE_SQL}), 0) AS total
-            FROM public.products p
-            WHERE p.store_id = ${req.params.storeId} AND p.deleted_at IS NULL
-          `,
+          // Variant-aware quantity AND cost, active variants only, plus (issue 2146) the value on DISABLED variants: not
+          // stock (owner decision 2026-10-01, #2078), shown beside it rather than vanishing. Either backend.
+          dashboardStockValues(req.params.storeId),
         ]);
-
-        const disabledVariantStockValue = Number(disabledValueRows[0]?.total ?? 0);
+        const { stockValue, disabledVariantStockValue } = stock;
 
         return {
           thisMonth: {
@@ -1135,8 +1124,9 @@ router.get(
       };
       if (currency) where.currency = currency.toUpperCase();
 
+      const db = await storeDb(req.params.storeId);
       const rates = await runInStoreCtx(req.params.storeId, () =>
-        prisma.fxRateEntry.findMany({
+        db.fxRateEntry.findMany({
           where,
           orderBy: { rateDate: 'desc' },
           take: 200,
@@ -1174,8 +1164,9 @@ router.post(
       const { currency, rate, rateDate } = parsed.data;
       const rateDateValue = rateDate ? new Date(rateDate) : new Date();
 
+      const w = await storeWriter(req.params.storeId);
       const entry = await runInStoreCtx(req.params.storeId, () =>
-        prisma.fxRateEntry.create({
+        w.fxRateEntry.create({
           data: {
             storeId: req.params.storeId,
             currency: currency.toUpperCase(),
@@ -1333,9 +1324,10 @@ router.get(
       const where: any = { storeId: req.params.storeId };
       if (q.status) where.status = q.status;
 
+      const db = await storeDb(req.params.storeId);
       const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
-          prisma.bankStatement.findMany({
+          db.bankStatement.findMany({
             where,
             select: {
               id: true,
@@ -1351,7 +1343,7 @@ router.get(
             skip: (q.page - 1) * q.perPage,
             take: q.perPage,
           }),
-          prisma.bankStatement.count({ where }),
+          db.bankStatement.count({ where }),
         ])
       );
 
@@ -1373,8 +1365,9 @@ router.get(
   ...bankRecMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await storeDb(req.params.storeId);
       const stmt = await runInStoreCtx(req.params.storeId, () =>
-        prisma.bankStatement.findFirst({
+        db.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: {
             id: true,
@@ -1419,8 +1412,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Verify statement ownership before running the difference query
+      const db = await storeDb(req.params.storeId);
       const stmt = await runInStoreCtx(req.params.storeId, () =>
-        prisma.bankStatement.findFirst({
+        db.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
         })
@@ -1456,8 +1450,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Verify statement belongs to this store
+      const db = await storeDb(req.params.storeId);
       const stmt = await runInStoreCtx(req.params.storeId, () =>
-        prisma.bankStatement.findFirst({
+        db.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
         })
@@ -1476,7 +1471,7 @@ router.get(
 
       const [items, total] = await runInStoreCtx(req.params.storeId, () =>
         Promise.all([
-          prisma.bankTransaction.findMany({
+          db.bankTransaction.findMany({
             where,
             select: {
               id: true,
@@ -1502,7 +1497,7 @@ router.get(
             skip: (q.page - 1) * q.perPage,
             take: q.perPage,
           }),
-          prisma.bankTransaction.count({ where }),
+          db.bankTransaction.count({ where }),
         ])
       );
 
@@ -1525,8 +1520,9 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Verify statement ownership
+      const db = await storeDb(req.params.storeId);
       const stmt = await runInStoreCtx(req.params.storeId, () =>
-        prisma.bankStatement.findFirst({
+        db.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
         })
@@ -1623,8 +1619,9 @@ router.delete(
   ...bankRecMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await storeDb(req.params.storeId);
       const stmt = await runInStoreCtx(req.params.storeId, () =>
-        prisma.bankStatement.findFirst({
+        db.bankStatement.findFirst({
           where: { id: req.params.sid, storeId: req.params.storeId },
           select: { id: true },
         })
@@ -1637,8 +1634,9 @@ router.delete(
         return;
       }
 
+      const w = await storeWriter(req.params.storeId);
       await runInStoreCtx(req.params.storeId, () =>
-        prisma.bankStatement.delete({ where: { id: req.params.sid, storeId: req.params.storeId } })
+        w.bankStatement.delete({ where: { id: req.params.sid, storeId: req.params.storeId } })
       );
 
       res.status(204).send();

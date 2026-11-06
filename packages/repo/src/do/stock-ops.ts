@@ -52,6 +52,7 @@ export const STOCK_OP_NAMES: readonly StockOpName[] = [
   'reconcileCountSession',
   'bulkSetInventory',
   'importCodRemittances',
+  'pickOrderItem',
 ];
 
 type HistoryType =

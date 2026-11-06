@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'crypto';
 import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
-import { storeDb, storeMoney } from '../lib/repo-factory';
+import { storeDb, storeMoney, storeWriter, storeWritesToDo } from '../lib/repo-factory';
 import { opKey } from '../lib/money-idempotency';
 import logger from '../lib/logger';
 import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';
@@ -126,7 +126,9 @@ class AffiliateService {
   }
 
   async upsertConfig(storeId: string, data: Partial<AffiliateConfigDefaults>) {
-    const config = await prisma.affiliateConfig.upsert({
+    const config = await (
+      await storeWriter(storeId)
+    ).affiliateConfig.upsert({
       where: { storeId },
       create: {
         storeId,
@@ -161,7 +163,9 @@ class AffiliateService {
 
     for (let attempt = 0; attempt < 10; attempt++) {
       const code = `${base}${randomChars(4)}`;
-      const existing = await prisma.affiliate.findUnique({
+      const existing = await (
+        await storeDb(storeId)
+      ).affiliate.findUnique({
         where: { storeId_referralCode: { storeId, referralCode: code } },
       });
       if (!existing) return code;
@@ -182,7 +186,9 @@ class AffiliateService {
     }
 
     // Check duplicate email
-    const existing = await prisma.affiliate.findUnique({
+    const existing = await (
+      await storeDb(storeId)
+    ).affiliate.findUnique({
       where: { storeId_email: { storeId, email: data.email } },
     });
     if (existing) {
@@ -193,7 +199,9 @@ class AffiliateService {
     const status = config.autoApprove ? 'approved' : 'pending';
     const approvedAt = config.autoApprove ? new Date() : null;
 
-    const affiliate = await prisma.affiliate.create({
+    const affiliate = await (
+      await storeWriter(storeId)
+    ).affiliate.create({
       data: {
         storeId,
         name: data.name,
@@ -227,7 +235,9 @@ class AffiliateService {
 
   async create(storeId: string, data: CreateAffiliateData) {
     // Check duplicate email
-    const existing = await prisma.affiliate.findUnique({
+    const existing = await (
+      await storeDb(storeId)
+    ).affiliate.findUnique({
       where: { storeId_email: { storeId, email: data.email } },
     });
     if (existing) {
@@ -236,7 +246,9 @@ class AffiliateService {
 
     const referralCode = await this.generateUniqueReferralCode(storeId, data.name);
 
-    const affiliate = await prisma.affiliate.create({
+    const affiliate = await (
+      await storeWriter(storeId)
+    ).affiliate.create({
       data: {
         storeId,
         name: data.name,
@@ -279,8 +291,9 @@ class AffiliateService {
     const where: Prisma.AffiliateWhereInput = { storeId };
     if (status) where.status = status;
 
+    const db = await storeDb(storeId);
     const [affiliates, total] = await Promise.all([
-      prisma.affiliate.findMany({
+      db.affiliate.findMany({
         where,
         skip,
         take: limit,
@@ -289,7 +302,7 @@ class AffiliateService {
           _count: { select: { referrals: true, payouts: true } },
         },
       }),
-      prisma.affiliate.count({ where }),
+      db.affiliate.count({ where }),
     ]);
 
     return {
@@ -328,7 +341,9 @@ class AffiliateService {
   async update(storeId: string, id: string, data: UpdateAffiliateData) {
     await this.getById(storeId, id);
 
-    const affiliate = await prisma.affiliate.update({
+    const affiliate = await (
+      await storeWriter(storeId)
+    ).affiliate.update({
       where: { id, storeId },
       data: {
         ...(data.commissionRate !== undefined && { commissionRate: data.commissionRate }),
@@ -348,7 +363,9 @@ class AffiliateService {
       throw new AppError(400, 'INVALID_STATUS', 'Only pending affiliates can be approved');
     }
 
-    const updated = await prisma.affiliate.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).affiliate.update({
       where: { id, storeId },
       data: { status: 'approved', approvedAt: new Date(), approvedBy: userId },
     });
@@ -372,7 +389,9 @@ class AffiliateService {
       throw new AppError(400, 'INVALID_STATUS', 'Only pending affiliates can be rejected');
     }
 
-    const updated = await prisma.affiliate.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).affiliate.update({
       where: { id, storeId },
       data: { status: 'rejected', approvedBy: userId },
     });
@@ -392,7 +411,9 @@ class AffiliateService {
   async suspend(storeId: string, id: string, userId: string) {
     const affiliate = await this.getById(storeId, id);
 
-    const updated = await prisma.affiliate.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).affiliate.update({
       where: { id, storeId },
       data: { status: 'suspended', approvedBy: userId },
     });
@@ -414,13 +435,41 @@ class AffiliateService {
   async delete(storeId: string, id: string) {
     await this.getById(storeId, id);
 
-    await prisma.affiliate.delete({ where: { id, storeId } });
+    const w = await storeWriter(storeId);
+    if (await storeWritesToDo(storeId)) {
+      // A store on its Durable Object: AffiliatePayout is not writable there (payouts are money history) and there is no FK
+      // cascade, so an affiliate with any money trail is refused; otherwise events + referrals + the row go in ONE batch.
+      const db = await storeDb(storeId);
+      const [payouts, row] = await Promise.all([
+        db.affiliatePayout.count({ where: { affiliateId: id, storeId } }),
+        db.affiliate.findFirst({
+          where: { id, storeId },
+          select: { pendingBalance: true, totalEarned: true },
+        }),
+      ]);
+      if (payouts > 0 || (row?.pendingBalance ?? 0) !== 0 || (row?.totalEarned ?? 0) !== 0) {
+        throw new AppError(
+          409,
+          'AFFILIATE_HAS_PAYOUTS',
+          'This affiliate has payouts or an earned balance and cannot be deleted; suspend it instead'
+        );
+      }
+      await w.$transaction([
+        w.affiliateEvent.deleteMany({ where: { affiliateId: id, storeId } }),
+        w.affiliateReferral.deleteMany({ where: { affiliateId: id, storeId } }),
+        w.affiliate.delete({ where: { id, storeId } }),
+      ]);
+      return;
+    }
+    await w.affiliate.delete({ where: { id, storeId } });
   }
 
   // ---- Click Tracking ----
 
   async registerClick(storeId: string, referralCode: string, sessionId: string) {
-    const affiliate = await prisma.affiliate.findUnique({
+    const affiliate = await (
+      await storeDb(storeId)
+    ).affiliate.findUnique({
       where: { storeId_referralCode: { storeId, referralCode } },
     });
 
@@ -437,7 +486,9 @@ class AffiliateService {
     const cookieExpiresAt = new Date();
     cookieExpiresAt.setDate(cookieExpiresAt.getDate() + cookieDurationDays);
 
-    const referral = await prisma.affiliateReferral.create({
+    const referral = await (
+      await storeWriter(storeId)
+    ).affiliateReferral.create({
       data: {
         storeId,
         affiliateId: affiliate.id,
@@ -460,7 +511,9 @@ class AffiliateService {
 
   async linkOrderToReferral(storeId: string, orderId: string, referralCode: string) {
     // Find the most recent active clicked referral for this code
-    const referral = await prisma.affiliateReferral.findFirst({
+    const referral = await (
+      await storeDb(storeId)
+    ).affiliateReferral.findFirst({
       where: {
         storeId,
         referralCode,
@@ -479,7 +532,9 @@ class AffiliateService {
       return null;
     }
 
-    const updated = await prisma.affiliateReferral.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).affiliateReferral.update({
       where: { id: referral.id, storeId },
       data: { orderId, status: 'converted', convertedAt: new Date() },
     });
@@ -604,7 +659,9 @@ class AffiliateService {
       const r = await money.affiliateReverse({ orderId });
       return r.amount === null ? null : { amount: r.amount };
     }
-    const referral = await prisma.affiliateReferral.findFirst({
+    const referral = await (
+      await storeDb(storeId)
+    ).affiliateReferral.findFirst({
       where: { storeId, orderId, status: 'commission_paid' },
     });
 
@@ -670,14 +727,15 @@ class AffiliateService {
 
     const where: Prisma.AffiliateReferralWhereInput = { storeId, affiliateId };
 
+    const db = await storeDb(storeId);
     const [referrals, total] = await Promise.all([
-      prisma.affiliateReferral.findMany({
+      db.affiliateReferral.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.affiliateReferral.count({ where }),
+      db.affiliateReferral.count({ where }),
     ]);
 
     return {
@@ -812,21 +870,20 @@ class AffiliateService {
   // ---- Stats ----
 
   async getStats(storeId: string) {
-    const [totalAffiliates, activeAffiliates, totalReferrals, conversions, commissionSumResult] =
+    const db = await storeDb(storeId);
+    const [totalAffiliates, activeAffiliates, totalReferrals, conversions, paidRows] =
       await Promise.all([
-        prisma.affiliate.count({ where: { storeId } }),
-        prisma.affiliate.count({ where: { storeId, status: 'approved' } }),
-        prisma.affiliateReferral.count({ where: { storeId } }),
-        prisma.affiliateReferral.count({
+        db.affiliate.count({ where: { storeId } }),
+        db.affiliate.count({ where: { storeId, status: 'approved' } }),
+        db.affiliateReferral.count({ where: { storeId } }),
+        db.affiliateReferral.count({
           where: { storeId, status: { in: ['converted', 'commission_paid'] } },
         }),
-        prisma.affiliate.aggregate({
-          where: { storeId },
-          _sum: { totalPaid: true },
-        }),
+        // summed in JS: the read client has no aggregate (the affiliate list of one store is small)
+        db.affiliate.findMany({ where: { storeId }, select: { totalPaid: true } }),
       ]);
 
-    const commissionPaid = commissionSumResult._sum.totalPaid ?? 0;
+    const commissionPaid = paidRows.reduce((sum, a) => sum + (a.totalPaid ?? 0), 0);
 
     return {
       totalAffiliates,

@@ -301,11 +301,18 @@ async function expenseStepOnDo(
   extra: { userId?: string | null; pending?: boolean } = {}
 ): Promise<ExpenseWithRelations> {
   const out = await r.money.expenseTransition({ expenseId: id, action, ...extra });
-  if (!out.found) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!out.found)
+    throw new AppError(404, 'EXPENSE_NOT_FOUND', `Expense ${id} not found in store ${storeId}`);
   if (!out.changed) {
     if (action === 'post')
-      throw new Error(`Expense ${id} must be approved before posting (status=${out.status})`);
-    throw new Error(
+      throw new AppError(
+        409,
+        'EXPENSE_INVALID_STATUS',
+        `Expense ${id} must be approved before posting (status=${out.status})`
+      );
+    throw new AppError(
+      409,
+      'EXPENSE_INVALID_STATUS',
       `Expense ${id} cannot be ${action === 'approve' ? 'approved' : 'rejected'} (status=${out.status})`
     );
   }
@@ -313,7 +320,8 @@ async function expenseStepOnDo(
     where: { id, storeId },
     include: EXPENSE_INCLUDE,
   });
-  if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!row)
+    throw new AppError(404, 'EXPENSE_NOT_FOUND', `Expense ${id} not found in store ${storeId}`);
   return row as unknown as ExpenseWithRelations;
 }
 
@@ -336,7 +344,8 @@ export async function approveExpense(
       where: { id, storeId },
       select: { createdBy: true },
     });
-    if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
+    if (!row)
+      throw new AppError(404, 'EXPENSE_NOT_FOUND', `Expense ${id} not found in store ${storeId}`);
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({ where: { id: storeId }, select: { expenseTwoStepApproval: true } })
     );
@@ -349,9 +358,14 @@ export async function approveExpense(
     include: { store: { select: { expenseTwoStepApproval: true } } },
   });
 
-  if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!expense)
+    throw new AppError(404, 'EXPENSE_NOT_FOUND', `Expense ${id} not found in store ${storeId}`);
   if (!['draft', 'pending'].includes(expense.status)) {
-    throw new Error(`Expense ${id} cannot be approved (status=${expense.status})`);
+    throw new AppError(
+      409,
+      'EXPENSE_INVALID_STATUS',
+      `Expense ${id} cannot be approved (status=${expense.status})`
+    );
   }
 
   const twoStep = expense.store?.expenseTwoStepApproval ?? false;
@@ -386,9 +400,14 @@ export async function postExpense(storeId: string, id: string): Promise<ExpenseW
   }
   const expense = await prisma.expense.findFirst({ where: { id, storeId } });
 
-  if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!expense)
+    throw new AppError(404, 'EXPENSE_NOT_FOUND', `Expense ${id} not found in store ${storeId}`);
   if (expense.status !== 'approved') {
-    throw new Error(`Expense ${id} must be approved before posting (status=${expense.status})`);
+    throw new AppError(
+      409,
+      'EXPENSE_INVALID_STATUS',
+      `Expense ${id} must be approved before posting (status=${expense.status})`
+    );
   }
 
   const updated = await prisma.expense.update({
@@ -426,9 +445,14 @@ export async function rejectExpense(storeId: string, id: string): Promise<Expens
   if (onDo) return expenseStepOnDo(onDo, storeId, id, 'reject');
   const expense = await prisma.expense.findFirst({ where: { id, storeId } });
 
-  if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!expense)
+    throw new AppError(404, 'EXPENSE_NOT_FOUND', `Expense ${id} not found in store ${storeId}`);
   if (!['draft', 'pending'].includes(expense.status)) {
-    throw new Error(`Expense ${id} cannot be rejected (status=${expense.status})`);
+    throw new AppError(
+      409,
+      'EXPENSE_INVALID_STATUS',
+      `Expense ${id} cannot be rejected (status=${expense.status})`
+    );
   }
 
   return prisma.expense.update({

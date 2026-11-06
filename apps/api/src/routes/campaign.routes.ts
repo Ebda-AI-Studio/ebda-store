@@ -553,18 +553,34 @@ campaignTestSendRouter.post(
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
       const userId = req.user!.userId;
-      const { campaign, user, store } = await runInTenantContext(
-        storeId,
-        async () => {
-          const found = await findCampaignOr404(storeId, campaignId);
-          const [u, s] = await Promise.all([
-            prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
-            prisma.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT }),
-          ]);
-          return { campaign: found, user: u, store: s };
-        },
-        userId
-      );
+      const repo = await storeRepo(storeId);
+      // A store on its Durable Object (NEON-ZERO): no Postgres transaction; the store is the split record on the DO read client
+      // and the admin's address is the session's (merchants sign in at the identity service, Ruling ID-1: no Store `users` row).
+      const { campaign, user, store } =
+        repo.backend === 'do'
+          ? {
+              campaign: await findCampaignOr404(storeId, campaignId),
+              user: { email: req.user!.email },
+              store: await repo.db.store.findUnique({
+                where: { id: storeId },
+                select: CAMPAIGN_STORE_SELECT,
+              }),
+            }
+          : await runInTenantContext(
+              storeId,
+              async () => {
+                const found = await findCampaignOr404(storeId, campaignId);
+                const [u, s] = await Promise.all([
+                  prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+                  prisma.store.findUnique({
+                    where: { id: storeId },
+                    select: CAMPAIGN_STORE_SELECT,
+                  }),
+                ]);
+                return { campaign: found, user: u, store: s };
+              },
+              userId
+            );
       if (!isCampaignSendable(campaign)) {
         throw new AppError(
           422,

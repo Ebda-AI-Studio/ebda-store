@@ -35,7 +35,7 @@ import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { planDeficit } from '../lib/warehouse-deficit';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
-import { storeStock } from '../lib/repo-factory';
+import { storeDb, storeStock, storeWriter } from '../lib/repo-factory';
 import { searchProductIdSet, searchVariantIdsBySku } from './product-search.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -181,7 +181,10 @@ export class WarehouseService {
    * List all warehouses for a store, with total SKU / unit counts.
    */
   static async listWarehouses(storeId: string): Promise<WarehouseRow[]> {
-    const warehouses = await prisma.warehouse.findMany({
+    // The store's backend (Warehouse / WarehouseStock live in its StoreDO; Postgres for a pg store).
+    const warehouses = await (
+      await storeDb(storeId)
+    ).warehouse.findMany({
       where: { storeId, isActive: true },
       select: {
         ...WAREHOUSE_SELECT,
@@ -215,7 +218,9 @@ export class WarehouseService {
    * Get a single warehouse (with stock totals).
    */
   static async getWarehouse(storeId: string, warehouseId: string): Promise<WarehouseRow> {
-    const w = await prisma.warehouse.findFirst({
+    const w = await (
+      await storeDb(storeId)
+    ).warehouse.findFirst({
       where: { id: warehouseId, storeId },
       select: {
         ...WAREHOUSE_SELECT,
@@ -238,8 +243,10 @@ export class WarehouseService {
     storeId: string,
     input: WarehouseCreateInput
   ): Promise<WarehouseRow> {
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
     // Check code uniqueness within store
-    const existing = await prisma.warehouse.findFirst({
+    const existing = await db.warehouse.findFirst({
       where: { storeId, code: input.code.toUpperCase() },
     });
     if (existing) {
@@ -250,15 +257,9 @@ export class WarehouseService {
       );
     }
 
-    // If setting as default, clear existing default first
-    if (input.isDefault) {
-      await prisma.warehouse.updateMany({
-        where: { storeId, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
-
-    const warehouse = await prisma.warehouse.create({
+    // One atomic batch (one StoreDO transaction, or the request transaction on Postgres): clearing the old default and
+    // inserting the new one cannot leave the store with two defaults or none.
+    const create = w.warehouse.create({
       data: {
         storeId,
         name: input.name,
@@ -271,11 +272,19 @@ export class WarehouseService {
         address: input.address ?? null,
         isActive: true,
       },
-      select: {
-        ...WAREHOUSE_SELECT,
-        warehouseStock: { select: { quantity: true } },
-      },
+      select: WAREHOUSE_SELECT,
     });
+    const warehouse = input.isDefault
+      ? (
+          await w.$transaction([
+            w.warehouse.updateMany({
+              where: { storeId, isDefault: true },
+              data: { isDefault: false },
+            }),
+            create,
+          ])
+        )[1]
+      : await create;
 
     logger.info(
       { storeId, warehouseId: warehouse.id, code: warehouse.code },
@@ -298,14 +307,16 @@ export class WarehouseService {
     warehouseId: string,
     input: WarehouseUpdateInput
   ): Promise<WarehouseRow> {
-    const existing = await prisma.warehouse.findFirst({
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
+    const existing = await db.warehouse.findFirst({
       where: { id: warehouseId, storeId },
     });
     if (!existing) throw new AppError(404, 'WAREHOUSE_NOT_FOUND', 'Warehouse not found');
 
     // Code uniqueness check if code is changing
     if (input.code && input.code.toUpperCase() !== existing.code) {
-      const clash = await prisma.warehouse.findFirst({
+      const clash = await db.warehouse.findFirst({
         where: { storeId, code: input.code.toUpperCase(), id: { not: warehouseId } },
       });
       if (clash) {
@@ -317,17 +328,9 @@ export class WarehouseService {
       }
     }
 
-    // Setting this as default → clear others
-    if (input.isDefault === true) {
-      await prisma.warehouse.updateMany({
-        where: { storeId, isDefault: true, id: { not: warehouseId } },
-        data: { isDefault: false },
-      });
-    }
-
     // Block disabling the only active warehouse
     if (input.isActive === false && existing.isDefault) {
-      const activeCount = await prisma.warehouse.count({
+      const activeCount = await db.warehouse.count({
         where: { storeId, isActive: true, id: { not: warehouseId } },
       });
       if (activeCount === 0) {
@@ -339,7 +342,7 @@ export class WarehouseService {
       }
     }
 
-    const updated = await prisma.warehouse.update({
+    const update = w.warehouse.update({
       where: { id: warehouseId, storeId },
       data: {
         ...(input.name !== undefined && { name: input.name }),
@@ -352,17 +355,20 @@ export class WarehouseService {
         ...(input.address !== undefined && { address: input.address }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
       },
-      select: {
-        ...WAREHOUSE_SELECT,
-        warehouseStock: { select: { quantity: true } },
-      },
+      select: { id: true },
     });
+    // Setting this as default clears the others in the SAME atomic batch (never two defaults).
+    if (input.isDefault === true)
+      await w.$transaction([
+        w.warehouse.updateMany({
+          where: { storeId, isDefault: true, id: { not: warehouseId } },
+          data: { isDefault: false },
+        }),
+        update,
+      ]);
+    else await update;
 
-    return {
-      ...updated,
-      totalSkus: updated.warehouseStock.length,
-      totalUnits: updated.warehouseStock.reduce((sum, s) => sum + s.quantity, 0),
-    };
+    return WarehouseService.getWarehouse(storeId, warehouseId);
   }
 
   /**
@@ -370,12 +376,13 @@ export class WarehouseService {
    * Blocks if it's the last active warehouse for the store.
    */
   static async deactivateWarehouse(storeId: string, warehouseId: string): Promise<void> {
-    const existing = await prisma.warehouse.findFirst({
+    const db = await storeDb(storeId);
+    const existing = await db.warehouse.findFirst({
       where: { id: warehouseId, storeId },
     });
     if (!existing) throw new AppError(404, 'WAREHOUSE_NOT_FOUND', 'Warehouse not found');
 
-    const activeCount = await prisma.warehouse.count({
+    const activeCount = await db.warehouse.count({
       where: { storeId, isActive: true, id: { not: warehouseId } },
     });
     if (activeCount === 0) {
@@ -386,9 +393,12 @@ export class WarehouseService {
       );
     }
 
-    await prisma.warehouse.update({
+    await (
+      await storeWriter(storeId)
+    ).warehouse.update({
       where: { id: warehouseId, storeId },
       data: { isActive: false, isDefault: false },
+      select: { id: true },
     });
 
     logger.info({ storeId, warehouseId }, '[Warehouse] deactivated');
@@ -413,7 +423,9 @@ export class WarehouseService {
       quantity: number;
     }[]
   > {
-    const rows = await prisma.warehouseStock.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).warehouseStock.findMany({
       where: {
         storeId,
         productId,
@@ -446,8 +458,9 @@ export class WarehouseService {
     warehouseId: string,
     options?: { page?: number; limit?: number; search?: string }
   ): Promise<{ rows: WarehouseStockRow[]; total: number; truncated: boolean }> {
+    const db = await storeDb(storeId);
     // Verify warehouse belongs to store
-    const warehouse = await prisma.warehouse.findFirst({
+    const warehouse = await db.warehouse.findFirst({
       where: { id: warehouseId, storeId },
     });
     if (!warehouse) throw new AppError(404, 'WAREHOUSE_NOT_FOUND', 'Warehouse not found');
@@ -476,7 +489,7 @@ export class WarehouseService {
     }
 
     const [rows, total] = await Promise.all([
-      prisma.warehouseStock.findMany({
+      db.warehouseStock.findMany({
         where,
         select: {
           id: true,
@@ -492,7 +505,7 @@ export class WarehouseService {
         skip,
         take: limit,
       }),
-      prisma.warehouseStock.count({ where }),
+      db.warehouseStock.count({ where }),
     ]);
 
     return {
@@ -873,7 +886,9 @@ export class WarehouseService {
   static async resolveDefaultWarehouse(
     storeId: string
   ): Promise<{ id: string; isDefault: boolean; priority: number; isActive: boolean } | null> {
-    const warehouses = await prisma.warehouse.findMany({
+    const warehouses = await (
+      await storeDb(storeId)
+    ).warehouse.findMany({
       where: { storeId },
       select: { id: true, isDefault: true, priority: true, isActive: true },
       orderBy: [{ createdAt: 'asc' }],
@@ -1199,8 +1214,10 @@ export class WarehouseService {
    * + insufficientStock=true (partial fulfillment indicator).
    */
   static async routeOrder(storeId: string, input: RouteOrderInput): Promise<RoutedLine[]> {
-    // Fetch all active warehouses for this store with their stock
-    const warehouses = await prisma.warehouse.findMany({
+    // Fetch all active warehouses for this store with their stock (the store's backend)
+    const warehouses = await (
+      await storeDb(storeId)
+    ).warehouse.findMany({
       where: { storeId, isActive: true },
       select: {
         id: true,

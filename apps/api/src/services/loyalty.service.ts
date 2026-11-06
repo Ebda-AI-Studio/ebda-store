@@ -12,6 +12,32 @@ import {
 } from '../lib/repo-factory';
 import { assertStoreCustomer } from '../lib/store-customer';
 import { withStoreRead } from '../lib/store-read';
+import { customerRows } from '../lib/customer-directory';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
+
+/**
+ * Name/email of this store's customers for the admin loyalty lists (SEC-CUSTOMER-SCOPE-1). A store whose customers are on its
+ * StoreDO (customer-auth cutover, Ruling NZ-N9-6) reads its directory there; a soft-deleted customer is dropped like a
+ * Postgres row that no longer matches. Otherwise the unchanged Postgres `users` read, scoped to the store's customer accounts.
+ */
+async function storeCustomerIdentities(
+  storeId: string,
+  ids: string[]
+): Promise<Map<string, { id: string; email: string; firstName: string; lastName: string }>> {
+  const unique = [...new Set(ids)];
+  const fromDo = await customerRows(storeId, unique);
+  const rows = fromDo
+    ? fromDo
+        .filter(c => c.deletedAt === null)
+        .map(c => ({ id: c.id, email: c.email, firstName: c.firstName, lastName: c.lastName }))
+    : await withStore(storeId, tx =>
+        tx.user.findMany({
+          where: { id: { in: unique }, role: 'customer', storeId },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      );
+  return new Map(rows.map(c => [c.id, c]));
+}
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -217,19 +243,22 @@ export class LoyaltyService {
       importedSeen.add(key);
       return;
     }
-    const rows = await prisma.loyaltyTransaction.findMany({
-      where: { storeId, customerId },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: {
-        id: true,
-        orderId: true,
-        type: true,
-        points: true,
-        description: true,
-        expiresAt: true,
-        createdAt: true,
-      },
-    });
+    // No Postgres on this Worker (NEON-ZERO N-17): there is no legacy ledger left to import, only the done flag to write.
+    const rows = postgresRemovedOnThisWorker()
+      ? []
+      : await prisma.loyaltyTransaction.findMany({
+          where: { storeId, customerId },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            orderId: true,
+            type: true,
+            points: true,
+            description: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        });
     if (rows.length === 0) {
       // nothing to import: only the flag (a no-op on a store without loyalty config); NO points row is created
       if ((await m.loyaltyMarkImported({ customerId })).done) importedSeen.add(key);
@@ -272,12 +301,15 @@ export class LoyaltyService {
       importedSeen.add(key);
       return;
     }
-    const customers = await prisma.loyaltyTransaction.findMany({
-      where: { storeId },
-      distinct: ['customerId'],
-      select: { customerId: true },
-      orderBy: { customerId: 'asc' },
-    });
+    // No Postgres on this Worker (NEON-ZERO N-17): no customer has legacy history; only the store-wide flag is written.
+    const customers = postgresRemovedOnThisWorker()
+      ? []
+      : await prisma.loyaltyTransaction.findMany({
+          where: { storeId },
+          distinct: ['customerId'],
+          select: { customerId: true },
+          orderBy: { customerId: 'asc' },
+        });
     const deadline = Date.now() + IMPORT_BUDGET_MS;
     for (const c of customers) {
       if (Date.now() > deadline)
@@ -1432,13 +1464,10 @@ export class LoyaltyService {
       await LoyaltyService.ensureDoStoreHistory(storeId, money);
       const r = await money.loyaltyMembers({ page, limit, tier: options?.tier });
       // SEC-CUSTOMER-SCOPE-1: the name/email join is Postgres identity, scoped to this store's customer accounts.
-      const customers = await withStore(storeId, tx =>
-        tx.user.findMany({
-          where: { id: { in: r.members.map(m => m.customerId) }, role: 'customer', storeId },
-          select: { id: true, email: true, firstName: true, lastName: true },
-        })
+      const byId = await storeCustomerIdentities(
+        storeId,
+        r.members.map(m => m.customerId)
       );
-      const byId = new Map(customers.map(c => [c.id, c]));
       return {
         members: r.members.flatMap(m => {
           const customer = byId.get(m.customerId);
@@ -1514,17 +1543,10 @@ export class LoyaltyService {
         from: q.from ? q.from.getTime() : null,
         to: q.to ? q.to.getTime() : null,
       });
-      const customers = await withStore(storeId, tx =>
-        tx.user.findMany({
-          where: {
-            id: { in: [...new Set(r.transactions.map(t => t.customerId))] },
-            role: 'customer',
-            storeId,
-          },
-          select: { id: true, firstName: true, lastName: true, email: true },
-        })
+      const byId = await storeCustomerIdentities(
+        storeId,
+        r.transactions.map(t => t.customerId)
       );
-      const byId = new Map(customers.map(c => [c.id, c]));
       return {
         total: r.total,
         transactions: r.transactions.flatMap(t => {

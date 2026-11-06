@@ -5,6 +5,8 @@ import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { broadcastToStore } from '../../lib/socket-broadcast';
 import { withSavepointOn } from '../../lib/savepoint';
+import { storeDb, storeMoney } from '../../lib/repo-factory';
+import { AppError } from '../../middleware/error-handler';
 
 import { REGION } from '@ebda/shared';
 export interface JournalLineInput {
@@ -202,6 +204,44 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
   });
 
   return entry;
+}
+
+/**
+ * The merchant-facing manual adjusting entry (`POST /finance/journal`). A store on its Durable Object posts it through the
+ * `journalManual` money op: one atomic section that checks balance, that every account is an active account of THIS store, and
+ * writes the entry and its lines together (Ruling NZ-FEAT-1). A Postgres store runs `postEntry`, unchanged. The refusals read
+ * the same on both: an unbalanced entry is a 400, an unknown account a 404, a disabled one a 409.
+ */
+export async function postManualEntry(input: PostEntryInput): Promise<JournalEntry> {
+  const money = await storeMoney(input.storeId);
+  if (!money) return postEntry(input);
+  const { id } = await money.journalManual({
+    memo: input.memo ?? null,
+    memoAr: input.memoAr ?? null,
+    postedAtMs: input.postedAt ? input.postedAt.getTime() : null,
+    postedBy: input.postedBy ?? null,
+    lines: input.lines.map(l => ({
+      accountId: l.accountId,
+      debit: l.debit,
+      credit: l.credit,
+      lineMemo: l.lineMemo ?? null,
+      currency: l.currency,
+      fxRate: l.fxRate ?? null,
+      originalAmount: l.originalAmount,
+    })),
+  });
+  const entry = await (
+    await storeDb(input.storeId)
+  ).journalEntry.findFirst({
+    where: { id, storeId: input.storeId },
+  });
+  if (!entry)
+    throw new AppError(500, 'JOURNAL_READBACK_FAILED', 'Posted entry could not be read back');
+  broadcastToStore(input.storeId, {
+    name: 'ui/journal-posted',
+    data: { entryId: entry.id, source: input.source, sourceId: input.sourceId },
+  });
+  return entry as JournalEntry;
 }
 
 /**

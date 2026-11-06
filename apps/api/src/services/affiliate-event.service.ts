@@ -2,6 +2,7 @@ import { prisma, Prisma } from '@ebda/database';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 // ==========================================
 // Types
@@ -101,8 +102,10 @@ async function recordAffiliateEventNow(
     // (#1589). A failed insert would otherwise abort that transaction and
     // take the caller's writes down with it — "never throws" has to mean
     // "never poisons the caller's transaction" too.
+    // The store's own backend: the Durable Object for a DO store, the `prisma` proxy for a Postgres one.
+    const w = await storeWriter(input.storeId);
     const event = await withSavepoint(() =>
-      prisma.affiliateEvent.create({
+      w.affiliateEvent.create({
         data: affiliateEventData(input),
         select: { id: true },
       })
@@ -134,7 +137,7 @@ async function recordAffiliateEventNow(
  * Returns up to 200 events, newest-first.
  */
 export async function listAffiliateEvents(affiliateId: string, storeId: string): Promise<object[]> {
-  return prisma.affiliateEvent.findMany({
+  return (await storeDb(storeId)).affiliateEvent.findMany({
     where: { affiliateId, storeId },
     orderBy: { occurredAt: 'desc' },
     take: 200,

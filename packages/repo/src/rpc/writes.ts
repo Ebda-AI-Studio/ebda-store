@@ -134,12 +134,30 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'ProductModelBinding',
   'StoreWhatsAppLink',
   'GoldRateSettings',
+  // feature-gated admin subsystems a merchant turns on (Ruling NZ-FEAT-1): warehouse rows (never their stock: `warehouse_stock`
+  // moves only in the stock ops), the affiliate programme config, affiliates, their audit events and click/referral rows
+  // (never a balance or a commission: those move only in the affiliate money ops, see the locked columns below)
+  'Warehouse',
+  'AffiliateConfig',
+  'Affiliate',
+  'AffiliateEvent',
+  'AffiliateReferral',
+  // finance admin (Ruling NZ-FEAT-1): the chart of accounts rows a merchant adds / disables, the manual FX rate log and the bank
+  // statement import + match state. NEVER the ledger: JournalEntry / JournalLine are written only by the journal money ops
+  'Account',
+  'FxRateEntry',
+  'BankStatement',
+  'BankTransaction',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */
 const STOCK_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   Product: ['inventory'],
   ProductVariant: ['inventory'],
+  // money columns, same lock (Ruling NZ-FEAT-1): an affiliate's balances and a referral's commission move only in the
+  // affiliateCommission / affiliateReverse / affiliatePayout money ops (one transactionSync section each)
+  Affiliate: ['totalEarned', 'totalPaid', 'pendingBalance'],
+  AffiliateReferral: ['commissionAmount'],
 };
 
 const WRITE_GUARD: WriteGuard = { writable: DO_WRITABLE_MODELS, stock: STOCK_COLUMNS };

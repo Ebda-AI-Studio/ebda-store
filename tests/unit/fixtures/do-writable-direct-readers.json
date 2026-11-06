@@ -44,7 +44,8 @@
       "reason": "seedCoaForStore / postOpeningBalanceIfNeeded: after the `storeStock()` early return (CF-R7-1: seedCoa runs the chart seed and the opening-balance journal in the DO); the tx body is the Postgres branch.",
       "models": {
         "product": 1,
-        "productVariant": 1
+        "productVariant": 1,
+        "account": 2
       }
     },
     "apps/api/src/services/accounting/analytics-rollup.service.ts": {
@@ -62,7 +63,23 @@
         "product": 1,
         "productVariant": 1,
         "category": 1,
-        "supplier": 1
+        "supplier": 1,
+        "account": 1
+      }
+    },
+    "apps/api/src/services/accounting/bank-reconcile.service.ts": {
+      "kind": "pg-branch",
+      "reason": "NZ-FEAT-1: importBankStatement / runAutoMatch / applyManualMatch / getReconciliationSummary / getReconciliationDifference each return early on a DO store (storeRepo / storeMoney) to a storeDb path; these withStore reads are the Postgres store's own rows.",
+      "models": {
+        "bankStatement": 1,
+        "bankTransaction": 9
+      }
+    },
+    "apps/api/src/services/accounting/expense.service.ts": {
+      "kind": "pg-branch",
+      "reason": "createExpenseInScope: the Postgres branch of createExpense, after the `storeRepo` early return to createExpenseOnDo (CF-EXP-1); the paid-from account check reads the store's own chart there.",
+      "models": {
+        "account": 1
       }
     },
     "apps/api/src/services/accounting/purchase-order.service.ts": {
@@ -232,10 +249,11 @@
     },
     "apps/api/src/services/warehouse.service.ts": {
       "kind": "pg-branch",
-      "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1).",
+      "reason": "setStock / adjustStock / assertNotVariantProductLevel: after `storeStock()` early return (CF-STOCK-1); the warehouse findFirst/count reads are the same Postgres-only branches (setStock, adjustStock, reconcileWarehouseStockToAggregate, reconcileAllWarehouseStock all return from `storeStock()` first).",
       "models": {
         "product": 2,
-        "productVariant": 2
+        "productVariant": 2,
+        "warehouse": 4
       }
     }
   }
