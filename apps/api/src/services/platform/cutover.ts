@@ -125,48 +125,88 @@ export interface CutoverKeys {
   alertTitle: string;
 }
 
+type CutoverRow = { key: string; value: string };
+
+/** Pure: the {moved, frozen} verdict for ONE key set from the `system_settings` rows that were read for it (expiry + P1 included). */
+function evaluateCutoverRows(
+  rows: readonly CutoverRow[],
+  k: CutoverKeys
+): { moved: boolean; frozen: boolean } {
+  let frozen = false;
+  for (const r of rows) {
+    if (!k.freezes.includes(r.key)) continue;
+    let expiresAt = Number.POSITIVE_INFINITY;
+    try {
+      const parsed = JSON.parse(r.value) as { expiresAt?: unknown };
+      if (typeof parsed.expiresAt === 'number') expiresAt = parsed.expiresAt;
+    } catch {
+      /* a freeze without a readable expiry is honoured */
+    }
+    if (expiresAt <= Date.now()) {
+      if (!expiredFreezeAlerted.has(r.key)) {
+        expiredFreezeAlerted.add(r.key);
+        void sendAlert({
+          level: 'p1',
+          title: k.alertTitle,
+          body: `${r.key} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: ${k.unfreezeHint(r.key)}`,
+        }).catch(() => undefined);
+      }
+      continue;
+    }
+    frozen = true;
+  }
+  return { moved: rows.some(r => k.markers.includes(r.key)), frozen };
+}
+
+const selectKeys = async (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
+  (
+    await d1
+      .prepare(
+        `SELECT key, value FROM system_settings WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(',')})`
+      )
+      .bind(...keys)
+      .all<CutoverRow>()
+  ).results ?? [];
+
 export async function readCutoverKeys(
   d1: MarkerD1,
   k: CutoverKeys
 ): Promise<{ moved: boolean; frozen: boolean }> {
-  const keys = [...k.markers, ...k.freezes];
   try {
-    const rows =
-      (
-        await d1
-          .prepare(
-            `SELECT key, value FROM system_settings WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(',')})`
-          )
-          .bind(...keys)
-          .all<{ key: string; value: string }>()
-      ).results ?? [];
-    let frozen = false;
-    for (const r of rows) {
-      if (!k.freezes.includes(r.key)) continue;
-      let expiresAt = Number.POSITIVE_INFINITY;
-      try {
-        const parsed = JSON.parse(r.value) as { expiresAt?: unknown };
-        if (typeof parsed.expiresAt === 'number') expiresAt = parsed.expiresAt;
-      } catch {
-        /* a freeze without a readable expiry is honoured */
-      }
-      if (expiresAt <= Date.now()) {
-        if (!expiredFreezeAlerted.has(r.key)) {
-          expiredFreezeAlerted.add(r.key);
-          void sendAlert({
-            level: 'p1',
-            title: k.alertTitle,
-            body: `${r.key} expired at ${new Date(expiresAt).toISOString()} and is being ignored. Remove it: ${k.unfreezeHint(r.key)}`,
-          }).catch(() => undefined);
-        }
-        continue;
-      }
-      frozen = true;
-    }
-    return { moved: rows.some(r => k.markers.includes(r.key)), frozen };
+    return evaluateCutoverRows(await selectKeys(d1, [...k.markers, ...k.freezes]), k);
   } catch {
     throw k.unreadable();
   }
+}
+
+/** D1 allows 100 bound parameters per statement; stay under it. */
+const MAX_KEYS_PER_READ = 90;
+
+/**
+ * `readCutoverKeys` for MANY key sets (one per store) in as few D1 reads as the 100-parameter limit allows: the union of
+ * the keys is read once (shared keys deduped), then each set is judged by the SAME rules. Verdicts come back in `sets` order.
+ * Replaces N sequential reads in a per-store sweep (Sentry EBDA-API-Z). Unreadable D1 -> the first set's `unreadable()`.
+ */
+export async function readCutoverKeysMany(
+  d1: MarkerD1,
+  sets: readonly CutoverKeys[]
+): Promise<Array<{ moved: boolean; frozen: boolean }>> {
+  if (sets.length === 0) return [];
+  const unique = [...new Set(sets.flatMap(k => [...k.markers, ...k.freezes]))];
+  const rows: CutoverRow[] = [];
+  try {
+    for (let i = 0; i < unique.length; i += MAX_KEYS_PER_READ)
+      rows.push(...(await selectKeys(d1, unique.slice(i, i + MAX_KEYS_PER_READ))));
+  } catch {
+    throw sets[0]!.unreadable();
+  }
+  return sets.map(k => {
+    const mine = new Set([...k.markers, ...k.freezes]);
+    return evaluateCutoverRows(
+      rows.filter(r => mine.has(r.key)),
+      k
+    );
+  });
 }
 
 const readKeys = (d1: MarkerD1, family: PlatformFamily) =>

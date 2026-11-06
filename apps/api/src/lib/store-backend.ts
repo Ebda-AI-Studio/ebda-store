@@ -14,6 +14,7 @@
  *
  * Never flag `qa-walk-store-1010`.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { isWorkers } from './runtime';
@@ -83,6 +84,10 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
     if (process.env.NODE_ENV === 'production') throw unavailable();
     return 'do';
   }
+  // Inside a `withBackendBatch` sweep the flag was read for every id in ONE query at its start; an id the batch did not
+  // find falls through to the live read below, so an unknown store keeps today's 404 (never a guess).
+  if (batchStorage.getStore()?.has(storeId))
+    return backendFromRow({ storage_backend: batchStorage.getStore()!.get(storeId) });
   let row: { storage_backend?: unknown } | null;
   try {
     row = await d1
@@ -93,12 +98,68 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
     throw unavailable();
   }
   if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  return backendFromRow(row);
+}
+
+function backendFromRow(row: { storage_backend?: unknown }): StoreBackend {
   // NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres. A directory row still saying `pg` (only the soft-deleted QA
   // store) is gone for good: 410, a clean answer instead of a Prisma call that throws POSTGRES_REMOVED.
   if (row.storage_backend === 'pg' && isWorkers)
     throw new AppError(410, 'STORE_STORAGE_REMOVED', 'This store is no longer available');
   if (row.storage_backend === 'do' || row.storage_backend === 'pg') return row.storage_backend;
   throw unavailable();
+}
+
+interface BatchD1 {
+  prepare(sql: string): {
+    bind(...v: unknown[]): {
+      all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>;
+    };
+  };
+}
+
+/**
+ * storeId -> raw `storage_backend` for the ids that exist; read once per sweep, scoped to the sweep, never shared across runs.
+ * Staleness class: BOUNDED-stale snapshot, window = one sweep run (seconds, bounded by the cron's lock TTL). A `flip-backend`
+ * or soft-delete landing mid-run takes effect on the NEXT run (every run re-reads). Residual risk is pg<->do flips only: on
+ * Workers a `pg` store already answers 410, so a stale `do`/`pg` view can at worst process one more sweep for that store.
+ * Request paths never run inside a batch (ALS scope), so they keep the live per-call read.
+ */
+const batchStorage = new AsyncLocalStorage<Map<string, unknown>>();
+const MAX_IDS_PER_READ = 90; // D1 allows 100 bound parameters per statement
+
+/**
+ * Run a cron sweep with every store's `storage_backend` read in as few D1 queries as possible (Sentry EBDA-API-Z: one
+ * `SELECT storage_backend ... WHERE id = ?` per store per call). The map lives only for `fn`'s async context, so each run
+ * re-reads the directory (the store-exists / soft-delete gate stays fresh; this is NOT a cross-request cache). Unreadable D1
+ * or no binding -> `fn` runs unbatched, exactly as before.
+ */
+export async function withBackendBatch<T>(
+  storeIds: readonly string[],
+  fn: () => Promise<T>
+): Promise<T> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: BatchD1 } | undefined)?.PLATFORM_DB;
+  const ids = [...new Set(storeIds)].filter(Boolean);
+  if (!d1 || ids.length === 0 || batchStorage.getStore()) return fn();
+  const found = new Map<string, unknown>();
+  try {
+    for (let i = 0; i < ids.length; i += MAX_IDS_PER_READ) {
+      const part = ids.slice(i, i + MAX_IDS_PER_READ);
+      const rows =
+        (
+          await d1
+            .prepare(
+              `SELECT id, storage_backend FROM stores WHERE id IN (${part.map((_, j) => `?${j + 1}`).join(',')})`
+            )
+            .bind(...part)
+            .all<{ id?: unknown; storage_backend?: unknown }>()
+        ).results ?? [];
+      for (const r of rows) if (typeof r.id === 'string') found.set(r.id, r.storage_backend);
+    }
+  } catch {
+    return fn();
+  }
+  return batchStorage.run(found, fn);
 }
 
 /**
