@@ -11,6 +11,7 @@
  */
 
 import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
+import { primeCustomerAuthRoutes } from '../lib/customer-auth';
 import {
   prisma,
   acrossStoresFlat,
@@ -46,6 +47,7 @@ import type { NotificationData, NotificationEvent } from '@ebda/shared';
 const LOCK_KEY = 'abandoned-cart:processing';
 const LOCK_TTL_SECONDS = 60;
 const ABANDONMENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+const PRIME_CHUNK = 20; // stores per batched customer-auth marker read
 
 interface AbandonedCartConfigDefaults {
   step1Enabled: boolean;
@@ -215,7 +217,11 @@ class AbandonedCartService {
       '[AbandonedCart] Scanning stores for abandoned carts'
     );
 
-    for (const storeId of storeIds) {
+    for (const [i, storeId] of storeIds.entries()) {
+      // Sentry EBDA-API-Z: one batched marker read per chunk instead of one per store (the per-store calls below hit the cache).
+      // A failed prime is not fatal: each store then resolves its own marker exactly as before.
+      if (i % PRIME_CHUNK === 0)
+        await primeCustomerAuthRoutes(storeIds.slice(i, i + PRIME_CHUNK)).catch(() => undefined);
       await runInStoreScope(storeId, async () => {
         // Find carts that:
         // 1. Haven't been active for >1 hour
