@@ -98,6 +98,10 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
     'unset-other-default + create/update batch over this store payment_configs rows only; no prior write in the request (Ruling NEON-ZERO-2: one atomic RPC on a DO store)',
   'routes/shipping.routes.ts':
     'area-rate upsert batches keyed on (storeId, country, governorate, area); reference only storeId; no prior write in the request',
+  'services/accounting/bank-reconcile.service.ts':
+    '`w.$transaction` runs only in the StoreDO branches (statement import, auto-match updates): ONE DO batch, not a Postgres transaction (Ruling NZ-FEAT-1); the Postgres path keeps its own `withStore` bodies unchanged',
+  'services/affiliate.service.ts':
+    '`w.$transaction` runs only in the StoreDO branch of `delete` (events + referrals + the affiliate in ONE DO batch, Ruling NZ-FEAT-1); the money balance writes keep the `hasTenantContext` branch documented in the file header',
   'routes/order.routes.ts':
     'COD mark-paid / bulk-mark-paid flip existing payment + order rows. Its own commit is load-bearing today: the handler enqueues `order/created` BEFORE the request commits, and the accounting consumer must read the order as paid. Moving the flip into the request transaction needs that send moved behind deferAfterTenantCommit first — see Ruling M5-3',
 };
