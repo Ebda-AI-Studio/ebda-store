@@ -156,6 +156,7 @@ declare module '@ebda-src/repo' {
     failed: number;
     deadLettered: number;
     newlyDead: number;
+    newlyAbandoned: number;
     conflicts: Array<{ kind: string; id: string; existing: string; attempted: string }>;
   }>;
   export function awaitEntityIndexed(
@@ -176,6 +177,19 @@ declare module '@ebda-src/repo' {
     afterId: number
   ): Array<{ kind: string; id: string }>;
   export function nextOutboxAttempt(db: SyncSql): number | null;
+  export const ABANDON_ATTEMPTS: number;
+  export function deadLetterReport(db: SyncSql): {
+    dead: number;
+    abandoned: number;
+    rows: Array<{
+      outboxId: number;
+      kind: string;
+      id: string;
+      storeId: string;
+      attempts: number;
+      abandoned: boolean;
+    }>;
+  };
   export function trialBalance(
     db: SyncSql,
     storeId: string

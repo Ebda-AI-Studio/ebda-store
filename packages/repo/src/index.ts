@@ -64,7 +64,10 @@ export {
   paymentIndexIds,
   outboxRowsAfter,
   nextOutboxAttempt,
+  deadLetterReport,
+  ABANDON_ATTEMPTS,
 } from './platform/entity-index';
+export type { DeadLetterReport, DeadLetterRow } from './platform/entity-index';
 export { scrubReceiptsForOrders } from './do/instapay-receipts';
 export { purgeErasureLedger } from './do/erase-shopper';
 export type { ReceiptRow as InstapayReceiptRow } from './do/instapay-receipts';

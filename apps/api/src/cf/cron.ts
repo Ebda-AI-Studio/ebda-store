@@ -25,6 +25,7 @@ import { doStoreIdList } from '../lib/store-backend';
 import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+import { runEntityIndexHealthCron } from '../lib/entity-index-health';
 import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
 import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
 import type { LegacyCronMessage } from '../lib/jobs/start';
@@ -42,6 +43,8 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'store-schedule-sync', run: () => syncStoreSchedules() },
     // Hotfix N-22: repair any Postgres -> D1 store-directory drift, fail-closed (lib/store-directory-reconcile.ts).
     { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
+    // Issue 458: StoreDO entity-index dead-letter rows -> one P1 per row per day (the DO cannot call sendAlert).
+    { name: 'entity-index-health', run: () => runEntityIndexHealthCron() },
   ],
   // Abandoned-cart reminder emails (was every 15 min).
   '*/15 * * * *': [
