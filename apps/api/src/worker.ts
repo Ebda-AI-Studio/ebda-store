@@ -307,6 +307,13 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
     const reset = new URL(request.url).searchParams.get('reset') === '1';
     return Response.json({ reaches: postgresReaches(reset) });
   }
+  // Test only: run every cron job body + the Postgres-adjacent queue messages (workers-test/route-sweep.test.ts, cron group).
+  if (path === '/__dev/run-jobs' && request.method === 'POST' && env.DEV_STATS === '1') {
+    return withWorkerContext(env, ctx, async () => {
+      const { runEveryJobBody } = await import('./lib/jobs/dev-run-all.js');
+      return Response.json(await runEveryJobBody());
+    });
+  }
   // Test only: the job events this isolate dispatched (workers-test/money-path.test.ts counts order/created).
   if (path === '/__dev/dispatched' && env.DEV_STATS === '1') {
     return Response.json({ events: dispatchedEvents() });
