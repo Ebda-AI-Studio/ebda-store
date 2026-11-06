@@ -1,5 +1,6 @@
 import { normalizePhoneForStorage } from '../../../shared/src/region';
 import { MoneyError, type SyncSql } from './sync-sql';
+import { freshOrderNumber } from './order-number';
 import { issueSaleDocument } from './fiscal';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { indexEntity } from './payments';
@@ -63,10 +64,6 @@ export interface AdminOrderResult {
 const COUPON_OVERRIDE_EVENT = 'coupon_override';
 const MAX_TOTAL = 2_000_000_000;
 const LIVE = "status NOT IN ('cancelled', 'refunded')";
-const orderNumber = (now: number) =>
-  `ORD-${Math.floor(now / 1000)
-    .toString(36)
-    .toUpperCase()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`;
 const jsonList = (v: unknown): string[] => {
   try {
     const a = JSON.parse(String(v ?? '[]'));
@@ -341,7 +338,7 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
     if (total > MAX_TOTAL) throw new MoneyError('TOTAL_TOO_LARGE', 'order total too large', 400);
     const frozen = frozenTaxInvoiceFields(active);
     const orderId = crypto.randomUUID();
-    const num = orderNumber(now);
+    const num = freshOrderNumber(db, now);
     const shippingAddress = withStoredPhone(addr);
     db.run(
       `INSERT INTO orders (id, store_id, customer_id, order_number, status, payment_status, subtotal, tax, tax_included_in_price, tax_rate_bps, taxable_amount, seller_tax_registration_number, seller_tax_legal_name, price_group_name, shipping, discount, total, currency, coupon_code, notes, shipping_address, billing_address, created_at, updated_at)

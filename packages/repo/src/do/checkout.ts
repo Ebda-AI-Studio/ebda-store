@@ -6,6 +6,7 @@ import {
   goldAllowsDeferredPayment,
 } from '../../../shared/src/commerce/payment-policy';
 import { MoneyError, type SyncSql } from './sync-sql';
+import { freshOrderNumber } from './order-number';
 import { decrementProduct, decrementVariant, forceDecrementVariant, recordMovement } from './stock';
 import { issueSaleDocument } from './fiscal';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
@@ -150,10 +151,6 @@ export interface PlacedOrder {
 }
 
 const MAX_TOTAL = 2_000_000_000;
-const orderNumber = (now: number) =>
-  `ORD-${Math.floor(now / 1000)
-    .toString(36)
-    .toUpperCase()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`;
 const int = (v: unknown, name: string): number => {
   if (v === undefined || v === null) return 0;
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > MAX_TOTAL)
@@ -889,7 +886,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     }
 
     // ---- 10. rows ------------------------------------------------------------------------------------------------------
-    const num = orderNumber(now);
+    const num = freshOrderNumber(db, now);
     const paymentStatus = fullyWalletPaid ? 'paid' : 'unpaid';
     db.run(
       `INSERT INTO orders (id, store_id, customer_id, order_number, status, payment_status, subtotal, tax, tax_included_in_price, tax_rate_bps, taxable_amount, seller_tax_registration_number, seller_tax_legal_name, price_group_name, shipping, discount, cod_fee, total, currency, coupon_code, coupon_discount, promotion_discount, applied_promotion_id, bundle_discount, loyalty_points_redeemed, loyalty_discount, wallet_amount, customer_notes, shipping_address, billing_address, checkout_ip, idempotency_key, manual_hold_admitted, created_at, updated_at)
