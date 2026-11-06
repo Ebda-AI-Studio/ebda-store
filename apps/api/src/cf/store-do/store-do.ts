@@ -424,7 +424,10 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   async storeRecord(
     storeId: string,
     fields?: string[]
-  ): Promise<Result<{ json: string; missing: string[] }>> {
+  ): Promise<
+    | Result<{ json: string; missing: string[] }>
+    | { ok: false; code: string; status: number; message: string }
+  > {
     try {
       this.bind(storeId);
       const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
@@ -433,7 +436,10 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       return { ok: true, data: { json: encodeRpc(out.record), missing: out.missing } };
     } catch (e) {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
-      return { ok: false, code: 'STORE_RECORD_REFUSED', status: 400 };
+      // A refusal must be diagnosable: the underlying message (an unknown field, a relation) rides the answer and the log.
+      const message = String((e as Error)?.message ?? e).slice(0, 300);
+      console.error(`[store-do] storeRecord refused: ${message}`);
+      return { ok: false, code: 'STORE_RECORD_REFUSED', status: 400, message };
     }
   }
 

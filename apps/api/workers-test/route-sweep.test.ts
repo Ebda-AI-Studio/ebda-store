@@ -723,7 +723,21 @@ describe.skipIf(e.E2E_DB === '1')(
         });
         expect(ran.status, 'the dev run-jobs endpoint answered').toBe(200);
         // eslint-disable-next-line no-console
-        console.log('SWEEP_JOBS_RAN ' + JSON.stringify(await ran.json()));
+        const ranBody = (await ran.json()) as {
+          jobs: Array<{ id: string; ok: boolean; error?: string }>;
+        };
+        console.log('SWEEP_JOBS_RAN ' + JSON.stringify(ranBody));
+        // A job body (cron run AND each DO store's alarm run) that answers a store-read refusal or a removed-Postgres error is a
+        // port defect (2026-11-06: stock-low-stock-alert-cron, STORE_RECORD_REFUSED). Other failures (provider keys...) are not ours.
+        const portDefects = ranBody.jobs.filter(
+          j =>
+            !j.ok &&
+            /POSTGRES_REMOVED|STORE_RECORD_REFUSED|STORE_READ_UNSUPPORTED/.test(j.error ?? '')
+        );
+        if (e.SWEEP_STRICT === '1')
+          expect(portDefects, 'job bodies that hit a DO store-read refusal or Postgres').toEqual(
+            []
+          );
         const report = await bucket.get(`ops-reports/backup-sweep/${day(new Date())}.json`);
         const backup = report
           ? (JSON.parse(await report.text()) as {

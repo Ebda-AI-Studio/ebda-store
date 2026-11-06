@@ -9,6 +9,7 @@ import { guardedRun } from './do-guard';
 import { handleJobsBatch, type QueueMessageLike } from './run-queue';
 import { JOBS_MAP } from './jobs-map';
 import { allJobs } from './registry';
+import { doStoreIdList } from '../store-backend';
 import { inlineStep } from './step-adapter';
 import type { JobStep } from './types';
 
@@ -26,20 +27,35 @@ export async function runEveryJobBody(): Promise<RunAllReport> {
     sleepUntil: async () => undefined,
   };
   const jobs: RunAllReport['jobs'] = [];
+  // A cron run (unscoped), then - for every alarm-enabled job - the run each DO store's own alarm makes
+  // (`data: { alarm: true, storeId }`, lib/jobs/store-scope.ts): production runs these per store, a cron run does not.
+  const storeIds = await doStoreIdList();
   for (const def of allJobs()) {
-    if (JOBS_MAP[def.id]?.trigger !== 'cron') continue;
-    const event = { name: 'inngest/scheduled.timer', data: {} };
-    try {
-      await guardedRun(def, event, () =>
-        def.handler({ event, step, runId: `sweep-${def.id}`, attempt: 0 })
-      );
-      jobs.push({ id: def.id, ok: true });
-    } catch (err) {
-      jobs.push({
-        id: def.id,
-        ok: false,
-        error: String((err as Error)?.message ?? err).slice(0, 200),
-      });
+    const entry = JOBS_MAP[def.id];
+    if (entry?.trigger !== 'cron') continue;
+    const runs = [
+      { label: def.id, data: {} as Record<string, unknown> },
+      ...(entry.alarm
+        ? storeIds.map(storeId => ({
+            label: `${def.id}@${storeId}`,
+            data: { alarm: true, storeId },
+          }))
+        : []),
+    ];
+    for (const r of runs) {
+      const event = { name: 'inngest/scheduled.timer', data: r.data };
+      try {
+        await guardedRun(def, event, () =>
+          def.handler({ event, step, runId: `sweep-${r.label}`, attempt: 0 })
+        );
+        jobs.push({ id: r.label, ok: true });
+      } catch (err) {
+        jobs.push({
+          id: r.label,
+          ok: false,
+          error: String((err as Error)?.message ?? err).slice(0, 300),
+        });
+      }
     }
   }
   // Queue consumers that touch Postgres by design on a Node deployment: they must be no-ops on a Worker without it.

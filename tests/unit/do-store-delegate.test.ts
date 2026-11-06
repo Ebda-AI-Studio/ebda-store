@@ -6,6 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { encodeRpc, decodeRpc } from '@ebda-src/repo';
 
 const d1Reads: unknown[] = [];
+vi.mock('../../apps/api/src/lib/identity-client', () => ({
+  getAccountState: async (id: string) =>
+    id === 'owner-1' ? { id, email: 'o@x.test', firstName: 'O', lastName: 'W', extra: 1 } : null,
+}));
 vi.mock('../../apps/api/src/lib/platform-db', () => ({
   requirePlatformDb: async () => ({
     store: {
@@ -20,7 +24,14 @@ vi.mock('../../apps/api/src/lib/platform-db', () => ({
 import { doStoreDelegate } from '../../apps/api/src/lib/repo-factory';
 
 const S = 'store-1';
-const REC = { id: S, name: 'Shop', status: 'active', taxEnabled: true, theme: { a: 1 } };
+const REC = {
+  id: S,
+  ownerId: 'owner-1',
+  name: 'Shop',
+  status: 'active',
+  taxEnabled: true,
+  theme: { a: 1 },
+};
 function stub(missing: string[] = [], code?: string) {
   const calls: Array<{ storeId: string; fields?: string[] }> = [];
   return {
@@ -36,6 +47,31 @@ function stub(missing: string[] = [], code?: string) {
   };
 }
 const make = (st: ReturnType<typeof stub>) => doStoreDelegate(S, st as never, decodeRpc as never);
+
+describe('doStoreDelegate owner relation (2026-11-06 stock-low-stock-alert-cron)', () => {
+  it('select { owner: { select: { email } } } asks the DO for ownerId and reads the account from the identity service', async () => {
+    const st = stub();
+    const row = await make(st).findUnique({
+      where: { id: S },
+      select: { id: true, name: true, owner: { select: { email: true } } },
+    });
+    expect(row).toEqual({ id: S, name: 'Shop', owner: { email: 'o@x.test' } });
+    expect(st.calls[0]!.fields).toEqual(['id', 'name', 'ownerId']);
+  });
+  it('a refusal carries the DO message', async () => {
+    const st = {
+      storeRecord: async () => ({
+        ok: false as const,
+        code: 'STORE_RECORD_REFUSED',
+        status: 400,
+        message: 'Store.plan is a relation: not served by the DO record',
+      }),
+    };
+    await expect(
+      make(st as never).findUnique({ where: { id: S }, select: { plan: true } })
+    ).rejects.toThrow(/STORE_RECORD_REFUSED \(Store.plan is a relation/);
+  });
+});
 
 describe('doStoreDelegate', () => {
   it('serves a select from ONE DO call and projects exactly the selected fields', async () => {
