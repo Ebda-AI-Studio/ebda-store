@@ -314,7 +314,9 @@ if (a.target === 'harness') {
     try {
       const tables = await digestSqlite(db);
       const stores = db
-        .prepare("SELECT id, slug, domain, owner_id FROM stores WHERE storage_backend = 'do'")
+        .prepare(
+          "SELECT id, slug, domain, owner_id, status FROM stores WHERE storage_backend = 'do'"
+        )
         .all();
       return { tables, stores };
     } finally {
