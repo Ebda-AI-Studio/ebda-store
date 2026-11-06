@@ -11,6 +11,8 @@
  */
 
 import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
+import { primeCustomerAuthRoutes } from '../lib/customer-auth';
+import { withBackendBatch } from '../lib/store-backend';
 import {
   prisma,
   acrossStoresFlat,
@@ -46,6 +48,7 @@ import type { NotificationData, NotificationEvent } from '@ebda/shared';
 const LOCK_KEY = 'abandoned-cart:processing';
 const LOCK_TTL_SECONDS = 60;
 const ABANDONMENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+const PRIME_CHUNK = 20; // stores per batched customer-auth marker read
 
 interface AbandonedCartConfigDefaults {
   step1Enabled: boolean;
@@ -92,6 +95,12 @@ interface CartItemSnapshot {
    * never reach a customer-facing surface.
    */
   isBundle?: boolean;
+}
+
+/** Batched customer-auth marker reads for `ids`, PRIME_CHUNK stores per D1 read. A failed prime is not fatal: stores then resolve their own marker. */
+async function primeAllMarkers(ids: readonly string[]): Promise<void> {
+  for (let i = 0; i < ids.length; i += PRIME_CHUNK)
+    await primeCustomerAuthRoutes(ids.slice(i, i + PRIME_CHUNK)).catch(() => undefined);
 }
 
 /**
@@ -171,17 +180,24 @@ class AbandonedCartService {
     try {
       logger.info({ correlationId }, '[AbandonedCart] Processing started');
 
-      await this.detectNewAbandonments(correlationId);
+      // Sentry EBDA-API-Z: read every store's storage_backend ONCE for this run instead of once per store per call.
+      const sweepIds = (await storeDirectory().catch(() => [])).map(st => st.id);
+      await withBackendBatch(sweepIds, async () => {
+        await this.detectNewAbandonments(correlationId);
 
-      await this.processReminders(correlationId);
+        // processReminders and the email sweep walk the same stores: prime their markers too (not fatal on failure).
+        await primeAllMarkers(sweepIds);
+        await this.processReminders(correlationId);
 
-      // Email channel (own state in email_status, independent of the push/SMS steps). A failure
-      // here must not fail the sweep that already ran the other channels.
-      try {
-        await sweepCartRecoveryEmails();
-      } catch (err) {
-        logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
-      }
+        // Email channel (own state in email_status, independent of the push/SMS steps). A failure
+        // here must not fail the sweep that already ran the other channels.
+        try {
+          await primeAllMarkers(sweepIds);
+          await sweepCartRecoveryEmails();
+        } catch (err) {
+          logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
+        }
+      });
 
       logger.info({ correlationId }, '[AbandonedCart] Processing completed');
     } catch (err) {
@@ -215,7 +231,10 @@ class AbandonedCartService {
       '[AbandonedCart] Scanning stores for abandoned carts'
     );
 
-    for (const storeId of storeIds) {
+    for (const [i, storeId] of storeIds.entries()) {
+      // Sentry EBDA-API-Z: one batched marker read per chunk instead of one per store (the per-store calls below hit the cache).
+      // A failed prime is not fatal: each store then resolves its own marker exactly as before.
+      if (i % PRIME_CHUNK === 0) await primeAllMarkers(storeIds.slice(i, i + PRIME_CHUNK));
       await runInStoreScope(storeId, async () => {
         // Find carts that:
         // 1. Haven't been active for >1 hour

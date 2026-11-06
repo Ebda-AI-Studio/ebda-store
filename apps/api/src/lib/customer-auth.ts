@@ -16,7 +16,13 @@ import crypto from 'crypto';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo } from './store-backend';
-import { readCutoverKeys, resetCutoverCache, type MarkerD1 } from '../services/platform/cutover';
+import {
+  readCutoverKeys,
+  readCutoverKeysMany,
+  resetCutoverCache,
+  type CutoverKeys,
+  type MarkerD1,
+} from '../services/platform/cutover';
 
 export const OFF_TTL_MS = 10_000;
 export const markerKey = (storeId: string) => `customer_auth_cutover.${storeId}`;
@@ -47,16 +53,41 @@ const frozenError = () =>
     retryAfterSeconds: 30,
   });
 
+const keysFor = (storeId: string | null): CutoverKeys => ({
+  markers: storeId ? [markerKey(storeId), GLOBAL_MARKER_KEY] : [],
+  freezes: storeId ? [freezeKey(storeId), ANY_FREEZE_KEY] : [ANY_FREEZE_KEY],
+  unreadable,
+  unfreezeHint: () =>
+    'node scripts/cf/cutover-customer-auth.mjs --unfreeze --store <id> (same --d1 flags)',
+  alertTitle: 'Customer auth cutover: an expired freeze was left behind',
+});
+
 /** Marker (store or global) and freeze (store or any) in ONE read. */
-const readKeys = (db: MarkerD1, storeId: string | null) =>
-  readCutoverKeys(db, {
-    markers: storeId ? [markerKey(storeId), GLOBAL_MARKER_KEY] : [],
-    freezes: storeId ? [freezeKey(storeId), ANY_FREEZE_KEY] : [ANY_FREEZE_KEY],
-    unreadable,
-    unfreezeHint: () =>
-      'node scripts/cf/cutover-customer-auth.mjs --unfreeze --store <id> (same --d1 flags)',
-    alertTitle: 'Customer auth cutover: an expired freeze was left behind',
+const readKeys = (db: MarkerD1, storeId: string | null) => readCutoverKeys(db, keysFor(storeId));
+
+/**
+ * Per-store sweeps (cron loops over stores): resolve the markers of ALL `storeIds` in one batched D1 read and fill the caches
+ * `customerAuthOnDo` reads, so the loop's per-store calls cost 0 reads instead of 1 each (Sentry EBDA-API-Z). Same rules as
+ * the per-store read: "on" cached for good, "off" for OFF_TTL_MS and never while frozen. Stores already cached are skipped.
+ * Call it per chunk right before that chunk is processed (the "off" TTL is short). No D1 binding -> no-op.
+ */
+export async function primeCustomerAuthRoutes(storeIds: readonly string[]): Promise<void> {
+  const db = d1();
+  if (!db) return;
+  const todo = [...new Set(storeIds)].filter(
+    id => !on.has(id) && (offUntil.get(id) ?? 0) <= Date.now()
+  );
+  if (todo.length === 0) return;
+  const verdicts = await readCutoverKeysMany(
+    db,
+    todo.map(id => keysFor(id))
+  );
+  todo.forEach((id, i) => {
+    const { moved, frozen } = verdicts[i]!;
+    if (moved) on.add(id);
+    else if (!frozen) offUntil.set(id, Date.now() + OFF_TTL_MS);
   });
+}
 
 /** READ path: true when this store's customers are served by its StoreDO. "On" is cached for good; "off" for OFF_TTL_MS, never while frozen. */
 export async function customerAuthOnDo(storeId: string): Promise<boolean> {
