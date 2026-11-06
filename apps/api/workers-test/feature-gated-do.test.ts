@@ -375,17 +375,37 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
       });
     };
     const [a, b] = await Promise.all([upload(), upload()]);
-    const statuses = [a.status, b.status].sort();
-    const texts = [await a.text(), await b.text()];
-    for (const st of statuses) expect([201, 409], texts.join(' | ')).toContain(st);
-    expect(statuses, texts.join(' | ')).toContain(201);
-    for (const t of texts.filter(t => t.includes('BANK_IMPORT')))
-      expect(t).toContain('BANK_IMPORT_CONFLICT');
-    const lines = await doRead<{ rowHash: string }>(storeId, 'BankTransaction', {
-      where: { storeId },
-    });
+    const answers = [
+      { status: a.status, text: await a.text() },
+      { status: b.status, text: await b.text() },
+    ];
+    const all = answers.map(x => `${x.status} ${x.text}`).join(' | ');
+    for (const x of answers) expect([201, 409], all).toContain(x.status);
+    for (const x of answers.filter(x => x.status === 409))
+      expect(x.text, all).toContain('BANK_IMPORT_CONFLICT');
+    const winners = answers.filter(x => x.status === 201);
+    expect(winners.length, all).toBeGreaterThanOrEqual(1);
+    const lines = await doRead<{ rowHash: string; statementId: string }>(
+      storeId,
+      'BankTransaction',
+      { where: { storeId } }
+    );
+    // exactly ONE import's lines exist, each hash once ...
     expect(lines).toHaveLength(3);
     expect(new Set(lines.map(l => l.rowHash)).size).toBe(3);
+    expect(new Set(lines.map(l => l.statementId)).size, all).toBe(1);
+    // ... and the other import is a 409 (its batch rolled back: no statement at all) or a no-op 201 whose statement got no line.
+    // "201 and 201 with doubles" fails above; "201 and 201 each holding lines" fails here.
+    const statementIds = winners.map(
+      x => (JSON.parse(x.text) as { data: { statementId: string } }).data.statementId
+    );
+    const holding = statementIds.filter(id => lines.some(l => l.statementId === id));
+    expect(holding, all).toHaveLength(1);
+    const statements = await doRead<{ id: string }>(storeId, 'BankStatement', {
+      where: { storeId },
+      select: { id: true },
+    });
+    expect(statements.map(st => st.id).sort(), all).toEqual([...statementIds].sort());
     expect(await pgReaches(true)).toEqual([]);
   }, 60_000);
 
@@ -572,13 +592,14 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     expect(markers).toHaveLength(1);
     expect(JSON.stringify(markers[0]!.metadata)).toContain('stockRestored');
     // the item-level order/refunded event (GL partial reversal + owed amount) went out exactly once, with the money figures of
-    // THIS line: no stock restore (the heal above is the only stock move), no wallet reversal, the line's share (EGP piastres,
-    // the store currency; the event carries no currency field) keyed backorder:<lineId>
+    // THIS line: no stock restore (the heal above is the only stock move), no wallet reversal, the line's share in the order's
+    // currency (minor units) keyed backorder:<lineId>
     const sent = await refundedEvents();
     expect(sent).toHaveLength(1);
     expect(sent[0]!.data).toEqual({
       orderId: line.orderItem.orderId,
       storeId,
+      currency: 'EGP',
       restoreInventory: false,
       notify: false,
       reverseWallet: false,
