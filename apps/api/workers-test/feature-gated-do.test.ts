@@ -348,6 +348,47 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     expect(await pgReaches(true)).toEqual([]);
   }, 60_000);
 
+  it('bank statements: two overlapping imports at once answer 201 / 409 (never a 500) and never duplicate a bank line', async () => {
+    const seed = await api(`/stores/${storeId}/finance/accounts/seed`, {
+      method: 'POST',
+      body: {},
+    });
+    expect(seed.status, seed.text).toBe(201);
+    const accounts = await doRead<{ id: string; code: string }>(storeId, 'Account', {
+      where: { storeId, code: '1030' },
+    });
+    expect(accounts, 'the seeded bank GL account').toHaveLength(1);
+    const csv = [
+      'Date,Description,Debit,Credit,Reference',
+      '2026-01-10,Rent,100.000,,R1',
+      '2026-01-11,Sale,,50.000,R2',
+      '2026-01-12,Fee,5.000,,R3',
+    ].join('\n');
+    const upload = () => {
+      const form = new FormData();
+      form.set('glAccountId', accounts[0]!.id);
+      form.set('file', new File([csv], 'jan.csv', { type: 'text/csv' }));
+      return e.API.fetch(`${BASE}/stores/${storeId}/finance/bank-statements`, {
+        method: 'POST',
+        headers: { ...h, 'x-forwarded-for': freshIp() },
+        body: form,
+      });
+    };
+    const [a, b] = await Promise.all([upload(), upload()]);
+    const statuses = [a.status, b.status].sort();
+    const texts = [await a.text(), await b.text()];
+    for (const st of statuses) expect([201, 409], texts.join(' | ')).toContain(st);
+    expect(statuses, texts.join(' | ')).toContain(201);
+    for (const t of texts.filter(t => t.includes('BANK_IMPORT')))
+      expect(t).toContain('BANK_IMPORT_CONFLICT');
+    const lines = await doRead<{ rowHash: string }>(storeId, 'BankTransaction', {
+      where: { storeId },
+    });
+    expect(lines).toHaveLength(3);
+    expect(new Set(lines.map(l => l.rowHash)).size).toBe(3);
+    expect(await pgReaches(true)).toEqual([]);
+  }, 60_000);
+
   it('suppliers: create, patch, delete; an unknown one is a 404 (not a 500)', async () => {
     const made = await api(`/stores/${storeId}/suppliers`, {
       method: 'POST',
@@ -509,7 +550,7 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     const refundedEvents = async () =>
       (
         (await (await e.API.fetch('https://api.ebda.app/__dev/dispatched')).json()) as {
-          events: Array<{ name: string; orderId: string | null }>;
+          events: Array<{ name: string; orderId: string | null; data: Record<string, unknown> }>;
         }
       ).events.filter(ev => ev.name === 'order/refunded' && ev.orderId === line.orderItem.orderId);
     expect(await refundedEvents()).toHaveLength(0);
@@ -530,8 +571,24 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     });
     expect(markers).toHaveLength(1);
     expect(JSON.stringify(markers[0]!.metadata)).toContain('stockRestored');
-    // the item-level order/refunded event (GL partial reversal + owed amount) went out exactly once
-    expect(await refundedEvents()).toHaveLength(1);
+    // the item-level order/refunded event (GL partial reversal + owed amount) went out exactly once, with the money figures of
+    // THIS line: no stock restore (the heal above is the only stock move), no wallet reversal, the line's share (EGP piastres,
+    // the store currency; the event carries no currency field) keyed backorder:<lineId>
+    const sent = await refundedEvents();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.data).toEqual({
+      orderId: line.orderItem.orderId,
+      storeId,
+      restoreInventory: false,
+      notify: false,
+      reverseWallet: false,
+      partial: {
+        items: [{ orderItemId: expect.any(String), quantity: line.qty }],
+        refundKey: `backorder:${line.id}`,
+        refundAmount: line.qty * 3000,
+        backorderLineId: line.id,
+      },
+    });
     // the same line again, by ANOTHER admin with another reason: a replay (200, same figures), no second heal, no second event
     await authState('user:tv:super-fg', [['set', 'user:tv:super-fg', '0', {}]]);
     const su = await accessToken({ userId: 'super-fg', jti: 'j-fg-su', role: 'super_admin' });
@@ -547,7 +604,8 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     });
     const againText = await again.text();
     expect(again.status, againText).toBe(200);
-    expect(JSON.parse(againText).data).toMatchObject({ owedToCustomer: 0, replayed: true });
+    // the FIRST cancel's answer, field for field (its time and reason, not this caller's)
+    expect(JSON.parse(againText).data).toEqual({ ...cancel.json.data, replayed: true });
     expect(await refundedEvents()).toHaveLength(1);
     const stillZero = await doRead<{ inventory: number }>(storeId, 'Product', {
       where: { id: boProductId },

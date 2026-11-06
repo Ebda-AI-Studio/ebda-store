@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx, hasTenantContext, type DbClient } from '@ebda/database';
+import { prisma, Prisma, withMoneyTx, hasTenantContext } from '@ebda/database';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
 import { storeDb, storeMoney } from '../../lib/repo-factory';
@@ -286,10 +286,10 @@ export async function cancelBackorder(
 }
 
 /**
- * The DO twin of `cancelBackorder`. Steps 1-4 run in the `backorderCancel` money op (one section; a re-cancel of the same
- * line is a replay that writes and sends nothing and answers 200 with the first cancel's figures). The allocation is then computed from the
- * committed rows exactly as the Postgres path computes it inside its transaction (the marker it just wrote is excluded by key),
- * and the same item-level `order/refunded` event goes out.
+ * The DO twin of `cancelBackorder`. Steps 1-4 AND the allocation run in the `backorderCancel` money op (one section, the
+ * figures stored on its marker). A re-cancel of the same line (a retry, another admin, another reason) is a replay: it writes
+ * and sends nothing and answers 200 with the FIRST cancel's time, reason and amount owed. Only the call that cancelled sends
+ * the item-level `order/refunded` event.
  */
 async function cancelBackorderOnDo(
   storeId: string,
@@ -304,71 +304,34 @@ async function cancelBackorderOnDo(
     userId: userId ?? null,
   });
   if (!r.found) throw notFound();
-  const now = new Date();
-  if (!r.replayed && r.stockRestored > 0) await invalidateStoreProductCaches(storeId);
+  const answer = {
+    id: backorderId,
+    cancelledAt: new Date(r.cancelledAt),
+    cancelledReason: r.cancelledReason,
+    owedToCustomer: r.notify ? r.refundAmount : 0,
+    replayed: r.replayed,
+  };
+  if (r.replayed) return answer;
+  if (r.stockRestored > 0) await invalidateStoreProductCaches(storeId);
   if (r.quantity === 0) {
     logger.info(
       { storeId, backorderId, orderId: r.orderId, userId },
       'backorder.cancel: line already fully fulfilled — nothing to reverse'
     );
-    return { id: backorderId, cancelledAt: now, cancelledReason: reason, owedToCustomer: 0 };
+    return answer;
   }
-  const refundKey = backorderRefundKey(backorderId);
-  const db = (await storeDb(storeId)) as unknown as DbClient;
-  const order = await db.order.findUniqueOrThrow({
-    where: { id: r.orderId, storeId },
-    select: {
-      subtotal: true,
-      discount: true,
-      tax: true,
-      taxIncludedInPrice: true,
-      paymentStatus: true,
-      items: { select: { id: true, quantity: true, price: true, priceSource: true } },
-    },
-  });
-  const { prevQty, prevAdjustment } = await loadPriorReversedQty(db, {
-    storeId,
-    orderId: r.orderId,
-    excludeKey: refundKey,
-  });
-  const alloc = allocatePartialReturn({
-    subtotal: order.subtotal,
-    discount: order.discount,
-    tax: order.tax,
-    taxIncludedInPrice: order.taxIncludedInPrice,
-    lines: order.items,
-    prevQty,
-    requested: [{ orderItemId: r.orderItemId, quantity: r.quantity }],
-    prevAdjustment,
-  });
-  const notify = order.paymentStatus === 'paid' && alloc.cashCredit > 0;
-  // A replay (the line was already cancelled, by this or another admin) answers the same figures and sends nothing: the
-  // item-level event went out with the cancel that wrote the marker (Ruling NZ-FEAT-1).
-  if (r.replayed)
-    return {
-      id: backorderId,
-      cancelledAt: now,
-      cancelledReason: reason,
-      owedToCustomer: notify ? alloc.cashCredit : 0,
-      replayed: true,
-    };
   await OrderService.applyRefundEffects(storeId, r.orderId, {
     restoreInventory: false,
     reverseWallet: false,
-    fireRefundNotification: notify,
+    fireRefundNotification: r.notify,
     partial: {
       items: [{ orderItemId: r.orderItemId, quantity: r.quantity }],
-      refundKey,
-      refundAmount: alloc.cashCredit,
+      refundKey: backorderRefundKey(backorderId),
+      refundAmount: r.refundAmount,
       backorderLineId: backorderId,
     },
   });
-  return {
-    id: backorderId,
-    cancelledAt: now,
-    cancelledReason: reason,
-    owedToCustomer: notify ? alloc.cashCredit : 0,
-  };
+  return answer;
 }
 
 // An AppError: the error handler reads `AppError.statusCode`; a plain Error carrying a `statusCode` property answered 500.
