@@ -12,6 +12,7 @@
 
 import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { primeCustomerAuthRoutes } from '../lib/customer-auth';
+import { withBackendBatch } from '../lib/store-backend';
 import {
   prisma,
   acrossStoresFlat,
@@ -173,17 +174,21 @@ class AbandonedCartService {
     try {
       logger.info({ correlationId }, '[AbandonedCart] Processing started');
 
-      await this.detectNewAbandonments(correlationId);
+      // Sentry EBDA-API-Z: read every store's storage_backend ONCE for this run instead of once per store per call.
+      const sweepIds = (await storeDirectory().catch(() => [])).map(st => st.id);
+      await withBackendBatch(sweepIds, async () => {
+        await this.detectNewAbandonments(correlationId);
 
-      await this.processReminders(correlationId);
+        await this.processReminders(correlationId);
 
-      // Email channel (own state in email_status, independent of the push/SMS steps). A failure
-      // here must not fail the sweep that already ran the other channels.
-      try {
-        await sweepCartRecoveryEmails();
-      } catch (err) {
-        logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
-      }
+        // Email channel (own state in email_status, independent of the push/SMS steps). A failure
+        // here must not fail the sweep that already ran the other channels.
+        try {
+          await sweepCartRecoveryEmails();
+        } catch (err) {
+          logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
+        }
+      });
 
       logger.info({ correlationId }, '[AbandonedCart] Processing completed');
     } catch (err) {
