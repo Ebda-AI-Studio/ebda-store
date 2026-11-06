@@ -88,3 +88,34 @@ describe('withBackendBatch', () => {
     expect(h.single.n).toBe(1);
   });
 });
+
+describe('withBackendBatch isolation and cleanup', () => {
+  it('a call OUTSIDE the batch while one is active does a live read (concurrent request isolation)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(r => (release = r));
+    const run = withBackendBatch(ids, async () => {
+      await gate;
+      await backendFor('store-0'); // inside: from the batch
+    });
+    await Promise.resolve();
+    await new Promise(r => setTimeout(r, 0));
+    h.flags.set('store-0', 'pg');
+    const outside = await backendFor('store-0'); // not inside the ALS run: live
+    expect(outside).toBe('pg');
+    expect(h.single.n).toBe(1);
+    release();
+    await run;
+    expect(h.single.n).toBe(1);
+  });
+
+  it('fn throwing propagates and the next call outside sees no batch', async () => {
+    await expect(
+      withBackendBatch(ids, async () => {
+        throw new Error('boom');
+      })
+    ).rejects.toThrow('boom');
+    expect(h.batch.n).toBe(1); // fn was not re-run
+    await backendFor('store-1');
+    expect(h.single.n).toBe(1);
+  });
+});

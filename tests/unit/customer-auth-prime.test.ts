@@ -85,7 +85,7 @@ describe('primeCustomerAuthRoutes', () => {
     expect(h.reads.n).toBe(afterPrime + 1);
   });
 
-  it('does not re-read stores already cached, and does nothing without a binding-free list', async () => {
+  it('does not re-read stores already cached, and does nothing for an empty list', async () => {
     h.keys.set(markerKey('store-0'), '{}');
     await primeCustomerAuthRoutes(['store-0']);
     h.reads.n = 0;
@@ -93,5 +93,17 @@ describe('primeCustomerAuthRoutes', () => {
     expect(h.reads.n).toBe(0);
     await primeCustomerAuthRoutes([]);
     expect(h.reads.n).toBe(0);
+  });
+});
+
+describe('primeCustomerAuthRoutes chunking and no-binding', () => {
+  it('300 stores: many reads, each under the 100-parameter ceiling (readCutoverKeysMany chunks)', async () => {
+    const many = Array.from({ length: 300 }, (_, i) => `big-${i}`);
+    h.keys.set(markerKey('big-299'), '{}');
+    await primeCustomerAuthRoutes(many);
+    expect(h.reads.n).toBeGreaterThan(1);
+    expect(h.maxParams.n).toBeLessThanOrEqual(90);
+    expect(await customerAuthOnDo('big-299')).toBe(true); // marker found in a later chunk
+    expect(await customerAuthOnDo('big-0')).toBe(false);
   });
 });

@@ -118,7 +118,13 @@ interface BatchD1 {
   };
 }
 
-/** storeId -> raw `storage_backend` for the ids that exist; read once per sweep, scoped to the sweep, never shared across runs. */
+/**
+ * storeId -> raw `storage_backend` for the ids that exist; read once per sweep, scoped to the sweep, never shared across runs.
+ * Staleness class: BOUNDED-stale snapshot, window = one sweep run (seconds, bounded by the cron's lock TTL). A `flip-backend`
+ * or soft-delete landing mid-run takes effect on the NEXT run (every run re-reads). Residual risk is pg<->do flips only: on
+ * Workers a `pg` store already answers 410, so a stale `do`/`pg` view can at worst process one more sweep for that store.
+ * Request paths never run inside a batch (ALS scope), so they keep the live per-call read.
+ */
 const batchStorage = new AsyncLocalStorage<Map<string, unknown>>();
 const MAX_IDS_PER_READ = 90; // D1 allows 100 bound parameters per statement
 

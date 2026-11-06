@@ -97,6 +97,12 @@ interface CartItemSnapshot {
   isBundle?: boolean;
 }
 
+/** Batched customer-auth marker reads for `ids`, PRIME_CHUNK stores per D1 read. A failed prime is not fatal: stores then resolve their own marker. */
+async function primeAllMarkers(ids: readonly string[]): Promise<void> {
+  for (let i = 0; i < ids.length; i += PRIME_CHUNK)
+    await primeCustomerAuthRoutes(ids.slice(i, i + PRIME_CHUNK)).catch(() => undefined);
+}
+
 /**
  * Stores whose EFFECTIVE `feature` entitlement is on: the plan baseline OR a `store_features`
  * override, exactly what `featureService` resolves for the request paths. Detection used to
@@ -179,11 +185,14 @@ class AbandonedCartService {
       await withBackendBatch(sweepIds, async () => {
         await this.detectNewAbandonments(correlationId);
 
+        // processReminders and the email sweep walk the same stores: prime their markers too (not fatal on failure).
+        await primeAllMarkers(sweepIds);
         await this.processReminders(correlationId);
 
         // Email channel (own state in email_status, independent of the push/SMS steps). A failure
         // here must not fail the sweep that already ran the other channels.
         try {
+          await primeAllMarkers(sweepIds);
           await sweepCartRecoveryEmails();
         } catch (err) {
           logger.error({ err, correlationId }, '[AbandonedCart] Email sweep failed');
@@ -225,8 +234,7 @@ class AbandonedCartService {
     for (const [i, storeId] of storeIds.entries()) {
       // Sentry EBDA-API-Z: one batched marker read per chunk instead of one per store (the per-store calls below hit the cache).
       // A failed prime is not fatal: each store then resolves its own marker exactly as before.
-      if (i % PRIME_CHUNK === 0)
-        await primeCustomerAuthRoutes(storeIds.slice(i, i + PRIME_CHUNK)).catch(() => undefined);
+      if (i % PRIME_CHUNK === 0) await primeAllMarkers(storeIds.slice(i, i + PRIME_CHUNK));
       await runInStoreScope(storeId, async () => {
         // Find carts that:
         // 1. Haven't been active for >1 hour
