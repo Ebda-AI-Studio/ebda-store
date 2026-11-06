@@ -38,8 +38,10 @@ export const backoffMs = (attempts: number): number =>
 export interface DrainResult {
   written: number;
   failed: number;
-  /** rows that failed MAX_ATTEMPTS times: no longer retried, need a human (alert on this) */
+  /** rows that failed MAX_ATTEMPTS times: off the fast path; the alarm still retries them hourly (`includeDead`); alert */
   deadLettered: number;
+  /** rows that crossed MAX_ATTEMPTS in THIS drain: the caller alerts once (Ruling NZ-MONEY-2) */
+  newlyDead: number;
   /** an id already points at ANOTHER store: not applied, needs a human */
   conflicts: Array<{ kind: string; id: string; existing: string; attempted: string }>;
 }
@@ -48,14 +50,37 @@ export interface DrainResult {
 export async function drainEntityIndexOutbox(
   db: SyncSql,
   d1: D1Like,
-  opts: { now?: number; limit?: number } = {}
+  opts: {
+    now?: number;
+    limit?: number;
+    afterId?: number;
+    onlyIds?: readonly string[];
+    /** the alarm: dead-lettered rows are retried too (on their capped 1 h backoff); a money row is never abandoned */
+    includeDead?: boolean;
+  } = {}
 ): Promise<DrainResult> {
   const now = opts.now ?? Date.now();
-  const rows = db.all(
-    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? ORDER BY id LIMIT ?",
-    [MAX_ATTEMPTS, now, Math.min(opts.limit ?? 100, 500)]
-  );
-  const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, conflicts: [] };
+  // `afterId`: only the rows queued after that outbox id (a money op drains ITS OWN rows first, ahead of any backlog).
+  // `onlyIds`: a FORCED drain of these entity ids (a reference about to be handed out is written NOW): due or not,
+  // dead-lettered or not (revived on demand), and a failure does NOT count toward the dead-letter limit, so shopper retries
+  // during an outage can never dead-letter the row (review NEW-3 of PR 455). Only the paced drains count attempts.
+  const only = opts.onlyIds && opts.onlyIds.length > 0 ? opts.onlyIds.slice(0, 50) : null;
+  const rows = only
+    ? db.all(
+        `SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND json_extract(payload, '$.id') IN (${only.map(() => '?').join(', ')}) ORDER BY id`,
+        [...only]
+      )
+    : db.all(
+        "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND (attempts < ? OR ?) AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
+        [
+          MAX_ATTEMPTS,
+          opts.includeDead ? 1 : 0,
+          now,
+          opts.afterId ?? 0,
+          Math.min(opts.limit ?? 100, 500),
+        ]
+      );
+  const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, newlyDead: 0, conflicts: [] };
   for (const r of rows) {
     const rowId = r.id as number;
     try {
@@ -83,17 +108,71 @@ export async function drainEntityIndexOutbox(
       db.run('UPDATE d1_outbox SET done_at = ? WHERE id = ?', [now, rowId]);
       out.written++;
     } catch {
+      out.failed++;
+      if (only) continue; // a forced drain neither counts nor reschedules (see above)
       const attempts = (r.attempts as number) + 1;
       db.run('UPDATE d1_outbox SET attempts = ?, next_attempt_at = ? WHERE id = ?', [
         attempts,
         now + backoffMs(attempts),
         rowId,
       ]);
-      out.failed++;
       if (attempts >= MAX_ATTEMPTS) out.deadLettered++;
+      if (attempts === MAX_ATTEMPTS) out.newlyDead++;
     }
   }
   return out;
+}
+
+/**
+ * The entity-index ids a payment must have in D1 before its reference is handed out: the payment id and each gateway reference
+ * (`<provider>:<ref>`). Empty when the payment is not this store's.
+ */
+export function paymentIndexIds(
+  db: SyncSql,
+  storeId: string,
+  paymentId: string
+): Array<{ kind: EntityKind; id: string }> {
+  const p = db.all(
+    'SELECT p.id, p.provider, p.transaction_id, p.invoice_id FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ? AND o.store_id = ?',
+    [paymentId, storeId]
+  )[0];
+  if (!p) return [];
+  const ids: Array<{ kind: EntityKind; id: string }> = [{ kind: 'payment', id: p.id as string }];
+  // only a GATEWAY payment has webhook references (cod has none; an InstaPay transfer is confirmed by the merchant, its
+  // reference is never routed by a webhook and never indexed)
+  if (p.provider !== 'cod' && p.provider !== 'instapay')
+    for (const ref of [p.transaction_id, p.invoice_id])
+      if (typeof ref === 'string' && ref)
+        ids.push({ kind: 'webhook', id: `${p.provider as string}:${ref}` });
+  return ids;
+}
+
+/** The highest outbox id so far (0 when empty): a money op's OWN index rows are the ones queued after it. */
+export function outboxHighWater(db: SyncSql): number {
+  return (db.all('SELECT COALESCE(MAX(id), 0) AS m FROM d1_outbox', [])[0]?.m as number) ?? 0;
+}
+
+/** The {kind, id} of the entity-index rows queued after `afterId` (a money op's own rows). */
+export function outboxRowsAfter(
+  db: SyncSql,
+  afterId: number
+): Array<{ kind: EntityKind; id: string }> {
+  return db
+    .all("SELECT payload FROM d1_outbox WHERE kind = 'entity_index' AND id > ? ORDER BY id", [
+      afterId,
+    ])
+    .map(r => JSON.parse(r.payload as string) as { kind: EntityKind; id: string })
+    .map(p => ({ kind: p.kind, id: p.id }));
+}
+
+/** When the next undone, not dead-lettered row is due (epoch ms), or null when the outbox is drained. */
+export function nextOutboxAttempt(db: SyncSql): number | null {
+  const r = db.all(
+    // dead-lettered rows included: the alarm keeps retrying them on their capped (1 h) backoff
+    "SELECT MIN(next_attempt_at) AS t FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL",
+    []
+  )[0];
+  return (r?.t as number | null) ?? null;
 }
 
 /** The store that owns an entity, or null (unknown id). */
@@ -167,11 +246,15 @@ export async function awaitEntityIndexed(
   d1: D1Like,
   storeId: string,
   ids: ReadonlyArray<{ kind: EntityKind; id: string }>,
-  opts: { now?: number } = {}
+  opts: { now?: number; afterId?: number; limit?: number } = {}
 ): Promise<void> {
   if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
   const now = opts.now ?? Date.now();
-  const drained = await drainEntityIndexOutbox(db, d1, { now: now + 1 });
+  const drained = await drainEntityIndexOutbox(db, d1, {
+    now: now + 1,
+    afterId: opts.afterId,
+    limit: opts.limit,
+  });
   // an id already owned by ANOTHER store is a conflict, not "done": routing it would deliver this payment to the wrong tenant
   const conflicted = ids.filter(w =>
     drained.conflicts.some(c => c.kind === w.kind && c.id === w.id)

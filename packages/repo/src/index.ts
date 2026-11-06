@@ -59,6 +59,11 @@ export {
   routePaymentWebhook,
   resolveStoreId,
   drainEntityIndexOutbox,
+  awaitEntityIndexed,
+  outboxHighWater,
+  paymentIndexIds,
+  outboxRowsAfter,
+  nextOutboxAttempt,
 } from './platform/entity-index';
 export { scrubReceiptsForOrders } from './do/instapay-receipts';
 export { purgeErasureLedger } from './do/erase-shopper';

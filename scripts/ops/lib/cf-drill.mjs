@@ -1,8 +1,25 @@
 // Restore drill (Ruling NZ-BACKUP-1): prove a backup can be turned back into a working store, not only that counts match.
 // Pure orchestration over injected targets so the unit tests and the weekly fixture drill share it with the real drill.
-import { fetchBackupSet, parseStoreDump, compareTables } from './cf-backup.mjs';
+import {
+  DERIVED_QUEUE_TABLES,
+  DO_MOVED_TABLES,
+  fetchBackupSet,
+  parseStoreDump,
+  compareTables,
+} from './cf-backup.mjs';
 
 export const IMPORT_PAGE_ROWS = 1000;
+
+const ANSI = /\x1b\[[0-9;]*m/g;
+// Only these end the wait for the local worker early. A bare "[ERROR]" line is NOT one of them: wrangler logs benign errors (a request
+// that reaches a removed Postgres path, optional bindings) while the Worker still serves.
+const FATAL_BOOT =
+  /Build failed|Could not resolve|The Workers runtime failed to start|Uncaught \w*Error|EADDRINUSE|address already in use/;
+/** The fatal boot line in a wrangler dev log, or null. */
+export function fatalBootLine(logText) {
+  const m = FATAL_BOOT.exec(String(logText).replace(ANSI, ''));
+  return m ? m[0] : null;
+}
 
 /** The drill only ever writes to a loopback worker. A remote URL is a misuse, not an option. */
 export function assertLoopback(url) {
@@ -56,8 +73,13 @@ export function orderSelfRefRows(columns, pk, rows, self) {
  * Replay a store dump through the production __import path (parents first), then __verify it. `post(path, body, contentType)` and
  * the optional `get(path)` return parsed JSON. Tables the target does not have are reported ALL AT ONCE by name, before any write.
  */
-export async function restoreStoreOverHttp(post, storeId, dump, batch, get) {
+export async function restoreStoreOverHttp(post, storeId, dumpIn, batch, get) {
   const base = `/cutover/stores/${storeId}`;
+  // An older backup may still hold a table that moved to D1 (DO_MOVED_TABLES): it is skipped with a note, never a failure.
+  const skippedMoved = dumpIn
+    .filter(t => DO_MOVED_TABLES.has(t.table))
+    .map(t => ({ table: t.table, rows: t.rows.length }));
+  const dump = dumpIn.filter(t => !DO_MOVED_TABLES.has(t.table));
   let fks = null;
   if (get) {
     const have = new Set((await get(`${base}/__tables`)).tables);
@@ -93,7 +115,7 @@ export async function restoreStoreOverHttp(post, storeId, dump, batch, get) {
     }),
     'application/json'
   );
-  return { tables: res.tables, fk: res.fk };
+  return { tables: res.tables, fk: res.fk, skippedMoved };
 }
 
 const pick = (j, ...paths) => {
@@ -111,6 +133,15 @@ const pick = (j, ...paths) => {
 export async function apiChecksForStore(http, { store, productCount }) {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name, ok: !!ok, detail });
+  // An inactive store is not served publicly (resolve 404, categories/products 400): that is correct behaviour, not a restore defect.
+  if (store.status && store.status !== 'active') {
+    add(
+      'public API checks',
+      true,
+      `SKIPPED: inactive store (status ${store.status}; public 404/400 is expected)`
+    );
+    return out;
+  }
   const host = store.domain || `${store.slug}.ebda.app`;
   const pub = { 'x-store-domain': host, 'x-store-id': store.id, 'cf-connecting-ip': '10.0.0.7' };
 
@@ -237,8 +268,25 @@ export async function runDrill({ io, targets, tier = 'daily', day, now = () => D
       restoreStoreOverHttp(targets.post, id, dump, batch, targets.get)
     );
     if (!res) continue;
-    const cmp = compareTables(entry.tables, res.tables);
+    const moved = new Set(res.skippedMoved.map(m => m.table));
+    const want = Object.fromEntries(Object.entries(entry.tables).filter(([t]) => !moved.has(t)));
+    const cmp = compareTables(want, res.tables, { exempt: DERIVED_QUEUE_TABLES });
     const bad = cmp.filter(c => !c.ok);
+    const exempted = cmp.filter(c => c.exempt);
+    if (exempted.length || moved.size)
+      checks.push({
+        name: `store ${id}: notes`,
+        ok: true,
+        detail: [
+          ...exempted.map(
+            c => `${c.table} not compared (${c.exempt}; backup ${c.want}, restored ${c.got})`
+          ),
+          ...res.skippedMoved.map(
+            m => `${m.table} skipped: moved to D1 (${m.rows} stale row(s) in this older backup)`
+          ),
+        ].join('; '),
+        ms: 0,
+      });
     checks.push({
       name: `store ${id}: ${cmp.length - bad.length}/${cmp.length} tables equal (count + content digest)`,
       ok: bad.length === 0,

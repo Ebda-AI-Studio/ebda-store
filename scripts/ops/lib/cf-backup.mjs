@@ -134,6 +134,19 @@ export const EXPORT_PAGE_ROWS = 500;
  * with its row count (`skippedTables`) so nothing disappears silently.
  */
 export const DO_MOVED_TABLES = new Set(['onesignal_subscriptions']);
+
+/**
+ * Derived work queues of a StoreDO. They are backed up and restored like any table, but their content is NOT part of the equality
+ * check of a restore: importing rows re-fills them by design (a drill measured `search_dirty want 0 got 18`: the search triggers mark
+ * every imported product, customer and guest order dirty), or they drain on their own. A real recovery re-indexes from the restored
+ * base tables, so the base tables being equal is the proof.
+ */
+export const DERIVED_QUEUE_TABLES = {
+  search_dirty:
+    'rows marked for re-index; the search triggers re-fill it on every imported product/customer/guest order',
+  d1_outbox:
+    'write-through retry queue to D1 (directory_update, entity_index), drained by the DO alarm; replay-safe, not state',
+};
 export const REQUEST_TIMEOUT_MS = 60_000;
 export const MAX_ATTEMPTS = 3;
 
@@ -429,11 +442,19 @@ export async function fetchBackupSet({ io, tier = 'daily', day, decrypt }) {
 }
 
 /** Compare per-table count + digest maps. Returns [{table, ok, want, got}] with a row for every table on either side. */
-export function compareTables(want, got) {
+export function compareTables(want, got, { exempt = {} } = {}) {
   const names = [...new Set([...Object.keys(want), ...Object.keys(got)])].sort();
   return names.map(table => {
     const w = want[table];
     const g = got[table];
+    if (table in exempt)
+      return {
+        table,
+        ok: true,
+        exempt: exempt[table],
+        want: w?.count ?? null,
+        got: g?.count ?? null,
+      };
     return {
       table,
       ok: !!w && !!g && w.count === g.count && w.digest === g.digest,

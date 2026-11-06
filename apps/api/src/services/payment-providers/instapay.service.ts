@@ -53,6 +53,7 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import { storeDb, storeMoney } from '../../lib/repo-factory';
+import { runInStoreCtx } from '../../lib/jobs/store-db';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
@@ -183,6 +184,11 @@ export class InstapayService {
     );
     const hours = settings.expiryHours ?? INSTAPAY_DEFAULT_EXPIRY_HOURS;
 
+    // A store on its Durable Object: the hold, the pending payment, the order event and the payment event are ONE section
+    // there (the DO serialises it against confirm / expiry, which is what the Postgres row lock below buys). No Postgres.
+    const money = await storeMoney(storeId);
+    if (money) return InstapayService.initiateOnDo(money, { ...args, now }, settings, hours, cfg);
+
     // Same lock as confirm/expiry, so initiate cannot interleave with them.
     const locked = await lockOrder(
       prisma as unknown as Prisma.TransactionClient,
@@ -294,6 +300,63 @@ export class InstapayService {
       payment: { id: payment.id },
       instructions: this.instructionsFor({ order, amountMinor, payment, expiresAt }),
       created: true,
+    };
+  }
+
+  /** `initiate` for a store on its Durable Object (money op `instapayInitiate`). Same answers and refusals. */
+  private static async initiateOnDo(
+    money: NonNullable<Awaited<ReturnType<typeof storeMoney>>>,
+    args: Parameters<typeof InstapayService.initiate>[0] & { now: Date },
+    settings: ReturnType<typeof parseInstapaySettings>,
+    hours: number,
+    cfg: NonNullable<Awaited<ReturnType<typeof InstapayService.getConfig>>>
+  ): Promise<{ payment: { id: string }; instructions: InstapayInstructions; created: boolean }> {
+    const { storeId, order, now } = args;
+    const amountMinor = order.total - order.walletAmount;
+    const expiresAt = new Date(now.getTime() + hours * HOUR_MS);
+    // No network: the adapter validates the charge and names the reference (the order number).
+    const result = await instapayProvider.createPayment(
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        amountMinor: Math.max(amountMinor, 1),
+        currency: 'EGP',
+        customer: args.customer,
+        returnUrls: { success: '', failure: '' },
+        idempotencyKey: `${order.id}:instapay`,
+        expiresAt,
+      },
+      toProviderCredentials(cfg)
+    );
+    const r = await money.instapayInitiate({
+      orderId: order.id,
+      expiresAt: expiresAt.getTime(),
+      providerRef: result.providerRef ?? null,
+      metadata: {
+        reference: order.orderNumber,
+        handle: settings.handle ?? null,
+        phone: settings.phone ?? null,
+        accountName: settings.accountName ?? null,
+        noteEn: settings.noteEn ?? null,
+        noteAr: settings.noteAr ?? null,
+        expiresAt: expiresAt.toISOString(),
+        customerReference: null,
+      },
+      actorUserId: args.userId ?? null,
+    });
+    if (r.created)
+      args.postCommit?.('instapay.awaiting.notify', () =>
+        runInStoreCtx(storeId, () => InstapayService.notifyMerchantAwaiting(storeId, order.id))
+      );
+    return {
+      payment: { id: r.paymentId },
+      instructions: this.instructionsFor({
+        order,
+        amountMinor: r.amountMinor,
+        payment: { metadata: r.metadata },
+        expiresAt: new Date(r.expiresAt),
+      }),
+      created: r.created,
     };
   }
 

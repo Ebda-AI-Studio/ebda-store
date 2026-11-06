@@ -64,8 +64,10 @@ vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { refund: (...a: unknown[]) => h.refund(...a) },
 }));
+// the route appends through `recordPaymentEventForStore` (a Durable Object store's timeline is in its DO; Postgres joins the scope)
 vi.mock('@api/services/payment-event.service', () => ({
   recordPaymentEvent: (...a: unknown[]) => h.recordPaymentEvent(...a),
+  recordPaymentEventForStore: (...a: unknown[]) => h.recordPaymentEvent(...a),
 }));
 vi.mock('@api/services/order.service', () => ({ OrderService: {} }));
 vi.mock('@api/config', () => ({ config: {} }));
@@ -98,7 +100,8 @@ function paymentRow(refundedAmount: number) {
     provider: 'paymob',
     amount: 5000,
     refundedAmount,
-    order: { store: { id: 'store_1', ownerId: 'owner' } },
+    // the payment's store IS the resolved one (the route refuses any other)
+    order: { id: 'order_1', storeId: 's1' },
   };
 }
 

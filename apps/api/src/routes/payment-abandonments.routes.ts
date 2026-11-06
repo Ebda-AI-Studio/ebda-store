@@ -15,11 +15,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { rangeOrLegacyDays } from '../lib/report-range';
-import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { runInStoreCtx } from '../lib/jobs/store-db';
+import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
+import { storeDb } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -102,9 +102,12 @@ router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: Ne
       where['paymentGatewayAbandonedAt'] = bounds;
     }
 
-    const [rows, total] = await runInStoreCtx(storeId, () =>
+    // The store's own backend (NEON-ZERO: a Durable Object store's orders are in its DO; `storeDb` is the `prisma` proxy for a
+    // Postgres store). `Order -> User` is a platform join the DO cannot do: the shoppers are read beside the page (NZ-A-3).
+    const db = await storeDb(storeId);
+    const [rawRows, total] = await runInStoreCtx(storeId, () =>
       Promise.all([
-        prisma.order.findMany({
+        db.order.findMany({
           where,
           skip,
           take: limit,
@@ -118,15 +121,7 @@ router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: Ne
             paymentGatewayAbandonedAt: true,
             createdAt: true,
             shippingAddress: true,
-            customer: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-              },
-            },
+            customerId: true,
             payments: {
               select: { provider: true, paymentUrl: true, status: true },
               take: 1,
@@ -141,15 +136,23 @@ router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: Ne
                 price: true,
                 total: true,
               },
-              take: 5,
             },
-            _count: { select: { items: true } },
           },
           orderBy: { paymentGatewayAbandonedAt: 'desc' },
         }),
-        prisma.order.count({ where }),
+        db.order.count({ where }),
       ])
     );
+    const shoppers = await customersById(
+      storeId,
+      rawRows.map(r => r.customerId)
+    );
+    const rows = rawRows.map(r => ({
+      ...r,
+      customer: r.customerId ? (shoppers.get(r.customerId) ?? null) : null,
+      _count: { items: r.items.length },
+      items: r.items.slice(0, 5),
+    }));
 
     const abandoners = rows.map(row => {
       // Derive contact from the customer record or the shipping address JSON.
@@ -230,12 +233,13 @@ router.get(
     try {
       const { storeId } = req.params;
 
+      const db = await storeDb(storeId); // the store's own backend (NEON-ZERO)
       const [total, last7d, last30d, totalValueResult] = await runInStoreCtx(storeId, () =>
         Promise.all([
-          prisma.order.count({
+          db.order.count({
             where: { storeId, deletedAt: null, paymentGatewayAbandonedAt: { not: null } },
           }),
-          prisma.order.count({
+          db.order.count({
             where: {
               storeId,
               deletedAt: null,
@@ -245,7 +249,7 @@ router.get(
               },
             },
           }),
-          prisma.order.count({
+          db.order.count({
             where: {
               storeId,
               deletedAt: null,
@@ -255,7 +259,7 @@ router.get(
               },
             },
           }),
-          prisma.order.aggregate({
+          db.order.aggregate({
             where: { storeId, deletedAt: null, paymentGatewayAbandonedAt: { not: null } },
             _sum: { total: true },
           }),

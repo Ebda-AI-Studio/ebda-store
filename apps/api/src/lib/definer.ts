@@ -650,6 +650,18 @@ export const webhookInbox = {
 export async function getStorefrontForPaymentRef(
   ref: string
 ): Promise<{ slug: string; domain: string | null } | null> {
+  // NEON-ZERO (Ruling NZ-N12-1/2): with D1 bound the entity index answers first, per gateway (a reference is unique per
+  // provider; the error redirect does not name one). Postgres is asked only while a `pg` store exists, and its answer is used
+  // only for a store the directory says is `pg`.
+  if (platformDb()) {
+    for (const provider of ['paymob', 'kashier', 'fawry']) {
+      const id = await resolveDoStoreFromWebhookRef({ transactionId: ref, provider });
+      if (id) return storefrontForStoreId(id);
+    }
+    if (!(await hasStoresOnBackend('pg'))) return null;
+    const pgId = await resolveStoreFromWebhookRefPg({ transactionId: ref }).catch(() => null);
+    return pgId && (await backendFor(pgId)) === 'pg' ? storefrontForStoreId(pgId) : null;
+  }
   const rows = await prisma.$queryRaw<Array<{ slug: string; domain: string | null }>>`
     SELECT slug, domain FROM public.ebda_storefront_for_payment_ref(${ref})`;
   return rows[0] ?? null;
