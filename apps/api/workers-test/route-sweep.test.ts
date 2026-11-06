@@ -15,9 +15,10 @@
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
-import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
+import { DEFAULT_PLAN_SEEDS, FEATURE_KEYS_ARRAY } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
 import ALL_ROUTES from './route-table.json';
+import ALL_CRONS from './cron-list.json';
 
 const ROUTES: string[] = ALL_ROUTES as string[];
 
@@ -147,6 +148,7 @@ describe.skipIf(e.E2E_DB === '1')(
   'route sweep, Postgres unreachable, all cutover markers set',
   () => {
     let storeId = '';
+    let jobsStoreId = '';
     let owner = '';
     let sa = '';
     let su = '';
@@ -187,6 +189,28 @@ describe.skipIf(e.E2E_DB === '1')(
       });
       expect(created.status).toBe(200);
       storeId = ((await created.json()) as { id: string }).id;
+      // #465: a SECOND fixture store with every feature on (D1 `store_features`, the override row super-admin's toggle writes) for
+      // the cron group. A job body that checks a feature returns BEFORE its store reads when the store lacks it, so a broken
+      // read behind the gate stayed green (the #463 low-stock `owner` fix could be reverted with the sweep still passing).
+      // Every store runs through /__dev/run-jobs. The route fixture above stays feature-default: with all features on, ~33 gated
+      // routes (finance, loyalty, warehouses, affiliates, wallets...) answer 500 - a separate defect class, not hidden here.
+      const jobsShop = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
+        method: 'POST',
+        body: JSON.stringify({
+          ownerId: owner,
+          name: 'Jobs Shop',
+          slug: 'sweep-jobs-shop',
+          operator: true,
+        }),
+      });
+      expect(jobsShop.status).toBe(200);
+      jobsStoreId = ((await jobsShop.json()) as { id: string }).id;
+      for (const key of FEATURE_KEYS_ARRAY)
+        await e.PLATFORM_DB.prepare(
+          'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
+        )
+          .bind(`sweep-feat-${key}`, jobsStoreId, key, Date.now())
+          .run();
       for (const u of [owner, 'super-sweep', 'cust-sweep'])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
       sa = await accessToken({ userId: owner, jti: 'j-owner', role: 'store_admin', storeId });
@@ -656,7 +680,8 @@ describe.skipIf(e.E2E_DB === '1')(
         const api = e.API as unknown as {
           scheduled?(o: { cron: string; scheduledTime?: Date }): Promise<{ outcome: string }>;
         };
-        const crons = ['0 * * * *', '*/15 * * * *', '*/30 * * * *', '0 */12 * * *', '0 3 * * *'];
+        // EVERY Cron Trigger in wrangler.jsonc (tests/unit/sweep-cron-list.test.ts pins this file to it), not a sample.
+        const crons: string[] = ALL_CRONS;
         // Every access to the Postgres client from here on is counted by the Worker (DEV_STATS=1; packages/database
         // request-db.ts `postgresReaches`). A job that catches its own error still shows up here.
         const pgReaches = async (reset: boolean) =>
@@ -713,6 +738,33 @@ describe.skipIf(e.E2E_DB === '1')(
           // eslint-disable-next-line no-console
           console.log('SWEEP_RESULT ' + JSON.stringify(r));
         }
+        // Every cron-triggered job BODY and the Postgres-adjacent queue messages (pg-copy-scrub), run through the consumers' own
+        // guard: a cron only STARTS most jobs (queue/workflow), so the bodies are driven here. Reaches are counted below.
+        const ran = await e.API.fetch('https://api.ebda.app/__dev/run-jobs', {
+          method: 'POST',
+          headers: { 'x-forwarded-for': freshIp() },
+        });
+        expect(ran.status, 'the dev run-jobs endpoint answered').toBe(200);
+        // eslint-disable-next-line no-console
+        const ranBody = (await ran.json()) as {
+          jobs: Array<{ id: string; ok: boolean; error?: string }>;
+        };
+        console.log('SWEEP_JOBS_RAN ' + JSON.stringify(ranBody));
+        expect(
+          ranBody.jobs.some(j => j.id.endsWith(`@${jobsStoreId}`)),
+          'the feature-complete fixture store was driven through the alarm jobs'
+        ).toBe(true);
+        // A job body (cron run AND each DO store's alarm run) that answers a store-read refusal or a removed-Postgres error is a
+        // port defect (2026-11-06: stock-low-stock-alert-cron, STORE_RECORD_REFUSED). Other failures (provider keys...) are not ours.
+        const portDefects = ranBody.jobs.filter(
+          j =>
+            !j.ok &&
+            /POSTGRES_REMOVED|STORE_RECORD_REFUSED|STORE_READ_UNSUPPORTED/.test(j.error ?? '')
+        );
+        if (e.SWEEP_STRICT === '1')
+          expect(portDefects, 'job bodies that hit a DO store-read refusal or Postgres').toEqual(
+            []
+          );
         const report = await bucket.get(`ops-reports/backup-sweep/${day(new Date())}.json`);
         const backup = report
           ? (JSON.parse(await report.text()) as {

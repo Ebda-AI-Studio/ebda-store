@@ -30,6 +30,10 @@ export interface D1Like {
 
 /** After this many failures a row is dead-lettered (still in the outbox, no longer retried, counted for the alert). */
 export const MAX_ATTEMPTS = 20;
+/** A dead-lettered row is retried hourly by the alarm for this many days; past that it is ABANDONED (no more background wakes). */
+export const ABANDON_AFTER_DEAD_DAYS = 14;
+/** Attempts at which a row is abandoned: the dead-letter limit plus one hourly retry per day for ABANDON_AFTER_DEAD_DAYS. */
+export const ABANDON_ATTEMPTS = MAX_ATTEMPTS + ABANDON_AFTER_DEAD_DAYS * 24;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 60 * 60 * 1000;
 export const backoffMs = (attempts: number): number =>
@@ -42,9 +46,21 @@ export interface DrainResult {
   deadLettered: number;
   /** rows that crossed MAX_ATTEMPTS in THIS drain: the caller alerts once (Ruling NZ-MONEY-2) */
   newlyDead: number;
+  /** rows that crossed ABANDON_ATTEMPTS (or can never be written: a malformed payload) in THIS drain: alerted once, then no more wakes */
+  newlyAbandoned: number;
   /** an id already points at ANOTHER store: not applied, needs a human */
   conflicts: Array<{ kind: string; id: string; existing: string; attempted: string }>;
 }
+
+class PermanentIndexError extends Error {}
+const isMalformedPayload = (raw: unknown): boolean => {
+  try {
+    const p = JSON.parse(String(raw)) as { kind?: string; id?: string; storeId?: string };
+    return !ENTITY_KINDS.includes(p.kind as EntityKind) || !p.id || !p.storeId;
+  } catch {
+    return true;
+  }
+};
 
 /** Write due outbox rows to D1. Idempotent: a retry after a lost acknowledgement finds the same row and succeeds. */
 export async function drainEntityIndexOutbox(
@@ -55,7 +71,10 @@ export async function drainEntityIndexOutbox(
     limit?: number;
     afterId?: number;
     onlyIds?: readonly string[];
-    /** the alarm: dead-lettered rows are retried too (on their capped 1 h backoff); a money row is never abandoned */
+    /**
+     * the alarm: dead-lettered rows are retried too (on their capped 1 h backoff) until ABANDON_ATTEMPTS (14 days of hourly retries).
+     * A forced `onlyIds` drain still writes an abandoned row on demand, so a payment about to be handed out is never refused for it.
+     */
     includeDead?: boolean;
   } = {}
 ): Promise<DrainResult> {
@@ -71,22 +90,30 @@ export async function drainEntityIndexOutbox(
         [...only]
       )
     : db.all(
-        "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND (attempts < ? OR ?) AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
+        "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND (attempts < ? OR (? AND attempts < ?)) AND next_attempt_at <= ? AND id > ? ORDER BY id LIMIT ?",
         [
           MAX_ATTEMPTS,
           opts.includeDead ? 1 : 0,
+          ABANDON_ATTEMPTS,
           now,
           opts.afterId ?? 0,
           Math.min(opts.limit ?? 100, 500),
         ]
       );
-  const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, newlyDead: 0, conflicts: [] };
+  const out: DrainResult = {
+    written: 0,
+    failed: 0,
+    deadLettered: 0,
+    newlyDead: 0,
+    newlyAbandoned: 0,
+    conflicts: [],
+  };
   for (const r of rows) {
     const rowId = r.id as number;
     try {
       const p = JSON.parse(r.payload as string) as { kind: string; id: string; storeId: string };
       if (!ENTITY_KINDS.includes(p.kind as EntityKind) || !p.id || !p.storeId)
-        throw new Error('malformed entity_index payload');
+        throw new PermanentIndexError('malformed entity_index payload');
       await d1
         .prepare(
           'INSERT INTO entity_index (kind, id, store_id) VALUES (?, ?, ?) ON CONFLICT (kind, id) DO NOTHING'
@@ -107,10 +134,12 @@ export async function drainEntityIndexOutbox(
         });
       db.run('UPDATE d1_outbox SET done_at = ? WHERE id = ?', [now, rowId]);
       out.written++;
-    } catch {
+    } catch (err) {
       out.failed++;
       if (only) continue; // a forced drain neither counts nor reschedules (see above)
-      const attempts = (r.attempts as number) + 1;
+      // a payload that can never be written (malformed) skips the retries: dead and abandoned at once, alerted once
+      const permanent = err instanceof PermanentIndexError || isMalformedPayload(r.payload);
+      const attempts = permanent ? ABANDON_ATTEMPTS : (r.attempts as number) + 1;
       db.run('UPDATE d1_outbox SET attempts = ?, next_attempt_at = ? WHERE id = ?', [
         attempts,
         now + backoffMs(attempts),
@@ -118,6 +147,8 @@ export async function drainEntityIndexOutbox(
       ]);
       if (attempts >= MAX_ATTEMPTS) out.deadLettered++;
       if (attempts === MAX_ATTEMPTS) out.newlyDead++;
+      if (attempts === ABANDON_ATTEMPTS && (r.attempts as number) < ABANDON_ATTEMPTS)
+        out.newlyAbandoned++;
     }
   }
   return out;
@@ -165,12 +196,14 @@ export function outboxRowsAfter(
     .map(p => ({ kind: p.kind, id: p.id }));
 }
 
-/** When the next undone, not dead-lettered row is due (epoch ms), or null when the outbox is drained. */
+/**
+ * When the next undone row is due (epoch ms), or null when the outbox is drained. Dead-lettered rows are included (the alarm keeps
+ * retrying them on their capped 1 h backoff); ABANDONED rows are not: a row that can never be written stops waking the DO hourly.
+ */
 export function nextOutboxAttempt(db: SyncSql): number | null {
   const r = db.all(
-    // dead-lettered rows included: the alarm keeps retrying them on their capped (1 h) backoff
-    "SELECT MIN(next_attempt_at) AS t FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL",
-    []
+    "SELECT MIN(next_attempt_at) AS t FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ?",
+    [ABANDON_ATTEMPTS]
   )[0];
   return (r?.t as number | null) ?? null;
 }
@@ -308,4 +341,51 @@ export async function createPaymentIndexed(
     if (ref) ids.push({ kind: 'webhook', id: `${args.provider}:${ref}` });
   await awaitEntityIndexed(db, d1, args.storeId, ids, { now: args.now });
   return { paymentId };
+}
+
+export interface DeadLetterRow {
+  outboxId: number;
+  kind: string;
+  id: string;
+  storeId: string;
+  attempts: number;
+  /** past ABANDON_ATTEMPTS: no more background retries */
+  abandoned: boolean;
+}
+export interface DeadLetterReport {
+  /** rows at or past MAX_ATTEMPTS, not yet written */
+  dead: number;
+  abandoned: number;
+  /** the oldest 20 */
+  rows: DeadLetterRow[];
+}
+
+/** The dead-lettered / abandoned entity-index rows of this store's outbox (what the API Worker's hourly health cron alerts on). */
+export function deadLetterReport(db: SyncSql): DeadLetterReport {
+  const all = db.all(
+    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts >= ? ORDER BY id",
+    [MAX_ATTEMPTS]
+  );
+  const rows: DeadLetterRow[] = all.slice(0, 20).map(r => {
+    let p: { kind?: string; id?: string; storeId?: string } = {};
+    try {
+      p = JSON.parse(String(r.payload));
+    } catch {
+      // unreadable payload: reported with empty fields (it is also abandoned at once)
+    }
+    const attempts = r.attempts as number;
+    return {
+      outboxId: r.id as number,
+      kind: p.kind ?? '?',
+      id: p.id ?? '?',
+      storeId: p.storeId ?? '',
+      attempts,
+      abandoned: attempts >= ABANDON_ATTEMPTS,
+    };
+  });
+  return {
+    dead: all.length,
+    abandoned: all.filter(r => (r.attempts as number) >= ABANDON_ATTEMPTS).length,
+    rows,
+  };
 }

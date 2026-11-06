@@ -1,0 +1,7 @@
+# NZ-MONEY-5
+
+> Section: NEON-ZERO money path (2026-11-06)
+
+**Ruling NZ-MONEY-5 - a dead-lettered entity-index row is a real alert, and a row that can never be written stops waking the DO. The StoreDO cannot call `sendAlert`, so it RECORDS its dead-lettered / abandoned rows as one D1 `system_settings` row per store (`entity_index_health.<storeId>`, written when the set changes, deleted when it clears); the API Worker's hourly cron (`entity-index-health`, `lib/entity-index-health.ts`) reads those rows with one query and sends one P1 per row per day (dedupe state `entity_index_alerted.<storeId>`; an alert that was not sent is retried next tick). A dead row is retried hourly for 14 days (`ABANDON_ATTEMPTS`), then ABANDONED: alerted once more as ABANDONED, no more background retries and no more alarm wakes (`nextOutboxAttempt` ignores it); a malformed payload is abandoned at once. A forced drain (`onlyIds`, the reference-handing paths) still writes an abandoned row on demand, so a payment is never refused because of the cap. Evidence: #458 (the `[P1]` dead-letter line was console-only, review of #455; the hourly wake was unbounded). Tests: `packages/repo/test/entity-index.test.ts`, `tests/unit/entity-index-health.test.ts`, `workers-do/index-retry-alarm.test.ts`. Cost if wrong: an alert is at most one hour late (the cron tick) and a row that was only unwritable for two weeks needs a manual write after the abandon alert instead of healing by itself.**
+
+Source: `docs/cf/payments-on-do.md` "NEON-ZERO money path".

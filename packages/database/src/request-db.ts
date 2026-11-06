@@ -57,6 +57,10 @@ const reachLabel = new AsyncLocalStorage<string>();
 export function withReachLabel<T>(label: string, fn: () => T): T {
   return reachLabel.run(label, fn);
 }
+/** The cron job / queue / job id running on this async context, if any (the reporter names it in the P1 alert). */
+export function currentReachLabel(): string | undefined {
+  return reachLabel.getStore();
+}
 const reaches: Array<{ at: number; label: string; stack: string }> = [];
 export function trackPostgresReaches(on: boolean): void {
   trackReaches = on;

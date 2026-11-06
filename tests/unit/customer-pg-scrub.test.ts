@@ -21,7 +21,15 @@ vi.mock('@api/lib/definer', () => ({
   deleteUserPasskeys: async (id: string) => void h.definers.push(`passkeys:${id}`),
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
-vi.mock('@api/cf/bindings', () => ({ cfBindings: () => undefined }));
+const rt = vi.hoisted(() => ({ isWorkers: false, hyperdrive: false }));
+vi.mock('@api/lib/runtime', () => ({
+  get isWorkers() {
+    return rt.isWorkers;
+  },
+}));
+vi.mock('@api/cf/bindings', () => ({
+  cfBindings: () => (rt.isWorkers ? (rt.hyperdrive ? { HYPERDRIVE: {} } : {}) : undefined),
+}));
 
 import { isPgCopyScrub, scrubOrEnqueue, scrubPgCustomerCopy } from '@api/lib/customer-pg-scrub';
 
@@ -48,6 +56,43 @@ describe('scrubPgCustomerCopy', () => {
     h.rows.exists = false;
     expect(await scrubPgCustomerCopy('u1', 's1')).toEqual({ scrubbed: false });
     expect(h.updates).toHaveLength(0);
+  });
+});
+
+describe('scrubPgCustomerCopy on a Worker without Postgres (2026-11-06 POSTGRES_REMOVED P1)', () => {
+  it('skips before any Prisma call, so no P1 and no retry loop', async () => {
+    rt.isWorkers = true;
+    rt.hyperdrive = false;
+    h.updates.length = 0;
+    h.rows.exists = true;
+    try {
+      expect(await scrubPgCustomerCopy('u1', 's1')).toEqual({
+        scrubbed: false,
+        skipped: 'postgres-removed',
+      });
+      expect(h.updates).toHaveLength(0);
+      const enqueue = vi.fn();
+      const alert = vi.fn();
+      expect(await scrubOrEnqueue('u1', 's1', { enqueue, alert })).toEqual({
+        scrubbed: false,
+        enqueued: false,
+      });
+      expect(enqueue).not.toHaveBeenCalled();
+      expect(alert).not.toHaveBeenCalled();
+    } finally {
+      rt.isWorkers = false;
+    }
+  });
+  it('a Worker WITH a Hyperdrive binding still scrubs', async () => {
+    rt.isWorkers = true;
+    rt.hyperdrive = true;
+    h.rows.exists = true;
+    try {
+      expect(await scrubPgCustomerCopy('u1', 's1')).toEqual({ scrubbed: true });
+    } finally {
+      rt.isWorkers = false;
+      rt.hyperdrive = false;
+    }
   });
 });
 

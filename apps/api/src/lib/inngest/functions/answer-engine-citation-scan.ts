@@ -24,6 +24,7 @@ import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { allStoresDirectory, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
+import { postgresRemovedOnThisWorker } from '../../postgres-present';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
 import { isAiEligiblePlan } from '../../ai-plan-eligibility';
@@ -57,6 +58,8 @@ export interface ScanStoreResult {
  * database make the filter miss rows an earlier attempt wrote.
  */
 async function dbNowIso(): Promise<string> {
+  // No Postgres on this Worker (Ruling NZ-D23): the Worker clock is the run clock, as for the DO stores' own rows.
+  if (postgresRemovedOnThisWorker()) return new Date().toISOString();
   // `AT TIME ZONE 'UTC'`: the driver reads a bare `timestamptz` as if its wall-clock text were UTC and drops the
   // offset, so a plain `now()` was hours off on any session whose zone is not UTC (Ruling ITEST-12).
   const rows = await prisma.$queryRaw<

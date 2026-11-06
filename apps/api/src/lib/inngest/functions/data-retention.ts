@@ -6,6 +6,7 @@ import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/databas
 import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
 import { storeMoney, storeRepo } from '../../repo-factory';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
+import { postgresRemovedOnThisWorker } from '../../postgres-present';
 import logger from '../../logger';
 import { shippingAddressNotAnonymized } from './order-anonymize-where';
 import { inngest } from '../client';
@@ -183,20 +184,23 @@ export const softDeletedUserAnonymize: JobDef = inngest.createFunction(
     // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
     // Customers live in their store's scope: found store by store.
     const candidates = await step.run('find-candidates', async () => {
-      const found: Array<{ id: string; storeId?: string }> = (
-        await acrossStoresFlat(storeId =>
-          prisma.user.findMany({
-            where: {
-              storeId,
-              role: 'customer',
-              deletedAt: { not: null, lt: cutoff },
-              NOT: { email: { startsWith: 'erased-' } },
-            },
-            select: { id: true },
-            take: USER_ANONYMIZE_BATCH_CAP,
-          })
-        )
-      ).slice(0, USER_ANONYMIZE_BATCH_CAP);
+      // No Postgres on this Worker (Ruling NZ-D23): there are no Postgres customer rows to find; the DO stores below are the source.
+      const found: Array<{ id: string; storeId?: string }> = postgresRemovedOnThisWorker()
+        ? []
+        : (
+            await acrossStoresFlat(storeId =>
+              prisma.user.findMany({
+                where: {
+                  storeId,
+                  role: 'customer',
+                  deletedAt: { not: null, lt: cutoff },
+                  NOT: { email: { startsWith: 'erased-' } },
+                },
+                select: { id: true },
+                take: USER_ANONYMIZE_BATCH_CAP,
+              })
+            )
+          ).slice(0, USER_ANONYMIZE_BATCH_CAP);
       // N-9: customers of stores served by their StoreDO are that DO's; their Postgres rows are stale copies.
       for (const storeId of await doStoreIdList()) {
         if (found.length >= USER_ANONYMIZE_BATCH_CAP) break;
