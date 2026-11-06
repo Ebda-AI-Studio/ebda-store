@@ -1036,13 +1036,21 @@ export interface MoneyClient {
    * Finance admin (Ruling NZ-FEAT-1): a manual adjusting entry (balanced, active store accounts, one section), the ledger side of a
    * bank reconciliation difference, and the on-hand / disabled-variant stock value of the finance dashboard.
    */
-  /** cancelBackorder on the DO (Ruling NZ-FEAT-1): claim + flag + stock heal + marker in ONE section; key it per line. */
+  /** cancelBackorder on the DO (Ruling NZ-FEAT-1): claim + flag + stock heal + marker in ONE section; a re-cancel is a replay. */
   backorderCancel(
     a: { backorderLineId: string; reason: string; userId?: string | null },
     key?: string
   ): Promise<
     | { found: false }
-    | { found: true; orderId: string; orderItemId: string; quantity: number; stockRestored: number }
+    | {
+        found: true;
+        /** true: the line was already cancelled; nothing was written, the figures are that cancel's */
+        replayed: boolean;
+        orderId: string;
+        orderItemId: string;
+        quantity: number;
+        stockRestored: number;
+      }
   >;
   journalManual(
     a: {

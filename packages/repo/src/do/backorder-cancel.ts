@@ -11,8 +11,9 @@ import { MoneyError, type SyncSql } from './sync-sql';
  *   4. The `backorder_line_cancelled` order event carrying `refundKey`, the items and `stockRestored`: the record every later
  *      allocation (GL `journalPartialReturn`, refunds, returns) counts as prior, and that a whole-order restore subtracts.
  * The item-level `order/refunded` event is sent by the service AFTER this section, keyed `backorder:<lineId>`, exactly as on
- * Postgres. Run it with the idempotency key `backorder-cancel:<lineId>` so a retried request replays this answer and re-sends
- * that (idempotent) event instead of a 404.
+ * Postgres. A second cancel of the same line (a retry, another admin, another reason) writes nothing and answers
+ * `replayed: true` with what the first cancel did (read from the line and its marker), so the service answers 200 and sends
+ * the event only for the call that cancelled.
  */
 export const BACKORDER_CANCEL_MARKER = 'backorder_line_cancelled';
 
@@ -44,7 +45,34 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
       WHERE bl.id = ? AND bl.store_id = ? AND bl.cancelled_at IS NULL AND bl.fulfilled_at IS NULL`,
     [lineId, storeId]
   )[0];
-  if (!line) return { found: false as const };
+  if (!line) {
+    // Already cancelled (by anyone, with any reason): answer what that cancel did, from its row and marker, writing nothing.
+    const done = db.all(
+      `SELECT bl.order_item_id, oi.order_id FROM backorder_lines bl JOIN order_items oi ON oi.id = bl.order_item_id
+        WHERE bl.id = ? AND bl.store_id = ? AND bl.cancelled_at IS NOT NULL`,
+      [lineId, storeId]
+    )[0];
+    if (!done) return { found: false as const };
+    const marker = db.all(
+      `SELECT metadata FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = ?
+          AND json_extract(metadata, '$.backorderLineId') = ?`,
+      [storeId, done.order_id, BACKORDER_CANCEL_MARKER, lineId]
+    )[0];
+    const meta = marker
+      ? (JSON.parse(String(marker.metadata)) as {
+          items?: Array<{ quantity?: number }>;
+          stockRestored?: number;
+        })
+      : null;
+    return {
+      found: true as const,
+      replayed: true as const,
+      orderId: done.order_id as string,
+      orderItemId: done.order_item_id as string,
+      quantity: Number(meta?.items?.[0]?.quantity ?? 0),
+      stockRestored: Number(meta?.stockRestored ?? 0),
+    };
+  }
   const now = Date.now();
   const orderItemId = line.order_item_id as string;
   const orderId = line.order_id as string;
@@ -70,7 +98,14 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
     db.run('UPDATE order_items SET cost_price_deferred = 0 WHERE id = ?', [orderItemId]);
 
   if (quantity === 0)
-    return { found: true as const, orderId, orderItemId, quantity, stockRestored: 0 };
+    return {
+      found: true as const,
+      replayed: false as const,
+      orderId,
+      orderItemId,
+      quantity,
+      stockRestored: 0,
+    };
 
   const refundKey = `backorder:${lineId}`;
   // 3. heal the stock debt (non-variant, tracked, negative only)
@@ -124,5 +159,12 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
       now,
     ]
   );
-  return { found: true as const, orderId, orderItemId, quantity, stockRestored };
+  return {
+    found: true as const,
+    replayed: false as const,
+    orderId,
+    orderItemId,
+    quantity,
+    stockRestored,
+  };
 }

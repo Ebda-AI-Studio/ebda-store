@@ -498,9 +498,21 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
 
     const list = await api(`/stores/${storeId}/backorders`);
     expect(list.status, list.text).toBe(200);
-    const line = (list.json.data as Array<{ id: string; qty: number; productId: string }>).find(
-      l => l.productId === boProductId
-    )!;
+    const line = (
+      list.json.data as Array<{
+        id: string;
+        qty: number;
+        productId: string;
+        orderItem: { orderId: string };
+      }>
+    ).find(l => l.productId === boProductId)!;
+    const refundedEvents = async () =>
+      (
+        (await (await e.API.fetch('https://api.ebda.app/__dev/dispatched')).json()) as {
+          events: Array<{ name: string; orderId: string | null }>;
+        }
+      ).events.filter(ev => ev.name === 'order/refunded' && ev.orderId === line.orderItem.orderId);
+    expect(await refundedEvents()).toHaveLength(0);
     expect(line.qty).toBeGreaterThanOrEqual(2); // checkout records the whole oversold line
     const cancel = await api(`/stores/${storeId}/backorders/${line.id}/cancel`, {
       method: 'POST',
@@ -518,12 +530,25 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     });
     expect(markers).toHaveLength(1);
     expect(JSON.stringify(markers[0]!.metadata)).toContain('stockRestored');
-    // the same line again replays the keyed section (no second heal), an unknown line is a 404
-    const again = await api(`/stores/${storeId}/backorders/${line.id}/cancel`, {
+    // the item-level order/refunded event (GL partial reversal + owed amount) went out exactly once
+    expect(await refundedEvents()).toHaveLength(1);
+    // the same line again, by ANOTHER admin with another reason: a replay (200, same figures), no second heal, no second event
+    await authState('user:tv:super-fg', [['set', 'user:tv:super-fg', '0', {}]]);
+    const su = await accessToken({ userId: 'super-fg', jti: 'j-fg-su', role: 'super_admin' });
+    const again = await e.API.fetch(`${BASE}/stores/${storeId}/backorders/${line.id}/cancel`, {
       method: 'POST',
-      body: { reason: 'supplier discontinued' },
+      headers: {
+        authorization: `Bearer ${su}`,
+        'x-store-id': storeId,
+        'content-type': 'application/json',
+        'x-forwarded-for': freshIp(),
+      },
+      body: JSON.stringify({ reason: 'another reason' }),
     });
-    expect(again.status, again.text).toBe(200);
+    const againText = await again.text();
+    expect(again.status, againText).toBe(200);
+    expect(JSON.parse(againText).data).toMatchObject({ owedToCustomer: 0, replayed: true });
+    expect(await refundedEvents()).toHaveLength(1);
     const stillZero = await doRead<{ inventory: number }>(storeId, 'Product', {
       where: { id: boProductId },
     });

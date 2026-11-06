@@ -239,26 +239,26 @@ export class LoyaltyService {
     const m = money ?? (await storeMoney(storeId));
     if (!m) return;
     if (!opts.trusted) await assertStoreCustomer(storeId, customerId);
+    // No Postgres on this Worker (NEON-ZERO N-17): nothing can be read to import, so nothing is imported AND the done flag is
+    // NOT written (a one-way door if a store still had Postgres-only history; that import runs where Postgres is reachable).
+    if (postgresRemovedOnThisWorker()) return;
     if ((await m.loyaltyImportState({ customerId })).done) {
       importedSeen.add(key);
       return;
     }
-    // No Postgres on this Worker (NEON-ZERO N-17): there is no legacy ledger left to import, only the done flag to write.
-    const rows = postgresRemovedOnThisWorker()
-      ? []
-      : await prisma.loyaltyTransaction.findMany({
-          where: { storeId, customerId },
-          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          select: {
-            id: true,
-            orderId: true,
-            type: true,
-            points: true,
-            description: true,
-            expiresAt: true,
-            createdAt: true,
-          },
-        });
+    const rows = await prisma.loyaltyTransaction.findMany({
+      where: { storeId, customerId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        orderId: true,
+        type: true,
+        points: true,
+        description: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
     if (rows.length === 0) {
       // nothing to import: only the flag (a no-op on a store without loyalty config); NO points row is created
       if ((await m.loyaltyMarkImported({ customerId })).done) importedSeen.add(key);
@@ -297,19 +297,18 @@ export class LoyaltyService {
   static async ensureDoStoreHistory(storeId: string, money: MoneyClient): Promise<void> {
     const key = `${storeId}:*`;
     if (importedSeen.has(key)) return;
+    // No Postgres on this Worker (NEON-ZERO N-17): nothing to read, so no import and no done flag (see ensureDoHistory).
+    if (postgresRemovedOnThisWorker()) return;
     if ((await money.loyaltyImportState({})).done) {
       importedSeen.add(key);
       return;
     }
-    // No Postgres on this Worker (NEON-ZERO N-17): no customer has legacy history; only the store-wide flag is written.
-    const customers = postgresRemovedOnThisWorker()
-      ? []
-      : await prisma.loyaltyTransaction.findMany({
-          where: { storeId },
-          distinct: ['customerId'],
-          select: { customerId: true },
-          orderBy: { customerId: 'asc' },
-        });
+    const customers = await prisma.loyaltyTransaction.findMany({
+      where: { storeId },
+      distinct: ['customerId'],
+      select: { customerId: true },
+      orderBy: { customerId: 'asc' },
+    });
     const deadline = Date.now() + IMPORT_BUDGET_MS;
     for (const c of customers) {
       if (Date.now() > deadline)

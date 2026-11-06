@@ -40,6 +40,7 @@ import {
   setAccountActive,
   seedCoaForStore,
 } from '../services/accounting/account.service';
+import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { postManualEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
 import { dashboardStockValues } from '../services/accounting/dashboard-stock';
@@ -322,15 +323,18 @@ router.post(
       });
 
       const entry = await runInStoreCtx(req.params.storeId, () =>
-        postManualEntry({
-          storeId: req.params.storeId,
-          source: 'manual',
-          memo: body.memo,
-          memoAr: body.memoAr,
-          postedAt: body.postedAt ? new Date(body.postedAt) : undefined,
-          postedBy: req.user?.userId,
-          lines: resolvedLines,
-        })
+        postManualEntry(
+          {
+            storeId: req.params.storeId,
+            source: 'manual',
+            memo: body.memo,
+            memoAr: body.memoAr,
+            postedAt: body.postedAt ? new Date(body.postedAt) : undefined,
+            postedBy: req.user?.userId,
+            lines: resolvedLines,
+          },
+          idempotencyKeyOf(req.header('idempotency-key'))
+        )
       );
 
       res.status(201).json({ data: entry });

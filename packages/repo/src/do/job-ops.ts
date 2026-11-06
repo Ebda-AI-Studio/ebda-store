@@ -511,6 +511,8 @@ export function affiliateReverseOp(
       "UPDATE affiliate_referrals SET status = 'refunded' WHERE id = ? AND store_id = ? AND status = 'commission_paid'",
       [ref.id as string, storeId]
     );
+    // the claim above is the guard: only the call that moved commission_paid -> refunded takes the money back (never twice)
+    if (Number(db.all('SELECT changes() AS n', [])[0]?.n ?? 0) !== 1) return { amount: null };
     db.run(
       'UPDATE affiliates SET total_earned = total_earned - ?1, pending_balance = pending_balance - ?1 WHERE id = ?2 AND store_id = ?3',
       [amount, ref.affiliate_id as string, storeId]

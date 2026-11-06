@@ -51,6 +51,7 @@ describe('feature-gated operations on the DO (Ruling NZ-FEAT-1)', () => {
       );
       expect(out).toEqual({
         found: true,
+        replayed: false,
         orderId: 'o1',
         orderItemId: 'i1',
         quantity: 3,
@@ -94,10 +95,12 @@ describe('feature-gated operations on the DO (Ruling NZ-FEAT-1)', () => {
       ).toEqual(out);
       expect(r.q(`SELECT inventory FROM products WHERE id = 'p1'`)[0].inventory).toBe(0);
       expect(r.q(`SELECT COUNT(*) AS n FROM order_events`)[0].n).toBe(1);
-      // unkeyed second cancel: the line is no longer open
+      // unkeyed second cancel: a replay of the first (the line is no longer open), nothing written
       expect(r.money('backorderCancel', { backorderLineId: 'b1', reason: 'again' })).toEqual({
-        found: false,
+        ...out,
+        replayed: true,
       });
+      expect(r.q(`SELECT COUNT(*) AS n FROM order_events`)[0].n).toBe(1);
     });
 
     it('refuses an unknown line, another store, a missing reason; keeps the flag while another line is open', () => {
@@ -195,5 +198,188 @@ describe('feature-gated operations on the DO (Ruling NZ-FEAT-1)', () => {
         })
       )
     ).toContain('STOCK_WRITE_REFUSED');
+  });
+});
+
+// Review of #467 (I-1, I-2, M-1, M-5): the affiliate money trail cannot be deleted or re-pointed through the generic writer,
+// a reversal never runs twice, a re-cancel is a replay, and a failure AFTER a first write inside an op rolls the op back.
+describe('money guards on the generic writer and the new ops (Ruling NZ-FEAT-1, review of #467)', () => {
+  function writer() {
+    const r = rig();
+    const sql = nodeSqlRunner(r.raw);
+    ensureIdempotencySchema(sql);
+    const lite = createPrismaLite(META as never, sql, 'store-do', { storeId: S }) as never as any;
+    const run = (ops: unknown[]) => runWrites(lite, sql, { ops } as never, () => 1) as Promise<any>;
+    const proc = async (op: string, args: Record<string, unknown>) => {
+      const out = await run([{ model: '$proc', op, args }]);
+      if (!out.ok) throw new Error(`${out.code}: ${out.message}`);
+      return JSON.parse(out.json)[0] as number;
+    };
+    r.raw.exec(`
+      INSERT INTO affiliates (id, store_id, name, email, referral_code, status) VALUES ('af1', 's1', 'A', 'a@x.invalid', 'A1', 'approved');
+      INSERT INTO affiliates (id, store_id, name, email, referral_code, status) VALUES ('af2', 's1', 'B', 'b@x.invalid', 'B1', 'approved');
+      INSERT INTO affiliate_referrals (id, store_id, affiliate_id, referral_code, status, cookie_expires_at) VALUES ('r1', 's1', 'af1', 'A1', 'clicked', 4102444800000);
+      INSERT INTO affiliate_events (id, store_id, affiliate_id, event_type) VALUES ('e2', 's1', 'af2', 'created');
+      INSERT INTO warehouses (id, store_id, name, code) VALUES ('w1', 's1', 'Main', 'MAIN');
+    `);
+    return { ...r, run, proc };
+  }
+
+  it('I-1: the generic writer never deletes an affiliate or a warehouse', async () => {
+    const r = writer();
+    for (const [model, op, args] of [
+      ['Affiliate', 'delete', { where: { id: 'af2', storeId: S } }],
+      ['Affiliate', 'deleteMany', { where: { storeId: S } }],
+      ['Warehouse', 'delete', { where: { id: 'w1', storeId: S } }],
+      ['Warehouse', 'deleteMany', { where: { storeId: S } }],
+    ] as const)
+      expect(await r.run([{ model, op, args }])).toMatchObject({
+        ok: false,
+        code: 'DELETE_REFUSED',
+      });
+    expect(r.q(`SELECT COUNT(*) AS n FROM affiliates`)[0].n).toBe(2);
+    expect(r.q(`SELECT COUNT(*) AS n FROM warehouses`)[0].n).toBe(1);
+  });
+
+  it('I-1: a commission that lands before the delete survives it (the check IS the delete); a clean affiliate goes with its children', async () => {
+    const r = writer();
+    // the link + commission land first (the race the old check-then-act lost)
+    expect(
+      await r.proc('affiliateReferralLink', { id: 'r1', storeId: S, orderId: 'o1', convertedAt: 1 })
+    ).toBe(1);
+    expect(r.money('affiliateCommission', { referralId: 'r1', commissionAmount: 250 })).toEqual({
+      claimed: true,
+    });
+    expect(await r.proc('affiliateDeleteIfClean', { id: 'af1', storeId: S })).toBe(0);
+    expect(r.q(`SELECT pending_balance, total_earned FROM affiliates WHERE id = 'af1'`)).toEqual([
+      { pending_balance: 250, total_earned: 250 },
+    ]);
+    expect(r.q(`SELECT status FROM affiliate_referrals WHERE id = 'r1'`)[0].status).toBe(
+      'commission_paid'
+    );
+    // a clean affiliate: deleted, its events cascade with it
+    expect(await r.proc('affiliateDeleteIfClean', { id: 'af2', storeId: S })).toBe(1);
+    expect(r.q(`SELECT COUNT(*) AS n FROM affiliate_events WHERE affiliate_id = 'af2'`)[0].n).toBe(
+      0
+    );
+    // another store's id deletes nothing
+    expect(await r.proc('affiliateDeleteIfClean', { id: 'af1', storeId: 's2' })).toBe(0);
+  });
+
+  it('I-2: a referral lifecycle (status, order) is never written through the generic writer; the link happens once', async () => {
+    const r = writer();
+    for (const data of [{ status: 'commission_paid' }, { status: 'refunded' }, { orderId: 'o1' }])
+      expect(
+        await r.run([
+          {
+            model: 'AffiliateReferral',
+            op: 'update',
+            args: { where: { id: 'r1', storeId: S }, data },
+          },
+        ])
+      ).toMatchObject({ ok: false, code: 'STOCK_WRITE_REFUSED' });
+    expect(
+      await r.run([
+        {
+          model: 'AffiliateReferral',
+          op: 'create',
+          args: {
+            data: {
+              id: 'r9',
+              storeId: S,
+              affiliateId: 'af1',
+              referralCode: 'A1',
+              status: 'commission_paid',
+              cookieExpiresAt: new Date(4102444800000),
+            },
+          },
+        },
+      ])
+    ).toMatchObject({ ok: false, code: 'STOCK_WRITE_REFUSED' });
+    expect(
+      await r.proc('affiliateReferralLink', { id: 'r1', storeId: S, orderId: 'o1', convertedAt: 1 })
+    ).toBe(1);
+    // a second link (another order) is a no-op: the referral is never re-pointed
+    r.raw.exec(
+      `INSERT INTO orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address) VALUES ('o3', 's1', 'ORD-3', 1, 1, '{}', '{}')`
+    );
+    expect(
+      await r.proc('affiliateReferralLink', { id: 'r1', storeId: S, orderId: 'o3', convertedAt: 2 })
+    ).toBe(0);
+    expect(r.q(`SELECT order_id, status FROM affiliate_referrals WHERE id = 'r1'`)).toEqual([
+      { order_id: 'o1', status: 'converted' },
+    ]);
+  });
+
+  it('I-2: a double reversal takes the commission back once', async () => {
+    const r = writer();
+    await r.proc('affiliateReferralLink', { id: 'r1', storeId: S, orderId: 'o1', convertedAt: 1 });
+    r.money('affiliateCommission', { referralId: 'r1', commissionAmount: 300 });
+    expect(r.money('affiliateReverse', { orderId: 'o1' })).toEqual({ amount: 300 });
+    expect(r.money('affiliateReverse', { orderId: 'o1' })).toEqual({ amount: null });
+    expect(r.q(`SELECT pending_balance, total_earned FROM affiliates WHERE id = 'af1'`)).toEqual([
+      { pending_balance: 0, total_earned: 0 },
+    ]);
+    expect(
+      r.q(
+        `SELECT COUNT(*) AS n FROM affiliate_events WHERE affiliate_id = 'af1' AND event_type = 'commission_reversed'`
+      )[0].n
+    ).toBe(1);
+  });
+
+  it('M-1: a re-cancel by another admin with another reason is a replay: same figures, nothing written', () => {
+    const r = rig();
+    const first = r.money('backorderCancel', {
+      backorderLineId: 'b1',
+      reason: 'discontinued',
+      userId: 'u1',
+    });
+    expect(first).toMatchObject({ found: true, replayed: false, quantity: 3, stockRestored: 2 });
+    const again = r.money('backorderCancel', {
+      backorderLineId: 'b1',
+      reason: 'other',
+      userId: 'u2',
+    });
+    expect(again).toEqual({ ...first, replayed: true });
+    expect(r.q(`SELECT COUNT(*) AS n FROM order_events`)[0].n).toBe(1);
+    expect(r.q(`SELECT inventory FROM products WHERE id = 'p1'`)[0].inventory).toBe(0);
+    expect(
+      r.q(`SELECT cancelled_reason FROM backorder_lines WHERE id = 'b1'`)[0].cancelled_reason
+    ).toBe('discontinued');
+  });
+
+  it('M-5: a failure AFTER the first write inside an op rolls the whole op back', () => {
+    const r = rig();
+    // backorderCancel: the marker insert (last step) fails after the claim, the flag and the stock heal were written
+    r.raw.exec(
+      `CREATE TRIGGER fail_marker BEFORE INSERT ON order_events BEGIN SELECT RAISE(ABORT, 'injected'); END;`
+    );
+    expect(() => r.money('backorderCancel', { backorderLineId: 'b1', reason: 'x' })).toThrow();
+    expect(
+      r.q(`SELECT cancelled_at FROM backorder_lines WHERE id = 'b1'`)[0].cancelled_at
+    ).toBeNull();
+    expect(r.q(`SELECT inventory FROM products WHERE id = 'p1'`)[0].inventory).toBe(-2);
+    expect(
+      r.q(`SELECT cost_price_deferred FROM order_items WHERE id = 'i1'`)[0].cost_price_deferred
+    ).toBe(1);
+    expect(r.q(`SELECT COUNT(*) AS n FROM inventory_history`)[0].n).toBe(0);
+
+    // journalManual: the SECOND line insert fails after the entry and the first line were written
+    r.raw.exec(`
+      INSERT INTO accounts (id, store_id, code, name_en, type, is_system, is_active) VALUES ('a1', 's1', '1000', 'Cash', 'asset', 1, 1);
+      INSERT INTO accounts (id, store_id, code, name_en, type, is_system, is_active) VALUES ('a2', 's1', '4000', 'Sales', 'revenue', 1, 1);
+      CREATE TRIGGER fail_second_line BEFORE INSERT ON journal_lines
+        WHEN (SELECT COUNT(*) FROM journal_lines) >= 1 BEGIN SELECT RAISE(ABORT, 'injected'); END;
+    `);
+    expect(() =>
+      r.money('journalManual', {
+        lines: [
+          { accountId: 'a1', debit: 100, credit: 0 },
+          { accountId: 'a2', debit: 0, credit: 100 },
+        ],
+      })
+    ).toThrow();
+    expect(r.q(`SELECT COUNT(*) AS n FROM journal_entries`)[0].n).toBe(0);
+    expect(r.q(`SELECT COUNT(*) AS n FROM journal_lines`)[0].n).toBe(0);
   });
 });

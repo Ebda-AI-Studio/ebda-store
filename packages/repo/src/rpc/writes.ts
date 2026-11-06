@@ -157,7 +157,10 @@ const STOCK_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   // money columns, same lock (Ruling NZ-FEAT-1): an affiliate's balances and a referral's commission move only in the
   // affiliateCommission / affiliateReverse / affiliatePayout money ops (one transactionSync section each)
   Affiliate: ['totalEarned', 'totalPaid', 'pendingBalance'],
-  AffiliateReferral: ['commissionAmount'],
+  // the referral's lifecycle is what the commission / reversal ops key on (`converted` + no commission -> claim,
+  // `commission_paid` -> reverse, by `order_id`): only `registerClick` creates it (status defaults to `clicked`), and the
+  // order link is the `affiliateReferralLink` procedure (clicked + unlinked only)
+  AffiliateReferral: ['commissionAmount', 'status', 'orderId'],
 };
 
 const WRITE_GUARD: WriteGuard = { writable: DO_WRITABLE_MODELS, stock: STOCK_COLUMNS };
@@ -255,6 +258,40 @@ export const DO_PROCS: Record<string, Proc> = {
     return { id, groupId, group };
   },
   /** Retention: delete rows older than `before` (epoch ms, at least 30 days ago) up to and including `upToId`. */
+  /**
+   * Affiliate delete on a DO store (Ruling NZ-FEAT-1): the money check IS the delete. Only an affiliate that never earned,
+   * holds nothing and was never paid (`total_paid` rises with every payout) is deleted; the FK cascade then removes its clicks
+   * and events. A commission landing first makes this a no-op (0), never a lost balance. Returns rows deleted.
+   */
+  affiliateDeleteIfClean(sql, a) {
+    const { id, storeId } = a as { id: unknown; storeId: unknown };
+    if (typeof id !== 'string' || !id) throw procErr('id');
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    sql.run(
+      `DELETE FROM affiliates WHERE id = ? AND store_id = ? AND pending_balance = 0 AND total_earned = 0 AND total_paid = 0
+         AND NOT EXISTS (SELECT 1 FROM affiliate_payouts p WHERE p.affiliate_id = affiliates.id)`,
+      [id, storeId]
+    );
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /**
+   * The order link of a referral (Ruling NZ-FEAT-1): only a still-`clicked`, still-unlinked referral of this store becomes
+   * `converted` for `orderId`. Returns rows changed (0 = someone else linked it first).
+   */
+  affiliateReferralLink(sql, a) {
+    const { id, storeId, orderId, convertedAt } = a as Record<string, unknown>;
+    if (typeof id !== 'string' || !id) throw procErr('id');
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (typeof orderId !== 'string' || !orderId) throw procErr('orderId');
+    if (typeof convertedAt !== 'number' || !Number.isFinite(convertedAt))
+      throw procErr('convertedAt');
+    sql.run(
+      `UPDATE affiliate_referrals SET order_id = ?, status = 'converted', converted_at = ?
+        WHERE id = ? AND store_id = ? AND status = 'clicked' AND order_id IS NULL`,
+      [orderId, convertedAt, id, storeId]
+    );
+    return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
   auditPurge(sql, a) {
     const { before, upToId } = a as { before: unknown; upToId: unknown };
     if (typeof before !== 'number' || !Number.isFinite(before)) throw procErr('before');
@@ -512,6 +549,16 @@ export function checkMutation(m: DoMutation): DoQueryResult | undefined {
       return refuse(
         'AUDIT_APPEND_ONLY',
         `AuditLog.${String(q.op)} is not allowed on the generic write path`
+      );
+    // deleting an affiliate cascades its payouts, referrals and events (DO FKs), a warehouse its warehouse_stock: money / stock
+    // history. Neither is deleted on the generic path; the affiliate goes through `affiliateDeleteIfClean` (Ruling NZ-FEAT-1).
+    if (
+      (q.model === 'Affiliate' || q.model === 'Warehouse') &&
+      (q.op === 'delete' || q.op === 'deleteMany')
+    )
+      return refuse(
+        'DELETE_REFUSED',
+        `${q.model}.${String(q.op)} is not allowed on the generic write path`
       );
     const a = (q.args ?? {}) as Record<string, unknown>;
     // only the VALUES a write stores are checked (a `where: { inventory: 0 }` filter is a read of stock, not a write)

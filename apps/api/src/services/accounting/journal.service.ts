@@ -1,3 +1,4 @@
+import { opKey } from '../../lib/money-idempotency';
 import { prisma, withStore, currentStoreId } from '@ebda/database';
 import { getEntityStoreId } from '../../lib/definer';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
@@ -212,24 +213,31 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
  * writes the entry and its lines together (Ruling NZ-FEAT-1). A Postgres store runs `postEntry`, unchanged. The refusals read
  * the same on both: an unbalanced entry is a 400, an unknown account a 404, a disabled one a 409.
  */
-export async function postManualEntry(input: PostEntryInput): Promise<JournalEntry> {
+export async function postManualEntry(
+  input: PostEntryInput,
+  /** The client's `Idempotency-Key`: a double-submit with the same key replays the first entry (DO store). */
+  idempotencyKey?: string
+): Promise<JournalEntry> {
   const money = await storeMoney(input.storeId);
   if (!money) return postEntry(input);
-  const { id } = await money.journalManual({
-    memo: input.memo ?? null,
-    memoAr: input.memoAr ?? null,
-    postedAtMs: input.postedAt ? input.postedAt.getTime() : null,
-    postedBy: input.postedBy ?? null,
-    lines: input.lines.map(l => ({
-      accountId: l.accountId,
-      debit: l.debit,
-      credit: l.credit,
-      lineMemo: l.lineMemo ?? null,
-      currency: l.currency,
-      fxRate: l.fxRate ?? null,
-      originalAmount: l.originalAmount,
-    })),
-  });
+  const { id } = await money.journalManual(
+    {
+      memo: input.memo ?? null,
+      memoAr: input.memoAr ?? null,
+      postedAtMs: input.postedAt ? input.postedAt.getTime() : null,
+      postedBy: input.postedBy ?? null,
+      lines: input.lines.map(l => ({
+        accountId: l.accountId,
+        debit: l.debit,
+        credit: l.credit,
+        lineMemo: l.lineMemo ?? null,
+        currency: l.currency,
+        fxRate: l.fxRate ?? null,
+        originalAmount: l.originalAmount,
+      })),
+    },
+    idempotencyKey ? opKey(`journal-manual:${input.storeId}`, idempotencyKey) : undefined
+  );
   const entry = await (
     await storeDb(input.storeId)
   ).journalEntry.findFirst({

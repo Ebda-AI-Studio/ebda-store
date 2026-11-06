@@ -286,8 +286,8 @@ export async function cancelBackorder(
 }
 
 /**
- * The DO twin of `cancelBackorder`. Steps 1-4 run in the `backorderCancel` money op (one section, keyed per line so a retried
- * request replays it and re-sends the idempotent event instead of answering 404). The allocation is then computed from the
+ * The DO twin of `cancelBackorder`. Steps 1-4 run in the `backorderCancel` money op (one section; a re-cancel of the same
+ * line is a replay that writes and sends nothing and answers 200 with the first cancel's figures). The allocation is then computed from the
  * committed rows exactly as the Postgres path computes it inside its transaction (the marker it just wrote is excluded by key),
  * and the same item-level `order/refunded` event goes out.
  */
@@ -298,13 +298,14 @@ async function cancelBackorderOnDo(
   userId: string | undefined,
   money: NonNullable<Awaited<ReturnType<typeof storeMoney>>>
 ) {
-  const r = await money.backorderCancel(
-    { backorderLineId: backorderId, reason, userId: userId ?? null },
-    `backorder-cancel:${backorderId}`
-  );
+  const r = await money.backorderCancel({
+    backorderLineId: backorderId,
+    reason,
+    userId: userId ?? null,
+  });
   if (!r.found) throw notFound();
   const now = new Date();
-  if (r.stockRestored > 0) await invalidateStoreProductCaches(storeId);
+  if (!r.replayed && r.stockRestored > 0) await invalidateStoreProductCaches(storeId);
   if (r.quantity === 0) {
     logger.info(
       { storeId, backorderId, orderId: r.orderId, userId },
@@ -341,6 +342,16 @@ async function cancelBackorderOnDo(
     prevAdjustment,
   });
   const notify = order.paymentStatus === 'paid' && alloc.cashCredit > 0;
+  // A replay (the line was already cancelled, by this or another admin) answers the same figures and sends nothing: the
+  // item-level event went out with the cancel that wrote the marker (Ruling NZ-FEAT-1).
+  if (r.replayed)
+    return {
+      id: backorderId,
+      cancelledAt: now,
+      cancelledReason: reason,
+      owedToCustomer: notify ? alloc.cashCredit : 0,
+      replayed: true,
+    };
   await OrderService.applyRefundEffects(storeId, r.orderId, {
     restoreInventory: false,
     reverseWallet: false,

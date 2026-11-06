@@ -437,28 +437,16 @@ class AffiliateService {
 
     const w = await storeWriter(storeId);
     if (await storeWritesToDo(storeId)) {
-      // A store on its Durable Object: AffiliatePayout is not writable there (payouts are money history) and there is no FK
-      // cascade, so an affiliate with any money trail is refused; otherwise events + referrals + the row go in ONE batch.
-      const db = await storeDb(storeId);
-      const [payouts, row] = await Promise.all([
-        db.affiliatePayout.count({ where: { affiliateId: id, storeId } }),
-        db.affiliate.findFirst({
-          where: { id, storeId },
-          select: { pendingBalance: true, totalEarned: true },
-        }),
-      ]);
-      if (payouts > 0 || (row?.pendingBalance ?? 0) !== 0 || (row?.totalEarned ?? 0) !== 0) {
+      // A store on its Durable Object: the money check IS the delete (one conditional statement, `affiliateDeleteIfClean`):
+      // an affiliate that ever earned, holds a balance or was paid is never deleted, so a commission landing between the
+      // read above and this call cannot be cascaded away. Its clicks and events go with it (DO FK cascade).
+      const deleted = Number(await w.$proc('affiliateDeleteIfClean', { id, storeId }));
+      if (deleted === 0)
         throw new AppError(
           409,
           'AFFILIATE_HAS_PAYOUTS',
           'This affiliate has payouts or an earned balance and cannot be deleted; suspend it instead'
         );
-      }
-      await w.$transaction([
-        w.affiliateEvent.deleteMany({ where: { affiliateId: id, storeId } }),
-        w.affiliateReferral.deleteMany({ where: { affiliateId: id, storeId } }),
-        w.affiliate.delete({ where: { id, storeId } }),
-      ]);
       return;
     }
     await w.affiliate.delete({ where: { id, storeId } });
@@ -494,7 +482,7 @@ class AffiliateService {
         affiliateId: affiliate.id,
         referralCode,
         sessionId,
-        status: 'clicked',
+        // `status` defaults to 'clicked' (the DO write path refuses a lifecycle column; Ruling NZ-FEAT-1)
         cookieExpiresAt,
       },
     });
@@ -532,12 +520,34 @@ class AffiliateService {
       return null;
     }
 
-    const updated = await (
-      await storeWriter(storeId)
-    ).affiliateReferral.update({
-      where: { id: referral.id, storeId },
-      data: { orderId, status: 'converted', convertedAt: new Date() },
-    });
+    // Conditional on BOTH backends: only a still-clicked, still-unlinked referral is linked, so a concurrent link (or a referral
+    // the money ops already moved on) is never re-pointed to another order. The DO twin is the `affiliateReferralLink` procedure.
+    const convertedAt = new Date();
+    const linked = (await storeWritesToDo(storeId))
+      ? Number(
+          await (
+            await storeWriter(storeId)
+          ).$proc('affiliateReferralLink', {
+            id: referral.id,
+            storeId,
+            orderId,
+            convertedAt: convertedAt.getTime(),
+          })
+        )
+      : (
+          await prisma.affiliateReferral.updateMany({
+            where: { id: referral.id, storeId, status: 'clicked', orderId: null },
+            data: { orderId, status: 'converted', convertedAt },
+          })
+        ).count;
+    if (linked === 0) {
+      logger.info(
+        { storeId, orderId, referralId: referral.id },
+        '[AffiliateService] Referral was linked by another order first'
+      );
+      return null;
+    }
+    const updated = { ...referral, orderId, status: 'converted', convertedAt };
 
     logger.info(
       { storeId, orderId, referralId: referral.id },
