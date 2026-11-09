@@ -226,6 +226,8 @@ Two concerns need an explicit decision, not a silent default, because they curre
 
 **Phase 0 re-check (2026-10-29, Ruling TRC-8):** gate NOT passed, flag stays off. Root layout still reads `headers()`/`cookies()`; all 15 tenant-tree routes build dynamic; prod serves `no-store`. Unblock = root-layout decomposition (3.6), then Phase 2 on a CF preview.
 
+**S2-REVIVE (2026-11-09, Ruling STORE-EDGE-2):** launch caching comes from the Worker-level store HTML edge cache (`apps/web/store-edge-cache.ts`, ON for every active store, off in one step with the secret `STOREFRONT_HTML_EDGE_OFF=1`), not from this plan. This plan's flag stays off until 3.6 lands.
+
 **Phase 3 — Consent-gating decision + production canary**
 
 - Ship the consent-gating adaptation (§3.6) with explicit sign-off.

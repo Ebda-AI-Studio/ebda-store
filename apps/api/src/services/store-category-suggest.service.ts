@@ -13,7 +13,7 @@ import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { AIService } from './ai.service';
-import { invalidateCached } from '../lib/public-cache';
+import { invalidateStoreCategoriesCaches } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
 
 export const MAX_SAMPLE_PRODUCTS = 60;
@@ -184,7 +184,7 @@ export async function applyStoreCategories(args: {
   await w.$transaction(ops as never);
   const created = made;
 
-  await invalidateCached(`public:categories:${storeId}`);
+  await invalidateStoreCategoriesCaches(storeId);
   await auditLog({
     action: 'category.created_from_ai_suggestion',
     userId: args.userId,

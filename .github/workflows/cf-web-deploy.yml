@@ -112,7 +112,10 @@ jobs:
           # Language in the URL for every store host (Rulings LOCALE-PATHS-1/-2): plain vars, re-passed on every deploy
           # (a plain var is dropped by the next deploy unless it is passed again). Roll back with the repo variable
           # STOREFRONT_LOCALE_PATHS=false, or by narrowing STOREFRONT_LOCALE_PATHS_STORES to named stores.
-          VARS=(--var "BUILD_COMMIT_SHA:$GITHUB_SHA" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}" --var "STOREFRONT_LOCALE_PATHS:${{ vars.STOREFRONT_LOCALE_PATHS || 'true' }}" --var "STOREFRONT_LOCALE_PATHS_STORES:${{ vars.STOREFRONT_LOCALE_PATHS_STORES || 'all' }}")
+          # Store HTML edge cache for every active store (Rulings STORE-EDGE-1/-2, S2-REVIVE). Off in one step, no build:
+          # `printf 1 | npx wrangler secret put STOREFRONT_HTML_EDGE_OFF --name ebda-web`; narrow with the repo variable
+          # STOREFRONT_HTML_EDGE_HOSTS (exact hosts) or set it to `none`.
+          VARS=(--var "BUILD_COMMIT_SHA:$GITHUB_SHA" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}" --var "STOREFRONT_LOCALE_PATHS:${{ vars.STOREFRONT_LOCALE_PATHS || 'true' }}" --var "STOREFRONT_LOCALE_PATHS_STORES:${{ vars.STOREFRONT_LOCALE_PATHS_STORES || 'all' }}" --var "STOREFRONT_HTML_EDGE_HOSTS:${{ vars.STOREFRONT_HTML_EDGE_HOSTS || 'all' }}")
           if [ -n "$SENTRY_DSN" ]; then VARS+=(--var "SENTRY_DSN:$SENTRY_DSN"); fi
           # Ruling DEPLOY-R2-POPULATE-2: the OpenNext CLI deploy populates the R2 cache through a remote-proxy worker whose
           # tunnel never answers on the self-hosted runner (all entries time out, 2026-11-03/04). Populate over the Cloudflare REST API

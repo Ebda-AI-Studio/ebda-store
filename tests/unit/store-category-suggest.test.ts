@@ -33,7 +33,7 @@ vi.mock('@ebda/database', async importOriginal => {
   };
 });
 vi.mock('@api/services/ai.service', () => ({ AIService: { proposeStoreCategories: m.propose } }));
-vi.mock('@api/lib/public-cache', () => ({ invalidateCached: m.invalidate }));
+vi.mock('@api/lib/public-cache', () => ({ invalidateStoreCategoriesCaches: m.invalidate }));
 vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
 
 import {
@@ -130,7 +130,7 @@ describe('applyStoreCategories', () => {
       { productId: uuid(1), categoryId: m.catCreate.mock.calls[0][0].data.id, position: 0 },
     ]);
     expect(m.catCreate.mock.calls[0][0].data.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(m.invalidate).toHaveBeenCalledWith('public:categories:s1');
+    expect(m.invalidate).toHaveBeenCalledWith('s1');
     expect(m.audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'category.created_from_ai_suggestion' })
     );
