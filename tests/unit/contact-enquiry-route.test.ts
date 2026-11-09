@@ -80,10 +80,7 @@ describe('validation at the edge', () => {
     [{ phone: '12345' }, 'phone', 'invalid_phone'],
     [{ email: 'not-an-email' }, 'email', 'invalid_email'],
     [{ topic: 'hacking' }, 'topic', 'invalid_topic'],
-    [{ topic: 'marketing' }, 'topic', 'invalid_topic'],
     [{ topic: 'homes' }, 'topic', 'invalid_topic'],
-    [{ topic: 'events' }, 'topic', 'invalid_topic'],
-    [{ topic: 'design' }, 'topic', 'invalid_topic'],
     [{ message: 'short' }, 'message', 'too_short'],
     [{ message: 'x'.repeat(4001) }, 'message', 'too_long'],
     [{ name: 'n'.repeat(101) }, 'name', 'too_long'],
@@ -94,6 +91,16 @@ describe('validation at the edge', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
     expect(res.body.error.fields[field]).toBe(code);
     expect(m.send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['marketing', 'Marketing'],
+    ['design', 'Design'],
+    ['events', 'Events'],
+  ])('accepts the service-line topic %s (SERVICES-IA-1) with its label', async (topic, label) => {
+    const res = await post({ ...good(), topic });
+    expect(res.status).toBe(200);
+    expect(m.send.mock.calls[0][0].topicLabel).toBe(label);
   });
 
   it('never echoes visitor text in an error response', async () => {

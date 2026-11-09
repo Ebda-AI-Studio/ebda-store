@@ -70,6 +70,8 @@ jobs:
           NEXT_PUBLIC_EBDA_META_PIXEL_ID: ${{ vars.NEXT_PUBLIC_EBDA_META_PIXEL_ID }}
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
           NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
+          # SERVICES-IA-1: unset = off (nothing public); set the repo variable to "on" to publish the service lines
+          EBDA_SERVICE_LINES: ${{ vars.EBDA_SERVICE_LINES }}
         run: npm run build -w apps/marketing
       - name: Require the built SEO surface
         run: |

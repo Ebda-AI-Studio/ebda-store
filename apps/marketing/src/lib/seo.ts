@@ -11,6 +11,8 @@ import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import { WHATSAPP_APP_URL, WHATSAPP_PAGE } from './whatsapp-page';
 import { STUDIO_HOME } from './studio-home';
+import { SERVICE_LINE_CONTENT, type LineId } from './service-lines-content';
+import { serviceLinesMode, serviceLinesPublished } from './service-lines';
 import {
   HOME,
   STORE_HOME,
@@ -80,6 +82,96 @@ const OG_IMAGE = {
   alt: `${BRAND.product.nameAr} — ابدأ متجرك · ${BRAND.domains.marketing}`,
 };
 
+/**
+ * `knowsAbout` / `makesOffer` of the Organization node: the core (BRAND.services), plus the three service lines ONLY when they are
+ * published (SERVICES-IA-1: nothing about them leaks before the go).
+ */
+function orgServices(locale: Locale) {
+  const core = servicesJsonLd(locale);
+  if (!serviceLinesPublished()) return core;
+  const lines = BRAND.serviceLines.map(l => (locale === 'ar' ? l.nameAr : l.nameEn));
+  return {
+    knowsAbout: [...core.knowsAbout, ...lines],
+    makesOffer: [
+      ...core.makesOffer,
+      ...BRAND.serviceLines.map(l => ({
+        '@type': 'Offer',
+        itemOffered: {
+          '@type': 'Service',
+          name: locale === 'ar' ? l.nameAr : l.nameEn,
+          description: SERVICE_LINE_CONTENT[l.id as LineId][locale].tagline,
+          url: absoluteUrl(pagePath(locale, `services/${l.id}` as PageSlug)),
+        },
+      })),
+    ],
+  };
+}
+
+/** One service-line page (published only): the Service under the studio Organization, and the page FAQ. */
+export function serviceLineJsonLd(locale: Locale, id: LineId) {
+  const c = SERVICE_LINE_CONTENT[id][locale];
+  const line = BRAND.serviceLines.find(l => l.id === id)!;
+  const org = `${SITE_URL}/#organization`;
+  const url = absoluteUrl(pagePath(locale, `services/${id}` as PageSlug));
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Service',
+        '@id': `${url}#service`,
+        name: locale === 'ar' ? line.nameAr : line.nameEn,
+        description: c.hero.lead,
+        url,
+        inLanguage: locale,
+        areaServed: { '@type': 'Country', name: 'Egypt' },
+        provider: { '@id': org },
+        serviceType: c.tagline,
+      },
+      {
+        '@type': 'FAQPage',
+        inLanguage: locale,
+        mainEntity: c.faq.map(i => ({
+          '@type': 'Question',
+          name: i.q,
+          acceptedAnswer: { '@type': 'Answer', text: i.a },
+        })),
+      },
+    ],
+  };
+}
+
+/** Meta title/description of the Services index and the line pages (descriptions 100-160 characters). */
+export const SERVICES_META = {
+  ar: {
+    marketing: {
+      title: 'التسويق والإعلان وإنتاج المحتوى',
+      desc: 'خدمة تسويق وإعلان وإنتاج محتوى من ابدأ ستوديو: خطة بهدف واضح، محتوى وإعلانات، ورد على كل عميل على واتساب، وتقرير بالأرقام.',
+    },
+    design: {
+      title: 'التصميم والتنفيذ للبيوت',
+      desc: 'تصميم داخلي وخارجي وديكور وتنفيذ كامل من ابدأ ستوديو: تشوف بيتك صورة واقعية وتكلفته بالجنيه قبل ما يتنفذ، وتتابع على واتساب.',
+    },
+    events: {
+      title: 'تنظيم الفعاليات',
+      desc: 'تنظيم فعاليات الشركات والمؤتمرات والمعارض وإطلاق المنتجات من ابدأ ستوديو: دعوات على واتساب وتسجيل بالـ QR وخطة وميزانية ومتابعة بعد الفعالية.',
+    },
+  },
+  en: {
+    marketing: {
+      title: 'Marketing, advertising and content',
+      desc: 'Marketing, advertising and content production from Ebda AI Studio: a plan with a clear goal, content, ads, every customer answered on WhatsApp, clear numbers.',
+    },
+    design: {
+      title: 'Home design and build',
+      desc: 'Interior and exterior design, decor and full execution from Ebda AI Studio: see your home as a realistic image with an early cost in EGP before it is built.',
+    },
+    events: {
+      title: 'Event organising',
+      desc: 'Corporate events, conferences, exhibitions and launches organised by Ebda AI Studio: WhatsApp invitations, QR check-in, a clear plan and budget, and follow-up.',
+    },
+  },
+} as const;
+
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */
 export function pageMetadata(
   locale: Locale,
@@ -127,6 +219,8 @@ export function pageMetadata(
     en: pagePath('en', page),
     'x-default': pagePath('ar', page),
   };
+  // a service-line page that exists but is not published (EBDA_SERVICE_LINES=preview) is never indexed (SERVICES-IA-1)
+  const hidden = page.startsWith('services') && serviceLinesMode() !== 'on';
   return {
     metadataBase: new URL(SITE_URL),
     title: t,
@@ -159,7 +253,7 @@ export function pageMetadata(
       shortcut: '/favicon.ico',
       apple: '/apple-touch-icon.png',
     },
-    robots: { index: true, follow: true },
+    robots: hidden ? { index: false, follow: false } : { index: true, follow: true },
   };
 }
 
@@ -187,7 +281,7 @@ export function jsonLd(
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
-        ...servicesJsonLd(locale),
+        ...orgServices(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
@@ -279,7 +373,7 @@ export function studioJsonLd(locale: Locale) {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
-        ...servicesJsonLd(locale),
+        ...orgServices(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
@@ -333,7 +427,7 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
-        ...servicesJsonLd(locale),
+        ...orgServices(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,

@@ -9,9 +9,15 @@ import {
 } from '../../packages/shared/src/contact-enquiry';
 
 describe('contact enquiry contract', () => {
-  it('topics are the two supports, all three BRAND services, and other, each with ar + en labels', () => {
-    expect(CONTACT_TOPIC_IDS).toHaveLength(2 + BRAND.services.length + 1);
+  it('topics are the two supports, the three BRAND services, the three service lines (SERVICES-IA-1), and other, each with ar + en labels', () => {
+    // 2 supports + 3 services + 3 lines + `products` (notify-me for the coming software) + `other`
+    expect(CONTACT_TOPIC_IDS).toHaveLength(
+      2 + BRAND.services.length + BRAND.serviceLines.length + 2
+    );
     expect(BRAND.services).toHaveLength(3);
+    expect(BRAND.serviceLines.map(l => l.id)).toEqual(['marketing', 'design', 'events']);
+    // the core list stays exactly STUDIO-CORE-1's three: the lines never join it
+    expect(BRAND.services.map(s => s.id)).toEqual(['software', 'ai', 'training']);
     for (const t of CONTACT_TOPIC_IDS) {
       expect(CONTACT_TOPIC_LABELS[t].ar).toBeTruthy();
       expect(CONTACT_TOPIC_LABELS[t].en).toBeTruthy();

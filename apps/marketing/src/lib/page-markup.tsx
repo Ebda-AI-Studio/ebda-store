@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AboutPage } from '../components/AboutPage';
+import { ServiceLinePage } from '../components/ServiceLinePage';
+import { ServicesIndexPage } from '../components/ServicesIndexPage';
 import { ComparePage } from '../components/ComparePage';
 import { ContactPage } from '../components/ContactPage';
 import { CreditsPage } from '../components/CreditsPage';
@@ -13,11 +15,13 @@ import {
   COMPARE_PAGES,
   FOR_PAGES,
   LOCALES,
+  SERVICE_PAGES,
   type CompareSlug,
   type ForSlug,
   type Locale,
   type PageSlug,
 } from './site';
+import type { LineId } from './service-lines-content';
 import { VerticalPage } from '../components/VerticalPage';
 
 /**
@@ -33,6 +37,8 @@ export const DATED_PAGES: readonly PageSlug[] = [
   'whatsapp',
   ...COMPARE_PAGES,
   ...FOR_PAGES,
+  // always dated, published or not: the date is recorded now, so going live needs no lastmod re-run (SERVICES-IA-1)
+  ...SERVICE_PAGES,
   'about',
   'contact',
   'credits',
@@ -43,6 +49,9 @@ const render = (page: PageSlug, locale: Locale): ReactElement => {
   if (page === 'store') return <Home locale={locale} />;
   if (page === 'features') return <FeaturesPage locale={locale} />;
   if (page === 'whatsapp') return <WhatsAppPage locale={locale} />;
+  if (page === 'services') return <ServicesIndexPage locale={locale} />;
+  if (page.startsWith('services/'))
+    return <ServiceLinePage locale={locale} id={page.split('/')[1] as LineId} />;
   if (page === 'about') return <AboutPage locale={locale} />;
   if (page === 'contact') return <ContactPage locale={locale} />;
   if (page === 'credits') return <CreditsPage locale={locale} />;

@@ -59,6 +59,22 @@
     "hash": "8b2f9308fa64c207",
     "date": "2026-11-09"
   },
+  "services": {
+    "hash": "a19a5fe9b08562f5",
+    "date": "2026-11-09"
+  },
+  "services/marketing": {
+    "hash": "97a89af203e475cd",
+    "date": "2026-11-09"
+  },
+  "services/design": {
+    "hash": "86ee909974543939",
+    "date": "2026-11-09"
+  },
+  "services/events": {
+    "hash": "04137655b3ed9026",
+    "date": "2026-11-09"
+  },
   "about": {
     "hash": "5f716733acc20e7e",
     "date": "2026-11-09"

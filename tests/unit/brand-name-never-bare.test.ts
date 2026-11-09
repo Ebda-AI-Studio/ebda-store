@@ -42,10 +42,12 @@ const EN_ALLOW: RegExp[] = [
   /legalNameEn:\s*'Ebda Studio'/,
 ];
 
-const EN_BARE = /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP)\b)/g;
+// SERVICES-IA-1: the coming-soon software (Quote Studio, Events Platform, Marketing Platform) and the three services (Events, Marketing, Design) are full names too
+const EN_BARE =
+  /\bEbda\b(?! (?:Store|Chat|AI Studio|CRM|ERP|Quote Studio|Invite|Ads|Events|Marketing|Design)\b)/g;
 const AR_BRAND = '(?:ابدأ|إبدأ|إبدا)';
 const AR_LETTER = '[\\u0621-\\u064A\\u0671-\\u06D3]';
-const AR_NEXT_OK = `(?!\\s*(?:ستور|ستوديو|استوديو|شات|واتساب|WhatsApp|CRM|ERP|Store)(?!${AR_LETTER}))`;
+const AR_NEXT_OK = `(?!\\s*(?:ستور|ستوديو|استوديو|شات|واتساب|WhatsApp|CRM|ERP|Store|إيفنتس|ماركتنج|ديزاين|إنفايت|آدز)(?!${AR_LETTER}))`;
 const AR_END = `(?!${AR_LETTER})`;
 const AR_CTX = [
   // brand as the object of a preposition or a noun: «من ابدأ», «على إبدأ», «مدعوم من ابدأ», «تواصل مع ابدأ»

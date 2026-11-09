@@ -16,7 +16,12 @@ import sitemap from '../../apps/marketing/src/app/sitemap';
 import robots, { AI_CRAWLERS } from '../../apps/marketing/src/app/robots';
 import { jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS } from '../../apps/marketing/src/lib/plans';
-import { SITE_PAGES, pagePath, productOfPage } from '../../apps/marketing/src/lib/site';
+import {
+  SERVICE_PAGES,
+  SITE_PAGES,
+  pagePath,
+  productOfPage,
+} from '../../apps/marketing/src/lib/site';
 
 const APP = path.resolve(__dirname, '../../apps/marketing/src/app');
 const walk = (d: string): string[] =>
@@ -119,7 +124,9 @@ describe('JSON-LD', () => {
 
 describe('every page exports metadata with a canonical', () => {
   const pages = walk(APP).filter(f => /[\\/]page\.tsx$/.test(f) && !f.includes('_not-found'));
-  it('finds every page, once per locale', () => expect(pages).toHaveLength(SITE_PAGES.length * 2));
+  // the /services pages are always BUILT as routes (SERVICES-IA-1) but only in SITE_PAGES (the sitemap) when published
+  const ROUTES = [...new Set([...SITE_PAGES, ...SERVICE_PAGES])];
+  it('finds every page, once per locale', () => expect(pages).toHaveLength(ROUTES.length * 2));
   for (const file of pages) {
     const rel = path.relative(APP, file);
     it(`${rel}`, async () => {
@@ -127,7 +134,7 @@ describe('every page exports metadata with a canonical', () => {
       const isEn = rel.startsWith(path.join('(en)', 'en'));
       // longest match first: 'legal/whatsapp-privacy' must not resolve to 'privacy'
       const page =
-        [...SITE_PAGES].sort((a, b) => b.length - a.length).find(p => p && dir.endsWith(p)) ?? '';
+        [...ROUTES].sort((a, b) => b.length - a.length).find(p => p && dir.endsWith(p)) ?? '';
       const mod = await import(file);
       // The home pages inherit metadata from their locale layout.
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
