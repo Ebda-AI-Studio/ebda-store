@@ -91,6 +91,17 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
     v11(true, {
       ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ شات، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
       en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda Chat is used, 72-hour breach notice, and a link to the data deletion page.',
+    }),
+    Object.freeze({
+      version: '1.2',
+      publishedAt: '2026-11-09',
+      effectiveAt: '2026-11-09',
+      material: true,
+      feeChange: false,
+      summary: Object.freeze({
+        ar: 'قائمة المزودين محدّثة لتطابق البنية الحالية: Cloudflare معالجًا رئيسيًا للبيانات (قاعدة البيانات والتخزين والطوابير والبريد)، ولم تعد Neon وInngest مستخدمتين. وإفصاح عن أداة تحليلات الويب Cloudflare Web Analytics، وهي لا تستخدم ملفات تعريف ارتباط ولا تتطلب موافقة.',
+        en: 'The provider list now matches our current infrastructure: Cloudflare as the main data processor (database, storage, queues and email); Neon and Inngest are no longer used. Disclosure of the Cloudflare Web Analytics beacon, which uses no cookies and needs no consent.',
+      }),
     })
   ),
   terms: doc(
@@ -130,7 +141,7 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
  * cutover PR flips this AND appends a material `privacy` 1.2 entry to LEGAL_POLICIES in the same commit; the policy
  * must change the day the processors do, never before (it would be false) and never after.
  */
-export const PRIVACY_STACK: 'current' | 'cloudflare' = 'current';
+export const PRIVACY_STACK: 'current' | 'cloudflare' = 'cloudflare';
 
 /** Document titles, identical to the marketing pages' titles (parity-tested in marketing-site.test.tsx). */
 export const LEGAL_DOC_TITLE: Readonly<Record<LegalDocKey, { ar: string; en: string }>> = {

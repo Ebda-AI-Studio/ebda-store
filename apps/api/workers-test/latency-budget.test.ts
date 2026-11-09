@@ -97,18 +97,20 @@ const ops: Record<string, string[]> = {};
  * Ceilings per path, measured 2026-11-09 after PERF-LATENCY (before -> after, waves = serial round trips):
  *   store resolve 2 -> 2 · product list / pdp 5 -> 4 · cart get 2 -> 2 · cart add 16 -> 15 · order create 38 -> 37 ·
  *   customer sign-in 11 -> 8 · customer /auth/me 4 -> 3 · merchant order list 7 -> 4.
+ * +1 call / +1 wave on store resolve, product list, PDP, cart add, order create (`rl:store-miss`) and on customer sign-in
+ * (`rl:auth-ip-fail`): the launch rate limits of #473 (Ruling PERF-LAT-1 addendum), a deliberate security hop, not a regression.
  * `remote` = D1 + StoreDO + AuthState + other DO + identity calls (KV is edge-local and not counted).
  * The NEON-SCALE-1 targets (public reads 0 D1 / 0 DO; a cart or order write ONE batched DO call) are NOT met yet: the order and
  * cart paths still make 10 StoreDO calls each (see the PR's follow-ups). Lower a ceiling whenever a change lowers the count.
  */
 const BUDGET: Record<string, { remote: number; waves: number }> = {
-  'store resolve': { remote: 2, waves: 2 },
-  'product list': { remote: 3, waves: 4 },
-  pdp: { remote: 3, waves: 4 },
+  'store resolve': { remote: 3, waves: 3 },
+  'product list': { remote: 4, waves: 5 },
+  pdp: { remote: 4, waves: 5 },
   'cart get': { remote: 2, waves: 2 },
-  'cart add (guest)': { remote: 15, waves: 15 },
-  'order create (guest, cod)': { remote: 30, waves: 37 },
-  'customer sign-in': { remote: 12, waves: 8 },
+  'cart add (guest)': { remote: 16, waves: 16 },
+  'order create (guest, cod)': { remote: 31, waves: 38 },
+  'customer sign-in': { remote: 13, waves: 9 },
   'customer /auth/me': { remote: 4, waves: 3 },
   'merchant order list': { remote: 6, waves: 4 },
 };
