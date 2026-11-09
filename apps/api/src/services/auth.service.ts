@@ -3134,8 +3134,9 @@ export class AuthService {
         })
       ),
       // SMS-marketing consent (issue 206): what was given, when, where, and
-      // any withdrawal. Keyed by the user id (the shopper's own rows).
-      prisma.smsMarketingConsent.findMany({
+      // any withdrawal. Keyed by the user id (the shopper's own rows). Through the store's own backend: a DO store's consent
+      // rows (grant, withdrawal) are written on its Durable Object, so a Postgres read would export nothing for them.
+      (storeId ? await storeDb(storeId) : prisma).smsMarketingConsent.findMany({
         where: { storeId, OR: [{ userId }, { customerKey: userId }] },
         select: {
           storeId: true,

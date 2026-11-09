@@ -17,7 +17,16 @@
  */
 import { cfBindings, type KVNamespaceLike } from './bindings';
 import { hop } from '../lib/hop-timing';
-import { applyOn, applyOnAll, shardOf } from './auth-state-client';
+import {
+  applyOn,
+  applyOnAll,
+  applyOnShard,
+  CACHEGEN_PREFIX,
+  cachegenAnchor,
+  cachegenHome,
+  cachegenStoreShards,
+  shardOf,
+} from './auth-state-client';
 import type { Op, SetOptions } from './auth-state-core';
 
 const KV_PREFIX = 'cache:';
@@ -282,6 +291,48 @@ export class CfRedis {
       return this.one(full, ['delIfEquals', full, argv[0]]);
     }
     throw new Error('CfRedis: EVAL supports only the two scripts the API ships');
+  }
+
+  // ---------------------------------------------------------------- cache generations (PERF-RL-DO)
+
+  /**
+   * Read the generations `names` (no `cachegen:` prefix) in ONE call per instance they live on: a store's names and the
+   * replicated generic prefix names together on the store's shard (auth-state-client `cachegenHome`), so a cache fill or an
+   * edge-hit check never touches a global instance.
+   */
+  async cacheGenerations(names: string[]): Promise<Array<string | null>> {
+    const anchor = cachegenAnchor(names);
+    const groups = new Map<number, number[]>();
+    names.forEach((n, i) => {
+      const shard = cachegenHome(n) ?? anchor;
+      const list = groups.get(shard) ?? [];
+      list.push(i);
+      groups.set(shard, list);
+    });
+    const out = new Array<string | null>(names.length).fill(null);
+    await Promise.all(
+      [...groups].map(async ([shard, idx]) => {
+        const res = await applyOnShard(
+          shard,
+          idx.map(i => ['get', this.key(CACHEGEN_PREFIX + names[i])] as Op)
+        );
+        idx.forEach((i, j) => (out[i] = (res[j] as string | null) ?? null));
+      })
+    );
+    return out;
+  }
+
+  /** INCR + refresh the TTL of one generation: on its home shard, or on EVERY store shard for a replicated name. */
+  async bumpCacheGeneration(name: string, ttlSeconds: number): Promise<void> {
+    const full = this.key(CACHEGEN_PREFIX + name);
+    const ops: Op[] = [
+      ['incr', full],
+      ['expire', full, ttlSeconds * 1000],
+    ];
+    const home = cachegenHome(name);
+    await Promise.all(
+      (home === null ? cachegenStoreShards() : [home]).map(shard => applyOnShard(shard, ops))
+    );
   }
 
   // ---------------------------------------------------------------- pipelines

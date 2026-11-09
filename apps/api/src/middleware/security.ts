@@ -1029,14 +1029,17 @@ export function createPublicSearchLimiter(opts?: {
   });
 }
 export const publicSearchLimiter = createPublicSearchLimiter();
+/** Whether a request carries a search term (the `whenSearching` condition; also read by the public limit prefetch). */
+export function hasSearchTerm(req: Request): boolean {
+  return (
+    req.headers['x-search-query'] !== undefined ||
+    (typeof req.query?.search === 'string' && req.query.search.trim() !== '')
+  );
+}
+
 /** Applies a search limiter only when the request actually carries a search term. */
 export function whenSearching(limiter: RequestHandler): RequestHandler {
-  return (req, res, next) => {
-    const hasTerm =
-      req.headers['x-search-query'] !== undefined ||
-      (typeof req.query?.search === 'string' && req.query.search.trim() !== '');
-    return hasTerm ? limiter(req, res, next) : next();
-  };
+  return (req, res, next) => (hasSearchTerm(req) ? limiter(req, res, next) : next());
 }
 
 /**

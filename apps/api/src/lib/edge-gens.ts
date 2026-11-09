@@ -50,9 +50,10 @@ export function edgeDepNames(storeId: string, host: string): string[] {
 /**
  * Stamp layout epoch. Bumped when the generation shard layout changes (Ruling NZ-D3: per-store shards): a counter on a new
  * shard restarts from 0 and could otherwise equal a stamp taken under the old layout, validating an old copy as fresh (ABA).
- * `v2:` makes every pre-shard stamp a guaranteed miss.
+ * `v2:` makes every pre-shard stamp a guaranteed miss. `v3:` (PERF-RL-DO): the generic prefix names moved off the global base
+ * instance onto per-store replicas, and leaf names without a store id onto their own shard.
  */
-export const EDGE_STAMP_EPOCH = 'v2:';
+export const EDGE_STAMP_EPOCH = 'v3:';
 
 /** The status generation of a store host: NEVER-stale (Ruling NZ-D1), so it is read fresh on every hit and never memoised. */
 const isStatusGeneration = (name: string): boolean => /^public:store:resolve:.+/.test(name);

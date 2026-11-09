@@ -33,12 +33,13 @@ export function smsConsentPhoneKey(phone: string | null | undefined): string | n
 
 /**
  * Signed opt-out token: `<base64url(consent uuid bytes)>.<base64url(MAC[0..16])>`,
- * always exactly 45 characters (issue 2426).
+ * exactly 45 characters (v2, issue 2426) or, from NEON-ZERO, 68 (v3, the store id rides in the token for a Durable Object store).
  *
  * - It rides inside an SMS, where every character is billed, so the consent
  *   uuid travels as its 16 raw bytes (22 chars, not 36), the MAC is truncated
- *   to 128 bits (22 chars), and the store id is NOT in the token: the consent
- *   row carries it. 128 bits is far beyond guessing range.
+ *   to 128 bits (22 chars), and (v2) the store id is NOT in the token: the consent
+ *   row carries it. v3 adds the store id (22 chars): a Durable Object store has no
+ *   cross-store id lookup to find it by. 128 bits is far beyond guessing range.
  * - Keyed on a purpose-bound key derived from ENCRYPTION_KEY
  *   (`derivedSecret('ebda:sms-optout-mac:v2')`), NOT JWT_SECRET (issue 2424):
  *   rotating the session secret signs everyone out, and must not also kill the
@@ -57,12 +58,14 @@ export function smsConsentPhoneKey(phone: string | null | undefined): string | n
 const B64_16 = /^[A-Za-z0-9_-]{22}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Length of every token `signSmsOptOutToken` returns (the SMS length budget relies on it). */
+/** Length of every v2 token (no store id). Kept for links already in inboxes; new links are v3. */
 export const SMS_OPT_OUT_TOKEN_LENGTH = 45;
+/** Length of every v3 token (`signSmsOptOutToken(consentId, storeId)`). */
+export const SMS_OPT_OUT_TOKEN_V3_LENGTH = 68;
 
-function mac(consentId: string): Buffer {
+function mac(consentId: string, storeId?: string): Buffer {
   return createHmac('sha256', derivedSecret('ebda:sms-optout-mac:v2'))
-    .update(`sms-optout:v2:${consentId}`)
+    .update(storeId ? `sms-optout:v3:${consentId}:${storeId}` : `sms-optout:v2:${consentId}`)
     .digest()
     .subarray(0, 16);
 }
@@ -74,22 +77,48 @@ function canonicalBytes(part: string): Buffer | null {
   return bytes.length === 16 && bytes.toString('base64url') === part ? bytes : null;
 }
 
-export function signSmsOptOutToken(consentId: string): string {
+const uuidOf = (bytes: Buffer): string => {
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+const bytesOf = (uuid: string): string =>
+  Buffer.from(uuid.replace(/-/g, ''), 'hex').toString('base64url');
+
+/**
+ * With `storeId` the token is v3 (`<id>.<store>.<mac>`, 68 chars): the store rides in the link and the MAC covers it, so the
+ * unsubscribe endpoint reads the consent row from THAT store's Durable Object (no cross-store id lookup exists there). Without
+ * it the token is the legacy v2 (45 chars, store looked up through Postgres).
+ */
+export function signSmsOptOutToken(consentId: string, storeId?: string): string {
   if (!UUID_RE.test(consentId)) throw new Error('signSmsOptOutToken: consent id is not a uuid');
+  if (storeId !== undefined && !UUID_RE.test(storeId))
+    throw new Error('signSmsOptOutToken: store id is not a uuid');
   const id = consentId.toLowerCase();
-  const idPart = Buffer.from(id.replace(/-/g, ''), 'hex').toString('base64url');
-  return `${idPart}.${mac(id).toString('base64url')}`;
+  if (storeId === undefined) return `${bytesOf(id)}.${mac(id).toString('base64url')}`;
+  const store = storeId.toLowerCase();
+  return `${bytesOf(id)}.${bytesOf(store)}.${mac(id, store).toString('base64url')}`;
+}
+
+/** The consent id (and the store id of a v3 token) the token was issued for, or null. Never throws on input. */
+export function parseSmsOptOutToken(
+  token: unknown
+): { consentId: string; storeId: string | null } | null {
+  if (typeof token !== 'string') return null;
+  if (token.length !== SMS_OPT_OUT_TOKEN_LENGTH && token.length !== SMS_OPT_OUT_TOKEN_V3_LENGTH)
+    return null;
+  const parts = token.split('.');
+  if (parts.length !== (token.length === SMS_OPT_OUT_TOKEN_LENGTH ? 2 : 3)) return null;
+  const bytes = parts.map(canonicalBytes);
+  if (bytes.some(b => b === null)) return null;
+  const consentId = uuidOf(bytes[0]!);
+  const storeId = bytes.length === 3 ? uuidOf(bytes[1]!) : null;
+  const given = bytes[bytes.length - 1]!;
+  return timingSafeEqual(given, mac(consentId, storeId ?? undefined))
+    ? { consentId, storeId }
+    : null;
 }
 
 /** The consent id the token was issued for, or null. Never throws on input. */
 export function verifySmsOptOutToken(token: unknown): string | null {
-  if (typeof token !== 'string' || token.length !== SMS_OPT_OUT_TOKEN_LENGTH) return null;
-  const parts = token.split('.');
-  if (parts.length !== 2) return null;
-  const idBytes = canonicalBytes(parts[0]);
-  const given = canonicalBytes(parts[1]);
-  if (!idBytes || !given) return null;
-  const hex = idBytes.toString('hex');
-  const consentId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  return timingSafeEqual(given, mac(consentId)) ? consentId : null;
+  return parseSmsOptOutToken(token)?.consentId ?? null;
 }

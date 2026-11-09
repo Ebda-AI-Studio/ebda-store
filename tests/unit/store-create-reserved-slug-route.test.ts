@@ -16,7 +16,12 @@ import request from 'supertest';
 import { RESERVED_SLUGS, STORE_SLUG_MIN_LENGTH } from '@ebda/shared';
 
 // `id` is reserved as a hostname but is already below the slug minimum (SLUG_TOO_SHORT).
-const RESERVED_CREATABLE = RESERVED_SLUGS.filter(s => s.length >= STORE_SLUG_MIN_LENGTH);
+// Plus the prefix rule (`preview-*`), which is not an exact list entry.
+const RESERVED_CREATABLE = [
+  ...RESERVED_SLUGS.filter(s => s.length >= STORE_SLUG_MIN_LENGTH),
+  'preview-x',
+  'preview-pr-123',
+];
 
 vi.mock('@api/middleware/auth', () => ({
   rejectImpersonated: (_q: any, _s: any, n: any) => n(),
