@@ -30,6 +30,9 @@ import {
   publicLimiter,
   publicTenantLimiter,
   storeResolveLimiter,
+  storeMissLimiter,
+  publicSearchLimiter,
+  whenSearching,
   cartLimiter,
   writeLimiter,
   couponAttemptLimiter,
@@ -129,6 +132,10 @@ const router = Router();
 // Both counters are independent keyed counters behind a Durable Object hop each; they run
 // together (one round trip, not two). Both still count every request and either can answer 429.
 router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
+// LAUNCH-RL: unknown-store 404s only (random slug/host probing), then search/typeahead per IP.
+router.use(storeMissLimiter);
+router.use('/products', whenSearching(publicSearchLimiter));
+router.use('/:storeId/search/suggest', publicSearchLimiter);
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {

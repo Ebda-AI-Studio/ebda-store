@@ -49,6 +49,8 @@ vi.mock('@ebda/database', () => ({
 
 vi.mock('@api/middleware/security', () => ({
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authIpFailureLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authIpAllLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   // S5-3, 2026-09-22 security audit: auth.routes.ts now imports this too.

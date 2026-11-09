@@ -1,4 +1,5 @@
 import { platformD1ReferencedKeys } from '../lib/r2-platform-d1-references';
+import { storeHasNoDataHere } from '../lib/store-pg-gone';
 import { currentStoreId, storeDirectory, withStore } from '@ebda/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -125,6 +126,9 @@ async function isStillReferenced(url: string, key: string): Promise<boolean> {
   // Stops at the first store that still references it.
   const stores = await storeDirectory(undefined, { includeDeleted: true });
   for (const { id } of stores) {
+    // A Postgres-flagged store on a Worker with no Postgres (the soft-deleted qa-merchant-test) has no rows to read here; its
+    // withStore would throw POSTGRES_REMOVED, the caller would KEEP every object, and no image would ever be deleted again.
+    if (await storeHasNoDataHere(id)) continue;
     const referenced = await withStore(id, async tx => {
       // issue 2249: the substring half of the check is a full scan of the
       // JSON/HTML columns. Bound how long it may hold its connection; a timeout

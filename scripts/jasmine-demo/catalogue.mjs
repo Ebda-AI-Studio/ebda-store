@@ -606,8 +606,8 @@ export const JASMINE_IMAGE_FILES = [
   ...new Set([
     ...JASMINE_PRODUCTS.flatMap(p => p.images),
     ...JASMINE_CATEGORIES.map(c => c.image).filter(Boolean),
-    'hero-apothecary.webp',
-    'hero-bloom.webp',
-    'hero-clinic.webp',
+    'hero-apothecary-2k.webp',
+    'hero-bloom-2k.webp',
+    'hero-clinic-2k.webp',
   ]),
 ];

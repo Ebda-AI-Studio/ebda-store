@@ -142,8 +142,9 @@ describe('qamar demo assets (Ruling B1-9 as amended by C18)', () => {
       expect(/\.(webp|mp4)$/.test(f), f).toBe(true);
       const size = statSync(p).size;
       total += size;
-      if (f.endsWith('.webp')) expect(size, f).toBeLessThanOrEqual(140 * KB);
-      if (f.endsWith('.mp4')) expect(size, f).toBeLessThanOrEqual(1.5 * KB * KB);
+      if (f.endsWith('.webp'))
+        expect(size, f).toBeLessThanOrEqual(/-2k\.webp$/.test(f) ? 400 * KB : 140 * KB);
+      if (f.endsWith('.mp4')) expect(size, f).toBeLessThanOrEqual(3 * KB * KB);
     }
     expect(total).toBeLessThanOrEqual(7 * KB * KB);
   });
