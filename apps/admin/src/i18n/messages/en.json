@@ -9482,6 +9482,7 @@
       "amount": "Amount",
       "status": "Status",
       "reference": "Gateway reference",
+      "eta": "ETA e-invoice",
       "failure": "Failure",
       "action": "Action"
     },
@@ -9638,6 +9639,16 @@
       "close": "Close"
     },
     "vatLine": "incl. VAT {rate}% {vat} · TRN {trn}",
+    "vatBreakdown": "Net {net} · VAT {vat} · Gross {gross}",
+    "buyerTaxId": "Buyer tax ID {id}",
+    "etaStatuses": {
+      "not_submitted": "Not submitted",
+      "submitted": "Submitted",
+      "accepted": "Accepted",
+      "rejected": "Rejected"
+    },
+    "etaSubmittedAt": "Submitted {date}",
+    "etaRejected": "ETA rejection: {reason}",
     "recordRefund": "Record refund / void",
     "manualRefund": {
       "title": "Record refund or void for {store}",

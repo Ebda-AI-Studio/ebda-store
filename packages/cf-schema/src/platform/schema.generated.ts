@@ -77,6 +77,9 @@ export const billingEvents = sqliteTable('billing_events', {
     .notNull()
     .default('not_submitted'),
   etaSubmittedAt: integer('eta_submitted_at', { mode: 'timestamp_ms' }),
+  etaLongId: text('eta_long_id'),
+  etaHash: text('eta_hash'),
+  etaRejectionReason: text('eta_rejection_reason'),
 });
 
 export const billingGrants = sqliteTable('billing_grants', {
