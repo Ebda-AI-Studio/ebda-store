@@ -8,9 +8,9 @@
 // wrangler.jsonc aliases `@aws-sdk/xml-builder` to this file: the SDK's own node parser, imported by dist-es file subpath (a direct
 // file import is not remapped by the `browser` field; the alias does not re-apply inside this file, measured: no loop in the build), plus the two XML builders the serializers use. No dependency is added.
 // Pinned by workers-test/s3-xml.test.ts (built Worker) and tests/unit/ops/aws-xml-builder-alias.test.ts.
-// @ts-ignore -- the SDK ships declarations for the package entry, not for these dist-es files
+// @ts-expect-error -- the SDK ships declarations for the package entry, not for these dist-es files
 export { XmlNode } from '@aws-sdk/xml-builder/dist-es/XmlNode.js';
-// @ts-ignore -- the SDK ships declarations for the package entry, not for these dist-es files
+// @ts-expect-error -- the SDK ships declarations for the package entry, not for these dist-es files
 export { XmlText } from '@aws-sdk/xml-builder/dist-es/XmlText.js';
-// @ts-ignore -- the SDK ships declarations for the package entry, not for these dist-es files
+// @ts-expect-error -- the SDK ships declarations for the package entry, not for these dist-es files
 export { parseXML } from '@aws-sdk/xml-builder/dist-es/xml-parser.js';
