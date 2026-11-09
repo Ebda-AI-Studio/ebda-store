@@ -82,6 +82,10 @@ The AI agent is optional and off until you switch it on. You are responsible for
 
 You will not use the Service to: send spam or unsolicited messages; send unlawful, deceptive, abusive or harassing content; sell or promote goods or services that Meta or the law prohibits; collect data in breach of the law; infringe others' rights; interfere with or probe our systems; resell the Service without our written consent; or send messages to people who opted out.
 
+9.1 Whatever licence you hold, you will not use the Service to promote, sell, confirm orders for, or send campaigns about: (a) alcoholic drinks or any intoxicating drink or substance; (b) pork or anything made from or containing pork; (c) prize draws, raffles or lotteries that require an entry fee or a purchase to enter; (d) mystery boxes, or any item whose contents or value are decided by chance; (e) fake, purchased, invented or rewarded-for-rating reviews; (f) fake scarcity, including a countdown timer that restarts, a stock or viewer count that is not true, or a discount shown against a price never charged.
+
+9.2 We may remove any content, template or campaign that breaches this section and suspend the store under section 11.
+
 ## 10. Your data
 
 Your customers' messages and contact data are processed as described in the Ebda Chat Privacy Policy and the Data Processing Agreement, which form part of these terms. Contact deletion is available as described at https://ebda.app/legal/data-deletion/.

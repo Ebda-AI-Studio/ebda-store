@@ -19,10 +19,10 @@ const DOCS = [
   ['dpa', 'waDpa'],
 ] as const;
 const PINNED_SHA256: Record<string, string> = {
-  'ar/whatsapp-terms': '7d8047decc7dd1b2eb92a214a4f845101b27e5af5bf745cd792ccd0478752984',
+  'ar/whatsapp-terms': 'adf8c6cefb1566f5bbe276f550a9fb3344674b2cb787cdc1de34ae9ad9fac052',
   'ar/whatsapp-privacy': '641b1e66c8b1fc6d325a701bd0bcab574a47b9358c938749fe6c88388e3fd9c1',
   'ar/whatsapp-dpa': '03b3d6fd5e963f7e2cce9113ca82e64fe6c33f2e76cec21204cc85745693cefa',
-  'en/whatsapp-terms': '5cabbbe09750da872ff16030e7550a99ab9acee1eb3d635081e716bd89b8091e',
+  'en/whatsapp-terms': '64cc8c9fd48f1d626ca2ad9536c3842a3590777f1f3f2bbab54284f4fcacff0d',
   'en/whatsapp-privacy': '555ed1b10626550dfaee37d394028de755143ad2daba551fb731497d57c91c7e',
   'en/whatsapp-dpa': '689ae9647baa0bc03d6d22097bb6c61485bbc76aea14f1384acfd70d877f4269',
 };
