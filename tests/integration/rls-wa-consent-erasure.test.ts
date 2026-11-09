@@ -144,10 +144,11 @@ describe.skipIf(!hasDb)('WhatsApp marketing consent under strict RLS (ebda_app)'
         runInTenantContext(storeId, () => phoneOnOwnOrder(storeId, otherCustomerId, OTHER_PHONE))
       )
     ).toBe(false);
-    // Outside any tenant scope, strict RLS returns nothing: this is the failure mode the fix avoids.
-    expect(await asApp(() => phoneOnOwnOrder(storeId, customerId, PHONE).catch(() => false))).toBe(
-      false
-    );
+    // Outside any tenant scope the proof still holds: with no caller client it reads through the store's own backend
+    // (`storeDb`, NEON-ZERO 2026-11-09), which scopes the Postgres read to THIS store itself (a DO store reads its DO). The old
+    // failure mode (a contextless read under strict RLS returning nothing, a silently false proof) cannot happen any more.
+    expect(await asApp(() => phoneOnOwnOrder(storeId, customerId, PHONE))).toBe(true);
+    expect(await asApp(() => phoneOnOwnOrder(storeId, otherCustomerId, OTHER_PHONE))).toBe(false);
   });
 
   it('a proven grant is recorded and bound to the account; an unproven one is refused', async () => {
