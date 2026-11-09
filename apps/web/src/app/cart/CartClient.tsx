@@ -801,7 +801,7 @@ export default function CartClient() {
                                 </div>
                                 <button
                                   onClick={() => handleRemoveItem(item.id)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
+                                  className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
                                   aria-label={t('Remove item', 'إزالة المنتج')}
                                 >
                                   <svg
