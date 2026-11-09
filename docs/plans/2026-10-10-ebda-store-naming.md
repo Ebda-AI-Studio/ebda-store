@@ -106,7 +106,7 @@ git remote set-url origin https://github.com/Whisky-11/ebda-store.git
 
 **Files:** local project folders; `~/Desktop/projects/README.md`; foundation `ops/agent-dispatch.sh`, `ops/tests/projects-layout.test.sh`; current local automation/launchd references found by the sweep. Foundation edits occur in a separate task worktree and PR, not its main checkout.
 
-**Interfaces:** Canonical product root `Ebda-AI-Studio/internal-projects/ebda-store`; business document root `Ebda-AI-Studio/business/ebda-ai-studio`. Existing task worktree directory names remain stable. Dispatch accepts canonical `ebda-store` and a documented compatibility alias `ebda` to avoid breaking queued tasks.
+**Interfaces:** Canonical product root `Ebda-AI-Studio/internal-projects/ebda-store`; business document root `Ebda-AI-Studio/business/ebda`. Existing task worktree directory names remain stable. Dispatch accepts canonical `ebda-store` and a documented compatibility alias `ebda` to avoid breaking queued tasks.
 
 - [ ] Export `git worktree list --porcelain` and statuses before moving. Confirm both destination paths are absent and business folder is a plain folder. Save an operational move manifest outside git.
 - [ ] Change foundation resolver and layout fixtures to the new root. Run:

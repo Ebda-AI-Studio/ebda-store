@@ -1,6 +1,6 @@
 # Ebda — evidence hierarchy (2026-10-10)
 
-**Replaces `docs/ebda/plans/STATUS.md` (2026-10-04) and `docs/ebda/launch-readiness-2026-10-05.md` (2026-10-05), both retired as historical snapshots (see banners on each).** This is FIX-016 (`~/Desktop/projects/Ebda-AI-Studio/business/ebda-ai-studio/audits/2026-10-05-ebda-ebda/CLAUDE-HANDOFF-ALL-FINDINGS.md`), option 2 as decided by Ahmad 2026-10-10: one document, four explicit evidence tiers per capability, instead of two stale docs that read every claim as one undifferentiated "done".
+**Replaces `docs/ebda/plans/STATUS.md` (2026-10-04) and `docs/ebda/launch-readiness-2026-10-05.md` (2026-10-05), both retired as historical snapshots (see banners on each).** This is FIX-016 (`~/Desktop/projects/Ebda-AI-Studio/business/ebda/audits/2026-10-05-ebda-ebda/CLAUDE-HANDOFF-ALL-FINDINGS.md`), option 2 as decided by Ahmad 2026-10-10: one document, four explicit evidence tiers per capability, instead of two stale docs that read every claim as one undifferentiated "done".
 
 **Binding rule (Ahmad, 2026-10-10): make NO public launch claim from this document or any other until an unaided merchant completes the full journey (sign-up → verified email → store → editor → publish → storefront order → payment) with nobody from Ebda helping.** That run has not happened yet (see §0, blocked — tracked in the active session handoff under Needs Ahmad). Everything below is an internal engineering record, not a readiness announcement.
 
