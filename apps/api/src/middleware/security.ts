@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { publicTenantKey } from './public-limiter-keys';
 import rateLimit, {
   ipKeyGenerator,
@@ -930,6 +930,107 @@ export function createAuthLimiter(opts?: { skip?: (req: Request) => boolean; pre
 }
 
 export const authLimiter = createAuthLimiter();
+
+/**
+ * LAUNCH-RL: the IP-wide half of the credential gates. `authLimiter` buckets on IP + the submitted
+ * email, so an attacker rotating the email (credential stuffing, signup spam, reset-mail bombing
+ * across many addresses) gets a fresh bucket per request. This bucket is the client IP alone
+ * (IPv6 -> /64). `countSuccess: false` counts only failed (>= 400) responses, so a shared office or
+ * carrier NAT with many honest sign-ins is not locked out; mail/account-creating routes use
+ * `countSuccess: true` because their success is the abuse. Exact: counted on the AuthState DO.
+ */
+export function createAuthIpLimiter(opts: {
+  countSuccess: boolean;
+  max?: number;
+  prefix?: string;
+  skip?: (req: Request) => boolean;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts.prefix ?? 'auth-ip'),
+    windowMs: 15 * 60 * 1000,
+    max: opts.max ?? (opts.countSuccess ? 30 : 60),
+    message: {
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many attempts from this network, try again later.',
+      },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skipSuccessfulRequests: !opts.countSuccess,
+    skip: opts.skip ?? skipForLoadTestOrTests,
+    keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+  });
+}
+/** Sign-in style routes (login, MFA verify, reset-password, change-password): failures only. */
+export const authIpFailureLimiter = createAuthIpLimiter({
+  countSuccess: false,
+  prefix: 'auth-ip-fail',
+});
+/** Account/mail-creating routes (register, forgot-password, resend-verification): every request. */
+export const authIpAllLimiter = createAuthIpLimiter({ countSuccess: true, prefix: 'auth-ip-all' });
+
+/**
+ * LAUNCH-RL: unknown-store lookups. Every storefront request resolves host/slug -> store; a miss is
+ * a database round trip an attacker can repeat for free with random slugs/hosts. Counts ONLY 404s
+ * (a hit is free and stays under the general public limiter), 20 misses/min per IP.
+ */
+export function createStoreMissLimiter(opts?: { skip?: (req: Request) => boolean; max?: number }) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'store-miss'),
+    windowMs: 60 * 1000,
+    max: opts?.max ?? 20,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (_req, res) => res.statusCode !== 404,
+    skip: opts?.skip ?? skipForLoadTest,
+    keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+  });
+}
+export const storeMissLimiter = createStoreMissLimiter();
+
+/**
+ * LAUNCH-RL: storefront search + typeahead run LIKE/embedding queries per call and shared the
+ * 300/min general bucket with cached reads. 60/min per IP: typeahead debounces to a few per second
+ * at most; a script does not.
+ */
+export function createPublicSearchLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  max?: number;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'public-search'),
+    windowMs: 60 * 1000,
+    max: opts?.max ?? 60,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many searches, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTest,
+    keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+  });
+}
+export const publicSearchLimiter = createPublicSearchLimiter();
+/** Applies a search limiter only when the request actually carries a search term. */
+export function whenSearching(limiter: RequestHandler): RequestHandler {
+  return (req, res, next) => {
+    const hasTerm =
+      req.headers['x-search-query'] !== undefined ||
+      (typeof req.query?.search === 'string' && req.query.search.trim() !== '');
+    return hasTerm ? limiter(req, res, next) : next();
+  };
+}
 
 /**
  * Passkey sign-in (Ruling PASSKEY-6) takes NO email, so `authLimiter`'s IP+email key would collapse every
