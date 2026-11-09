@@ -276,8 +276,12 @@ describe('purge tag mapping and the resolver verdict', () => {
           status: 200,
         });
       }) as unknown as typeof fetch;
-    expect(await storeVerdict(HOST, 'https://api', f('active'))).toEqual({ ok: true, id: ID_A });
-    expect(await storeVerdict(HOST, 'https://api', f('suspended'))).toEqual({ ok: true, id: ID_A }); // remembered 60 s
+    expect(await storeVerdict(HOST, 'https://api', f('active'))).toEqual({
+      ok: true,
+      id: ID_A,
+      defaultLanguage: 'ar',
+    });
+    expect((await storeVerdict(HOST, 'https://api', f('suspended'))).ok).toBe(true); // remembered 60 s
     expect(calls).toBe(1);
     resetStoreVerdicts();
     expect((await storeVerdict(HOST, 'https://api', f('suspended'))).ok).toBe(false);
