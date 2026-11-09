@@ -132,8 +132,10 @@ const router = Router();
 // Both counters are independent keyed counters behind a Durable Object hop each; they run
 // together (one round trip, not two). Both still count every request and either can answer 429.
 router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
-// LAUNCH-RL: counts only unknown-store 404s (random slug/host probing); a hit costs nothing here.
+// LAUNCH-RL: unknown-store 404s only (random slug/host probing), then search/typeahead per IP.
 router.use(storeMissLimiter);
+router.use('/products', whenSearching(publicSearchLimiter));
+router.use('/:storeId/search/suggest', publicSearchLimiter);
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {
@@ -284,230 +286,223 @@ export const createOrderSchema = z.object({
 });
 
 // GET /products - List all public products (cached 30s)
-router.get(
-  '/products',
-  whenSearching(publicSearchLimiter),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { page, limit, category, tag, featured, sort, minPrice, maxPrice, cursor, ids } =
-        req.query;
-      // Scalars only (M1): an array or `?x[op]=…` object is a 400, never a Prisma operator or a 500.
-      assertScalarQuery(req.query, PUBLIC_PRODUCT_LIST_QUERY_KEYS, ['opt_']);
-      // The shopper's term travels in the `X-Search-Query` header (percent-encoded), not the URL: a
-      // typed phone or email in a URL is retained in Cloudflare Workers Logs (Ruling SEARCH-URL-1,
-      // closing SEARCH-T5-8 for the storefront). The `?search=` form stays accepted for one release
-      // for already-deployed storefront bundles, then is removed.
-      const headerTerm = searchQueryFromHeader(req);
-      const search = headerTerm ?? req.query.search;
-      const storeId = await getStoreIdFromRequest(req);
-      // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
-      // to turn an absent param into `featured: false`, which listPublic applied
-      // as `WHERE featured = false` on every non-"Featured" listing.
-      const featuredFilter = parseOptionalBooleanQuery(featured, 'featured');
+router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page, limit, category, tag, featured, sort, minPrice, maxPrice, cursor, ids } =
+      req.query;
+    // Scalars only (M1): an array or `?x[op]=…` object is a 400, never a Prisma operator or a 500.
+    assertScalarQuery(req.query, PUBLIC_PRODUCT_LIST_QUERY_KEYS, ['opt_']);
+    // The shopper's term travels in the `X-Search-Query` header (percent-encoded), not the URL: a
+    // typed phone or email in a URL is retained in Cloudflare Workers Logs (Ruling SEARCH-URL-1,
+    // closing SEARCH-T5-8 for the storefront). The `?search=` form stays accepted for one release
+    // for already-deployed storefront bundles, then is removed.
+    const headerTerm = searchQueryFromHeader(req);
+    const search = headerTerm ?? req.query.search;
+    const storeId = await getStoreIdFromRequest(req);
+    // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
+    // to turn an absent param into `featured: false`, which listPublic applied
+    // as `WHERE featured = false` on every non-"Featured" listing.
+    const featuredFilter = parseOptionalBooleanQuery(featured, 'featured');
 
-      // Search floor + length cap (adversarial audit P1-3, mirrors the >= 2
-      // floor on /:storeId/search/suggest below). The raw term used to pass
-      // straight into an unbounded leading-wildcard ILIKE over 4 TEXT columns
-      // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
-      // bypassed every cache layer and ran a fresh scan per request. A term
-      // under the floor short-circuits to an empty page with NO DB or cache
-      // touch; longer terms are capped at 100 chars (token count is capped at 8
-      // in searchTokens, @ebda/shared) so a crafted query cannot expand into
-      // hundreds of LIKE clauses (product-search.service).
-      const rawSearch = typeof search === 'string' ? search.trim() : '';
-      if (rawSearch.length === 1) {
-        const floorPage = page ? parseInt(page as string) || 1 : 1;
-        const floorLimit = Math.min(
-          100,
-          Math.max(1, (limit ? parseInt(limit as string) : 20) || 20)
-        );
-        res.json({
-          success: true,
-          data: {
-            products: [],
-            meta: { page: floorPage, limit: floorLimit, total: 0, totalPages: 0 },
-          },
-        });
-        return;
-      }
-      const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
-
-      // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
-      // whenever semantic search is off or there is no search term. An unknown value is a 400, and
-      // `on_sale` refuses the params it cannot honour (assertOnSaleQuery).
-      const sortValue = parseOptionalSortQuery(sort);
-      if (sortValue === 'on_sale') assertOnSaleQuery(req.query);
-
-      // Cursor MUST be a v4 UUID — refuse anything else so a malformed cursor
-      // can't bypass the offset cap or trigger a Prisma error path.
-      const validCursor =
-        typeof cursor === 'string' &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)
-          ? cursor
-          : undefined;
-
-      // ids query param — comma-separated product UUIDs. Used by page-builder
-      // ExtraCarousel with `productSource === 'manual'`. Service caps at 50.
-      const idsParam =
-        typeof ids === 'string' && ids.length > 0
-          ? ids
-              .split(',')
-              .map(s => s.trim())
-              .filter(Boolean)
-              .slice(0, 50)
-          : undefined;
-
-      // Variant-option facet filters: ?opt_Size=Large,XL&opt_Color=Red
-      // Each `opt_<OptionName>` param carries comma-separated selected values.
-      // Capped at 10 option names and 20 values each to prevent abuse.
-      const optionFilters: Record<string, string[]> = {};
-      const MAX_OPTION_NAMES = 10;
-      const MAX_OPTION_VALUES = 20;
-      for (const [key, raw] of Object.entries(req.query)) {
-        if (!key.startsWith('opt_')) continue;
-        if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
-        const optionName = key.slice(4); // strip "opt_"
-        if (!optionName || typeof raw !== 'string') continue;
-        const vals = raw
-          .split(',')
-          .map(v => v.trim())
-          .filter(Boolean)
-          .slice(0, MAX_OPTION_VALUES);
-        if (vals.length > 0) {
-          optionFilters[optionName] = vals;
-        }
-      }
-      const hasOptionFilters = Object.keys(optionFilters).length > 0;
-
-      // The EXACT options the service receives (ids sorted: their order never changes the result).
-      const listOptions: Parameters<typeof ProductService.listPublic>[1] = {
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        category: category as string,
-        // Tag NAME (Ruling B3-5); capped at the column's practical length so a crafted value cannot
-        // mint cache keys of unbounded size.
-        tag: typeof tag === 'string' && tag.trim() ? tag.trim().slice(0, 120) : undefined,
-        search: effectiveSearch,
-        featured: featuredFilter,
-        sort: sortValue,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
-        cursor: validCursor,
-        ids: idsParam?.sort(),
-        optionFilters: hasOptionFilters ? optionFilters : undefined,
-      };
-      // `on_sale` is a short merchandising row: it ignores page and cursor and caps the limit, so
-      // none of them is in its key (a crafted ?page=N, or a negative limit, cannot mint a fresh SQL
-      // run + cache entry per value); category and ids are honoured and stay in the key.
-      if (sortValue === 'on_sale') {
-        listOptions.page = undefined;
-        listOptions.cursor = undefined;
-        listOptions.limit = Math.min(Math.max(1, parseInt(limit as string, 10) || 12), 12);
-      }
-      // Cache key (Ruling SEARCH-T12-7) = the store + a JSON encoding of exactly those options + the
-      // semantic-search mode. JSON quotes every value, so no value can borrow a delimiter: the old
-      // `a:b:…;name=v,v;` join let `?category=x:y&search=z` and `?category=x&search=y:z` (or
-      // `opt_A=1;B=2` and `opt_A=1&opt_B=2`) share one entry, i.e. one URL could fill another's
-      // cache. The response does not vary by locale (both name and nameAr are returned), so locale
-      // is not part of it. CACHE CLASS: BOUNDED-stale 120 s, busted by invalidateStoreProductCaches
-      // on every product write (prefix `public:products:<storeId>:` kept). A DEGRADED hybrid list
-      // (the vector leg was wanted but unavailable) is never cached under any key (`cacheIf`).
-      // The semantic MODE a search runs in (absent for a list without a search: it never ranks, so a
-      // mode change must not cold-start every list): off, on, or budget-spent (a daily embed budget
-      // is spent until the next Cairo day, SEARCH-T12-10: keyword-only is that mode's full answer).
-      const semanticMode = !effectiveSearch
-        ? undefined
-        : !semanticSearchEnabled()
-          ? 'off'
-          : queryBudgetSpent(storeId)
-            ? 'budget-spent'
-            : 'on';
-      // Long keys (a 100-char Arabic term + option filters) are hashed under the same prefix so they
-      // still fit Workers KV's 512-byte limit and still get busted (`boundedCacheKey`, review M7).
-      const cacheKey = boundedCacheKey(
-        `public:products:${storeId}:`,
-        JSON.stringify({ ...listOptions, semantic: semanticMode })
-      );
-
-      const result = await getCached(
-        cacheKey,
-        120,
-        () =>
-          readInStoreContext(storeId, () =>
-            ProductService.listPublic(storeId, {
-              ...listOptions,
-              // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
-              searcher: searcherFromIp(req.ip),
-            })
-          ),
-        {
-          // Never cache a degraded list (transient: race lost, provider/SQL error, searcher limit, or
-          // the request that DISCOVERS a spent budget, whose key still says `on`). A budget-spent list
-          // is cached for 120 s only while 120 s remain before the next Cairo day (TTL floor), so no
-          // entry outlives the budget reset.
-          cacheIf: r =>
-            (r as { meta?: { degraded?: boolean } }).meta?.degraded !== true &&
-            (semanticMode !== 'budget-spent' ||
-              queryBudgetSpentUntil(storeId) - Date.now() >= 120_000),
-        }
-      );
-      const ranked = (result as { meta?: { ranked?: boolean } }).meta?.ranked === true;
-
-      // First-party search log (search program P0, Task 5): page 1 of a real query only, so
-      // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
-      // Ruling SEARCH-6). Counted after the request transaction commits, in its own tenant
-      // transaction (E2), fail-open. A getCached hit is still counted: it counts searches, not
-      // DB reads. No identity is stored and personal-data-shaped terms are dropped.
-      if (effectiveSearch && (!page || page === '1') && !validCursor) {
-        const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
-        // The FULL raw term: the log folds it, checks it whole for personal data, and only then
-        // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
-        // Distinct searchers (Ruling SEARCH-T5-6): a sort/category change or a retry re-fetches
-        // page 1; the same searcher counts a term once per window (salted daily HMAC of IP+UA,
-        // kept only as a short-lived Redis key; fail-open counts once).
-        const searcher = { ip: req.ip ?? '', userAgent: String(req.headers['user-agent'] ?? '') };
-        void deferAfterTenantCommit('search-log', async () =>
-          (await claimSearcherSearch(storeId, rawSearch, searcher))
-            ? recordSearch(storeId, rawSearch, total)
-            : false
-        );
-      }
-
-      // Edge-cacheable: product list is identical for all anonymous
-      // visitors of the same store. Per-tenant via the default Vary on
-      // x-store-id; per-locale because the storefront ?lang= query
-      // surfaces in the URL, so it's already in the cache key without
-      // needing Accept-Language Vary.
-      // The store's backorder feature is applied AFTER the cache read (an
-      // entitlement never rides the cached payload — the product_3d precedent).
-      // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
-      // edge copy below is not — after the store's `inventory.backorder` feature flips,
-      // an edge-cached listing/PDP can show the old pre-order state for up to
-      // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
-      // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
-      // Per request and uncached by us (FeatureService has its own cache): read in its own scope so a
-      // route that opens no request transaction (Ruling LAZY-TX-1) never touches the DB unscoped.
-      const backorderOn = await readInStoreContext(storeId, () =>
-        featureService.isFeatureEnabled(storeId, 'inventory.backorder')
-      );
-      // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
-      // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
-      // list keeps the edge policy unchanged.
-      // A header-borne term is not part of the URL, and Cloudflare's cache key ignores `Vary`
-      // (edge-cache.ts), so a shared cache would serve one shopper's results to another term:
-      // never shared-cacheable (Ruling SEARCH-URL-1). `Vary` is set for any cache that honours it.
-      if (headerTerm !== undefined) res.vary('X-Search-Query');
-      if (ranked || headerTerm !== undefined) res.setHeader('Cache-Control', 'private, no-store');
-      else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300, neverStale: true });
+    // Search floor + length cap (adversarial audit P1-3, mirrors the >= 2
+    // floor on /:storeId/search/suggest below). The raw term used to pass
+    // straight into an unbounded leading-wildcard ILIKE over 4 TEXT columns
+    // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
+    // bypassed every cache layer and ran a fresh scan per request. A term
+    // under the floor short-circuits to an empty page with NO DB or cache
+    // touch; longer terms are capped at 100 chars (token count is capped at 8
+    // in searchTokens, @ebda/shared) so a crafted query cannot expand into
+    // hundreds of LIKE clauses (product-search.service).
+    const rawSearch = typeof search === 'string' ? search.trim() : '';
+    if (rawSearch.length === 1) {
+      const floorPage = page ? parseInt(page as string) || 1 : 1;
+      const floorLimit = Math.min(100, Math.max(1, (limit ? parseInt(limit as string) : 20) || 20));
       res.json({
         success: true,
-        data: gateBackorderPayload(result, backorderOn),
+        data: {
+          products: [],
+          meta: { page: floorPage, limit: floorLimit, total: 0, totalPages: 0 },
+        },
       });
-    } catch (error) {
-      next(error);
+      return;
     }
+    const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
+
+    // `relevance` (Task 12) = the hybrid order of a search; the service treats it as no sort
+    // whenever semantic search is off or there is no search term. An unknown value is a 400, and
+    // `on_sale` refuses the params it cannot honour (assertOnSaleQuery).
+    const sortValue = parseOptionalSortQuery(sort);
+    if (sortValue === 'on_sale') assertOnSaleQuery(req.query);
+
+    // Cursor MUST be a v4 UUID — refuse anything else so a malformed cursor
+    // can't bypass the offset cap or trigger a Prisma error path.
+    const validCursor =
+      typeof cursor === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)
+        ? cursor
+        : undefined;
+
+    // ids query param — comma-separated product UUIDs. Used by page-builder
+    // ExtraCarousel with `productSource === 'manual'`. Service caps at 50.
+    const idsParam =
+      typeof ids === 'string' && ids.length > 0
+        ? ids
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .slice(0, 50)
+        : undefined;
+
+    // Variant-option facet filters: ?opt_Size=Large,XL&opt_Color=Red
+    // Each `opt_<OptionName>` param carries comma-separated selected values.
+    // Capped at 10 option names and 20 values each to prevent abuse.
+    const optionFilters: Record<string, string[]> = {};
+    const MAX_OPTION_NAMES = 10;
+    const MAX_OPTION_VALUES = 20;
+    for (const [key, raw] of Object.entries(req.query)) {
+      if (!key.startsWith('opt_')) continue;
+      if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
+      const optionName = key.slice(4); // strip "opt_"
+      if (!optionName || typeof raw !== 'string') continue;
+      const vals = raw
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+        .slice(0, MAX_OPTION_VALUES);
+      if (vals.length > 0) {
+        optionFilters[optionName] = vals;
+      }
+    }
+    const hasOptionFilters = Object.keys(optionFilters).length > 0;
+
+    // The EXACT options the service receives (ids sorted: their order never changes the result).
+    const listOptions: Parameters<typeof ProductService.listPublic>[1] = {
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      category: category as string,
+      // Tag NAME (Ruling B3-5); capped at the column's practical length so a crafted value cannot
+      // mint cache keys of unbounded size.
+      tag: typeof tag === 'string' && tag.trim() ? tag.trim().slice(0, 120) : undefined,
+      search: effectiveSearch,
+      featured: featuredFilter,
+      sort: sortValue,
+      minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+      maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+      cursor: validCursor,
+      ids: idsParam?.sort(),
+      optionFilters: hasOptionFilters ? optionFilters : undefined,
+    };
+    // `on_sale` is a short merchandising row: it ignores page and cursor and caps the limit, so
+    // none of them is in its key (a crafted ?page=N, or a negative limit, cannot mint a fresh SQL
+    // run + cache entry per value); category and ids are honoured and stay in the key.
+    if (sortValue === 'on_sale') {
+      listOptions.page = undefined;
+      listOptions.cursor = undefined;
+      listOptions.limit = Math.min(Math.max(1, parseInt(limit as string, 10) || 12), 12);
+    }
+    // Cache key (Ruling SEARCH-T12-7) = the store + a JSON encoding of exactly those options + the
+    // semantic-search mode. JSON quotes every value, so no value can borrow a delimiter: the old
+    // `a:b:…;name=v,v;` join let `?category=x:y&search=z` and `?category=x&search=y:z` (or
+    // `opt_A=1;B=2` and `opt_A=1&opt_B=2`) share one entry, i.e. one URL could fill another's
+    // cache. The response does not vary by locale (both name and nameAr are returned), so locale
+    // is not part of it. CACHE CLASS: BOUNDED-stale 120 s, busted by invalidateStoreProductCaches
+    // on every product write (prefix `public:products:<storeId>:` kept). A DEGRADED hybrid list
+    // (the vector leg was wanted but unavailable) is never cached under any key (`cacheIf`).
+    // The semantic MODE a search runs in (absent for a list without a search: it never ranks, so a
+    // mode change must not cold-start every list): off, on, or budget-spent (a daily embed budget
+    // is spent until the next Cairo day, SEARCH-T12-10: keyword-only is that mode's full answer).
+    const semanticMode = !effectiveSearch
+      ? undefined
+      : !semanticSearchEnabled()
+        ? 'off'
+        : queryBudgetSpent(storeId)
+          ? 'budget-spent'
+          : 'on';
+    // Long keys (a 100-char Arabic term + option filters) are hashed under the same prefix so they
+    // still fit Workers KV's 512-byte limit and still get busted (`boundedCacheKey`, review M7).
+    const cacheKey = boundedCacheKey(
+      `public:products:${storeId}:`,
+      JSON.stringify({ ...listOptions, semantic: semanticMode })
+    );
+
+    const result = await getCached(
+      cacheKey,
+      120,
+      () =>
+        readInStoreContext(storeId, () =>
+          ProductService.listPublic(storeId, {
+            ...listOptions,
+            // The query-embed limit is charged inside the service at the provider call (SEARCH-T12-6).
+            searcher: searcherFromIp(req.ip),
+          })
+        ),
+      {
+        // Never cache a degraded list (transient: race lost, provider/SQL error, searcher limit, or
+        // the request that DISCOVERS a spent budget, whose key still says `on`). A budget-spent list
+        // is cached for 120 s only while 120 s remain before the next Cairo day (TTL floor), so no
+        // entry outlives the budget reset.
+        cacheIf: r =>
+          (r as { meta?: { degraded?: boolean } }).meta?.degraded !== true &&
+          (semanticMode !== 'budget-spent' ||
+            queryBudgetSpentUntil(storeId) - Date.now() >= 120_000),
+      }
+    );
+    const ranked = (result as { meta?: { ranked?: boolean } }).meta?.ranked === true;
+
+    // First-party search log (search program P0, Task 5): page 1 of a real query only, so
+    // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
+    // Ruling SEARCH-6). Counted after the request transaction commits, in its own tenant
+    // transaction (E2), fail-open. A getCached hit is still counted: it counts searches, not
+    // DB reads. No identity is stored and personal-data-shaped terms are dropped.
+    if (effectiveSearch && (!page || page === '1') && !validCursor) {
+      const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
+      // The FULL raw term: the log folds it, checks it whole for personal data, and only then
+      // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
+      // Distinct searchers (Ruling SEARCH-T5-6): a sort/category change or a retry re-fetches
+      // page 1; the same searcher counts a term once per window (salted daily HMAC of IP+UA,
+      // kept only as a short-lived Redis key; fail-open counts once).
+      const searcher = { ip: req.ip ?? '', userAgent: String(req.headers['user-agent'] ?? '') };
+      void deferAfterTenantCommit('search-log', async () =>
+        (await claimSearcherSearch(storeId, rawSearch, searcher))
+          ? recordSearch(storeId, rawSearch, total)
+          : false
+      );
+    }
+
+    // Edge-cacheable: product list is identical for all anonymous
+    // visitors of the same store. Per-tenant via the default Vary on
+    // x-store-id; per-locale because the storefront ?lang= query
+    // surfaces in the URL, so it's already in the cache key without
+    // needing Accept-Language Vary.
+    // The store's backorder feature is applied AFTER the cache read (an
+    // entitlement never rides the cached payload — the product_3d precedent).
+    // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
+    // edge copy below is not — after the store's `inventory.backorder` feature flips,
+    // an edge-cached listing/PDP can show the old pre-order state for up to
+    // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
+    // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
+    // Per request and uncached by us (FeatureService has its own cache): read in its own scope so a
+    // route that opens no request transaction (Ruling LAZY-TX-1) never touches the DB unscoped.
+    const backorderOn = await readInStoreContext(storeId, () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder')
+    );
+    // A hybrid-ranked list (semantic search on) depends on the mode and on the provider's health at
+    // that moment, which no edge key can see: never shared-cacheable (SEARCH-T12-7). Every other
+    // list keeps the edge policy unchanged.
+    // A header-borne term is not part of the URL, and Cloudflare's cache key ignores `Vary`
+    // (edge-cache.ts), so a shared cache would serve one shopper's results to another term:
+    // never shared-cacheable (Ruling SEARCH-URL-1). `Vary` is set for any cache that honours it.
+    if (headerTerm !== undefined) res.vary('X-Search-Query');
+    if (ranked || headerTerm !== undefined) res.setHeader('Cache-Control', 'private, no-store');
+    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300, neverStale: true });
+    res.json({
+      success: true,
+      data: gateBackorderPayload(result, backorderOn),
+    });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // GET /products/:slugOrId - Get a product by slug or ID
 router.get('/products/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
@@ -1830,57 +1825,53 @@ router.get(
 // cache keep cold-start hits cheap on busy stores. The dropdown's
 // max-h-[70vh] + overscroll-contain takes care of the scroll inside
 // the typeahead.
-router.get(
-  '/:storeId/search/suggest',
-  publicSearchLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
+router.get('/:storeId/search/suggest', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
 
-      // Validate UUID to prevent enumeration / cache-key bloat
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(storeId)) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_ID', message: 'Invalid store ID' },
-        });
-        return;
-      }
-
-      assertScalarQuery(req.query, ['q']);
-      // Header first (Ruling SEARCH-URL-1); the deprecated `?q=` stays accepted for one release.
-      const headerQ = searchQueryFromHeader(req);
-      const q = headerQ ?? (typeof req.query.q === 'string' ? req.query.q : '');
-      // Length-cap alongside the >= 2 floor (same class as /products' search:
-      // the term is part of the cache key, so an unbounded term is unbounded
-      // cache-key cardinality AND an unbounded ILIKE pattern).
-      const trimmed = q.trim().slice(0, 100);
-      if (trimmed.length < 1) {
-        res.json({ success: true, data: { suggestions: [] } });
-        return;
-      }
-
-      // Keyed by exactly what the result depends on: the suggestions are computed from the
-      // Arabic-normalised term only (searchProductIds folds it), so two raw spellings that fold the
-      // same share an entry, and two that fold differently never do (Ruling SEARCH-T12-7: the old
-      // `toLowerCase()` key also folded non-ASCII letters the search does not, e.g. É and é).
-      const cacheKey = `public:suggest:${storeId}:${normalizeArabicSearch(trimmed)}`;
-      const result = await getCached(cacheKey, 120, () =>
-        ProductService.getSuggestSuggestions(storeId, trimmed, 25)
-      );
-
-      if (headerQ !== undefined) {
-        res.vary('X-Search-Query');
-        res.setHeader('Cache-Control', 'private, no-store');
-      } else {
-        res.setHeader('Cache-Control', 'private, max-age=120');
-      }
-      res.json({ success: true, data: result });
-    } catch (error) {
-      next(error);
+    // Validate UUID to prevent enumeration / cache-key bloat
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(storeId)) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid store ID' },
+      });
+      return;
     }
+
+    assertScalarQuery(req.query, ['q']);
+    // Header first (Ruling SEARCH-URL-1); the deprecated `?q=` stays accepted for one release.
+    const headerQ = searchQueryFromHeader(req);
+    const q = headerQ ?? (typeof req.query.q === 'string' ? req.query.q : '');
+    // Length-cap alongside the >= 2 floor (same class as /products' search:
+    // the term is part of the cache key, so an unbounded term is unbounded
+    // cache-key cardinality AND an unbounded ILIKE pattern).
+    const trimmed = q.trim().slice(0, 100);
+    if (trimmed.length < 1) {
+      res.json({ success: true, data: { suggestions: [] } });
+      return;
+    }
+
+    // Keyed by exactly what the result depends on: the suggestions are computed from the
+    // Arabic-normalised term only (searchProductIds folds it), so two raw spellings that fold the
+    // same share an entry, and two that fold differently never do (Ruling SEARCH-T12-7: the old
+    // `toLowerCase()` key also folded non-ASCII letters the search does not, e.g. É and é).
+    const cacheKey = `public:suggest:${storeId}:${normalizeArabicSearch(trimmed)}`;
+    const result = await getCached(cacheKey, 120, () =>
+      ProductService.getSuggestSuggestions(storeId, trimmed, 25)
+    );
+
+    if (headerQ !== undefined) {
+      res.vary('X-Search-Query');
+      res.setHeader('Cache-Control', 'private, no-store');
+    } else {
+      res.setHeader('Cache-Control', 'private, max-age=120');
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // GET /public/:storeId/wishlist/:userId - Get a user's public wishlist (no auth required)
 router.get(
