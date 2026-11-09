@@ -700,6 +700,9 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       ]);
       expect(sec(doc, 'category-grid')).toMatchObject({ source: 'tags', layout: 'chips' });
       expect((doc.sections.find(x => x.type === 'steps')?.blocks ?? []).length).toBe(3);
+      // T7 (Ruling T7-1): the signature section sits right after the main grid
+      const types = doc.sections.map(x => x.type);
+      expect(types[types.indexOf('featured-collection') + 1]).toBe('key-ingredients');
       s = await row(m.storeId);
       expect(s).toMatchObject({ look: 'jasmine.clinic', template: 'jasmine' });
 
@@ -766,10 +769,12 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       expect(await row(m.storeId)).toMatchObject({ look: 'lamma.table', template: 'lamma' });
       let doc = await draftOf(m.storeId);
       expect(doc.appliedLook).toBe('lamma.table');
-      expect(doc.sections.map(x => x.type).slice(0, 4)).toEqual([
+      expect(doc.sections.map(x => x.type).slice(0, 5)).toEqual([
         'hero',
         'product-carousel',
         'featured-collection',
+        // T7 (Ruling T7-1): the template's signature section, after the main grid
+        'kitchen-days',
         'maker-profile',
       ]);
       expect(sec(doc, 'featured-collection')).toMatchObject({ layout: 'menu', tabs: 'categories' });
@@ -778,6 +783,7 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       await ok(m, 'lamma.notebook');
       doc = await draftOf(m.storeId);
       expect(sec(doc, 'maker-profile')?.variant).toBe('lead');
+      expect(doc.sections.filter(x => x.type === 'kitchen-days')).toHaveLength(1);
       // Table's menu layout must not leak into Notebook's light-band grid
       expect(sec(doc, 'featured-collection')?.layout).not.toBe('menu');
       expect(sec(doc, 'featured-collection')).toMatchObject({
@@ -787,6 +793,7 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
 
       await ok(m, 'lamma.market');
       doc = await draftOf(m.storeId);
+      expect(doc.sections.filter(x => x.type === 'kitchen-days')).toHaveLength(1);
       expect(sec(doc, 'category-grid')).toMatchObject({
         layout: 'tiles',
         tint: 'aisles',
