@@ -47,6 +47,7 @@ import {
   scrubSentryEvent,
 } from '@ebda/shared';
 import { companyHostRoute } from './company-host-route';
+import { edgeLocaleRedirect } from './locale-redirect-edge';
 import { DEMO_EDGE_API_URL, isDemoStoreHost, serveDemoEdge } from './demo-edge-cache';
 import {
   bumpEpochs,
@@ -107,6 +108,13 @@ const baseHandler = {
       // Host is derived from the proxy origin so Pages serves the company site.
       return fetch(new Request(route.origin + pathname + search, request));
     }
+    // An old unprefixed URL of a locale-path store: an empty-body redirect here, never a render (Ruling
+    // LOCALE-REDIRECT-EDGE-1). Null = undecidable, Next handles it exactly as before.
+    const localeRedirect = await edgeLocaleRedirect(request, env, async host => {
+      const v = await storeVerdict(host, DEMO_EDGE_API_URL);
+      return v.ok ? (v.defaultLanguage ?? null) : null;
+    });
+    if (localeRedirect) return localeRedirect;
     // route.kind === 'next' — all merchant domains + platform subdomains,
     // routed to the Next storefront exactly as before this carve-out.
     // Demo showroom hosts only (Ruling DEMO-EDGE-1): served from the edge cache when eligible.

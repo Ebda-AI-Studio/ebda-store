@@ -11,13 +11,14 @@ import { sendAlert } from '../../../services/alerts.service';
 import { EmailService } from '../../../services/email.service';
 import { GoldRateService } from '../../../services/gold-rate/gold-rate.service';
 import {
+  DISAGREE_SANITY_BPS,
   FEED_TIMEOUT_MS,
   goldFeed,
   storeCandidateRates,
   type GoldFeedQuote,
   type GoldFeedResult,
 } from '../../../services/gold-rate/feed/adapter';
-import { markSent, wasSent } from '../../../services/gold-rate/sentinel';
+import { clearSent, markSent, wasSent } from '../../../services/gold-rate/sentinel';
 import { config } from '../../../config';
 
 /**
@@ -32,8 +33,17 @@ import { config } from '../../../config';
  * Order of trust: primary (XAU/USD x USD/EGP) -> fallback (one currency file) -> the last stored rate
  * while it is inside the store's max age (nothing written) -> the merchant's manual rate -> the
  * fail-closed block. Both sources down: no write, one P1 per run. Sources disagree by more than 2 %:
- * every opted-in store gets a PENDING rate (never auto-applied) and the operator gets a P1. A rate
- * over a store's jump gate is stored pending too (`GoldRateService.applyRates`, actor `feed`).
+ * the STORE OWNER decides (Ruling GOLD-DISAGREE-MERCHANT-1): every opted-in store gets a PENDING rate
+ * (never auto-applied) carrying both feed values, one email per store per disagreement episode, and the
+ * gold-rates page / dashboard banner offers primary / fallback / manual / keep current. The operator gets
+ * an INFO only. Over DISAGREE_SANITY_BPS (20 %) it is a platform fault, not a choice: nothing is stored
+ * and the operator gets a P1. A rate over a store's jump gate is stored pending too
+ * (`GoldRateService.applyRates`, actor `feed`).
+ *
+ * STALENESS CLASS (price = NEVER-stale): a store that does not decide keeps its last CONFIRMED rate in
+ * `gold_rates_current`, untouched by this cron; it ages out through the normal max-age block and the
+ * staleness watch (fail closed), never by an auto-apply. The pending rows are not a cache: nothing reads
+ * them for pricing, so no invalidation is owed until a decision applies one (that path purges, B5-21).
  */
 export async function handleGoldRateFeedFetch(
   { step, event }: { step: StepLike; event?: { data?: unknown } },
@@ -73,14 +83,33 @@ export async function handleGoldRateFeedFetch(
 
     const disagree = result.kind === 'disagree';
     const quote: GoldFeedQuote = disagree ? result.primary : result.quote;
-    if (disagree) {
-      await step.run('alert-disagree', () =>
+    if (disagree && result.diffBps > DISAGREE_SANITY_BPS) {
+      // Wildly apart: a broken feed or conversion, not a price choice. Ask nobody, store nothing.
+      await step.run('alert-broken', () =>
         sendAlert({
           level: 'p1',
           scope: 'platform',
+          source: 'cron.gold-rate-feed-broken',
+          title: 'Gold rate feed: sources are wildly apart',
+          body: `The primary and fallback 24k rates differ by ${result.diffBps} bps (sanity bound: ${DISAGREE_SANITY_BPS}). Nothing was stored; ${stores.length} store(s) keep their current rate.`,
+          context: {
+            primary24k: result.primary.per24kGramPiastres,
+            fallback24k: result.fallback.per24kGramPiastres,
+            diffBps: result.diffBps,
+          },
+        })
+      );
+      return { stores: stores.length, outcome: 'broken' };
+    }
+    if (disagree) {
+      // Operator visibility only: the merchant decides, so this no longer pages anyone.
+      await step.run('alert-disagree', () =>
+        sendAlert({
+          level: 'info',
+          scope: 'platform',
           source: 'cron.gold-rate-feed-disagree',
           title: 'Gold rate feed: sources disagree',
-          body: `The primary and fallback 24k rates differ by ${result.diffBps} bps (gate: 200). Nothing was auto-applied; every opted-in store has a PENDING rate to confirm.`,
+          body: `The primary and fallback 24k rates differ by ${result.diffBps} bps (gate: 200). Nothing was auto-applied; each of ${stores.length} opted-in store(s) has a PENDING rate and its owner was asked to decide.`,
           context: {
             primary24k: result.primary.per24kGramPiastres,
             fallback24k: result.fallback.per24kGramPiastres,
@@ -108,6 +137,15 @@ export async function handleGoldRateFeedFetch(
               ? {
                   disagreeDiffBps: result.diffBps,
                   otherSource24k: result.fallback.per24kGramPiastres,
+                  // what the owner sees and picks from (read by GoldRateService.getState)
+                  disagree: {
+                    diffBps: result.diffBps,
+                    primary24k: result.primary.per24kGramPiastres,
+                    fallback24k: result.fallback.per24kGramPiastres,
+                    fallbackRates: Object.fromEntries(
+                      storeCandidateRates(result.fallback, s.premiumBps)
+                    ),
+                  },
                 }
               : {}),
           };
@@ -154,7 +192,8 @@ export async function handleGoldRateFeedFetch(
       if (out.pending.length === 0) continue;
 
       // Notify: its OWN step, so an email error cannot re-run `apply-` (which would write history again and
-      // supersede the pending rows it just made). One email per pending rate id, marked after the send.
+      // supersede the pending rows it just made). A disagreement: ONE email per store per episode (the
+      // sentinel is cleared by the first run where the feeds agree again). Otherwise one per pending rate id.
       await step.run(`notify-${s.storeId}`, async () => {
         try {
           const info = await withStoreDb(s.storeId, db =>
@@ -165,6 +204,26 @@ export async function handleGoldRateFeedFetch(
           );
           const to = info?.owner?.email;
           if (!to) return;
+          if (disagree) {
+            const key = `gold:disagree-mail:${s.storeId}`;
+            if (await wasSent(key)) return;
+            const p24 = out.pending.find(p => p.karat === 24) ?? out.pending[0];
+            await EmailService.sendGoldRateNotice(s.storeId, 'disagree', {
+              to,
+              storeName: info?.name ?? s.storeId,
+              adminUrl: config.adminUrl,
+              primaryText: `${(result.primary.per24kGramPiastres / 100).toLocaleString('en-US')} EGP`,
+              fallbackText: `${(result.fallback.per24kGramPiastres / 100).toLocaleString('en-US')} EGP`,
+              jumpText: `${(result.diffBps / 100).toFixed(1)}%`,
+              karat: p24?.karat,
+            });
+            await markSent(key);
+            logger.info(
+              { storeId: s.storeId, to: maskEmail(to) },
+              'gold-rate-feed: disagreement email sent'
+            );
+            return;
+          }
           for (const p of out.pending) {
             const key = `gold:pending-mail:${s.storeId}:${p.id}`;
             if (await wasSent(key)) continue;
@@ -195,6 +254,18 @@ export async function handleGoldRateFeedFetch(
               error: err instanceof Error ? err.message : String(err),
             },
           }).catch(() => undefined);
+        }
+      });
+    }
+    if (!disagree) {
+      // The feeds agree again: end every store's disagreement episode so a NEW one notifies again.
+      await step.run('end-disagree-episode', async () => {
+        for (const s of stores) {
+          try {
+            await clearSent(`gold:disagree-mail:${s.storeId}`);
+          } catch (err) {
+            logger.warn({ err, storeId: s.storeId }, 'gold-rate-feed: could not end the episode');
+          }
         }
       });
     }

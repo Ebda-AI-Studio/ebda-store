@@ -28,6 +28,10 @@ Lamma is the Egyptian home-kitchen and grocery template: stuffed vegetables, tag
 
 Inputs read the composed `--input` (never the decorative line), so a field boundary is >= 3:1 on every look. Ruling B4-2 records every colour that changed from the directions (terracotta, saffron, tomato, the market's saffron section colour) and why.
 
+## Signature section (T7)
+
+`kitchen-days`: the week's dishes by day (Saturday first), a scroll-snap row on a phone and a grid from `md`, in all three looks after the main grid. The preset names the seven days with no dishes, so nothing shows until the merchant writes at least two (Rulings T7-1, T7-2). The cook portrait stays `maker-profile` `lead`. Demo: four dishes from the seeded menu.
+
 ## Chrome
 
 `apps/web/src/templates/lamma/Header.tsx` wraps the shared base header (`templates/base/Header.tsx`) with the look's logo placement (`start` on Table and Market, `centre` on Notebook; the skin's icon search). `PACK_STYLES.lamma` is a photo-led card in the look's radius, one >= 44 px add control; the `[data-pack='lamma']` CSS sets the type voice only (no colour of its own). Every Lamma look also sets `chrome.cartBar: 'total'` and `chrome.cardStepper: 'inline'` (platform-commerce sections 15 and 16); Market sets `chrome.aisles`.

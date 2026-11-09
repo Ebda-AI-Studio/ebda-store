@@ -159,7 +159,7 @@
         "merchant_api_keys": 12,
         "plans": 12,
         "store_subscriptions": 27,
-        "billing_events": 30,
+        "billing_events": 33,
         "instapay_receipts": 38,
         "manual_payment_claims": 17,
         "billing_reminders": 6,

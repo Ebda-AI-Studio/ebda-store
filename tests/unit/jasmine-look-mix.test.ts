@@ -63,12 +63,13 @@ describe('the mixes, exactly as designed', () => {
       'hero',
       'category-grid',
       'featured-collection',
+      'key-ingredients',
       'steps',
       'trust-strip',
     ]);
     // the listing pages keep the olive ground; photos sit on a paper matte (fix wave 1)
     expect(apothecary.chrome?.listing).toBe('ground');
-    const [h, chips, rows, ritual] = apothecary.sections!;
+    const [h, chips, rows, , ritual] = apothecary.sections!;
     expect(h.design).toMatchObject({ presentation: 'full-bleed' });
     expect(chips.design).toMatchObject({ source: 'tags', layout: 'chips', layoutMobile: 'chips' });
     expect(chips.preset).toMatchObject({ titleAr: 'حسب نوع بشرتك' });
@@ -82,11 +83,12 @@ describe('the mixes, exactly as designed', () => {
       'category-grid',
       'product-carousel',
       'featured-collection',
+      'key-ingredients',
       'testimonials',
       'product-carousel',
       'trust-strip',
     ]);
-    const [h, rail, week, grid, , deals] = bloom.sections!;
+    const [h, rail, week, grid, , , deals] = bloom.sections!;
     // the photo FILLS the frame (cover) and the headline sits on the scrim, never on pale pink
     expect(h.design).toMatchObject({
       presentation: 'framed',
@@ -106,6 +108,7 @@ describe('the mixes, exactly as designed', () => {
       'product-spotlight',
       'steps',
       'featured-collection',
+      'key-ingredients',
       'trust-strip',
       'newsletter',
     ]);

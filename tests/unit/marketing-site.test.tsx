@@ -521,11 +521,11 @@ describe('marketing honesty', () => {
   it('the about page carries the company line, the story and both contact addresses', () => {
     for (const l of ['ar', 'en'] as const) {
       const html = renderToStaticMarkup(<AboutPage locale={l} />);
-      // a STUDIO page: AI, software and digital marketing, the two products with their names, one account (not a Store page)
+      // a STUDIO page: AI and software, the two products with their names, one account (not a Store page)
       expect(html).toContain(
         l === 'en'
-          ? 'an Egyptian studio for AI, software and digital marketing'
-          : 'ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي'
+          ? 'an Egyptian studio for AI and software'
+          : 'ستوديو مصري للذكاء الاصطناعي والبرمجيات'
       );
       expect(html).toMatch(l === 'en' ? /One account opens both/ : /حساب واحد يفتح الاتنين/);
       expect(html).toContain(l === 'en' ? 'href="/en/store' : 'href="/store');

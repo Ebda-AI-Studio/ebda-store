@@ -33,7 +33,12 @@
 import { getLook } from '@ebda/shared';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
 import { renewNonce } from './csp-nonce-renew';
-import { isStorableHtml, reissueLangCookie, urlLocaleOf } from './edge-html-lang';
+import {
+  acceptsHtmlDocument,
+  isStorableHtml,
+  reissueLangCookie,
+  urlLocaleOf,
+} from './edge-html-lang';
 
 export const DEMO_EDGE_FRESH_S = 300;
 export const DEMO_EDGE_STALE_S = 86400;
@@ -76,7 +81,7 @@ export function demoEdgeKey(request: Request): string | null {
     'next-router-state-tree',
   ])
     if (h.has(name)) return null;
-  if (!(h.get('accept') ?? '').includes('text/html')) return null;
+  if (!acceptsHtmlDocument(h.get('accept'))) return null;
   // The ONLY cookie a cacheable request may carry is the storefront's own language cookie, exactly
   // `force-language=ar|en` and nothing else in the header: the app writes it on every first load, so
   // refusing it would exclude every visitor after their first page. It selects one of two HTML

@@ -49,7 +49,7 @@ export const COMMERCE_OUTCOME_KINDS = [
 // Columns that exist only in D1 and were added after `0001_init.sql` reached the production database. `since` is the
 // migration number that adds the column (generated into `migrations/platform/<since>_late_columns.sql`); 0001 is generated
 // WITHOUT it, so a fresh database gets the column exactly once and a live one gets it from the numbered migration.
-export const LATE_COLUMN_MIGRATIONS = { 3: 'late_columns' };
+export const LATE_COLUMN_MIGRATIONS = { 3: 'late_columns', 7: 'billing_eta_fields' };
 
 export const extraColumns = {
   // TAX-1 (NEON-FOLD-1 9.1): Ebda's own invoices are VAT / ETA ready. Filled and policed by 0004_billing_tax_ready.sql.
@@ -88,6 +88,22 @@ export const extraColumns = {
       optional: true,
       since: 3,
       note: 'when the invoice was submitted to ETA',
+    }),
+    // FOLD-VAT (data side of TAX-1): the rest of an ETA document's identity. All NULL until submission code ships.
+    f('etaLongId', 'String', {
+      optional: true,
+      since: 7,
+      note: 'ETA longId (the id the QR / portal link uses)',
+    }),
+    f('etaHash', 'String', {
+      optional: true,
+      since: 7,
+      note: 'ETA document hash key returned on acceptance',
+    }),
+    f('etaRejectionReason', 'String', {
+      optional: true,
+      since: 7,
+      note: 'ETA rejection text for a rejected submission; an operator reads it',
     }),
   ],
   Store: [

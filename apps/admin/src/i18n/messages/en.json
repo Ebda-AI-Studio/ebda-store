@@ -9482,6 +9482,7 @@
       "amount": "Amount",
       "status": "Status",
       "reference": "Gateway reference",
+      "eta": "ETA e-invoice",
       "failure": "Failure",
       "action": "Action"
     },
@@ -9638,6 +9639,16 @@
       "close": "Close"
     },
     "vatLine": "incl. VAT {rate}% {vat} · TRN {trn}",
+    "vatBreakdown": "Net {net} · VAT {vat} · Gross {gross}",
+    "buyerTaxId": "Buyer tax ID {id}",
+    "etaStatuses": {
+      "not_submitted": "Not submitted",
+      "submitted": "Submitted",
+      "accepted": "Accepted",
+      "rejected": "Rejected"
+    },
+    "etaSubmittedAt": "Submitted {date}",
+    "etaRejected": "ETA rejection: {reason}",
     "recordRefund": "Record refund / void",
     "manualRefund": {
       "title": "Record refund or void for {store}",
@@ -10686,7 +10697,8 @@
     "banner": {
       "stale": "The gold rate is out of date. Gold products cannot be bought.",
       "pending": "A new automatic gold rate is waiting for your confirmation.",
-      "open": "Open gold rates"
+      "open": "Open gold rates",
+      "disagree": "A gold rate source disagreement is waiting for your decision."
     },
     "bulk": {
       "title": "Gold-rate pricing",
@@ -10695,6 +10707,18 @@
       "done": "{count, plural, one {{count} product updated} other {{count} products updated}}",
       "failed": "The switch did not apply.",
       "skipped": "{count} skipped: a product needs its karat, weight and making charge first, and a current rate."
+    },
+    "disagree": {
+      "title": "The two automatic gold rates disagree: you decide",
+      "body": "They are {pct}% apart, so nothing was applied. Your current rate stays in force until you pick one.",
+      "primary": "First source (24k per gram)",
+      "fallback": "Second source (24k per gram)",
+      "current": "Your current 24k rate",
+      "applyPrimary": "Apply first source",
+      "applyFallback": "Apply second source",
+      "manual": "Enter my own rate",
+      "keep": "Keep current rate",
+      "failed": "The decision did not save. Try again."
     }
   },
   "sizeCharts": {
