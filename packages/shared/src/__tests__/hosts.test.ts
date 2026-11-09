@@ -50,9 +50,35 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'media',
         // Ebda Chat product host (wa.ebda.app)
         'wa',
+        // Ebda AI Studio hosts (store-local extension)
+        'events',
+        'marketing',
+        'design',
+        'os',
+        'studio',
+        'checkin',
+        'manage',
       ].sort()
     );
   });
+
+  it.each(['preview-x', 'preview-abc123', 'PREVIEW-Foo', ' preview-1 '])(
+    'prefix rule: isReservedSlug(%j) and validateStoreSlug refuse it with SLUG_RESERVED',
+    slug => {
+      expect(isReservedSlug(slug)).toBe(true);
+      const r = validateStoreSlug(slug.trim().toLowerCase());
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.code).toBe('SLUG_RESERVED');
+      expect(parseStoreHost(`${slug.trim().toLowerCase()}.ebda.app`).kind).not.toBe('subdomain');
+    }
+  );
+
+  it.each(['previews', 'preview', 'my-preview-shop', 'previewshop'])(
+    'prefix rule does not over-match %s',
+    slug => {
+      expect(isReservedSlug(slug)).toBe(false);
+    }
+  );
 
   it.each([...RESERVED_SLUGS])('isReservedSlug(%s)', slug => {
     expect(isReservedSlug(slug)).toBe(true);
