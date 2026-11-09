@@ -455,11 +455,12 @@ export const QAMAR_OCCASIONS = [
 
 /** Page imagery the home document uses (heroes are one per look, C10). */
 export const QAMAR_PAGE_IMAGES = {
-  heroAtelier: 'hero-atelier.webp',
-  heroVitrine: 'hero-vitrine.webp',
-  lookbook: ['lookbook-1.webp', 'lookbook-2.webp', 'lookbook-3.webp'],
+  heroAtelier: 'hero-atelier-2k.webp',
+  heroVitrine: 'hero-vitrine-2k.webp',
+  lookbook: ['lookbook-1-2k.webp', 'lookbook-2-2k.webp', 'lookbook-3-2k.webp'],
   break: 'break-atelier.webp',
-  video: 'hero.mp4',
+  video: 'hero-1080.mp4',
+  videoMobile: 'hero-540.mp4',
 };
 
 /** Every file under assets/ the catalogue references (the test checks presence, budget, no extras). */
@@ -476,5 +477,6 @@ export const ASSET_FILES = [
     ...QAMAR_PAGE_IMAGES.lookbook,
     QAMAR_PAGE_IMAGES.break,
     QAMAR_PAGE_IMAGES.video,
+    QAMAR_PAGE_IMAGES.videoMobile,
   ]),
 ];

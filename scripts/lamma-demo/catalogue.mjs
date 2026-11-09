@@ -153,7 +153,8 @@ export const LAMMA_PRODUCTS = [
     category: 'tagines',
     price: 24_000,
     images: ['okra-tagine.webp'],
-    description: 'Small okra and beef cubes slow-cooked in a rich garlic and coriander sauce, in a clay pot that serves four to six.',
+    description:
+      'Small okra and beef cubes slow-cooked in a rich garlic and coriander sauce, in a clay pot that serves four to six.',
     descriptionAr: 'بامية زيرو ولحمة مكعبات على نار هادية بالتوم والكزبرة في طاجن فخار.',
     leadTimeDays: 1,
     facts: [SERVES('4-6 people', '4-6 أفراد'), READY('24 hours', '24 ساعة'), MADE],
@@ -487,7 +488,7 @@ export const LAMMA_IMAGE_FILES = [
   ...new Set([
     ...LAMMA_PRODUCTS.flatMap(p => p.images),
     ...LAMMA_CATEGORIES.map(c => c.image).filter(Boolean),
-    'hero-table.webp',
+    'hero-table-2k.webp',
     'maker.webp',
   ]),
 ];
