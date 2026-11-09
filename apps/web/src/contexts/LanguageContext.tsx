@@ -329,6 +329,16 @@ export const translations = {
     'ضيف خطوتين على الأقل والروتين هيظهر هنا.',
   'Add a name or a photo and your kitchen profile will appear here.':
     'ضيف اسم أو صورة وملف مطبخك هيظهر هنا.',
+  'Add photos or a title and your collage will appear here.':
+    'ضيف صور أو عنوان والكولاج هيظهر هنا.',
+  'Add a photo or a title and your window will appear here.':
+    'ضيف صورة أو عنوان والفاترينة هتظهر هنا.',
+  'Add at least two figures and your spec sheet will appear here.':
+    'ضيف رقمين على الأقل والمواصفات هتظهر هنا.',
+  'Add at least two ingredients and they will appear here.': 'ضيف مكوّنين على الأقل وهيظهروا هنا.',
+  'Add a dish to at least two days and your kitchen days will appear here.':
+    'اكتب أكلة ليومين على الأقل وأيام المطبخ هتظهر هنا.',
+  'Kitchen days': 'أيام المطبخ',
   'Add an occasion or a budget and your gift finder will appear here.':
     'ضيف مناسبة أو ميزانية ومساعد الهدايا هيظهر هنا.',
   // Jasmine routine, rating and bundle lines (Phase B3): sentences are Egyptian, buttons neutral.

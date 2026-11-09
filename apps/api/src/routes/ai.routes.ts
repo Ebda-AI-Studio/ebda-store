@@ -121,7 +121,15 @@ const seoSchema = z.object({
  * the kicker/subtitle fields (Ahmad 2026-05-16).
  */
 const sectionSchema = z.object({
-  section: z.enum(['categories', 'newArrivals', 'bestSellers', 'featured', 'testimonials']),
+  section: z.enum([
+    'categories',
+    'newArrivals',
+    'bestSellers',
+    'featured',
+    'testimonials',
+    // T7 signature sections (collage, window, spec sheet, ingredients, kitchen days)
+    'signature',
+  ]),
   existingTitle: z.string().optional(),
   existingTitleAr: z.string().optional(),
 });

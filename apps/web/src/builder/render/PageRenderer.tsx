@@ -46,6 +46,12 @@ import { MenuSection } from '../sections/MenuSection';
 import { ReorderRow } from '../sections/ReorderRow';
 import { MakerProfileSection, type MakerProfileSettings } from '../sections/MakerProfileSection';
 import { GiftFinderSection, type GiftFinderSettings } from '../sections/GiftFinderSection';
+import {
+  SIGNATURE_TYPES,
+  SignatureSection,
+  isSignatureType,
+  type SignatureSettings,
+} from '../sections/SignatureSection';
 import { SectionHeader } from '../sections/SectionHeader';
 import { EditorModeProvider } from './editor-mode';
 import { TagChips } from '../../templates/shared/TagChips';
@@ -149,6 +155,8 @@ const DOCUMENT_SECTION_TYPES = new Set([
   'trust-badges',
   'image-text',
   'newsletter',
+  // T7 signature sections (one per template)
+  ...SIGNATURE_TYPES,
 ]);
 
 /** A function with a forever-stable identity that always calls the latest one passed in. */
@@ -228,6 +236,14 @@ export const DocumentSectionBody = React.memo(function DocumentSectionBody({
       categories={categories}
       pack={templateId}
       onAddToCart={onAddToCart}
+      editorMode={editorMode}
+    />
+  ) : isSignatureType(def.type) ? (
+    <SignatureSection
+      type={def.type}
+      settings={settings as SignatureSettings}
+      blocks={section.blocks ?? []}
+      pack={templateId}
       editorMode={editorMode}
     />
   ) : def.type === 'gift-finder' ? (

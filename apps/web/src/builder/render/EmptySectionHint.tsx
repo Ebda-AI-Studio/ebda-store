@@ -21,7 +21,12 @@ export type EmptySectionKind =
   | 'shopTheLook'
   | 'steps'
   | 'makerProfile'
-  | 'giftFinder';
+  | 'giftFinder'
+  | 'collage'
+  | 'pieceWindow'
+  | 'specSheet'
+  | 'keyIngredients'
+  | 'kitchenDays';
 
 const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   categories: 'Add categories and they will appear here.',
@@ -35,6 +40,11 @@ const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   steps: 'Add at least two steps and your routine will appear here.',
   makerProfile: 'Add a name or a photo and your kitchen profile will appear here.',
   giftFinder: 'Add an occasion or a budget and your gift finder will appear here.',
+  collage: 'Add photos or a title and your collage will appear here.',
+  pieceWindow: 'Add a photo or a title and your window will appear here.',
+  specSheet: 'Add at least two figures and your spec sheet will appear here.',
+  keyIngredients: 'Add at least two ingredients and they will appear here.',
+  kitchenDays: 'Add a dish to at least two days and your kitchen days will appear here.',
 };
 
 /** The admin page that fills a data-driven section, when there is one. */

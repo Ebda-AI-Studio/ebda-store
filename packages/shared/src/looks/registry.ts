@@ -42,6 +42,8 @@ export const LOOKS: readonly LookDefinition[] = [
         design: { columns: 4, mobileColumns: 2 },
         preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'editorial-collage' },
       { type: 'image-text', design: { layout: 'full-bleed' } },
       { type: 'product-carousel', preset: { productSource: 'newest', limit: 12 } },
       { type: 'brand-story' },
@@ -181,6 +183,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'في الفاترينة',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'editorial-collage' },
       { type: 'testimonials', design: { layout: 'single' } },
     ],
     name: { ar: 'فاترينة', en: 'Vitrine' },
@@ -249,6 +253,8 @@ export const LOOKS: readonly LookDefinition[] = [
         design: { columns: 4, mobileColumns: 2 },
         preset: { productSource: 'newest', limit: 12, heading: 'New in', headingAr: 'لسه واصل' },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'spec-sheet' },
       { type: 'trust-strip' },
       { type: 'newsletter' },
     ],
@@ -334,6 +340,8 @@ export const LOOKS: readonly LookDefinition[] = [
         design: { columns: 4, mobileColumns: 2 },
         preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'جديد السوق' },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'spec-sheet' },
       { type: 'trust-strip' },
       { type: 'brand-story' },
     ],
@@ -427,6 +435,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'كل المنتجات',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'spec-sheet' },
       { type: 'trust-strip' },
     ],
     name: { ar: 'شو روم', en: 'Showroom' },
@@ -496,6 +506,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'مكوّنات تعرفها',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'key-ingredients' },
       // the ritual is the real three-step routine (fix wave 1, taste P2: one jar photo and a
       // sentence was not "ingredients first"); the same `steps` section Clinic uses
       {
@@ -586,6 +598,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'كل الدرجات',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'key-ingredients' },
       { type: 'testimonials' },
       {
         type: 'product-carousel',
@@ -668,6 +682,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'المواد الفعّالة',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'key-ingredients' },
       { type: 'trust-strip' },
       { type: 'newsletter' },
     ],
@@ -734,6 +750,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'منيو النهاردة',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'kitchen-days' },
       { type: 'maker-profile', design: { variant: 'strip' } },
       { type: 'trust-strip' },
     ],
@@ -800,6 +818,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'من المطبخ النهاردة',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'kitchen-days' },
       { type: 'brand-story' },
       { type: 'trust-strip' },
     ],
@@ -884,6 +904,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'طازة النهاردة',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'kitchen-days' },
       { type: 'trust-strip' },
     ],
     name: { ar: 'سوق طازة', en: 'Fresh market' },
@@ -942,6 +964,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'بتتلبس كل يوم',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'piece-window' },
       {
         type: 'image-text',
         design: { layout: 'full-bleed', imagePosition: 'start', bgColor: 'token:card' },
@@ -1043,6 +1067,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'بتتعمل بالطلب',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'piece-window' },
       {
         type: 'image-text',
         design: { layout: 'split', imagePosition: 'end', imageAspect: 'landscape' },
@@ -1105,6 +1131,8 @@ export const LOOKS: readonly LookDefinition[] = [
           headingAr: 'هدايا هتفضل معاها',
         },
       },
+      // T7: the template's signature section, after the main grid (filled by the merchant or the demo seed).
+      { type: 'piece-window' },
       {
         type: 'image-text',
         design: { layout: 'full-bleed', imagePosition: 'end', bgColor: 'token:card' },
