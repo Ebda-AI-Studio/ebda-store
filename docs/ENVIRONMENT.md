@@ -294,7 +294,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 - `STORE_DO`, `STORE_REALTIME`, `STORE_BACKUPS`, `RATE_LIMITER` — Cloudflare bindings (there is no `HYPERDRIVE` any more, NEON-ZERO N-17; Durable Objects, R2 bucket, rate-limit binding) declared in `apps/api/wrangler.jsonc`.
 - `DB_CLIENT_CONCURRENCY`, `DB_CLIENT_QUEUE`, `DB_CLIENT_WAIT_MS`, `DB_REQUEST_CONNECTIONS` — optional DB client tuning for the Worker (`worker.ts`). Set: wrangler var.
 - `CACHEGEN_DO_NAME`, `CACHEGEN_LOCATION_HINT` — optional; AuthState Durable Object name / location hint (`cf/auth-state-client.ts`). Set: wrangler var.
-- `DEV_STATS` — optional, local/test only (`.dev.vars` or workerd test config, never `wrangler.jsonc`); enables the dev-only `POST /__dev/create-store` route (`src/worker.ts`; the pool stats / probe routes went with the isolate pool in N-17).
+- `DEV_STATS` — optional, local/test only (`.dev.vars` or workerd test config, never `wrangler.jsonc`); enables the dev-only `POST /__dev/create-store` route (`src/worker.ts`; the pool stats / probe routes went with the isolate pool in N-17), keeps the per-binding call counts in `Server-Timing` on the credential routes, and adds the `x-dev-io-ops` header (the remote calls of the request in order, `lib/io-tally.ts`; the latency budget test prints it when a budget fails).
 - `HOP_TIMING_TOKEN` — optional; authorises hop-timing diagnostics (`lib/hop-timing.ts`). Set: Worker secret.
 - `LOAD_TEST_BYPASS_TOKEN` — optional; lets the k6 load test skip the global rate limit (`middleware/global-rate-limit-skip.ts`). Set: Worker secret, only while load testing.
 - `PUBLIC_TENANT_RATE_LIMIT_PER_MIN` — optional per-tenant public limiter (`middleware/security.ts`). Set: wrangler var.
