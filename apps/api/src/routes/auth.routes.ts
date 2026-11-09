@@ -325,20 +325,19 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     // csrfProtection and mints for whatever X-Session-ID the caller sends,
     // so the principal is the only thing tying the token to a real session.
     const sessionId = req.headers['x-session-id'] as string;
-    let csrfToken: string | undefined;
-    if (sessionId) {
-      csrfToken = await generateCsrfToken(sessionId, result.user.id);
-    }
-
-    // Audit log
-    await auditLog({
-      action: 'user.login',
-      userId: result.user.id,
-      resourceType: 'user',
-      resourceId: result.user.id,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    // PERF-LATENCY: the CSRF mint (AuthState) and the audit row (D1) are independent writes: one round trip, not two. Both are
+    // still awaited before the response.
+    const [csrfToken] = await Promise.all([
+      sessionId ? generateCsrfToken(sessionId, result.user.id) : Promise.resolve(undefined),
+      auditLog({
+        action: 'user.login',
+        userId: result.user.id,
+        resourceType: 'user',
+        resourceId: result.user.id,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      }),
+    ]);
 
     // Set BOTH the access cookie and the rotating refresh cookie for
     // cookie-based auth. The refresh cookie lets a pure-browser client
