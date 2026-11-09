@@ -1,5 +1,11 @@
 import { renewNonce } from './csp-nonce-renew';
-import { isStorableHtml, reissueLangCookie, urlLocaleOf, type UrlLocale } from './edge-html-lang';
+import {
+  acceptsHtmlDocument,
+  isStorableHtml,
+  reissueLangCookie,
+  urlLocaleOf,
+  type UrlLocale,
+} from './edge-html-lang';
 
 export { urlLocaleOf };
 /**
@@ -140,7 +146,7 @@ export function storeEdgeKey(request: Request, allow: Set<string>): string | nul
     'next-router-state-tree',
   ])
     if (h.has(name)) return null;
-  if (!(h.get('accept') ?? '').includes('text/html')) return null;
+  if (!acceptsHtmlDocument(h.get('accept'))) return null;
   const path = url.pathname;
   const urlLocale = urlLocaleOf(path);
   if (url.search !== '') {
@@ -165,7 +171,10 @@ export function storeEdgeKey(request: Request, allow: Set<string>): string | nul
   )
     return null;
   // On a `/ar|/en` path the URL decides the language and the cookie is not part of the page (LOCALE-PATHS-1).
-  return `https://${host}${path}${lang && !urlLocale ? `?__lang=${lang}` : ''}`;
+  // `__edge=store` keeps this layer's entries apart from the demo layer's in the SAME `caches.default` (Ruling STORE-EDGE-3):
+  // the two used to write the same key for a demo host, each read the other's copy as a miss and overwrote it, so the
+  // demo layer never hit and this one hit only every other time (measured on storedemo-souq.ebda.app/ar, 2026-11-09).
+  return `https://${host}${path}?__edge=store${lang && !urlLocale ? `&__lang=${lang}` : ''}`;
 }
 
 /** The request the page is rendered from: the visitor's, minus click-tracking parameters. */
