@@ -52,6 +52,7 @@ interface StuckReversal {
   updatedAt: Date | string;
   // Date on the first execution, ISO string once replayed from step memo.
   refundReversalRequestedAt: Date | string | null;
+  currency: string;
 }
 
 /**
@@ -130,6 +131,7 @@ export async function handleRefundReversalStuckSweep(
             status: true,
             updatedAt: true,
             refundReversalRequestedAt: true,
+            currency: true,
           },
           orderBy: { updatedAt: 'asc' },
           take: SWEEP_TAKE,
@@ -150,6 +152,7 @@ export async function handleRefundReversalStuckSweep(
           data: {
             orderId: o.id,
             storeId: o.storeId,
+            currency: o.currency,
             // Recovery re-send: restore stock (the fanout's own marker check
             // makes this a no-op if it somehow already ran) but never re-fire
             // the "Refund issued" merchant push / customer refund email — this
@@ -224,6 +227,7 @@ interface StuckPartialReturn {
   // Date on the first execution, ISO string once replayed from step memo.
   reversalRequestedAt: Date | string | null;
   items: Array<{ orderItemId: string; quantity: number }>;
+  order: { currency: string } | null;
 }
 
 export async function handlePartialReturnReversalSweep(
@@ -255,6 +259,7 @@ export async function handlePartialReturnReversalSweep(
               refundAmount: true,
               reversalRequestedAt: true,
               items: { select: { orderItemId: true, quantity: true } },
+              order: { select: { currency: true } },
             },
             orderBy: { reversalRequestedAt: 'asc' },
             take: SWEEP_TAKE,
@@ -275,6 +280,7 @@ export async function handlePartialReturnReversalSweep(
           data: {
             orderId: r.orderId,
             storeId: r.storeId,
+            ...(r.order?.currency ? { currency: r.order.currency } : {}),
             restoreInventory: true,
             notify: false,
             partial: {

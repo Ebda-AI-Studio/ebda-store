@@ -1305,6 +1305,39 @@ export function resolveReturnRefundLegs(
   return null;
 }
 
+/**
+ * What a single-line backorder cancel gives back (Ruling NZ-FEAT-1), computed INSIDE the cancel's section exactly as the
+ * Postgres `cancelBackorder` does inside its transaction: the line's share net of discount plus its tax share, prior reversals
+ * (returns, other cancels) counted, this cancel's own marker excluded by key. `notify` = money was taken AND some comes back.
+ */
+export function backorderCancelAllocation(
+  db: SyncSql,
+  storeId: string,
+  orderId: string,
+  refundKey: string,
+  requested: Array<{ orderItemId: string; quantity: number }>
+): { refundAmount: number; notify: boolean } {
+  const order = orderMoney(db, storeId, orderId);
+  if (!order) return { refundAmount: 0, notify: false };
+  const { prevQty, prevAdjustment } = priorReversed(db, storeId, orderId, refundKey);
+  const alloc = allocatePartialReturn({
+    subtotal: order.subtotal,
+    discount: order.discount,
+    tax: order.tax,
+    taxIncludedInPrice: order.taxIncludedInPrice,
+    lines: orderLines(db, orderId).map(l => ({ ...l, priceSource: l.priceSource })),
+    prevQty,
+    requested,
+    prevAdjustment,
+  });
+  const paid =
+    db.all('SELECT payment_status FROM orders WHERE id = ?1 AND store_id = ?2', [
+      orderId,
+      storeId,
+    ])[0]?.payment_status === 'paid';
+  return { refundAmount: alloc.cashCredit, notify: paid && alloc.cashCredit > 0 };
+}
+
 export function postPartialReturnJournal(
   db: SyncSql,
   a: {
