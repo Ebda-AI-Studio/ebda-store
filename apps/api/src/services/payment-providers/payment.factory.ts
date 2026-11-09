@@ -2564,11 +2564,13 @@ export class PaymentService {
       // customer who cancelled / let the invoice expire. Idempotent per payment
       // (webhooks retry) and never throws.
       if (webhookData.status === 'failed') {
-        void CardTestingGuard.recordDecline({
-          storeId: order.storeId,
-          orderId: order.id,
-          paymentId: payment.id,
-        });
+        void deferAfterTenantCommit('payment.card-testing-decline', () =>
+          CardTestingGuard.recordDecline({
+            storeId: order.storeId,
+            orderId: order.id,
+            paymentId: payment.id,
+          })
+        );
       }
       OneSignalService.notifyAdminsOfPaymentFailure({
         orderId: order.id,
@@ -2921,7 +2923,9 @@ export class PaymentService {
     }
     if (r.postCommit.includes('payment_failed')) {
       if (r.paymentStatus === 'failed')
-        void CardTestingGuard.recordDecline({ storeId, orderId: order.id, paymentId: r.paymentId });
+        void deferAfterTenantCommit('payment.card-testing-decline', () =>
+          CardTestingGuard.recordDecline({ storeId, orderId: order.id, paymentId: r.paymentId })
+        );
       OneSignalService.notifyAdminsOfPaymentFailure({
         orderId: order.id,
         orderNumber: order.orderNumber,

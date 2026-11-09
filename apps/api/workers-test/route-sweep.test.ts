@@ -764,7 +764,9 @@ describe.skipIf(e.E2E_DB === '1')(
         const portDefects = ranBody.jobs.filter(
           j =>
             !j.ok &&
-            /POSTGRES_REMOVED|STORE_RECORD_REFUSED|STORE_READ_UNSUPPORTED/.test(j.error ?? '')
+            /POSTGRES_REMOVED|STORE_RECORD_REFUSED|STORE_READ_UNSUPPORTED|not available on the StoreDO read path/.test(
+              j.error ?? ''
+            )
         );
         if (e.SWEEP_STRICT === '1')
           expect(portDefects, 'job bodies that hit a DO store-read refusal or Postgres').toEqual(

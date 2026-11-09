@@ -12,7 +12,15 @@ import fs from 'fs';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const SKIP = new Set(['node_modules', '.next', '.open-next', 'dist', '.wrangler', '__tests__']);
+const SKIP = new Set([
+  'node_modules',
+  '.next',
+  '.open-next',
+  'dist',
+  'out',
+  '.wrangler',
+  '__tests__',
+]);
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

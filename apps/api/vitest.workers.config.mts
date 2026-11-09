@@ -70,7 +70,7 @@ export default defineConfig(async () => {
             ...apiVars,
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
-          serviceBindings: { API: 'api' },
+          serviceBindings: { API: 'api', S3_STUB: 'gateway-stub' },
           durableObjects: {
             // Defined in the test worker itself (workers-test/entry.ts): runDurableObjectAlarm needs that.
             TEST_SCHEDULE: { className: 'TestSchedule', useSQLite: true },
@@ -134,10 +134,33 @@ export default defineConfig(async () => {
               modules: true,
               compatibilityDate: '2026-08-01',
               script: `
+                // An S3-compatible endpoint (R2) answering with the REAL XML shapes (workers-test/s3-xml.test.ts). Bucket 'broken'
+                // answers the XML error body of a failed call. GET /__calls reports what the API Worker sent.
+                const calls = [];
+                const XML = { headers: { 'content-type': 'application/xml' } };
+                async function s3(request, u) {
+                  if (u.pathname === '/__calls') return Response.json(calls);
+                  const bucket = u.pathname.split('/')[1];
+                  calls.push(request.method + ' ' + u.pathname + u.search);
+                  if (bucket === 'broken') return new Response('<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist</Message><RequestId>r1</RequestId></Error>', { status: 404, ...XML });
+                  if (request.method === 'POST' && u.searchParams.has('delete')) {
+                    const asked = [...(await request.text()).matchAll(/<Key>([^<]+)<\\/Key>/g)].map(m => m[1]);
+                    return new Response('<?xml version="1.0" encoding="UTF-8"?><DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' + asked.map(k => '<Deleted><Key>' + k + '</Key></Deleted>').join('') + '</DeleteResult>', XML);
+                  }
+                  if (request.method === 'GET' && u.searchParams.get('list-type') === '2') {
+                    const prefix = u.searchParams.get('prefix') || '';
+                    const old = '2020-01-01T00:00:00.000Z';
+                    if (u.searchParams.get('delimiter') === '/')
+                      return new Response('<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>' + bucket + '</Name><Prefix>stores/</Prefix><KeyCount>1</KeyCount><MaxKeys>1000</MaxKeys><Delimiter>/</Delimiter><IsTruncated>false</IsTruncated><CommonPrefixes><Prefix>stores/s1/</Prefix></CommonPrefixes></ListBucketResult>', XML);
+                    return new Response('<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>' + bucket + '</Name><Prefix>' + prefix + '</Prefix><KeyCount>2</KeyCount><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated><Contents><Key>stores/s1/catalogimport-a/old.xlsx</Key><LastModified>' + old + '</LastModified><ETag>&quot;e1&quot;</ETag><Size>10</Size><StorageClass>STANDARD</StorageClass></Contents><Contents><Key>stores/s1/catalogimport-a/old &amp; 2.xlsx</Key><LastModified>' + old + '</LastModified><ETag>&quot;e2&quot;</ETag><Size>20</Size><StorageClass>STANDARD</StorageClass></Contents></ListBucketResult>', XML);
+                  }
+                  return new Response('', { status: 200 });
+                }
                 const GATEWAYS = /(^|\\.)(kashier\\.io|paymob\\.com|fawrystaging\\.com|atfawry\\.com)$/;
                 export default {
                   async fetch(request) {
                     const u = new URL(request.url);
+                    if (u.hostname === 's3-stub.test') return s3(request, u);
                     if (!GATEWAYS.test(u.hostname)) return fetch(request);
                     const m = u.pathname.match(/\\/v2\\/aggregator\\/transactions\\/([^/]+)$/);
                     if (m && u.hostname.endsWith('kashier.io')) {
@@ -165,7 +188,15 @@ export default defineConfig(async () => {
               ],
               compatibilityDate: '2026-08-01',
               compatibilityFlags: ['nodejs_compat'],
-              bindings: apiVars,
+              bindings: {
+                ...apiVars,
+                // an S3-compatible endpoint answered by gateway-stub (workers-test/s3-xml.test.ts)
+                STORAGE_ENDPOINT: 'https://s3-stub.test',
+                STORAGE_ACCESS_KEY: 'k',
+                STORAGE_SECRET_KEY: 's',
+                STORAGE_BUCKET: 'uploads',
+                STORAGE_PRIVATE_BUCKET: 'private',
+              },
               kvNamespaces: { KV_CACHE: 'kv-cache' },
               // The private bucket of the nightly backup sweep (cf/ops/backup-sweep.ts, G8).
               r2Buckets: { STORE_BACKUPS: 'store-backups' },
@@ -210,7 +241,12 @@ export default defineConfig(async () => {
     resolve: {
       // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
       // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
-      alias: { '@ebda/shared': here('../../packages/shared/src/index.ts') },
+      alias: [
+        { find: '@ebda/shared', replacement: here('../../packages/shared/src/index.ts') },
+        // the same swap as wrangler.jsonc's alias block: the SDK's DOM-free XML parser (a Worker has no DOMParser).
+        // Exact match only: the stub itself imports @aws-sdk/xml-builder/dist-es/* subpaths.
+        { find: /^@aws-sdk\/xml-builder$/, replacement: here('./src/cf/stubs/aws-xml-builder.ts') },
+      ],
     },
     test: {
       include: ['workers-test/**/*.test.ts'],

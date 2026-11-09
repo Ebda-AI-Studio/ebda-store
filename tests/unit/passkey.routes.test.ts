@@ -92,6 +92,8 @@ vi.mock('@api/middleware/auth', async importOriginal => {
 const pass = (_q: any, _s: any, n: any) => n();
 vi.mock('@api/middleware/security', () => ({
   authLimiter: pass,
+  authIpFailureLimiter: pass,
+  authIpAllLimiter: pass,
   refreshLimiter: pass,
   refreshIpLimiter: pass,
   resetEmailLimiter: pass,
