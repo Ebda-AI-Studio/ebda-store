@@ -116,7 +116,7 @@
     },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
-      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route.",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route. The SMS-marketing consent rows in that export are read through storeDb (DO-writable since 2026-11-09, ported in the consent residue branch).",
       "models": {
         "campaignRecipient": 1,
         "address": 1,
@@ -254,6 +254,13 @@
         "product": 2,
         "productVariant": 2,
         "warehouse": 4
+      }
+    },
+    "apps/api/src/lib/wa/consent.ts": {
+      "kind": "pg-only-flow",
+      "reason": "WhatsApp consent account-lifecycle + event paths (erasure revoke/delete, export, Ebda Chat STOP consumer): still Postgres for a DO store, listed in docs/cf/not-on-do.json postgresOnly (class sweep 2026-11-09). The storefront opt-in reads through storeDb.",
+      "models": {
+        "storeWhatsAppConsent": 4
       }
     }
   }

@@ -20,11 +20,12 @@ import { cfBindings } from '../../cf/bindings';
  * its order id, so a workers-test can assert an event fired EXACTLY once (money-path.test.ts: a retried keyed checkout).
  */
 let trackDispatch = false;
-const dispatched: Array<{ name: string; orderId: string | null }> = [];
+// `data` is the event payload as sent (a workers-test asserts the money figures an event carries, not only that it fired)
+const dispatched: Array<{ name: string; orderId: string | null; data: unknown }> = [];
 export function trackDispatches(on: boolean): void {
   trackDispatch = on;
 }
-export function dispatchedEvents(): Array<{ name: string; orderId: string | null }> {
+export function dispatchedEvents(): Array<{ name: string; orderId: string | null; data: unknown }> {
   return dispatched.slice();
 }
 
@@ -33,7 +34,11 @@ export async function dispatchEvents(payload: JobEvent | JobEvent[]): Promise<{ 
   if (trackDispatch && dispatched.length < 2000)
     for (const ev of events) {
       const orderId = (ev.data as { orderId?: unknown } | undefined)?.orderId;
-      dispatched.push({ name: ev.name, orderId: typeof orderId === 'string' ? orderId : null });
+      dispatched.push({
+        name: ev.name,
+        orderId: typeof orderId === 'string' ? orderId : null,
+        data: ev.data ?? null,
+      });
     }
   if (!cfBindings()) return { ids: [] };
   const failures: unknown[] = [];

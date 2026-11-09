@@ -261,6 +261,35 @@ function seedContent(type: string, node: SectionNode): SectionNode {
           image: img(9),
         },
       };
+    // T7 signature sections: the photos and the two filled rows each needs before it shows.
+    case 'editorial-collage':
+      return {
+        ...node,
+        blocks: [1, 2, 3].map((n, i) => block('photo', i, { image: img(n), alt: `Seed ${n}` })),
+      };
+    case 'piece-window':
+    case 'spec-sheet':
+    case 'key-ingredients':
+    case 'kitchen-days': {
+      const rows =
+        type === 'spec-sheet'
+          ? [0, 1].map(i => block('spec', i, { value: `${i + 6}`, label: `Seed spec ${i}` }))
+          : type === 'key-ingredients'
+            ? [0, 1].map(i => block('ingredient', i, { name: `Seed ${i}`, benefit: 'Seed use' }))
+            : type === 'kitchen-days'
+              ? [0, 1].map(i => block('day', i, { day: `Day ${i}`, dish: `Dish ${i}` }))
+              : undefined;
+      return {
+        ...node,
+        settings: {
+          kicker: 'Seed kicker',
+          subtitle: 'Seed subtitle',
+          ...node.settings,
+          ...(type === 'kitchen-days' ? {} : { image: img(8) }),
+        },
+        ...(rows ? { blocks: rows } : {}),
+      };
+    }
     case 'category-grid':
     case 'best-sellers':
     case 'new-arrivals':

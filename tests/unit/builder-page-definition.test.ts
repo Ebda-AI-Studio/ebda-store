@@ -250,6 +250,12 @@ describe('registry', () => {
       'steps',
       'maker-profile',
       'gift-finder',
+      // T7 signature sections (one per template)
+      'editorial-collage',
+      'piece-window',
+      'spec-sheet',
+      'key-ingredients',
+      'kitchen-days',
       'trust-badges',
       // page documents (VE-3 / VE-12)
       'product-main',

@@ -5,7 +5,7 @@ import type { Locale } from '../lib/site';
 const MOTIFS = ['m8', 'mr', 'mq'] as const;
 
 /**
- * What the studio does: the seven service categories of BRAND.services as a clean grid (the studio home and About), each
+ * What the studio does: the three service categories of BRAND.services as a clean grid (the studio home and About), each
  * with its named sub-items. Benefit lines only. Wording is pending a match to the registration papers (see BRAND.services). Products (Ebda Store, Ebda Chat) are a separate section.
  */
 export function ServicesGrid({ locale }: { locale: Locale }) {

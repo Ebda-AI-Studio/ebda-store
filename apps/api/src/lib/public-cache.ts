@@ -272,8 +272,23 @@ async function clearCategoriesRedis(storeId: string): Promise<void> {
   // Redis ONLY — the storefront purge is the caller's (#1220). This helper
   // used to fire its own purge as well, so every product write and every ORDER
   // sent two outbound purges, and a category write sent the same tag twice.
-  await invalidateCached(`public:categories:${storeId}`);
-  await invalidateCached(`admin:categories:${storeId}`);
+  await allInvalidations([
+    invalidateCached(`public:categories:${storeId}`),
+    invalidateCached(`admin:categories:${storeId}`),
+  ]);
+}
+
+/**
+ * Run independent invalidations TOGETHER (Ruling PERF-LAT-2). Each one keeps its own order inside (generation bump FIRST,
+ * then the delete), and the keys and prefixes are disjoint, so nothing depends on another finishing. Run one after another
+ * they cost a serial round trip each (the order path made ~18 of its 38 that way, PERF-LAT-1). Every invalidation runs to
+ * its end even when another fails (a serial chain stopped at the first throw and left the rest stale), and the first
+ * failure is re-thrown afterwards, so the caller logs or alerts exactly as before.
+ */
+export async function allInvalidations(tasks: Array<Promise<void>>): Promise<void> {
+  const settled = await Promise.allSettled(tasks);
+  const failed = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) throw failed.reason;
 }
 
 export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
@@ -313,8 +328,8 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * PRODUCTS' current price/inventory (NEVER-stale data), so a product write
  * that changes either — including checkout-driven inventory decrement —
  * would otherwise leave a bundled product's stock/price wrong in the cached
- * bundle list for up to its own TTL, even though `invalidateStoreBundlesCache`
- * itself is only ever called from the 3 bundle-specific write handlers.
+ * bundle list for up to its own TTL. It is also the ONLY bundle invalidator: the 3
+ * bundle write handlers call this function (there is no bundles-only one).
  */
 /**
  * The Redis half of {@link invalidateStoreProductCaches}, shared with the
@@ -322,17 +337,20 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * through here so the bundle-list bust below can't be forgotten by either.
  */
 export async function clearProductsRedis(storeId: string): Promise<void> {
-  await invalidateCachedPrefix(`public:products:${storeId}:`);
-  await invalidateCachedPrefix(`public:product:${storeId}:`);
-  await invalidateCachedPrefix(`public:suggest:${storeId}:`);
-  // B2B C1: recommendation payloads embed related products (name, image, price), so a product audience flip must drop them too.
-  await invalidateCachedPrefix(`recommendations:product:${storeId}:`);
-  await invalidateCachedPrefix(`admin:products:${storeId}:`);
-  // Redis-only: the caller fires ONE purge covering both tags. Calling the
-  // public categories invalidator here would fire a second outbound POST for
-  // every product write — two requests per bust, and two per order.
-  await clearCategoriesRedis(storeId);
-  await invalidateCached(bundlesCacheKey(storeId));
+  // All together (allInvalidations): disjoint keys, each bump-then-delete on its own. Every one still runs and is awaited.
+  await allInvalidations([
+    invalidateCachedPrefix(`public:products:${storeId}:`),
+    invalidateCachedPrefix(`public:product:${storeId}:`),
+    invalidateCachedPrefix(`public:suggest:${storeId}:`),
+    // B2B C1: recommendation payloads embed related products (name, image, price), so a product audience flip must drop them too.
+    invalidateCachedPrefix(`recommendations:product:${storeId}:`),
+    invalidateCachedPrefix(`admin:products:${storeId}:`),
+    // Redis-only: the caller fires ONE purge covering both tags. Calling the
+    // public categories invalidator here would fire a second outbound POST for
+    // every product write — two requests per bust, and two per order.
+    clearCategoriesRedis(storeId),
+    invalidateCached(bundlesCacheKey(storeId)),
+  ]);
 }
 
 export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
@@ -363,21 +381,11 @@ export function bundlesCacheKey(storeId: string): string {
   return `public:bundles:v2:${storeId}`;
 }
 
-/**
- * Invalidate a store's public bundle-list cache (both layers) plus the
- * storefront's Next.js data cache tag `bundles:<storeId>` — the tag the
- * storefront's /bundles list and bundle PDP fetches carry (pinned by
- * tests/unit/storefront-purge-on-write.test.ts). Self-sufficient for a write
- * that touches ONLY bundles. A write that already calls
- * `invalidateStoreProductCaches` must NOT also call this: that function clears
- * the same Redis key and purges `bundles:<storeId>` in its one request, so a
- * second call is a second outbound purge POST for nothing (issue 2202 — the
- * three bundle write handlers did exactly that).
- */
-export async function invalidateStoreBundlesCache(storeId: string): Promise<void> {
-  await invalidateCached(bundlesCacheKey(storeId));
-  revalidateStorefront({ tags: [`bundles:${storeId}`] });
-}
+// There is deliberately NO bundles-only invalidator (removed in S2-REVIVE, Ruling STORE-EDGE-2: it had zero call sites).
+// Every bundle write (bundle.routes.ts create/update/deactivate) calls `invalidateStoreProductCaches`, which clears
+// `bundlesCacheKey` in `clearProductsRedis` and purges `bundles:<storeId>` in its one storefront request, and a bundle's
+// price/availability also depends on its component products, which only that function covers. Pinned by
+// tests/unit/storefront-purge-on-write.test.ts (bundle writes) and tests/unit/public-cache-invalidation.test.ts.
 
 /**
  * How long an order-driven storefront purge is coalesced per store (#1220).

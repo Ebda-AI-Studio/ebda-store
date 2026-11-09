@@ -6,7 +6,11 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma, SlugEntityType } from '@ebda/database';
 import { storeWriter, storeDb } from '../lib/repo-factory';
-import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
+import {
+  invalidateCached,
+  invalidateStoreCategoriesCaches,
+  invalidateStoreProductCaches,
+} from '../lib/public-cache';
 import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import { recordSlugRedirect } from '../services/slug-redirect.service';
@@ -154,7 +158,7 @@ router.put(
       // Bust the public categories cache so the storefront sees the
       // new tile image on the next request rather than waiting out
       // the 120s TTL.
-      await invalidateCached(`public:categories:${storeId}`);
+      await invalidateStoreCategoriesCaches(storeId);
 
       res.json({ success: true, data: { image: store.bestSellersImage } });
     } catch (error) {
@@ -236,7 +240,7 @@ router.put(
           })
         )
       );
-      await invalidateCached(`public:categories:${storeId}`);
+      await invalidateStoreCategoriesCaches(storeId);
       res.json({ success: true });
     } catch (error) {
       next(error);
@@ -363,7 +367,7 @@ router.put(
 
       // Bust the public product cache for this store so the storefront
       // immediately reflects the new order on the next request.
-      await invalidateCached(`public:categories:${storeId}`);
+      await invalidateStoreCategoriesCaches(storeId);
 
       res.json({ success: true });
     } catch (error) {
@@ -456,7 +460,7 @@ router.post(
       // Storefront caches the public category list for 120s. Without
       // this bust, a merchant adding a category waits two minutes for
       // it to appear on the live site.
-      await invalidateCached(`public:categories:${storeId}`);
+      await invalidateStoreCategoriesCaches(storeId);
 
       res.status(201).json({
         success: true,
@@ -643,7 +647,7 @@ router.delete(
         userAgent: req.headers['user-agent'],
       });
 
-      await invalidateCached(`public:categories:${storeId}`);
+      await invalidateStoreCategoriesCaches(storeId);
       // A deleted category stops lending its size chart to its products' PDPs.
       if (existing.sizeChartId) await invalidateStoreProductCaches(storeId);
 

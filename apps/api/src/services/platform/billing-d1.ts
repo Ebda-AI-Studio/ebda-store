@@ -476,3 +476,63 @@ export async function listDeferredBillingWebhooksD1(
     limit
   );
 }
+
+/** FOLD-VAT: the tax / ETA columns of billing_events rows (D1-only columns the prisma-shaped model does not carry). */
+export interface LedgerTaxFields {
+  netMinor: number;
+  grossMinor: number;
+  vatRateBp: number;
+  sellerLegalName: string | null;
+  sellerTaxId: string | null;
+  buyerTaxId: string | null;
+  etaUuid: string | null;
+  etaStatus: 'not_submitted' | 'submitted' | 'accepted' | 'rejected';
+  etaSubmittedAt: Date | null;
+  etaLongId: string | null;
+  etaHash: string | null;
+  etaRejectionReason: string | null;
+}
+
+export async function ledgerTaxFieldsD1(ids: string[]): Promise<Map<string, LedgerTaxFields>> {
+  const out = new Map<string, LedgerTaxFields>();
+  // D1 allows 100 bound parameters per statement; a ledger page is at most 200 rows.
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    const rows = await d1All<{
+      id: string;
+      net_minor: number;
+      gross_minor: number;
+      vat_rate_bp: number;
+      seller_legal_name: string | null;
+      seller_tax_id: string | null;
+      buyer_tax_id: string | null;
+      eta_uuid: string | null;
+      eta_status: LedgerTaxFields['etaStatus'];
+      eta_submitted_at: number | null;
+      eta_long_id: string | null;
+      eta_hash: string | null;
+      eta_rejection_reason: string | null;
+    }>(
+      `SELECT id, net_minor, gross_minor, vat_rate_bp, seller_legal_name, seller_tax_id, buyer_tax_id, eta_uuid,
+              eta_status, eta_submitted_at, eta_long_id, eta_hash, eta_rejection_reason
+         FROM billing_events WHERE id IN (${chunk.map((_, n) => `?${n + 1}`).join(',')})`,
+      ...chunk
+    );
+    for (const r of rows)
+      out.set(r.id, {
+        netMinor: Number(r.net_minor),
+        grossMinor: Number(r.gross_minor),
+        vatRateBp: Number(r.vat_rate_bp),
+        sellerLegalName: r.seller_legal_name,
+        sellerTaxId: r.seller_tax_id,
+        buyerTaxId: r.buyer_tax_id,
+        etaUuid: r.eta_uuid,
+        etaStatus: r.eta_status,
+        etaSubmittedAt: fromMs(r.eta_submitted_at),
+        etaLongId: r.eta_long_id,
+        etaHash: r.eta_hash,
+        etaRejectionReason: r.eta_rejection_reason,
+      });
+  }
+  return out;
+}

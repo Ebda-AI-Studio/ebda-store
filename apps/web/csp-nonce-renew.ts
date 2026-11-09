@@ -43,6 +43,10 @@ export function renewNonce(res: Response, fresh: string = newCspNonce()): Respon
   if (!csp || !old || !res.body) return res;
   const out = new Response(res.body.pipeThrough(replacingStream(old, fresh)), res);
   out.headers.set('content-security-policy', csp.split(old).join(fresh));
+  // The preload `Link` header carries the nonce too (Next adds `nonce="..."` per font/style preload); left stale, a cached
+  // page's preloads no longer match the CSP and are refused (Ruling STORE-EDGE-3).
+  const link = res.headers.get('link');
+  if (link) out.headers.set('link', link.split(old).join(fresh));
   out.headers.delete('content-length');
   return out;
 }

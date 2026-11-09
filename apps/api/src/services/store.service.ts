@@ -62,6 +62,7 @@ import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
+import { demoLayoutCacheKey } from '../lib/demo-layout-cache-key';
 import logger from '../lib/logger';
 import {
   deleteStoreClients,
@@ -140,6 +141,9 @@ export async function bustStoreCaches(
   if (slug) bustCorsCache(storeHost(slug));
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCachedPrefix(`public:products:${storeId}:`);
+  // The demo showroom's layout response cache (a no-op key for a real store): every publish / rollback / layout PUT /
+  // look apply ends here, so a published home shows at once (Ruling DEMO-LAYOUT-PURGE-1).
+  await invalidateCached(demoLayoutCacheKey(storeId));
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
   // STOREFRONT_REVALIDATE_URL / REVALIDATE_SECRET env pair isn't configured) so
   // a merchant's edit shows on the live storefront within ~a second.

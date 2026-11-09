@@ -9,8 +9,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet } from '../../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 import { formatDateTime } from '../../../../lib/format';
+import { DisagreementBanner } from './_components/DisagreementBanner';
 import { GoldPaymentPolicyCard } from './_components/GoldPaymentPolicyCard';
 import { GoldSettingsCard } from './_components/GoldSettingsCard';
 import { PendingRateBanner } from './_components/PendingRateBanner';
@@ -40,6 +41,16 @@ export default function GoldRatesPage() {
   }, [load, reload]);
 
   const refresh = () => setReload(n => n + 1);
+  // The owner typed their own rate while a feed disagreement was open: that is the decision, so the
+  // pending feed rows are rejected through the existing decision path and the banner clears.
+  const savedOwnRate = async (s: GoldState) => {
+    if (s.disagreement)
+      for (const p of s.pending)
+        await apiPost(`/api/v1/stores/${storeId}/gold-rates/${p.id}/decision`, {
+          decision: 'reject',
+        });
+    refresh();
+  };
   // The server refuses a write the role may not make; the controls only mirror it.
   const canEdit = true;
   const stale = state?.rates.some(r => r.stale && r.ratePerGram !== null) ?? false;
@@ -85,19 +96,31 @@ export default function GoldRatesPage() {
                 ? ` · ${t('updated', { at: formatDateTime(state.rates.find(r => r.appliedAt)?.appliedAt) })}`
                 : ''}
             </p>
-            <PendingRateBanner
-              storeId={storeId}
-              pending={state.pending}
-              canEdit={canEdit}
-              onDecided={refresh}
-            />
+            {state.disagreement ? (
+              <DisagreementBanner
+                storeId={storeId}
+                pending={state.pending}
+                disagreement={state.disagreement}
+                rates={state.rates}
+                canEdit={canEdit}
+                onDecided={refresh}
+              />
+            ) : (
+              <PendingRateBanner
+                storeId={storeId}
+                pending={state.pending}
+                canEdit={canEdit}
+                onDecided={refresh}
+              />
+            )}
+            <div id="gold-rate-editor" />
             <RateEditor
               key={`${String(reload)}-${state.rates.map(r => r.ratePerGram ?? 0).join('-')}`}
               storeId={storeId}
               rates={state.rates}
               feedEnabled={state.settings.feedEnabled}
               canEdit={canEdit}
-              onSaved={refresh}
+              onSaved={() => void savedOwnRate(state)}
             />
             <GoldSettingsCard
               key={`s-${String(reload)}`}

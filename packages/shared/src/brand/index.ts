@@ -56,25 +56,19 @@ export const BRAND = {
     country: 'EG',
   },
   /**
-   * What the studio does (Ahmad, 2026-11-03, scope widened 2026-11-09): seven service categories, each with named
-   * sub-items. ONE source for the studio home, About, the contact-form topics, llms.txt and the Organization JSON-LD
+   * What the studio does (Ahmad, 2026-11-09, STUDIO-CORE-1: Ebda is an AI and software company at the core): three
+   * service categories, each with named sub-items. ONE source for the studio home, About, the contact-form topics, llms.txt and the Organization JSON-LD
    * (`knowsAbout` / `makesOffer`). Benefit lines only: no prices, no claims we cannot back, no client names.
    * Products (Ebda Store, Ebda Chat) are separate from services.
+   * Marketing/advertising/media, home engineering, interior and exterior design, and events were REMOVED from ebda.app
+   * on purpose: they will move to separate subdomains or standalone sites (homes separately; marketing + media + events
+   * separately). Nothing is built or linked for them here yet.
    *
    * PENDING MATCH TO REGISTRATION PAPERS: Ahmad will share the company registration papers and every `ar` / `en`
    * name below (category and item) must then match the registered activity wording EXACTLY. The wording is a
    * one-file edit here; nothing else hard-codes a service name. A category `id` is also a contact-form topic id.
    */
   services: [
-    {
-      id: 'ai',
-      ar: 'الذكاء الاصطناعي',
-      en: 'Artificial intelligence',
-      benefitAr: 'مساعد بيكتب ويرد ويرتّب معاك، من غير ما تحتاج تفهم تقنية.',
-      benefitEn:
-        'An assistant that writes, replies and organises with you, no technical know-how needed.',
-      items: [],
-    },
     {
       id: 'software',
       ar: 'البرمجيات',
@@ -85,74 +79,35 @@ export const BRAND = {
       items: [],
     },
     {
-      id: 'design',
-      ar: 'التصميم الداخلي والخارجي',
-      en: 'Interior and exterior design',
-      benefitAr: 'تصميم لمساحتك من جوه ومن بره، بشكل تشوفه قبل ما يتنفذ.',
-      benefitEn: 'Design for your space inside and out, so you see it before it is built.',
-      items: [
-        { id: 'interior', ar: 'تصميم داخلي', en: 'Interior design' },
-        { id: 'exterior', ar: 'تصميم خارجي', en: 'Exterior design' },
-      ],
-    },
-    {
-      id: 'homes',
-      ar: 'هندسة المنازل',
-      en: 'Home engineering',
-      benefitAr: 'من تصميم الديكور بالبرامج لحد تنفيذ بيتك كله بإيدينا.',
+      id: 'ai',
+      ar: 'الذكاء الاصطناعي',
+      en: 'Artificial intelligence',
+      benefitAr: 'مساعد بيكتب ويرد ويرتّب معاك، من غير ما تحتاج تفهم تقنية.',
       benefitEn:
-        'From software-based decoration design to building your whole home with our own hands.',
-      items: [
-        {
-          id: 'decoration',
-          ar: 'تصميم الديكور وما قبل الديكور بالبرامج',
-          en: 'Decoration and pre-decoration design using software',
-        },
-        {
-          id: 'fit-out',
-          ar: 'تنفيذ كامل لبيت أو شقة',
-          en: 'Full implementation for a whole house or apartment',
-        },
-        { id: 'woodwork', ar: 'أعمال النجارة', en: 'Woodwork' },
-        { id: 'kitchens', ar: 'المطابخ', en: 'Kitchens' },
-        { id: 'furniture', ar: 'كل أنواع الأثاث', en: 'All furniture' },
-      ],
-    },
-    {
-      id: 'marketing',
-      ar: 'التسويق والإعلان والإعلام',
-      en: 'Marketing, advertising and media',
-      benefitAr: 'حملات وإنتاج محتوى يجيبلك العميل، وأرقام واضحة تعرف منها إيه اللي نفع.',
-      benefitEn:
-        'Campaigns and content production that bring customers in, with clear numbers on what worked.',
-      items: [
-        { id: 'digital-marketing', ar: 'التسويق الرقمي', en: 'Digital marketing' },
-        { id: 'advertising', ar: 'الإعلان', en: 'Advertising' },
-        { id: 'podcasts', ar: 'بودكاست', en: 'Podcasts' },
-        { id: 'graphic-design', ar: 'التصميم الجرافيكي', en: 'Graphic design' },
-        { id: 'video-design', ar: 'تصميم فيديو', en: 'Video design' },
-        { id: 'montage', ar: 'مونتاج', en: 'Montage and editing' },
-        { id: 'motion-graphics', ar: 'موشن جرافيك', en: 'Motion graphics' },
-        { id: 'photography', ar: 'تصوير فوتوغرافي', en: 'Photography' },
-        { id: 'videography', ar: 'تصوير فيديو', en: 'Videography' },
-      ],
+        'An assistant that writes, replies and organises with you, no technical know-how needed.',
+      items: [],
     },
     {
       id: 'training',
       ar: 'استشارات وتدريب',
       en: 'Consulting and training',
-      benefitAr: 'نصيحة تبدأ منين، وتدريب لفريقك على الأدوات اللي هتشتغلوا بيها.',
+      benefitAr:
+        'نساعد فريقك يستخدم الذكاء الاصطناعي والبرمجيات صح، بنصيحة تقنية وتدريب على الأدوات.',
       benefitEn:
-        'Advice on where to start, and training for your team on the tools you will work with.',
-      items: [],
-    },
-    {
-      id: 'events',
-      ar: 'الفعاليات',
-      en: 'Events',
-      benefitAr: 'تنظيم فعاليات وإطلاقات من أول التخطيط لحد يوم الحدث.',
-      benefitEn: 'Organising events and launches, from planning to the day itself.',
-      items: [],
+        'We help your team use AI and software well, with technical advice and hands-on training.',
+      items: [
+        { id: 'ai-workshops', ar: 'ورش تبنّي الذكاء الاصطناعي', en: 'AI adoption workshops' },
+        {
+          id: 'team-training',
+          ar: 'تدريب الفرق على أدوات الذكاء الاصطناعي والأتمتة',
+          en: 'Training teams on AI tools and automation',
+        },
+        {
+          id: 'tech-advisory',
+          ar: 'استشارات تقنية ومعمارية',
+          en: 'Technical and architecture advisory',
+        },
+      ],
     },
   ],
   tagline: 'Your store, live today.',

@@ -9,9 +9,9 @@ import {
 } from '../../packages/shared/src/contact-enquiry';
 
 describe('contact enquiry contract', () => {
-  it('topics are the two supports, all seven BRAND services, and other, each with ar + en labels', () => {
+  it('topics are the two supports, all three BRAND services, and other, each with ar + en labels', () => {
     expect(CONTACT_TOPIC_IDS).toHaveLength(2 + BRAND.services.length + 1);
-    expect(BRAND.services).toHaveLength(7);
+    expect(BRAND.services).toHaveLength(3);
     for (const t of CONTACT_TOPIC_IDS) {
       expect(CONTACT_TOPIC_LABELS[t].ar).toBeTruthy();
       expect(CONTACT_TOPIC_LABELS[t].en).toBeTruthy();

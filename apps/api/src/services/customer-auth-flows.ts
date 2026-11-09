@@ -250,14 +250,15 @@ export const CustomerAuthFlows = {
 
   async login(c: CustomerAuthClient, email: string, password: string, ip?: string) {
     const lockoutKey = loginGate.lockoutKey(email, c.storeId);
-    await loginGate.assertNotLocked(lockoutKey);
     // The compare runs HERE, in the Worker (bcrypt cost 12 in the single-threaded store DO would let a login flood starve that
     // store's checkout / stock). Unknown account: a dummy compare keeps the timing equal. The DO re-validates the hash it handed
     // out when it stamps the success, so a reset / revoke that lands during the compare voids the login.
-    const cred = await c.call<{ id: string; hash: string; tokenVersion: number } | null>(
-      'credential',
-      { email }
-    );
+    // PERF-LATENCY: the lockout read (AuthState) and the credential read (StoreDO) are independent reads, made in parallel; a
+    // locked account still gets its 429 BEFORE any password compare (the credential read writes nothing).
+    const [, cred] = await Promise.all([
+      loginGate.assertNotLocked(lockoutKey),
+      c.call<{ id: string; hash: string; tokenVersion: number } | null>('credential', { email }),
+    ]);
     const good = await bcrypt.compare(password, cred ? cred.hash : DUMMY_PASSWORD_HASH);
     const r: { valid: boolean; user?: DoCustomer; mfa?: boolean } =
       cred && good
@@ -278,24 +279,34 @@ export const CustomerAuthFlows = {
       }
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
-    await loginGate.recordSuccess(lockoutKey, ip);
-    loginGate.assertActive({
-      status: r.user.status,
-      deletedAt: r.user.deletedAt ? new Date(r.user.deletedAt) : null,
-    });
-    // Reached ONLY with the right password (a wrong password / unknown email threw the generic 401 above), so naming the
-    // unverified state here is not an account-existence oracle. The lockout counter was already reset like any correct password.
-    if (!r.user.emailVerified) {
-      throw new AppError(
-        403,
-        'EMAIL_NOT_VERIFIED',
-        'Verify your email address to sign in. We can send you a new link.'
-      );
+    // PERF-LATENCY: clearing the lockout counters + logging the success (AuthState, D1) runs alongside the session issue (StoreDO)
+    // instead of before it. Same outcome as the old sequence: the clear always completes (awaited on every path), the gate checks
+    // below still refuse before any session is issued, and a failed issue still leaves the counters cleared.
+    const cleared = loginGate.recordSuccess(lockoutKey, ip);
+    const user = r.user;
+    try {
+      loginGate.assertActive({
+        status: user.status,
+        deletedAt: user.deletedAt ? new Date(user.deletedAt) : null,
+      });
+      // Reached ONLY with the right password (a wrong password / unknown email threw the generic 401 above), so naming the
+      // unverified state here is not an account-existence oracle. The lockout counter was already reset like any correct password.
+      if (!r.user.emailVerified) {
+        throw new AppError(
+          403,
+          'EMAIL_NOT_VERIFIED',
+          'Verify your email address to sign in. We can send you a new link.'
+        );
+      }
+      // Ruling NZ-N9-1: TOTP for storefront customers is not offered by any storefront screen (no enrol UI) and is not ported.
+      // An account that nevertheless has it ON is refused, never signed in without the second factor.
+      if (r.mfa) throw mfaUnavailable();
+    } catch (err) {
+      await cleared;
+      throw err;
     }
-    // Ruling NZ-N9-1: TOTP for storefront customers is not offered by any storefront screen (no enrol UI) and is not ported.
-    // An account that nevertheless has it ON is refused, never signed in without the second factor.
-    if (r.mfa) throw mfaUnavailable();
-    return CustomerAuthFlows.issueSession(c, r.user);
+    const [, session] = await Promise.all([cleared, CustomerAuthFlows.issueSession(c, user)]);
+    return session;
   },
 
   /** Rotate. `claims` come from the VERIFIED refresh JWT. Returns the new pair; the DO decided everything else. */

@@ -45,6 +45,7 @@ import {
   onD1,
   planTierDriftD1,
   staleDeferredBillingWebhooksD1,
+  ledgerTaxFieldsD1,
 } from '../platform/billing-d1';
 import { isFamilyFrozen } from '../platform/cutover';
 import { cfBindings } from '../../cf/bindings';
@@ -2173,7 +2174,10 @@ export async function listLedger(args: {
         },
       });
   const stuckBefore = Date.now() - 3_600_000;
+  // FOLD-VAT: net / gross / rate, seller + buyer tax ids and the ETA document state (all empty while VAT is off).
+  const tax = d1Rows ? await ledgerTaxFieldsD1(rows.map(r => r.id)) : new Map();
   return rows.map(r => ({
+    tax: tax.get(r.id) ?? null,
     id: r.id,
     storeId: r.storeId,
     storeName: r.store.name,
