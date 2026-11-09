@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
 // Prod P1 (catalog-import-uploads-sweep: "DOMParser is not defined"): wrangler resolves @aws-sdk/xml-builder to its `browser`
@@ -19,17 +20,16 @@ describe('@aws-sdk/xml-builder alias for the Workers bundle', () => {
     expect(existsSync(join(API, 'src/cf/stubs/aws-xml-builder.ts'))).toBe(true);
   });
 
-  it('every file the stub re-exports exists and none is the DOMParser parser', () => {
+  it('every SDK file the stub re-exports resolves from apps/api and none is the DOMParser parser', () => {
+    const resolveFromApi = createRequire(join(API, 'package.json')).resolve;
     const targets = [...stub.matchAll(/from '([^']+)'/g)].map(m => m[1]!);
     expect(targets.length).toBe(3);
     for (const t of targets) {
-      expect(existsSync(join(API, 'src/cf/stubs', t)), t).toBe(true);
+      expect(t).toMatch(/^@aws-sdk\/xml-builder\/dist-es\//);
       expect(t).not.toMatch(/browser/);
+      expect(existsSync(resolveFromApi(t)), t).toBe(true);
     }
-    const parser = readFileSync(
-      join(API, 'src/cf/stubs', targets.find(t => t.includes('xml-parser'))!),
-      'utf8'
-    );
-    expect(parser).not.toContain('DOMParser');
+    const parser = targets.find(t => t.includes('xml-parser'))!;
+    expect(readFileSync(resolveFromApi(parser), 'utf8')).not.toContain('DOMParser');
   });
 });

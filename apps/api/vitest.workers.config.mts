@@ -241,11 +241,12 @@ export default defineConfig(async () => {
     resolve: {
       // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
       // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
-      alias: {
-        '@ebda/shared': here('../../packages/shared/src/index.ts'),
-        // the same swap as wrangler.jsonc's alias block: the SDK's DOM-free XML parser (a Worker has no DOMParser)
-        '@aws-sdk/xml-builder': here('./src/cf/stubs/aws-xml-builder.ts'),
-      },
+      alias: [
+        { find: '@ebda/shared', replacement: here('../../packages/shared/src/index.ts') },
+        // the same swap as wrangler.jsonc's alias block: the SDK's DOM-free XML parser (a Worker has no DOMParser).
+        // Exact match only: the stub itself imports @aws-sdk/xml-builder/dist-es/* subpaths.
+        { find: /^@aws-sdk\/xml-builder$/, replacement: here('./src/cf/stubs/aws-xml-builder.ts') },
+      ],
     },
     test: {
       include: ['workers-test/**/*.test.ts'],
