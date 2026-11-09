@@ -29,3 +29,7 @@ its credits are removed in the same PR).
 - **Known illustrative limits:** the "gold" pieces are graded paler than real 21 karat gold on purpose; the
   gold bar is a plain plate and the coin a plain disc (any mark FLUX drew was a fake one); the single drop
   earring is one earring, not a pair.
+
+## Hero re-render (Ruling HERO-HIRES-1, 2026-11-09)
+
+The hero stills (`hero-*-2k.webp`) are 2048x1152 AI-generated illustrative samples: Cloudflare Workers AI FLUX.2 [dev] re-rendered the earlier 1024x576 still (kept as the reference image, same composition and palette), prompts in `prompts.py` plus the style line in `scripts/hero-hires/hires.py`. Hero budget <= 400 KB each. No stock photo, no real person, no third-party image.

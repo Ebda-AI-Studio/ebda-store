@@ -259,6 +259,9 @@
     // @aws-sdk/xml-builder's `browser` field picks a parser that needs the global DOMParser (absent on Workers): every S3 response
     // with an XML body (list, batch delete, error bodies) failed. The stub re-exports the SDK's own DOM-free parser.
     "@aws-sdk/xml-builder": "./src/cf/stubs/aws-xml-builder.ts",
+    // Ruling BUNDLE-BUDGET-9: `import { z } from 'zod'` (contracts/wa-v1.ts) kept all 64 zod locales (261 KB raw) because esbuild
+    // cannot shake a re-exported namespace. Exactly `zod` only; `zod/v3` and `zod/v4` resolve normally.
+    "zod": "./src/cf/stubs/zod-root.ts",
     "socket.io": "./src/cf/stubs/socket-io.ts",
     "@socket.io/redis-adapter": "./src/cf/stubs/socket-io-redis-adapter.ts",
     "rate-limit-redis": "./src/cf/stubs/rate-limit-redis.ts",

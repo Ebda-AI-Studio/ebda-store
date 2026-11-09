@@ -27,3 +27,7 @@ Manual retouches (PIL, offline; recorded here because the committed WebP is not 
 - `kettle.webp` replaced the espresso machine of the first catalogue draft (every generation printed a
   badge or lettering on the front).
 - `tv-43.webp`, `tv-55.webp`: third-round generations with a plain bezel (the first two printed a brand strip).
+
+## Hero re-render (Ruling HERO-HIRES-1, 2026-11-09)
+
+The hero stills (`hero-*-2k.webp`) are 2048x1152 AI-generated illustrative samples: Cloudflare Workers AI FLUX.2 [dev] re-rendered the earlier 1024x576 still (kept as the reference image, same composition and palette), prompts in `prompts.py` plus the style line in `scripts/hero-hires/hires.py`. Hero budget <= 400 KB each. No stock photo, no real person, no third-party image.

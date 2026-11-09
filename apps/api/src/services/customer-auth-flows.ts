@@ -6,6 +6,7 @@
  * tokens are stored as sha256 only; this file hashes a NEW password (CPU work stays out of the single-threaded DO) and hands
  * the hash in.
  */
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { PASSWORD_RESET_TTL_MINUTES } from '@ebda/shared';
@@ -133,14 +134,16 @@ export const CustomerAuthFlows = {
           .catch(() => null)
       )?.name;
       const ex = r.existing;
-      void EmailService.sendDuplicateRegistrationNotice(
-        c.storeId,
-        {
-          email: ex.email,
-          name: `${ex.firstName} ${ex.lastName}`.trim() || ex.email,
-          storeName: storeName ?? undefined,
-        },
-        lang(ex.language)
+      void deferAfterTenantCommit('customer-auth.duplicate-registration-notice', () =>
+        EmailService.sendDuplicateRegistrationNotice(
+          c.storeId,
+          {
+            email: ex.email,
+            name: `${ex.firstName} ${ex.lastName}`.trim() || ex.email,
+            storeName: storeName ?? undefined,
+          },
+          lang(ex.language)
+        )
       ).catch(err =>
         logger.error(
           { err, email: maskEmail(ex.email) },
@@ -157,13 +160,15 @@ export const CustomerAuthFlows = {
       user: { id: string; email: string; firstName: string; lastName: string; language: string };
     }>('verifyEmail', { tokenHash: sha256(token) });
     if (r.already) return { success: true, message: 'Email already verified' };
-    void EmailService.sendWelcome(
-      c.storeId,
-      {
-        email: r.user.email,
-        name: `${r.user.firstName} ${r.user.lastName}`.trim() || r.user.email,
-      },
-      lang(r.user.language)
+    void deferAfterTenantCommit('customer-auth.welcome-after-verify', () =>
+      EmailService.sendWelcome(
+        c.storeId,
+        {
+          email: r.user.email,
+          name: `${r.user.firstName} ${r.user.lastName}`.trim() || r.user.email,
+        },
+        lang(r.user.language)
+      )
     ).catch(err =>
       logger.error({ err, userId: r.user.id }, 'Failed to send welcome email after verify')
     );
