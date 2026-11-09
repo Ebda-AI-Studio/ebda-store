@@ -42,6 +42,7 @@ import {
   auditLog,
   viewIngestLimiter,
 } from '../middleware/security';
+import { refuseUnknownPublicStore } from '../middleware/tenant-context';
 import {
   queryBudgetSpent,
   queryBudgetSpentUntil,
@@ -137,6 +138,8 @@ router.use(prefetchPublicLimits);
 router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
 // LAUNCH-RL: unknown-store 404s only (random slug/host probing), then search/typeahead per IP.
 router.use(storeMissLimiter);
+// An unknown store id in the path is refused HERE, behind the limiters above, not in `publicStoreContext` in front of them.
+router.use(refuseUnknownPublicStore);
 router.use('/products', whenSearching(publicSearchLimiter));
 router.use('/:storeId/search/suggest', publicSearchLimiter);
 

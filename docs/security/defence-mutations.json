@@ -2322,6 +2322,26 @@
       "test": "tests/unit/store-miss-limiter.test.ts"
     },
     {
+      "id": "public-unknown-store-reaches-the-limiters",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "an unknown store id in a public path is answered 404 in front of the public router's limiters, so probing store ids is neither limited per IP nor counted as a store miss (production 2026-11-10: no RateLimit header on that 404)",
+      "source": "apps/api/src/middleware/tenant-context.ts",
+      "find": "      if (err instanceof AppError && err.statusCode === 404 && err.code === 'STORE_NOT_FOUND') {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/public-unknown-store-limited.test.ts"
+    },
+    {
+      "id": "public-unknown-store-refused-after-the-limiters",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "the 404 held back for an unknown store id is never raised again, so the request runs the route handlers with no store scope open",
+      "source": "apps/api/src/routes/public.routes.ts",
+      "find": "router.use(refuseUnknownPublicStore);",
+      "replace": "",
+      "test": "tests/unit/public-unknown-store-limited.test.ts"
+    },
+    {
       "id": "rl-giveback-kept-alive",
       "domain": "rate limiting",
       "tier": "unit",

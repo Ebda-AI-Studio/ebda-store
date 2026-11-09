@@ -11,6 +11,8 @@
  *     IP are all served, the counter stays empty, `ratelimit-remaining` stays 20.
  *  2. store-miss still binds: 20 misses are answered 404 with the budget falling, miss 21 is 429 (RATE_LIMITED, Retry-After),
  *     the counter holds exactly 20, another IP is unaffected.
+ *  2b. normal browsing of a real store is not a miss: an unedited policy page (200, `page: null`) and a slug with no
+ *     redirect (200, `toSlug: null`) leave the counter at 0; the same page on an unknown store id is a counted 404.
  *  3. the IP-wide sign-in limiter (`rl:auth-ip-fail`, give-back kind): successful sign-ins leave its counter at 0, failed ones
  *     are counted.
  *
@@ -234,6 +236,49 @@ describe.skipIf(e.E2E_DB === '1')('failures-only limiters on workerd (LAUNCH-RL-
     // a 429 is not a miss: the counter stops at the limit
     expect(await settled(key, MISS_MAX)).toBe(MISS_MAX);
     expect((await call('/public/stores/no-such-store-21', '192.0.2.13')).status).toBe(404);
+  });
+
+  // Pre-QA sweep 2026-11-09, finding 6: ordinary browsing of a REAL store answered 404s that were counted as probing. A
+  // policy page the merchant never edited (the storefront then shows its built-in copy) and a slug that was never renamed
+  // are answers about a store that exists: 200, never counted. The same page on a store id that does not exist is still
+  // a counted 404.
+  it('store-miss: an unedited policy page and a slug with no redirect on a real store are 200 and not counted; an unknown store still is', async () => {
+    const ip = '192.0.2.15';
+    const key = `rl:store-miss:${ip}`;
+    for (const slug of ['privacy', 'terms', 'about']) {
+      const res = await call(`/public/${storeId}/pages/${slug}`, ip);
+      expect(res.status, slug).toBe(200);
+      expect(await res.json(), slug).toEqual({ success: true, data: { page: null } });
+      expect(res.headers.get('ratelimit-remaining'), slug).toBe(String(MISS_MAX));
+    }
+    const noRedirect = await call('/public/redirects/resolve?type=product&slug=never-renamed', ip, {
+      headers: { 'x-store-id': storeId },
+    });
+    expect(noRedirect.status).toBe(200);
+    expect(await noRedirect.json()).toEqual({ toSlug: null });
+    expect(noRedirect.headers.get('ratelimit-remaining')).toBe(String(MISS_MAX));
+    await new Promise(r => setTimeout(r, 300));
+    expect(await counter(key)).toBe(0);
+
+    const unknown = await call(`/public/${crypto.randomUUID()}/pages/privacy`, ip);
+    expect(unknown.status).toBe(404);
+    expect(((await unknown.json()) as { error: { code: string } }).error.code).toBe(
+      'STORE_NOT_FOUND'
+    );
+    // exactly one: the miss above, and none of the four 200s before it
+    expect(await settled(key, 1)).toBe(1);
+    const after = await call(`/public/${storeId}/pages/privacy`, ip);
+    expect(after.status).toBe(200);
+    expect(after.headers.get('ratelimit-remaining')).toBe(String(MISS_MAX - 1));
+
+    // a redirect lookup for a store that does not resolve is refused as before (400, so not a miss)
+    const unresolved = await call('/public/redirects/resolve?type=product&slug=x', ip, {
+      headers: { 'x-store-id': crypto.randomUUID() },
+    });
+    expect(unresolved.status).toBe(400);
+    expect(((await unresolved.json()) as { error: { code: string } }).error.code).toBe(
+      'STORE_NOT_RESOLVED'
+    );
   });
 
   it('sign-in: successful sign-ins from one IP leave the IP-wide failure budget untouched, failed ones are counted', async () => {
