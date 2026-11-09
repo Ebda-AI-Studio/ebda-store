@@ -129,11 +129,11 @@ export const BRAND = {
   ],
   /**
    * The software products still COMING SOON (names confirmed by Ahmad 2026-11-09; the Arabic is the transliteration pattern of
-   * ابدأ ستور / ابدأ شات, except Quote Studio: «استوديو للتسعير», because «كوت» reads as "coat" in Egyptian Arabic). They are NOT live products
+   * ابدأ ستور / ابدأ شات, except Quote Studio: «ستوديو للتسعير», because «كوت» reads as "coat" in Egyptian Arabic). They are NOT live products
    * (siteNavProducts lists only live ones); the marketing site shows them as "coming soon" only when the service lines are published.
    */
   comingProducts: [
-    { id: 'quote-studio', nameAr: 'ابدأ استوديو للتسعير', nameEn: 'Ebda Quote Studio' },
+    { id: 'quote-studio', nameAr: 'ابدأ ستوديو للتسعير', nameEn: 'Ebda Quote Studio' },
     { id: 'invite', nameAr: 'ابدأ إنفايت', nameEn: 'Ebda Invite' },
     { id: 'ads', nameAr: 'ابدأ آدز', nameEn: 'Ebda Ads' },
   ],

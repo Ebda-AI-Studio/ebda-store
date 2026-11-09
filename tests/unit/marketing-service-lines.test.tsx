@@ -107,12 +107,14 @@ describe('names and the header dropdowns', () => {
       ['Ebda Events', 'ابدأ إيفنتس'],
     ]);
     expect(BRAND.comingProducts.map(p => [p.nameEn, p.nameAr])).toEqual([
-      ['Ebda Quote Studio', 'ابدأ استوديو للتسعير'],
+      ['Ebda Quote Studio', 'ابدأ ستوديو للتسعير'],
       ['Ebda Invite', 'ابدأ إنفايت'],
       ['Ebda Ads', 'ابدأ آدز'],
     ]);
     // «كوت» reads as "coat" in Egyptian Arabic (Ahmad 2026-11-09)
     expect(JSON.stringify(BRAND.comingProducts)).not.toContain('كوت');
+    // no leading alef: the studio's old spelling is banned repo-wide (AR-STUDIO-NAME-1), so the name must never need an exemption
+    expect(JSON.stringify(BRAND.comingProducts)).not.toContain('استوديو');
   });
 
   it('OFF: no Services dropdown and no coming-soon rows in the header', () => {
@@ -252,7 +254,7 @@ describe('coming-soon cards (software only, names distinct from the services)', 
     const names = comingSoonItems('en').map(i => i.name);
     expect(names).toEqual(['Ebda Quote Studio', 'Ebda Invite', 'Ebda Ads']);
     expect(comingSoonItems('ar').map(i => i.name)).toEqual([
-      'ابدأ استوديو للتسعير',
+      'ابدأ ستوديو للتسعير',
       'ابدأ إنفايت',
       'ابدأ آدز',
     ]);

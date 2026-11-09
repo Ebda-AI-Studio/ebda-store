@@ -409,10 +409,7 @@ describe('names and facts (AR-STUDIO-NAME-1)', () => {
     const hits = ['apps', 'packages', 'docs']
       .flatMap(d => walk(path.join(ROOT, d)))
       .filter(f => !allowed.includes(path.relative(ROOT, f)))
-      // «ابدأ استوديو للتسعير» (Ebda Quote Studio, Ahmad 2026-11-09, SERVICES-IA-1) is a product name, not the studio's
-      .filter(f =>
-        readFileSync(f, 'utf8').replaceAll('ابدأ استوديو للتسعير', '').includes('ابدأ استوديو')
-      );
+      .filter(f => readFileSync(f, 'utf8').includes('ابدأ استوديو'));
     expect(hits.map(f => path.relative(ROOT, f))).toEqual([]);
   });
   it('the legal entity name is on the legal notice, not on the contact page', () => {
