@@ -232,11 +232,12 @@ describe('jasmine skin id', () => {
       const json = JSON.parse(readFileSync(path.join(root, f), 'utf8'));
       expect(json.template.page.skins.jasmine, f).toBe(label);
     }
+    // UX:T-1: /template is a redirect to the editor, whose look switcher picks the skin; the label lives in the messages above.
     const page = readFileSync(
       path.join(root, 'apps/admin/src/app/stores/[id]/template/page.tsx'),
       'utf8'
     );
-    expect(page).toMatch(/SKIN_LABEL_IDS = \[[^\]]*'jasmine'/);
+    expect(page).toContain('/builder');
   });
   it('the jasmine template family renders on the jasmine skin', () => {
     expect(TEMPLATE_FAMILIES.find(f => f.id === 'jasmine')?.skin).toBe('jasmine');

@@ -434,7 +434,7 @@ export function SimpleVariantsForm({
           // read it per row) — only the SIGHTED repetition goes, via
           // `sr-only` on every row after the first.
           const labelClass =
-            idx === 0 ? 'mb-1 block text-[11px] font-medium text-muted-foreground' : 'sr-only';
+            idx === 0 ? 'mb-1 block text-xs font-medium text-muted-foreground' : 'sr-only';
           return (
             <div key={row.rowId} className="rounded-lg border border-border bg-background p-3">
               <div className="grid gap-2 sm:grid-cols-2">
@@ -595,7 +595,7 @@ export function SimpleVariantsForm({
       </div>
 
       {product.sku && (
-        <p className="mt-3 text-[11px] text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           {t('parentSkuNote', { sku: product.sku })}
         </p>
       )}

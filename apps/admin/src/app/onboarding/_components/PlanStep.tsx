@@ -7,6 +7,7 @@ import { formatMoney } from '@ebda/shared';
 import { apiPut } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { isTrialPlanCode, storePlan } from '../../../components/billing/types';
+import { planLabel, TRIAL_PLAN_CODE } from '@/lib/plan-labels';
 import type { PlanOption, PlanSelection } from '../../../components/billing/types';
 
 /**
@@ -56,7 +57,9 @@ export function PlanStep({
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
-        <p className="text-sm text-muted-foreground">{t('trialNote')}</p>
+        <p className="text-sm text-muted-foreground">
+          {t('trialNote', { trialPlan: planLabel(TRIAL_PLAN_CODE, locale === 'ar' ? 'ar' : 'en') })}
+        </p>
       </div>
       {error && (
         <div role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">

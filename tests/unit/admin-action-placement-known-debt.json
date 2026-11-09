@@ -1,8 +1,1 @@
-{
-  "backTo": [],
-  "nativeDialog": [
-    "components/ProviderVerificationSection.tsx",
-    "components/SmartPaletteModal.tsx",
-    "components/ZoneEditor.tsx"
-  ]
-}
+{ "backTo": [], "nativeDialog": [] }

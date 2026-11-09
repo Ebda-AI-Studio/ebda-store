@@ -272,11 +272,12 @@ describe('lamma skin id', () => {
       const json = JSON.parse(readFileSync(path.join(root, f), 'utf8'));
       expect(json.template.page.skins.lamma, f).toBe(label);
     }
+    // UX:T-1: /template is a redirect to the editor, whose look switcher picks the skin; the label lives in the messages above.
     const page = readFileSync(
       path.join(root, 'apps/admin/src/app/stores/[id]/template/page.tsx'),
       'utf8'
     );
-    expect(page).toMatch(/SKIN_LABEL_IDS = \[[^\]]*'lamma'/);
+    expect(page).toContain('/builder');
   });
   it('the lamma template family renders on the lamma skin', () => {
     expect(TEMPLATE_FAMILIES.find(f => f.id === 'lamma')?.skin).toBe('lamma');

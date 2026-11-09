@@ -346,7 +346,7 @@ export default function CategoryProductOrderPage() {
       ) : (
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           {isDirty && (
-            <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300">
+            <div className="border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning-ink">
               {t('unsavedChanges')}
             </div>
           )}

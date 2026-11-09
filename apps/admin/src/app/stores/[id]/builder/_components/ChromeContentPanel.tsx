@@ -133,7 +133,7 @@ function LinkList({
           <div key={i} className="space-y-1.5 rounded-lg border border-border p-2">
             <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-2">
               <label className="block">
-                <span className="mb-0.5 block text-[11px] text-muted-foreground">
+                <span className="mb-0.5 block text-xs text-muted-foreground">
                   {t('chromeLabelAr')}
                 </span>
                 <input
@@ -146,7 +146,7 @@ function LinkList({
                 />
               </label>
               <label className="block">
-                <span className="mb-0.5 block text-[11px] text-muted-foreground">
+                <span className="mb-0.5 block text-xs text-muted-foreground">
                   {t('chromeLabelEn')}
                 </span>
                 <input
@@ -160,9 +160,7 @@ function LinkList({
               </label>
             </div>
             <label className="block">
-              <span className="mb-0.5 block text-[11px] text-muted-foreground">
-                {t('chromeLink')}
-              </span>
+              <span className="mb-0.5 block text-xs text-muted-foreground">{t('chromeLink')}</span>
               <input
                 dir="ltr"
                 value={r.href}
@@ -175,7 +173,7 @@ function LinkList({
               />
             </label>
             {bad && (
-              <p role="alert" className="text-[11px] text-destructive-ink">
+              <p role="alert" className="text-xs text-destructive-ink">
                 {t('chromeUnsafeLink')}
               </p>
             )}

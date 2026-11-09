@@ -64,32 +64,6 @@
     "users": 3,
     "webhookEvents": 1
   },
-  "englishFeedback": {
-    "app/stores/[id]/affiliates/[affiliateId]/events/page.tsx": 1,
-    "app/stores/[id]/settings/page.tsx": 3
-  },
-  "smallText": {
-    "app/stores/[id]/answer-engine/_components/GscTrendChart.tsx": 2,
-    "app/stores/[id]/answer-engine/_components/TrendChart.tsx": 1,
-    "app/stores/[id]/blog/page.tsx": 1,
-    "app/stores/[id]/builder/_components/ChromeContentPanel.tsx": 4,
-    "app/stores/[id]/builder/_components/SectionSpacingField.tsx": 3,
-    "app/stores/[id]/builder/_components/SectionTree.tsx": 1,
-    "app/stores/[id]/builder/_components/SettingsPanel.tsx": 4,
-    "app/stores/[id]/builder/_components/VideoField.tsx": 4,
-    "app/stores/[id]/codes/_labels/_components/ShapePicker.tsx": 1,
-    "app/stores/[id]/customers/[customerKey]/page.tsx": 1,
-    "app/stores/[id]/merchant-keys/page.tsx": 3,
-    "app/stores/[id]/orders/[orderId]/_components/PaymentLinkButton.tsx": 1,
-    "app/stores/[id]/orders/new/page.tsx": 2,
-    "app/stores/[id]/products/[productId]/variants/_components/OptionSwatchesEditor.tsx": 1,
-    "app/stores/[id]/products/[productId]/variants/_components/SimpleVariantsForm.tsx": 2,
-    "app/stores/[id]/pwa/_components/PwaIconUploader.tsx": 3,
-    "app/stores/[id]/seo/page.tsx": 1,
-    "app/stores/[id]/webhooks/page.tsx": 3,
-    "components/SectionPreview.tsx": 1,
-    "components/section-design/FontsCard.tsx": 1,
-    "components/section-design/SectionDividersBlock.tsx": 1,
-    "components/section-design/SectionTypographyBlock.tsx": 1
-  }
+  "englishFeedback": {},
+  "smallText": {}
 }

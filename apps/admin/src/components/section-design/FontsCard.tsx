@@ -230,7 +230,7 @@ export function FontsCard({
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             />
             {uploadFile && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {t('uploadFileSize', {
                   name: uploadFile.name,
                   kb: Math.round(uploadFile.size / 1024),

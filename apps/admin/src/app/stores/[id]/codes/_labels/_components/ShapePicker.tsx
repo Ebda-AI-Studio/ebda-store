@@ -61,7 +61,7 @@ export function ShapePicker({
         })}
       </div>
       <p className="text-xs text-muted-foreground">{tl('hint')}</p>
-      <p className="text-[11px] text-muted-foreground">{BARCODE_SHAPE_CREDIT}</p>
+      <p className="text-xs text-muted-foreground">{BARCODE_SHAPE_CREDIT}</p>
     </div>
   );
 }

@@ -24,6 +24,7 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
   { prefix: '/finance', feature: 'accounting.basic' },
   { prefix: '/campaigns', feature: 'email_campaigns' },
   { prefix: '/abandoned-carts', feature: 'abandoned_cart' },
+  { prefix: '/payment-abandonments', feature: 'payment_abandonment' },
   { prefix: '/affiliates', feature: 'affiliate' },
   { prefix: '/loyalty', feature: 'loyalty' },
   { prefix: '/bundles', feature: 'bundles' },

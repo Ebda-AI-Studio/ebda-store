@@ -170,7 +170,7 @@ export function buildStorePaletteItems(
       [settings.tax, `/stores/${storeId}/tax`],
       [settings.pwa, `/stores/${storeId}/pwa`],
       [settings.qr, `/stores/${storeId}/codes`],
-      [settings.template, `/stores/${storeId}/template`],
+      [settings.template, `/stores/${storeId}/builder`],
       [settings.language, `/stores/${storeId}/language`],
       [settings.staff, `/stores/${storeId}/staff`],
       [settings.agentKey, `/stores/${storeId}/agent-key`],

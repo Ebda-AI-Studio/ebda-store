@@ -10,11 +10,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { pctToBps } from './pct';
+import { wholesalePlanName } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface CustomerGroup {
@@ -56,6 +58,7 @@ export default function CustomerGroupsPage() {
   const storeId = params.id as string;
   const t = useT('customerGroups.page');
   const askConfirm = useConfirm();
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
 
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,7 +136,11 @@ export default function CustomerGroupsPage() {
         : await apiPost(`/api/v1/stores/${storeId}/customer-groups`, body);
       if (res.error) {
         // FEATURE_DISABLED = turning wholesale pricing ON needs the plan (turning it off never does).
-        setError(res.error.code === 'FEATURE_DISABLED' ? t('planRequired') : res.error.message);
+        setError(
+          res.error.code === 'FEATURE_DISABLED'
+            ? t('planRequired', { plan: wholesalePlanName(locale) })
+            : res.error.message
+        );
         setSaving(false);
         return;
       }

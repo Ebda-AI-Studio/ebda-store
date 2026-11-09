@@ -108,7 +108,7 @@
       "recentStoresSubtitle": "Latest store registrations",
       "recentOrdersTitle": "Recent Orders",
       "recentOrdersAll": "Across all stores",
-      "viewAll": "View all →",
+      "viewAll": "View all",
       "noStoresTitle": "No stores yet",
       "noStoresSubtitle": "Create your first store to get started",
       "createStore": "Create Store",
@@ -371,7 +371,7 @@
       "orders": "Orders",
       "plan": "Plan",
       "createdPrefix": "Created {date}",
-      "viewDetails": "View Details →",
+      "viewDetails": "View Details",
       "tableLabel": "Stores",
       "colStore": "Store",
       "colOwner": "Owner",
@@ -383,8 +383,8 @@
       "colActions": "Actions",
       "view": "View",
       "paginationShowing": "Showing {from} to {to} of {total} stores",
-      "previous": "← Previous",
-      "next": "Next →",
+      "previous": "Previous",
+      "next": "Next",
       "emptyTitle": "No stores found",
       "emptyHintSearch": "Try adjusting your search or filter criteria",
       "emptyHintDefault": "Get started by creating your first store on the platform",
@@ -496,7 +496,7 @@
   },
   "products": {
     "list": {
-      "title": "Products - {storeName}",
+      "title": "Products",
       "subtitle": "Manage products for {storeName}",
       "loading": "Loading...",
       "fallbackStore": "Store",
@@ -734,7 +734,7 @@
         "status": "Status",
         "organization": "Organization",
         "flags": "Product Flags",
-        "seo": "SEO"
+        "seo": "Search appearance"
       },
       "fields": {
         "name": "Product Name",
@@ -2039,7 +2039,7 @@
       "profitUnknown": "Unknown",
       "profitMissingCost": "Profit unknown — cost price missing on {count} sold items",
       "profitPartial": "Excludes {count} sold items with no cost price ({amount} in sales)",
-      "addCostPrices": "Add cost prices to see profit →"
+      "addCostPrices": "Add cost prices to see profit"
     },
     "chart": {
       "title": "Sales Overview",
@@ -2288,6 +2288,16 @@
     "rail": {
       "label": "Settings sections",
       "allSettings": "All settings"
+    },
+    "superadmin": {
+      "statusChangeFailed": "Could not change the store status",
+      "suspended": "Store suspended",
+      "suspendedBody": "{name} is now suspended.",
+      "reactivated": "Store reactivated",
+      "reactivatedBody": "{name} is now active.",
+      "planChangeFailed": "Could not change the plan",
+      "planUpdated": "Plan updated",
+      "planUpdatedBody": "Store plan changed to {plan}."
     }
   },
   "branding": {
@@ -2407,14 +2417,9 @@
         "enableLabel": "Enable storefront web push opt-in"
       },
       "cardFrameDedup": {
-        "title": "Remove doubled card frame",
+        "title": "One frame around each card",
         "hint": "Off by default on existing stores; new stores are created with this on. When your homepage carousels/strips have \"Show card frame\" enabled, this removes the extra inner border so each card shows a single frame instead of two nested ones.",
         "enableLabel": "Enable single card frame"
-      },
-      "uppercaseStyle": {
-        "title": "Uppercase text styling (nav, headings, labels)",
-        "hint": "When enabled, nav links, footer column headings, section headings, category captions, hero text, and testimonial author names render in uppercase. Off by default (natural case). Product names have their own control in the visual editor.",
-        "enableLabel": "Enable uppercase chrome styling"
       },
       "footerLogo": {
         "title": "Footer logo (optional)",
@@ -2559,7 +2564,7 @@
       "enableDescription": "Show the Locations page on your storefront. Customers can find your branches.",
       "disabledTitle": "Locations are currently disabled",
       "disabledDescription": "Locations you add here are saved but won't be visible on the storefront until you enable the toggle above.",
-      "navHint": "Add the Locations link to your storefront via the visual editor → header navigation, footer links, or top utility bar.",
+      "navHint": "Add the Locations link to your storefront via the visual editor: header navigation, footer links, or top utility bar.",
       "showInFooterTitle": "Show branches in footer",
       "showInFooterHint": "Adds a \"Branches\" column to your storefront footer listing your published locations (name, address, phone). Off by default — existing footers are unaffected until you turn this on.",
       "showInFooterToggle": "Show a Branches column in the storefront footer",
@@ -2611,7 +2616,7 @@
       "delete": "Delete",
       "emptyTitle": "No locations yet",
       "emptyDescription": "Add your store branches so customers can find you.",
-      "emptyCta": "Add your first location →",
+      "emptyCta": "Add your first location",
       "errCreate": "Failed to create location",
       "errUpdate": "Failed to update location",
       "errDelete": "Delete failed",
@@ -3054,7 +3059,7 @@
       "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee.",
       "carriersBannerTitle": "Shipping Carriers enabled",
       "carriersBannerHint": "Configure Bosta, ShipBlu, Mylerz and Aramex credentials, test connections, and view shipments.",
-      "carriersBannerLink": "Manage carriers →"
+      "carriersBannerLink": "Manage carriers"
     },
     "toolbar": {
       "addZone": "Add Zone"
@@ -3723,7 +3728,7 @@
     },
     "subtitle": "Affiliates",
     "backToAffiliates": "Back to Affiliates",
-    "auditTrail2": "Audit Trail →",
+    "auditTrail2": "Audit Trail",
     "noEventsYet": "No events yet",
     "eventHistory": "Event History",
     "orderLabel": "Order:",
@@ -3731,7 +3736,8 @@
     "amountLabel": "Amount:",
     "via": "via",
     "eventsTitle": "{name} — Events",
-    "eventsTitleFallback": "Affiliate Events"
+    "eventsTitleFallback": "Affiliate Events",
+    "eventsLoadFailed": "Could not load the events."
   },
   "bulk": {
     "page": {
@@ -3761,7 +3767,7 @@
       "xlsxReady": "Workbook loaded — rows will be mapped + parsed on the server",
       "updateExisting": "Update existing products (match by SKU or slug)",
       "xlsxOptionsHint": "XLSX options — applied to rows that don't specify these columns explicitly.",
-      "skuPrefixLabel": "SKU prefix (e.g. <code>WJ</code> → <code>WJ-001</code>)",
+      "skuPrefixLabel": "SKU prefix (e.g. <code>WJ</code> becomes <code>WJ-001</code>)",
       "skuPrefixPlaceholder": "ITEM",
       "defaultInventoryLabel": "Default inventory per row",
       "defaultStatusLabel": "Default status",
@@ -4611,8 +4617,8 @@
       "aiFaqNote": "AI-generated FAQ items live in SEO Tools, not here.",
       "aiHowToNote": "AI-generated How-To guides live in SEO Tools, not here.",
       "wrapperNote": "This editor controls the static page wrapper (cover image, intro paragraphs, etc.). The accordion content the storefront actually renders comes from a separate surface.",
-      "openFaqInSeo": "Open FAQ items in SEO →",
-      "openHowToInSeo": "Open How-To items in SEO →"
+      "openFaqInSeo": "Open FAQ items in SEO",
+      "openHowToInSeo": "Open How-To items in SEO"
     },
     "faqsPage": {
       "title": "Questions and answers",
@@ -5318,7 +5324,7 @@
         "resetTitle": "Reset to Plan Defaults",
         "resetDescription": "Clear ALL feature overrides for this store. The store will use its plan baseline only.",
         "resetButton": "Reset Overrides",
-        "auditLogsLink": "View audit logs →"
+        "auditLogsLink": "View audit logs"
       },
       "modals": {
         "changePlanTitle": "Change Plan",
@@ -5385,7 +5391,7 @@
   },
   "seo": {
     "page": {
-      "title": "SEO Settings",
+      "title": "Search appearance",
       "subtitle": "Optimize your store for search engines",
       "loading": "Loading...",
       "backToSettings": "Back to Settings",
@@ -5506,8 +5512,8 @@
       "socialTwitterPlaceholder": "https://twitter.com/yourstore",
       "socialSaveError": "The Wikipedia or Wikidata link is not valid",
       "socialSaveSuccess": "Social links saved",
-      "socialRedirectNote": "Social platform links (Instagram, Facebook, TikTok, etc.) are managed in Branding → Social. Edit them there to keep everything in one place.",
-      "socialRedirectNoteLinkText": "Go to Branding → Social",
+      "socialRedirectNote": "Social platform links (Instagram, Facebook, TikTok, etc.) are managed in Branding › Social. Edit them there to keep everything in one place.",
+      "socialRedirectNoteLinkText": "Go to Branding › Social",
       "redirectsLoadMore": "Load more",
       "redirectsLoadingMore": "Loading…",
       "generating": "Writing...",
@@ -6212,7 +6218,8 @@
         "wallet": "Wallet",
         "wholesaleApplications": "Wholesale applications",
         "customerIntelligence": "Smart hints",
-        "categories": "Categories"
+        "categories": "Categories",
+        "accountantGroup": "For your accountant"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -6273,7 +6280,7 @@
       "loading": "Loading AI quota…",
       "loadError": "Failed to load AI quota",
       "header": "AI Quota",
-      "viewLog": "View detailed log →",
+      "viewLog": "View detailed log",
       "quotaBarDaily": "Daily",
       "quotaBarMonthly": "Monthly",
       "remainingToday": "Remaining today",
@@ -6333,7 +6340,7 @@
       "tokenHint": "Token refs (e.g. token:primary) preview as gray here; storefront resolves at render.",
       "cancel": "Cancel",
       "applyAll": "Apply to all sections",
-      "applyConfirm": "This overwrites the current section bg + frame colors. Proceed?",
+      "applyConfirm": "The new colors replace the current section background and frame colors.",
       "frameThin": "Thin (1px)",
       "frameNormal": "Normal (2px)",
       "frameThick": "Thick (4px)",
@@ -6369,7 +6376,9 @@
         "newArrivals": "New arrivals",
         "bestSellers": "Best sellers",
         "testimonials": "Testimonials"
-      }
+      },
+      "applyConfirmObject": "Current section colors",
+      "applyConfirmLabel": "Apply colors"
     },
     "paymentEventsTimeline": {
       "toggleLabel": "View payment events",
@@ -6525,7 +6534,7 @@
       "memo": "Memo",
       "debit": "Debit",
       "credit": "Credit",
-      "reversed": "Reversed →",
+      "reversed": "Reversed by entry",
       "reverses": "Reverses",
       "viewDetail": "View",
       "account": "Account",
@@ -6580,7 +6589,8 @@
       "salesOrdersRevenue": "Paid Orders Revenue",
       "salesOrdersCount": "Paid Orders",
       "salesOrdersCountUnit": "orders in period",
-      "couldntLoad": "Couldn't load"
+      "couldntLoad": "Couldn't load",
+      "loadFailedShort": "Could not load the finance dashboard."
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -6838,7 +6848,7 @@
         "entryId": "Journal Entry ID (UUID)",
         "confirm": "Link",
         "cancel": "Cancel",
-        "entryIdHelp": "You can find entry IDs in Finance → Journal.",
+        "entryIdHelp": "You can find entry IDs in Finance › Journal.",
         "confirming": "Linking…",
         "uuidExample": "e.g. 550e8400-e29b-41d4-a716-446655440000"
       },
@@ -6876,7 +6886,7 @@
       "subtitle": "Record exchange rates for non-EGP transactions",
       "multiCurrencyAccounting": "Multi-Currency Accounting",
       "featureInactive": "Feature not active",
-      "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Upgrade to the Business plan to turn it on.",
+      "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Upgrade your plan to turn it on.",
       "recordNewRate": "Record a New Rate",
       "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate EGP.",
       "rateExample": "Example: USD at 50.00 means 1 USD = 50.00 EGP.",
@@ -6957,7 +6967,8 @@
       "backorderDisableFailed": "Could not disable backorder. Try again.",
       "backorderEnabledDone": "Backorder enabled on {count} products",
       "backorderDisabledDone": "Backorder disabled on {count} products",
-      "moreActions": "Inventory options"
+      "moreActions": "Inventory options",
+      "loadFailedShort": "Could not load the inventory."
     },
     "scan": {
       "title": "Barcode Scan",
@@ -7246,7 +7257,7 @@
       },
       "emptyState": "No purchase orders yet. Create one with the button above.",
       "totalCount": "{total} purchase orders",
-      "backToPurchaseOrders": "← Back to purchase orders",
+      "backToPurchaseOrders": "Back to purchase orders",
       "notesArPlaceholder": "Notes in Arabic (optional)",
       "loadFailed": "Could not load purchase orders. Try again."
     },
@@ -7421,7 +7432,7 @@
       "asOf": "As of",
       "repeatPurchaseBasis": "of {count, plural, one {{count, number, latn} buyer} other {{count, number, latn} buyers}} re-ordered (last 30 days)",
       "repeatPurchaseUnknown": "No identifiable buyers in the last 30 days",
-      "cartToOrder": "Cart → order",
+      "cartToOrder": "Cart to order",
       "colSku": "SKU",
       "colName": "Name",
       "colSold7d": "Sold 7d",
@@ -7868,8 +7879,8 @@
       "geoForceTooltip": "Overwrites existing GEO content. Without this, sweeps skip entities that already have content."
     },
     "jobKind": {
-      "translateToAr": "Translate (→ AR)",
-      "translateToEn": "Translate (→ EN)",
+      "translateToAr": "Translate to AR",
+      "translateToEn": "Translate to EN",
       "seo": "SEO meta",
       "faqAeo": "Draft FAQs",
       "howtoAeo": "Draft HowTos",
@@ -7973,7 +7984,7 @@
       },
       "totalTags": "Total tags",
       "recentlyTranslated": "Recently translated (last 30 days)",
-      "openCatalogProducts": "Open Catalog → Products",
+      "openCatalogProducts": "Open Catalog › Products",
       "latestSeoFills": "Latest SEO fills",
       "titleLabel": "Title:",
       "descLabel": "Desc:",
@@ -8197,7 +8208,7 @@
     "page": {
       "title": "Payment Abandonments",
       "subtitle": "Shoppers who reached the payment gateway but did not complete payment.",
-      "enterprise": "Payment abandonment capture is available on the Business plan.",
+      "enterprise": "Payment abandonment capture is available on the {plan} plan.",
       "empty": "No gateway abandoners found in this period.",
       "emptyHint": "The sweep runs every 30 minutes and marks orders whose gateway link was generated but never paid.",
       "statsTotal": "Total abandoners (all time)",
@@ -8304,7 +8315,7 @@
       "disabledSuffix": "to publish.",
       "emptyTitle": "No blog posts yet",
       "emptyDescription": "Articles, news, and stories you publish will show up here.",
-      "emptyCta": "Write your first post →",
+      "emptyCta": "Write your first post",
       "postPublished": "Published",
       "postDraft": "Draft",
       "postEdit": "Edit",
@@ -8327,7 +8338,7 @@
       "newTitle": "New blog post",
       "editTitle": "Edit blog post",
       "subtitle": "Write a story or article that customers see on your storefront blog.",
-      "backToAll": "← Back to all posts",
+      "backToAll": "Back to all posts",
       "titleEn": "Title (English)",
       "titleEnPlaceholder": "What's new at your store...",
       "titleAr": "Title (Arabic)",
@@ -8447,7 +8458,7 @@
       "saveFailed": "Could not save the group.",
       "deleteFailed": "Could not delete the group.",
       "discountInvalid": "Enter a discount between 0 and 90 with at most two decimals.",
-      "planRequired": "Wholesale pricing needs the Business plan.",
+      "planRequired": "Wholesale pricing needs the {plan} plan.",
       "pricingTitle": "Pricing",
       "wholesaleLabel": "Wholesale group (members must be approved)",
       "wholesaleHint": "Only approved, signed-in accounts get these prices. A phone number or email typed at checkout never does.",
@@ -8529,7 +8540,7 @@
   "merchantKeys": {
     "writeSwitch": {
       "title": "Let AI assistants make changes (write tools)",
-      "body": "When on, keys with the write or destructive scope can update orders, products, stock, coupons and returns. Deleting, cancelling and refunding always need a second confirmation call. Included with Growth and Business. Turn off to keep every key read-only.",
+      "body": "When on, keys with the write or destructive scope can update orders, products, stock, coupons and returns. Deleting, cancelling and refunding always need a second confirmation call. Included with {plans}. Turn off to keep every key read-only.",
       "on": "On",
       "off": "Off",
       "saveFailed": "Could not change the setting"
@@ -8708,7 +8719,7 @@
     "fontFamilyLabel": "Font family",
     "fontSizeLabel": "Font size",
     "fontSizeExample": "e.g. 16px or 1rem",
-    "fontSizeHint": "Bare number auto-converts to px (16 → 16px). Allowed: 12 / 14 / 16 / 18 / 22px.",
+    "fontSizeHint": "Bare number auto-converts to px (16 becomes 16px). Allowed: 12 / 14 / 16 / 18 / 22px.",
     "arbitrarySizeNotAllowed": "Arbitrary Tailwind sizes (text-[…]) are not allowed.\nUse a px value (e.g. 12px / 14px / 16px / 18px / 22px) or\na named token: text-xs / text-sm / text-base / text-lg / text-xl / text-2xl.",
     "fontWeightLabel": "Font weight",
     "fontWeightExample": "e.g. 400, 600, 700",
@@ -9056,7 +9067,7 @@
       "unpaidTitle": "Your store is paused for shoppers until payment is recorded",
       "unpaidBody": "Pay by InstaPay with your reference, then send us the transaction reference below. Your store comes back as soon as we confirm it.",
       "overLimitTitle": "Read-only: your plan covers fewer stores",
-      "overLimitBody": "Your plan includes fewer stores than you have. Upgrade to Business to edit all of them again.",
+      "overLimitBody": "Your plan includes fewer stores than you have. Upgrade to {plan} to edit all of them again.",
       "overdueTitle": "Your payment is overdue",
       "overdueBody": "We will pause your store on {date} if payment is not recorded.",
       "overdueBodyNoDate": "Your store will be paused if payment is not recorded soon.",
@@ -9164,7 +9175,7 @@
       "noAccount": "New to Ebda Store?",
       "createStore": "Create your store",
       "plan": {
-        "chip": "Selected plan: {plan} · {interval} — 14-day Growth trial",
+        "chip": "Selected plan: {plan} · {interval} — 14-day {trialPlan} trial",
         "monthly": "monthly",
         "yearly": "annual"
       },
@@ -9196,7 +9207,8 @@
       "password": "Password",
       "verifyButton": "Verify my email",
       "wrongPassword": "That is not the password this verification was created with.",
-      "forgotPassword": "Forgot your password?"
+      "forgotPassword": "Forgot your password?",
+      "rateLimited": "Too many attempts in a row. Wait a minute and try again."
     },
     "flow": {
       "title": "Set up your store",
@@ -9221,7 +9233,8 @@
         "refresh": "I verified my email",
         "resend": "Send the link again",
         "resent": "If the address is eligible, a new link is on its way.",
-        "sendFailed": "Could not resend the email. Please try again shortly."
+        "sendFailed": "Could not resend the email. Please try again shortly.",
+        "rateLimited": "You asked for the link too many times in a row. Wait a minute and try again."
       },
       "store": {
         "title": "Name your store",
@@ -9313,7 +9326,7 @@
       "retry": "Try again",
       "plan": {
         "title": "Choose your plan",
-        "trialNote": "Every plan starts with a 14-day Growth trial. On day 15 the plan you pick is due; if it is not paid, your store returns to the Free plan.",
+        "trialNote": "Every plan starts with a 14-day {trialPlan} trial. On day 15 the plan you pick is due; if it is not paid, your store returns to the Free plan.",
         "monthly": "Monthly",
         "yearly": "Annual",
         "saveBadge": "Save 25%",
@@ -9509,11 +9522,6 @@
       "subscriptions": "Subscriptions",
       "claims": "Payment claims",
       "grants": "Free months"
-    },
-    "plans": {
-      "basic": "Basic",
-      "growth": "Growth",
-      "business": "Business"
     },
     "manual": {
       "title": "Record manual payment for {store}",
@@ -10911,7 +10919,7 @@
       "hint": "Quantity price breaks, a minimum order and who can see this product. Prices are in the store currency.",
       "vatInclusive": "Your prices include VAT, so tier prices include it too.",
       "vatExclusive": "Your prices exclude VAT; VAT is added on top of tier prices too.",
-      "upgrade": "Wholesale pricing is part of the Business plan.",
+      "upgrade": "Wholesale pricing is part of the {plan} plan.",
       "upgradeLink": "See plans",
       "scope": "Applies to",
       "minQty": "From quantity",
@@ -10961,7 +10969,7 @@
       "backToSettings": "Back to settings"
     },
     "plan": {
-      "title": "Webhooks are on the Growth and Business plans",
+      "title": "Webhooks are on the {plans} plans",
       "body": "Upgrade your plan to send order and product events to your own systems.",
       "cta": "See plans"
     },

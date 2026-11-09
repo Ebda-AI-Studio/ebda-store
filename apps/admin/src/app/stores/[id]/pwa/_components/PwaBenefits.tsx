@@ -9,7 +9,7 @@ export function PwaBenefits() {
   const t = useT('pwa.benefits');
 
   return (
-    <div className="bg-gradient-to-r from-primary/5 to-amber-50 border border-primary/30 rounded-xl p-6">
+    <div className="bg-gradient-to-r from-primary/5 to-warning/10 border border-primary/30 rounded-xl p-6">
       <h3 className="font-semibold text-foreground mb-3">{t('title')}</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="flex items-start gap-3">

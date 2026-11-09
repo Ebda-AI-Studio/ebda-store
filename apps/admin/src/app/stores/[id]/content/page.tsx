@@ -221,7 +221,7 @@ function PageRowCard({
             className={`rounded-full px-2 py-0.5 ${
               authored
                 ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                : 'bg-warning/15 text-warning-ink'
             }`}
           >
             {authored ? authoredLabel : fallbackLabel}

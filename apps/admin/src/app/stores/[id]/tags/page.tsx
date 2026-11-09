@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AITranslateMissingButton } from '../../../../components/AITranslateMissingButton';
+import { DataTable } from '../../../../components/mobile/DataTable';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { tagTranslatePair } from '../../../../lib/tag-translate-pair';
@@ -112,29 +113,30 @@ export default function StoreTagsPage() {
         </div>
       )}
       {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-start text-muted-foreground">
-                <th className="p-3 text-start font-medium">{t('name')}</th>
-                <th className="p-3 text-start font-medium">{t('nameAr')}</th>
-                <th className="p-3 text-start font-medium">{t('products')}</th>
-                <th className="p-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.id} className="border-b last:border-0" data-tag-row={r.id}>
-                  <td className="p-3">
-                    <input
-                      aria-label={t('name')}
-                      className="h-10 w-full min-w-[10rem] rounded-md border border-input bg-background px-3"
-                      value={r.name}
-                      maxLength={80}
-                      onChange={e => patch(r.id, { name: e.target.value })}
-                    />
-                  </td>
-                  <td className="p-3">
+        <div className="rounded-xl border bg-card shadow-sm">
+          <DataTable
+            ariaLabel={t('name')}
+            rows={rows}
+            rowKey={r => r.id}
+            columns={[
+              {
+                header: t('name'),
+                primaryOnMobile: true,
+                cell: r => (
+                  <input
+                    aria-label={t('name')}
+                    data-tag-row={r.id}
+                    className="h-10 w-full min-w-[10rem] rounded-md border border-input bg-background px-3"
+                    value={r.name}
+                    maxLength={80}
+                    onChange={e => patch(r.id, { name: e.target.value })}
+                  />
+                ),
+              },
+              {
+                header: t('nameAr'),
+                cell: r => (
+                  <>
                     <input
                       aria-label={t('nameAr')}
                       dir="rtl"
@@ -147,22 +149,30 @@ export default function StoreTagsPage() {
                     {!r.nameAr.trim() && (
                       <p className="mt-1 text-xs text-muted-foreground">{t('missingAr')}</p>
                     )}
-                  </td>
-                  <td className="p-3 tabular-nums">{r.productCount}</td>
-                  <td className="p-3 text-end">
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={!dirty(r) || !r.name.trim() || savingId === r.id}
-                      onClick={() => save(r)}
-                    >
-                      {t('save')}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </>
+                ),
+              },
+              {
+                header: t('products'),
+                cell: r => <span className="tabular-nums">{r.productCount}</span>,
+              },
+              {
+                header: '',
+                mobileActions: true,
+                alignEnd: true,
+                cell: r => (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!dirty(r) || !r.name.trim() || savingId === r.id}
+                    onClick={() => save(r)}
+                  >
+                    {t('save')}
+                  </Button>
+                ),
+              },
+            ]}
+          />
         </div>
       )}
     </AdminLayout>

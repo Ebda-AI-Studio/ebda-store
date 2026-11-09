@@ -117,8 +117,8 @@ export default function AnnouncementPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title={t('title')} subtitle={t('loading')}>
-        <div className="animate-pulse space-y-4">
+      <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+        <div className="animate-pulse space-y-4" aria-busy="true">
           <div className="h-20 rounded-xl bg-muted" />
           <div className="h-64 rounded-xl bg-muted" />
         </div>

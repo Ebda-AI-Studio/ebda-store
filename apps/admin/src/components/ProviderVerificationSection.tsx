@@ -54,7 +54,7 @@ export function ProviderVerificationSection() {
     };
   }, [reload]);
 
-  async function confirm(provider: string) {
+  async function confirmProvider(provider: string) {
     setBusy(provider);
     const { error } = await apiPost(`/api/v1/admin/provider-verification/${provider}/confirm`);
     setBusy(null);
@@ -105,7 +105,7 @@ export function ProviderVerificationSection() {
                     disabled={busy === r.provider}
                     onClick={e => {
                       e.preventDefault();
-                      void confirm(r.provider);
+                      void confirmProvider(r.provider);
                     }}
                   >
                     {t('confirm')}

@@ -7,6 +7,8 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost, apiPut, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { planNamesJoined } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
 
@@ -84,6 +86,7 @@ export default function MerchantKeysPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('merchantKeys');
+  const plans = planNamesJoined(['growth', 'business'], useLocale() === 'ar' ? 'ar' : 'en');
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [data, setData] = useState<ListResponse | null>(null);
@@ -313,7 +316,7 @@ export default function MerchantKeysPage() {
               {t('writeSwitch.title')}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground" dir="auto">
-              {t('writeSwitch.body')}
+              {t('writeSwitch.body', { plans })}
             </p>
           </div>
           <Button
@@ -382,7 +385,7 @@ export default function MerchantKeysPage() {
             <legend className="text-xs font-medium text-foreground" dir="auto">
               {t('create.scopesLabel')}
             </legend>
-            <p className="text-[11px] leading-relaxed text-muted-foreground" dir="auto">
+            <p className="text-xs leading-relaxed text-muted-foreground" dir="auto">
               {t('create.scopesHelp')}
             </p>
             {SCOPE_ORDER.map(scope => (
@@ -394,7 +397,7 @@ export default function MerchantKeysPage() {
                   onChange={() => toggleScope(scope)}
                 />
                 <span>
-                  <code className="font-mono text-[11px]" dir="ltr">
+                  <code className="font-mono text-xs" dir="ltr">
                     {scope}
                   </code>
                   <span className="block text-muted-foreground">
@@ -448,7 +451,7 @@ export default function MerchantKeysPage() {
       <Modal isOpen={minted !== null} onClose={dismissReveal} title={t('reveal.title')} size="lg">
         <div className="space-y-3">
           <p
-            className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+            className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs leading-relaxed text-warning-ink"
             dir="auto"
           >
             {t('reveal.warning')}
@@ -465,7 +468,7 @@ export default function MerchantKeysPage() {
             <summary className="cursor-pointer" dir="auto">
               {t('reveal.configSummary')}
             </summary>
-            <pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 text-[11px]" dir="ltr">
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 text-xs" dir="ltr">
               {JSON.stringify(
                 {
                   mcpServers: {

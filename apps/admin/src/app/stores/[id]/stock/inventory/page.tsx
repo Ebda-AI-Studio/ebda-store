@@ -233,7 +233,7 @@ export default function StockInventoryPage() {
       })
       .catch(() => {
         if (!isLatest()) return;
-        setProductsErr('Failed to load inventory');
+        setProductsErr(t('loadFailedShort'));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, search, currentPage, refreshKey]);

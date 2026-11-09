@@ -133,7 +133,7 @@ export function SectionSpacingField({
           <div key={axis} data-spacing-axis={axis}>
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-foreground">{label}</span>
-              <span className="text-[11px] tabular-nums text-muted-foreground" dir="ltr">
+              <span className="text-xs tabular-nums text-muted-foreground" dir="ltr">
                 {t('spacing.px', { px })}
               </span>
             </div>
@@ -160,7 +160,7 @@ export function SectionSpacingField({
               <button
                 type="button"
                 onClick={() => write(axis, editing, undefined)}
-                className="mt-1 text-[11px] text-primary hover:underline"
+                className="mt-1 text-xs text-primary hover:underline"
               >
                 {t(editing === 'desktop' ? 'spacing.resetDefault' : 'spacing.resetInherit')}
               </button>
@@ -168,7 +168,7 @@ export function SectionSpacingField({
           </div>
         );
       })}
-      <p className="text-[11px] text-muted-foreground">{t('spacing.hint')}</p>
+      <p className="text-xs text-muted-foreground">{t('spacing.hint')}</p>
     </fieldset>
   );
 }

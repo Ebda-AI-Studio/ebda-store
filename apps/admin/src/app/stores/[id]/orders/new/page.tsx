@@ -494,7 +494,7 @@ export default function NewOrderPage() {
                       </span>
                     )}
                     {c.isGuest && (
-                      <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning-ink">
+                      <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
                         {t('customerSection.guestBadge')}
                       </span>
                     )}
@@ -710,7 +710,7 @@ export default function NewOrderPage() {
                           {formatPrice(effectiveVariantPrice(v.price, pendingVariantProduct.price))}
                         </span>
                         {v.inventory <= 0 && (
-                          <span className="ms-1.5 text-destructive-ink text-[10px]">
+                          <span className="ms-1.5 text-destructive-ink text-xs">
                             {t('productsSection.outOfStock')}
                           </span>
                         )}

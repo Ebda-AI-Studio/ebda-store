@@ -16,6 +16,9 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [CHANGELOG-2026-11-04-admin-fix-pass-t3.md](CHANGELOG-2026-11-04-admin-fix-pass-t3.md) - Admin fix pass, T3 UI foundation (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t4.md](CHANGELOG-2026-11-04-admin-fix-pass-t4.md) - Admin fix pass, T4 store setup pages (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
+- [CHANGELOG-2026-11-09-admin-audit-closure-ux.md](CHANGELOG-2026-11-09-admin-audit-closure-ux.md) - Admin audit closure, UX rows (2026-11-09)
+- [CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md) - Admin audit closure, API and storefront rows (2026-11-09)
+- [CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md) - Atomic StoreDO settings patch (2026-11-09)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t5.md](CHANGELOG-2026-11-04-admin-fix-pass-t5.md) - Admin fix pass, T5 UI catalog + sales (2026-11-04)
 - [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) - Database backup, restore & disaster recovery
 - [DB-INDEX-MIGRATIONS.md](DB-INDEX-MIGRATIONS.md) - DB index migrations — lock procedure
@@ -44,6 +47,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [api/loyalty.md](api/loyalty.md) - Loyalty API (admin and storefront)
 - [api/lifecycle-emails.md](api/lifecycle-emails.md) - Lifecycle emails (self-serve onboarding)
 - [api/openapi.yaml](api/openapi.yaml) - openapi
+- [api/route-inventory.md](api/route-inventory.md) - Generated inventory of every Express route (method, path, auth chain, feature and permission gates)
 - [api/studio-enquiry.md](api/studio-enquiry.md) - Studio service-enquiry form (contact page, mail-only)
 
 ## architecture - Architecture and invariants

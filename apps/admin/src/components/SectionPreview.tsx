@@ -353,7 +353,7 @@ export function SectionPreview({
                   className="aspect-square w-full"
                   style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
                 />
-                <div className="px-1.5 py-1 text-[9px] leading-tight">
+                <div className="px-1.5 py-1 text-xs leading-tight">
                   <div
                     className="truncate"
                     style={{

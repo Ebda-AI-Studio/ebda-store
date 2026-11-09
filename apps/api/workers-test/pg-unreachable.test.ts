@@ -617,6 +617,8 @@ describe.skipIf(e.E2E_DB === '1')('customer auth on a StoreDO with Postgres unre
       lastName: 'Sp',
       verification: { tokenHash: await sha(vt), expiresAt: Date.now() + 3_600_000, rowId: 'v-s' },
     });
+    // sign-in needs a verified address (QA P2-8 / D4), so the account is verified before its first login
+    expect((await post('/auth/verify-email', { token: vt })).status).toBe(200);
     const l = (
       await data(
         await post('/auth/login', { email: 'susp@exit-test.invalid', password: PW, storeId: A })
@@ -635,6 +637,8 @@ describe.skipIf(e.E2E_DB === '1')('customer auth on a StoreDO with Postgres unre
       storeId: A,
     });
     expect(again.status).toBe(403);
+    // refused for the suspension, not for the (already verified) address
+    expect((await data(again)).error?.code).not.toBe('EMAIL_NOT_VERIFIED');
     // the directory read the merchant admin / emails / eligibility checks use: from the DO, suspended is visible
     const p = await doOp(A, 'profiles', { ids: ['user-s', 'nope'] });
     expect(p).toMatchObject({ ok: true });
@@ -654,6 +658,17 @@ describe.skipIf(e.E2E_DB === '1')('customer auth on a StoreDO with Postgres unre
       lastName: 'D',
       verification: { tokenHash: await sha(vt), expiresAt: Date.now() + 3_600_000, rowId: 'v-h' },
     });
+    // QA P2-8 / D4 on workerd: the right password of an UNVERIFIED account is a named 403 (no session), then verifying opens it
+    const unverified = await post(
+      '/auth/login',
+      { email: 'hdr@exit-test.invalid', password: PW },
+      { 'x-store-id': A }
+    );
+    expect(unverified.status).toBe(403);
+    const unverifiedBody = await data(unverified);
+    expect(unverifiedBody.error?.code).toBe('EMAIL_NOT_VERIFIED');
+    expect(unverifiedBody.data).toBeUndefined();
+    expect((await post('/auth/verify-email', { token: vt })).status).toBe(200);
     const viaHeader = await post(
       '/auth/login',
       { email: 'hdr@exit-test.invalid', password: PW },

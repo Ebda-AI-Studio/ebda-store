@@ -41,6 +41,7 @@ import {
   ensureMoneyOpsSchema,
   type MoneyAnswer,
   applyStoreSettings,
+  patchStoreSettings,
   bootstrapStoreRows,
   readStoreRecord,
   encodeRpc,
@@ -588,6 +589,34 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       return {
         ok: true,
         data: applyStoreSettings(doSqlRunner(this.ctx.storage), meta, storeId, fields),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  /**
+   * The atomic settings PATCH (BE:F-2 / BE:F-3): merges ONLY the sent top-level keys of `settings` / `theme` / `socialLinks` against
+   * the value this DO holds now and writes any plain `fields` in the same synchronous transaction, so interleaved saves of
+   * different keys both survive and a refusal rolls the whole patch back. Input is an RPC JSON string `{ fields?, json? }`.
+   */
+  async patchSettings(
+    storeId: string,
+    inputJson: string
+  ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
+    try {
+      this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const input = decodeRpc<{
+        fields?: Record<string, unknown>;
+        json?: Record<string, { set?: Record<string, unknown>; remove?: string[] }>;
+      }>(inputJson);
+      return {
+        ok: true,
+        data: patchStoreSettings(doSqlRunner(this.ctx.storage), meta, storeId, input),
       };
     } catch (e) {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };

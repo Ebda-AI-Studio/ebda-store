@@ -42,7 +42,7 @@ describe('PlanStep', () => {
         onDone={vi.fn()}
       />
     );
-    expect(screen.getByText('onboarding.flow.plan.trialNote')).toBeTruthy();
+    expect(screen.getByText(/onboarding.flow.plan.trialNote/)).toBeTruthy();
     expect(plan(/Basic/).textContent).toContain('EGP 1,490.00');
     expect(plan(/Growth/).textContent).toContain('EGP 3,490.00');
     expect(plan(/Business/).textContent).toContain('EGP 9,990.00');

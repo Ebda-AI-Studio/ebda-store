@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowEnd, ArrowStart } from '../../../components/ArrowStart';
 import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import type { Pagination } from './types';
@@ -30,6 +31,7 @@ export function StoresPagination({ pagination, onPageChange }: StoresPaginationP
           disabled={pagination.page === 1}
           onClick={() => onPageChange(pagination.page - 1)}
         >
+          <ArrowStart className="me-1 h-4 w-4" />
           {t('previous')}
         </Button>
         <Button
@@ -40,6 +42,7 @@ export function StoresPagination({ pagination, onPageChange }: StoresPaginationP
           onClick={() => onPageChange(pagination.page + 1)}
         >
           {t('next')}
+          <ArrowEnd className="ms-1 h-4 w-4" />
         </Button>
       </div>
     </div>

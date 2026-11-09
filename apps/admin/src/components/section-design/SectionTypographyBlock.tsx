@@ -90,9 +90,7 @@ export function SectionTypographyBlock({
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t('typography.sectionOverrideTitle')}
       </h4>
-      <p className="mb-3 text-[11px] text-muted-foreground/80">
-        {t('typography.sectionOverrideHint')}
-      </p>
+      <p className="mb-3 text-xs text-muted-foreground/80">{t('typography.sectionOverrideHint')}</p>
       <div className="space-y-3">
         {roles.map(role => (
           <ZoneEditor

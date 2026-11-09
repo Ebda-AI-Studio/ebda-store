@@ -12,7 +12,7 @@ import {
   withUser,
   asPlatformOperator,
 } from '@ebda/database';
-import { StoreService } from '../services/store.service';
+import { StoreService, type SocialLinksPatch } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { toSafeStoreResponse } from '../lib/store-response';
 import { resolveDomainService } from '../services/domain-provider';
@@ -1064,24 +1064,17 @@ router.put(
  * (never user-controlled keys) so a crafted `{"__proto__": ...}` can't reach `merged[key]`; `hasOwnProperty`, not `in`.
  * Shared by `PUT /:id/social` and `PUT /:id/branding-bundle`.
  */
-function mergeSocialLinks(
-  existingSocialLinks: unknown,
-  incoming: unknown,
-  rawBody: unknown
-): Prisma.InputJsonValue {
-  const existingLinks = (existingSocialLinks as Record<string, string | null> | null) ?? {};
-  const merged: Record<string, string | null | undefined> = { ...existingLinks };
+function socialLinksPatch(incoming: unknown, rawBody: unknown): SocialLinksPatch {
   const incomingRecord = incoming as Record<string, string | undefined>;
+  const patch: SocialLinksPatch = { set: {}, remove: [] };
   for (const key of Object.keys(socialSchema.shape)) {
     if (!Object.prototype.hasOwnProperty.call(rawBody, key)) continue;
     const val = incomingRecord[key];
-    if (val === undefined) {
-      delete merged[key]; // explicitly cleared (empty string -> remove)
-    } else {
-      merged[key] = val;
-    }
+    if (val === undefined)
+      patch.remove.push(key); // explicitly cleared (empty string -> remove)
+    else patch.set[key] = val;
   }
-  return merged as Prisma.InputJsonValue;
+  return patch;
 }
 
 // PUT /stores/:id/social - Update store social links
@@ -1096,10 +1089,7 @@ router.put(
       const { id } = req.params;
       const incoming = socialSchema.parse(req.body);
 
-      const existing = await StoreService.getById(id);
-      const merged = mergeSocialLinks(existing.socialLinks, incoming, req.body);
-
-      const store = await StoreService.updateSocialLinks(id, merged);
+      const store = await StoreService.patchSocialLinks(id, socialLinksPatch(incoming, req.body));
 
       res.json({
         success: true,
@@ -1116,9 +1106,10 @@ router.put(
 // The page used to fire five independent PUTs (branding, theme, contact, social, settings). A 429 in the middle left the store
 // half saved, with only a partial-failure toast. Every part here is optional and validated by the SAME schema as its own route.
 // `StoreService.updateBrandingBundle` applies them in ONE database transaction on a Postgres store (any failure rolls all of it
-// back); on a D1 + Durable Object store the parts apply in order and a failure leaves the earlier ones written (Ruling FP-8).
+// back); on a D1 + Durable Object store they are folded into ONE StoreDO `patchSettings` call applied in a single DO transaction
+// (a refused part writes nothing; only the keys the page sends are merged, so a concurrent save of other keys survives).
 // This router has NO request transaction (storeScopeContext), so the transaction is opened in the service, not here. `settings`
-// goes through the shallow merge of `PUT /:id` (live row, server-owned keys kept), so the page sends only the keys it owns.
+// goes through the key-wise merge of `PUT /:id` (server-owned keys never written), so the page sends only the keys it owns.
 const brandingBundleSchema = z
   .object({
     branding: brandingSchema.optional(),
@@ -1146,9 +1137,7 @@ router.put(
         branding: body.branding,
         theme: body.theme as Record<string, unknown> | undefined,
         contact: body.contact,
-        social: body.social
-          ? stored => mergeSocialLinks(stored, body.social, raw.social ?? {})
-          : undefined,
+        social: body.social ? socialLinksPatch(body.social, raw.social ?? {}) : undefined,
         settings: body.settings as Prisma.InputJsonValue | undefined,
         blogEnabled: body.blogEnabled,
       });

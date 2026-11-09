@@ -289,6 +289,15 @@ export const CustomerAuthFlows = {
         status: user.status,
         deletedAt: user.deletedAt ? new Date(user.deletedAt) : null,
       });
+      // Reached ONLY with the right password (a wrong password / unknown email threw the generic 401 above), so naming the
+      // unverified state here is not an account-existence oracle. The lockout counter was already reset like any correct password.
+      if (!r.user.emailVerified) {
+        throw new AppError(
+          403,
+          'EMAIL_NOT_VERIFIED',
+          'Verify your email address to sign in. We can send you a new link.'
+        );
+      }
       // Ruling NZ-N9-1: TOTP for storefront customers is not offered by any storefront screen (no enrol UI) and is not ported.
       // An account that nevertheless has it ON is refused, never signed in without the second factor.
       if (r.mfa) throw mfaUnavailable();

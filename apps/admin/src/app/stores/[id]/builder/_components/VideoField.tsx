@@ -81,7 +81,7 @@ export function VideoField({
   const message = problem ?? uploadError;
   return (
     <div className="min-w-0" data-setting-id="builder.video">
-      {tag && <span className="mb-0.5 block text-[11px] text-muted-foreground">{tag}</span>}
+      {tag && <span className="mb-0.5 block text-xs text-muted-foreground">{tag}</span>}
       <div className="flex items-center gap-2">
         {value ? (
           <video
@@ -112,7 +112,7 @@ export function VideoField({
             {uploading ? t('videoUploading') : value ? t('changeVideo') : t('chooseVideo')}
           </button>
           {value && bytes !== null && (
-            <span className="text-[11px] text-muted-foreground" data-testid="video-size">
+            <span className="text-xs text-muted-foreground" data-testid="video-size">
               {t('videoSize', { size: formatMegabytes(bytes) })}
             </span>
           )}
@@ -143,11 +143,9 @@ export function VideoField({
           void pick(f);
         }}
       />
-      {!value && !message && (
-        <p className="mt-1 text-[11px] text-muted-foreground">{t('videoHint')}</p>
-      )}
+      {!value && !message && <p className="mt-1 text-xs text-muted-foreground">{t('videoHint')}</p>}
       {message && (
-        <p role="alert" className="mt-1 text-[11px] text-destructive-ink">
+        <p role="alert" className="mt-1 text-xs text-destructive-ink">
           {message}
         </p>
       )}

@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PageState } from '../../../../components/PageState';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet } from '../../../../lib/api';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
@@ -90,6 +91,7 @@ export default function AiUsagePage() {
     async (p: number) => {
       if (!isAuthenticated || !storeId) return;
       setLogError(false);
+      setLogLoading(true);
       try {
         // apiGet already unwraps the API's `{ success, data }` envelope, so
         // `data` IS the LogData object — reading `data?.data` double-
@@ -199,53 +201,48 @@ export default function AiUsagePage() {
           <h2 className="text-base font-semibold text-foreground">{t('table.title')}</h2>
         </div>
 
-        {logLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : logError || !log || log.rows.length === 0 ? (
-          <div className="px-6 py-8 text-center">
-            {logError ? (
-              <p className="text-sm text-destructive-ink">{t('table.loadError')}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">{t('table.empty')}</p>
-            )}
-          </div>
-        ) : (
-          <>
-            <DataTable<UsageRow>
-              ariaLabel={t('table.title')}
-              columns={columns}
-              rows={log.rows}
-              rowKey={row => row.id}
-            />
+        <PageState
+          loading={logLoading}
+          error={logError ? t('table.loadError') : null}
+          onRetry={() => void fetchLog(page)}
+          empty={!log || log.rows.length === 0 ? { title: t('table.empty') } : null}
+        >
+          {log && (
+            <>
+              <DataTable<UsageRow>
+                ariaLabel={t('table.title')}
+                columns={columns}
+                rows={log.rows}
+                rowKey={row => row.id}
+              />
 
-            {/* Pagination */}
-            {log.pages > 1 && (
-              <div className="flex items-center justify-between border-t px-6 py-3">
-                <button
-                  type="button"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
-                >
-                  {t('table.prevPage')}
-                </button>
-                <span className="text-xs text-muted-foreground">
-                  {t('table.pageInfo', { page: log.page, pages: log.pages })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage(p => Math.min(log.pages, p + 1))}
-                  disabled={page >= log.pages}
-                  className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
-                >
-                  {t('table.nextPage')}
-                </button>
-              </div>
-            )}
-          </>
-        )}
+              {/* Pagination */}
+              {log.pages > 1 && (
+                <div className="flex items-center justify-between border-t px-6 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    {t('table.prevPage')}
+                  </button>
+                  <span className="text-xs text-muted-foreground">
+                    {t('table.pageInfo', { page: log.page, pages: log.pages })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(p => Math.min(log.pages, p + 1))}
+                    disabled={page >= log.pages}
+                    className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    {t('table.nextPage')}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </PageState>
       </div>
     </AdminLayout>
   );

@@ -175,6 +175,7 @@ export function AdminLayout({
     expenses: t('hubTabs.expenses'),
     reports: t('hubTabs.reports'),
     bankRec: t('hubTabs.bankRec'),
+    accountantGroup: t('hubTabs.accountantGroup'),
     // Analytics tabs (Overview = legacy /analytics; rest = ex-/insights)
     analyticsOverview: t('hubTabs.analyticsOverview'),
     insightsDashboard: t('hubTabs.insightsDashboard'),

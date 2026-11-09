@@ -163,11 +163,11 @@ export default function AffiliateEventsPage() {
         setAffiliate(data.affiliate ?? null);
       }
     } catch {
-      setError('Failed to load events');
+      setError(t('eventsLoadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [storeId, affiliateId]);
+  }, [storeId, affiliateId, t]);
 
   useEffect(() => {
     fetchEvents();

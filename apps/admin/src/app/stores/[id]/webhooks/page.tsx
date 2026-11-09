@@ -8,6 +8,8 @@ import { WEBHOOK_EVENT_TYPES, withNumerals, type WebhookEventType } from '@ebda/
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { planNamesJoined } from '@/lib/plan-labels';
 
 /**
  * Merchant outgoing webhooks: endpoints, the once-only signing secret, the delivery log with
@@ -53,6 +55,8 @@ export default function WebhooksPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('webhooks');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
+  const plans = planNamesJoined(['growth', 'business'], locale);
   const { success: toastSuccess, error: toastError } = useToast();
   const base = `/api/v1/stores/${storeId}/webhooks`;
 
@@ -76,7 +80,7 @@ export default function WebhooksPage() {
   const errText = useCallback(
     (e: ApiError) =>
       e.status === 402
-        ? t('plan.title')
+        ? t('plan.title', { plans })
         : e.code === 'WEBHOOK_URL_REJECTED' || e.code === 'WEBHOOK_LIMIT'
           ? t(`error.${e.code}`)
           : e.message,
@@ -251,7 +255,7 @@ export default function WebhooksPage() {
         {needsUpgrade ? (
           <div className="rounded-lg border bg-card p-4">
             <h2 className="text-sm font-semibold text-foreground" dir="auto">
-              {t('plan.title')}
+              {t('plan.title', { plans })}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground" dir="auto">
               {t('plan.body')}
@@ -308,7 +312,7 @@ export default function WebhooksPage() {
                 ) : null}
                 {!ep.active && ep.disabledReason === 'consecutive_failures' ? (
                   <p
-                    className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                    className="rounded-lg border border-warning/40 bg-warning/10 p-2 text-xs text-warning-ink"
                     dir="auto"
                   >
                     {t('status.autoOff')}
@@ -321,7 +325,7 @@ export default function WebhooksPage() {
                     </span>
                   ))}
                 </div>
-                <p className="text-[11px] text-muted-foreground" dir="auto">
+                <p className="text-xs text-muted-foreground" dir="auto">
                   {t('table.lastSuccess')}: {fmt(ep.lastSuccessAt)}
                   {ep.consecutiveFailures > 0
                     ? ` · ${t('status.failures', { count: String(ep.consecutiveFailures) })}`
@@ -414,7 +418,7 @@ export default function WebhooksPage() {
               dir="ltr"
               inputMode="url"
             />
-            <span className="mt-1 block text-[11px] font-normal text-muted-foreground">
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">
               {t('form.urlHelp')}
             </span>
           </label>
@@ -496,7 +500,7 @@ export default function WebhooksPage() {
       >
         <div className="space-y-3">
           <p
-            className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+            className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs leading-relaxed text-warning-ink"
             dir="auto"
           >
             {t('secret.warning')}
@@ -634,7 +638,7 @@ export default function WebhooksPage() {
                 </p>
                 {d.responseSnippet ? (
                   <code
-                    className="mt-1 block font-mono text-[11px] break-all text-muted-foreground"
+                    className="mt-1 block font-mono text-xs break-all text-muted-foreground"
                     dir="ltr"
                   >
                     {d.responseSnippet}

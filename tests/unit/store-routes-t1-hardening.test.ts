@@ -71,7 +71,10 @@ const svc = vi.hoisted(() => ({
   setStatus: vi.fn(),
   updateTemplate: vi.fn(),
 }));
-vi.mock('@api/services/store.service', () => ({ StoreService: svc }));
+vi.mock('@api/services/store.service', () => ({
+  StoreService: svc,
+  applySocialLinksPatch: vi.fn(),
+}));
 vi.mock('@api/services/domain-provider', () => ({
   resolveDomainService: vi.fn(() => ({ isConfigured: () => false })),
 }));
@@ -177,10 +180,8 @@ describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
       blogEnabled: true,
     });
     expect(parts.theme).toBeUndefined(); // untouched parts are not written
-    // social merges over the STORED links (the service passes them in), keeping the key the body omitted
-    expect(
-      parts.social({ facebook: 'https://f.b/x', instagram: 'https://old.example/i' })
-    ).toMatchObject({ facebook: 'https://f.b/x', instagram: 'https://instagram.com/x' });
+    // social is a KEY patch (set what was sent), so a key the body omitted is never touched (BE:F-3: the DO merges it atomically)
+    expect(parts.social).toEqual({ set: { instagram: 'https://instagram.com/x' }, remove: [] });
   });
 
   it('a failing bundle is one error response', async () => {

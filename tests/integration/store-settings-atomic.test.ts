@@ -114,8 +114,12 @@ describe.skipIf(!hasDb)('the branding bundle is one transaction', () => {
         StoreService.updateBrandingBundle(fx.storeId, {
           branding: { name: `Renamed ${run}` },
           contact: { email: `bundle-${run}@example.com` },
-          social: () => {
-            throw new Error('boom');
+          // the social part is a key patch now; a throwing `remove` fails it after branding + contact were written
+          social: {
+            set: {},
+            get remove(): string[] {
+              throw new Error('boom');
+            },
           },
         })
       )

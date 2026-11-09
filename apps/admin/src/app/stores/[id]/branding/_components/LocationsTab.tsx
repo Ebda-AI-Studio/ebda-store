@@ -265,7 +265,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
       cell: loc => (
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
-            loc.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+            loc.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-warning/10 text-warning-ink'
           }`}
         >
           {loc.isPublished ? t('statusPublished') : t('statusDraft')}
@@ -384,9 +384,9 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
       {/* Locations not enabled callout */}
       {store && !isEnabled && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
-          <p className="font-semibold text-amber-900">{t('disabledTitle')}</p>
-          <p className="mt-1 text-amber-800">{t('disabledDescription')}</p>
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
+          <p className="font-semibold text-warning-ink">{t('disabledTitle')}</p>
+          <p className="mt-1 text-warning-ink">{t('disabledDescription')}</p>
         </div>
       )}
 

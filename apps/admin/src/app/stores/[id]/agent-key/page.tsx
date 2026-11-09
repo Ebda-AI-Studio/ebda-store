@@ -168,7 +168,7 @@ export default function AgentKeyPage() {
       >
         <div className="space-y-3">
           <p
-            className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+            className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs leading-relaxed text-warning-ink"
             dir="auto"
           >
             {t('reveal.warning')}

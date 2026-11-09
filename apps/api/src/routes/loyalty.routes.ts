@@ -340,6 +340,7 @@ publicRouter.get(
   '/:storeId/loyalty/my-points',
   authenticate,
   requireCustomerStoreMatch,
+  requireFeature('loyalty'), // BE:S-29
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

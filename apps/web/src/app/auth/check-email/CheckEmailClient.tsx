@@ -1,14 +1,26 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from '../../../components/StoreLink';
 import { Button } from '@ebda/ui';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import ResendVerification, {
+  PENDING_VERIFICATION_EMAIL_KEY,
+} from '../../../components/ResendVerification';
 
 export default function CheckEmailClient() {
   const storeUrl = useStoreUrl();
   const { t } = useLanguage();
+  const [email, setEmail] = useState('');
+  useEffect(() => {
+    try {
+      setEmail(sessionStorage.getItem(PENDING_VERIFICATION_EMAIL_KEY) ?? '');
+    } catch {
+      /* storage blocked: ResendVerification asks for the address */
+    }
+  }, []);
 
   return (
     <MinimalChrome>
@@ -49,6 +61,8 @@ export default function CheckEmailClient() {
               'لو بريدك متسجل قبل كده، هنبعتلك على بريدك عشان تسجّل دخول أو تغيّر كلمة المرور.'
             )}
           </p>
+
+          <ResendVerification email={email} />
 
           <div className="flex flex-col gap-3">
             <Link href={storeUrl('/auth/login')}>

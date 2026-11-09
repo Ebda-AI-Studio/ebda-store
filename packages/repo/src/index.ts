@@ -42,7 +42,14 @@ export {
   type DoMutation,
   type WriteOp,
 } from './rpc/writes';
-export { applyStoreSettings, bootstrapStoreRows, readStoreRecord } from './rpc/settings';
+export {
+  applyStoreSettings,
+  bootstrapStoreRows,
+  patchStoreSettings,
+  readStoreRecord,
+  PATCHABLE_JSON_FIELDS,
+  type JsonKeyPatch,
+} from './rpc/settings';
 export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } from './do/stock-ops';
 export { answerStockOp, type StockAnswer } from './rpc/stock';
 export { runMoneyOp, ensureMoneyOpsSchema, MONEY_OP_NAMES, type MoneyOpName } from './do/money-ops';

@@ -157,7 +157,7 @@ export function SectionDividersBlock({
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t('dividers.title')}
       </p>
-      <p className="mb-3 text-[11px] text-muted-foreground/80">{t('dividers.hint')}</p>
+      <p className="mb-3 text-xs text-muted-foreground/80">{t('dividers.hint')}</p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {(!availableSlots || availableSlots.includes('above')) && (
           <RowToggle

@@ -79,7 +79,7 @@ export function TaxRateFormModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-2">
               {t('name.label')} <span className="text-destructive-ink">*</span>

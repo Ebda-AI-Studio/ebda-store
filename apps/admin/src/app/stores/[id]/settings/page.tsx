@@ -116,17 +116,19 @@ export default function StoreSettingsPage() {
       status: newStatus,
     });
     if (apiErr) {
-      toastError('Status change failed', apiErr.message);
+      toastError(t('superadmin.statusChangeFailed'), apiErr.message);
     } else {
       toastSuccess(
-        newStatus === 'suspended' ? 'Store suspended' : 'Store reactivated',
-        `${storeInfo.name} is now ${newStatus}.`
+        newStatus === 'suspended' ? t('superadmin.suspended') : t('superadmin.reactivated'),
+        newStatus === 'suspended'
+          ? t('superadmin.suspendedBody', { name: storeInfo.name })
+          : t('superadmin.reactivatedBody', { name: storeInfo.name })
       );
       await fetchStore();
     }
     setStatusChanging(false);
     setSuspendModalOpen(false);
-  }, [storeInfo, storeId, fetchStore, toastSuccess, toastError]);
+  }, [storeInfo, storeId, fetchStore, toastSuccess, toastError, t]);
 
   const handlePlanChange = useCallback(async () => {
     if (!pendingPlan) return;
@@ -135,9 +137,12 @@ export default function StoreSettingsPage() {
       plan: pendingPlan,
     });
     if (apiErr) {
-      toastError('Plan change failed', apiErr.message);
+      toastError(t('superadmin.planChangeFailed'), apiErr.message);
     } else {
-      toastSuccess('Plan updated', `Store plan changed to ${PLAN_LABELS[pendingPlan].en}.`);
+      toastSuccess(
+        t('superadmin.planUpdated'),
+        t('superadmin.planUpdatedBody', { plan: PLAN_LABELS[pendingPlan].en })
+      );
       // A plan change moves the feature baseline — refresh the store-wide
       // flags so the Settings cards and sidebar reflect it without a reload.
       await Promise.all([fetchStore(), refreshFeatures()]);
@@ -145,7 +150,7 @@ export default function StoreSettingsPage() {
     setPlanChanging(false);
     setPlanModalOpen(false);
     setPendingPlan(null);
-  }, [pendingPlan, storeId, fetchStore, refreshFeatures, toastSuccess, toastError]);
+  }, [pendingPlan, storeId, fetchStore, refreshFeatures, toastSuccess, toastError, t]);
 
   const cards: SettingsCard[] = [
     {
@@ -341,7 +346,7 @@ export default function StoreSettingsPage() {
     },
     {
       key: 'template',
-      href: `/stores/${storeId}/template`,
+      href: `/stores/${storeId}/builder`,
       color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

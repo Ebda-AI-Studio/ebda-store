@@ -210,7 +210,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
                     height={48}
                     className="w-12 h-12 rounded-lg object-contain bg-muted border mx-auto"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">192×192</p>
+                  <p className="text-xs text-muted-foreground mt-1">192×192</p>
                 </div>
               )}
               {settings.iconAppleTouch && (
@@ -222,7 +222,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
                     height={45}
                     className="w-[45px] h-[45px] rounded-lg object-contain bg-muted border mx-auto"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">180×180</p>
+                  <p className="text-xs text-muted-foreground mt-1">180×180</p>
                 </div>
               )}
               {settings.favicon32 && (
@@ -234,7 +234,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
                     height={32}
                     className="w-8 h-8 rounded object-contain bg-muted border mx-auto"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">32×32</p>
+                  <p className="text-xs text-muted-foreground mt-1">32×32</p>
                 </div>
               )}
             </div>

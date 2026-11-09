@@ -69,3 +69,13 @@ describe('hubs', () => {
     }
   });
 });
+
+describe('finance hub accountant group (UX:FN-2)', () => {
+  it('the ledger tabs open under a named group label, not a bare divider', () => {
+    const finance = HUBS.find(h => h.key === 'finance')!;
+    const tabs = finance.buildTabs('s1', labels);
+    const accounts = tabs.find(t => t.href.endsWith('/finance/accounts'))!;
+    expect(accounts.groupStart).toBe(true);
+    expect(accounts.groupLabel).toBe('accountantGroup');
+  });
+});

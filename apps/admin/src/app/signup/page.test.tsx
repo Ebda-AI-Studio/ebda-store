@@ -260,7 +260,7 @@ describe('signup plan hand-off from the marketing site', () => {
     render(<SignupPage />);
     const chip = await screen.findByTestId('selected-plan');
     expect(chip.textContent).toBe(
-      'onboarding.signup.plan.chip:{"plan":"Business","interval":"onboarding.signup.plan.yearly"}'
+      'onboarding.signup.plan.chip:{"plan":"Business","interval":"onboarding.signup.plan.yearly","trialPlan":"Growth"}'
     );
     expect(JSON.parse(window.localStorage.getItem('ebda.signup.plan')!)).toEqual({
       planCode: 'business',
