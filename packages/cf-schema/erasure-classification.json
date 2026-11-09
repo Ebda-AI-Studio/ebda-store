@@ -1262,8 +1262,15 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": "seller_legal_name is the SELLER (the company issuing the invoice), not a person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column.",
-    "reviewedNotPii": ["seller_legal_name"]
+    "note": "Money record, kept (tax law: an invoice and its ETA fields are retained, FOLD-VAT). seller_legal_name / seller_tax_id are the SELLER (the company issuing the invoice), not a person. eta_uuid, eta_long_id, eta_hash and eta_rejection_reason are ETA document identifiers / ETA text, no person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column.",
+    "reviewedNotPii": [
+      "seller_legal_name",
+      "seller_tax_id",
+      "eta_uuid",
+      "eta_long_id",
+      "eta_hash",
+      "eta_rejection_reason"
+    ]
   },
   "d1:instapay_receipts": {
     "db": "d1",

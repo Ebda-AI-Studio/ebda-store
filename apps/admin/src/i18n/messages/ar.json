@@ -9482,6 +9482,7 @@
       "amount": "المبلغ",
       "status": "الحالة",
       "reference": "مرجع بوابة الدفع",
+      "eta": "الفاتورة الإلكترونية (مصلحة الضرائب)",
       "failure": "سبب الفشل",
       "action": "إجراء"
     },
@@ -9638,6 +9639,16 @@
       "close": "إغلاق"
     },
     "vatLine": "شامل ضريبة القيمة المضافة {rate}% {vat} · الرقم الضريبي {trn}",
+    "vatBreakdown": "الصافي {net} · الضريبة {vat} · الإجمالي {gross}",
+    "buyerTaxId": "الرقم الضريبي للمشتري {id}",
+    "etaStatuses": {
+      "not_submitted": "لم تُرسل",
+      "submitted": "أُرسلت",
+      "accepted": "مقبولة",
+      "rejected": "مرفوضة"
+    },
+    "etaSubmittedAt": "أُرسلت {date}",
+    "etaRejected": "سبب الرفض من المصلحة: {reason}",
     "recordRefund": "سجّل استرداد / إلغاء",
     "manualRefund": {
       "title": "سجّل استرداد أو إلغاء لمتجر {store}",

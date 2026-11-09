@@ -53,6 +53,16 @@ interface LedgerRow {
   /** Ebda VAT inside amountMinor (0 = none) + snapshot with Ebda's TRN. */
   vatMinor?: number;
   vat?: { rateBps: number; trn: string | null } | null;
+  /** FOLD-VAT: D1 tax / ETA columns; null for a row read off the old store. All empty while Ebda VAT is off. */
+  tax?: {
+    netMinor: number;
+    grossMinor: number;
+    vatRateBp: number;
+    buyerTaxId: string | null;
+    etaStatus: 'not_submitted' | 'submitted' | 'accepted' | 'rejected';
+    etaSubmittedAt: string | null;
+    etaRejectionReason: string | null;
+  } | null;
 }
 
 const STATUS_FILTERS = ['', 'pending', 'succeeded', 'failed', 'refunded'] as const;
@@ -181,8 +191,55 @@ function LedgerPanel({
               })}
             </span>
           )}
+          {r.tax && r.vat && (r.vatMinor ?? 0) > 0 && (
+            <span className="block text-xs text-muted-foreground">
+              {t('vatBreakdown', {
+                net: formatMoney(r.tax.netMinor, locale, { fixedDecimals: true }),
+                vat: formatMoney(r.vatMinor ?? 0, locale, { fixedDecimals: true }),
+                gross: formatMoney(r.tax.grossMinor, locale, { fixedDecimals: true }),
+              })}
+              {r.tax.buyerTaxId ? ` · ${t('buyerTaxId', { id: r.tax.buyerTaxId })}` : ''}
+            </span>
+          )}
         </span>
       ),
+    },
+    {
+      header: t('columns.eta'),
+      hideOnMobile: true,
+      cell: r => {
+        // Empty while Ebda VAT is off: nothing is submitted, so nothing to show.
+        if (!r.tax || (r.tax.etaStatus === 'not_submitted' && (r.vatMinor ?? 0) === 0)) return '';
+        return (
+          <span className="block max-w-[200px] text-xs">
+            <Badge
+              variant={
+                r.tax.etaStatus === 'accepted'
+                  ? 'success'
+                  : r.tax.etaStatus === 'rejected'
+                    ? 'destructive'
+                    : r.tax.etaStatus === 'submitted'
+                      ? 'warning'
+                      : 'default'
+              }
+            >
+              {t(`etaStatuses.${r.tax.etaStatus}`)}
+            </Badge>
+            {r.tax.etaSubmittedAt && (
+              <span className="block text-muted-foreground">
+                {t('etaSubmittedAt', {
+                  date: new Date(r.tax.etaSubmittedAt).toLocaleDateString(locale),
+                })}
+              </span>
+            )}
+            {r.tax.etaRejectionReason && (
+              <span className="block text-destructive-ink" title={r.tax.etaRejectionReason}>
+                {t('etaRejected', { reason: r.tax.etaRejectionReason })}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       header: t('columns.status'),
