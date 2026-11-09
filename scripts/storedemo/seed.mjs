@@ -413,7 +413,7 @@ export function assetBase(argv, env, spec = TEMPLATE_SPECS.qamar) {
 }
 /** The hero clip URL, or null when the base cannot carry one (a video must be https or relative). */
 export function videoUrl(base) {
-  const u = `${base}/hero.mp4`;
+  const u = `${base}/hero-1080.mp4`;
   return u.startsWith('https://') || u.startsWith('/') ? u : null;
 }
 

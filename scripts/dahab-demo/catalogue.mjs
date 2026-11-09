@@ -578,7 +578,11 @@ export const DAHAB_PRODUCTS = [
 ];
 
 /** Every photo file the catalogue names (products, categories); the three heroes are listed below. */
-export const DAHAB_HERO_FILES = ['hero-worn.webp', 'hero-workshop.webp', 'hero-giftbox.webp'];
+export const DAHAB_HERO_FILES = [
+  'hero-worn-2k.webp',
+  'hero-workshop-2k.webp',
+  'hero-giftbox-2k.webp',
+];
 export const DAHAB_IMAGE_FILES = [
   ...new Set([
     ...DAHAB_PRODUCTS.flatMap(p => p.images),

@@ -242,7 +242,7 @@ export function DahabHeroSlider({
             onClick={() => setIndex(i)}
             aria-label={t(`Show slide ${i + 1}`, `عرض الشريحة ${i + 1}`)}
             aria-current={i === index}
-            className="pointer-events-auto flex h-11 w-9 items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="pointer-events-auto flex h-11 w-11 items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span
               className={cx(

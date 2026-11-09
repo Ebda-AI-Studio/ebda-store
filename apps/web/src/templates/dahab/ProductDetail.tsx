@@ -453,7 +453,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                   type="button"
                   onClick={() => p.setQuantity(Math.max(p.minQuantity ?? 1, p.quantity - 1))}
                   aria-label={t('Decrease quantity', 'تقليل الكمية')}
-                  className="flex h-12 w-11 items-center justify-center max-lg:w-9 text-foreground/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-12 w-11 items-center justify-center text-foreground/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <MinusIcon className="h-4 w-4" />
                 </button>
@@ -464,7 +464,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                   type="button"
                   onClick={() => p.setQuantity(Math.min(p.maxQuantity, p.quantity + 1))}
                   aria-label={t('Increase quantity', 'زيادة الكمية')}
-                  className="flex h-12 w-11 items-center justify-center max-lg:w-9 text-foreground/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-12 w-11 items-center justify-center text-foreground/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <PlusIcon className="h-4 w-4" />
                 </button>
