@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import lastmod from '../../apps/marketing/src/lib/page-lastmod.json';
 import sitemap from '../../apps/marketing/src/app/sitemap';
 import { DATED_PAGES, pageHash } from '../../apps/marketing/src/lib/page-markup';
-import { LEGAL_EXTRA_SLUGS, LEGAL_SLUGS, SITE_PAGES } from '../../apps/marketing/src/lib/site';
+import {
+  LEGAL_EXTRA_SLUGS,
+  LEGAL_SLUGS,
+  SERVICE_PAGES,
+  SITE_PAGES,
+} from '../../apps/marketing/src/lib/site';
 
 /**
  * Sitemap <lastmod> is real: each dated page's recorded date belongs to a hash of its rendered markup (both
@@ -15,6 +20,8 @@ describe('sitemap lastmod is tied to the rendered page', () => {
     const want = SITE_PAGES.filter(
       p => !([...LEGAL_SLUGS, ...LEGAL_EXTRA_SLUGS] as readonly string[]).includes(p)
     ).map(p => p || 'home');
+    // the service-line pages are dated even while unpublished (SERVICES-IA-1): going live needs no lastmod re-run
+    for (const p of SERVICE_PAGES) if (!want.includes(p)) want.push(p);
     expect(Object.keys(REG).sort()).toEqual([...want].sort());
     expect(DATED_PAGES.map(p => p || 'home').sort()).toEqual([...want].sort());
   });

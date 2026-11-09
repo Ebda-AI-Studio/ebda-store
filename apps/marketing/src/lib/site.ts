@@ -1,4 +1,5 @@
 import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { serviceLinesPublished } from './service-lines';
 
 export type Locale = 'ar' | 'en';
 export const LOCALES: readonly Locale[] = ['ar', 'en'] as const;
@@ -65,8 +66,16 @@ export type ForSlug = (typeof FOR_SLUGS)[number];
 export type ForPage = `for/${ForSlug}`;
 export const FOR_PAGES: readonly ForPage[] = FOR_SLUGS.map(s => `for/${s}` as const);
 export type ComparePage = `compare/${CompareSlug}`;
+/** The Services index and the three service-line pages (Ruling SERVICES-IA-1). They are in SITE_PAGES (so the sitemap) only when published (lib/service-lines.ts). */
+export type ServiceLinePage = `services/${'marketing' | 'design' | 'events'}`;
+export const SERVICE_PAGES: readonly (ServiceLinePage | 'services')[] = [
+  'services',
+  ...BRAND.serviceLines.map(l => `services/${l.id}` as const),
+];
 export type PageSlug =
   | ''
+  | 'services'
+  | ServiceLinePage
   | 'about'
   | 'contact'
   | 'credits'
@@ -91,6 +100,7 @@ export const SITE_PAGES = [
   'whatsapp',
   ...COMPARE_PAGES,
   ...FOR_PAGES,
+  ...(serviceLinesPublished() ? SERVICE_PAGES : []),
   'about',
   'contact',
   'credits',

@@ -50,7 +50,14 @@ function validate(v: Record<Field, string | boolean>): Errors {
  * API redirects back to `/contact/#sent` or `#send-failed` (static panels shown with `:target`). With JavaScript it
  * validates, posts JSON, and shows the result in place (role=status), moving focus to the first error or the result.
  */
-export function ContactForm({ locale }: { locale: Locale }) {
+export function ContactForm({
+  locale,
+  lineTopics = false,
+}: {
+  locale: Locale;
+  /** List the service-line topics (marketing, design, events) and `products`: only when the lines are built (lib/service-lines.ts, SERVICES-IA-1). The API accepts them always. */
+  lineTopics?: boolean;
+}) {
   const f = CONTACT_FORM_COPY[locale];
   const uid = useId();
   const id = (k: string) => `${uid}-${k}`;
@@ -65,6 +72,11 @@ export function ContactForm({ locale }: { locale: Locale }) {
   useEffect(() => {
     openedAt.current = Date.now();
     setHydrated(true);
+    // `?topic=` (the service-line and coming-soon CTAs) preselects a topic that is actually listed
+    const want = new URLSearchParams(window.location.search).get('topic');
+    const sel = formRef.current?.querySelector<HTMLSelectElement>('select[name="topic"]');
+    if (want && sel && [...sel.options].some(o => o.value === want && !o.disabled))
+      sel.value = want;
   }, []);
   useEffect(() => {
     if (status === 'sent') sentRef.current?.focus();
@@ -74,7 +86,12 @@ export function ContactForm({ locale }: { locale: Locale }) {
   const support: readonly ContactTopicId[] = CONTACT_TOPIC_IDS.filter(
     t => t === 'store-support' || t === 'chat-support'
   );
-  const services = CONTACT_TOPIC_IDS.filter(t => !support.includes(t) && t !== 'other');
+  const lineIds = BRAND.serviceLines.map(l => l.id as ContactTopicId);
+  const core = CONTACT_TOPIC_IDS.filter(
+    t => !support.includes(t) && t !== 'other' && t !== 'products' && !lineIds.includes(t)
+  );
+  const services = lineTopics ? [...core, ...lineIds] : core;
+  const showProducts = lineTopics;
 
   function focusFirst(e: Errors) {
     const first = REQUIRED_ORDER.concat(['company']).find(k => e[k]);
@@ -280,6 +297,7 @@ export function ContactForm({ locale }: { locale: Locale }) {
                   </option>
                 ))}
               </optgroup>
+              {showProducts && <option value="products">{label('products')}</option>}
               <option value="other">{label('other')}</option>
             </select>
             {err('topic')}

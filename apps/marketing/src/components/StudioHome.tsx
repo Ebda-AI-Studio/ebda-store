@@ -5,6 +5,9 @@ import { STUDIO_HOME } from '../lib/studio-home';
 import { SIGNUP_URL, STORE_HOME, pagePath, type Locale } from '../lib/site';
 import { WHATSAPP_APP_URL } from '../lib/whatsapp-page';
 import { studioJsonLd } from '../lib/seo';
+import { comingSoonItems, comingSoonLabels } from '../lib/coming-soon';
+import { serviceLinesPublished } from '../lib/service-lines';
+import { HOME_SERVICES } from '../lib/services-page';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { ServicesGrid } from './ServicesGrid';
@@ -132,6 +135,24 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
           </div>
         </section>
 
+        {serviceLinesPublished() && (
+          <section className="sh-sec sh-ground" aria-labelledby="sh-ground-h" id="on-the-ground">
+            <div className="wrap sh-grid">
+              <h2 className="sh-label" id="sh-ground-h">
+                {HOME_SERVICES[locale].h}
+              </h2>
+              <div className="sh-body">
+                <p className="sh-statement">{HOME_SERVICES[locale].p}</p>
+                <p className="actions">
+                  <Link href={`${pagePath(locale, 'services')}/`} className="btn btn-ghost btn-lg">
+                    {HOME_SERVICES[locale].cta}
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="sh-sec" aria-labelledby="sh-products-h" id="products">
           <div className="wrap sh-grid">
             <h2 className="sh-label" id="sh-products-h">
@@ -166,6 +187,30 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                   </Link>
                 </p>
               </li>
+              {comingSoonItems(locale).map(it => (
+                <li key={it.id} className="sh-soon" data-coming-soon={it.id}>
+                  <h3>
+                    {it.name} <span className="sh-badge">{comingSoonLabels(locale).label}</span>
+                  </h3>
+                  <p>{it.blurb}</p>
+                  {it.facts.length > 0 && (
+                    <ul className="sh-facts">
+                      {it.facts.map(t => (
+                        <li key={t}>{t}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="actions">
+                    <Link
+                      href={`${pagePath(locale, 'contact')}/?topic=products#form`}
+                      className="btn btn-ghost"
+                    >
+                      {comingSoonLabels(locale).notify}
+                      <span className="sv-card-sr"> — {it.name}</span>
+                    </Link>
+                  </p>
+                </li>
+              ))}
             </ul>
           </div>
         </section>
