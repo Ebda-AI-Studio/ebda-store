@@ -8,7 +8,10 @@ const lines = (src: string, needle: RegExp) => src.split('\n').filter(l => needl
 
 describe('44px tap targets', () => {
   it('dahab cart drawer steppers are 44px', () => {
-    const l = lines(read('../dahab/CartDrawer.tsx'), /flex h-\d+ w-\d+ items-center justify-center text-foreground\/80/);
+    const l = lines(
+      read('../dahab/CartDrawer.tsx'),
+      /flex h-\d+ w-\d+ items-center justify-center text-foreground\/80/
+    );
     expect(l.length).toBe(2);
     for (const x of l) expect(x).toContain('h-11 w-11');
   });
@@ -21,7 +24,11 @@ describe('44px tap targets', () => {
     expect(read('../dahab/Hero.tsx')).toContain('pointer-events-auto flex h-11 w-11 items-center');
   });
   it('cart remove button and list-row actions are not under 44px', () => {
-    expect(read('../../app/cart/CartClient.tsx')).not.toMatch(/flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/);
-    expect(read('../../app/products/ProductListItem.tsx')).not.toMatch(/flex h-10 (w-10 )?items-center/);
+    expect(read('../../app/cart/CartClient.tsx')).not.toMatch(
+      /flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/
+    );
+    expect(read('../../app/products/ProductListItem.tsx')).not.toMatch(
+      /flex h-10 (w-10 )?items-center/
+    );
   });
 });
