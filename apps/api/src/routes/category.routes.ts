@@ -200,7 +200,7 @@ router.get(
 
       // BE:F-5 / QA P2-5: lazy, idempotent repair of a pre-fix default category (no Arabic name).
       if (await backfillDefaultCategoryNameAr(w, storeId, categories)) {
-        await invalidateCached(`public:categories:${storeId}`);
+        await invalidateStoreCategoriesCaches(storeId);
       }
 
       res.json({
