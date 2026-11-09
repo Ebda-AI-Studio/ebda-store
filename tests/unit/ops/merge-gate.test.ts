@@ -15,7 +15,6 @@ const REQ = [
   'Detect affected workspaces',
   'Repo guards',
   'Scan for leaked secrets',
-  'blast-radius',
 ];
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12';
 
@@ -28,7 +27,7 @@ type Check = {
 };
 const run = (
   checks: Check[],
-  over: { head?: string; mergeable?: string; want?: string; polls?: string } = {}
+  over: { head?: string; mergeable?: string; want?: string; polls?: string; derive?: boolean } = {}
 ) => {
   const dir = mkdtempSync(join(tmpdir(), 'mg-'));
   const view = join(dir, 'view.json');
@@ -62,7 +61,8 @@ const run = (
       env: {
         ...process.env,
         MERGE_GATE_VIEW_CMD: `cat ${view}`,
-        MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ),
+        // derive: the gate derives the list from the real workflows itself, as it does in production
+        ...(over.derive ? {} : { MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ) }),
         MERGE_GATE_MAX_WAIT_S: '1',
       },
       encoding: 'utf8',
@@ -76,7 +76,8 @@ const run = (
       env: {
         ...process.env,
         MERGE_GATE_VIEW_CMD: `cat ${view}`,
-        MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ),
+        // derive: the gate derives the list from the real workflows itself, as it does in production
+        ...(over.derive ? {} : { MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ) }),
         MERGE_GATE_MAX_WAIT_S: '1',
         MERGE_GATE_MERGE_CMD: `echo "$sha" > ${merged}`,
       },
@@ -120,12 +121,21 @@ describe('merge-gate.sh', () => {
     expect(r.merged).toBeNull();
   });
   it('a required check that is SKIPPED (no explicit SUCCESS) -> refuses', () => {
-    const r = run(
-      green.map(c => (c.name === 'blast-radius' ? { ...c, conclusion: 'SKIPPED' } : c))
-    );
+    const r = run(green.map(c => (c.name === 'Repo guards' ? { ...c, conclusion: 'SKIPPED' } : c)));
     expect(r.status).toBe(2);
     expect(r.merged).toBeNull();
-    expect(r.out).toContain('without an explicit SUCCESS: blast-radius');
+    expect(r.out).toContain('without an explicit SUCCESS: Repo guards');
+  });
+  it('a docs-only PR (the path-filtered blast-radius check never reports) -> merges on the derived list', () => {
+    expect(requiredChecks(WF)).not.toContain('blast-radius');
+    const r = run(green, { derive: true });
+    expect(r.status).toBe(0);
+    expect(r.merged).not.toBeNull();
+  });
+  it('blast-radius, when it does run and FAILS, still refuses (not required is not ignored)', () => {
+    const r = run([...green, { name: 'blast-radius', conclusion: 'FAILURE' }]);
+    expect(r.status).toBe(1);
+    expect(r.merged).toBeNull();
   });
   it('an OLD failed run of a check followed by a NEWER passing run of the same name -> merges (latest run wins)', () => {
     const r = run([
@@ -257,6 +267,31 @@ describe('merge-gate-required.mjs: the required list is derived, so it cannot dr
     const dir = mkdtempSync(join(tmpdir(), 'wf-'));
     writeFileSync(join(dir, 'x.yml'), wf);
     expect(requiredChecks(dir)).toEqual(['Always']);
+  });
+  it('a workflow whose pull_request trigger is path-filtered contributes nothing: a PR outside the filter never gets its check', () => {
+    for (const filter of [
+      "    paths-ignore: ['docs/**', '*.md']",
+      "    paths:\n      - 'apps/**'",
+    ]) {
+      const wf = `on:\n  pull_request:\n    branches: [main]\n${filter}\n  workflow_dispatch:\njobs:\n  a:\n    name: Filtered\n`;
+      expect(parseWorkflow(wf).prPathFiltered).toBe(true);
+      const dir = mkdtempSync(join(tmpdir(), 'wf-'));
+      writeFileSync(join(dir, 'x.yml'), wf);
+      expect(requiredChecks(dir)).toEqual([]);
+    }
+  });
+  it('a path filter on push only does NOT drop the workflow: its jobs still run on every PR and stay required', () => {
+    const wf = `on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n    paths:\n      - 'apps/**'\njobs:\n  a:\n    name: EveryPr\n`;
+    expect(parseWorkflow(wf).prPathFiltered).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), 'wf-'));
+    writeFileSync(join(dir, 'x.yml'), wf);
+    expect(requiredChecks(dir)).toEqual(['EveryPr']);
+  });
+  it('the real blast-radius workflow is path-filtered on pull_request, the real ci workflow is not', () => {
+    expect(parseWorkflow(readFileSync(join(WF, 'blast-radius.yml'), 'utf8')).prPathFiltered).toBe(
+      true
+    );
+    expect(parseWorkflow(readFileSync(join(WF, 'ci.yml'), 'utf8')).prPathFiltered).toBe(false);
   });
   it('a workflow that does not run on pull_request contributes nothing', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wf-'));
