@@ -1,5 +1,5 @@
 /**
- * Home story (id=story), Ruling MKT-STORY-1: pinned, scrolled by progress (--p), compositor-only. Measured in Chrome:
+ * Store story (id=story on /store/, formerly the home page), Ruling MKT-STORY-1: pinned, scrolled by progress (--p), compositor-only. Measured in Chrome:
  * no long task (>50 ms) while scrolling, no frame over 34 ms, CLS 0, keyboard (space bar) scrolling drives it,
  * and reduced motion gets the static finished store.
  */
@@ -34,7 +34,7 @@ for (const { w, h } of SIZES) {
         })
       ).observe({ type: 'layout-shift', buffered: true });
     });
-    await page.goto('/', { waitUntil: 'load' });
+    await page.goto('/store/', { waitUntil: 'load' });
     // let hydration, fonts and the 3D viewer settle: page-load work is the page's, not the story's
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.waitForTimeout(3000);
@@ -94,7 +94,7 @@ for (const { w, h } of SIZES) {
 }
 
 test('story: the space bar scrolls it (native scroll, no hijack)', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'load' });
+  await page.goto('/store/', { waitUntil: 'load' });
   await page.waitForTimeout(1200);
   await page.evaluate(() => {
     const s = document.getElementById('story')!;
@@ -124,7 +124,7 @@ test('story: reduced motion shows the finished store in normal flow', async ({ b
     viewport: { width: 1280, height: 800 },
   });
   const page = await ctx.newPage();
-  await page.goto('/', { waitUntil: 'load' });
+  await page.goto('/store/', { waitUntil: 'load' });
   const s = await page.evaluate(() => {
     const el = document.getElementById('story')!;
     const cs = getComputedStyle(el);
@@ -153,7 +153,7 @@ test('story: without JavaScript there is no pinned dead scroll, just the finishe
     viewport: { width: 1280, height: 800 },
   });
   const page = await ctx.newPage();
-  await page.goto('/', { waitUntil: 'load' });
+  await page.goto('/store/', { waitUntil: 'load' });
   const s = await page.evaluate(() => {
     const el = document.getElementById('story')!;
     return {
@@ -174,7 +174,7 @@ test('story: without JavaScript there is no pinned dead scroll, just the finishe
 test('story glide: wheel ticks are smoothed (desktop), the page still ends where the wheel says', async ({
   page,
 }) => {
-  await page.goto('/', { waitUntil: 'load' });
+  await page.goto('/store/', { waitUntil: 'load' });
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(2000);
   await page.evaluate(() => {
