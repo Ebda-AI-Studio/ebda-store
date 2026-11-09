@@ -67,13 +67,17 @@ function tally<T>(kind: IoKind, start: () => T, label = ''): T {
 /** Props that must pass through untouched: thenable probing, RPC stub lifecycle, symbols. */
 const PASS = new Set<PropertyKey>(['then', 'constructor', 'dup', 'toJSON']);
 
-function wrapCalls<T extends object>(target: T, kind: IoKind): T {
+function wrapCalls<T extends object>(target: T, kind: IoKind, instance = ''): T {
   return new Proxy(target, {
     get(t, p) {
       const v = Reflect.get(t, p);
       if (typeof p === 'symbol' || PASS.has(p) || typeof v !== 'function') return v;
       return (...args: unknown[]) =>
-        tally(kind, () => Reflect.apply(v, t, args), `${String(p)}:${labelArgs(args)}`);
+        tally(
+          kind,
+          () => Reflect.apply(v, t, args),
+          `${instance ? `@${instance}:` : ''}${String(p)}:${labelArgs(args)}`
+        );
     },
   });
 }
@@ -90,15 +94,33 @@ function labelArgs(args: unknown[]): string {
     .join('|');
 }
 
-/** A Durable Object namespace whose stubs tally every method call (`fetch` included). */
+/**
+ * A Durable Object namespace whose stubs tally every method call (`fetch` included). The op label carries the instance NAME
+ * (`@shard-3:`, `@cachegen-s12:`) when the stub came from `idFromName` / `getByName`, so a test can see which instance a call hit.
+ */
 function wrapNamespace<T extends object>(ns: T, kind: IoKind): T {
+  const names = new WeakMap<object, string>();
   return new Proxy(ns, {
     get(t, p) {
       const v = Reflect.get(t, p);
+      if (p === 'idFromName' && typeof v === 'function') {
+        return (...args: unknown[]) => {
+          const id = Reflect.apply(v, t, args) as unknown;
+          if (id && typeof id === 'object') names.set(id, String(args[0]));
+          return id;
+        };
+      }
       if ((p === 'get' || p === 'getByName') && typeof v === 'function') {
         return (...args: unknown[]) => {
           const stub = Reflect.apply(v, t, args) as object;
-          return stub && typeof stub === 'object' ? wrapCalls(stub, kind) : stub;
+          const a0 = args[0];
+          const instance =
+            p === 'getByName'
+              ? String(a0)
+              : a0 && typeof a0 === 'object'
+                ? (names.get(a0) ?? '')
+                : '';
+          return stub && typeof stub === 'object' ? wrapCalls(stub, kind, instance) : stub;
         };
       }
       return typeof v === 'function' ? v.bind(t) : v;
