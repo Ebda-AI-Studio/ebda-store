@@ -315,6 +315,22 @@ interface PWASettingsResponse {
   settings: PWASettings;
 }
 
+/**
+ * The settings as the ADMIN form reads them: what is stored, with a default for every field the merchant left unset.
+ * Only for a settings read or a settings-write response. The public manifest never uses it (see `generateManifest`).
+ */
+function withReadDefaults(storeName: string, stored: Partial<PWASettings> | null): PWASettings {
+  const storedSettings = stored || {};
+  return {
+    ...DEFAULT_PWA_SETTINGS,
+    ...storedSettings,
+    // Use store name as default if not set
+    appName: storedSettings.appName || storeName,
+    shortName: storedSettings.shortName || storeName.substring(0, 12),
+    description: storedSettings.description || `Shop at ${storeName}`,
+  };
+}
+
 export class PWAService {
   /**
    * Get store PWA settings
@@ -335,19 +351,9 @@ export class PWAService {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    const storedSettings = (store.pwaSettings as Partial<PWASettings>) || {};
-    const settings: PWASettings = {
-      ...DEFAULT_PWA_SETTINGS,
-      ...storedSettings,
-      // Use store name as default if not set
-      appName: storedSettings.appName || store.name,
-      shortName: storedSettings.shortName || store.name.substring(0, 12),
-      description: storedSettings.description || `Shop at ${store.name}`,
-    };
-
     return {
       pwaEnabled: store.pwaEnabled,
-      settings,
+      settings: withReadDefaults(store.name, store.pwaSettings as Partial<PWASettings> | null),
     };
   }
 
@@ -370,23 +376,19 @@ export class PWAService {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    const currentSettings = {
-      ...DEFAULT_PWA_SETTINGS,
-      appName: existing.name,
-      shortName: existing.name.substring(0, 12),
-      description: `Shop at ${existing.name}`,
-      ...(existing.pwaSettings as Partial<PWASettings>),
-    };
-
-    const updatedSettings = data.settings
-      ? { ...currentSettings, ...data.settings }
-      : currentSettings;
+    // Only what was SENT is stored (Ruling PWA-MANIFEST-1). This used to merge DEFAULT_PWA_SETTINGS, the store name and
+    // `Shop at <name>` into the row on EVERY write, so turning the PWA on or uploading an icon saved a near-black theme
+    // colour and a generic description the merchant never chose, and the public manifest could no longer tell a saved
+    // value from an invented one. The defaults are applied where they are read (`withReadDefaults`), never persisted.
+    const stored = (existing.pwaSettings ?? {}) as Partial<PWASettings>;
 
     const updateArgs = {
       where: { id: storeId },
       data: {
         pwaEnabled: data.pwaEnabled,
-        pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
+        ...(data.settings
+          ? { pwaSettings: { ...stored, ...data.settings } as unknown as Prisma.InputJsonValue }
+          : {}),
       },
       select: {
         pwaEnabled: true,
@@ -398,7 +400,7 @@ export class PWAService {
       ? await storeUpdate(prisma, updateArgs)
       : await withStore(storeId, tx => storeUpdate(tx, updateArgs));
 
-    // Every write here can change what /public/:storeId/manifest.json and
+    // Every write here can change what /stores/public/:storeId/manifest.json and
     // the storefront's home-screen icon look like. The manifest route itself
     // has no Redis cache today (see generateManifest below — not behind
     // getCached), so the only stale-read surface is the Next.js storefront's
@@ -411,7 +413,7 @@ export class PWAService {
 
     return {
       pwaEnabled: store.pwaEnabled,
-      settings: store.pwaSettings as unknown as PWASettings,
+      settings: withReadDefaults(existing.name, store.pwaSettings as Partial<PWASettings> | null),
     };
   }
 
@@ -423,11 +425,7 @@ export class PWAService {
       withStoreRead(storeId, tx =>
         tx.store.findUnique({
           where: { id: storeId },
-          select: {
-            name: true,
-            nameAr: true,
-            pwaSettings: true,
-          },
+          select: { pwaSettings: true },
         })
       ),
       featureService.isFeatureEnabled(storeId, 'pwa'),
@@ -437,43 +435,36 @@ export class PWAService {
       return null;
     }
 
-    const settings = {
-      ...DEFAULT_PWA_SETTINGS,
-      appName: store.name,
-      shortName: store.name.substring(0, 12),
-      description: `Shop at ${store.name}`,
-      ...(store.pwaSettings as Partial<PWASettings>),
-    };
-
-    const manifest: Record<string, unknown> = {
-      name: settings.appName,
-      short_name: settings.shortName,
-      description: settings.description,
-      theme_color: settings.themeColor,
-      background_color: settings.backgroundColor,
-      display: settings.display,
-      orientation: settings.orientation,
-      start_url: settings.startUrl,
-      scope: '/',
-      icons: [],
-    };
-
-    // Arabic identity (#2194). The admin PWA tab authors appNameAr /
-    // shortNameAr / descriptionAr, but the manifest used to emit only the
-    // English fields, so an Arabic storefront's install prompt read English.
-    // Emitted as EXTRA members alongside the standard ones (a browser ignores
-    // unknown manifest members) rather than a `?lang=` variant, so the
-    // storefront's single `pwa:<storeId>`-tagged fetch serves both locales and
-    // updateSettings' tag bust still refreshes both at once. The storefront
-    // (apps/web/src/app/manifest.ts) picks them under the `ar` locale.
-    const authored = (store.pwaSettings ?? {}) as Partial<PWASettings>;
+    // ONLY what the merchant saved (Ruling PWA-MANIFEST-1). No default is filled in here: no store name, no
+    // `Shop at <name>` / `تسوق في <name>`, no default colour, display, orientation, start URL or scope. A member the
+    // merchant never saved is ABSENT, and the storefront (apps/web/src/app/manifest.ts) fills it with the same value
+    // its generic manifest uses, which knows the store's theme colour and its own description. So a store that never
+    // saved PWA settings answers `{}` here and keeps exactly the manifest it had before the per-store one applied.
+    const settings = (store.pwaSettings ?? {}) as Partial<PWASettings>;
     const clean = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-    const nameAr = clean(authored.appNameAr) ?? clean(store.nameAr);
-    if (nameAr) {
-      manifest.name_ar = nameAr;
-      manifest.short_name_ar = clean(authored.shortNameAr) ?? nameAr.substring(0, 12);
+
+    // Arabic identity (#2194). The admin PWA tab authors appNameAr / shortNameAr / descriptionAr. They are emitted as
+    // EXTRA members alongside the standard ones (a browser ignores unknown manifest members) rather than a `?lang=`
+    // variant, so the storefront's single `pwa:<storeId>`-tagged fetch serves both locales and updateSettings' tag
+    // bust still refreshes both at once. The storefront picks them under the `ar` locale, and falls back to the
+    // store's own Arabic name when they were never saved.
+    const members: Record<string, string | undefined> = {
+      name: clean(settings.appName),
+      short_name: clean(settings.shortName),
+      description: clean(settings.description),
+      name_ar: clean(settings.appNameAr),
+      short_name_ar: clean(settings.shortNameAr),
+      description_ar: clean(settings.descriptionAr),
+      theme_color: clean(settings.themeColor),
+      background_color: clean(settings.backgroundColor),
+      display: clean(settings.display),
+      orientation: clean(settings.orientation),
+      start_url: clean(settings.startUrl),
+    };
+    const manifest: Record<string, unknown> = {};
+    for (const [member, value] of Object.entries(members)) {
+      if (value !== undefined) manifest[member] = value;
     }
-    manifest.description_ar = clean(authored.descriptionAr) ?? `تسوق في ${nameAr ?? store.name}`;
 
     // Add icons if available.
     //
@@ -516,11 +507,11 @@ export class PWAService {
       });
     }
 
-    // No icon uploaded: an EMPTY list, and the storefront (apps/web/src/app/manifest.ts) serves its own (the store favicon,
-    // else its shipped `/icon-192.png` + `/icon-512.png`). This used to name `/icons/icon-192x192.png` and
+    // No icon uploaded: NO `icons` member, and the storefront (apps/web/src/app/manifest.ts) serves its own (the store
+    // favicon, else its shipped `/icon-192.png` + `/icon-512.png`). This used to name `/icons/icon-192x192.png` and
     // `/icons/icon-512x512.png`, two files no app ships (404 on the live storefront, measured 2026-11-10): the API cannot
     // know the storefront's static files.
-    manifest.icons = icons;
+    if (icons.length > 0) manifest.icons = icons;
 
     return manifest;
   }

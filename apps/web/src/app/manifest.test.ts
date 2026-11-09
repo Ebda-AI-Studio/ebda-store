@@ -326,3 +326,254 @@ describe('manifest — a failed, slow or invalid per-store manifest falls back t
     ]);
   });
 });
+
+// Ruling PWA-MANIFEST-1 (the alternative, taken 2026-11-10). The API emits only the PWA settings the merchant SAVED; the
+// storefront lays them over its generic manifest. So the per-store manifest applying for the first time changes nothing
+// for a store that saved nothing, and a merchant who saved one field changes exactly that field.
+describe('manifest — saved PWA settings are laid over the generic manifest (Ruling PWA-MANIFEST-1)', () => {
+  const okFetch = (body: unknown) =>
+    vi.fn(async () => ({ ok: true, json: async () => body })) as unknown as typeof fetch;
+  const noApi = () => vi.fn(async () => ({ ok: false })) as unknown as typeof fetch;
+  const shippedIcons = [
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+  ];
+  const httpsIcon = {
+    src: 'https://cdn.ebda.app/stores/store-1/icon-192.png',
+    sizes: '192x192',
+    type: 'image/png',
+  };
+  /** A store with its own description in both languages, a theme colour and a favicon. */
+  const richStore = () =>
+    makeStore({
+      description: 'Handmade leather, made in Cairo',
+      descriptionAr: 'جلد طبيعي صناعة يدوية في القاهرة',
+      theme: { primaryColor: '210 50% 40%' },
+      favicon: 'https://cdn.ebda.app/stores/store-1/favicon.png',
+    });
+
+  async function render(store: Record<string, unknown>, lang: string, fetchImpl: typeof fetch) {
+    storeRef.current = store;
+    cookieRef.lang = lang;
+    global.fetch = fetchImpl;
+    return manifest();
+  }
+
+  // What the generic branch answers today, typed out here and not read back from the code under test: a change to the
+  // generic manifest itself has to change this.
+  const genericToday = {
+    ar: {
+      name: 'وادي الجوز',
+      short_name: 'وادي الجوز',
+      description: 'تسوق في وادي الجوز',
+      start_url: '/',
+      display: 'standalone',
+      background_color: '#ffffff',
+      theme_color: '#B08D57',
+      icons: shippedIcons,
+    },
+    en: {
+      name: 'Demo Shop',
+      short_name: 'Demo Shop',
+      description: 'Shop at Demo Shop',
+      start_url: '/',
+      display: 'standalone',
+      background_color: '#ffffff',
+      theme_color: '#B08D57',
+      icons: shippedIcons,
+    },
+  };
+
+  describe('1. a store with NO saved settings (the API answers {}) keeps the generic manifest', () => {
+    it.each(['ar', 'en'] as const)('%s: deep-equal to the generic manifest', async lang => {
+      const withEmptyApi = await render(makeStore(), lang, okFetch({}));
+      expect(withEmptyApi).toStrictEqual(genericToday[lang]);
+      expect(withEmptyApi).not.toHaveProperty('scope');
+      expect(withEmptyApi).not.toHaveProperty('orientation');
+      // and it is the same object the no-API path answers
+      expect(withEmptyApi).toStrictEqual(await render(makeStore(), lang, noApi()));
+    });
+
+    it.each(['ar', 'en'] as const)(
+      '%s: a store with its own description, theme colour and favicon keeps all three',
+      async lang => {
+        const generic = await render(richStore(), lang, noApi());
+        expect(generic.description).toBe(
+          lang === 'ar' ? 'جلد طبيعي صناعة يدوية في القاهرة' : 'Handmade leather, made in Cairo'
+        );
+        expect(generic.theme_color).toBe('#336699');
+        expect(generic.icons?.map(icon => icon.src)).toEqual([
+          'https://cdn.ebda.app/stores/store-1/favicon.png',
+          'https://cdn.ebda.app/stores/store-1/favicon.png',
+        ]);
+        expect(await render(richStore(), lang, okFetch({}))).toStrictEqual(generic);
+      }
+    );
+
+    // The live demo store, as production serves it (measured 2026-11-10: no PWA settings saved, the template's own
+    // primary colour, its own description in both languages). Its manifest must not move when the per-store manifest
+    // starts applying.
+    it.each([
+      ['ar', 'قمر', 'بوتيك مصري توضيحي: عبايات وقفاطين وطرح وفساتين سهرة، متفصلة في مصر الجديدة.'],
+      [
+        'en',
+        'Qamar',
+        'An illustrative Egyptian boutique: abayas, kaftans, scarves and evening dresses, cut in Heliopolis.',
+      ],
+    ])(
+      '%s: a store shaped like Qamar keeps its name, description and #141414',
+      async (lang, name, description) => {
+        const qamar = () =>
+          makeStore({
+            name: 'Qamar',
+            nameAr: 'قمر',
+            description:
+              'An illustrative Egyptian boutique: abayas, kaftans, scarves and evening dresses, cut in Heliopolis.',
+            descriptionAr:
+              'بوتيك مصري توضيحي: عبايات وقفاطين وطرح وفساتين سهرة، متفصلة في مصر الجديدة.',
+            theme: { primaryColor: '0 0% 8%', showNewBadge: true },
+          });
+        expect(await render(qamar(), lang, okFetch({}))).toStrictEqual({
+          name,
+          short_name: name,
+          description,
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#ffffff',
+          theme_color: '#141414',
+          icons: shippedIcons,
+        });
+      }
+    );
+
+    it('blank strings from the API read as "not saved": still the generic manifest', async () => {
+      const blank = {
+        name: '',
+        short_name: '  ',
+        description: '',
+        name_ar: ' ',
+        description_ar: '',
+      };
+      for (const lang of ['ar', 'en'] as const) {
+        expect(await render(makeStore(), lang, okFetch(blank))).toStrictEqual(genericToday[lang]);
+      }
+    });
+  });
+
+  describe('2. partly saved: the saved member wins, every other member is the generic value', () => {
+    it.each([
+      ['name', { name: 'Merchant App' }, { name: 'Merchant App' }],
+      ['short_name', { short_name: 'Merchant' }, { short_name: 'Merchant' }],
+      ['description', { description: 'Our own words' }, { description: 'Our own words' }],
+      ['theme_color', { theme_color: '#123456' }, { theme_color: '#123456' }],
+      ['background_color', { background_color: '#fefefe' }, { background_color: '#fefefe' }],
+      ['display', { display: 'minimal-ui' }, { display: 'minimal-ui' }],
+      ['orientation', { orientation: 'portrait' }, { orientation: 'portrait' }],
+      ['start_url', { start_url: '/offers' }, { start_url: '/offers' }],
+      ['scope', { scope: '/' }, { scope: '/' }],
+      ['icons', { icons: [httpsIcon] }, { icons: [{ ...httpsIcon, purpose: undefined }] }],
+      // the Arabic members are for the Arabic storefront only
+      ['name_ar (ignored under en)', { name_ar: 'تطبيق التاجر' }, {}],
+      ['description_ar (ignored under en)', { description_ar: 'كلامنا إحنا' }, {}],
+    ])('en, only %s saved', async (_label, saved, expected) => {
+      const generic = await render(richStore(), 'en', noApi());
+      const result = await render(richStore(), 'en', okFetch(saved));
+      expect(result).toStrictEqual({ ...generic, ...expected });
+    });
+
+    it.each([
+      ['name_ar', { name_ar: 'تطبيق التاجر' }, { name: 'تطبيق التاجر' }],
+      ['short_name_ar', { short_name_ar: 'التاجر' }, { short_name: 'التاجر' }],
+      ['description_ar', { description_ar: 'كلامنا إحنا' }, { description: 'كلامنا إحنا' }],
+      ['theme_color', { theme_color: '#123456' }, { theme_color: '#123456' }],
+      // the store has an Arabic name: it beats a saved ENGLISH app name on the Arabic storefront
+      ['name (English, store has an Arabic name)', { name: 'Merchant App' }, {}],
+      ['short_name (English, store has an Arabic name)', { short_name: 'Merchant' }, {}],
+      // a saved English description never shows under ar: the store's own Arabic description does
+      ['description (English)', { description: 'Our own words' }, {}],
+    ])('ar, only %s saved', async (_label, saved, expected) => {
+      const generic = await render(richStore(), 'ar', noApi());
+      const result = await render(richStore(), 'ar', okFetch(saved));
+      expect(result).toStrictEqual({ ...generic, ...expected });
+    });
+
+    it('ar, a store with NO Arabic name: the saved English names are used, they are all there is', async () => {
+      const store = () => makeStore({ nameAr: undefined });
+      const generic = await render(store(), 'ar', noApi());
+      const result = await render(
+        store(),
+        'ar',
+        okFetch({ name: 'Merchant App', short_name: 'Merchant' })
+      );
+      expect(result).toStrictEqual({ ...generic, name: 'Merchant App', short_name: 'Merchant' });
+    });
+
+    // The API-manifest branch used to skip `pickMetaDescription` and answer "Shop at <name>" whenever no PWA
+    // description was saved, even for a store that wrote its own description.
+    it.each([
+      ['en', 'Handmade leather, made in Cairo'],
+      ['ar', 'جلد طبيعي صناعة يدوية في القاهرة'],
+    ])(
+      '%s: no PWA description saved → the store OWN description, never "Shop at"',
+      async (lang, own) => {
+        const result = await render(
+          richStore(),
+          lang,
+          okFetch({ name: 'Merchant App', name_ar: 'تطبيق التاجر', theme_color: '#123456' })
+        );
+        expect(result.description).toBe(own);
+      }
+    );
+
+    it('everything saved: nothing generic is left but what was not offered', async () => {
+      const saved = {
+        name: 'Merchant App',
+        short_name: 'Merchant',
+        description: 'Our own words',
+        theme_color: '#123456',
+        background_color: '#fefefe',
+        display: 'minimal-ui',
+        orientation: 'portrait',
+        start_url: '/offers',
+        scope: '/',
+        icons: [{ ...httpsIcon, purpose: 'maskable' }],
+      };
+      expect(await render(richStore(), 'en', okFetch(saved))).toStrictEqual(saved);
+    });
+  });
+
+  describe('3. the schema takes a manifest with members absent', () => {
+    it('{} parses to {}: no member is required and none is filled in', async () => {
+      const { storePwaManifestSchema } = await import('@ebda/shared');
+      const parsed = storePwaManifestSchema.safeParse({});
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toStrictEqual({});
+    });
+
+    it('every member parses on its own, and the result carries no other member', async () => {
+      const { storePwaManifestSchema } = await import('@ebda/shared');
+      const members: Record<string, unknown> = {
+        name: 'Merchant App',
+        short_name: 'Merchant',
+        description: 'Our own words',
+        name_ar: 'تطبيق التاجر',
+        short_name_ar: 'التاجر',
+        description_ar: 'كلامنا إحنا',
+        theme_color: '#123456',
+        background_color: '#fefefe',
+        display: 'minimal-ui',
+        orientation: 'portrait',
+        start_url: '/offers',
+        scope: '/',
+        icons: [httpsIcon],
+      };
+      // the list above is the whole schema: a member added to it without a case here fails
+      expect(Object.keys(members).sort()).toEqual(Object.keys(storePwaManifestSchema.shape).sort());
+      for (const [member, value] of Object.entries(members)) {
+        const parsed = storePwaManifestSchema.safeParse({ [member]: value });
+        expect(parsed.success, member).toBe(true);
+        expect(parsed.success && parsed.data, member).toStrictEqual({ [member]: value });
+      }
+    });
+  });
+});

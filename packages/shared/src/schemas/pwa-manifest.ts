@@ -3,7 +3,10 @@ import { z } from 'zod/v3';
 /**
  * The per-store PWA manifest the API builds from a merchant's PWA settings
  * (`GET /stores/public/:storeId/manifest.json`, PWAService.generateManifest), as the storefront
- * accepts it before serving it to a browser (apps/web/src/app/manifest.ts).
+ * accepts it before laying it over its own generic manifest (apps/web/src/app/manifest.ts).
+ *
+ * Every member is optional, and none has a default: the API emits ONLY what the merchant saved
+ * (`{}` for a store that saved nothing, Ruling PWA-MANIFEST-1) and the storefront fills the rest.
  *
  * The values are merchant input. A manifest that fails this schema is not served: the storefront
  * falls back to its own generic manifest, so a broken merchant manifest is never worse than none.
