@@ -9,10 +9,9 @@ Never append to `docs/RULINGS.md` (frozen pointer; its entries were split out in
 
 Where an Ebda ruling (`R-EBDA-*`) and an inherited ruling disagree, the Ebda ruling wins in this repo.
 
-1694 rulings.
+1693 rulings.
 
 | CLOSURE-E4 | super-admin fan-out stays capped at 500 stores until a D1 rollup exists (BE:E-4) | 2026-11-09 | [CLOSURE-E4.md](CLOSURE-E4.md) |
-| CLOSURE-F2F3 | DO-store settings patch and branding bundle stay read-merge-write until a StoreDO patch op exists (BE:F-2/F-3) | 2026-11-09 | [CLOSURE-F2F3.md](CLOSURE-F2F3.md) |
 | CLOSURE-S20 | staff-invite 201/202/409 responses keep revealing account existence to the owner (BE:S-20) | 2026-11-09 | [CLOSURE-S20.md](CLOSURE-S20.md) |
 | CLOSURE-S9 | faq/howto DELETE stay ungated by the seo feature so downgraded stores can clean up (BE:S-9) | 2026-11-09 | [CLOSURE-S9.md](CLOSURE-S9.md) |
 | ID | Decision | Date | File |

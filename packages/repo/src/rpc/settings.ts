@@ -17,7 +17,9 @@ export function applyStoreSettings(
   sql: SqlRunner,
   meta: Meta,
   storeId: string,
-  fields: Record<string, unknown>
+  fields: Record<string, unknown>,
+  /** `true` when the caller already holds the DO's synchronous transaction (`patchStoreSettings`): do not open another. */
+  opts: { inTransaction?: boolean } = {}
 ): { profile: string[]; config: string[]; directoryOnly: string[] } {
   const store = meta.models.Store;
   if (!store) throw new Error('Store is not in the model metadata');
@@ -78,9 +80,59 @@ export function applyStoreSettings(
         [storeId, ...sets.store_config.map(([, v]) => v)]
       );
   };
-  if (sql.transactionSync) sql.transactionSync(run);
+  if (sql.transactionSync && !opts.inTransaction) sql.transactionSync(run);
   else run();
   return out;
+}
+
+/** The JSON columns `patchStoreSettings` merges key by key (Prisma `Store` field names). */
+export const PATCHABLE_JSON_FIELDS = ['settings', 'theme', 'socialLinks'] as const;
+export type JsonKeyPatch = { set?: Record<string, unknown>; remove?: string[] };
+
+/**
+ * BE:F-2 / BE:F-3: the DO's atomic settings PATCH. The service used to read `settings` (or `theme`,
+ * `socialLinks`), merge in its own memory and write the whole value back, so two quick saves of different keys could overwrite each
+ * other. Here the merge runs INSIDE the DO's synchronous transaction against the value the DO holds right now: only the top-level
+ * keys in `set` are written (`remove` deletes keys), every other key is untouched, and `fields` (plain column values: branding,
+ * contact, ...) are written in the SAME transaction, so a refusal anywhere (an unknown field, a missing profile row) rolls back
+ * the whole patch. Reserved/server-owned key stripping is the caller's job (it differs by writer).
+ */
+export function patchStoreSettings(
+  sql: SqlRunner,
+  meta: Meta,
+  storeId: string,
+  input: { fields?: Record<string, unknown>; json?: Record<string, JsonKeyPatch> }
+): { profile: string[]; config: string[]; directoryOnly: string[] } {
+  const jsonNames = Object.keys(input.json ?? {});
+  for (const n of jsonNames)
+    if (!(PATCHABLE_JSON_FIELDS as readonly string[]).includes(n))
+      throw Object.assign(new Error(`Store.${n} is not a patchable JSON field`), {
+        code: 'PATCH_FIELD_REFUSED',
+      });
+  const run = () => {
+    const fields: Record<string, unknown> = { ...(input.fields ?? {}) };
+    if (jsonNames.length) {
+      const rec = readStoreRecord(sql, meta, storeId, jsonNames);
+      if (!rec)
+        throw Object.assign(new Error('store_profile row is missing (import it first)'), {
+          code: 'STORE_PROFILE_MISSING',
+        });
+      for (const n of jsonNames) {
+        const patch = (input.json as Record<string, JsonKeyPatch>)[n];
+        const cur = rec.record[n];
+        const next: Record<string, unknown> = {
+          ...(cur && typeof cur === 'object' && !Array.isArray(cur)
+            ? (cur as Record<string, unknown>)
+            : {}),
+          ...(patch.set ?? {}),
+        };
+        for (const k of patch.remove ?? []) delete next[k];
+        fields[n] = next;
+      }
+    }
+    return applyStoreSettings(sql, meta, storeId, fields, { inTransaction: true });
+  };
+  return sql.transactionSync ? sql.transactionSync(run) : run();
 }
 
 /**

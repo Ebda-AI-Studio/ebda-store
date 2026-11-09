@@ -164,6 +164,39 @@ describe('StoreDO.mutate procedures and the settings copy (PR D1b)', () => {
       code: 'STORE_MISMATCH',
     });
   });
+  it('patchSettings (BE:F-2/F-3) merges only the sent keys in ONE DO transaction and rolls a refused part back', async () => {
+    const stub = stubFor('mut-patch');
+    await stub.mutate('mut-patch', { ops: [{ model: 'StorePage', op: 'count' }] }); // binds the instance
+    await runInDurableObject(stub, async d => {
+      d.ctx.storage.sql.exec(
+        "INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES ('mut-patch', 'S', 's', 'u')"
+      );
+    });
+    const { encodeRpc } = await import('@ebda-src/repo');
+    await stub.applySettings('mut-patch', encodeRpc({ settings: { base: 1 } }));
+    const [a, b] = await Promise.all([
+      stub.patchSettings('mut-patch', encodeRpc({ json: { settings: { set: { a: 1 } } } })),
+      stub.patchSettings('mut-patch', encodeRpc({ json: { settings: { set: { b: 2 } } } })),
+    ]);
+    expect([a.ok, b.ok]).toEqual([true, true]);
+    const settings = () =>
+      runInDurableObject(stub, async d =>
+        JSON.parse(
+          d.ctx.storage.sql
+            .exec("SELECT settings FROM store_config WHERE store_id = 'mut-patch'")
+            .one().settings as string
+        )
+      );
+    expect(await settings()).toEqual({ base: 1, a: 1, b: 2 });
+    // a refused part (unknown field) leaves the settings of the same patch unwritten
+    expect(
+      await stub.patchSettings(
+        'mut-patch',
+        encodeRpc({ fields: { nope: 1 }, json: { settings: { set: { c: 3 } } } })
+      )
+    ).toMatchObject({ ok: false });
+    expect(await settings()).toEqual({ base: 1, a: 1, b: 2 });
+  });
   it('bootstrapStore (N-18) creates profile + config + inactive VAT + COD, is idempotent, and the record reads back', async () => {
     const stub = stubFor('boot-1');
     const { encodeRpc, decodeRpc: dec } = await import('@ebda-src/repo');

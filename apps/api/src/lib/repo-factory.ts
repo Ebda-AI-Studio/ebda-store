@@ -1987,6 +1987,46 @@ export async function storeUpdateOnDo(
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
     throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   await copyStoreSettings(storeId, data);
+  return readStoreRowOnDo(storeId, args);
+}
+
+/**
+ * The ATOMIC settings patch for a store served by its Durable Object (BE:F-2 / BE:F-3, StoreDO `patchSettings`): the DO merges
+ * ONLY the sent top-level keys of `settings` / `theme` / `socialLinks` against the value it holds now and writes the plain `fields`
+ * in the SAME DO transaction, so interleaved saves of different keys both survive and a refused part leaves nothing written.
+ * Order is the DO FIRST (the only step that can refuse a part), then the D1 mirror columns of `fields` (a plain UPDATE on the
+ * directory row); a D1 failure after that leaves the mirror behind the DO and fails the request, and the idempotent retry converges.
+ */
+export async function storePatchOnDo(
+  storeId: string,
+  patch: {
+    fields?: Record<string, unknown>;
+    json?: Record<string, { set?: Record<string, unknown>; remove?: string[] }>;
+  },
+  args: { select?: unknown; include?: { owner?: unknown } } = {}
+): Promise<any> {
+  const fields = Object.fromEntries(
+    Object.entries(patch.fields ?? {}).filter(([, v]) => v !== undefined)
+  );
+  await mirrorEntitlementToPg(storeId, fields);
+  const stub = storeDo(storeId) as unknown as {
+    patchSettings(
+      storeId: string,
+      inputJson: string
+    ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
+  };
+  const { encodeRpc } = await import('@ebda-src/repo');
+  const r = await stub.patchSettings(storeId, encodeRpc({ fields, json: patch.json ?? {} }));
+  if (!r.ok) throw new AppError(502, 'SETTINGS_COPY_FAILED', `settings patch refused: ${r.code}`);
+  if ((await d1StoreWrite({ id: storeId }, d1StorePatch(fields))) === 0)
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  return readStoreRowOnDo(storeId, args);
+}
+
+async function readStoreRowOnDo(
+  storeId: string,
+  args: { select?: unknown; include?: { owner?: unknown } }
+): Promise<any> {
   const stub = storeDo(storeId) as unknown as QueryStub;
   const { decodeRpc } = await import('@ebda-src/repo');
   const row = await doStoreDelegate(storeId, stub, decodeRpc as never).findUnique({

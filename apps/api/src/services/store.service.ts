@@ -16,6 +16,7 @@ import {
   storeDb,
   storeRepo,
   storeUpdateOnDo,
+  storePatchOnDo,
   closeDoIfNoMoney,
   reopenDoAfterFailedDelete,
   storeWritesToDo,
@@ -53,7 +54,6 @@ import {
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
   LOOK_OWNED_THEME_KEYS,
-  mergeClientSettings,
   stripServerOwnedSettings,
   isRetiredTemplate,
   normalizeLegacyTemplate,
@@ -298,17 +298,74 @@ async function countStoreRows(
  *   for one key), so it is atomic in the database whatever the transaction shape. This matters: the `/stores` router has NO
  *   request transaction (it runs under `storeScopeContext`), so every query is its own transaction and a `SELECT ... FOR UPDATE`
  *   followed by a separate UPDATE would release its lock between the two. Never write that pair here.
- * - D1 + Durable Object store (`storeWritesToDo`): there is no single statement across D1 and the DO, so the writer reads the row
- *   at write time (`readLiveSettings`) and writes the merge. RESIDUAL: two writers inside the same few milliseconds can still
- *   interleave and one key is lost. Cost if wrong: one key written in that window is lost, instead of every key written during the
- *   page's lifetime.
+ * - D1 + Durable Object store (`storeWritesToDo`): the StoreDO `patchSettings` op merges ONLY the sent top-level keys inside the
+ *   DO's own synchronous transaction (`storePatchOnDo`), so no writer ever reads, merges and writes back here and two saves of
+ *   different keys both survive (BE:F-2).
  */
-async function readLiveSettings(
-  tx: Parameters<Parameters<typeof updateStoreThrough>[1]>[0],
-  storeId: string
-): Promise<Record<string, unknown>> {
-  const row = await tx.store.findUnique({ where: { id: storeId }, select: { settings: true } });
-  return (row?.settings as Record<string, unknown> | null) ?? {};
+type BrandingInput = Parameters<typeof StoreService.updateBranding>[1];
+type ContactInput = Parameters<typeof StoreService.updateContactInfo>[1];
+
+const brandingColumns = (b: BrandingInput) => ({
+  name: b.name,
+  nameAr: b.nameAr,
+  logo: b.logo,
+  logoAr: b.logoAr,
+  favicon: b.favicon,
+  description: b.description,
+  descriptionAr: b.descriptionAr,
+});
+
+const contactColumns = (c: ContactInput) => ({
+  email: c.email,
+  phone: c.phone,
+  phoneAr: c.phoneAr,
+  whatsapp: c.whatsapp,
+  address: c.address,
+  addressAr: c.addressAr,
+  businessHours: c.businessHours,
+  googleMapsUrl: c.googleMapsUrl,
+});
+
+/**
+ * Diff the three image fields and queue cleanup for any URL that was replaced. `undefined` in the patch means "leave existing", so
+ * only fire when the caller explicitly sent the field.
+ */
+function queueBrandingImageCleanup(storeId: string, store: unknown, branding: BrandingInput): void {
+  const oldUrls: string[] = [];
+  const newUrls: string[] = [];
+  const s = store as { logo?: string | null; logoAr?: string | null; favicon?: string | null };
+  if (branding.logo !== undefined) {
+    if (s.logo) oldUrls.push(s.logo);
+    if (branding.logo) newUrls.push(branding.logo);
+  }
+  if (branding.logoAr !== undefined) {
+    if (s.logoAr) oldUrls.push(s.logoAr);
+    if (branding.logoAr) newUrls.push(branding.logoAr);
+  }
+  if (branding.favicon !== undefined) {
+    if (s.favicon) oldUrls.push(s.favicon);
+    if (branding.favicon) newUrls.push(branding.favicon);
+  }
+  if (oldUrls.length > 0) {
+    void cleanupRemovedImages(oldUrls, newUrls).catch(err =>
+      logger.warn({ err, storeId }, '[store.updateBranding] r2 cleanup failed')
+    );
+  }
+}
+
+/** The social-links change a bundle carries: keys to set and keys to remove (a cleared field). */
+export type SocialLinksPatch = { set: Record<string, string>; remove: string[] };
+type JsonKeyPatchInput = { set?: Record<string, unknown>; remove?: string[] };
+
+/** Apply a `SocialLinksPatch` to the stored links (the Postgres path; a DO store applies it inside the DO). */
+export function applySocialLinksPatch(
+  stored: unknown,
+  patch: SocialLinksPatch
+): Prisma.InputJsonValue {
+  const merged: Record<string, unknown> = { ...((stored as Record<string, unknown> | null) ?? {}) };
+  for (const k of patch.remove) delete merged[k];
+  Object.assign(merged, patch.set);
+  return merged as Prisma.InputJsonValue;
 }
 
 const stamp = (row?: { updatedAt?: Date }) =>
@@ -778,7 +835,7 @@ export class StoreService {
     }
 
     // Merge settings instead of replacing entirely. BE:F-2: the merge happens against the row as it is NOW (see the note above
-    // readLiveSettings): ONE atomic SQL statement on a Postgres store, a write-time read on a DO store. `incoming` holds only the
+    // readLiveSettings): ONE atomic SQL statement on a Postgres store, the StoreDO `patchSettings` op on a DO store. `incoming` holds only the
     // keys the client sent; server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
     const incoming =
       data.settings && typeof data.settings === 'object'
@@ -788,16 +845,19 @@ export class StoreService {
     const atomicPatch = incoming && !onDo ? stripServerOwnedSettings(incoming) : undefined;
 
     const updatedStore = await updateStoreThrough(storeId, async tx => {
-      const mergedSettings =
-        incoming && onDo
-          ? (mergeClientSettings(
-              await readLiveSettings(tx, storeId),
-              incoming
-            ) as Prisma.InputJsonValue)
-          : incoming
-            ? undefined // written below by the atomic statement
-            : data.settings;
-      return tx.store.update({
+      const mergedSettings = incoming && !onDo ? undefined : data.settings; // an incoming object is written by the atomic path
+      const write = (args: Parameters<typeof tx.store.update>[0]) => {
+        if (!incoming || !onDo) return tx.store.update(args);
+        // BE:F-2: a DO store merges ONLY the sent keys inside the DO (StoreDO `patchSettings`), never a read-merge-write here.
+        const fields: Record<string, unknown> = { ...(args.data as Record<string, unknown>) };
+        delete fields.settings;
+        return storePatchOnDo(
+          storeId,
+          { fields, json: { settings: { set: stripServerOwnedSettings(incoming) } } },
+          { include: { owner: true } }
+        );
+      };
+      return write({
         where: { id: storeId },
         data: {
           name: data.name,
@@ -1508,48 +1568,14 @@ export class StoreService {
     const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
-        data: {
-          name: branding.name,
-          nameAr: branding.nameAr,
-          logo: branding.logo,
-          logoAr: branding.logoAr,
-          favicon: branding.favicon,
-          description: branding.description,
-          descriptionAr: branding.descriptionAr,
-        },
+        data: brandingColumns(branding),
       })
     );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
 
-    // Diff the three image fields and queue cleanup for any URL that
-    // was replaced. `undefined` in the patch means "leave existing", so
-    // only fire when the caller explicitly sent the field.
-    const oldUrls: string[] = [];
-    const newUrls: string[] = [];
-    const s = store as {
-      logo?: string | null;
-      logoAr?: string | null;
-      favicon?: string | null;
-    };
-    if (branding.logo !== undefined) {
-      if (s.logo) oldUrls.push(s.logo);
-      if (branding.logo) newUrls.push(branding.logo);
-    }
-    if (branding.logoAr !== undefined) {
-      if (s.logoAr) oldUrls.push(s.logoAr);
-      if (branding.logoAr) newUrls.push(branding.logoAr);
-    }
-    if (branding.favicon !== undefined) {
-      if (s.favicon) oldUrls.push(s.favicon);
-      if (branding.favicon) newUrls.push(branding.favicon);
-    }
-    if (oldUrls.length > 0) {
-      void cleanupRemovedImages(oldUrls, newUrls).catch(err =>
-        logger.warn({ err, storeId }, '[store.updateBranding] r2 cleanup failed')
-      );
-    }
+    queueBrandingImageCleanup(storeId, store, branding);
 
     return updatedStore;
   }
@@ -1589,16 +1615,7 @@ export class StoreService {
     const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
-        data: {
-          email: contact.email,
-          phone: contact.phone,
-          phoneAr: contact.phoneAr,
-          whatsapp: contact.whatsapp,
-          address: contact.address,
-          addressAr: contact.addressAr,
-          businessHours: contact.businessHours,
-          googleMapsUrl: contact.googleMapsUrl,
-        },
+        data: contactColumns(contact),
       })
     );
 
@@ -1645,7 +1662,7 @@ export class StoreService {
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
   /**
-   * QR-1: replace `settings.qr` only (setSettingsKey: one atomic jsonb_set on Postgres, a write-time read-merge on a DO store) so a concurrent write of another
+   * QR-1: replace `settings.qr` only (setSettingsKey: one atomic jsonb_set on Postgres, the StoreDO `patchSettings` op on a DO store) so a concurrent write of another
    * settings key (floating widget, announcement, ...) is never overwritten by a stale read-merge-write.
    */
   static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
@@ -1666,12 +1683,9 @@ export class StoreService {
     const store = await this.getById(storeId);
     let updatedStore;
     if (await storeWritesToDo(storeId)) {
-      updatedStore = await updateStoreThrough(storeId, async tx => {
-        const live = await readLiveSettings(tx, storeId);
-        return tx.store.update({
-          where: { id: storeId },
-          data: { settings: { ...live, [key]: value } as Prisma.InputJsonValue },
-        });
+      // BE:F-2: the DO replaces this ONE top-level key against the settings it holds now (no read-merge-write here).
+      updatedStore = await storePatchOnDo(storeId, {
+        json: { settings: { set: { [key]: value } } },
       });
     } else {
       await setSettingsKeyAtomic(storeId, key, value);
@@ -1687,43 +1701,76 @@ export class StoreService {
    * (`runInTenantContext`; each `withStore` inside reuses it), so a failure in any part rolls ALL of it back. The `/stores`
    * router has no request transaction of its own (it runs under `storeScopeContext`), so the transaction is opened here.
    *
-   * D1 + Durable Object store (`storeWritesToDo`): D1 and the DO cannot share a transaction, so the parts apply in order and a
-   * failure leaves the earlier parts written (Ruling FP-8). Cost if wrong: a merchant sees one error and finds part of the page
-   * saved; saving again converges because every part is an idempotent write.
+   * D1 + Durable Object store (`storeWritesToDo`): the validated parts are folded into ONE StoreDO `patchSettings` call (branding
+   * and contact columns, `blogEnabled`, and key-wise patches of `theme` / `socialLinks` / `settings`), which the DO applies in a
+   * single synchronous transaction against what it holds now. A refused part therefore writes nothing, and a concurrent save of
+   * other keys is never overwritten (FP-8 is superseded for DO stores).
    *
    * Caches are busted AFTER the commit so a read between the bust and the commit cannot re-cache the old values.
    */
   static async updateBrandingBundle(
     storeId: string,
     parts: {
-      branding?: Parameters<typeof StoreService.updateBranding>[1];
+      branding?: BrandingInput;
       theme?: Record<string, unknown>;
-      contact?: Parameters<typeof StoreService.updateContactInfo>[1];
-      /** Given the stored social links, returns the merged links to write. */
-      social?: (stored: unknown) => Prisma.InputJsonValue;
+      contact?: ContactInput;
+      /** The keys to set / remove in the stored social links. */
+      social?: SocialLinksPatch;
       settings?: Prisma.InputJsonValue;
       blogEnabled?: boolean;
     }
   ) {
     const before = await this.getById(storeId);
-    const run = async () => {
-      if (parts.branding) await this.updateBranding(storeId, parts.branding);
-      if (parts.theme) await this.updateTheme(storeId, parts.theme);
-      if (parts.contact) await this.updateContactInfo(storeId, parts.contact);
-      if (parts.social) {
-        const stored = await this.getById(storeId);
-        await this.updateSocialLinks(storeId, parts.social(stored.socialLinks));
-      }
-      if (parts.settings !== undefined || parts.blogEnabled !== undefined) {
-        await this.update(storeId, {
-          ...(parts.settings !== undefined && { settings: parts.settings }),
-          ...(parts.blogEnabled !== undefined && { blogEnabled: parts.blogEnabled }),
-        });
-      }
-    };
     const onDo = await storeWritesToDo(storeId);
-    if (onDo) await run();
-    else await runInTenantContext(storeId, run);
+    if (onDo) {
+      const fields: Record<string, unknown> = {};
+      const json: Record<string, JsonKeyPatchInput> = {};
+      if (parts.branding) {
+        assertMediaOriginOrUnchanged(
+          { logo: parts.branding.logo, logoAr: parts.branding.logoAr },
+          before as { logo?: string | null; logoAr?: string | null },
+          appConfig.storagePublicUrl
+        );
+        Object.assign(fields, brandingColumns(parts.branding));
+      }
+      if (parts.contact) Object.assign(fields, contactColumns(parts.contact));
+      if (parts.blogEnabled !== undefined) fields.blogEnabled = parts.blogEnabled;
+      if (parts.theme) {
+        // a `null` value removes that theme key (see updateTheme)
+        json.theme = {
+          set: Object.fromEntries(Object.entries(parts.theme).filter(([, v]) => v !== null)),
+          remove: Object.entries(parts.theme)
+            .filter(([, v]) => v === null)
+            .map(([k]) => k),
+        };
+      }
+      if (parts.social) json.socialLinks = { set: parts.social.set, remove: parts.social.remove };
+      if (parts.settings && typeof parts.settings === 'object' && !Array.isArray(parts.settings))
+        json.settings = {
+          set: stripServerOwnedSettings(parts.settings as Record<string, unknown>),
+        };
+      await storePatchOnDo(storeId, { fields, json });
+      if (parts.branding) queueBrandingImageCleanup(storeId, before, parts.branding);
+    } else {
+      await runInTenantContext(storeId, async () => {
+        if (parts.branding) await this.updateBranding(storeId, parts.branding);
+        if (parts.theme) await this.updateTheme(storeId, parts.theme);
+        if (parts.contact) await this.updateContactInfo(storeId, parts.contact);
+        if (parts.social) {
+          const stored = await this.getById(storeId);
+          await this.updateSocialLinks(
+            storeId,
+            applySocialLinksPatch(stored.socialLinks, parts.social)
+          );
+        }
+        if (parts.settings !== undefined || parts.blogEnabled !== undefined) {
+          await this.update(storeId, {
+            ...(parts.settings !== undefined && { settings: parts.settings }),
+            ...(parts.blogEnabled !== undefined && { blogEnabled: parts.blogEnabled }),
+          });
+        }
+      });
+    }
     const after = await this.getById(storeId);
     await StoreService.invalidateCache(before);
     await bustStoreCaches(after.id, after.slug, after.domain);
