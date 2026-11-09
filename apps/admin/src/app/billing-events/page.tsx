@@ -228,7 +228,10 @@ function LedgerPanel({
             {r.tax.etaSubmittedAt && (
               <span className="block text-muted-foreground">
                 {t('etaSubmittedAt', {
-                  date: new Date(r.tax.etaSubmittedAt).toLocaleDateString(locale),
+                  date: new Date(r.tax.etaSubmittedAt).toLocaleDateString(
+                    undefined,
+                    withNumerals()
+                  ),
                 })}
               </span>
             )}
