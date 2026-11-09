@@ -994,7 +994,10 @@ export const authIpAllLimiter = createAuthIpLimiter({ countSuccess: true, prefix
  * Here a request only READS the miss count (20 already: 429, same body and headers as before) and a miss is counted after
  * its 404 was sent, kept alive past the response with `waitUntil`. A response that is not a 404 never writes the counter.
  * The RateLimit headers carry the misses left BEFORE this response, so they are flat across hits and fall across misses.
- * A counter outage serves the request (fail open), as every limiter here does.
+ * A counter outage serves the request (fail open), as every limiter here does: a read that throws counts as no misses,
+ * and a miss is still written afterwards, so the count is right again once the counter can be read. A store with no `get`
+ * (express-rate-limit declares it optional) cannot be read at all and so never refuses; every store built here has one
+ * (`makeRateLimitStore`), and the workerd test proves the production store is read (the 21st miss is a 429).
  *
  * Reading then counting is not atomic: misses already in flight when the budget runs out are still answered, so a burst
  * can pass the limit by its own concurrency. The atomic per-IP public limiter in front of it bounds that.

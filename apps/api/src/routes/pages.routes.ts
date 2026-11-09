@@ -180,10 +180,17 @@ router.delete(
 // back to legacy copy" from "merchant explicitly turned this page off":
 //
 //   - 200 + page          -> render `contentHtml` / `contentHtmlAr`
-//   - 404 NOT_FOUND       -> no row exists; storefront falls back
+//   - 200 + page: null    -> no row exists; storefront falls back
 //   - 410 PAGE_DISABLED   -> row exists but isPublished=false;
 //                            storefront shows "Page unavailable" and
 //                            MUST NOT fall back to default copy.
+//
+// "No row" is the NORMAL state of privacy / terms / about on a store that
+// never edited them (the storefront then shows its built-in copy), so it is
+// answered 200, not 404: every 404 on the public router spends the caller's
+// per-IP store-miss budget (`storeMissLimiter`, 20 a minute), and a shopper
+// reading the policy pages of a real store was being counted as a prober
+// (pre-QA sweep 2026-11-09, finding 6). An unknown store is still a 404.
 router.get(
   '/public/:storeId/pages/:slug',
   async (req: Request, res: Response, next: NextFunction) => {
@@ -191,10 +198,7 @@ router.get(
       const { storeId, slug } = req.params;
       const result = await PagesService.getPublic(storeId, slug);
       if (result.status === 'not_found') {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Page not found' },
-        });
+        res.json({ success: true, data: { page: null } });
         return;
       }
       if (result.status === 'disabled') {

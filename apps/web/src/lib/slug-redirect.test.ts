@@ -38,6 +38,15 @@ describe('fetchSlugRedirect', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null on the 200 the API answers when there is no redirect', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ toSlug: null }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await fetchSlugRedirect({ id: 'store-1' }, 'product', 'ghost-slug');
+
+    expect(result).toBeNull();
+  });
+
   it('returns null for the demo store without calling fetch', async () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;

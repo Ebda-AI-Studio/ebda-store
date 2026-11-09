@@ -805,11 +805,12 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
     const storeId = await getStoreIdFromRequest(req);
     // Cached 60s, hits AND misses (#904) — see resolveSlugRedirectCached.
     const toSlug = await resolveSlugRedirectCached(storeId, entityType, slug);
-    if (!toSlug) {
-      res.status(404).json({ error: 'not found' });
-      return;
-    }
-    res.json({ toSlug });
+    // "No redirect for this slug" is an answer about a store that exists, so it is a 200 with `toSlug: null`, not a 404:
+    // the storefront asks this after every unknown product/category/page/blog slug, and a 404 here made one dead link cost
+    // the shopper's IP TWO misses of the per-IP store-miss budget (the product 404 plus this one). A store that
+    // does not resolve is still refused (400 STORE_NOT_RESOLVED, getStoreIdFromRequest), exactly as before. The storefront
+    // reads only `toSlug` and treats null and a non-2xx the same (apps/web/src/lib/slug-redirect.ts).
+    res.json({ toSlug: toSlug ?? null });
   } catch (err) {
     next(err);
   }

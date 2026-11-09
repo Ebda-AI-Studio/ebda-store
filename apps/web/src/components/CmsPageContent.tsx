@@ -46,7 +46,9 @@ interface CmsPageContentProps {
  * Three response paths from /public/:storeId/pages/:slug:
  *   - 200 with non-empty contentHtml  -> render the merchant's content
  *   - 200 with empty contentHtml      -> treat like missing row, fall back
- *   - 404 NOT_FOUND                   -> fall back to legacy hardcoded copy
+ *   - 200 with `page: null`           -> no row; fall back to legacy hardcoded copy
+ *     (a 404 means the same and is still handled: it is what an API older than
+ *     this storefront answers, and it costs the shopper's per-IP miss budget)
  *   - 410 PAGE_DISABLED               -> render "Page unavailable" (no fallback)
  *
  * The 410 path is the merchant's "hard off" toggle: when they turn the
@@ -87,7 +89,7 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
           return;
         }
         const json = await res.json();
-        const page = json?.data?.page as PublicStorePage | undefined;
+        const page = json?.data?.page as PublicStorePage | null | undefined;
         if (!page) {
           setState({ kind: 'fallback' });
           return;
