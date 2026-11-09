@@ -28,6 +28,10 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
         h.sentinels.add(k);
         return 'OK';
       },
+      del: async (k: string) => {
+        h.sentinels.delete(k);
+        return 1;
+      },
     }),
   },
 }));
@@ -199,27 +203,59 @@ describe('gold-rate feed cron', () => {
     expect(h.applied.find(x => x.storeId === 'real')!.actor).not.toHaveProperty('skipJumpGate');
   });
 
-  it('feeds DISAGREE: every opted-in store gets a PENDING rate, nothing is applied, the operator gets a P1 and the owner an email', async () => {
+  const disagreeing = (diffBps = 241) =>
+    adapter({
+      kind: 'disagree',
+      primary: quote(713_800),
+      fallback: quote(731_000, 'fallback'),
+      diffBps,
+    });
+
+  it('feeds DISAGREE (GOLD-DISAGREE-MERCHANT-1): every store gets a PENDING rate carrying both values, ONE owner email each, an INFO (not a P1) for the operator', async () => {
+    h.stores = [
+      { storeId: 'a', premiumBps: 0 },
+      { storeId: 'b', premiumBps: 250 },
+    ];
+    const r = await handleGoldRateFeedFetch({ step }, disagreeing());
+    expect(r).toMatchObject({ outcome: 'disagree', applied: 0, pending: 2 });
+    expect(h.applied.every(x => x.actor.forcePending === true)).toBe(true);
+    expect(h.alerts.map(a => [a.level, a.source])).toEqual([
+      ['info', 'cron.gold-rate-feed-disagree'],
+    ]);
+    expect(h.alerts.some(a => a.level === 'p1' || a.level === 'p0')).toBe(false);
+    expect(h.emails).toEqual([
+      { kind: 'disagree', to: 'o@example.com' },
+      { kind: 'disagree', to: 'o@example.com' },
+    ]);
+    // the reference carries both feed values and THAT store's fallback candidates (premium applied)
+    const feedB = (h.applied.find(x => x.storeId === 'b')!.actor as { feed: { disagree: any } })
+      .feed.disagree;
+    expect(feedB).toMatchObject({ diffBps: 241, primary24k: 713_800, fallback24k: 731_000 });
+    expect(feedB.fallbackRates[24]).toBe(749_275); // 731 000 + 250 bps
+  });
+
+  it('a disagreement that lasts several ticks notifies ONCE per store; when the feeds agree the episode ends and a NEW disagreement notifies again', async () => {
+    h.stores = [{ storeId: 'a', premiumBps: 0 }];
+    await handleGoldRateFeedFetch({ step }, disagreeing());
+    await handleGoldRateFeedFetch({ step }, disagreeing(300));
+    await handleGoldRateFeedFetch({ step }, disagreeing(280));
+    expect(h.emails).toHaveLength(1);
+    await handleGoldRateFeedFetch({ step }, adapter({ kind: 'ok', quote: quote(713_800) }));
+    expect(h.sentinels.has('gold:disagree-mail:a')).toBe(false);
+    await handleGoldRateFeedFetch({ step }, disagreeing());
+    expect(h.emails).toHaveLength(2);
+  });
+
+  it('feeds WILDLY apart (over the sanity bound): a platform P1, nothing stored, no merchant asked', async () => {
     h.stores = [
       { storeId: 'a', premiumBps: 0 },
       { storeId: 'b', premiumBps: 0 },
     ];
-    const r = await handleGoldRateFeedFetch(
-      { step },
-      adapter({
-        kind: 'disagree',
-        primary: quote(713_800),
-        fallback: quote(731_000, 'fallback'),
-        diffBps: 241,
-      })
-    );
-    expect(r).toMatchObject({ outcome: 'disagree', applied: 0, pending: 2 });
-    expect(h.applied.every(x => x.actor.forcePending === true)).toBe(true);
-    expect(h.alerts.map(a => a.source)).toEqual(['cron.gold-rate-feed-disagree']);
-    expect(h.emails).toEqual([
-      { kind: 'pending', to: 'o@example.com' },
-      { kind: 'pending', to: 'o@example.com' },
-    ]);
+    const r = await handleGoldRateFeedFetch({ step }, disagreeing(2500));
+    expect(r).toMatchObject({ outcome: 'broken' });
+    expect(h.applied).toEqual([]);
+    expect(h.emails).toEqual([]);
+    expect(h.alerts.map(a => [a.level, a.source])).toEqual([['p1', 'cron.gold-rate-feed-broken']]);
   });
 
   it("a rate over a store's jump gate is stored pending and its owner is emailed, the other store applies", async () => {
