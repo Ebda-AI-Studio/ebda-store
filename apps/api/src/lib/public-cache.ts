@@ -272,8 +272,23 @@ async function clearCategoriesRedis(storeId: string): Promise<void> {
   // Redis ONLY — the storefront purge is the caller's (#1220). This helper
   // used to fire its own purge as well, so every product write and every ORDER
   // sent two outbound purges, and a category write sent the same tag twice.
-  await invalidateCached(`public:categories:${storeId}`);
-  await invalidateCached(`admin:categories:${storeId}`);
+  await allInvalidations([
+    invalidateCached(`public:categories:${storeId}`),
+    invalidateCached(`admin:categories:${storeId}`),
+  ]);
+}
+
+/**
+ * Run independent invalidations TOGETHER (Ruling PERF-LAT-2). Each one keeps its own order inside (generation bump FIRST,
+ * then the delete), and the keys and prefixes are disjoint, so nothing depends on another finishing. Run one after another
+ * they cost a serial round trip each (the order path made ~18 of its 38 that way, PERF-LAT-1). Every invalidation runs to
+ * its end even when another fails (a serial chain stopped at the first throw and left the rest stale), and the first
+ * failure is re-thrown afterwards, so the caller logs or alerts exactly as before.
+ */
+export async function allInvalidations(tasks: Array<Promise<void>>): Promise<void> {
+  const settled = await Promise.allSettled(tasks);
+  const failed = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) throw failed.reason;
 }
 
 export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
@@ -322,17 +337,20 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * through here so the bundle-list bust below can't be forgotten by either.
  */
 export async function clearProductsRedis(storeId: string): Promise<void> {
-  await invalidateCachedPrefix(`public:products:${storeId}:`);
-  await invalidateCachedPrefix(`public:product:${storeId}:`);
-  await invalidateCachedPrefix(`public:suggest:${storeId}:`);
-  // B2B C1: recommendation payloads embed related products (name, image, price), so a product audience flip must drop them too.
-  await invalidateCachedPrefix(`recommendations:product:${storeId}:`);
-  await invalidateCachedPrefix(`admin:products:${storeId}:`);
-  // Redis-only: the caller fires ONE purge covering both tags. Calling the
-  // public categories invalidator here would fire a second outbound POST for
-  // every product write — two requests per bust, and two per order.
-  await clearCategoriesRedis(storeId);
-  await invalidateCached(bundlesCacheKey(storeId));
+  // All together (allInvalidations): disjoint keys, each bump-then-delete on its own. Every one still runs and is awaited.
+  await allInvalidations([
+    invalidateCachedPrefix(`public:products:${storeId}:`),
+    invalidateCachedPrefix(`public:product:${storeId}:`),
+    invalidateCachedPrefix(`public:suggest:${storeId}:`),
+    // B2B C1: recommendation payloads embed related products (name, image, price), so a product audience flip must drop them too.
+    invalidateCachedPrefix(`recommendations:product:${storeId}:`),
+    invalidateCachedPrefix(`admin:products:${storeId}:`),
+    // Redis-only: the caller fires ONE purge covering both tags. Calling the
+    // public categories invalidator here would fire a second outbound POST for
+    // every product write — two requests per bust, and two per order.
+    clearCategoriesRedis(storeId),
+    invalidateCached(bundlesCacheKey(storeId)),
+  ]);
 }
 
 export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
