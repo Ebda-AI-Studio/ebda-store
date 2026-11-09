@@ -2277,9 +2277,29 @@
       "tier": "unit",
       "why": "cache-generation counters are routed back onto one of the auth shards, so attacker-triggerable public cache misses queue in front of jti / token-version / lockout / CSRF / MFA / rate-limit checks",
       "source": "apps/api/src/cf/auth-state-client.ts",
-      "find": "if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD;",
+      "find": "    return cachegenHome(key.slice(CACHEGEN_PREFIX.length)) ?? CACHEGEN_SHARD;\n",
       "replace": "",
       "test": "tests/unit/api-fewer-hops.test.ts"
+    },
+    {
+      "id": "cachegen-replicated-bump-fans-out",
+      "domain": "cache coherence",
+      "tier": "unit",
+      "why": "a bump of a replicated generic prefix generation lands on one store shard only, so a fill or edge stamp read from any other replica never sees it and republishes a pre-write price/stock (PERF-RL-DO)",
+      "source": "apps/api/src/cf/ioredis-cf.ts",
+      "find": "(home === null ? cachegenStoreShards() : [home])",
+      "replace": "[home ?? cachegenStoreShards()[0]]",
+      "test": "tests/unit/public-limit-prefetch.test.ts"
+    },
+    {
+      "id": "rl-prefetch-exact-key",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "a limiter takes ANY prefetched hit instead of the one for its own key, so one client's or one limiter's count answers for another and a per-client limit stops binding (PERF-RL-DO)",
+      "source": "apps/api/src/cf/rate-limit-store.ts",
+      "find": "const pre = prefetched.getStore()?.get(redisKey);",
+      "replace": "const pre = [...(prefetched.getStore()?.values() ?? [])].find(e => !e.consumed);",
+      "test": "tests/unit/public-limit-prefetch.test.ts"
     },
     {
       "id": "public-read-native-only-anonymous",

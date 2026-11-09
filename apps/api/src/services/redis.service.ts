@@ -199,6 +199,9 @@ class RedisService {
    */
   async getCacheGenerations(names: string[]): Promise<Array<string | null>> {
     if (!this.isAvailable()) throw new Error('Redis unavailable');
+    const client = this.getConnectedClient() as unknown;
+    // Workers: one call per shard, replicated prefix names read with their store (PERF-RL-DO), never a global instance.
+    if (client instanceof CfRedis) return client.cacheGenerations(names);
     const pipe = this.getConnectedClient().pipeline();
     for (const name of names) pipe.get(`cachegen:${name}`);
     const results = await pipe.exec();
@@ -212,6 +215,8 @@ class RedisService {
   /** Atomically bump one generation (INCR + refresh its TTL). Throws on failure. */
   async bumpCacheGeneration(name: string, ttlSeconds: number): Promise<void> {
     if (!this.isAvailable()) throw new Error('Redis unavailable');
+    const client = this.getConnectedClient() as unknown;
+    if (client instanceof CfRedis) return client.bumpCacheGeneration(name, ttlSeconds);
     const key = `cachegen:${name}`;
     const results = await this.getConnectedClient()
       .multi()

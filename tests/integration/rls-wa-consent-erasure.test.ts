@@ -73,6 +73,8 @@ async function cleanup(): Promise<void> {
 
 describe.skipIf(!hasDb)('WhatsApp marketing consent under strict RLS (ebda_app)', () => {
   let storeId = '';
+  let storeBId = '';
+  let customerBId = '';
   let customerId = '';
   let otherCustomerId = '';
   let key = '';
@@ -122,6 +124,24 @@ describe.skipIf(!hasDb)('WhatsApp marketing consent under strict RLS (ebda_app)'
       });
     await order(customerId, PHONE, 'delivered'); // proves PHONE for the customer
     await order(otherCustomerId, OTHER_PHONE, 'pending'); // a pending order proves nothing
+    // A SECOND store whose customer has a DELIVERED order with OTHER_PHONE: store A must never see it.
+    const storeB = await owner.store.create({
+      data: { slug: `${PREFIX}b`, name: 'WA consent B', ownerId: storeOwner.id },
+    });
+    storeBId = storeB.id;
+    customerBId = (await mk('custb', 'customer', storeBId, OTHER_PHONE)).id;
+    await owner.order.create({
+      data: {
+        storeId: storeBId,
+        customerId: customerBId,
+        orderNumber: `${PREFIX}o-${Math.random().toString(36).slice(2, 8)}`,
+        subtotal: 10,
+        total: 10,
+        status: 'delivered' as never,
+        shippingAddress: { phone: OTHER_PHONE },
+        billingAddress: {},
+      },
+    });
     await owner.cart.create({ data: { storeId, sessionId: session, customerId } });
   });
 
@@ -144,10 +164,31 @@ describe.skipIf(!hasDb)('WhatsApp marketing consent under strict RLS (ebda_app)'
         runInTenantContext(storeId, () => phoneOnOwnOrder(storeId, otherCustomerId, OTHER_PHONE))
       )
     ).toBe(false);
-    // Outside any tenant scope, strict RLS returns nothing: this is the failure mode the fix avoids.
-    expect(await asApp(() => phoneOnOwnOrder(storeId, customerId, PHONE).catch(() => false))).toBe(
-      false
-    );
+    // Outside any tenant scope the proof still holds: with no caller client it reads through the store's own backend
+    // (`storeDb`, NEON-ZERO 2026-11-09), which scopes the Postgres read to THIS store itself (a DO store reads its DO). The old
+    // failure mode (a contextless read under strict RLS returning nothing, a silently false proof) cannot happen any more.
+    expect(await asApp(() => phoneOnOwnOrder(storeId, customerId, PHONE))).toBe(true);
+    expect(await asApp(() => phoneOnOwnOrder(storeId, otherCustomerId, OTHER_PHONE))).toBe(false);
+  });
+
+  it("the proof never crosses stores: another store's delivered order proves nothing in this store", async () => {
+    // Control: in ITS store the order proves the number.
+    expect(await asApp(() => phoneOnOwnOrder(storeBId, customerBId, OTHER_PHONE))).toBe(true);
+    // Store A asked about store B's customer + number: false with no ambient scope, inside A's tenant scope, and as the
+    // OWNER role (BYPASSRLS, so only the code's own `storeId` filter stands between the stores, not RLS).
+    expect(await asApp(() => phoneOnOwnOrder(storeId, customerBId, OTHER_PHONE))).toBe(false);
+    expect(
+      await asApp(() =>
+        runInTenantContext(storeId, () => phoneOnOwnOrder(storeId, customerBId, OTHER_PHONE))
+      )
+    ).toBe(false);
+    expect(
+      await runWithRequestDb(
+        // a fresh owner client: runWithRequestDb releases the client it is given
+        () => createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' }),
+        () => phoneOnOwnOrder(storeId, customerBId, OTHER_PHONE)
+      )
+    ).toBe(false);
   });
 
   it('a proven grant is recorded and bound to the account; an unproven one is refused', async () => {

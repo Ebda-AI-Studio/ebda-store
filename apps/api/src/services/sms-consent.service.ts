@@ -1,7 +1,7 @@
 import crypto from 'crypto';
-import { prisma, withStore } from '@ebda/database';
+import { prisma } from '@ebda/database';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 
 /**
  * Promotional-SMS consent, per customer per store (issue 206).
@@ -92,6 +92,28 @@ export class SmsConsentService {
     const phoneKey = smsConsentPhoneKey(input.phone);
     if (!phoneKey || !input.customerKey) return false;
     const phone = input.phone.trim().slice(0, 40);
+    // A store on its Durable Object (NEON-ZERO, Ruling NZ-D23): the raw INSERT below threw POSTGRES_REMOVED, swallowed by the
+    // checkout, so every DO store silently dropped the shopper's SMS opt-in (class sweep, P1 2026-11-09). One DO upsert on the
+    // same unique key is the same idempotent, race-free write (the DO serialises its writes).
+    if ((await storeRepo(storeId)).backend === 'do') {
+      const now = new Date();
+      const fields = {
+        userId: input.userId ?? null,
+        phone,
+        phoneKey,
+        granted: true,
+        grantedAt: now,
+        grantedSource: input.source,
+      };
+      await (
+        await storeWriter(storeId)
+      ).smsMarketingConsent.upsert({
+        where: { storeId_customerKey: { storeId, customerKey: input.customerKey } },
+        create: { id: crypto.randomUUID(), storeId, customerKey: input.customerKey, ...fields },
+        update: fields,
+      });
+      return true;
+    }
     await prisma.$executeRaw`
       INSERT INTO "sms_marketing_consents"
         ("id", "store_id", "customer_key", "user_id", "phone", "phone_key",
@@ -126,11 +148,47 @@ export class SmsConsentService {
     if (phoneKey) or.push({ phoneKey });
     if (target.userId) or.push({ customerKey: target.userId });
     if (or.length === 0) return 0;
-    const res = await prisma.smsMarketingConsent.updateMany({
+    // A DO store writes its own consent rows (same filter, same phone-wide withdrawal); Postgres is unchanged.
+    const writer =
+      (await storeRepo(storeId)).backend === 'do' ? await storeWriter(storeId) : prisma;
+    const res = await writer.smsMarketingConsent.updateMany({
       where: { storeId, granted: true, OR: or },
       data: { granted: false, revokedAt: new Date(), revokedSource: source },
     });
     return res.count;
+  }
+
+  /**
+   * The consent row an unsubscribe link (v3 token, store id inside) names, read from THAT store's own backend. Null when the
+   * store has no such row (a forged or re-paired store segment finds nothing: consent ids are random uuids).
+   */
+  static async lookupForUnsubscribe(
+    storeId: string,
+    consentId: string
+  ): Promise<{
+    id: string;
+    storeId: string;
+    phone: string;
+    granted: boolean;
+    store: { name: string; nameAr: string | null };
+  } | null> {
+    const db = await storeDb(storeId);
+    const row = await db.smsMarketingConsent.findFirst({
+      where: { id: consentId, storeId },
+      select: { id: true, phone: true, granted: true },
+    });
+    if (!row) return null;
+    const store = await db.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, nameAr: true },
+    });
+    return {
+      id: row.id,
+      storeId,
+      phone: row.phone,
+      granted: row.granted,
+      store: { name: store?.name ?? '', nameAr: store?.nameAr ?? null },
+    };
   }
 
   /**
@@ -146,13 +204,13 @@ export class SmsConsentService {
   ): Promise<{ id: string } | null> {
     const phoneKey = smsConsentPhoneKey(phone);
     if (!phoneKey) return null;
-    return withStore(storeId, tx =>
-      tx.smsMarketingConsent.findFirst({
-        where: { storeId, phoneKey, granted: true },
-        select: { id: true },
-        orderBy: { grantedAt: 'desc' },
-      })
-    );
+    // Through the store's own backend: a DO store's consent rows are on its Durable Object (`withStore` there only opens a
+    // lazy Postgres scope, POSTGRES_REMOVED); a Postgres store keeps the store-scoped read.
+    return (await storeDb(storeId)).smsMarketingConsent.findFirst({
+      where: { storeId, phoneKey, granted: true },
+      select: { id: true },
+      orderBy: { grantedAt: 'desc' },
+    });
   }
 
   /**

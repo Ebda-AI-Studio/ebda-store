@@ -224,6 +224,7 @@ describe.skipIf(e.E2E_DB === '1')(
 // NEON-ZERO-1 N-2..N-5/N-14: the public storefront + cart for a Durable Object store with Postgres unreachable.
 const PID = '11111111-1111-4111-8111-111111111111';
 const SID = '22222222-2222-4222-8222-222222222222';
+const PID_FULL = '44444444-4444-4444-8444-444444444444';
 describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachable', () => {
   const H = { 'x-store-id': SID, 'x-session-id': 'sess-neon-zero-1' };
   const api = (path: string, init?: RequestInit) =>
@@ -240,6 +241,42 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
     ['PDP', () => api('/public/products/p', { headers: H })],
     ['category list', () => api('/public/categories', { headers: H })],
     ['search', () => api('/public/products', { headers: { ...H, 'x-search-query': 'P' } })],
+    // 2026-11-09 P1 (POSTGRES_REMOVED from GET /public/products): every listing branch of ProductService.listPublic, not just
+    // the bare list. `sort=on_sale` (the Souq deals row) ran a raw Postgres statement for every store.
+    [
+      'product list sort=on_sale (deals row)',
+      () => api('/public/products?sort=on_sale', { headers: H }),
+    ],
+    [
+      'product list sort=on_sale + ids',
+      () => api(`/public/products?sort=on_sale&ids=${PID}`, { headers: H }),
+    ],
+    [
+      'product list sort=on_sale + category',
+      () => api('/public/products?sort=on_sale&category=no-such-cat', { headers: H }),
+    ],
+    ['product list sort=newest', () => api('/public/products?sort=newest', { headers: H })],
+    [
+      'product list sort=best_seller',
+      () => api('/public/products?sort=best_seller', { headers: H }),
+    ],
+    ['product list sort=price_asc', () => api('/public/products?sort=price_asc', { headers: H })],
+    ['product list sort=price_desc', () => api('/public/products?sort=price_desc', { headers: H })],
+    ['product list category', () => api('/public/products?category=no-such-cat', { headers: H })],
+    ['product list tag', () => api('/public/products?tag=sale', { headers: H })],
+    ['product list featured', () => api('/public/products?featured=true', { headers: H })],
+    [
+      'product list price range',
+      () => api('/public/products?minPrice=100&maxPrice=5000', { headers: H }),
+    ],
+    ['product list option facet', () => api('/public/products?opt_Size=L', { headers: H })],
+    ['product list ids', () => api(`/public/products?ids=${PID}`, { headers: H })],
+    ['product list cursor', () => api(`/public/products?cursor=${PID}`, { headers: H })],
+    ['product list page 2', () => api('/public/products?page=2&limit=1', { headers: H })],
+    [
+      'search sorted by price',
+      () => api('/public/products?sort=price_asc', { headers: { ...H, 'x-search-query': 'P' } }),
+    ],
     [
       'add to cart',
       () =>
@@ -325,6 +362,20 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
             name: 'P',
             slug: 'p',
             price: 1000,
+            // on sale (compare-at above price): the deals row must list it
+            compareAtPrice: 1500,
+            inventory: 5,
+            status: 'active',
+            hasVariants: false,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: PID_FULL,
+            storeId: SID,
+            name: 'Q',
+            slug: 'q',
+            price: 2000,
             inventory: 5,
             status: 'active',
             hasVariants: false,
@@ -342,10 +393,10 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
       expirationTtl: 600,
     });
   });
-  // Every route answers 2xx from the DO + D1 + KV alone. The checkout quote still needs two platform reads that are not in
-  // this PR: the plan entitlement (billing family, N-10a, served by D1 only after its cutover marker) and the per-store
-  // `store_features` override (N-10b). `it.fails` is the tripwire: it goes red the day the quote works, so the flag is flipped.
-  const blocked = new Set(['checkout quote']);
+  // Every route answers 2xx from the DO + D1 + KV alone. The checkout quote's platform reads (plan entitlement, billing family;
+  // `store_features`, platform family) are served by D1 even with no cutover marker in this harness: a Worker without Postgres
+  // has no other home for a family (2026-11-09, services/platform/cutover.ts). The `it.fails` tripwire went red; flipped.
+  const blocked = new Set<string>();
   const expect404 = new Set(['verify-payment (order read from the DO)']);
   for (const [name, call] of probe) {
     const run = async () => {
@@ -359,6 +410,14 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
     if (blocked.has(name)) it.fails(`${name} (blocked on N-10a/N-10b)`, run);
     else it(name, run);
   }
+  it('the deals row (sort=on_sale) lists exactly the on-sale product from the DO', async () => {
+    const r = await api('/public/products?sort=on_sale', {
+      headers: { ...H, 'x-forwarded-for': '10.9.9.9' },
+    });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { data: { products: Array<{ id: string }> } };
+    expect(body.data.products.map(p => p.id)).toEqual([PID]);
+  });
 });
 
 // NEON-ZERO-1 N-9 (Ruling NZ-A3): storefront CUSTOMER auth for a DO store is served by its StoreDO. With Postgres dead every
