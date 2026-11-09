@@ -6,6 +6,7 @@ import { SERVICE_LINE_CONTENT, type LineId } from '../lib/service-lines-content'
 import { serviceLinesPublished } from '../lib/service-lines';
 import { LINE_POWERED, LINE_UI } from '../lib/services-page';
 import { pagePath, type Locale } from '../lib/site';
+import '@/app/services.css';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';

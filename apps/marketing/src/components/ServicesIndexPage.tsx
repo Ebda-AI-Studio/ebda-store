@@ -4,6 +4,7 @@ import { COPY } from '../lib/content';
 import { SERVICE_LINE_CONTENT } from '../lib/service-lines-content';
 import { SERVICES_PAGE } from '../lib/services-page';
 import { pagePath, type Locale } from '../lib/site';
+import '@/app/services.css';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { ServicesGrid } from './ServicesGrid';
