@@ -99,3 +99,12 @@ describe('readStoreRecord (NEON-ZERO-1)', () => {
     expect(out.record).toHaveProperty('taxEnabled', false);
   });
 });
+
+describe('readStoreRecord: the exact field set the low-stock scan asks for (2026-11-09)', () => {
+  it('serves id, name, settings, ownerId without a refusal', () => {
+    const { sql } = rig();
+    const out = readStoreRecord(sql, META as never, 's1', ['id', 'name', 'settings', 'ownerId'])!;
+    expect(out.record).toMatchObject({ id: 's1', name: 'n', ownerId: 'o' });
+    expect(out.missing).toEqual([]);
+  });
+});
