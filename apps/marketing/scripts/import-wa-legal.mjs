@@ -29,7 +29,7 @@ for (const lang of ['ar', 'en']) {
         `  ${key}: ${JSON.stringify(
           {
             title: d.title,
-            meta: { version: '1.0', publishedAt: d.updated },
+            meta: { version: d.version, publishedAt: d.updated },
             ...(d.provisional ? { note: PROVISIONAL_NOTE[lang] } : {}),
             sections: d.sections,
           },

@@ -21,6 +21,7 @@ import { Reveal, StoryScroll } from './Motion';
 import { Product3D } from './Product3D';
 import { Phone } from './Devices';
 import { STORY_FRAMES } from '../lib/story-frames';
+import { ExploreLinks } from './ExploreLinks';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
@@ -300,6 +301,7 @@ export function Home({ locale }: { locale: Locale }) {
           {c.whatsapp.close}{' '}
           <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
         </p>
+        <ExploreLinks locale={locale} />
         <p className="close-login">
           <SiteLink href={LOGIN_URL} locale={locale}>
             {c.start.login}

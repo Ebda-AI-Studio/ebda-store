@@ -54,3 +54,27 @@
 /signup/ https://store.ebda.app/signup 302
 /en/signup https://store.ebda.app/signup 302
 /en/signup/ https://store.ebda.app/signup 302
+
+# Search Console coverage (2026-11-09): guessable and legacy URLs that answered 404 now land on the right page in ONE hop.
+# The store apps use an /ar locale prefix and the /for hub never existed; the policy slugs below are the common English guesses.
+/ar / 301
+/ar/ / 301
+/ar/* /:splat 301
+/for /store/#looks 301
+/for/ /store/#looks 301
+/en/for /en/store/#looks 301
+/en/for/ /en/store/#looks 301
+/about-us /about/ 301
+/contact-us /contact/ 301
+/privacy-policy /privacy/ 301
+/terms-of-service /terms/ 301
+/terms-and-conditions /terms/ 301
+/refund-policy /refund/ 301
+/returns /refund/ 301
+/en/about-us /en/about/ 301
+/en/contact-us /en/contact/ 301
+/en/privacy-policy /en/privacy/ 301
+/en/terms-of-service /en/terms/ 301
+/en/terms-and-conditions /en/terms/ 301
+/en/refund-policy /en/refund/ 301
+/en/returns /en/refund/ 301
