@@ -174,11 +174,24 @@ describe('StoreDO.mutate procedures and the settings copy (PR D1b)', () => {
     });
     const { encodeRpc } = await import('@ebda-src/repo');
     await stub.applySettings('mut-patch', encodeRpc({ settings: { base: 1 } }));
-    const [a, b] = await Promise.all([
+    const [a, b, t, sl] = await Promise.all([
       stub.patchSettings('mut-patch', encodeRpc({ json: { settings: { set: { a: 1 } } } })),
       stub.patchSettings('mut-patch', encodeRpc({ json: { settings: { set: { b: 2 } } } })),
+      stub.patchSettings('mut-patch', encodeRpc({ json: { theme: { set: { font: 'x' } } } })),
+      stub.patchSettings(
+        'mut-patch',
+        encodeRpc({ json: { socialLinks: { set: { instagram: 'u' } } } })
+      ),
     ]);
-    expect([a.ok, b.ok]).toEqual([true, true]);
+    expect([a.ok, b.ok, t.ok, sl.ok]).toEqual([true, true, true, true]);
+    // theme + social saves survive next to the settings saves (they used to read-merge-write their own column)
+    const cols = await runInDurableObject(stub, async d => {
+      const r = d.ctx.storage.sql
+        .exec("SELECT theme, social_links FROM store_profile WHERE store_id = 'mut-patch'")
+        .one();
+      return { theme: JSON.parse(r.theme as string), social: JSON.parse(r.social_links as string) };
+    });
+    expect(cols).toEqual({ theme: { font: 'x' }, social: { instagram: 'u' } });
     const settings = () =>
       runInDurableObject(stub, async d =>
         JSON.parse(

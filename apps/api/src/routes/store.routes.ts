@@ -12,11 +12,7 @@ import {
   withUser,
   asPlatformOperator,
 } from '@ebda/database';
-import {
-  StoreService,
-  applySocialLinksPatch,
-  type SocialLinksPatch,
-} from '../services/store.service';
+import { StoreService, type SocialLinksPatch } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { toSafeStoreResponse } from '../lib/store-response';
 import { resolveDomainService } from '../services/domain-provider';
@@ -1081,14 +1077,6 @@ function socialLinksPatch(incoming: unknown, rawBody: unknown): SocialLinksPatch
   return patch;
 }
 
-function mergeSocialLinks(
-  existingSocialLinks: unknown,
-  incoming: unknown,
-  rawBody: unknown
-): Prisma.InputJsonValue {
-  return applySocialLinksPatch(existingSocialLinks, socialLinksPatch(incoming, rawBody));
-}
-
 // PUT /stores/:id/social - Update store social links
 router.put(
   '/:id/social',
@@ -1101,10 +1089,7 @@ router.put(
       const { id } = req.params;
       const incoming = socialSchema.parse(req.body);
 
-      const existing = await StoreService.getById(id);
-      const merged = mergeSocialLinks(existing.socialLinks, incoming, req.body);
-
-      const store = await StoreService.updateSocialLinks(id, merged);
+      const store = await StoreService.patchSocialLinks(id, socialLinksPatch(incoming, req.body));
 
       res.json({
         success: true,

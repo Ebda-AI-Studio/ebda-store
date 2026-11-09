@@ -46,6 +46,35 @@ describe('patchStoreSettings', () => {
     }
   });
 
+  it('theme save, social save and settings save each interleave with a second writer of the SAME column and both survive', async () => {
+    const { sql } = rig();
+    applyStoreSettings(sql, META as never, 's1', {
+      settings: { base: 1 },
+      theme: { base: 1 },
+      socialLinks: { base: 'u' },
+    });
+    const patch = (json: Record<string, { set?: Record<string, unknown>; remove?: string[] }>) =>
+      Promise.resolve().then(() => patchStoreSettings(sql, META as never, 's1', { json }));
+    for (let i = 0; i < 20; i++) {
+      await Promise.all([
+        // PUT /theme and the branding bundle's theme part
+        patch({ theme: { set: { font: `f${i}` }, remove: ['gone'] } }),
+        patch({ theme: { set: { color: `c${i}` } } }),
+        // PUT /social and the bundle's social part
+        patch({ socialLinks: { set: { instagram: `i${i}` }, remove: ['tiktok'] } }),
+        patch({ socialLinks: { set: { x: `x${i}` } } }),
+        // settings save and a per-key setter
+        patch({ settings: { set: { contact: { i } } } }),
+        patch({ settings: { set: { floatingWidget: { i } } } }),
+      ]);
+      expect(read(sql, ['settings', 'theme', 'socialLinks']), `round ${i}`).toEqual({
+        settings: { base: 1, contact: { i }, floatingWidget: { i } },
+        theme: { base: 1, font: `f${i}`, color: `c${i}` },
+        socialLinks: { base: 'u', instagram: `i${i}`, x: `x${i}` },
+      });
+    }
+  });
+
   it('writes only the sent keys; theme/social support removal; plain fields ride the same transaction', () => {
     const { sql } = rig();
     applyStoreSettings(sql, META as never, 's1', {

@@ -1530,6 +1530,22 @@ export class StoreService {
   // is free to carry "remove" and a literal null is never persisted.
   static async updateTheme(storeId: string, theme: Record<string, unknown>) {
     const store = await this.getById(storeId);
+    if (await storeWritesToDo(storeId)) {
+      // DO store: the key patch is merged INSIDE the DO's transaction against the theme it holds now (no read-merge-write here).
+      const patched = await storePatchOnDo(storeId, {
+        json: {
+          theme: {
+            set: Object.fromEntries(Object.entries(theme).filter(([, v]) => v !== null)),
+            remove: Object.entries(theme)
+              .filter(([, v]) => v === null)
+              .map(([k]) => k),
+          },
+        },
+      });
+      await StoreService.invalidateCache(store);
+      await bustStoreCaches(patched.id, patched.slug, patched.domain);
+      return patched;
+    }
     const existingTheme = (store.theme as Record<string, unknown>) || {};
     const mergedTheme: Record<string, unknown> = { ...existingTheme, ...theme };
     for (const [k, v] of Object.entries(theme)) if (v === null) delete mergedTheme[k];
@@ -1593,6 +1609,24 @@ export class StoreService {
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
+  }
+
+  /**
+   * `PUT /:id/social`: apply a `{set, remove}` key patch. A DO store merges it inside the DO's transaction; a Postgres store reads,
+   * merges (`applySocialLinksPatch`) and writes through `updateSocialLinks`.
+   */
+  static async patchSocialLinks(storeId: string, patch: SocialLinksPatch) {
+    if (await storeWritesToDo(storeId)) {
+      const store = await this.getById(storeId);
+      const patched = await storePatchOnDo(storeId, {
+        json: { socialLinks: { set: patch.set, remove: patch.remove } },
+      });
+      await StoreService.invalidateCache(store);
+      await bustStoreCaches(patched.id, patched.slug, patched.domain);
+      return patched;
+    }
+    const existing = await this.getById(storeId);
+    return this.updateSocialLinks(storeId, applySocialLinksPatch(existing.socialLinks, patch));
   }
 
   static async updateContactInfo(

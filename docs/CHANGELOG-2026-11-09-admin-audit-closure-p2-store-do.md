@@ -4,4 +4,4 @@
 - `PUT /stores/:id/branding-bundle` social part is now a key patch (`{ set, remove }`), applied inside the DO on a DO store.
 - Ruling `CLOSURE-F2F3` deleted (rulings 1694 -> 1693); FP-5 and FP-8 note they are superseded for DO stores.
 - Tests: `packages/repo/test/rpc-settings-patch.test.ts`, `tests/unit/store-settings-patch-on-do.test.ts`.
-- Residual: `updateTheme` and the `PUT /:id/social` route on a DO store still read-merge-write their own column (separate surfaces, not the settings/bundle path).
+- `StoreService.updateTheme` (`PUT /:id/theme`) and the new `StoreService.patchSocialLinks` (`PUT /:id/social`) also send their key patch to `patchSettings` on a DO store (a `null` theme value is a `remove`), so a theme save, a social save and a settings save interleave without a lost update. Postgres stores keep the read-merge-write path. Tests: `tests/unit/store-settings-patch-on-do.test.ts`, the three-column interleave in `packages/repo/test/rpc-settings-patch.test.ts`, `apps/api/workers-do/mutate.test.ts`.

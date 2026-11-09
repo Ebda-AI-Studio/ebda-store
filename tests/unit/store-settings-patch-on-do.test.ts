@@ -113,4 +113,21 @@ describe('settings writers on a DO store send a key patch (BE:F-2 / BE:F-3)', ()
     expect(h.patch).toHaveBeenCalledTimes(1);
     expect(h.update).not.toHaveBeenCalled();
   });
+
+  it('updateTheme on a DO store sends ONE theme key patch (null removes a key) and never reads the theme to merge', async () => {
+    await StoreService.updateTheme(ID, { font: 'x', gone: null, color: '#fff' });
+    expect(h.patch).toHaveBeenCalledTimes(1);
+    expect(h.patch.mock.calls[0][0]).toBe(ID);
+    expect(h.patch.mock.calls[0][1]).toEqual({
+      json: { theme: { set: { font: 'x', color: '#fff' }, remove: ['gone'] } },
+    });
+  });
+
+  it('patchSocialLinks (PUT /:id/social) on a DO store sends the {set,remove} patch', async () => {
+    await StoreService.patchSocialLinks(ID, { set: { instagram: 'u' }, remove: ['tiktok'] });
+    expect(h.patch).toHaveBeenCalledTimes(1);
+    expect(h.patch.mock.calls[0][1]).toEqual({
+      json: { socialLinks: { set: { instagram: 'u' }, remove: ['tiktok'] } },
+    });
+  });
 });
