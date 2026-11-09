@@ -98,6 +98,32 @@ describe('cf-setup-local.sh → assert-cf-cache-bindings.sh', () => {
     expect(r.stdout + r.stderr).toMatch(/NO incremental-cache binding/);
   });
 
+  it.each(['true', 'false'])(
+    'web, OPENNEXT_CACHE=%s: a generator that dropped the version binding is caught (Ruling EDGE-BUILD-1)',
+    mode => {
+      // The generated config carries it, so the assertion passes first...
+      const ok = generateThenAssert('web', mode, mode);
+      expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+      const f = path.join(scratch, 'apps/web/wrangler.jsonc');
+      const generated = readFileSync(f, 'utf8');
+      expect(generated).toMatch(/"version_metadata": \{ "binding": "CF_VERSION_METADATA" \}/);
+      // ...and fails once the binding is gone or renamed: without it the two
+      // HTML edge caches have no build id and switch themselves off.
+      for (const broken of [
+        generated.replace(/^.*"version_metadata".*\n/m, ''),
+        generated.replace('CF_VERSION_METADATA', 'VERSION'),
+      ]) {
+        expect(broken).not.toBe(generated);
+        writeFileSync(f, broken);
+        const r = run('assert-cf-cache-bindings.sh', ['web'], { OPENNEXT_CACHE: mode });
+        expect(r.status).toBe(1);
+        expect(r.stdout + r.stderr).toMatch(
+          /NO version_metadata binding named CF_VERSION_METADATA/
+        );
+      }
+    }
+  );
+
   it.each(['admin', 'orders'])(
     '%s never carries cache bindings, whatever the variable says',
     app => {

@@ -54,10 +54,14 @@ let page: string;
 const waits: Promise<unknown>[] = [];
 const ctx = { waitUntil: (p: Promise<unknown>) => void waits.push(p) };
 const idOf = (host: string) => (host === HOST ? ID_A : ID_B);
+/** A Worker version id (Ruling EDGE-BUILD-1): every stored entry lives under it. */
+const BUILD = 'aaaaaaaa-1111-4111-8111-111111111111';
+const OTHER_BUILD = 'bbbbbbbb-2222-4222-8222-222222222222';
 const deps = (allow = parseAllowlist(`${HOST},${OTHER}`)): StoreEdgeDeps => ({
   allow,
   r2,
   cache,
+  build: BUILD,
   verdict: async host => ({ ok: true, id: idOf(host) }),
   now: () => clock,
 });
@@ -337,8 +341,8 @@ describe('cache key includes the store: no cross-tenant HTML', () => {
     const a = await get(`https://${HOST}/ar/products/abaya`, {}, deps(ALL));
     expect([a.state, a.body]).toEqual(['HIT', 'store A page']);
     expect([...cache.m.keys()].sort()).toEqual([
-      `https://${HOST}/ar/products/abaya?__edge=store`,
-      `https://${OTHER}/ar/products/abaya?__edge=store`,
+      `https://${HOST}/ar/products/abaya?__edge=store&__build=${BUILD}`,
+      `https://${OTHER}/ar/products/abaya?__edge=store&__build=${BUILD}`,
     ]);
   });
 });
@@ -358,7 +362,7 @@ describe('first visitor on a /ar|/en page (the viral path)', () => {
     const first = await serve(`https://${HOST}/ar`);
     expect(first.headers.get('x-store-edge')).toBe('MISS');
     expect(first.headers.get('set-cookie')).toContain('force-language=ar');
-    const stored = cache.m.get(`https://${HOST}/ar?__edge=store`);
+    const stored = cache.m.get(`https://${HOST}/ar?__edge=store&__build=${BUILD}`);
     expect(stored?.headers.get('set-cookie')).toBeNull();
     const second = await serve(`https://${HOST}/ar`);
     expect(second.headers.get('x-store-edge')).toBe('HIT');
@@ -526,6 +530,7 @@ describe('Ruling STORE-EDGE-3: the demo layer and this layer share caches.defaul
         { waitUntil: p => void c.push(p) },
         r => serveStoreEdge(r, { waitUntil: p => void c.push(p) }, next, storeDeps),
         async () => true,
+        BUILD,
         shared as never
       );
       await Promise.all(c);
@@ -539,8 +544,8 @@ describe('Ruling STORE-EDGE-3: the demo layer and this layer share caches.defaul
     expect(third.headers.get('x-demo-edge')).toBe('HIT');
     expect(n).toBe(1);
     expect([...shared.m.keys()].sort()).toEqual([
-      `https://${demoHost}/ar`,
-      `https://${demoHost}/ar?__edge=store`,
+      `https://${demoHost}/ar?__build=${BUILD}`,
+      `https://${demoHost}/ar?__edge=store&__build=${BUILD}`,
     ]);
   });
 });
@@ -558,5 +563,66 @@ describe('Ruling STORE-EDGE-3: link previews and crawlers (Accept */* or none) a
     const r = new Request(`https://${HOST}/ar`, { headers });
     if (accept !== null) r.headers.set('accept', accept as string);
     expect(storeEdgeKey(r, ALL) !== null).toBe(ok);
+  });
+});
+
+describe('Ruling EDGE-BUILD-1: a copy rendered by one build is never served by another', () => {
+  const of = (build: string | null): StoreEdgeDeps => ({ ...deps(ALL), build });
+  it('build B misses on the entry build A stored a moment ago, and renders its own page', async () => {
+    page = '<script src="/_next/static/chunks/old-build.js"></script>';
+    expect((await get(`https://${HOST}/ar`, {}, of(BUILD))).state).toBe('MISS');
+    clock += 1_000;
+    const sameBuild = await get(`https://${HOST}/ar`, {}, of(BUILD));
+    expect([sameBuild.state, sameBuild.body]).toEqual(['HIT', page]);
+
+    // The deploy: same store, same path, no store write (so no epoch moved), one second later.
+    page = '<script src="/_next/static/chunks/new-build.js"></script>';
+    clock += 1_000;
+    const afterDeploy = await get(`https://${HOST}/ar`, {}, of(OTHER_BUILD));
+    expect(afterDeploy.state).toBe('MISS');
+    expect(afterDeploy.body).toContain('new-build.js');
+    expect(afterDeploy.body).not.toContain('old-build.js');
+    expect([...cache.m.keys()].sort()).toEqual([
+      `https://${HOST}/ar?__edge=store&__build=${BUILD}`,
+      `https://${HOST}/ar?__edge=store&__build=${OTHER_BUILD}`,
+    ]);
+  });
+  it('the stale window never reaches across a deploy either', async () => {
+    page = 'old-build';
+    await get(`https://${HOST}/ar`, {}, of(BUILD));
+    clock += (STORE_EDGE_FRESH_S + 5) * 1000;
+    expect((await get(`https://${HOST}/ar`, {}, of(BUILD))).state).toBe('STALE');
+    page = 'new-build';
+    const next = await get(`https://${HOST}/ar`, {}, of(OTHER_BUILD));
+    expect([next.state, next.body]).toEqual(['MISS', 'new-build']);
+  });
+  it('a store purge still reaches every build (the epoch is per store, not per build)', async () => {
+    await get(`https://${HOST}/ar`, {}, of(BUILD));
+    await get(`https://${HOST}/ar`, {}, of(OTHER_BUILD));
+    clock += 5_000;
+    await bumpEpochs(r2, [`products:${ID_A}`], clock);
+    clock += 1_500;
+    expect((await get(`https://${HOST}/ar`, {}, of(BUILD))).state).toBe('MISS');
+    expect((await get(`https://${HOST}/ar`, {}, of(OTHER_BUILD))).state).toBe('MISS');
+  });
+  it('no build id: nothing is read and nothing is stored', async () => {
+    await get(`https://${HOST}/ar`, {}, of(BUILD));
+    const before = [...cache.m.keys()];
+    const a = await get(`https://${HOST}/ar`, {}, of(null));
+    const b = await get(`https://${HOST}/ar`, {}, of(null));
+    expect([a.state, b.state]).toEqual([null, null]);
+    expect(renders).toBe(3);
+    expect([...cache.m.keys()]).toEqual(before);
+  });
+  it('an entry stored before this ruling (no build in its key) is never read', async () => {
+    page = 'pre-ruling';
+    await get(`https://${HOST}/ar`, {}, of(BUILD));
+    const key = `https://${HOST}/ar?__edge=store`;
+    cache.m.set(key, cache.m.get(`${key}&__build=${BUILD}`)!.clone());
+    cache.m.delete(`${key}&__build=${BUILD}`);
+    page = 'new-build';
+    clock += 1_000;
+    const r = await get(`https://${HOST}/ar`, {}, of(BUILD));
+    expect([r.state, r.body]).toEqual(['MISS', 'new-build']);
   });
 });

@@ -16,6 +16,8 @@ import {
 } from '../../apps/web/store-edge-cache';
 
 const RENDER_NONCE = 'AAAAAAAAAAAAAAAAAAAAAA==';
+/** A Worker version id (Ruling EDGE-BUILD-1): every stored entry lives under it. */
+const BUILD = 'aaaaaaaa-1111-4111-8111-111111111111';
 const page = (n: string) =>
   `<html><head><script nonce="${n}">dark()</script></head><body>` +
   `<script nonce="${n}">self.__next_f.push([1,"{\\"nonce\\":\\"${n}\\"}"])</script></body></html>`;
@@ -82,6 +84,7 @@ describe('demo edge cache', () => {
       c,
       async () => rendered(),
       async () => true,
+      BUILD,
       cache
     );
     await c.settle();
@@ -91,6 +94,7 @@ describe('demo edge cache', () => {
       ctx(),
       async () => rendered(),
       async () => true,
+      BUILD,
       cache
     );
     const b = await serveDemoEdge(
@@ -98,6 +102,7 @@ describe('demo edge cache', () => {
       ctx(),
       async () => rendered(),
       async () => true,
+      BUILD,
       cache
     );
     expect(a.headers.get('x-demo-edge')).toBe('HIT');
@@ -126,6 +131,7 @@ describe('store edge cache', () => {
       allow: parseAllowlist('shop-a.ebda.app'),
       r2,
       cache,
+      build: BUILD,
       verdict: async () => ({ ok: true, id: 'id-a' }),
       now: () => 1_000_000,
     };

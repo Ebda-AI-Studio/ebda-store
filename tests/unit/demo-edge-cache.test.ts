@@ -2,8 +2,9 @@
 //  1 per-visitor state (any cookie / consent / auth is never cached),
 //  2 scope (a real store, spoofed Host-ish headers, case, trailing dot, port, custom domain are never cached),
 //  3 parser differential (unknown/malformed/repeated look, extra params, odd paths never get a key).
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  DEMO_EDGE_FRESH_S,
   demoEdgeKey,
   isDemoStoreHost,
   resetDemoVerdicts,
@@ -14,6 +15,9 @@ import {
 const req = (url: string, headers: Record<string, string> = {}, method = 'GET') =>
   new Request(url, { method, headers: { accept: 'text/html', ...headers } });
 const D = 'https://storedemo.ebda.app';
+/** A Worker version id (Ruling EDGE-BUILD-1): every stored entry lives under it. */
+const BUILD = 'aaaaaaaa-1111-4111-8111-111111111111';
+const OTHER_BUILD = 'bbbbbbbb-2222-4222-8222-222222222222';
 
 describe('finding 3: the key is built from a strict allowlist', () => {
   it('keys host + path + a built look only', () => {
@@ -156,7 +160,7 @@ describe('finding 1: no per-visitor state is ever cached', () => {
     const origin = async () => (renders++, html());
     const c = ctx();
     for (const cookie of ['force-cookie-consent=granted', 'force-cookie-consent=denied'])
-      await serveDemoEdge(req(`${D}/`, { cookie }), c, origin, async () => true, cache);
+      await serveDemoEdge(req(`${D}/`, { cookie }), c, origin, async () => true, BUILD, cache);
     await c.settle();
     expect(renders).toBe(2);
     expect(cache.m.size).toBe(0);
@@ -188,13 +192,20 @@ describe('serveDemoEdge', () => {
     let renders = 0;
     const origin = async () => (renders++, html());
     const c1 = ctx();
-    const r1 = await serveDemoEdge(req(`${D}/?look=qamar.lookbook`), c1, origin, yes, cache);
+    const r1 = await serveDemoEdge(req(`${D}/?look=qamar.lookbook`), c1, origin, yes, BUILD, cache);
     await c1.settle();
     expect(r1.headers.get('x-demo-edge')).toBe('MISS');
     expect(r1.headers.get('cache-control')).toBe('private, no-store');
     expect(DEMO_EDGE_CACHE_CONTROL).toBe('private, no-store');
     expect(r1.headers.get('x-demo-cache')).toBe('miss');
-    const r2 = await serveDemoEdge(req(`${D}/?look=qamar.lookbook`), ctx(), origin, yes, cache);
+    const r2 = await serveDemoEdge(
+      req(`${D}/?look=qamar.lookbook`),
+      ctx(),
+      origin,
+      yes,
+      BUILD,
+      cache
+    );
     expect(r2.headers.get('x-demo-edge')).toBe('HIT');
     expect(r2.headers.get('x-demo-cache')).toBe('hit');
     expect(r2.headers.get('cache-control')).toBe('private, no-store');
@@ -203,7 +214,7 @@ describe('serveDemoEdge', () => {
   it('a HIT or STALE never waits for the resolver (entries exist only after a passed verdict)', async () => {
     const cache = fakeCache();
     const c = ctx();
-    await serveDemoEdge(req(`${D}/x`), c, async () => html(), yes, cache);
+    await serveDemoEdge(req(`${D}/x`), c, async () => html(), yes, BUILD, cache);
     await c.settle();
     let asked = 0;
     const r = await serveDemoEdge(
@@ -211,6 +222,7 @@ describe('serveDemoEdge', () => {
       ctx(),
       async () => html(),
       async () => (asked++, false),
+      BUILD,
       cache
     );
     expect(r.headers.get('x-demo-edge')).toBe('HIT');
@@ -224,6 +236,7 @@ describe('serveDemoEdge', () => {
       c,
       async () => html(),
       async () => false,
+      BUILD,
       cache
     );
     await c.settle();
@@ -237,6 +250,7 @@ describe('serveDemoEdge', () => {
       ctx(),
       async () => html(),
       yes,
+      BUILD,
       cache
     );
     expect(r.headers.get('cache-control')).toBe('private, no-store');
@@ -251,6 +265,7 @@ describe('serveDemoEdge', () => {
       c,
       async () => new Response('x', { status: 404, headers: { 'content-type': 'text/html' } }),
       yes,
+      BUILD,
       cache
     );
     await serveDemoEdge(
@@ -259,6 +274,7 @@ describe('serveDemoEdge', () => {
       async () =>
         new Response('x', { headers: { 'content-type': 'text/html', 'set-cookie': 'a=b' } }),
       yes,
+      BUILD,
       cache
     );
     await c.settle();
@@ -281,10 +297,10 @@ describe('first cookie-less visitor on a /ar|/en page (Ruling STORE-EDGE-2, meas
       });
     };
     const c = ctx();
-    await serveDemoEdge(req(`${D}/ar`), c, origin, yes, cache);
+    await serveDemoEdge(req(`${D}/ar`), c, origin, yes, BUILD, cache);
     await c.settle();
-    expect(cache.m.get(`${D}/ar`)?.headers.get('set-cookie')).toBeNull();
-    const hit = await serveDemoEdge(req(`${D}/ar`), ctx(), origin, yes, cache);
+    expect(cache.m.get(`${D}/ar?__build=${BUILD}`)?.headers.get('set-cookie')).toBeNull();
+    const hit = await serveDemoEdge(req(`${D}/ar`), ctx(), origin, yes, BUILD, cache);
     expect(hit.headers.get('x-demo-edge')).toBe('HIT');
     expect(hit.headers.get('set-cookie')).toContain('force-language=ar');
     const cookied = await serveDemoEdge(
@@ -292,6 +308,7 @@ describe('first cookie-less visitor on a /ar|/en page (Ruling STORE-EDGE-2, meas
       ctx(),
       origin,
       yes,
+      BUILD,
       cache
     );
     expect(cookied.headers.get('x-demo-edge')).toBe('HIT');
@@ -309,9 +326,123 @@ describe('first cookie-less visitor on a /ar|/en page (Ruling STORE-EDGE-2, meas
           headers: { 'content-type': 'text/html', 'set-cookie': 'sid=1; Path=/' },
         }),
       yes,
+      BUILD,
       cache
     );
     await c.settle();
     expect(cache.m.size).toBe(0);
+  });
+});
+
+describe('Ruling EDGE-BUILD-1: a copy rendered by one build is never served by another', () => {
+  beforeEach(() => resetDemoVerdicts());
+  const pageOf = (chunk: string) => async () =>
+    new Response(`<html><script src="/_next/static/chunks/${chunk}.js"></script></html>`, {
+      headers: { 'content-type': 'text/html' },
+    });
+  it('build B misses on the entry build A stored, and renders its own page', async () => {
+    const cache = fakeCache();
+    const c = ctx();
+    await serveDemoEdge(req(`${D}/en`), c, pageOf('old-build'), yes, BUILD, cache);
+    await c.settle();
+    const sameBuild = await serveDemoEdge(
+      req(`${D}/en`),
+      ctx(),
+      pageOf('never'),
+      yes,
+      BUILD,
+      cache
+    );
+    expect(sameBuild.headers.get('x-demo-edge')).toBe('HIT');
+    expect(await sameBuild.text()).toContain('old-build.js');
+
+    const c2 = ctx();
+    const afterDeploy = await serveDemoEdge(
+      req(`${D}/en`),
+      c2,
+      pageOf('new-build'),
+      yes,
+      OTHER_BUILD,
+      cache
+    );
+    await c2.settle();
+    expect(afterDeploy.headers.get('x-demo-edge')).toBe('MISS');
+    const body = await afterDeploy.text();
+    expect(body).toContain('new-build.js');
+    expect(body).not.toContain('old-build.js');
+    expect([...cache.m.keys()].sort()).toEqual([
+      `${D}/en?__build=${BUILD}`,
+      `${D}/en?__build=${OTHER_BUILD}`,
+    ]);
+  });
+  it('the 24 h stale window never reaches across a deploy (the 2026-11-09 /en failure)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_800_000_000_000);
+      const cache = fakeCache();
+      const c = ctx();
+      await serveDemoEdge(req(`${D}/en`), c, pageOf('old-build'), yes, BUILD, cache);
+      await c.settle();
+      // Past the fresh window: the SAME build may serve it stale...
+      vi.setSystemTime(1_800_000_000_000 + (DEMO_EDGE_FRESH_S + 60) * 1000);
+      const c1 = ctx();
+      const stale = await serveDemoEdge(req(`${D}/en`), c1, pageOf('old-build'), yes, BUILD, cache);
+      await c1.settle();
+      expect(stale.headers.get('x-demo-edge')).toBe('STALE');
+      // ...the next build never does.
+      const c2 = ctx();
+      const next = await serveDemoEdge(
+        req(`${D}/en`),
+        c2,
+        pageOf('new-build'),
+        yes,
+        OTHER_BUILD,
+        cache
+      );
+      await c2.settle();
+      expect(next.headers.get('x-demo-edge')).toBe('MISS');
+      expect(await next.text()).not.toContain('old-build.js');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a rollback to build A reads build A entries again, never build B ones', async () => {
+    const cache = fakeCache();
+    for (const [build, chunk] of [
+      [BUILD, 'a'],
+      [OTHER_BUILD, 'b'],
+    ] as const) {
+      const c = ctx();
+      await serveDemoEdge(req(`${D}/ar`), c, pageOf(chunk), yes, build, cache);
+      await c.settle();
+    }
+    const back = await serveDemoEdge(req(`${D}/ar`), ctx(), pageOf('never'), yes, BUILD, cache);
+    expect(back.headers.get('x-demo-edge')).toBe('HIT');
+    expect(await back.text()).toContain('/chunks/a.js');
+  });
+  it('no build id: nothing is read and nothing is stored', async () => {
+    const cache = fakeCache();
+    cache.m.set(`${D}/en`, await pageOf('legacy-entry')());
+    let renders = 0;
+    const origin = async () => (renders++, html());
+    const c = ctx();
+    for (let i = 0; i < 2; i++) {
+      const r = await serveDemoEdge(req(`${D}/en`), c, origin, yes, null, cache);
+      expect(r.headers.get('x-demo-edge')).toBeNull();
+    }
+    await c.settle();
+    expect(renders).toBe(2);
+    expect([...cache.m.keys()]).toEqual([`${D}/en`]);
+  });
+  it('an entry stored before this ruling (no build in its key) is never read', async () => {
+    const cache = fakeCache();
+    const legacy = await pageOf('pre-ruling')();
+    legacy.headers.set('x-edge-cached-at', String(Date.now()));
+    cache.m.set(`${D}/en`, legacy);
+    const c = ctx();
+    const r = await serveDemoEdge(req(`${D}/en`), c, pageOf('new-build'), yes, BUILD, cache);
+    await c.settle();
+    expect(r.headers.get('x-demo-edge')).toBe('MISS');
+    expect(await r.text()).toContain('new-build.js');
   });
 });
