@@ -164,3 +164,32 @@ describe('source guard: a category write never clears only the API cache', () =>
     expect(offenders).toEqual([]);
   });
 });
+
+describe('no dead invalidator (an invalidate* with zero call sites is a bug)', () => {
+  it('every exported invalidate* in public-cache.ts is called somewhere in apps/api/src', () => {
+    const root = path.resolve(__dirname, '../../apps/api/src');
+    const lib = readFileSync(path.join(root, 'lib/public-cache.ts'), 'utf8');
+    const names = [...lib.matchAll(/export async function (invalidate\w+)\(/g)].map(m => m[1]!);
+    expect(names.length).toBeGreaterThan(3);
+    const sources: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = path.join(dir, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.ts$/.test(name) && !/\.test\.ts$/.test(name)) {
+          const src = readFileSync(p, 'utf8');
+          // public-cache.ts itself counts only for calls from its other functions.
+          sources.push(
+            p.endsWith(path.join('lib', 'public-cache.ts'))
+              ? src.replace(/export async function invalidate\w+\(/g, '')
+              : src
+          );
+        }
+      }
+    };
+    walk(root);
+    const all = sources.join('\n');
+    const dead = names.filter(n => !new RegExp(`\\b${n}\\(`).test(all));
+    expect(dead).toEqual([]);
+  });
+});

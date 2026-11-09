@@ -11,7 +11,6 @@
 import { randomUUID } from 'node:crypto';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
-import { prisma } from '@ebda/database';
 import { AIService } from './ai.service';
 import { invalidateStoreCategoriesCaches } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';

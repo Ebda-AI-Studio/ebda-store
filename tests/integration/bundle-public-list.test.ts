@@ -121,8 +121,8 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
   // after it. Unlike the tests above (which seed via the DB-direct
   // `seedBundle`/`setStock` fixtures — now fixed to invalidate too, see
   // their doc comments), these go through the REAL admin POST/PUT routes,
-  // proving the routes' own `invalidateStoreProductCaches` /
-  // `invalidateStoreBundlesCache` calls actually keep the public list live.
+  // proving the routes' own `invalidateStoreProductCaches` calls (the only
+  // bundle invalidator) actually keep the public list live.
   it('create bundle via the admin route → public list shows it on the very next request', async () => {
     const productId = await seedProduct(store.storeId, `${suffix}-create`, {
       price: 700,
