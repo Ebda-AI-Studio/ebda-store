@@ -26,6 +26,8 @@ vi.mock('@api/middleware/security', () => {
   const pass = (_q: unknown, _s: unknown, n: () => void) => n();
   return {
     authLimiter: pass,
+    authIpFailureLimiter: pass,
+    authIpAllLimiter: pass,
     refreshLimiter: pass,
     refreshIpLimiter: pass,
     resetEmailLimiter: pass,

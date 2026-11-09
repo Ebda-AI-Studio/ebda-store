@@ -59,6 +59,11 @@
   margin: 0;
   padding: 0;
   white-space: nowrap;
+  flex: none; /* the row scrolls sideways on a phone; shrinking the list squeezed a link onto two lines and grew the bar to 60px */
+}
+.product-links li {
+  display: flex;
+  flex: none;
 }
 .product-links a {
   display: inline-flex;

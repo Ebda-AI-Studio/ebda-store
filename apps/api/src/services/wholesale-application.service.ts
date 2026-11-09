@@ -5,6 +5,7 @@
  * the application only and is never an identity. Applicant PII (business name, phone, commercial reg. no.) is covered by the
  * customer export and erasure (auth.service) and cascades with the store.
  */
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { prisma } from '@ebda/database';
 import { storeDb, storeWriter } from '../lib/repo-factory';
@@ -142,9 +143,11 @@ export const WholesaleApplicationService = {
           select: appSelect,
         })
       );
-      void notify(storeId, 'received', user, input.businessName);
+      void deferAfterTenantCommit('wholesale.notify-received', () =>
+        notify(storeId, 'received', user, input.businessName)
+      );
       // Fail-soft (not money): a merchant-notification failure never un-creates the application.
-      void (async () => {
+      void deferAfterTenantCommit('wholesale.notify-merchant', async () => {
         try {
           const pendingCount = await (
             await storeDb(storeId)
@@ -161,7 +164,7 @@ export const WholesaleApplicationService = {
             '[wholesale] merchant notification failed (application kept)'
           );
         }
-      })();
+      });
       return created;
     } catch (err) {
       if ((err as { code?: string })?.code === 'P2002') {
@@ -319,7 +322,10 @@ export const WholesaleApplicationService = {
             where: { id: app.userId, storeId },
             select: { email: true, firstName: true, lastName: true },
           });
-    if (user) void notify(storeId, 'approved', user, app.businessName);
+    if (user)
+      void deferAfterTenantCommit('wholesale.notify-approved', () =>
+        notify(storeId, 'approved', user, app.businessName)
+      );
     return updated;
   },
 
@@ -360,7 +366,10 @@ export const WholesaleApplicationService = {
             where: { id: app.userId, storeId },
             select: { email: true, firstName: true, lastName: true },
           });
-    if (user) void notify(storeId, 'rejected', user, app.businessName, note);
+    if (user)
+      void deferAfterTenantCommit('wholesale.notify-rejected', () =>
+        notify(storeId, 'rejected', user, app.businessName, note)
+      );
     return updated;
   },
 

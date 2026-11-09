@@ -12,6 +12,7 @@ import { hubOnD1 } from './platform-hub';
 import { d1DirectoryEntries } from '../services/platform/directory-entries';
 import { platformUserScopeIsLazy } from '../services/platform/cutover';
 import { backendFor } from './store-backend';
+import { storeHasNoDataHere } from './store-pg-gone';
 import { AppError } from '../middleware/error-handler';
 
 export async function resolveStoreScope(storeId: string): Promise<'pg' | 'no-pg'> {
@@ -33,5 +34,6 @@ export async function resolveStoreScope(storeId: string): Promise<'pg' | 'no-pg'
 setScopeResolver({
   lazyForStore: async storeId => (await resolveStoreScope(storeId)) === 'no-pg',
   lazyForUser: platformUserScopeIsLazy,
+  skipStore: storeHasNoDataHere,
   directory: d1DirectoryEntries,
 });
