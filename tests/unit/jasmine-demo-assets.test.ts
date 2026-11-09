@@ -43,12 +43,14 @@ describe('jasmine demo assets: files', () => {
   it('exactly the images the catalogue and the home document name', () => {
     expect([...files].sort()).toEqual([...JASMINE_IMAGE_FILES].sort());
   });
-  it('every file is a WebP, <= 140 KB', () => {
+  it('every file is a WebP, <= 140 KB (heroes -2k: <= 400 KB)', () => {
     for (const f of files) {
       const buf = readFileSync(path.join(dir, f));
       expect(buf.subarray(0, 4).toString('latin1'), f).toBe('RIFF');
       expect(buf.subarray(8, 12).toString('latin1'), f).toBe('WEBP');
-      expect(statSync(path.join(dir, f)).size, f).toBeLessThanOrEqual(140 * KB);
+      expect(statSync(path.join(dir, f)).size, f).toBeLessThanOrEqual(
+        /-2k\.webp$/.test(f) ? 400 * KB : 140 * KB
+      );
     }
   });
   it('the whole set is <= 8 MB', () => {

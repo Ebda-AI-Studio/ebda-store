@@ -32,3 +32,7 @@ The 29 WebP files in `assets/` are AI-generated ILLUSTRATIVE samples (Ruling TPL
 - **Served from:** locally `LAMMA_DEMO_ASSET_BASE=/__lamma-demo` (an untracked copy under
   `apps/web/public/__lamma-demo/`, deleted afterwards); in production the R2 prefix `demo/lamma/`
   (`https://media.ebda.app/demo/lamma`), uploaded by the controller after merge.
+
+## Hero re-render (Ruling HERO-HIRES-1, 2026-11-09)
+
+The hero stills (`hero-*-2k.webp`) are 2048x1152 AI-generated illustrative samples: Cloudflare Workers AI FLUX.2 [dev] re-rendered the earlier 1024x576 still (kept as the reference image, same composition and palette), prompts in `prompts.py` plus the style line in `scripts/hero-hires/hires.py`. Hero budget <= 400 KB each. No stock photo, no real person, no third-party image.
