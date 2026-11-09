@@ -174,7 +174,8 @@ export function jsonLd(
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
   const brand = `${SITE_URL}/#store`;
-  const site = `${SITE_URL}/#website`;
+  // the studio home owns #website (studioJsonLd); this is the Ebda Store site, so it gets its own id
+  const site = `${SITE_URL}/#website-store`;
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -190,8 +191,6 @@ export function jsonLd(
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
-        // No verified public profiles yet; add real ones only (never a guessed handle).
-        sameAs: [] as string[],
       },
       {
         // The product as a brand: "Ebda Store" (ابدأ ستور), made by the studio above.
@@ -203,7 +202,6 @@ export function jsonLd(
         logo: `${SITE_URL}/logo-store.png`,
         email: BRAND.supportEmail,
         parentOrganization: { '@id': org },
-        sameAs: [] as string[],
       },
       {
         '@type': 'WebSite',
@@ -285,7 +283,6 @@ export function studioJsonLd(locale: Locale) {
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
-        sameAs: [] as string[],
       },
       {
         '@type': 'WebSite',
@@ -304,7 +301,6 @@ export function studioJsonLd(locale: Locale) {
         alternateName: [BRAND.product.nameAr, brandLine()],
         url: absoluteUrl(STORE_HOME[locale]),
         parentOrganization: { '@id': org },
-        sameAs: [] as string[],
       },
       {
         '@type': 'Organization',
@@ -313,7 +309,6 @@ export function studioJsonLd(locale: Locale) {
         alternateName: [BRAND.productWhatsapp.nameAr, whatsappBrandLine()],
         url: absoluteUrl(pagePath(locale, 'whatsapp')),
         parentOrganization: { '@id': org },
-        sameAs: [] as string[],
       },
     ],
   };
@@ -342,7 +337,6 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
-        sameAs: [] as string[],
       },
       {
         '@type': 'Organization',
@@ -351,7 +345,6 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         alternateName: [BRAND.productWhatsapp.nameAr, whatsappBrandLine()],
         url: absoluteUrl(pagePath(locale, 'whatsapp')),
         parentOrganization: { '@id': org },
-        sameAs: [] as string[],
       },
       {
         '@type': 'SoftwareApplication',

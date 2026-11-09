@@ -24,6 +24,8 @@ Besides its two products, Ebda AI Studio offers services in seven categories (wo
 - [Ebda Store landing (Arabic, Egyptian colloquial)](https://ebda.app/store/): how it works in four steps, five templates with three looks each as working phone previews (open a product, add to cart), features, payments and shipping, pricing and plan comparison, FAQ
 - [Ebda Store landing (English)](https://ebda.app/en/store/): the same in English
 - [About Ebda AI Studio](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda Store, the Ebda AI Studio story, contact
+- [Contact Ebda AI Studio](https://ebda.app/contact/) ([English](https://ebda.app/en/contact/)): email, WhatsApp, office address, enquiry form
+- [Credits](https://ebda.app/credits/) ([English](https://ebda.app/en/credits/)): photo and 3D model credits
 - [Fashion store](https://ebda.app/for/fashion/)
 - [Electronics store](https://ebda.app/for/electronics/)
 - [Beauty store](https://ebda.app/for/beauty/)

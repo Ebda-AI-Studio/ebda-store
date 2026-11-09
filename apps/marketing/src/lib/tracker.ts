@@ -18,7 +18,7 @@ export function getTracker(): Tracker | null {
         metaPixelId: process.env.NEXT_PUBLIC_EBDA_META_PIXEL_ID,
         posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-        privacyUrl: pagePath(lang, 'privacy'),
+        privacyUrl: `${pagePath(lang, 'privacy')}/`,
       },
       window
     );
