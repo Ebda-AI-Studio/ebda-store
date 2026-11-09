@@ -116,12 +116,11 @@
     },
     "apps/api/src/services/auth.service.ts": {
       "kind": "platform",
-      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route. Same for the SMS-marketing consent rows in that export (made DO-writable 2026-11-09; listed in not-on-do.json postgresOnly).",
+      "reason": "eraseAccount's Postgres transaction deliberately runs for the platform rows and the PRE-CUTOVER copy of a DO store's campaign recipients (it runs after the doMoney.eraseShopper branch, CF-R6A erasure); the DO half is erased in the DO. The data export (Art. 20) also reads the shopper's address and wholesale rows from Postgres; a DO-store shopper's export is the customer-auth exportCustomer port, not a merchant admin route. The SMS-marketing consent rows in that export are read through storeDb (DO-writable since 2026-11-09, ported in the consent residue branch).",
       "models": {
         "campaignRecipient": 1,
         "address": 1,
-        "wholesaleApplication": 1,
-        "smsMarketingConsent": 1
+        "wholesaleApplication": 1
       }
     },
     "apps/api/src/services/barcode-scan.service.ts": {
