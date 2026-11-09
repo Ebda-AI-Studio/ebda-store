@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import * as realZod from 'zod';
+import * as realZod from 'zod/v4'; // the root's `z` is this namespace (bare 'zod' is banned by zod-imports-use-v3)
 import * as shim from '../../../apps/api/src/cf/stubs/zod-root';
 
 // Ruling BUNDLE-BUDGET-9: wrangler.jsonc aliases exactly `zod` to apps/api/src/cf/stubs/zod-root.ts, because
