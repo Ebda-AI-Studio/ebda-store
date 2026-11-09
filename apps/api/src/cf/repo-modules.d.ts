@@ -123,6 +123,7 @@ declare module '@ebda-src/repo' {
   export function ensureSearchIndex(db: SyncSql): void;
   export function ensurePaymentSchema(db: SyncSql): void;
   export function purgeErasureLedger(db: SyncSql, now?: number): number;
+  export function scrubUserFromStoreDo(db: SyncSql, userId: string): { rows: number };
   /** Storefront customer auth on the StoreDO (N-9; rpc/customer-auth.ts). */
   export type AuthAnswer =
     | { ok: true; json: string }

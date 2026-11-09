@@ -37,6 +37,8 @@ const apiVars = {
   // StoreDO spike (lib/store-backend.ts): one flagged id + the operator seed secret.
   STORE_DO_ENABLED_IDS: 'spike-store-1',
   STORE_DO_SEED_TOKEN: 'workers-test-seed-token',
+  // Ruling DEMO-SEED-DO-1: the demo-home operator channel (routes/demo-home.routes.ts); workers-test/demo-home.test.ts.
+  DEMO_SEED_TOKEN: 'workers-test-demo-seed-token-0123456789',
   // Ruling NZ-MONEY-2: the index-retry alarm floor (30 s in production), short so money-path.test.ts watches a retry drain.
   STORE_DO_INDEX_RETRY_MS: '500',
   // The alerts webhook bridge fails closed without a token; a sweep request carries none, so it answers 401, not 503.

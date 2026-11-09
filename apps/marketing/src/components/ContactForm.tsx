@@ -306,7 +306,7 @@ export function ContactForm({ locale }: { locale: Locale }) {
             <input {...fieldProps('consent')} type="checkbox" required />
             <label htmlFor={id('consent')}>
               {f.consentBefore}
-              <a href={pagePath(locale, 'privacy')}>{f.consentLink}</a>
+              <a href={`${pagePath(locale, 'privacy')}/`}>{f.consentLink}</a>
               {f.consentAfter}
             </label>
             {err('consent')}

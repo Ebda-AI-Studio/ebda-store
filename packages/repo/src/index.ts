@@ -77,5 +77,6 @@ export {
 export type { DeadLetterReport, DeadLetterRow } from './platform/entity-index';
 export { scrubReceiptsForOrders } from './do/instapay-receipts';
 export { purgeErasureLedger } from './do/erase-shopper';
+export { scrubUserFromStoreDo } from './platform-erasure';
 export type { ReceiptRow as InstapayReceiptRow } from './do/instapay-receipts';
 export type { VectorWork, VectorizeLike, EmbeddingProviderLike } from './do/search-vectors';

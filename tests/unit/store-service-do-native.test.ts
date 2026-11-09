@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   closed: [] as string[],
   moneyRefused: false,
   clientsDeleted: [] as string[],
+  anonymised: [] as string[],
+  paymentsScrubbed: [] as string[],
   pgProbes: 0,
 }));
 
@@ -66,12 +68,25 @@ vi.mock('../../apps/api/src/lib/store-backend', () => ({
         ? { ok: true, data: { json: encodeRpc(r.record), missing: r.missing } }
         : { ok: false, code: 'STORE_NOT_FOUND', status: 404 };
     },
+    // FOLD-ERASURE-2: the post-commit anonymisation of the closed DO
+    eraseSubject: async (subj: { storeId: string; kind: string }) => {
+      h.anonymised.push(`${subj.kind}:${subj.storeId}`);
+      return { erased: {}, remaining: 0 };
+    },
     closeIfNoMoneyInFlight: async (id: string) => {
       if (h.moneyRefused) return { ok: true, data: { refused: true, counts: { paidOrders: 1 } } };
       h.closed.push(id);
       return { ok: true, data: { closed: true, token: 't1' } };
     },
   }),
+}));
+vi.mock('../../apps/api/src/services/billing/payments-erasure', () => ({
+  paymentsErasurePort: {
+    scrub: async (ids: string[]) => {
+      h.paymentsScrubbed.push(...ids);
+      return { erased: 0 };
+    },
+  },
 }));
 vi.mock('../../apps/api/src/lib/platform-db', () => ({
   requirePlatformDb: async () => h.d1,
@@ -153,6 +168,8 @@ beforeEach(() => {
   h.d1 = createD1Client(META as never, fakeD1() as never);
   h.doDb = openSqlite();
   h.closed.length = 0;
+  h.anonymised.length = 0;
+  h.paymentsScrubbed.length = 0;
   h.clientsDeleted.length = 0;
   h.moneyRefused = false;
   h.pgProbes = 0;
@@ -194,6 +211,9 @@ describe('StoreService.delete of a store with no Postgres row (NZ-D14)', () => {
     expect(out).toEqual({ id: store.id, name: 'Gone Shop', slug: 'gone-shop' });
     expect(h.closed).toEqual([store.id]);
     expect(h.clientsDeleted).toEqual([store.id]);
+    // PDPL: the closed DO is anonymised, the platform payer fields scrubbed (FOLD-ERASURE-2)
+    expect(h.anonymised).toEqual([`merchant:${store.id}`]);
+    expect(h.paymentsScrubbed).toEqual([store.id]);
     expect(h.pgProbes).toBe(1); // only the existence probe
     expect(
       sqlite.prepare('SELECT status, deleted_at FROM stores WHERE id=?').get(store.id)
