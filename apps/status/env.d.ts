@@ -11,6 +11,8 @@ declare global {
       TELEGRAM_ALERT_CHAT_ID?: string;
       FAIL_THRESHOLD?: string;
       RECOVER_THRESHOLD?: string;
+      /** `on` shows the Services dropdown in the shared header (SERVICES-IA-1); passed by the deploy workflow with --var. */
+      EBDA_SERVICE_LINES?: string;
     }
   }
 }

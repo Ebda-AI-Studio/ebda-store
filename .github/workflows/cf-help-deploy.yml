@@ -65,6 +65,9 @@ jobs:
       - run: npm ci
       - run: npm run build -w packages/shared
       - name: Build help (static site to apps/help/out)
+        # SERVICES-IA-1: unset = no Services dropdown; "on" shows it, like ebda.app (the same repo variable)
+        env:
+          EBDA_SERVICE_LINES: ${{ vars.EBDA_SERVICE_LINES }}
         run: npm run build -w apps/help
       - name: Require the built site
         run: |

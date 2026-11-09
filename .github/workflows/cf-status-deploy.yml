@@ -75,7 +75,8 @@ jobs:
         # Ruling DEPLOY-TIMEOUT-1: a hung wrangler/OpenNext R2 populate must fail the step, not hold the runner.
         timeout-minutes: 10
         working-directory: apps/status
-        run: npx wrangler deploy
+        # SERVICES-IA-1: the Services dropdown follows the same repo variable as ebda.app (unset = off); status renders at request time, so it is a Worker var
+        run: npx wrangler deploy --var EBDA_SERVICE_LINES:"${{ vars.EBDA_SERVICE_LINES || 'off' }}"
       - name: Verify the live host, roll back automatically if it is unhealthy
         # Ruling DEPLOY-SAFETY-2: poll 90s; any non-200 or 5xx -> wrangler rollback to the recorded
         # version, confirm it serves, fail the job.

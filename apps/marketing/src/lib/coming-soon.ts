@@ -29,7 +29,6 @@ const COPY = {
     notify: 'عرّفني أول ما يجهز',
     items: {
       'quote-studio': {
-        short: 'عروض أسعار تفاعلية لمكاتب التصميم',
         blurb:
           'للمهندسين الداخليين ومكاتب التصميم: بتعرض تصميمك على عميلك في رابط، وهو بيغيّر الخامات والألوان ويشوف السعر مباشرة.',
         facts: [
@@ -40,7 +39,6 @@ const COPY = {
         ],
       },
       invite: {
-        short: 'دعوات وحضور الفعاليات',
         blurb:
           'برنامج لتنظيم الفعاليات: صفحة للفعالية وتذاكر، ودعوات على واتساب وتأكيد حضور، وتسجيل دخول بالـ QR، ومتابعة بعد الفعالية.',
         facts: [
@@ -51,7 +49,6 @@ const COPY = {
         ],
       },
       ads: {
-        short: 'إعلاناتك ومبيعاتك في مكان واحد',
         blurb:
           'برنامج تسويق من ابدأ ستوديو: إعلاناتك ومبيعاتك ومحادثات عملائك في مكان واحد، بالجنيه المصري.',
         facts: [
@@ -71,7 +68,6 @@ const COPY = {
     notify: 'Tell me when it is ready',
     items: {
       'quote-studio': {
-        short: 'Live quotes for design offices',
         blurb:
           'For interior engineers and design offices: share your design with a client in one link, and they change materials and colours and see the live price.',
         facts: [
@@ -82,7 +78,6 @@ const COPY = {
         ],
       },
       invite: {
-        short: 'Invitations and event attendance',
         blurb:
           'A product for running events: an event page and tickets, WhatsApp invitations and RSVP, QR check-in and post-event follow-up.',
         facts: [
@@ -93,7 +88,6 @@ const COPY = {
         ],
       },
       ads: {
-        short: 'Your ads and sales in one place',
         blurb:
           'A marketing platform from Ebda AI Studio: your ads, sales and customer conversations in one place, in Egyptian pounds.',
         facts: [
@@ -124,6 +118,7 @@ export function comingSoonItems(locale: Locale): ComingSoon[] {
     return {
       id,
       name: locale === 'ar' ? b.nameAr : b.nameEn,
+      short: locale === 'ar' ? b.shortAr : b.shortEn,
       ...COPY[locale].items[id],
       facts: [...COPY[locale].items[id].facts],
     };
