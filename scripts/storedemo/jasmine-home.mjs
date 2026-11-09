@@ -81,7 +81,7 @@ export function buildJasmineHome(base, ctx) {
         {
           id: `${key}-1`,
           type: 'slide',
-          settings: { image: img(`hero-${key}.webp`), ctaHref: '/products', ...slide },
+          settings: { image: img(`hero-${key}-2k.webp`), ctaHref: '/products', ...slide },
         },
       ],
       look

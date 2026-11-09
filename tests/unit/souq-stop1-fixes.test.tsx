@@ -37,7 +37,7 @@ describe('newsletter consent line (shared by every store)', () => {
 describe('Night hero asset', () => {
   const root = path.resolve(__dirname, '../..');
   it('exists, is within budget and the source prompt names no device', () => {
-    const f = path.join(root, 'scripts/souq-demo/assets/hero-night.webp');
+    const f = path.join(root, 'scripts/souq-demo/assets/hero-night-2k.webp');
     expect(statSync(f).size).toBeLessThanOrEqual(140 * 1024);
     const prompts = readFileSync(path.join(root, 'scripts/souq-demo/prompts.py'), 'utf8');
     const hero = prompts.slice(

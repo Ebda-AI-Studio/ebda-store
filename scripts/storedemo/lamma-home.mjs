@@ -46,7 +46,7 @@ export function buildLammaHome(base, ctx) {
         id: 'table-1',
         type: 'slide',
         settings: {
-          image: img('hero-table.webp'),
+          image: img('hero-table-2k.webp'),
           ctaHref: '/products',
           alt: 'A Friday table spread seen from above: stuffed vine leaves, molokhia, rice, salad and bread',
           headline: 'Friday lunch, like at home',

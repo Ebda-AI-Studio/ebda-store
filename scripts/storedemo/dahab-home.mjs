@@ -67,7 +67,7 @@ export function buildDahabHome(base, ctx) {
         {
           id: `${key}-1`,
           type: 'slide',
-          settings: { image: img(`hero-${key}.webp`), ctaHref: '/products', ...slide },
+          settings: { image: img(`hero-${key}-2k.webp`), ctaHref: '/products', ...slide },
         },
       ],
       look
@@ -193,7 +193,7 @@ export function buildDahabHome(base, ctx) {
       buttonTextAr: 'خصّص',
     }),
     imageText('dahab.workshop', 'workshop', {
-      image: img('hero-workshop.webp'),
+      image: img('hero-workshop-2k.webp'),
       alt: 'Steel tools and enamel dishes on a jeweller’s bench',
       heading: 'Small workshop, real hands',
       headingAr: 'ورشة صغيرة وإيد حقيقية',
