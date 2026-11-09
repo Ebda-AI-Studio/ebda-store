@@ -14,7 +14,7 @@ export interface StudioHome {
   store: { blurb: string; cta: string; more: string };
   chat: { blurb: string; cta: string; more: string };
   account: string;
-  /** What the studio does: one statement; the seven services are BRAND.services. */
+  /** What the studio does: one statement; the three services are BRAND.services. */
   does: {
     label: string;
     statement: string;

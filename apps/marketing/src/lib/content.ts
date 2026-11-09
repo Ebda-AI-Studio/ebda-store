@@ -181,7 +181,7 @@ export interface Copy {
     title: string;
     /** The studio's line, «ابدأ — بابك لبدء مشروعك.» (moved off the home hero, MKT-1). */
     brandLine: string;
-    /** The lead: what the studio is and what it makes today (AI, software, digital marketing; two products; one account). */
+    /** The lead: what the studio is and what it makes today (AI and software; two products; one account). */
     eyebrow: string;
     lead: string;
     /** «اتأسست في» / "Founded": followed by the date (BRAND.company.foundedOn through formatLegalDate). */
@@ -650,11 +650,11 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'عن ابدأ ستوديو',
-      desc: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي، بيبني أدوات بسيطة لأصحاب الشغل في مصر: ابدأ ستور وابدأ شات.',
+      desc: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات، بيبني أدوات بسيطة لأصحاب الشغل في مصر: ابدأ ستور وابدأ شات.',
       brandLine: 'ابدأ ستوديو — بابك لبدء مشروعك.',
       eyebrow: 'ستوديو مصري',
       foundedLabel: 'اتأسست في',
-      lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات والتسويق الرقمي. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين. وبنقدّم كمان خدمات تانية، هتلاقيها مقسّمة تحت.',
+      lead: 'ابدأ ستوديو ستوديو مصري للذكاء الاصطناعي والبرمجيات. بنبني أدوات بسيطة لأصحاب الشغل في مصر. النهاردة عندنا منتجين: ابدأ ستور لمتجرك أونلاين، وابدأ شات لبيع ودعم عملاءك على واتساب. وحساب واحد يفتح الاتنين. وبنقدّم كمان خدمات تانية، هتلاقيها مقسّمة تحت.',
       doH: 'بنشتغل في إيه',
       talkCta: 'كلّمنا عن مشروعك',
       productsH: 'منتجاتنا',
@@ -1088,11 +1088,11 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'About Ebda AI Studio',
-      desc: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing that builds simple tools for merchants in Egypt: Ebda Store and Ebda Chat.',
+      desc: 'Ebda AI Studio is an Egyptian studio for AI and software that builds simple tools for merchants in Egypt: Ebda Store and Ebda Chat.',
       brandLine: 'Ebda AI Studio — Your doorway to business.',
       eyebrow: 'An Egyptian studio',
       foundedLabel: 'Founded',
-      lead: 'Ebda AI Studio is an Egyptian studio for AI, software and digital marketing. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both. We also offer services, grouped below.',
+      lead: 'Ebda AI Studio is an Egyptian studio for AI and software. We build simple tools for merchants in Egypt. Today we make two products: Ebda Store, to put your store online, and Ebda Chat, to sell to and support your customers on WhatsApp. One account opens both. We also offer services, grouped below.',
       doH: 'What we do',
       talkCta: 'Tell us about your project',
       productsH: 'Our products',
