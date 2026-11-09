@@ -1,5 +1,7 @@
 # Demo store (looks showroom)
 
+**Production homes since Postgres was removed (Ruling DEMO-SEED-DO-1):** `DEMO_SEED_TOKEN=<worker secret> node scripts/storedemo/seed-home-do.mjs --api-url https://api.ebda.app [--template <tpl>|all] [--apply]` builds each demo home with the same `build<X>Home` builders and publishes it through `PUT /api/v1/internal/demo-home/:slug` on the store's DO. Dry run by default, `--apply` writes, a home already equal to the built one is skipped, every write is read back; only the five `storedemo*` slugs, and the Worker refuses any store that is not `is_demo`. Catalogues are not touched. The `seed.mjs` commands below are Postgres-era and run locally only.
+
 `stores.is_demo = true` marks the showroom store (`storedemo`, seeded by `scripts/storedemo/seed.mjs`). It does four things and nothing else:
 
 1. **Previews looks.** `?look=<id>` on a demo store renders that look. Applied only when the store `isDemo` AND the look is `status: 'built'` in `@ebda/shared`'s registry (since Phase B1 Task 10 that is exactly the three Qamar looks; the other twelve are `designed`, so `?look=souq.night` etc. is ignored and the bar lists Qamar only). The preview goes through the one composition path every store uses: `applyDemoLook` (`apps/web/src/lib/demo-look.ts`) replaces `template` (the look's skin), `look` and `theme` (`composeStoreTheme`, no merchant overrides) on the resolved store, so `layout.tsx` (`data-look`, font link, CSS vars) needs no parallel mechanism.

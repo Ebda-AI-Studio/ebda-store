@@ -115,6 +115,7 @@ import {
 } from '../middleware/tenant-context';
 
 import storeDoSpikeRoutes from './store-do-spike.routes';
+import demoHomeRoutes from './demo-home.routes';
 const router = Router();
 
 // Public routes (no auth required)
@@ -131,6 +132,8 @@ router.use('/public', publicStoreLayoutRoutes);
 router.use('/realtime', realtimeRoutes);
 // Phase 0 StoreDO spike loader: 404 unless the flag AND the seed secret are set (routes/store-do-spike.routes.ts).
 router.use('/internal/store-do', storeDoSpikeRoutes);
+// Demo-store home seed on the StoreDO (Ruling DEMO-SEED-DO-1): 404 unless DEMO_SEED_TOKEN is set; demo stores only.
+router.use('/internal/demo-home', demoHomeRoutes);
 
 // Store-scoped MCP endpoint (agent checkout) — POST /api/v1/mcp/:storeSlug.
 // Resolves the store by slug + checks the `agent_checkout` feature gate
