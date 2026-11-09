@@ -249,7 +249,7 @@ describe('platform D1: user export + erasure covers every personal table', () =>
     expect(count(db, 'store_staff', "store_id = 's1'")).toBe(0);
     expect(count(db, 'merchant_api_keys', "store_id = 's1'")).toBe(0);
     expect(
-      count(db, 'staff_invites', "store_id = 's1' AND email LIKE 'erased-%@anonymized.local'")
+      count(db, 'staff_invites', "store_id = 's1' AND email LIKE 'erased-%@anonymized.invalid'")
     ).toBe(1);
     expect(
       count(

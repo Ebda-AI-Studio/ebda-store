@@ -125,7 +125,7 @@ export async function countPlatformSubject(
   if (s.email) {
     bind.push(s.email);
     parts.push(
-      `(SELECT count(*) FROM ${ident(INVITE_TABLE)} WHERE lower(email) = lower(?2) AND email NOT LIKE 'erased-%@anonymized.local')`
+      `(SELECT count(*) FROM ${ident(INVITE_TABLE)} WHERE lower(email) = lower(?2) AND email NOT LIKE 'erased-%@anonymized.invalid')`
     );
   }
   const r = await d1
@@ -165,7 +165,7 @@ export async function erasePlatformSubject(
     stmts.push(
       d1
         .prepare(
-          `UPDATE ${ident(INVITE_TABLE)} SET status = CASE WHEN status = 'pending' THEN 'revoked' ELSE status END, decided_at = CASE WHEN status = 'pending' THEN ?2 ELSE decided_at END, email = 'erased-' || id || '@anonymized.local' WHERE lower(email) = lower(?1)`
+          `UPDATE ${ident(INVITE_TABLE)} SET status = CASE WHEN status = 'pending' THEN 'revoked' ELSE status END, decided_at = CASE WHEN status = 'pending' THEN ?2 ELSE decided_at END, email = 'erased-' || id || '@anonymized.invalid' WHERE lower(email) = lower(?1)`
         )
         .bind(s.email, now)
     );
@@ -185,6 +185,7 @@ export async function erasePlatformSubject(
  *   store_subscriptions              billing record kept; the card reference and the provider customer id removed
  * Payer fields on instapay_receipts / manual_payment_claims are the payments erasure port's job (services/billing/payments-erasure.ts).
  */
+// wa-plan: not-plan-state (the store_subscriptions UPDATE below clears only the card reference + provider customer id)
 export const STORE_SCOPED_TABLES = [
   'store_staff',
   'merchant_api_keys',
@@ -202,7 +203,7 @@ export async function eraseStorePlatformData(
     d1.prepare('DELETE FROM "merchant_api_keys" WHERE "store_id" = ?1').bind(storeId),
     d1
       .prepare(
-        `UPDATE "staff_invites" SET status = CASE WHEN status = 'pending' THEN 'revoked' ELSE status END, decided_at = CASE WHEN status = 'pending' THEN ?2 ELSE decided_at END, email = 'erased-' || id || '@anonymized.local' WHERE "store_id" = ?1`
+        `UPDATE "staff_invites" SET status = CASE WHEN status = 'pending' THEN 'revoked' ELSE status END, decided_at = CASE WHEN status = 'pending' THEN ?2 ELSE decided_at END, email = 'erased-' || id || '@anonymized.invalid' WHERE "store_id" = ?1`
       )
       .bind(storeId, now),
     d1
@@ -215,7 +216,7 @@ export async function eraseStorePlatformData(
     .prepare(
       `SELECT (SELECT count(*) FROM "store_staff" WHERE "store_id" = ?1)
             + (SELECT count(*) FROM "merchant_api_keys" WHERE "store_id" = ?1)
-            + (SELECT count(*) FROM "staff_invites" WHERE "store_id" = ?1 AND email NOT LIKE 'erased-%@anonymized.local')
+            + (SELECT count(*) FROM "staff_invites" WHERE "store_id" = ?1 AND email NOT LIKE 'erased-%@anonymized.invalid')
             + (SELECT count(*) FROM "store_subscriptions" WHERE "store_id" = ?1 AND ("provider_customer_id" IS NOT NULL OR "payment_method_last4" IS NOT NULL)) AS n`
     )
     .bind(storeId)
