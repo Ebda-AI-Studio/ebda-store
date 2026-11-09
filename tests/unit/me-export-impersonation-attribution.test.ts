@@ -43,6 +43,10 @@ vi.mock('@api/services/auth.service', () => ({
 }));
 vi.mock('@api/middleware/security', () => ({
   authLimiter: (_req: any, _res: any, next: any) => next(),
+  authIpFailureLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authIpAllLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authIpFailureLimiter: (_req: any, _res: any, next: any) => next(),
+  authIpAllLimiter: (_req: any, _res: any, next: any) => next(),
   refreshLimiter: (_req: any, _res: any, next: any) => next(),
   refreshIpLimiter: (_req: any, _res: any, next: any) => next(),
   resetEmailLimiter: (_req: any, _res: any, next: any) => next(),

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod/v3';
 import jwt from 'jsonwebtoken';
 import {
@@ -7,7 +7,7 @@ import {
   rejectIdentityManaged,
   rejectImpersonated,
 } from '../middleware/auth';
-import { authLimiter } from '../middleware/security';
+import { authLimiter, authIpFailureLimiter } from '../middleware/security';
 import { withUser } from '@ebda/database';
 import { encryption } from '../services/encryption.service';
 import { MfaService } from '../services/mfa.service';
@@ -19,6 +19,7 @@ import { redis } from '../services/redis.service';
 
 import { JWT_ISSUERS_ACCEPTED, JWT_MFA_AUDIENCES_ACCEPTED } from '@ebda/shared';
 const router = Router();
+const authLimiters = [authIpFailureLimiter, authLimiter];
 
 // TOTP codes are always 6 digits (see MfaService.verifyCode).
 const codeSchema = z.object({
@@ -173,7 +174,7 @@ const MFA_VERIFY_MAX_ATTEMPTS = 5;
 // when the challenge itself does (prevents stale counter accumulation).
 const MFA_CHALLENGE_TTL_SECONDS = 5 * 60;
 
-router.post('/verify', authLimiter, async (req, res, next) => {
+router.post('/verify', authLimiters, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = verifyBodySchema.safeParse(req.body);
     if (!parsed.success) {

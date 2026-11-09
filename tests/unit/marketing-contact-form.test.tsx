@@ -30,7 +30,7 @@ function fill(c: HTMLElement, o: Partial<Record<string, string>> = {}) {
   set('name', o.name ?? 'منى');
   set('phone', o.phone ?? '01012345678');
   set('email', o.email ?? 'mona@example.com');
-  set('topic', o.topic ?? 'photography');
+  set('topic', o.topic ?? 'marketing');
   set('message', o.message ?? 'محتاجة تصوير لأربعين منتج');
   if (o.consent !== 'off') fireEvent.click(c.querySelector('[name="consent"]')!);
 }
@@ -103,7 +103,7 @@ describe.each(['ar', 'en'] as const)('ContactForm (%s)', locale => {
     const sent = JSON.parse(init.body);
     expect(sent).toMatchObject({
       phone: '01012345678',
-      topic: 'photography',
+      topic: 'marketing',
       consent: true,
       lang: locale,
       website: '',
