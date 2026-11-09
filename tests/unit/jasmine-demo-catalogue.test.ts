@@ -328,6 +328,7 @@ describe('jasmine demo catalogue: images and the home document', () => {
       'testimonials',
       'trust-strip',
       'newsletter',
+      'key-ingredients', // T7 signature section
     ]);
     expect(
       doc.sections

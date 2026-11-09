@@ -12,6 +12,7 @@ import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
 const USED = [
+  'kitchen-days', // T7 signature section
   'hero',
   'category-grid',
   'product-carousel',
@@ -148,6 +149,32 @@ export function buildLammaHome(base, ctx) {
   const story = node('brand-story', 'story', {});
   const trust = node('trust-strip', 'trust', {});
 
+  // T7 signature: the week's kitchen, dishes from the seeded menu.
+  const signature = node(
+    'kitchen-days',
+    'signature',
+    {
+      kicker: 'Cooked fresh',
+      kickerAr: 'طبخ النهاردة',
+      title: "This week's kitchen",
+      titleAr: 'مطبخ الأسبوع',
+      subtitle: 'Order the day before and it leaves the kitchen hot.',
+      subtitleAr: 'الطلب قبلها بيوم بيوصل سخن من المطبخ.',
+      ctaText: 'See the menu',
+      ctaTextAr: 'عرض المنيو',
+      ctaHref: '/products',
+    },
+    [
+      ['Saturday', 'السبت', 'Stuffed cabbage', 'محشي كرنب', 'mahshi-koronb.webp'],
+      ['Sunday', 'الحد', 'Molokhia with chicken', 'ملوخية بالفراخ', 'molokhia-chicken.webp'],
+      ['Monday', 'الاتنين', 'Okra tagine', 'طاجن بامية', 'okra-tagine.webp'],
+      ['Tuesday', 'التلات', 'Béchamel pasta', 'مكرونة بشاميل', 'bechamel-pasta.webp'],
+    ].map(([day, dayAr, dish, dishAr, photo], i) => ({
+      id: `day-${i + 1}`,
+      type: 'day',
+      settings: { day, dayAr, dish, dishAr, image: img(photo) },
+    }))
+  );
   const hiddenLegacy = base.sections
     .filter(n => !USED.includes(n.type))
     .filter(n => getSectionDefinition(n.type)?.legacyKey)
@@ -169,6 +196,7 @@ export function buildLammaHome(base, ctx) {
       deals,
       story,
       trust,
+      signature,
       ...hiddenLegacy,
     ],
   };

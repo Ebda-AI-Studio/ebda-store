@@ -13,6 +13,7 @@ import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
 const USED = [
+  'piece-window', // T7 signature section
   'hero',
   'category-grid',
   'steps',
@@ -233,6 +234,21 @@ export function buildDahabHome(base, ctx) {
   const story = node('brand-story', 'story', {});
   const newsletter = node('newsletter', 'newsletter', {});
 
+  // T7 signature: one piece in the window.
+  const signature = node('piece-window', 'signature', {
+    kicker: 'In the window',
+    kickerAr: 'في الفاترينة',
+    title: 'The solitaire ring',
+    titleAr: 'خاتم السوليتير',
+    subtitle: 'One stone, set by hand, sized to order.',
+    subtitleAr: 'فص واحد متركّب بالإيد، ومقاسه حسب طلبك.',
+    image: img('ring-solitaire.webp'),
+    alt: 'A solitaire ring on a soft cloth',
+    altAr: 'خاتم سوليتير على قماشة ناعمة',
+    ctaText: 'See the rings',
+    ctaTextAr: 'عرض الخواتم',
+    ctaHref: '/products',
+  });
   const hiddenLegacy = base.sections
     .filter(n => !USED.includes(n.type))
     .filter(n => getSectionDefinition(n.type)?.legacyKey)
@@ -256,6 +272,7 @@ export function buildDahabHome(base, ctx) {
       trust,
       story,
       newsletter,
+      signature,
       ...hiddenLegacy,
     ],
   };

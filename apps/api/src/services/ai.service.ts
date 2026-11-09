@@ -650,7 +650,13 @@ export class AIService {
    */
   static async suggestSectionContent(input: {
     storeId: string;
-    section: 'categories' | 'newArrivals' | 'bestSellers' | 'featured' | 'testimonials';
+    section:
+      | 'categories'
+      | 'newArrivals'
+      | 'bestSellers'
+      | 'featured'
+      | 'testimonials'
+      | 'signature';
     storeName: string;
     storeNameAr?: string | null;
     storeDescription?: string | null;

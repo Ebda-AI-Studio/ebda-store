@@ -293,6 +293,7 @@ describe('lamma demo catalogue: images and the home document', () => {
       'product-carousel',
       'brand-story',
       'trust-strip',
+      'kitchen-days', // T7 signature section
     ]);
     expect(
       doc.sections

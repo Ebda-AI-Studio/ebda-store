@@ -302,3 +302,66 @@ export const giftBudgetBlockSchema = z
     labelAr: text(60),
   })
   .strict();
+
+/**
+ * Signature sections (T7, plan `2026-10-25-templates-match-mockups.md` P7): one distinctive
+ * section per template, the "signature moment" of its looks. Five types, one shape: an optional
+ * kicker, title and subtitle (the AI fills the kicker and subtitle), an optional call to action,
+ * and, per type, a main photo and/or a short list of blocks. Every one renders with no photo at
+ * all (a typographic fallback); a list-driven one with fewer than two filled blocks renders
+ * nothing publicly (an unfilled feature renders nothing). Photos are one per section or block,
+ * the same in both languages; every text is bilingual.
+ */
+const signatureText = {
+  kicker: text(60),
+  kickerAr: text(60),
+  title: text(200),
+  titleAr: text(200),
+  subtitle: text(400),
+  subtitleAr: text(400),
+  ctaText: text(60),
+  ctaTextAr: text(60),
+  ctaHref: safeLink,
+};
+const signaturePhoto = {
+  image: z.string().max(2048).optional(),
+  alt: text(300),
+  altAr: text(300),
+};
+
+/** Qamar: three overlapping photos under one line (the Lookbook collage, as a page section). */
+export const editorialCollageSchema = z.object({ ...frame, ...signatureText }).strict();
+export const collagePhotoBlockSchema = z.object({ ...signaturePhoto }).strict();
+
+/** Dahab: one piece in a double hairline frame, like a jeweller's window. */
+export const pieceWindowSchema = z
+  .object({ ...frame, ...signatureText, ...signaturePhoto })
+  .strict();
+
+/** Souq: a product photo beside its key figures (screen, battery, storage). */
+export const specSheetSchema = z.object({ ...frame, ...signatureText, ...signaturePhoto }).strict();
+export const specBlockSchema = z
+  .object({ value: text(16), label: text(60), labelAr: text(60) })
+  .strict();
+
+/** Jasmine: what is inside, one ingredient per line with what it does. */
+export const keyIngredientsSchema = z
+  .object({ ...frame, ...signatureText, ...signaturePhoto })
+  .strict();
+export const ingredientBlockSchema = z
+  .object({ name: text(60), nameAr: text(60), benefit: text(160), benefitAr: text(160) })
+  .strict();
+
+/** Lamma: what is cooking on which day of the week. */
+export const kitchenDaysSchema = z.object({ ...frame, ...signatureText }).strict();
+export const kitchenDayBlockSchema = z
+  .object({
+    day: text(30),
+    dayAr: text(30),
+    dish: text(80),
+    dishAr: text(80),
+    note: text(120),
+    noteAr: text(120),
+    image: z.string().max(2048).optional(),
+  })
+  .strict();

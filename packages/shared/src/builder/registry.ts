@@ -36,6 +36,15 @@ import {
   giftFinderSchema,
   giftOccasionBlockSchema,
   giftBudgetBlockSchema,
+  editorialCollageSchema,
+  collagePhotoBlockSchema,
+  pieceWindowSchema,
+  specSheetSchema,
+  specBlockSchema,
+  keyIngredientsSchema,
+  ingredientBlockSchema,
+  kitchenDaysSchema,
+  kitchenDayBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -298,6 +307,230 @@ const NO_HERO_SPACING = ['maxWidth'] as const;
 
 const carouselLimit = (max: number) => s.range('limit', 'Products to show', 'عدد المنتجات', 1, max);
 
+/**
+ * Signature sections (T7): the text every one of them shares. `kicker` + `subtitle` are what the
+ * AI fills (`AI_FILL_SECTIONS`), only when empty. `photo` adds the section's one main photo.
+ */
+const signatureSettings = (photo: boolean): SettingDefinition[] => [
+  s.text('kicker', 'Small line above the title', 'سطر صغير فوق العنوان', { localized: true }),
+  s.text('title', 'Title', 'العنوان', { localized: true }),
+  s.textarea('subtitle', 'One line under the title', 'سطر تحت العنوان', { localized: true }),
+  ...(photo
+    ? [
+        s.image('image', 'Photo', 'الصورة'),
+        s.text('alt', 'Photo description', 'وصف الصورة', { localized: true }),
+      ]
+    : []),
+  s.text('ctaText', 'Button text', 'نص الزر', { localized: true }),
+  s.url('ctaHref', 'Button link', 'رابط الزر'),
+  s.color('bgColor', 'Background', 'الخلفية'),
+  ...spacingSettings(),
+];
+
+/** The Egyptian week from Saturday: the kitchen-days preset names the days, never the dishes. */
+const WEEK_DAYS: ReadonlyArray<[string, string]> = [
+  ['Saturday', 'السبت'],
+  ['Sunday', 'الحد'],
+  ['Monday', 'الاتنين'],
+  ['Tuesday', 'التلات'],
+  ['Wednesday', 'الأربع'],
+  ['Thursday', 'الخميس'],
+  ['Friday', 'الجمعة'],
+];
+
+/**
+ * One signature section per template (T7). Presets carry only copy that is true of any store
+ * (a title, a button to the product list) and the STRUCTURE of the list (spec names, the days of
+ * the week), never a claim about the merchant's products: a spec with no figure, an ingredient
+ * list with nothing in it or a day with no dish renders nothing until the merchant fills it.
+ */
+const SIGNATURE_DEFS: SectionDefInput[] = [
+  {
+    type: 'editorial-collage',
+    labelEn: 'Collage',
+    labelAr: 'كولاج',
+    legacyKey: null,
+    rendererKey: 'section.signature',
+    group: 'template',
+    propsSchema: editorialCollageSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'photo',
+        labelEn: 'Photo',
+        labelAr: 'صورة',
+        maxCount: 3,
+        propsSchema: collagePhotoBlockSchema,
+        settings: [
+          s.image('image', 'Photo', 'الصورة'),
+          s.text('alt', 'Photo description', 'وصف الصورة', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Collage',
+        nameAr: 'كولاج',
+        settings: {
+          title: 'Our edit',
+          titleAr: 'اختياراتنا',
+          ctaText: 'Shop the edit',
+          ctaTextAr: 'تسوّق الاختيارات',
+          ctaHref: '/products',
+        },
+        blocks: [],
+      },
+    ],
+    settings: signatureSettings(false),
+  },
+  {
+    type: 'piece-window',
+    labelEn: 'Window',
+    labelAr: 'الفاترينة',
+    legacyKey: null,
+    rendererKey: 'section.signature',
+    group: 'template',
+    propsSchema: pieceWindowSchema,
+    maxCount: 2,
+    presets: [
+      {
+        nameEn: 'Window',
+        nameAr: 'الفاترينة',
+        settings: {
+          title: 'In the window',
+          titleAr: 'في الفاترينة',
+          ctaText: 'See the pieces',
+          ctaTextAr: 'عرض القطع',
+          ctaHref: '/products',
+        },
+      },
+    ],
+    settings: signatureSettings(true),
+  },
+  {
+    type: 'spec-sheet',
+    labelEn: 'Spec sheet',
+    labelAr: 'المواصفات',
+    legacyKey: null,
+    rendererKey: 'section.signature',
+    group: 'template',
+    propsSchema: specSheetSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'spec',
+        labelEn: 'Spec',
+        labelAr: 'مواصفة',
+        maxCount: 4,
+        propsSchema: specBlockSchema,
+        settings: [
+          s.text('value', 'Figure (6.7, 5000, 256)', 'الرقم (6.7، 5000، 256)'),
+          s.text('label', 'What it measures', 'بيقيس إيه', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Spec sheet',
+        nameAr: 'المواصفات',
+        settings: {
+          title: 'The numbers that matter',
+          titleAr: 'الأرقام المهمة',
+          ctaText: 'View the product',
+          ctaTextAr: 'عرض المنتج',
+          ctaHref: '/products',
+        },
+        blocks: [
+          { type: 'spec', settings: { label: 'inch screen', labelAr: 'بوصة الشاشة' } },
+          { type: 'spec', settings: { label: 'mAh battery', labelAr: 'مللي أمبير البطارية' } },
+          { type: 'spec', settings: { label: 'GB storage', labelAr: 'جيجا مساحة' } },
+        ],
+      },
+    ],
+    settings: signatureSettings(true),
+  },
+  {
+    type: 'key-ingredients',
+    labelEn: 'Key ingredients',
+    labelAr: 'المكوّنات',
+    legacyKey: null,
+    rendererKey: 'section.signature',
+    group: 'template',
+    propsSchema: keyIngredientsSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'ingredient',
+        labelEn: 'Ingredient',
+        labelAr: 'مكوّن',
+        maxCount: 6,
+        propsSchema: ingredientBlockSchema,
+        settings: [
+          s.text('name', 'Ingredient', 'المكوّن', { localized: true }),
+          s.text('benefit', 'What it does', 'بيعمل إيه', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Key ingredients',
+        nameAr: 'المكوّنات',
+        settings: {
+          title: 'What is inside',
+          titleAr: 'إيه اللي جوّه',
+          ctaText: 'See the products',
+          ctaTextAr: 'عرض المنتجات',
+          ctaHref: '/products',
+        },
+        blocks: [],
+      },
+    ],
+    settings: signatureSettings(true),
+  },
+  {
+    type: 'kitchen-days',
+    labelEn: 'Kitchen days',
+    labelAr: 'أيام المطبخ',
+    legacyKey: null,
+    rendererKey: 'section.signature',
+    group: 'template',
+    propsSchema: kitchenDaysSchema,
+    maxCount: 1,
+    blocks: [
+      {
+        type: 'day',
+        labelEn: 'Day',
+        labelAr: 'يوم',
+        maxCount: 7,
+        propsSchema: kitchenDayBlockSchema,
+        settings: [
+          s.text('day', 'Day', 'اليوم', { localized: true }),
+          s.text('dish', 'Dish of the day', 'أكلة اليوم', { localized: true }),
+          s.text('note', 'One line (optional)', 'سطر (اختياري)', { localized: true }),
+          s.image('image', 'Photo (optional)', 'صورة (اختياري)'),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Kitchen days',
+        nameAr: 'أيام المطبخ',
+        settings: {
+          title: "This week's kitchen",
+          titleAr: 'مطبخ الأسبوع',
+          ctaText: 'See the menu',
+          ctaTextAr: 'عرض المنيو',
+          ctaHref: '/products',
+        },
+        blocks: WEEK_DAYS.map(([day, dayAr]) => ({ type: 'day', settings: { day, dayAr } })),
+      },
+    ],
+    settings: signatureSettings(false),
+  },
+];
+
+/** The five signature section types (T7), one per template. */
+export const SIGNATURE_SECTION_TYPES = SIGNATURE_DEFS.map(d => d.type);
 export const SECTION_REGISTRY: readonly SectionDefinition[] = [
   def({
     type: 'announcement',
@@ -1198,6 +1431,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       ...spacingSettings(),
     ],
   }),
+  ...SIGNATURE_DEFS.map(def),
   def({
     type: 'trust-badges',
     pages: PAGE_KINDS,

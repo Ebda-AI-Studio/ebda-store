@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1458,
+    "wired": 1763,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -632,6 +632,149 @@
       ],
       "surface": "section:collection-list",
       "control": "tileShape",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage/photo|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:editorial-collage/photo|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:editorial-collage|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|ctaHref",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|ctaText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|kicker",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:editorial-collage|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -1403,6 +1546,344 @@
       "evidence": "static+probe"
     },
     {
+      "id": "dahab|section:key-ingredients/ingredient|benefit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "benefit",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:key-ingredients/ingredient|name",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "name",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:key-ingredients|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|ctaHref",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|ctaText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|kicker",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:key-ingredients|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days/day|day",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "day",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:kitchen-days/day|dish",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "dish",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:kitchen-days/day|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:kitchen-days/day|note",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "note",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:kitchen-days|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|ctaHref",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|ctaText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|kicker",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:kitchen-days|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "dahab|section:maker-profile|alt",
       "skin": "dahab",
       "looks": [
@@ -1789,6 +2270,149 @@
       ],
       "surface": "section:newsletter",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|ctaHref",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|ctaText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|kicker",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:piece-window|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:piece-window",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -2296,6 +2920,175 @@
       ],
       "surface": "section:shop-the-look",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet/spec|label",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:spec-sheet/spec|value",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "value",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:spec-sheet|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|ctaHref",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|ctaText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|kicker",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:spec-sheet|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -4211,6 +5004,149 @@
       "evidence": "static+probe"
     },
     {
+      "id": "jasmine|section:editorial-collage/photo|alt",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:editorial-collage/photo|image",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|bgColor",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|ctaHref",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|ctaText",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|kicker",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|maxWidth",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|subtitle",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:editorial-collage|title",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "jasmine|section:featured-collection|bgColor",
       "skin": "jasmine",
       "looks": [
@@ -5004,6 +5940,344 @@
       "evidence": "static+probe"
     },
     {
+      "id": "jasmine|section:key-ingredients/ingredient|benefit",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "benefit",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:key-ingredients/ingredient|name",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "name",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|alt",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|bgColor",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|ctaHref",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|ctaText",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|image",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|kicker",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|maxWidth",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|subtitle",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:key-ingredients|title",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days/day|day",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "day",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:kitchen-days/day|dish",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "dish",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:kitchen-days/day|image",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:kitchen-days/day|note",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "note",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|bgColor",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|ctaHref",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|ctaText",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|kicker",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|maxWidth",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|subtitle",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:kitchen-days|title",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "jasmine|section:maker-profile|alt",
       "skin": "jasmine",
       "looks": [
@@ -5546,6 +6820,149 @@
       ],
       "surface": "section:newsletter",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|alt",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|bgColor",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|ctaHref",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|ctaText",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|image",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|kicker",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|maxWidth",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|subtitle",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:piece-window|title",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:piece-window",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -6209,6 +7626,175 @@
       ],
       "surface": "section:shop-the-look",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet/spec|label",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:spec-sheet/spec|value",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "value",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|alt",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|bgColor",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|ctaHref",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|ctaText",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|image",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|kicker",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|maxWidth",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|subtitle",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:spec-sheet|title",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -8150,6 +9736,149 @@
       "evidence": "static+probe"
     },
     {
+      "id": "lamma|section:editorial-collage/photo|alt",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:editorial-collage/photo|image",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:editorial-collage|bgColor",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|ctaHref",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|ctaText",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|kicker",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|maxWidth",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|subtitle",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:editorial-collage|title",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "lamma|section:featured-collection|bgColor",
       "skin": "lamma",
       "looks": [
@@ -8943,6 +10672,344 @@
       "evidence": "static+probe"
     },
     {
+      "id": "lamma|section:key-ingredients/ingredient|benefit",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "benefit",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:key-ingredients/ingredient|name",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "name",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:key-ingredients|alt",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|bgColor",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|ctaHref",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|ctaText",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|image",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|kicker",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|maxWidth",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|subtitle",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:key-ingredients|title",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days/day|day",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "day",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:kitchen-days/day|dish",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "dish",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:kitchen-days/day|image",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:kitchen-days/day|note",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "note",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:kitchen-days|bgColor",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|ctaHref",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|ctaText",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|kicker",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|maxWidth",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|subtitle",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:kitchen-days|title",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "lamma|section:maker-profile|alt",
       "skin": "lamma",
       "looks": [
@@ -9485,6 +11552,149 @@
       ],
       "surface": "section:newsletter",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|alt",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|bgColor",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|ctaHref",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|ctaText",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|image",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|kicker",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|maxWidth",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|subtitle",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:piece-window|title",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:piece-window",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -10148,6 +12358,175 @@
       ],
       "surface": "section:shop-the-look",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet/spec|label",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:spec-sheet/spec|value",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "value",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:spec-sheet|alt",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|bgColor",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|ctaHref",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|ctaText",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|image",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|kicker",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|maxWidth",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|subtitle",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:spec-sheet|title",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -12076,6 +14455,149 @@
       "evidence": "static+probe"
     },
     {
+      "id": "qamar|section:editorial-collage/photo|alt",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:editorial-collage/photo|image",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:editorial-collage|bgColor",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|ctaHref",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|ctaText",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|kicker",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|maxWidth",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|subtitle",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:editorial-collage|title",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "qamar|section:featured-collection|bgColor",
       "skin": "qamar",
       "looks": [
@@ -12869,6 +15391,344 @@
       "evidence": "static+probe"
     },
     {
+      "id": "qamar|section:key-ingredients/ingredient|benefit",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "benefit",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:key-ingredients/ingredient|name",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "name",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:key-ingredients|alt",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|bgColor",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|ctaHref",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|ctaText",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|image",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|kicker",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|maxWidth",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|subtitle",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:key-ingredients|title",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days/day|day",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "day",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:kitchen-days/day|dish",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "dish",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:kitchen-days/day|image",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:kitchen-days/day|note",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "note",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:kitchen-days|bgColor",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|ctaHref",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|ctaText",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|kicker",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|maxWidth",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|subtitle",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:kitchen-days|title",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "qamar|section:maker-profile|alt",
       "skin": "qamar",
       "looks": [
@@ -13411,6 +16271,149 @@
       ],
       "surface": "section:newsletter",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|alt",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|bgColor",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|ctaHref",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|ctaText",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|image",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|kicker",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|maxWidth",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|subtitle",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:piece-window|title",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:piece-window",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -14074,6 +17077,175 @@
       ],
       "surface": "section:shop-the-look",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet/spec|label",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:spec-sheet/spec|value",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "value",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:spec-sheet|alt",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|bgColor",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|ctaHref",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|ctaText",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|image",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|kicker",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|maxWidth",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|subtitle",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:spec-sheet|title",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -16002,6 +19174,149 @@
       "evidence": "static+probe"
     },
     {
+      "id": "souq|section:editorial-collage/photo|alt",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:editorial-collage/photo|image",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage/photo",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:editorial-collage|bgColor",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|ctaHref",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|ctaText",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|kicker",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|maxWidth",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|subtitle",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:editorial-collage|title",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:editorial-collage",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "souq|section:featured-collection|bgColor",
       "skin": "souq",
       "looks": [
@@ -16795,6 +20110,344 @@
       "evidence": "static+probe"
     },
     {
+      "id": "souq|section:key-ingredients/ingredient|benefit",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "benefit",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:key-ingredients/ingredient|name",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients/ingredient",
+      "control": "name",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:key-ingredients|alt",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|bgColor",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|ctaHref",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|ctaText",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|image",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|kicker",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|maxWidth",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|subtitle",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:key-ingredients|title",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:key-ingredients",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days/day|day",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "day",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:kitchen-days/day|dish",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "dish",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:kitchen-days/day|image",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:kitchen-days/day|note",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days/day",
+      "control": "note",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:kitchen-days|bgColor",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|ctaHref",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|ctaText",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|kicker",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|maxWidth",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|subtitle",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:kitchen-days|title",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:kitchen-days",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "souq|section:maker-profile|alt",
       "skin": "souq",
       "looks": [
@@ -17337,6 +20990,149 @@
       ],
       "surface": "section:newsletter",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|alt",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|bgColor",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|ctaHref",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|ctaText",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|image",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|kicker",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|maxWidth",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|subtitle",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:piece-window|title",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:piece-window",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -18000,6 +21796,175 @@
       ],
       "surface": "section:shop-the-look",
       "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet/spec|label",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:spec-sheet/spec|value",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet/spec",
+      "control": "value",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:spec-sheet|alt",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|bgColor",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|ctaHref",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|ctaText",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|image",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|kicker",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "kicker",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|maxWidth",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|subtitle",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:spec-sheet|title",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:spec-sheet",
+      "control": "title",
       "status": "wired",
       "evidence": "static+probe"
     },
