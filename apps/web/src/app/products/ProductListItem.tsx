@@ -272,7 +272,7 @@ export function ProductListItem({
                   ? t('Remove from compare', 'إزالة من المقارنة')
                   : t('Add to compare', 'إضافة إلى المقارنة')
               }
-              className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
+              className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${
                 isInCompare
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-input bg-background text-muted-foreground hover:border-primary hover:text-primary'
@@ -304,7 +304,7 @@ export function ProductListItem({
             }) ? null : viewOnly || hasVariants ? (
               <span
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground pointer-events-none',
+                  'flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground pointer-events-none',
                   ctaExtraCls
                 )}
                 style={{
@@ -319,7 +319,7 @@ export function ProductListItem({
                 type="button"
                 disabled
                 className={cn(
-                  'flex h-10 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground cursor-not-allowed',
+                  'flex h-11 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground cursor-not-allowed',
                   ctaExtraCls
                 )}
                 onClick={e => {
@@ -336,8 +336,8 @@ export function ProductListItem({
                 ref={addRef}
                 className={cn(
                   lookCta === 'quiet'
-                    ? `flex h-10 items-center gap-2 ${QUIET_CARD_CTA_CLS}`
-                    : 'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+                    ? `flex h-11 items-center gap-2 ${QUIET_CARD_CTA_CLS}`
+                    : 'flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
                   ctaExtraCls
                 )}
                 onClick={e => {

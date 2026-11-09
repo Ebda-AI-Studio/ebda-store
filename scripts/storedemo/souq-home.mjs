@@ -71,7 +71,7 @@ export function buildSouqHome(base, ctx) {
         id: 'night-1',
         type: 'slide',
         settings: {
-          image: img('hero-night.webp'),
+          image: img('hero-night-2k.webp'),
           alt: 'A covered souq arcade at night, lit by rows of champagne lanterns',
           headline: 'The souq is lit',
           headlineAr: 'السوق منوّر',

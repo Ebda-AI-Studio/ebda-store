@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeMs,
+  bannedInputProblems,
   budgetProblems,
   median,
   minSample,
@@ -73,5 +74,34 @@ describe('minSample: a profile that recorded nothing is not the fastest start', 
     const base = minSample([127.8, 128.6, 0, 147.2, 124.9]);
     const pr = minSample([109.7, 101.1, 112.5, 138.4, 104.2]);
     expect(relativeProblems(pr, base, { ratio: 0.2, slackMs: 20 })).toEqual([]);
+  });
+});
+
+describe('banned bundle inputs (Ruling BUNDLE-BUDGET-9)', () => {
+  const meta = (inputs: string[]) => ({
+    outputs: {
+      'out/worker.js': { inputs: Object.fromEntries(inputs.map(f => [f, { bytesInOutput: 1 }])) },
+      'out/worker.js.map': { inputs: {} },
+    },
+  });
+  it('the English locale and the locales index are allowed', () => {
+    expect(
+      bannedInputProblems(
+        meta([
+          '../../node_modules/zod/v4/locales/en.js',
+          '../../node_modules/zod/v4/locales/index.js',
+        ])
+      )
+    ).toEqual([]);
+  });
+  it('any other zod locale fails, once per class', () => {
+    const problems = bannedInputProblems(
+      meta(['../../node_modules/zod/v4/locales/he.js', '../../node_modules/zod/v4/locales/ru.js'])
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/^2 banned bundle input/);
+  });
+  it('a metafile without worker.js never passes', () => {
+    expect(bannedInputProblems({ outputs: {} })).toHaveLength(1);
   });
 });
