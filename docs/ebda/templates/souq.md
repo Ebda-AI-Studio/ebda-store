@@ -31,6 +31,10 @@ Night's sale / new chips and the PDP discount pill are the same brass with dark 
 
 Ahmad chose brass CTAs for Night souq at STOP-1 (2026-10-21). Brass `#C89B3C` (hue 41) is in the forbidden hue band, so the no-orange gate carries ONE scoped exception: that exact hex, only as `souq.night`'s primary CTA tokens (look token `primary` and the theme / CSS roles that carry it: `primaryColor`, `ringColor`, `--primary`, `--ring`). Every other Night token, every other look and every other hex stay gated (`tests/unit/souq-look-tokens.test.ts`: brass passes only there, the same hex fails anywhere else, a real orange or an off-by-one brass fails even on Night primary). The turquoise alternative path was deleted.
 
+## Signature section (T7)
+
+`spec-sheet`: one product photo beside two to four key figures (a number + what it measures, e.g. 6.7 / inch screen), in all three looks after the main grid. Fewer than two filled figures renders nothing; the preset names the specs, never the numbers (Rulings T7-1, T7-2). Demo: the stage phone's own figures.
+
 ## Chrome (Task 2)
 
 `apps/web/src/templates/souq/Header.tsx` wraps the shared base header (`templates/base/Header.tsx`) and reads the search placement the merchant chose in the editor's Theme pane (`theme.headerSearch`, Ruling EP-4), else the look's `chrome.header.search`: Catalogue is **prominent** (one labelled search field, `role="search"`, 44px tall, with a themed clear button; under the logo row on a phone, in the centre column from `md`, the nav on a second row from `lg`); Night souq and Showroom keep the skin's **icon** search (Ruling B2-16). The label is "دوّر على منتج أو ماركة" / "Search for a product or brand" (`LanguageContext` translations). The store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'` on all three looks, so checkout shows the same one). `PACK_STYLES.souq` is the framed tile card with a two-line name, a firm price and one always-visible quick add; the `[data-pack='souq']` CSS sets the type voice only (no colour of its own, pinned by `souq-look-tokens.test.ts`).

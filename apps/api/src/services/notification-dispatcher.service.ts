@@ -427,12 +427,12 @@ export function __clearOptOutBaseCacheForTests(): void {
  * The storefront opt-out page for a consent row: the store's own domain when
  * it has one, else the platform storefront under its slug (the same base the
  * abandoned-cart and back-in-stock links use). The token is a fixed
- * SMS_OPT_OUT_TOKEN_LENGTH (45) characters, so the appended
- * ` Stop offers: <base>/sms-unsubscribe?t=<token>` costs 78 characters plus
- * the base, and nothing that varies per recipient. It was 92 plus the base.
+ * SMS_OPT_OUT_TOKEN_V3_LENGTH (68) characters (it carries the store id since NEON-ZERO: a Durable Object store has no
+ * cross-store consent lookup), so the appended ` Stop offers: <base>/sms-unsubscribe?t=<token>` costs 101 characters plus
+ * the base, and nothing that varies per recipient. It was 78 (45-character token) before the store id; 92 before issue 2426.
  */
 async function smsOptOutUrl(storeId: string, consentId: string): Promise<string> {
-  return `${await storefrontBase(storeId)}/sms-unsubscribe?t=${signSmsOptOutToken(consentId)}`;
+  return `${await storefrontBase(storeId)}/sms-unsubscribe?t=${signSmsOptOutToken(consentId, storeId)}`;
 }
 
 /**

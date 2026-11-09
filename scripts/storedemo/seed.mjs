@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// POSTGRES-ERA (production has no Postgres since N-17): this writes through Prisma and only runs against a local
+// Postgres now. To fill the demo HOMES on production use scripts/storedemo/seed-home-do.mjs (StoreDO, Ruling DEMO-SEED-DO-1).
 // Seed a looks DEMO store (is_demo = true): the showroom that previews every built look of its
 // template through `?look=<id>` (apps/web/src/lib/demo-look.ts) and refuses every order. One demo
 // store per template (Ruling B2-7): `storedemo` = Qamar (default), `storedemo-souq` = Souq
@@ -411,7 +413,7 @@ export function assetBase(argv, env, spec = TEMPLATE_SPECS.qamar) {
 }
 /** The hero clip URL, or null when the base cannot carry one (a video must be https or relative). */
 export function videoUrl(base) {
-  const u = `${base}/hero.mp4`;
+  const u = `${base}/hero-1080.mp4`;
   return u.startsWith('https://') || u.startsWith('/') ? u : null;
 }
 

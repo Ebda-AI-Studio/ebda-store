@@ -158,6 +158,9 @@ export type WritableModel =
   | 'productModel'
   | 'productModelBinding'
   | 'storeWhatsAppLink'
+  // marketing consents a shopper grants / withdraws on the storefront (NEON-ZERO class sweep, 2026-11-09)
+  | 'storeWhatsAppConsent'
+  | 'smsMarketingConsent'
   | 'goldRateSettings'
   | 'warehouse'
   | 'affiliateConfig'
@@ -1050,6 +1053,12 @@ export interface MoneyClient {
         orderItemId: string;
         quantity: number;
         stockRestored: number;
+        /** epoch ms and reason of the cancel that wrote the row (the first one, on a replay) */
+        cancelledAt: number;
+        cancelledReason: string;
+        /** the allocation computed in that cancel's section: the line's share net of discount + tax; notify = paid and > 0 */
+        refundAmount: number;
+        notify: boolean;
       }
   >;
   journalManual(

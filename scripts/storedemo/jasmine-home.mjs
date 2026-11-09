@@ -41,6 +41,7 @@ const STAGE = 'vitamin-c-serum';
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
 const USED = [
+  'key-ingredients', // T7 signature section
   'hero',
   'category-grid',
   'steps',
@@ -80,7 +81,7 @@ export function buildJasmineHome(base, ctx) {
         {
           id: `${key}-1`,
           type: 'slide',
-          settings: { image: img(`hero-${key}.webp`), ctaHref: '/products', ...slide },
+          settings: { image: img(`hero-${key}-2k.webp`), ctaHref: '/products', ...slide },
         },
       ],
       look
@@ -171,6 +172,45 @@ export function buildJasmineHome(base, ctx) {
   const trust = node('trust-strip', 'trust', {});
   const newsletter = node('newsletter', 'newsletter', {});
 
+  // T7 signature: the three ingredients the Apothecary hero already names.
+  const signature = node(
+    'key-ingredients',
+    'signature',
+    {
+      kicker: 'Inside the bottle',
+      kickerAr: 'جوّه الإزازة',
+      title: 'Ingredients you know',
+      titleAr: 'مكوّنات بتعرفها',
+      subtitle: 'Short lists, every name you can say out loud.',
+      subtitleAr: 'قوايم قصيرة، وكل اسم فيها سهل يتنطق.',
+      image: img('hero-apothecary.webp'),
+      alt: 'Jade, clear and cobalt glass bottles on olive linen with leaves and oats',
+      altAr: 'إزازات زجاج أخضر وشفاف وأزرق على قماش زيتوني مع ورق وشوفان',
+      ctaText: 'Shop skincare',
+      ctaTextAr: 'تسوّق العناية',
+      ctaHref: '/products',
+    },
+    [
+      [
+        'Jojoba oil',
+        'زيت الجوجوبا',
+        "Close to the skin's own oil, so it sinks in.",
+        'قريب من زيت البشرة نفسه، فبيتشرب بسرعة.',
+      ],
+      ['Colloidal oats', 'الشوفان', 'Calms dry, tight skin.', 'بيهدّي البشرة الناشفة والمشدودة.'],
+      [
+        'Green tea leaf',
+        'ورق الشاي الأخضر',
+        'An antioxidant for the day.',
+        'مضاد أكسدة لطول اليوم.',
+      ],
+      ['Shea butter', 'زبدة الشيا', 'Seals moisture in overnight.', 'بتقفل على الترطيب طول الليل.'],
+    ].map(([name, nameAr, benefit, benefitAr], i) => ({
+      id: `ingredient-${i + 1}`,
+      type: 'ingredient',
+      settings: { name, nameAr, benefit, benefitAr },
+    }))
+  );
   const hiddenLegacy = base.sections
     .filter(n => !USED.includes(n.type))
     .filter(n => getSectionDefinition(n.type)?.legacyKey)
@@ -192,6 +232,7 @@ export function buildJasmineHome(base, ctx) {
       testimonials,
       trust,
       newsletter,
+      signature,
       ...hiddenLegacy,
     ],
   };

@@ -30,6 +30,8 @@ import {
   resetEmailLimiter,
   verifyEmailLimiter,
   authEmailAddressLimiter,
+  authIpFailureLimiter,
+  authIpAllLimiter,
   auditLog,
   generateCsrfToken,
   verifyRefreshJwt,
@@ -45,6 +47,10 @@ import { assertNotDemoStore } from '../services/plan-limit.service';
 
 import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 const router = Router();
+
+// LAUNCH-RL: IP-wide bucket in front of the per-IP+email authLimiter (email rotation cannot bypass it).
+const authLimiters = [authIpFailureLimiter, authLimiter];
+const regAuthLimiters = [authIpAllLimiter, authLimiter];
 
 /** Shared cookie options for the HTTP-only access-token cookie.
  *
@@ -224,40 +230,44 @@ const emailLookupSchema = z.object({
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  */
-router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = registerSchema.parse(req.body);
-    // Ruling B1-13: no customer accounts on the demo showroom.
-    if (data.storeId) await assertNotDemoStore(data.storeId);
-    const result = await AuthService.register({
-      ...data,
-      storeId: data.storeId ?? null,
-    });
+router.post(
+  '/register',
+  regAuthLimiters,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = registerSchema.parse(req.body);
+      // Ruling B1-13: no customer accounts on the demo showroom.
+      if (data.storeId) await assertNotDemoStore(data.storeId);
+      const result = await AuthService.register({
+        ...data,
+        storeId: data.storeId ?? null,
+      });
 
-    // T1-4 enumeration close: register no longer leaks "this email
-    // already exists" via response status, body shape, or tokens.
-    // AuthService.register handles both branches and returns the same
-    // `{ emailVerificationSent: true }` for new and existing emails;
-    // existing users get a notification email, new users get the
-    // standard verification email. The audit log key is the
-    // submitted email rather than a user.id (we deliberately don't
-    // expose whether a row was created).
-    await auditLog({
-      action: 'user.register',
-      resourceType: 'user',
-      details: { email: data.email },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+      // T1-4 enumeration close: register no longer leaks "this email
+      // already exists" via response status, body shape, or tokens.
+      // AuthService.register handles both branches and returns the same
+      // `{ emailVerificationSent: true }` for new and existing emails;
+      // existing users get a notification email, new users get the
+      // standard verification email. The audit log key is the
+      // submitted email rather than a user.id (we deliberately don't
+      // expose whether a row was created).
+      await auditLog({
+        action: 'user.register',
+        resourceType: 'user',
+        details: { email: data.email },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -303,7 +313,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', authLimiters, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = loginSchema.parse(req.body);
     // The storefront names its store by header / host as well as in the body; a login with neither is the admin namespace, which
@@ -325,20 +335,19 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     // csrfProtection and mints for whatever X-Session-ID the caller sends,
     // so the principal is the only thing tying the token to a real session.
     const sessionId = req.headers['x-session-id'] as string;
-    let csrfToken: string | undefined;
-    if (sessionId) {
-      csrfToken = await generateCsrfToken(sessionId, result.user.id);
-    }
-
-    // Audit log
-    await auditLog({
-      action: 'user.login',
-      userId: result.user.id,
-      resourceType: 'user',
-      resourceId: result.user.id,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    // PERF-LATENCY: the CSRF mint (AuthState) and the audit row (D1) are independent writes: one round trip, not two. Both are
+    // still awaited before the response.
+    const [csrfToken] = await Promise.all([
+      sessionId ? generateCsrfToken(sessionId, result.user.id) : Promise.resolve(undefined),
+      auditLog({
+        action: 'user.login',
+        userId: result.user.id,
+        resourceType: 'user',
+        resourceId: result.user.id,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      }),
+    ]);
 
     // Set BOTH the access cookie and the rotating refresh cookie for
     // cookie-based auth. The refresh cookie lets a pure-browser client
@@ -1045,6 +1054,7 @@ router.put(
 // POST /auth/change-password
 router.post(
   '/change-password',
+  authIpFailureLimiter,
   authLimiter,
   authenticate,
   rejectIdentityManaged,
@@ -1081,6 +1091,7 @@ router.post(
 // POST /auth/forgot-password
 router.post(
   '/forgot-password',
+  authIpAllLimiter,
   authLimiter,
   // S5-3: a dedicated, tighter, email-scoped budget stacked in front of
   // authLimiter — see resetEmailLimiter's docstring in middleware/security.ts.
@@ -1173,6 +1184,7 @@ router.post(
 // POST /auth/reset-password
 router.post(
   '/reset-password',
+  authIpFailureLimiter,
   authLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1284,6 +1296,7 @@ router.post(
 // POST /auth/resend-verification
 router.post(
   '/resend-verification',
+  authIpAllLimiter,
   authLimiter,
   // issue 2228: the same per-inbox ceiling as /forgot-password — this route
   // also takes a caller-supplied storeId and sends one mail per account.

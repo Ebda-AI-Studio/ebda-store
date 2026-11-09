@@ -15,6 +15,7 @@
  * Never flag `qa-walk-store-1010`.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { backendMemoKey, requestMemo } from './request-memo';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { isWorkers } from './runtime';
@@ -88,17 +89,23 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
   // find falls through to the live read below, so an unknown store keeps today's 404 (never a guess).
   if (batchStorage.getStore()?.has(storeId))
     return backendFromRow({ storage_backend: batchStorage.getStore()!.get(storeId) });
-  let row: { storage_backend?: unknown } | null;
-  try {
-    row = await d1
-      .prepare('SELECT storage_backend FROM stores WHERE id = ?')
-      .bind(storeId)
-      .first<{ storage_backend?: unknown }>();
-  } catch {
-    throw unavailable();
-  }
-  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  return backendFromRow(row);
+  // PERF-LATENCY: one D1 read per store per REQUEST (tenant context, repo factory and store access each asked; a directory
+  // lookup that already read the row seeds it, lib/platform-directory.ts). A request never flips a store's backend (the flip is
+  // the operator cutover outside Express), and a 404 / 503 is never memoised (request-memo drops failed loads).
+  const raw = await requestMemo(backendMemoKey(storeId), async () => {
+    let row: { storage_backend?: unknown } | null;
+    try {
+      row = await d1
+        .prepare('SELECT storage_backend FROM stores WHERE id = ?')
+        .bind(storeId)
+        .first<{ storage_backend?: unknown }>();
+    } catch {
+      throw unavailable();
+    }
+    if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    return row.storage_backend;
+  });
+  return backendFromRow({ storage_backend: raw });
 }
 
 function backendFromRow(row: { storage_backend?: unknown }): StoreBackend {

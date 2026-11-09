@@ -48,6 +48,7 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'trust-strip',
       'testimonials',
       'newsletter',
+      'spec-sheet', // T7 signature section
       'footer',
     ],
     pendingSectionTypes: [],
@@ -81,6 +82,7 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'category-grid',
       'product-carousel',
       'brand-story',
+      'piece-window', // T7 signature section
       'footer',
     ],
     pendingSectionTypes: [],
@@ -99,6 +101,7 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'image-text',
       'brand-story',
       'testimonials',
+      'editorial-collage', // T7 signature section
       'footer',
     ],
     pendingSectionTypes: [],
@@ -119,6 +122,7 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'category-grid',
       'trust-strip',
       'blog-carousel',
+      'kitchen-days', // T7 signature section
       'footer',
     ],
     pendingSectionTypes: [],
@@ -142,6 +146,7 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'image-text',
       'testimonials',
       'newsletter',
+      'key-ingredients', // T7 signature section
       'footer',
     ],
     pendingSectionTypes: [],

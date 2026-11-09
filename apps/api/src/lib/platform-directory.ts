@@ -5,10 +5,12 @@
  * closed). `platformDb()` is undefined only in Node / unit tests / local dev, where `lib/definer.ts` keeps its SQL
  * definers.
  *
- * Staleness class: NEVER-stale, no cache here (a read per call; the directory is a primary-key / unique-index SELECT).
+ * Staleness class: NEVER-stale, no cache here (a read per call; the directory is a primary-key / unique-index SELECT). The
+ * `storage_backend` a lookup reads is handed to `backendFor` for the rest of the SAME request only (lib/request-memo.ts).
  */
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
+import { backendMemoKey, seedRequestMemo } from './request-memo';
 
 interface DirD1 {
   prepare(sql: string): {
@@ -45,7 +47,7 @@ export async function d1LookupStore(
   const row = await guarded(() =>
     db
       .prepare(
-        `SELECT id, status FROM stores
+        `SELECT id, status, storage_backend FROM stores
           WHERE deleted_at IS NULL AND status IN (${marks})
             AND ((?1 IS NOT NULL AND id = ?1) OR (?2 IS NOT NULL AND slug = ?2)
               OR (?3 IS NOT NULL AND domain = ?3 AND domain_status = 'active'))
@@ -53,8 +55,11 @@ export async function d1LookupStore(
           LIMIT 1`
       )
       .bind(match.id ?? null, match.slug ?? null, match.domain ?? null, ...statuses)
-      .first<{ id: string; status: string }>()
+      .first<{ id: string; status: string; storage_backend?: unknown }>()
   );
+  // PERF-LATENCY: the same row answers `backendFor` for the rest of this request (one D1 read instead of two on every public
+  // write: cart, checkout, order). Same table, same row, read moments apart; the memo is request-scoped (lib/request-memo.ts).
+  if (row) seedRequestMemo(backendMemoKey(row.id), row.storage_backend);
   return row ? { id: row.id, status: row.status } : null;
 }
 

@@ -56,6 +56,11 @@ describe('feature-gated operations on the DO (Ruling NZ-FEAT-1)', () => {
         orderItemId: 'i1',
         quantity: 3,
         stockRestored: 2,
+        cancelledAt: expect.any(Number),
+        cancelledReason: 'discontinued',
+        // the line's share of an unpaid order (no discount, no tax): the books reverse it, nothing is owed back
+        refundAmount: 3000,
+        notify: false,
       });
       expect(r.q(`SELECT inventory FROM products WHERE id = 'p1'`)[0].inventory).toBe(0);
       expect(
@@ -381,5 +386,63 @@ describe('money guards on the generic writer and the new ops (Ruling NZ-FEAT-1, 
     ).toThrow();
     expect(r.q(`SELECT COUNT(*) AS n FROM journal_entries`)[0].n).toBe(0);
     expect(r.q(`SELECT COUNT(*) AS n FROM journal_lines`)[0].n).toBe(0);
+  });
+
+  it('re-review m-1: a replay answers the FIRST cancel figures (time, reason, amount owed on a paid order) exactly', () => {
+    const r = rig();
+    r.raw.exec(`UPDATE orders SET payment_status = 'paid' WHERE id = 'o1'`);
+    const first = r.money('backorderCancel', {
+      backorderLineId: 'b1',
+      reason: 'first reason',
+      userId: 'u1',
+    });
+    expect(first).toMatchObject({
+      refundAmount: 3000,
+      notify: true,
+      cancelledReason: 'first reason',
+    });
+    // a later write that would change a recomputation (the order refunded) does not change the stored answer
+    r.raw.exec(`UPDATE orders SET payment_status = 'refunded' WHERE id = 'o1'`);
+    const again = r.money('backorderCancel', {
+      backorderLineId: 'b1',
+      reason: 'other reason',
+      userId: 'u2',
+    });
+    expect(again).toEqual({ ...first, replayed: true });
+  });
+
+  it('re-review: a pickOrderItem failure AFTER its write rolls the pick back', () => {
+    const r = rig();
+    // the op's last statement (the remaining-lines count) runs AFTER the picked_qty UPDATE: make exactly that read fail
+    const failing = new Proxy(r.db, {
+      get(target, prop, recv) {
+        const v = Reflect.get(target, prop, recv);
+        if (prop !== 'all' || typeof v !== 'function')
+          return typeof v === 'function' ? v.bind(target) : v;
+        return (sql: string, params: unknown[]) => {
+          if (/COUNT\(\*\) AS n FROM order_items/.test(sql))
+            throw new Error('injected after the write');
+          return v.call(target, sql, params);
+        };
+      },
+    });
+    expect(() =>
+      runStockOp(failing as typeof r.db, S, 'pickOrderItem', {
+        orderId: 'o1',
+        productId: 'p2',
+        qty: 1,
+      })
+    ).toThrow('injected after the write');
+    expect(
+      r.q(`SELECT picked_qty, picked_at FROM order_items WHERE order_id = 'o1' ORDER BY id`)
+    ).toEqual([
+      { picked_qty: 0, picked_at: null },
+      { picked_qty: 0, picked_at: null },
+      { picked_qty: 0, picked_at: null },
+    ]);
+    // the same op without the injected failure does write (the assertion above is not vacuous)
+    expect(r.stock('pickOrderItem', { orderId: 'o1', productId: 'p2', qty: 1 })).toMatchObject({
+      kind: 'picked',
+    });
   });
 });

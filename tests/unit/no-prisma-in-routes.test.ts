@@ -14,11 +14,13 @@
  * The runtime half is apps/api/workers-test/money-path.test.ts (signed webhooks + checkout with Postgres absent) and the
  * strict route sweep (SWEEP_STRICT=1).
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(__dirname, '../../apps/api/src/routes');
+const API_SRC = join(__dirname, '../../apps/api/src');
+const BASELINE = join(__dirname, 'prisma-sites-baseline.json');
 
 /** Money routes: ZERO `prisma.` sites, never allowlisted. */
 const MONEY_ROUTES = [
@@ -114,5 +116,43 @@ describe('no prisma.<model> in Worker route handlers (NEON-ZERO)', () => {
     expect(prismaSites('await prisma.$transaction([])')).toBe(1);
     expect(prismaSites('// prisma.order.findFirst\n/* prisma.payment.create */')).toBe(0);
     expect(prismaSites("const u = 'https://x'; await prisma.user.findMany()")).toBe(1);
+  });
+});
+
+/**
+ * The same class OUTSIDE the route files (P1 2026-11-09: `ProductService.listPublic` `sort=on_sale` ran a raw Postgres statement
+ * from a SERVICE, so the route ratchet above never saw it, and the route sweep hits each route once with no query string).
+ * Every `prisma.` site in apps/api/src (services, lib, jobs, mcp...; routes are ratcheted above) is pinned per file in
+ * `prisma-sites-baseline.json`: a new file with a call, or a file that gains one, fails here. Port the call to `storeDb` /
+ * `storeWriter` / `storeMoney` / D1 instead. After porting, lower the baseline with
+ *   UPDATE_PRISMA_BASELINE=1 npx vitest run tests/unit/no-prisma-in-routes.test.ts
+ * (it refuses to write while any file is OVER its baseline, so it can only ratchet down).
+ */
+describe('no new prisma.<x> call anywhere in the Worker source (NEON-ZERO ratchet)', () => {
+  const nonRoute = new Map(
+    routeFiles(API_SRC)
+      .filter(p => !p.startsWith(ROOT) && !/__tests__/.test(p))
+      .map(p => [relative(API_SRC, p), prismaSites(readFileSync(p, 'utf8'))] as const)
+      .filter(([, n]) => n > 0)
+  );
+  const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, number>;
+
+  it('every non-route file stays at or under its pinned count; a new file needs none', () => {
+    const over: string[] = [];
+    for (const [file, n] of nonRoute) {
+      const max = baseline[file];
+      if (max === undefined) over.push(`${file}: ${n} prisma call(s), not in the baseline`);
+      else if (n > max) over.push(`${file}: ${n} > ${max}`);
+    }
+    expect(over, 'port these to storeDb / storeWriter / storeMoney / D1').toEqual([]);
+    if (process.env.UPDATE_PRISMA_BASELINE === '1') {
+      const sorted = Object.fromEntries([...nonRoute].sort(([a], [b]) => a.localeCompare(b)));
+      writeFileSync(BASELINE, JSON.stringify(sorted, null, 2) + '\n');
+    }
+  });
+
+  it('the baseline names no file that no longer has a call (it only ever shrinks)', () => {
+    const stale = Object.keys(baseline).filter(f => !nonRoute.has(f));
+    expect(stale, 'rerun with UPDATE_PRISMA_BASELINE=1 to drop them').toEqual([]);
   });
 });

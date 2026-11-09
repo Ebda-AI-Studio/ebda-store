@@ -19,48 +19,95 @@ import {
   previewTokenKey,
 } from '../services/page-builder.service';
 import { testimonialAuthorName } from '../lib/testimonial-author';
+import { getCached } from '../lib/public-cache';
+import { demoLayoutCacheKey } from '../lib/demo-layout-cache-key';
 
 const router = Router();
+
+/**
+ * The store row both the draft and committed paths resolve against (template baseline, one round trip).
+ * `stores` is under RLS (R-EBDA-005): an ACTIVE store with this id through the lookup definer, then its row inside its
+ * own scope.
+ */
+async function loadStore(storeId: string) {
+  const hit = await lookupStoreCached({ id: storeId }, ['active']);
+  return hit
+    ? await readInStoreContext(hit.id, async () =>
+        (await storeDb(hit.id)).store.findUnique({
+          where: { id: hit.id },
+          select: { layoutSettings: true, template: true, look: true, isDemo: true },
+        })
+      )
+    : null;
+}
+
+/**
+ * The committed (published) layout response. Visual builder (additive): the page document the storefront renders —
+ * the PUBLISHED revision (never a draft) when it agrees with layout_settings, else the layout-derived document — plus
+ * its rev for provenance. `layout` is unchanged so a storefront/admin deploy that predates the builder keeps working
+ * across the deploy gap.
+ */
+async function committedBody(
+  storeId: string,
+  store: NonNullable<Awaited<ReturnType<typeof loadStore>>>
+) {
+  const templateId = normalizeLegacyTemplate(store.template);
+  const layout = resolveLayoutSettings(store.layoutSettings, templateId, store.look);
+  const { definition, rev } = await getPublishedDefinition(
+    storeId,
+    layout,
+    templateId,
+    undefined,
+    store.look
+  );
+  return { success: true, data: { layout, definition, rev } };
+}
 
 router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
 
     // DEMO-STORE-ONLY response cache (look-switch speed): the showroom's layout (3 DB reads, 1.4-3.5 s
-    // measured cold on prod) is re-read on every look/template switch. CACHE CLASS: BOUNDED-stale
-    // 120 s, residual = a layout edit on a demo store shows up to 2 min late; nothing is invalidated
-    // because only `stores.is_demo` rows are ever written here (below), so a real merchant store can
-    // never be served from, or populate, this key. Draft previews bypass it.
-    const demoKey = `public:layout-demo:${storeId}`;
+    // measured cold on prod) is re-read on every look/template switch. CACHE CLASS: page content a merchant (or the
+    // demo seed) just published, so EVENT-invalidated: every publish / rollback / layout PUT / look apply ends in
+    // `bustStoreCaches`, which clears `demoLayoutCacheKey` (Ruling DEMO-LAYOUT-PURGE-1; it used to sit out its 120 s
+    // TTL, the seed's publish showed old hero images for up to 2 min). The fill goes through `getCached`, so a read that
+    // raced a publish cannot write the old layout back (generation guard). Residual: KV deletes reach other data centres
+    // within <= 60 s (NZ-D1), so a visitor elsewhere may see the previous layout for up to that long; TTL 120 s is only
+    // the outer bound. Only `stores.is_demo` rows are ever stored (`cacheIf`), so a real merchant store can never be
+    // served from, or populate, this key. Draft previews bypass it.
+    const demoKey = demoLayoutCacheKey(storeId);
     const wantsDraft =
       typeof req.query._layoutDraft === 'string' && req.query._layoutDraft.length > 0;
     if (!wantsDraft) {
+      let committed: { isDemo: boolean; body: unknown } | null;
       try {
-        const hit = await redis.get<string>(demoKey);
-        if (hit) {
-          res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
-          res.json(typeof hit === 'string' ? JSON.parse(hit) : hit);
-          return;
-        }
-      } catch {
-        // cache down: fall through to the DB path
+        committed = await getCached(
+          demoKey,
+          120,
+          async () => {
+            const store = await loadStore(storeId);
+            if (!store) return null;
+            return { isDemo: store.isDemo === true, body: await committedBody(storeId, store) };
+          },
+          { cacheIf: v => v?.isDemo === true }
+        );
+      } catch (err) {
+        return next(err);
       }
+      if (!committed) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Store not found' },
+        });
+        return;
+      }
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
+      res.json(committed.body);
+      return;
     }
 
-    // Load store once (template + layoutSettings) so both the draft and
-    // committed paths resolve against the store's template baseline without
-    // a second round-trip.
-    // `stores` is under RLS (R-EBDA-005): an ACTIVE store with this id through the lookup
-    // definer, then its row inside its own scope.
-    const hit = await lookupStoreCached({ id: storeId }, ['active']);
-    const store = hit
-      ? await readInStoreContext(hit.id, async () =>
-          (await storeDb(hit.id)).store.findUnique({
-            where: { id: hit.id },
-            select: { layoutSettings: true, template: true, look: true, isDemo: true },
-          })
-        )
-      : null;
+    const store = await loadStore(storeId);
     if (!store) {
       res.status(404).json({
         success: false,
@@ -118,30 +165,8 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
       // so the preview at least shows the saved state rather than a 404.
     }
 
-    const layout = resolveLayoutSettings(store.layoutSettings, templateId, store.look);
-    // Visual builder (additive): the page document the storefront renders —
-    // the PUBLISHED revision (never a draft) when it agrees with
-    // layout_settings, else the layout-derived document — plus its rev for
-    // provenance. `layout` is unchanged so a storefront/admin deploy that
-    // predates the builder keeps working across the deploy gap.
-    const { definition, rev } = await getPublishedDefinition(
-      storeId,
-      layout,
-      templateId,
-      undefined,
-      store.look
-    );
-    // Cache lightly at the edge — layout settings change rarely
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
-    const body = { success: true, data: { layout, definition, rev } };
-    if (store.isDemo === true) {
-      try {
-        await redis.set(demoKey, JSON.stringify(body), 120);
-      } catch {
-        // best effort
-      }
-    }
-    res.json(body);
+    res.json(await committedBody(storeId, store));
   } catch (error) {
     next(error);
   }

@@ -29,6 +29,7 @@ const LOOK_ALT = {
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
 const USED = [
+  'editorial-collage', // T7 signature section
   'hero',
   'shop-the-look',
   'category-grid',
@@ -66,7 +67,7 @@ export function buildQamarHome(base, ctx) {
         image: img(QAMAR_PAGE_IMAGES.heroAtelier),
         // The model stands at the top of the still: keep her head in the wide desktop crop (B1-32).
         focus: 'top',
-        ...(video ? { video } : {}),
+        ...(video ? { video, videoMobile: video.replace(/hero-1080\.mp4$/, 'hero-540.mp4') } : {}),
         alt: 'A woman in a dusty rose linen abaya beside a clothing rail',
         headline: 'Linen for the Cairo summer',
         headlineAr: 'كتان لصيف القاهرة',
@@ -194,6 +195,27 @@ export function buildQamarHome(base, ctx) {
   });
   const story = node('brand-story', 'brand-story', {});
 
+  // T7 signature: the three look photos as one collage (Atelier and Vitrine; Lookbook's hero IS one).
+  const signature = node(
+    'editorial-collage',
+    'signature',
+    {
+      kicker: 'This season',
+      kickerAr: 'الموسم ده',
+      title: 'Three looks, one wardrobe',
+      titleAr: 'تلات لوكات من دولاب واحد',
+      subtitle: 'One abaya, a shawl and a headscarf, styled three ways.',
+      subtitleAr: 'عباية واحدة وشال وطرحة، متنسّقين بتلات طرق.',
+      ctaText: 'Shop abayas',
+      ctaTextAr: 'تسوّق العبايات',
+      ctaHref: '/products?category=abayas',
+    },
+    QAMAR_LOOKS_STORY.map((l, i) => ({
+      id: `photo-${i + 1}`,
+      type: 'photo',
+      settings: { image: img(l.image), ...LOOK_ALT[l.id] },
+    }))
+  );
   const hiddenLegacy = base.sections
     .filter(n => !USED.includes(n.type))
     .filter(n => getSectionDefinition(n.type)?.legacyKey)
@@ -216,6 +238,7 @@ export function buildQamarHome(base, ctx) {
       occasions,
       testimonials,
       story,
+      signature,
       ...hiddenLegacy,
     ],
   };

@@ -18,7 +18,7 @@ import { JsonLd } from './JsonLd';
 import { studioJsonLd } from '../lib/seo';
 
 /**
- * The About page, a STUDIO page: what Ebda AI Studio is (an Egyptian studio for AI, software and digital marketing), what
+ * The About page, a STUDIO page: what Ebda AI Studio is (an Egyptian studio for AI and software), what
  * it does, its two products, the doorway story, how it works, how to reach it, and one small legal-entity line. Only facts
  * the brand module and the product pages hold: no founding date, team, funding or address. Each section carries one
  * medallion from public/motifs and a gold hairline under its heading; no calligraphy and no arch (those are the home's).

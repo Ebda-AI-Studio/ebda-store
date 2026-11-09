@@ -77,6 +77,43 @@ const lockKey = (storeId: string) => `gold-rate:${storeId}`;
 /** The request-bound root client, typed as a transaction client for the shared read helpers. */
 const root = () => prisma as unknown as Prisma.TransactionClient;
 
+/**
+ * The disagreement the owner is asked to decide, read from the pending rows' feed reference: the primary
+ * candidates are the pending rows themselves, the fallback candidates ride in the reference. Null when no
+ * pending row came from a disagreement (a plain jump-gate pending rate has none).
+ */
+export function disagreementFrom(
+  pending: Array<{ karat: number; ratePerGram: number; feedReference?: unknown }>
+): {
+  diffBps: number;
+  primary24k: number;
+  fallback24k: number;
+  primaryRates: Record<string, number>;
+  fallbackRates: Record<string, number>;
+} | null {
+  const withRef = pending.filter(p => {
+    const d = (p.feedReference as { disagree?: unknown } | null)?.disagree;
+    return d && typeof d === 'object';
+  });
+  if (withRef.length === 0) return null;
+  const d = (withRef[0].feedReference as { disagree: Record<string, unknown> }).disagree;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const diffBps = num(d.diffBps);
+  const primary24k = num(d.primary24k);
+  const fallback24k = num(d.fallback24k);
+  const fb = d.fallbackRates as Record<string, unknown> | undefined;
+  if (diffBps === null || primary24k === null || fallback24k === null || !fb) return null;
+  const fallbackRates: Record<string, number> = {};
+  for (const k of GOLD_KARATS) {
+    const v = num(fb[String(k)]);
+    if (v === null) return null;
+    fallbackRates[String(k)] = v;
+  }
+  const primaryRates: Record<string, number> = {};
+  for (const p of withRef) primaryRates[String(p.karat)] = p.ratePerGram;
+  return { diffBps, primary24k, fallback24k, primaryRates, fallbackRates };
+}
+
 export class GoldRateService {
   /** Current rates, settings, ages, pending rows: what the admin rate page reads. Never cached. */
   static async getState(storeId: string) {
@@ -127,6 +164,8 @@ export class GoldRateService {
         jumpBps: p.jumpBps,
         createdAt: p.createdAt.toISOString(),
       })),
+      // Both feed values when the pending rates came from a feed disagreement (GOLD-DISAGREE-MERCHANT-1).
+      disagreement: disagreementFrom(pending),
       // The free automatic rate needs no secret (Ruling B5-15), so it is always available.
       feedAvailable: true,
     };

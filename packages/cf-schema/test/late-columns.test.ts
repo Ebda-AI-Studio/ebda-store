@@ -212,3 +212,70 @@ describe('0004 billing tax columns', () => {
     db.prepare(`UPDATE billing_events SET status = 'succeeded' WHERE id = ?`).run(id); // the settle CAS is still legal
   });
 });
+
+describe('0007 / 0008 FOLD-VAT: ETA document fields and the seller snapshot', () => {
+  const fresh = () => {
+    const db = apply(files);
+    db.exec(`INSERT INTO stores (id, name, slug, owner_id) VALUES ('s', 's', 's', 'o')`);
+    return db;
+  };
+  const insert = (db: DatabaseSync, amount: number, vatMinor: number, vat: object | null) => {
+    const id = crypto.randomUUID();
+    db.prepare(
+      `INSERT INTO billing_events (id, store_id, type, amount_minor, provider, idempotency_key, vat_minor, vat) VALUES (?, 's', 'renewal', ?, 'kashier', ?, ?, ?)`
+    ).run(id, amount, id, vatMinor, vat ? JSON.stringify(vat) : null);
+    return id;
+  };
+  const row = (db: DatabaseSync, id: string) =>
+    db
+      .prepare(
+        `SELECT net_minor n, gross_minor g, vat_rate_bp r, seller_tax_id t, seller_legal_name l, buyer_tax_id b,
+                eta_status s, eta_uuid u, eta_long_id li, eta_hash h, eta_rejection_reason rr, eta_submitted_at sa
+           FROM billing_events WHERE id = ?`
+      )
+      .get(id);
+
+  it('VAT off: totals identical to today, rate 0, every tax / ETA field empty or defaulted', () => {
+    const db = fresh();
+    expect(row(db, insert(db, 29900, 0, null))).toEqual({
+      n: 29900,
+      g: 29900,
+      r: 0,
+      t: null,
+      l: null,
+      b: null,
+      s: 'not_submitted',
+      u: null,
+      li: null,
+      h: null,
+      rr: null,
+      sa: null,
+    });
+  });
+
+  it('VAT on: the seller registration snapshot is copied from the charge into the columns', () => {
+    const db = fresh();
+    const r = row(
+      db,
+      insert(db, 34086, 4186, { rateBps: 1400, trn: '123-456-789', legalName: 'Ebda Studio' })
+    );
+    expect(r).toMatchObject({
+      n: 29900,
+      g: 34086,
+      r: 1400,
+      t: '123-456-789',
+      l: 'Ebda Studio',
+      s: 'not_submitted',
+    });
+  });
+
+  it('the ETA document columns accept a full lifecycle and stay editable after the money froze', () => {
+    const db = fresh();
+    const id = insert(db, 11400, 1400, { rateBps: 1400, trn: null, legalName: null });
+    db.prepare(
+      `UPDATE billing_events SET eta_status = 'rejected', eta_uuid = 'u', eta_long_id = 'L', eta_hash = 'H',
+              eta_rejection_reason = 'bad tax id', eta_submitted_at = 5 WHERE id = ?`
+    ).run(id);
+    expect(row(db, id)).toMatchObject({ s: 'rejected', li: 'L', h: 'H', rr: 'bad tax id', sa: 5 });
+  });
+});

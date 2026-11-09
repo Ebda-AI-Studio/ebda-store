@@ -16,6 +16,7 @@ interface State {
   goldProductCount: number;
   rates: { ratePerGram: number | null; stale: boolean }[];
   pending: unknown[];
+  disagreement?: unknown;
 }
 
 export function GoldRateBanner({ storeId }: { storeId: string }) {
@@ -42,7 +43,9 @@ export function GoldRateBanner({ storeId }: { storeId: string }) {
       role="alert"
       className="mb-6 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm"
     >
-      <p className="font-medium">{stale ? t('stale') : t('pending')}</p>
+      <p className="font-medium">
+        {state.disagreement ? t('disagree') : stale ? t('stale') : t('pending')}
+      </p>
       <Link
         href={`/stores/${storeId}/gold-rates`}
         className="mt-1 inline-flex min-h-11 items-center text-primary underline underline-offset-4"

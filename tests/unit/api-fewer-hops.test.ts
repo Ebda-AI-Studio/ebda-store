@@ -11,6 +11,10 @@ import {
   shardOf,
   AUTH_STATE_SHARDS,
   CACHEGEN_SHARD,
+  CACHEGEN_STORE_SHARDS,
+  cachegenAnchor,
+  cachegenHome,
+  cachegenStoreShards,
 } from '../../apps/api/src/cf/auth-state-client';
 import { generationNamesFor } from '../../apps/api/src/lib/public-cache';
 
@@ -90,22 +94,30 @@ describe('the public router still mounts BOTH limiters', () => {
 });
 
 describe('cache-generation keys have their OWN Durable Object, never an auth shard', () => {
-  it('every generation name of a key with no store id routes to the one base cachegen instance', () => {
-    for (const key of ['public:categories:abc', 'public:products:s1:feed:v2']) {
-      const shards = new Set(generationNamesFor(key).map(n => shardOf(`cachegen:${n}`)));
-      expect([...shards]).toEqual([CACHEGEN_SHARD]);
-    }
-  });
-  it('a store-scoped key spans the base instance plus exactly ONE store shard (NZ-D3: at most two calls per fill)', () => {
+  // PERF-RL-DO (Ruling PERF-RL-DO-1) replaced the NZ-D3 layout: the generic prefix names were the ONE global base instance every
+  // fill read. They are now replicated per store shard and read with the batch, so a fill is ONE call on ONE instance.
+  it('every generation name of a fill routes to ONE store shard, never the global base instance', () => {
     for (const key of [
+      'public:categories:abc',
+      'public:products:s1:feed:v2',
+      'dir:slug:some-shop',
       'public:products:11111111-1111-4111-8111-111111111111:feed:v2',
       'public:store:resolve:h.ebda.app',
     ]) {
-      const shards = new Set(generationNamesFor(key).map(n => shardOf(`cachegen:${n}`)));
-      expect(shards.has(CACHEGEN_SHARD)).toBe(true);
-      expect(shards.size).toBe(2);
-      expect([...shards].every(x => x <= CACHEGEN_SHARD)).toBe(true);
+      const names = generationNamesFor(key);
+      const anchor = cachegenAnchor(names);
+      const shards = new Set(names.map(n => cachegenHome(n) ?? anchor));
+      expect(shards.size, key).toBe(1);
+      expect([...shards][0]).toBeLessThan(CACHEGEN_SHARD);
+      // the generic per-key route (CfRedis get/incr) never sends a generation to an auth shard
+      for (const n of names) expect(shardOf(`cachegen:${n}`)).toBeLessThanOrEqual(CACHEGEN_SHARD);
     }
+  });
+  it('generic prefix names are replicated (no home); a bump of one lands on every store shard', () => {
+    for (const n of ['', 'public:', 'public:products:', 'dir:slug:', 'public:store:resolve:'])
+      expect(cachegenHome(n)).toBeNull();
+    expect(cachegenStoreShards()).toHaveLength(CACHEGEN_STORE_SHARDS);
+    expect(cachegenStoreShards().every(s => s < CACHEGEN_SHARD)).toBe(true);
   });
   it('the cachegen instance is outside the auth shard range, and no auth key can route to it', () => {
     expect(CACHEGEN_SHARD < 0 || CACHEGEN_SHARD >= AUTH_STATE_SHARDS).toBe(true);

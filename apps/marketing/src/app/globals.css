@@ -3616,3 +3616,27 @@ html[lang='ar'] .sh-statement {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Crawlable links to the business-type and comparison pages (ExploreLinks). */
+.explore {
+  margin-block: 2rem 0;
+  text-align: start;
+}
+.explore h3 {
+  font-size: 1rem;
+  margin: 1rem 0 0.5rem;
+}
+.explore ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.explore a {
+  display: inline-block;
+  padding: 0.5rem 0;
+  min-height: 44px;
+  line-height: 1.5;
+}

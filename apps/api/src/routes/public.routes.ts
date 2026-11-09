@@ -30,6 +30,9 @@ import {
   publicLimiter,
   publicTenantLimiter,
   storeResolveLimiter,
+  storeMissLimiter,
+  publicSearchLimiter,
+  whenSearching,
   cartLimiter,
   writeLimiter,
   couponAttemptLimiter,
@@ -108,6 +111,7 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 import { inParallel } from '../lib/run-in-parallel';
 import { publicReadLimit } from '../middleware/public-read-limit';
+import { prefetchPublicLimits } from '../middleware/public-limit-prefetch';
 /**
  * The guest view token for a just-created order, or undefined when it cannot be signed. The order
  * is already committed at this point: a missing signing key must degrade to the masked order view,
@@ -128,7 +132,13 @@ const router = Router();
 // per-tenant aggregate backstop (see publicTenantLimiter's comment).
 // Both counters are independent keyed counters behind a Durable Object hop each; they run
 // together (one round trip, not two). Both still count every request and either can answer 429.
+// PERF-RL-DO: every limiter hit below is sent first, batched per shard (one round trip); the limiters take their results.
+router.use(prefetchPublicLimits);
 router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
+// LAUNCH-RL: unknown-store 404s only (random slug/host probing), then search/typeahead per IP.
+router.use(storeMissLimiter);
+router.use('/products', whenSearching(publicSearchLimiter));
+router.use('/:storeId/search/suggest', publicSearchLimiter);
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {

@@ -35,6 +35,10 @@ The old fonts (Amiri, Marcellus) are gone from `layout.tsx`. The Workshop page i
 
 New platform sections: `gift-finder` (occasions link to categories, budgets are whole pounds; a budget link opens the PLP with `maxPrice`, Ruling B5-7, `GiftFinderSection.tsx`) and the `blocks` field of a mix section spec (a look can ship its own blocks). The collection tile shape `arch` stays in the Zod enum for old data but is no longer offered in the editor; it renders as a rectangle. `docs/architecture/page-definition.md` has the schema.
 
+## Signature section (T7)
+
+`piece-window`: one piece in a double hairline frame (the line token), its name, a line and a button, in all three looks after the main grid. With no photo the frame holds the words. The journey strip stays `steps` on Workshop (Ruling B5-8; Rulings T7-1, T7-2). Demo: the solitaire ring.
+
 ## Conventions (what a Dahab merchant fills in)
 
 - **Karat, width and weight are product facts** ("عيار 21", "عرض 4 مم", "الوزن 3.2 جم"), at most two on the card (Ruling B5-5). A gold-rate piece's karat and weight come from its spec; the admin warns when a fact names another karat.

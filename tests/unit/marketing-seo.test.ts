@@ -80,7 +80,7 @@ describe('JSON-LD', () => {
       // the studio is the organization / publisher; "Ebda Store" is the product brand organization
       // whose parent is the studio; the site and the app are the product
       byType.Organization = byId['https://ebda.app/#organization'];
-      expect(byType.Organization.sameAs).toEqual([]);
+      expect(byType.Organization.sameAs).toBeUndefined(); // no verified public profiles: omitted, never empty
       expect(byType.Organization.name).toBe('Ebda AI Studio');
       const brand = byId['https://ebda.app/#store'];
       expect(brand['@type']).toBe('Organization');

@@ -141,12 +141,14 @@ async function sumOrderQty(
   variantId: string | null,
   storeId: string,
   days: number,
-  tx: any
+  tx: any,
+  onDo: boolean
 ): Promise<number> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  // A store on its Durable Object (Ruling CF-JOBS-4): the read client has no raw SQL, so the same sum is an aggregate.
-  if (typeof tx.$queryRaw !== 'function') {
+  // A store on its Durable Object (Ruling CF-JOBS-4): the read client has no raw SQL, so the same sum is an aggregate. The
+  // caller says so (`onDo`): the DO client THROWS on any `$`-member, so probing `tx.$queryRaw` was itself the crash (2026-11-09 P1).
+  if (onDo) {
     const agg = await tx.orderItem.aggregate({
       where: {
         productId,
@@ -455,8 +457,8 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
 
       for (const unit of unitSlice) {
         const { product, variantId, rule, onHand } = unit;
-        const qty7d = await sumOrderQty(product.id, variantId, storeId, 7, tx);
-        const qty28d = await sumOrderQty(product.id, variantId, storeId, 28, tx);
+        const qty7d = await sumOrderQty(product.id, variantId, storeId, 7, tx, !!money);
+        const qty28d = await sumOrderQty(product.id, variantId, storeId, 28, tx, !!money);
 
         const velocity7d = qty7d / 7;
         const velocity28d = qty28d / 28;
