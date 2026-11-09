@@ -105,3 +105,22 @@ describe('public search limiter', () => {
     expect(s).toEqual([200, 200, 200, 429]);
   });
 });
+
+describe('no resolvable client IP', () => {
+  it('is not counted (no shared bucket)', async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      Object.defineProperty(req, 'ip', { value: undefined });
+      next();
+    });
+    app.get('/s', createPublicSearchLimiter({ skip: never, max: 2 }), (_req, res) =>
+      res.json({ ok: true })
+    );
+    const srv = await new Promise<Server>(r => {
+      const x = app.listen(0, () => r(x));
+    });
+    const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/s`;
+    for (let i = 0; i < 5; i++) expect((await fetch(url)).status).toBe(200);
+    await new Promise<void>(r => srv.close(() => r()));
+  });
+});

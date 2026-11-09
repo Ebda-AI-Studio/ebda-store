@@ -939,6 +939,13 @@ export const authLimiter = createAuthLimiter();
  * carrier NAT with many honest sign-ins is not locked out; mail/account-creating routes use
  * `countSuccess: true` because their success is the abuse. Exact: counted on the AuthState DO.
  */
+/**
+ * LAUNCH-RL fail-safe: on the Worker `req.ip` is the CF-Connecting-IP Cloudflare saw (worker.ts rewrites X-Forwarded-For to it,
+ * `trust proxy` 1). With no resolvable IP the new per-IP limiters do NOT count, rather than pooling every such request in one
+ * shared bucket that would throttle all shoppers at once.
+ */
+const noClientIp = (req: Request): boolean => !req.ip;
+
 export function createAuthIpLimiter(opts: {
   countSuccess: boolean;
   max?: number;
@@ -960,8 +967,8 @@ export function createAuthIpLimiter(opts: {
     legacyHeaders: false,
     passOnStoreError: true,
     skipSuccessfulRequests: !opts.countSuccess,
-    skip: opts.skip ?? skipForLoadTestOrTests,
-    keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+    skip: req => noClientIp(req) || (opts.skip ?? skipForLoadTestOrTests)(req),
+    keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
   });
 }
 /** Sign-in style routes (login, MFA verify, reset-password, change-password): failures only. */
@@ -991,8 +998,8 @@ export function createStoreMissLimiter(opts?: { skip?: (req: Request) => boolean
     passOnStoreError: true,
     skipSuccessfulRequests: true,
     requestWasSuccessful: (_req, res) => res.statusCode !== 404,
-    skip: opts?.skip ?? skipForLoadTest,
-    keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+    skip: req => noClientIp(req) || (opts?.skip ?? skipForLoadTest)(req),
+    keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
   });
 }
 export const storeMissLimiter = createStoreMissLimiter();
@@ -1017,8 +1024,8 @@ export function createPublicSearchLimiter(opts?: {
     standardHeaders: true,
     legacyHeaders: false,
     passOnStoreError: true,
-    skip: opts?.skip ?? skipForLoadTest,
-    keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+    skip: req => noClientIp(req) || (opts?.skip ?? skipForLoadTest)(req),
+    keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
   });
 }
 export const publicSearchLimiter = createPublicSearchLimiter();
