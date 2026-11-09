@@ -3,39 +3,16 @@ import { getStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import { pickMetaDescription } from '../lib/seo/meta-description';
 import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
-import { hslToHex, BRAND } from '@ebda/shared';
+import { hslToHex, BRAND, storePwaManifestSchema, type StorePwaManifest } from '@ebda/shared';
 
-/**
- * Shape of the per-store manifest returned by the API. Mirrors what
- * `apps/api/src/services/pwa.service.ts::generateManifest` builds. Kept
- * loose because the API can evolve fields independently and Next.js
- * `MetadataRoute.Manifest` already enforces the contract for the response.
- */
 type ManifestIconPurpose = 'any' | 'maskable' | 'monochrome';
 
-interface ApiManifestIcon {
-  src: string;
-  sizes: string;
-  type: string;
-  purpose?: string;
-}
+/** The per-store manifest the API builds, after it passed `storePwaManifestSchema` (@ebda/shared). */
+type ApiManifest = StorePwaManifest;
+type ApiManifestIcon = NonNullable<ApiManifest['icons']>[number];
 
-interface ApiManifest {
-  name?: string;
-  short_name?: string;
-  description?: string;
-  /** Arabic identity members emitted by generateManifest (#2194). */
-  name_ar?: string;
-  short_name_ar?: string;
-  description_ar?: string;
-  theme_color?: string;
-  background_color?: string;
-  display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser';
-  orientation?: 'any' | 'portrait' | 'landscape';
-  start_url?: string;
-  scope?: string;
-  icons?: ApiManifestIcon[];
-}
+/** A manifest is never worth holding a render for: past this the generic manifest is served instead. */
+const MANIFEST_FETCH_TIMEOUT_MS = 3000;
 
 /**
  * Coerce an icon's `purpose` into the strict union the Next.js manifest type
@@ -58,23 +35,40 @@ function normalizeIcon(icon: ApiManifestIcon): {
 
 /**
  * Try to fetch the per-store manifest assembled by the API from the admin's
- * PWA settings. Returns `null` if PWA is disabled for this store, the store
- * id is unknown (demo fallback), or the fetch fails — callers should then
- * fall back to the basic manifest derived from generic store fields.
+ * PWA settings. Returns `null` when PWA is disabled for this store, the store
+ * id is unknown (demo fallback), the fetch fails or times out, or the answer
+ * fails `storePwaManifestSchema`. The caller then serves the generic manifest
+ * built from the store's own fields, so a broken merchant manifest is never
+ * worse than no merchant manifest.
  */
 async function fetchStoreManifest(storeId: string): Promise<ApiManifest | null> {
   if (!storeId || storeId === 'demo') return null;
   try {
-    const res = await fetch(`${API_URL}/public/${storeId}/manifest.json`, {
+    // The PWA router is mounted at `/stores` (apps/api/src/routes/index.ts). `/public/<id>/manifest.json` is no route at
+    // all: it answered 404 on every render, so the per-store manifest never applied and each miss was charged to the
+    // per-IP store-miss budget on the public router.
+    const res = await fetch(`${API_URL}/stores/public/${storeId}/manifest.json`, {
       // Tagged so an icon/settings write (PWAService.updateSettings) can bust
       // this immediately via revalidateStorefront({tags:[`pwa:<storeId>`]})
       // instead of merchants waiting out the 300s TTL — same pattern as the
       // products/categories tags this fetch's siblings use.
       next: { revalidate: 300, tags: [`pwa:${storeId}`] },
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(MANIFEST_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
-    return (await res.json()) as ApiManifest;
+    // Merchant input, read at the edge: start_url/scope must stay on the store's own origin, every icon must be an
+    // absolute https URL, colours must be hex. One bad field refuses the whole manifest rather than serving half of it.
+    const parsed = storePwaManifestSchema.safeParse(await res.json());
+    if (!parsed.success) {
+      console.warn(
+        'Per-store PWA manifest refused, serving the generic one:',
+        storeId,
+        parsed.error.issues.map(issue => issue.path.join('.')).join(', ')
+      );
+      return null;
+    }
+    return parsed.data;
   } catch (error) {
     console.error('Failed to fetch per-store PWA manifest:', error);
     return null;

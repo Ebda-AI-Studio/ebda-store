@@ -24,6 +24,7 @@ export * from './notifications';
 export * from './schemas/location';
 export * from './schemas/plan-limits';
 export * from './schemas/revalidate';
+export * from './schemas/pwa-manifest';
 export * from './schemas/campaign';
 export * from './schemas/webhook';
 export * from './schemas/typography';

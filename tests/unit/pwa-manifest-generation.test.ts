@@ -149,16 +149,15 @@ describe('PWAService.generateManifest', () => {
     expect(await PWAService.generateManifest(STORE_ID)).toBeNull();
   });
 
-  it('falls back to platform default icons when NOTHING has been set', async () => {
+  // The API used to name `/icons/icon-192x192.png` + `/icons/icon-512x512.png` here, which no app ships (both 404 on the
+  // live storefront, 2026-11-10). The storefront owns the fallback icons, so the API names none.
+  it('names NO icon when nothing has been set (the storefront serves its own)', async () => {
     findUniqueMock.mockResolvedValue({ name: 'Bare Store', pwaSettings: {} });
 
     const { PWAService } = await import('@api/services/pwa.service');
     const manifest = (await PWAService.generateManifest(STORE_ID)) as { icons: unknown };
 
-    expect(manifest.icons).toEqual([
-      { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
-    ]);
+    expect(manifest.icons).toEqual([]);
   });
 });
 

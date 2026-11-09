@@ -516,22 +516,10 @@ export class PWAService {
       });
     }
 
-    // Default icons if none provided
-    if (icons.length === 0) {
-      icons.push(
-        {
-          src: '/icons/icon-192x192.png',
-          sizes: '192x192',
-          type: 'image/png',
-        },
-        {
-          src: '/icons/icon-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-        }
-      );
-    }
-
+    // No icon uploaded: an EMPTY list, and the storefront (apps/web/src/app/manifest.ts) serves its own (the store favicon,
+    // else its shipped `/icon-192.png` + `/icon-512.png`). This used to name `/icons/icon-192x192.png` and
+    // `/icons/icon-512x512.png`, two files no app ships (404 on the live storefront, measured 2026-11-10): the API cannot
+    // know the storefront's static files.
     manifest.icons = icons;
 
     return manifest;
