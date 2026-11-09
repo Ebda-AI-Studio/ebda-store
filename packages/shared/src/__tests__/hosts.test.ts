@@ -58,6 +58,9 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'studio',
         'checkin',
         'manage',
+        'invite',
+        'ads',
+        'quote',
       ].sort()
     );
   });

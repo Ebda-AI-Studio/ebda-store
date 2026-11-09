@@ -19,6 +19,9 @@ export const STORE_EXTRA_RESERVED_SLUGS = [
   'studio',
   'checkin',
   'manage',
+  'invite',
+  'ads',
+  'quote',
 ] as const;
 
 /** Any slug starting with one of these is reserved (per-deployment preview hosts). */
