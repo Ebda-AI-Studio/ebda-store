@@ -15,7 +15,7 @@ import { formatMoney, intlLocale, withNumerals, localizeDigits } from '@ebda/sha
 
 const ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIR =
-  /(^|\/)(node_modules|\.next|\.open-next|out|dist|\.gate|\.wrangler|graphify-out|coverage)(\/|$)/;
+  /(^|\/)(node_modules|\.next|\.open-next|out|dist|dist-cf|\.gate|\.wrangler|graphify-out|coverage)(\/|$)/;
 
 function* walk(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {
