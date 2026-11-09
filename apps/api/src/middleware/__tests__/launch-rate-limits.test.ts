@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
+import type { Store } from 'express-rate-limit';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
@@ -81,6 +82,83 @@ describe('store-miss limiter', () => {
     expect(s).toEqual([404, 404, 404, 429]);
     expect((await call('GET', '/stores/real', '9.1.0.1')).status).toBe(429); // blocked IP stays blocked this minute
     expect((await call('GET', '/stores/real', '9.1.0.2')).status).toBe(200);
+  });
+  // LAUNCH-RL-MISS: a hit must not move the miss budget, not after the response and not while it is in flight.
+  it('hits leave the budget in the headers untouched; misses bring it down', async () => {
+    const left: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const r = await call('GET', '/stores/real', '9.1.0.3');
+      left.push(`${r.status}:${r.headers.get('ratelimit-remaining')}`);
+    }
+    expect(left).toEqual(Array.from({ length: 6 }, () => '200:3'));
+    const miss: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = await call('GET', `/stores/nope${i}`, '9.1.0.3');
+      miss.push(`${r.status}:${r.headers.get('ratelimit-remaining')}`);
+    }
+    // the header is the budget BEFORE the response
+    expect(miss).toEqual(['404:3', '404:2', '404:1', '429:0']);
+  });
+  it('30 parallel hits from one IP (a carrier NAT) are all served with a budget of 3', async () => {
+    const s = await Promise.all(
+      Array.from({ length: 30 }, async () => (await call('GET', '/stores/real', '9.1.0.4')).status)
+    );
+    expect(s).toEqual(Array.from({ length: 30 }, () => 200));
+    expect((await call('GET', '/stores/real', '9.1.0.4')).headers.get('ratelimit-remaining')).toBe(
+      '3'
+    );
+  });
+  it('a counter outage serves the request (fail open), reads and writes', async () => {
+    const down: Store = {
+      init: () => undefined,
+      get: async () => {
+        throw new Error('store down');
+      },
+      increment: async () => {
+        throw new Error('store down');
+      },
+      decrement: async () => undefined,
+      resetKey: async () => undefined,
+    };
+    const app = express();
+    app.set('trust proxy', true);
+    app.get(
+      '/stores/:slug',
+      createStoreMissLimiter({ skip: never, max: 1, store: down }),
+      (req, res) =>
+        req.params.slug === 'real' ? res.json({ ok: true }) : res.status(404).json({ ok: false })
+    );
+    const srv = await new Promise<Server>(r => {
+      const x = app.listen(0, () => r(x));
+    });
+    const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/stores/`;
+    const unhandled: unknown[] = [];
+    const onUnhandled = (e: unknown) => unhandled.push(e);
+    process.on('unhandledRejection', onUnhandled);
+    const s: number[] = [];
+    for (const slug of ['real', 'nope1', 'nope2', 'nope3'])
+      s.push((await fetch(url + slug, { headers: { 'x-forwarded-for': '9.1.0.5' } })).status);
+    await new Promise(r => setTimeout(r, 50));
+    process.off('unhandledRejection', onUnhandled);
+    await new Promise<void>(r => srv.close(() => r()));
+    expect(s).toEqual([200, 404, 404, 404]);
+    expect(unhandled).toEqual([]);
+  });
+  it('a request with no client IP is never counted', async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      Object.defineProperty(req, 'ip', { value: undefined });
+      next();
+    });
+    app.get('/stores/:slug', createStoreMissLimiter({ skip: never, max: 1 }), (_req, res) =>
+      res.status(404).json({ ok: false })
+    );
+    const srv = await new Promise<Server>(r => {
+      const x = app.listen(0, () => r(x));
+    });
+    const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/stores/x`;
+    for (let i = 0; i < 4; i++) expect((await fetch(url)).status).toBe(404);
+    await new Promise<void>(r => srv.close(() => r()));
   });
 });
 

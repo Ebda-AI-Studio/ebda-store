@@ -14,6 +14,7 @@ import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
 import { CfRateLimitStore } from '../cf/rate-limit-store';
+import { cfWaitUntil } from '../cf/bindings';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
 import { abuseConfig } from '../lib/abuse-config';
@@ -983,24 +984,76 @@ export const authIpAllLimiter = createAuthIpLimiter({ countSuccess: true, prefix
  * LAUNCH-RL: unknown-store lookups. Every storefront request resolves host/slug -> store; a miss is
  * a database round trip an attacker can repeat for free with random slugs/hosts. Counts ONLY 404s
  * (a hit is free and stays under the general public limiter), 20 misses/min per IP.
+ *
+ * LAUNCH-RL-MISS (Ruling LAUNCH-RL-MISS-1): this is deliberately NOT express-rate-limit's `skipSuccessfulRequests`. That
+ * mode counts EVERY request up front and gives the hit back after the response, so a request that is not a miss still spent
+ * the miss budget: (a) while in flight (30 parallel 200s from one IP on workerd: 10 answered 429), and (b) for the rest of
+ * the minute whenever the give-back, which runs after the response, did not land on the Worker (production 2026-11-09: seven
+ * sequential 200s took `ratelimit-remaining` from 19 to 14). Shoppers behind one carrier NAT share the IP.
+ *
+ * Here a request only READS the miss count (20 already: 429, same body and headers as before) and a miss is counted after
+ * its 404 was sent, kept alive past the response with `waitUntil`. A response that is not a 404 never writes the counter.
+ * The RateLimit headers carry the misses left BEFORE this response, so they are flat across hits and fall across misses.
+ * A counter outage serves the request (fail open), as every limiter here does.
+ *
+ * Reading then counting is not atomic: misses already in flight when the budget runs out are still answered, so a burst
+ * can pass the limit by its own concurrency. The atomic per-IP public limiter in front of it bounds that.
  */
-export function createStoreMissLimiter(opts?: { skip?: (req: Request) => boolean; max?: number }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, 'store-miss'),
-    windowMs: 60 * 1000,
-    max: opts?.max ?? 20,
-    message: {
-      success: false,
-      error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    passOnStoreError: true,
-    skipSuccessfulRequests: true,
-    requestWasSuccessful: (_req, res) => res.statusCode !== 404,
-    skip: req => noClientIp(req) || (opts?.skip ?? skipForLoadTest)(req),
-    keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
-  });
+export function createStoreMissLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  max?: number;
+  /** Tests only: the counter store (a failing or slow one). */
+  store?: Store;
+}): RequestHandler {
+  const windowMs = 60 * 1000;
+  const max = opts?.max ?? 20;
+  const store = opts?.store ?? makeRateLimitStore(rateLimitRedisClient, 'store-miss');
+  // No `limit`: the store's own over-limit telemetry stays quiet, the 429 below is what is recorded.
+  void store.init?.({ windowMs } as Options);
+  const skip = (req: Request) => noClientIp(req) || (opts?.skip ?? skipForLoadTest)(req);
+  const message = {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  };
+  return async (req, res, next) => {
+    if (skip(req)) return next();
+    const key = ipKeyGenerator(req.ip ?? '');
+    let misses = 0;
+    let resetAt = 0;
+    try {
+      const info = await store.get?.(key);
+      const until = info?.resetTime?.getTime() ?? 0;
+      // an in-memory store can still hold a window that has ended
+      if (info && (!until || until > Date.now())) {
+        misses = info.totalHits;
+        resetAt = until;
+      }
+    } catch {
+      // fail open: the miss is still counted below when the counter is back
+    }
+    const resetSeconds = Math.max(
+      1,
+      Math.ceil(((resetAt || Date.now() + windowMs) - Date.now()) / 1000)
+    );
+    if (!res.headersSent) {
+      res.setHeader('RateLimit-Policy', `${max};w=${windowMs / 1000}`);
+      res.setHeader('RateLimit-Limit', String(max));
+      res.setHeader('RateLimit-Remaining', String(Math.max(0, max - misses)));
+      res.setHeader('RateLimit-Reset', String(resetSeconds));
+    }
+    if (misses >= max) {
+      recordRateLimited('rl:store-miss:');
+      res.setHeader('Retry-After', String(resetSeconds));
+      res.status(429).send(message);
+      return;
+    }
+    res.once('finish', () => {
+      if (res.statusCode !== 404) return;
+      // after the response: `cfWaitUntil` keeps the count alive on a Worker and swallows a store error
+      cfWaitUntil(Promise.resolve().then(() => store.increment(key)));
+    });
+    next();
+  };
 }
 export const storeMissLimiter = createStoreMissLimiter();
 

@@ -2302,6 +2302,36 @@
       "test": "tests/unit/public-limit-prefetch.test.ts"
     },
     {
+      "id": "store-miss-refuses-at-limit",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "the store-miss limiter reads the miss count but never refuses, so one IP can enumerate store slugs (one store lookup per guess) without limit (LAUNCH-RL-MISS-1)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "    if (misses >= max) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/store-miss-limiter.test.ts"
+    },
+    {
+      "id": "store-miss-counts-a-404",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "a 404 is never written to the miss counter, so the store-miss limit can never be reached and unknown-store probing is unlimited (LAUNCH-RL-MISS-1)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "      if (res.statusCode !== 404) return;",
+      "replace": "      return;",
+      "test": "tests/unit/store-miss-limiter.test.ts"
+    },
+    {
+      "id": "rl-giveback-kept-alive",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "the give-back of a failures-only limiter (IP-wide sign-in, passkey finish) is no longer handed to waitUntil, so on a Worker it is dropped when the response ends and successful sign-ins behind one carrier IP use up that IP's failure budget (LAUNCH-RL-MISS-2)",
+      "source": "apps/api/src/cf/rate-limit-store.ts",
+      "find": "    cfWaitUntil(done);\n",
+      "replace": "",
+      "test": "tests/unit/public-limit-prefetch.test.ts"
+    },
+    {
       "id": "public-read-native-only-anonymous",
       "domain": "rate limiting",
       "tier": "unit",

@@ -13,6 +13,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Options, Store, ClientRateLimitInfo } from 'express-rate-limit';
 import { applyOn, shardOf } from './auth-state-client';
+import { cfWaitUntil } from './bindings';
 import type { Op } from './auth-state-core';
 
 /**
@@ -27,32 +28,69 @@ import type { Op } from './auth-state-core';
  * A prediction can only cost time, never a count: a limiter that finds no prefetched hit calls the DO itself as before, and a
  * prefetched hit no limiter took (a skipped limiter, an earlier 429) is taken back with `unhit` when the response ends
  * ({@link releaseUnconsumed}). A failed prefetch falls back to the direct call.
+ *
+ * LAUNCH-RL-MISS: a `peek` rides the same batch but only READS a counter (`get` + `pttl`, existing ops), for a limiter that
+ * counts after the response (the store-miss limiter, middleware/security.ts). It is never a hit: `increment` does not take
+ * it and nothing is taken back for it.
  */
 interface Prefetched {
   windowMs: number;
+  /** [count, resetAtMs]; for a peek resetAtMs is 0 when no window is open. */
   result: Promise<[number, number]>;
   consumed: boolean;
   landed: boolean;
+  peek?: true;
 }
 export type PrefetchedHits = Map<string, Prefetched>;
 const prefetched = new AsyncLocalStorage<PrefetchedHits>();
 
-export function prefetchHits(entries: Array<{ key: string; windowMs: number }>): PrefetchedHits {
+export function prefetchHits(
+  entries: Array<{ key: string; windowMs: number }>,
+  peeks: string[] = []
+): PrefetchedHits {
   const map: PrefetchedHits = new Map();
-  const byShard = new Map<number, Array<{ key: string; windowMs: number }>>();
+  const byShard = new Map<
+    number,
+    { hits: Array<{ key: string; windowMs: number }>; reads: string[] }
+  >();
   const seen = new Set<string>();
+  const slot = (key: string) => {
+    let s = byShard.get(shardOf(key));
+    if (!s) byShard.set(shardOf(key), (s = { hits: [], reads: [] }));
+    return s;
+  };
   for (const e of entries) {
     if (seen.has(e.key)) continue;
     seen.add(e.key);
-    const list = byShard.get(shardOf(e.key)) ?? [];
-    list.push(e);
-    byShard.set(shardOf(e.key), list);
+    slot(e.key).hits.push(e);
   }
-  for (const list of byShard.values()) {
-    const call = applyOn(
-      list[0].key,
-      list.map(e => ['hit', e.key, e.windowMs] as Op)
-    );
+  for (const key of peeks) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    slot(key).reads.push(key);
+  }
+  for (const { hits: list, reads } of byShard.values()) {
+    // hits first: the reads follow them in the same call
+    const call = applyOn(list[0]?.key ?? reads[0], [
+      ...list.map(e => ['hit', e.key, e.windowMs] as Op),
+      ...reads.flatMap(k => [['get', k] as Op, ['pttl', k] as Op]),
+    ]);
+    reads.forEach((key, j) => {
+      const at = list.length + 2 * j;
+      const entry: Prefetched = {
+        windowMs: 0,
+        consumed: true,
+        landed: false,
+        peek: true,
+        result: call.then(out => {
+          const count = Number(out[at] ?? 0);
+          const ttl = Number(out[at + 1]);
+          return [Number.isFinite(count) ? count : 0, ttl > 0 ? Date.now() + ttl : 0];
+        }),
+      };
+      entry.result.catch(() => undefined);
+      map.set(key, entry);
+    });
     list.forEach((e, j) => {
       const entry: Prefetched = {
         windowMs: e.windowMs,
@@ -112,6 +150,17 @@ export class CfRateLimitStore implements Store {
 
   async get(key: string): Promise<ClientRateLimitInfo | undefined> {
     const redisKey = this.k(key);
+    // (named `read`, not `pre`: the defence-mutation record finds the hit lookup in `increment` by its exact text)
+    const read = prefetched.getStore()?.get(redisKey);
+    if (read?.peek) {
+      try {
+        const [hits, resetAt] = await read.result;
+        if (hits <= 0) return undefined;
+        return { totalHits: hits, resetTime: new Date(resetAt || Date.now() + this.windowMs) };
+      } catch {
+        // the batched call failed: read directly below (a store error there fails open at the caller)
+      }
+    }
     const [value, pttl] = (await applyOn(redisKey, [
       ['get', redisKey],
       ['pttl', redisKey],
@@ -138,9 +187,18 @@ export class CfRateLimitStore implements Store {
     return { totalHits: res[0], resetTime: new Date(res[1]) };
   }
 
+  /**
+   * The give-back of a failures-only limiter (`skipSuccessfulRequests`: the IP-wide sign-in limiter, passkey finish).
+   * express-rate-limit counts every request up front and calls this AFTER the response has finished, without waiting for it.
+   * On a Worker that is work past the response: unless it is handed to `waitUntil` the runtime may drop the call when the
+   * request ends, and a SUCCESSFUL request stays counted as a failure (production 2026-11-09: seven sequential 200s moved
+   * a failures-only budget from 19 to 14). Never throws: nothing awaits it, and a lost give-back cannot be retried.
+   */
   async decrement(key: string): Promise<void> {
     const redisKey = this.k(key);
-    await applyOn(redisKey, [['unhit', redisKey]]);
+    const done = applyOn(redisKey, [['unhit', redisKey]]).catch(() => undefined);
+    cfWaitUntil(done);
+    await done;
   }
 
   async resetKey(key: string): Promise<void> {
