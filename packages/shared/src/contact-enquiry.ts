@@ -6,20 +6,25 @@
 import { BRAND } from './brand';
 import { toAsciiDigits } from './ascii-digits';
 
-/** What the visitor needs: the two products' support, each of the three studio services (ids from BRAND.services), other. */
+/** What the visitor needs: the two products' support, each of the three studio services (ids from BRAND.services), each of the three service lines (BRAND.serviceLines, SERVICES-IA-1), other. */
 export const CONTACT_TOPIC_IDS = [
   'store-support',
   'chat-support',
   ...BRAND.services.map(s => s.id),
+  ...BRAND.serviceLines.map(s => s.id),
+  'products',
   'other',
 ] as const;
 export type ContactTopicId = (typeof CONTACT_TOPIC_IDS)[number];
 
-const SERVICE_LABELS = Object.fromEntries(BRAND.services.map(s => [s.id, { ar: s.ar, en: s.en }]));
+const SERVICE_LABELS = Object.fromEntries(
+  [...BRAND.services, ...BRAND.serviceLines].map(s => [s.id, { ar: s.ar, en: s.en }])
+);
 export const CONTACT_TOPIC_LABELS = {
   'store-support': { ar: 'دعم ابدأ ستور', en: 'Ebda Store support' },
   'chat-support': { ar: 'دعم ابدأ شات', en: 'Ebda Chat support' },
   ...SERVICE_LABELS,
+  products: { ar: 'المنتجات الجاية', en: 'Upcoming products' },
   other: { ar: 'حاجة تانية', en: 'Something else' },
 } as Record<ContactTopicId, { ar: string; en: string }>;
 

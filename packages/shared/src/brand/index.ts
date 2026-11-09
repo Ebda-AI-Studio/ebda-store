@@ -110,6 +110,33 @@ export const BRAND = {
       ],
     },
   ],
+  /**
+   * The three SERVICE LINES (Ahmad 2026-11-09, Ruling SERVICES-IA-1): Marketing, Design and Events are lines of the studio on
+   * ebda.app (`/services/<id>`), not standalone sites. They are NOT part of `services` (the core: STUDIO-CORE-1) and stay
+   * hidden in production behind the marketing build flag `EBDA_SERVICE_LINES` until Ahmad approves the wording. An id is also a
+   * contact-form topic id (the API accepts it always; the form lists it only when the lines are published).
+   */
+  serviceLines: [
+    {
+      id: 'marketing',
+      ar: 'التسويق',
+      en: 'Marketing',
+      nameAr: 'ابدأ ماركتنج',
+      nameEn: 'Ebda Marketing',
+    },
+    { id: 'design', ar: 'التصميم', en: 'Design', nameAr: 'ابدأ ديزاين', nameEn: 'Ebda Design' },
+    { id: 'events', ar: 'الفعاليات', en: 'Events', nameAr: 'ابدأ إيفنتس', nameEn: 'Ebda Events' },
+  ],
+  /**
+   * The software products still COMING SOON (names confirmed by Ahmad 2026-11-09; the Arabic is the transliteration pattern of
+   * ابدأ ستور / ابدأ شات, except Quote Studio: «استوديو للتسعير», because «كوت» reads as "coat" in Egyptian Arabic). They are NOT live products
+   * (siteNavProducts lists only live ones); the marketing site shows them as "coming soon" only when the service lines are published.
+   */
+  comingProducts: [
+    { id: 'quote-studio', nameAr: 'ابدأ استوديو للتسعير', nameEn: 'Ebda Quote Studio' },
+    { id: 'invite', nameAr: 'ابدأ إنفايت', nameEn: 'Ebda Invite' },
+    { id: 'ads', nameAr: 'ابدأ آدز', nameEn: 'Ebda Ads' },
+  ],
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',
   colors: {
@@ -560,6 +587,68 @@ export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
         'Talk to your customers on WhatsApp, from one inbox'
       ),
     },
+  ];
+}
+
+export type SiteNavServiceId = 'core' | 'events' | 'marketing' | 'design' | 'all';
+export interface SiteNavService extends NavLink {
+  id: SiteNavServiceId;
+  blurb: string;
+}
+
+/**
+ * The Services menu (Ruling SERVICES-IA-1), built like Products: one entry per destination, then "All services". Core first (AI and
+ * software, on the Services index), then the three service lines. The marketing header renders it ONLY when the service lines are
+ * published (build flag EBDA_SERVICE_LINES=on); the support sites do not render it.
+ */
+export function siteNavServices(lang: NavLang): SiteNavService[] {
+  const item = (
+    id: SiteNavServiceId,
+    label: string,
+    p: string,
+    blurbAr: string,
+    blurbEn: string
+  ) => ({
+    ...mlink(lang, id, label, p),
+    id,
+    blurb: L(lang, blurbAr, blurbEn),
+  });
+  return [
+    item(
+      'core',
+      L(lang, 'ذكاء اصطناعي وبرمجيات', 'AI & Software'),
+      '/services/#core',
+      'ذكاء اصطناعي وبرمجيات واستشارات وتدريب',
+      'AI, software, consulting and training'
+    ),
+    item(
+      'events',
+      L(lang, BRAND.serviceLines[2].nameAr, BRAND.serviceLines[2].nameEn),
+      '/services/events/',
+      'تنظيم فعاليات الشركات والمؤتمرات',
+      'Corporate events and conferences, organised'
+    ),
+    item(
+      'marketing',
+      L(lang, BRAND.serviceLines[0].nameAr, BRAND.serviceLines[0].nameEn),
+      '/services/marketing/',
+      'تسويق وإعلان وإنتاج محتوى',
+      'Marketing, advertising and content'
+    ),
+    item(
+      'design',
+      L(lang, BRAND.serviceLines[1].nameAr, BRAND.serviceLines[1].nameEn),
+      '/services/design/',
+      'تصميم وتنفيذ البيوت',
+      'Home design and build'
+    ),
+    item(
+      'all',
+      L(lang, 'كل الخدمات', 'All services'),
+      '/services/',
+      'كل اللي بنقدمه في مكان واحد',
+      'Everything we do, in one place'
+    ),
   ];
 }
 

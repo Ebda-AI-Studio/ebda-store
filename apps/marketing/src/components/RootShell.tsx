@@ -9,6 +9,7 @@ import '@/app/motifs.css';
 import '@/app/chrome.css';
 import '@/app/about.css';
 import '@/app/contact.css';
+import '@/app/services.css';
 
 /**
  * SEO-5: fonts are self-hosted at build by next/font (no fonts.googleapis.com / gstatic request, no

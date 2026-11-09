@@ -6,6 +6,7 @@ import {
   siteNavLabels,
   siteNavLogin,
   siteNavProducts,
+  siteNavServices,
   siteNavResources,
   siteNavStudio,
   studioHomeLink,
@@ -13,6 +14,9 @@ import {
   type SiteNavProductId,
 } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { serviceLinesPublished } from '../lib/service-lines';
+import { SERVICES_PAGE } from '../lib/services-page';
+import { comingSoonItems, comingSoonLabels } from '../lib/coming-soon';
 import { NavBehavior } from './NavBehavior';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
@@ -99,6 +103,15 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
   const bar = kind === 'studio' ? null : productBar(kind, lang);
   const here = pagePath(locale, page).replace(/\/?$/, '/');
   const cur = (l: NavLink) => !!l.path && l.path === here;
+  // Services dropdown + coming-soon Products items (SERVICES-IA-1): present only when the service lines are published
+  // (build flag EBDA_SERVICE_LINES=on); when off, both are absent and the header is exactly the studio's.
+  const services = serviceLinesPublished() ? siteNavServices(lang) : null;
+  const servicesLabel = SERVICES_PAGE[locale].nav;
+  const soon = comingSoonItems(locale);
+  const soonLabel = comingSoonLabels(locale).label;
+  const svcHere = page === 'services' || page.startsWith('services/');
+  const svcCur = (l: NavLink) =>
+    l.id === 'all' ? page === 'services' : l.id === 'core' ? false : page === `services/${l.id}`;
   return (
     <header className="site-header">
       <div className="wrap header-row">
@@ -125,9 +138,38 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                       </Link>
                     </li>
                   ))}
+                  {soon.map(it => (
+                    <li key={it.id} className="np-soon" data-coming-soon={it.id}>
+                      <span className="np-txt">
+                        <b>
+                          {it.name} <em className="np-badge">{soonLabel}</em>
+                        </b>
+                        <span>{it.short}</span>
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </details>
             </li>
+            {services && (
+              <li className="nav-products nav-services">
+                <details>
+                  <summary aria-current={svcHere ? 'page' : undefined}>{servicesLabel}</summary>
+                  <ul>
+                    {services.map(sv => (
+                      <li key={sv.id}>
+                        <Link href={sv.path!} aria-current={svcCur(sv) ? 'page' : undefined}>
+                          <span className="np-txt">
+                            <b>{sv.label}</b>
+                            <span>{sv.blurb}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            )}
             <li className="nav-products">
               <details>
                 <summary>{t.resources}</summary>
@@ -168,8 +210,27 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                       <NavA locale={locale} l={p} />
                     </li>
                   ))}
+                  {soon.map(it => (
+                    <li key={it.id} className="np-soon" data-coming-soon={it.id}>
+                      <span>
+                        {it.name} <em className="np-badge">{soonLabel}</em>
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </li>
+              {services && (
+                <li className="menu-group">
+                  <p>{servicesLabel}</p>
+                  <ul>
+                    {services.map(sv => (
+                      <li key={sv.id}>
+                        <NavA locale={locale} l={sv} current={svcCur(sv)} />
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )}
               <li className="menu-group">
                 <p>{t.resources}</p>
                 <ul>

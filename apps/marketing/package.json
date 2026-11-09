@@ -5,7 +5,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev -p 3005",
-    "build": "next build && node scripts/build-search.mjs",
+    "build": "next build && tsx scripts/service-lines-postbuild.ts && node scripts/build-search.mjs",
+    "build:preview": "EBDA_SERVICE_LINES=preview npm run build",
+    "build:services-on": "EBDA_SERVICE_LINES=on npm run build",
     "start": "node ../../packages/site-kit/src/gates/serve-static.mjs out 3005",
     "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
     "lint:fix": "eslint src scripts --ext .ts,.tsx,.mjs --fix",
