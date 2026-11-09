@@ -33,6 +33,7 @@
  * idempotency) is only enqueued on the first transition into `paid`.
  */
 
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import type { PaymentStatus } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
@@ -469,11 +470,13 @@ export async function confirmPaymentFromProviderStatus(
     // expired). Idempotent per payment, so a webhook that already counted it is
     // not counted twice.
     if (status === 'failed') {
-      void CardTestingGuard.recordDecline({
-        storeId: order.storeId,
-        orderId: order.id,
-        paymentId: payment.id,
-      });
+      void deferAfterTenantCommit('payment.card-testing-decline', () =>
+        CardTestingGuard.recordDecline({
+          storeId: order.storeId,
+          orderId: order.id,
+          paymentId: payment.id,
+        })
+      );
     }
 
     return { paymentStatus: 'failed', providerStatus: status, statusChanged: true };
