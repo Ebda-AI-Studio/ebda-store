@@ -25,8 +25,14 @@ export function fnv1a(s: string): number {
  * pipeline over them stays atomic.
  */
 export function shardKey(key: string): string {
+  // PERF-RL-DO: the public request limiters of ONE client (per-IP, tenant-or-IP fallback, store-miss, search) share the
+  // client's shard, so the counters one public request touches are one batched apply, not three serial round trips to three
+  // instances (lib public-limit-prefetch). A tenant key (`t:<storeId>`) is its own subject, on its own shard.
+  const rl = PUBLIC_RL_KEY.exec(key);
+  if (rl) return `rl-client:${rl[1]}`;
   return key.replace(/:(attempts|locked|row)$/, '');
 }
+const PUBLIC_RL_KEY = /^rl:(?:public|public-tenant|store-miss|public-search):(.+)$/;
 
 /**
  * Sentinel "shard" of the cache-generation counters: their OWN Durable Object instance
@@ -36,6 +42,8 @@ export function shardKey(key: string): string {
  * shard holding jti / token-version / lockout / CSRF / MFA / rate-limit keys. The counters are
  * only a fill-race guard (a lost counter makes one fill skip caching), never an authorisation
  * decision.
+ * PERF-RL-DO (Ruling PERF-RL-DO-1): the base instance no longer serves reads or bumps. The generic prefix names it held are
+ * replicated on the store shards ({@link cachegenHome}); it stays only as the id of the generic per-key route and the sweeps.
  */
 export const CACHEGEN_SHARD = -1;
 
@@ -50,12 +58,55 @@ const UUID_IN_NAME = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 
 export function shardOf(key: string): number {
   if (key.startsWith(CACHEGEN_PREFIX)) {
-    const rest = key.slice(CACHEGEN_PREFIX.length);
-    // the store STATUS generation is keyed by host (`public:store:resolve:<host>`): its own shard per host, never the base one
-    const id = rest.match(UUID_IN_NAME)?.[0] ?? rest.match(/^public:store:resolve:(.+)$/)?.[1];
-    return id ? CACHEGEN_SHARD - 1 - (fnv1a(id) % CACHEGEN_STORE_SHARDS) : CACHEGEN_SHARD;
+    return cachegenHome(key.slice(CACHEGEN_PREFIX.length)) ?? CACHEGEN_SHARD;
   }
   return fnv1a(shardKey(key)) % AUTH_STATE_SHARDS;
+}
+
+const storeShard = (id: string): number => CACHEGEN_SHARD - 1 - (fnv1a(id) % CACHEGEN_STORE_SHARDS);
+
+/**
+ * The home instance of one cache-generation NAME (no `cachegen:` prefix), or `null` for a REPLICATED name (PERF-RL-DO).
+ *
+ *  - a name carrying a store id lives on that store's shard; the store STATUS generation (`public:store:resolve:<host>`) on its
+ *    host's shard; any other leaf name (`dir:slug:<slug>`) on the shard of the name itself;
+ *  - a generic PREFIX name with no id (`''`, `public:`, `public:products:`, `dir:slug:`, ...) is REPLICATED on every store
+ *    shard: a read takes it from the shard the rest of its batch lives on ({@link cachegenAnchor}), a bump increments EVERY
+ *    replica before it resolves. These names were the single global `cachegen` instance every cache fill and every edge-hit
+ *    validation worldwide read (measured 2026-11-09: 6 serial calls to it on one cold store resolve). No write path bumps
+ *    them today (every prefix bust carries a store id), so the fan-out costs nothing in practice and stays correct if one does.
+ *
+ * Correctness: a generation is only ever compared with a value read from the SAME instance (the anchor is a pure function of the
+ * name list, and a fill / edge stamp re-reads the same list), and a bump of a replicated name lands on every replica before the
+ * invalidation deletes, so a read that starts after the bump sees it on whichever replica it asks.
+ */
+export function cachegenHome(name: string): number | null {
+  const id = name.match(UUID_IN_NAME)?.[0] ?? name.match(/^public:store:resolve:(.+)$/)?.[1];
+  if (id) return storeShard(id);
+  if (name === '' || name.endsWith(':')) return null;
+  return storeShard(name);
+}
+
+/** The instance a batch of names reads its replicated names from: the store id's, else the status host's, else the first leaf's. */
+export function cachegenAnchor(names: string[]): number {
+  for (const n of names) {
+    const id = n.match(UUID_IN_NAME)?.[0];
+    if (id) return storeShard(id);
+  }
+  for (const n of names) {
+    const host = n.match(/^public:store:resolve:(.+)$/)?.[1];
+    if (host) return storeShard(host);
+  }
+  for (const n of names) {
+    const home = cachegenHome(n);
+    if (home !== null) return home;
+  }
+  return storeShard('');
+}
+
+/** Every store shard: where a replicated name's bump must land. */
+export function cachegenStoreShards(): number[] {
+  return Array.from({ length: CACHEGEN_STORE_SHARDS }, (_, i) => CACHEGEN_SHARD - 1 - i);
 }
 
 interface AuthStateStub extends DurableObjectStubLike {
@@ -99,6 +150,14 @@ export function applyOn(key: string, ops: Op[]): Promise<unknown[]> {
   return hop(
     `do-${key.split(':')[0]}-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`,
     () => stub(shardOf(key)).apply(ops)
+  );
+}
+
+/** Run ops on one explicit shard (cache generations route by name list, not by one key). */
+export function applyOnShard(shard: number, ops: Op[]): Promise<unknown[]> {
+  return hop(
+    `do-cachegen-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`,
+    () => stub(shard).apply(ops)
   );
 }
 
