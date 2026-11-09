@@ -20,6 +20,7 @@ import { startSignupTrial, type TrialChoice } from './billing/trial';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { resolveDomainService } from './domain-provider';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
@@ -472,12 +473,16 @@ export class ProvisioningService {
     }
 
     // Store is provisioned — fire-and-forget the welcome email so SMTP latency
-    // can't stall the provisioning API response.
+    // can't stall the provisioning API response. Post-response work goes through
+    // deferAfterTenantCommit: a bare `void` inherits the request's database lease and dies
+    // with P2028 once it is released (or is cancelled with the response on a Worker).
     if (result.isNewUser) {
-      void EmailService.sendWelcome(result.store.id, {
-        email: ownerEmail,
-        name: ownerName,
-      }).catch(err =>
+      void deferAfterTenantCommit('provisioning.welcome-email', () =>
+        EmailService.sendWelcome(result.store.id, {
+          email: ownerEmail,
+          name: ownerName,
+        })
+      ).catch(err =>
         logger.error(
           { err, email: maskEmail(ownerEmail) },
           'Failed to send welcome email during provisioning'

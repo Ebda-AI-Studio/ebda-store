@@ -484,14 +484,16 @@ export class AuthService {
         existingUser.email;
       const notifyStoreId = storeId ?? existingUser.storeId;
       if (notifyStoreId) {
-        void EmailService.sendDuplicateRegistrationNotice(
-          notifyStoreId,
-          {
-            email: existingUser.email,
-            name: recipientName,
-            storeName: storeName ?? undefined,
-          },
-          (existingUser.language as 'en' | 'ar' | undefined) ?? undefined
+        void deferAfterTenantCommit('auth.duplicate-registration-notice', () =>
+          EmailService.sendDuplicateRegistrationNotice(
+            notifyStoreId,
+            {
+              email: existingUser.email,
+              name: recipientName,
+              storeName: storeName ?? undefined,
+            },
+            (existingUser.language as 'en' | 'ar' | undefined) ?? undefined
+          )
         ).catch(err =>
           logger.error(
             { err, email: maskEmail(existingUser.email) },
@@ -733,13 +735,16 @@ export class AuthService {
     // Welcome email is a follow-up — fire-and-forget so SMTP latency can't
     // delay the verify-email API response.
     if (tokenUser.storeId) {
-      void EmailService.sendWelcome(
-        tokenUser.storeId,
-        {
-          email: tokenUser.email,
-          name: `${tokenUser.firstName} ${tokenUser.lastName}`.trim() || tokenUser.email,
-        },
-        (tokenUser.language as 'en' | 'ar' | undefined) ?? undefined
+      const welcomeStoreId = tokenUser.storeId;
+      void deferAfterTenantCommit('auth.welcome-after-verify', () =>
+        EmailService.sendWelcome(
+          welcomeStoreId,
+          {
+            email: tokenUser.email,
+            name: `${tokenUser.firstName} ${tokenUser.lastName}`.trim() || tokenUser.email,
+          },
+          (tokenUser.language as 'en' | 'ar' | undefined) ?? undefined
+        )
       ).catch(err =>
         logger.error(
           { err, userId: verificationToken.userId },
@@ -2921,13 +2926,15 @@ export class AuthService {
     // The stale Postgres copy of the same person goes too (queued + P1 if Postgres is unreachable).
     await scrubOrEnqueue(userId, storeId);
     if (doErase.receiptIds.length > 0)
-      void InstapayReceiptService.deleteImages(storeId, doErase.receiptIds).catch(err =>
+      void deferAfterTenantCommit('auth.erase.receipt-images', () =>
+        InstapayReceiptService.deleteImages(storeId, doErase.receiptIds)
+      ).catch(err =>
         logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')
       );
     if (user.avatar)
-      void deleteR2ObjectIfOrphan(user.avatar, { ownerStoreId: storeId }).catch(err =>
-        logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
-      );
+      void deferAfterTenantCommit('auth.erase.avatar', () =>
+        deleteR2ObjectIfOrphan(user.avatar!, { ownerStoreId: storeId })
+      ).catch(err => logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed'));
     const eraseProvenBuyerKey = doErase.provenBuyerKey ?? undefined;
     void inngest
       .send({

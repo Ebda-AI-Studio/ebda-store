@@ -46,7 +46,7 @@ const good = () => ({
   company: '',
   phone: '٠١٠١٢٣٤٥٦٧٨',
   email: '  Mona@Example.COM ',
-  topic: 'photography',
+  topic: 'marketing',
   message: 'I need product photos for 40 items. <script>alert(1)</script>',
   consent: true,
   lang: 'en',
@@ -68,7 +68,7 @@ describe('validation at the edge', () => {
     expect(arg.phone).toBe('+201012345678');
     expect(arg.phoneDisplay).toBe('+20 101 234 5678');
     expect(arg.email).toBe('mona@example.com');
-    expect(arg.topicLabel).toBe('Photography');
+    expect(arg.topicLabel).toBe('Marketing, advertising and media');
     expect(m.receipt).toHaveBeenCalledWith(
       'mona@example.com',
       expect.objectContaining({ lang: 'en' })
