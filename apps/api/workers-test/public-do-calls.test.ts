@@ -4,7 +4,8 @@
  *
  *  1. Rate limiting: a store resolve makes exactly ONE AuthState call for its limiters (per-IP, tenant-or-IP, store-miss
  *     co-located on the client's shard and prefetched in one batch), a tenant-scoped read at most two (client + tenant shard),
- *     issued together. Before: 3 calls / 2 serial waves (4 / 3 with a search term).
+ *     issued together. Before: 3 calls / 2 serial waves (4 / 3 with a search term). Since LAUNCH-RL-MISS-1 the store-miss
+ *     entry of that batch is a READ of its counter (`get` + `pttl`), not a hit; a 404 adds one call after the response.
  *  2. No request ever reaches the single global `cachegen` instance: the generic prefix generations are replicated per store
  *     shard and read with the store's own names (cf/auth-state-client.ts cachegenHome). Before: every cold fill read it 3x.
  *  3. The limits still bind per client: the store-miss limiter 429s one IP at miss 21 while another IP is unaffected.

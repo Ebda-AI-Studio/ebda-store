@@ -20,13 +20,17 @@ import { hasSearchTerm } from './security';
  *
  * A wrong prediction never changes a count: a limiter with no prefetched hit calls the DO itself, and a hit no limiter took is
  * taken back when the response ends. Window: every public-router limiter counts per 60 s.
+ *
+ * LAUNCH-RL-MISS: the store-miss limiter no longer hits on every request. It READS its counter before the handler and counts
+ * only after a 404, so its key rides this batch as a `peek` (two read ops), not a hit.
  */
 const WINDOW_MS = 60_000;
 const SUGGEST = /^\/[^/]+\/search\/suggest(?:\/|$)/;
 const PRODUCTS = /^\/products(?:\/|$)/;
 
-export function plannedPublicHits(req: Request): string[] {
+export function plannedPublicHits(req: Request): { hits: string[]; peeks: string[] } {
   const keys: string[] = [];
+  const peeks: string[] = [];
   const b = cfBindings();
   // publicReadLimit's native fast path (anonymous cached catalogue read of a resolved store): no exact DO limiters.
   const native =
@@ -37,16 +41,20 @@ export function plannedPublicHits(req: Request): string[] {
     keys.push(`rl:public:${publicIpKey(req)}`, `rl:public-tenant:${publicTenantKey(req)}`);
   if (req.ip) {
     const ip = ipKeyGenerator(req.ip);
-    keys.push(`rl:store-miss:${ip}`);
+    peeks.push(`rl:store-miss:${ip}`);
     if (SUGGEST.test(req.path) || (PRODUCTS.test(req.path) && hasSearchTerm(req)))
       keys.push(`rl:public-search:${ip}`);
   }
-  return keys;
+  return { hits: keys, peeks };
 }
 
 export function prefetchPublicLimits(req: Request, res: Response, next: NextFunction): void {
   if (!isWorkers || !authStateAvailable() || skipPublicLimiters(req)) return next();
-  const hits = prefetchHits(plannedPublicHits(req).map(key => ({ key, windowMs: WINDOW_MS })));
+  const planned = plannedPublicHits(req);
+  const hits = prefetchHits(
+    planned.hits.map(key => ({ key, windowMs: WINDOW_MS })),
+    planned.peeks
+  );
   let released = false;
   const release = () => {
     if (released) return;

@@ -8,6 +8,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({
   calls: [] as Array<{ shard: number; ops: unknown[][] }>,
   fail: false,
+  // counters a `get` answers with (a key not listed answers the shard marker the cachegen cases read)
+  counters: new Map<string, unknown>(),
+  pttl: 1 as number,
 }));
 vi.mock('../../apps/api/src/cf/auth-state-client', async orig => {
   const real = await orig<typeof import('../../apps/api/src/cf/auth-state-client')>();
@@ -15,7 +18,15 @@ vi.mock('../../apps/api/src/cf/auth-state-client', async orig => {
     h.calls.push({ shard, ops });
     if (h.fail) throw new Error('do down');
     return ops.map(op =>
-      op[0] === 'hit' ? [7, 1_000_000] : op[0] === 'get' ? `v:${shard}:${String(op[1])}` : 1
+      op[0] === 'hit'
+        ? [7, 1_000_000]
+        : op[0] === 'get'
+          ? h.counters.has(String(op[1]))
+            ? h.counters.get(String(op[1]))
+            : `v:${shard}:${String(op[1])}`
+          : op[0] === 'pttl'
+            ? h.pttl
+            : 1
     );
   };
   return {
@@ -31,6 +42,7 @@ import {
   runWithPrefetchedHits,
 } from '../../apps/api/src/cf/rate-limit-store';
 import { CfRedis } from '../../apps/api/src/cf/ioredis-cf';
+import { runWithWaitUntil } from '../../apps/api/src/cf/bindings';
 import {
   shardOf,
   CACHEGEN_SHARD,
@@ -47,6 +59,8 @@ const store = (name: string) => {
 beforeEach(() => {
   h.calls.length = 0;
   h.fail = false;
+  h.counters.clear();
+  h.pttl = 1;
 });
 
 describe('public limiter prefetch', () => {
@@ -108,6 +122,111 @@ describe('public limiter prefetch', () => {
     expect(h.calls).toEqual([
       { shard: shardOf('rl:store-miss:4.4.4.4'), ops: [['hit', 'rl:store-miss:4.4.4.4', W]] },
     ]);
+  });
+});
+
+// LAUNCH-RL-MISS (Ruling LAUNCH-RL-MISS-1): the store-miss limiter reads its counter before the handler and counts after a
+// 404, so its key rides the batch as a READ. A read is never a hit: nothing to take, nothing to give back.
+describe('a peek rides the prefetch batch (store-miss)', () => {
+  const ip = '203.0.113.40';
+  const miss = `rl:store-miss:${ip}`;
+  it('is read with `get` + `pttl` after the hits, in the same ONE call', () => {
+    prefetchHits([{ key: `rl:public:${ip}`, windowMs: W }], [miss]);
+    expect(h.calls).toHaveLength(1);
+    expect(h.calls[0].ops).toEqual([
+      ['hit', `rl:public:${ip}`, W],
+      ['get', miss],
+      ['pttl', miss],
+    ]);
+  });
+  it('a request with no hit to prefetch (native fast path) still reads the counter in one call', () => {
+    prefetchHits([], [miss]);
+    expect(h.calls).toEqual([
+      {
+        shard: shardOf(miss),
+        ops: [
+          ['get', miss],
+          ['pttl', miss],
+        ],
+      },
+    ]);
+  });
+  it('the limiter’s `get` takes the batched read (no second call): count and the open window', async () => {
+    h.counters.set(miss, 5);
+    h.pttl = 30_000;
+    const hits = prefetchHits([{ key: `rl:public:${ip}`, windowMs: W }], [miss]);
+    const before = Date.now();
+    const info = await runWithPrefetchedHits(hits, () => store('store-miss').get(ip));
+    expect(info?.totalHits).toBe(5);
+    expect(info!.resetTime!.getTime()).toBeGreaterThanOrEqual(before + 30_000);
+    expect(info!.resetTime!.getTime()).toBeLessThanOrEqual(Date.now() + 30_000);
+    expect(h.calls).toHaveLength(1);
+  });
+  it('no counter yet reads as nothing counted', async () => {
+    h.counters.set(miss, null);
+    h.pttl = -2;
+    const hits = prefetchHits([], [miss]);
+    expect(await runWithPrefetchedHits(hits, () => store('store-miss').get(ip))).toBeUndefined();
+    expect(h.calls).toHaveLength(1);
+  });
+  it('is never taken as a hit and never given back', async () => {
+    h.counters.set(miss, 5);
+    const hits = prefetchHits([{ key: `rl:public:${ip}`, windowMs: W }], [miss]);
+    await runWithPrefetchedHits(hits, async () => {
+      await store('public').increment(ip);
+      // counting the miss (after a 404) is its own hit, not the batched read
+      await store('store-miss').increment(ip);
+    });
+    expect(h.calls).toHaveLength(2);
+    expect(h.calls[1].ops).toEqual([['hit', miss, W]]);
+    await releaseUnconsumed(hits);
+    expect(h.calls).toHaveLength(2);
+  });
+  it('a failed batch falls back to a direct read', async () => {
+    h.fail = true;
+    const hits = prefetchHits([], [miss]);
+    h.fail = false;
+    h.counters.set(miss, 9);
+    h.pttl = 1_000;
+    const info = await runWithPrefetchedHits(hits, () => store('store-miss').get(ip));
+    expect(info?.totalHits).toBe(9);
+    expect(h.calls).toHaveLength(2);
+    expect(h.calls[1].ops).toEqual([
+      ['get', miss],
+      ['pttl', miss],
+    ]);
+  });
+});
+
+// LAUNCH-RL-MISS: express-rate-limit calls `decrement` AFTER the response and does not wait for it. On a Worker that call
+// must be handed to `waitUntil`, or the runtime may drop it with the request and a success stays counted as a failure.
+describe('the give-back of a failures-only limiter outlives the response', () => {
+  it('`decrement` hands its Durable Object call to waitUntil', async () => {
+    const kept: Array<Promise<unknown>> = [];
+    await runWithWaitUntil(
+      p => kept.push(p),
+      () => store('auth-ip-fail').decrement('198.51.100.60')
+    );
+    expect(h.calls).toEqual([
+      {
+        shard: shardOf('rl:auth-ip-fail:198.51.100.60'),
+        ops: [['unhit', 'rl:auth-ip-fail:198.51.100.60']],
+      },
+    ]);
+    expect(kept).toHaveLength(1);
+    await expect(kept[0]).resolves.not.toThrow();
+  });
+  it('a failed give-back never rejects (nothing awaits it after the response)', async () => {
+    h.fail = true;
+    const kept: Array<Promise<unknown>> = [];
+    await expect(
+      runWithWaitUntil(
+        p => kept.push(p),
+        () => store('auth-ip-fail').decrement('198.51.100.61')
+      )
+    ).resolves.toBeUndefined();
+    expect(kept).toHaveLength(1);
+    await expect(kept[0]).resolves.toBeUndefined();
   });
 });
 
