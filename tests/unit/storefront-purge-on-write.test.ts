@@ -162,7 +162,7 @@ describe('the order path uses the coalesced bust (#1220)', () => {
 });
 
 describe('the bundles:<storeId> purge tag matches a storefront fetch', () => {
-  // `invalidateStoreBundlesCache` and the product purge both send
+  // The product purge (the only bundle invalidator) sends
   // `bundles:<storeId>`. revalidateTag on a tag no fetch carries is a silent
   // no-op, so the storefront's bundle list and bundle PDP must carry it.
   it.each([
@@ -227,9 +227,9 @@ describe('every InventoryService stock writer busts the product caches', () => {
 });
 
 describe('bundle writes fire ONE storefront purge (issue 2202)', () => {
-  // invalidateStoreProductCaches already clears the bundle-list key and sends
-  // `bundles:<storeId>` in the same request, so pairing it with
-  // invalidateStoreBundlesCache was a second outbound POST per write.
+  // invalidateStoreProductCaches clears the bundle-list key and sends
+  // `bundles:<storeId>` in the same request; a bundles-only purge next to it
+  // was a second outbound POST per write (that function is now deleted).
   it('bundle.routes.ts busts via invalidateStoreProductCaches only', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
@@ -238,6 +238,8 @@ describe('bundle writes fire ONE storefront purge (issue 2202)', () => {
       'utf8'
     );
     expect(src.match(/await invalidateStoreProductCaches\(storeId\)/g)?.length).toBe(3);
+    // one bust per bundle write: create, update, deactivate
+    expect(src.match(/\.bundle\.(create|update)\(/g)?.length).toBe(5); // DO + Postgres create/update, deactivate
     expect(src).not.toContain('invalidateStoreBundlesCache(');
   });
 });

@@ -30,7 +30,7 @@ import { OrderService } from '@api/services/order.service';
 import { ReturnService } from '@api/services/return.service';
 import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
-import { invalidateStoreProductCaches, invalidateStoreBundlesCache } from '@api/lib/public-cache';
+import { invalidateStoreProductCaches } from '@api/lib/public-cache';
 
 /** True when a real (non-placeholder) DATABASE_URL is configured. Gate every describe block on this — mirrors the convention already used across tests/integration. */
 export const hasDb =
@@ -242,7 +242,7 @@ export interface SeedBundleOptions {
  * construct fixtures).
  *
  * Busts the same caches the real POST /:storeId/bundles route does
- * (`invalidateStoreProductCaches` + `invalidateStoreBundlesCache`) — this
+ * (`invalidateStoreProductCaches`, which also clears the bundle list) — this
  * write bypasses that route entirely, so nothing else would. Skipping this
  * is exactly the bug the public-bundle-list cache (#1565) exposed: a store
  * shared across `it()` blocks in the same `describe` (the common pattern in
@@ -278,7 +278,6 @@ export async function seedBundle(
     })
   );
   await invalidateStoreProductCaches(storeId);
-  await invalidateStoreBundlesCache(storeId);
   return bundle.id;
 }
 

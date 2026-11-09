@@ -113,7 +113,7 @@ describe('FIX-001: a pre-write fill cannot republish after invalidation', () => 
     const cache = await import('../../apps/api/src/lib/public-cache');
     const key = cache.bundlesCacheKey('audit-store');
     const fill = await startHeldFill(cache, key);
-    await cache.invalidateStoreBundlesCache('audit-store');
+    await cache.invalidateStoreProductCaches('audit-store');
     fill.release({ price: 100 });
     await fill.pending;
     const result = await cache.getCached(key, 120, async () => ({ price: 200 }));

@@ -313,8 +313,8 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * PRODUCTS' current price/inventory (NEVER-stale data), so a product write
  * that changes either — including checkout-driven inventory decrement —
  * would otherwise leave a bundled product's stock/price wrong in the cached
- * bundle list for up to its own TTL, even though `invalidateStoreBundlesCache`
- * itself is only ever called from the 3 bundle-specific write handlers.
+ * bundle list for up to its own TTL. It is also the ONLY bundle invalidator: the 3
+ * bundle write handlers call this function (there is no bundles-only one).
  */
 /**
  * The Redis half of {@link invalidateStoreProductCaches}, shared with the
@@ -363,21 +363,11 @@ export function bundlesCacheKey(storeId: string): string {
   return `public:bundles:v2:${storeId}`;
 }
 
-/**
- * Invalidate a store's public bundle-list cache (both layers) plus the
- * storefront's Next.js data cache tag `bundles:<storeId>` — the tag the
- * storefront's /bundles list and bundle PDP fetches carry (pinned by
- * tests/unit/storefront-purge-on-write.test.ts). Self-sufficient for a write
- * that touches ONLY bundles. A write that already calls
- * `invalidateStoreProductCaches` must NOT also call this: that function clears
- * the same Redis key and purges `bundles:<storeId>` in its one request, so a
- * second call is a second outbound purge POST for nothing (issue 2202 — the
- * three bundle write handlers did exactly that).
- */
-export async function invalidateStoreBundlesCache(storeId: string): Promise<void> {
-  await invalidateCached(bundlesCacheKey(storeId));
-  revalidateStorefront({ tags: [`bundles:${storeId}`] });
-}
+// There is deliberately NO bundles-only invalidator (removed in S2-REVIVE, Ruling STORE-EDGE-2: it had zero call sites).
+// Every bundle write (bundle.routes.ts create/update/deactivate) calls `invalidateStoreProductCaches`, which clears
+// `bundlesCacheKey` in `clearProductsRedis` and purges `bundles:<storeId>` in its one storefront request, and a bundle's
+// price/availability also depends on its component products, which only that function covers. Pinned by
+// tests/unit/storefront-purge-on-write.test.ts (bundle writes) and tests/unit/public-cache-invalidation.test.ts.
 
 /**
  * How long an order-driven storefront purge is coalesced per store (#1220).

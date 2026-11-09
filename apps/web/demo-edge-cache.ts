@@ -21,8 +21,10 @@
  *    the one a cookieless visitor gets, by construction: the storefront server's only per-visitor
  *    inputs are the cookies (`force-language`, `force-cookie-consent`, `force-preview-draft`; the
  *    headers it reads are host-derived), and none can be present. A visitor who has set the
- *    language or consent cookie is rendered live, never from this cache. A response with
- *    `Set-Cookie`, a non-200 or a non-HTML body is never stored.
+ *    consent cookie is rendered live, never from this cache. On a `/ar|/en` path the URL decides the
+ *    language, so the language cookie is not part of the key there and the one Set-Cookie the render
+ *    writes for it is stripped and re-issued per visitor (edge-html-lang.ts); any other `Set-Cookie`,
+ *    a non-200 or a non-HTML body is never stored.
  * Real merchant stores and every ineligible request keep the app's `private, no-store`.
  * CACHE CLASS: BOUNDED-stale. Fresh 300 s, then served stale while one request refreshes, up to
  * 86400 s. Residual: a demo catalogue/layout edit shows after <= 300 s. No NEVER-stale data
@@ -31,6 +33,7 @@
 import { getLook } from '@ebda/shared';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
 import { renewNonce } from './csp-nonce-renew';
+import { isStorableHtml, reissueLangCookie, urlLocaleOf } from './edge-html-lang';
 
 export const DEMO_EDGE_FRESH_S = 300;
 export const DEMO_EDGE_STALE_S = 86400;
@@ -102,6 +105,8 @@ export function demoEdgeKey(request: Request): string | null {
     if (all.length !== 1 || getLook(all[0])?.status !== 'built') return null;
     look = all[0];
   }
+  // On a `/ar|/en` path the URL decides the language; the cookie is not part of the page (edge-html-lang.ts).
+  if (urlLocaleOf(path)) lang = '';
   const q = [look && `look=${look}`, lang && `__lang=${lang}`].filter(Boolean).join('&');
   return `https://${host}${path}${q ? `?${q}` : ''}`;
 }
@@ -143,13 +148,12 @@ export function resetDemoVerdicts(): void {
   demoVerdict.clear();
 }
 
-/** Only a clean 200 HTML document without cookies is worth keeping. */
-export function isStorable(res: Response): boolean {
-  return (
-    res.status === 200 &&
-    (res.headers.get('content-type') ?? '').includes('text/html') &&
-    !res.headers.has('set-cookie')
-  );
+/**
+ * Only a clean 200 HTML document is worth keeping; a Set-Cookie refuses it, except the URL-locale language cookie of a
+ * `/ar|/en` page (stripped from the copy, re-issued per visitor: edge-html-lang.ts).
+ */
+export function isStorable(res: Response, path = '/'): boolean {
+  return isStorableHtml(res, urlLocaleOf(path));
 }
 
 /** Age in seconds of a stored copy; Infinity when unstamped. */
@@ -158,7 +162,11 @@ export function ageSeconds(stored: Response, now = Date.now()): number {
   return Number.isFinite(at) && at > 0 ? (now - at) / 1000 : Infinity;
 }
 
-function withEdgeHeaders(res: Response, state: 'HIT' | 'MISS' | 'STALE'): Response {
+function withEdgeHeaders(
+  res: Response,
+  state: 'HIT' | 'MISS' | 'STALE',
+  request: Request
+): Response {
   // A stored page is served to many visitors: each response gets its own CSP nonce (Ruling CSP-WEB-1).
   const out =
     state === 'MISS' ? new Response(res.body, res) : renewNonce(new Response(res.body, res));
@@ -167,6 +175,7 @@ function withEdgeHeaders(res: Response, state: 'HIT' | 'MISS' | 'STALE'): Respon
   out.headers.set('x-demo-edge', state);
   out.headers.set('x-demo-cache', state.toLowerCase());
   out.headers.delete('vary');
+  if (state !== 'MISS') reissueLangCookie(out, request, urlLocaleOf(new URL(request.url).pathname));
   return out;
 }
 
@@ -183,9 +192,11 @@ export async function serveDemoEdge(
 ): Promise<Response> {
   const key = demoEdgeKey(request);
   if (!key) return origin(request);
+  const path = new URL(request.url).pathname;
 
   const store = async (res: Response) => {
     const copy = new Response(res.body, res);
+    copy.headers.delete('set-cookie');
     copy.headers.set('Cache-Control', `public, max-age=${DEMO_EDGE_STALE_S}`);
     copy.headers.set('x-edge-cached-at', String(Date.now()));
     copy.headers.delete('vary');
@@ -196,14 +207,14 @@ export async function serveDemoEdge(
     const hit = await cache.match(key);
     if (hit) {
       const age = ageSeconds(hit);
-      if (age < DEMO_EDGE_FRESH_S) return withEdgeHeaders(hit, 'HIT');
+      if (age < DEMO_EDGE_FRESH_S) return withEdgeHeaders(hit, 'HIT', request);
       if (age < DEMO_EDGE_STALE_S) {
         ctx.waitUntil(
           origin(new Request(request))
-            .then(r => (isStorable(r) ? store(r) : undefined))
+            .then(r => (isStorable(r, path) ? store(r) : undefined))
             .catch(() => {})
         );
-        return withEdgeHeaders(hit, 'STALE');
+        return withEdgeHeaders(hit, 'STALE', request);
       }
     }
   } catch {
@@ -214,7 +225,7 @@ export async function serveDemoEdge(
   // for a host that passed it, so a HIT/STALE above needs no second check) and gates the store.
   const verdict = isDemoHost(new URL(key).hostname).catch(() => false);
   const res = await origin(request);
-  if (!isStorable(res) || !(await verdict)) return res;
+  if (!isStorable(res, path) || !(await verdict)) return res;
   ctx.waitUntil(store(res.clone()).catch(() => {}));
-  return withEdgeHeaders(res, 'MISS');
+  return withEdgeHeaders(res, 'MISS', request);
 }
