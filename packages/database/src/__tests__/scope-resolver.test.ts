@@ -198,3 +198,22 @@ describe('scope resolver (one implementation)', () => {
     expect(fake.log.transactions).toBe(0);
   });
 });
+
+describe('acrossStores skips a store the resolver says has no reachable data', () => {
+  it('visits the other stores, never opens a transaction for the skipped one, and does not fail the sweep', async () => {
+    setScopeResolver(resolver({ skipStore: async id => id === PG_STORE }));
+    const visited: string[] = [];
+    const { value, log } = await run(() =>
+      acrossStores(
+        async id => {
+          visited.push(id);
+          return 1;
+        },
+        { storeIds: [PG_STORE, DO_STORE] }
+      )
+    );
+    expect(visited).toEqual([DO_STORE]);
+    expect(value.map(v => v.storeId)).toEqual([DO_STORE]);
+    expect(log.transactions).toBe(0);
+  });
+});
