@@ -452,7 +452,7 @@ export const SOUQ_IMAGE_FILES = [
   ...new Set([
     ...SOUQ_PRODUCTS.flatMap(p => p.images),
     ...SOUQ_CATEGORIES.map(c => c.image).filter(Boolean),
-    'hero-night.webp',
-    'hero-showroom.webp',
+    'hero-night-2k.webp',
+    'hero-showroom-2k.webp',
   ]),
 ];

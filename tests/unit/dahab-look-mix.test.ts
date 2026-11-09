@@ -76,12 +76,14 @@ describe('the mixes, exactly as designed', () => {
       'hero',
       'category-grid',
       'featured-collection',
+      'piece-window',
       'image-text',
       'product-carousel',
       'testimonials',
       'brand-story',
     ]);
-    const [h, chips, pieces, engraving] = worn.sections!;
+    const [h, chips, pieces, signature, engraving] = worn.sections!;
+    expect(signature.type).toBe('piece-window');
     // no textAnchor: Dahab's hero always sets its copy at the inline start (Ruling B5-35)
     expect(h.design).toEqual({ presentation: 'full-bleed' });
     expect(chips.design).toMatchObject({ layout: 'chips', layoutMobile: 'chips' });
@@ -93,12 +95,13 @@ describe('the mixes, exactly as designed', () => {
       'hero',
       'steps',
       'featured-collection',
+      'piece-window',
       'image-text',
       'collection-list',
       'trust-badges',
       'brand-story',
     ]);
-    const [, steps, pieces, , tiles] = workshop.sections!;
+    const [, steps, pieces, , , tiles] = workshop.sections!;
     expect(steps.blocks!.map(b => b.settings.titleAr)).toEqual(['رسم', 'صب', 'تلميع']);
     // quality bar section 9 rule 1: merchant photos are shot on white, so the grid sits on the inverse band
     expect(pieces.design).toMatchObject({ bgColor: 'token:inverse' });
@@ -109,12 +112,13 @@ describe('the mixes, exactly as designed', () => {
       'hero',
       'gift-finder',
       'featured-collection',
+      'piece-window',
       'image-text',
       'product-carousel',
       'trust-badges',
       'newsletter',
     ]);
-    expect(giftbox.sections![3].preset).toMatchObject({ headingAr: 'بنغلّفها لحد باب الفرح' });
+    expect(giftbox.sections![4].preset).toMatchObject({ headingAr: 'بنغلّفها لحد باب الفرح' });
   });
   it('every look reaches the products in the first three sections', () => {
     for (const l of DAHAB) {

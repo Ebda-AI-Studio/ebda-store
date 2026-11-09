@@ -74,10 +74,11 @@ describe('the mixes, exactly as designed', () => {
       'hero',
       'product-carousel',
       'featured-collection',
+      'kitchen-days',
       'maker-profile',
       'trust-strip',
     ]);
-    const [h, again, menu, maker] = table.sections!;
+    const [h, again, menu, , maker] = table.sections!;
     expect(again.preset).toMatchObject({ productSource: 'reorder', titleAr: 'اطلب تاني' });
     expect(h.design).toMatchObject({ presentation: 'full-bleed', textAnchor: 'bottom-start' });
     expect(menu.design).toMatchObject({ layout: 'menu', tabs: 'categories' });
@@ -98,6 +99,7 @@ describe('the mixes, exactly as designed', () => {
       'maker-profile',
       'product-carousel',
       'featured-collection',
+      'kitchen-days',
       'brand-story',
       'trust-strip',
     ]);
@@ -115,6 +117,7 @@ describe('the mixes, exactly as designed', () => {
       'product-carousel',
       'product-carousel',
       'featured-collection',
+      'kitchen-days',
       'trust-strip',
     ]);
     const [tiles, again, deals, grid] = market.sections!;

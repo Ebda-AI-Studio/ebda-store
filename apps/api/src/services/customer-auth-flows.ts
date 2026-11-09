@@ -6,6 +6,7 @@
  * tokens are stored as sha256 only; this file hashes a NEW password (CPU work stays out of the single-threaded DO) and hands
  * the hash in.
  */
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { PASSWORD_RESET_TTL_MINUTES } from '@ebda/shared';
@@ -133,14 +134,16 @@ export const CustomerAuthFlows = {
           .catch(() => null)
       )?.name;
       const ex = r.existing;
-      void EmailService.sendDuplicateRegistrationNotice(
-        c.storeId,
-        {
-          email: ex.email,
-          name: `${ex.firstName} ${ex.lastName}`.trim() || ex.email,
-          storeName: storeName ?? undefined,
-        },
-        lang(ex.language)
+      void deferAfterTenantCommit('customer-auth.duplicate-registration-notice', () =>
+        EmailService.sendDuplicateRegistrationNotice(
+          c.storeId,
+          {
+            email: ex.email,
+            name: `${ex.firstName} ${ex.lastName}`.trim() || ex.email,
+            storeName: storeName ?? undefined,
+          },
+          lang(ex.language)
+        )
       ).catch(err =>
         logger.error(
           { err, email: maskEmail(ex.email) },
@@ -157,13 +160,15 @@ export const CustomerAuthFlows = {
       user: { id: string; email: string; firstName: string; lastName: string; language: string };
     }>('verifyEmail', { tokenHash: sha256(token) });
     if (r.already) return { success: true, message: 'Email already verified' };
-    void EmailService.sendWelcome(
-      c.storeId,
-      {
-        email: r.user.email,
-        name: `${r.user.firstName} ${r.user.lastName}`.trim() || r.user.email,
-      },
-      lang(r.user.language)
+    void deferAfterTenantCommit('customer-auth.welcome-after-verify', () =>
+      EmailService.sendWelcome(
+        c.storeId,
+        {
+          email: r.user.email,
+          name: `${r.user.firstName} ${r.user.lastName}`.trim() || r.user.email,
+        },
+        lang(r.user.language)
+      )
     ).catch(err =>
       logger.error({ err, userId: r.user.id }, 'Failed to send welcome email after verify')
     );
@@ -245,14 +250,15 @@ export const CustomerAuthFlows = {
 
   async login(c: CustomerAuthClient, email: string, password: string, ip?: string) {
     const lockoutKey = loginGate.lockoutKey(email, c.storeId);
-    await loginGate.assertNotLocked(lockoutKey);
     // The compare runs HERE, in the Worker (bcrypt cost 12 in the single-threaded store DO would let a login flood starve that
     // store's checkout / stock). Unknown account: a dummy compare keeps the timing equal. The DO re-validates the hash it handed
     // out when it stamps the success, so a reset / revoke that lands during the compare voids the login.
-    const cred = await c.call<{ id: string; hash: string; tokenVersion: number } | null>(
-      'credential',
-      { email }
-    );
+    // PERF-LATENCY: the lockout read (AuthState) and the credential read (StoreDO) are independent reads, made in parallel; a
+    // locked account still gets its 429 BEFORE any password compare (the credential read writes nothing).
+    const [, cred] = await Promise.all([
+      loginGate.assertNotLocked(lockoutKey),
+      c.call<{ id: string; hash: string; tokenVersion: number } | null>('credential', { email }),
+    ]);
     const good = await bcrypt.compare(password, cred ? cred.hash : DUMMY_PASSWORD_HASH);
     const r: { valid: boolean; user?: DoCustomer; mfa?: boolean } =
       cred && good
@@ -273,15 +279,25 @@ export const CustomerAuthFlows = {
       }
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
-    await loginGate.recordSuccess(lockoutKey, ip);
-    loginGate.assertActive({
-      status: r.user.status,
-      deletedAt: r.user.deletedAt ? new Date(r.user.deletedAt) : null,
-    });
-    // Ruling NZ-N9-1: TOTP for storefront customers is not offered by any storefront screen (no enrol UI) and is not ported.
-    // An account that nevertheless has it ON is refused, never signed in without the second factor.
-    if (r.mfa) throw mfaUnavailable();
-    return CustomerAuthFlows.issueSession(c, r.user);
+    // PERF-LATENCY: clearing the lockout counters + logging the success (AuthState, D1) runs alongside the session issue (StoreDO)
+    // instead of before it. Same outcome as the old sequence: the clear always completes (awaited on every path), the gate checks
+    // below still refuse before any session is issued, and a failed issue still leaves the counters cleared.
+    const cleared = loginGate.recordSuccess(lockoutKey, ip);
+    const user = r.user;
+    try {
+      loginGate.assertActive({
+        status: user.status,
+        deletedAt: user.deletedAt ? new Date(user.deletedAt) : null,
+      });
+      // Ruling NZ-N9-1: TOTP for storefront customers is not offered by any storefront screen (no enrol UI) and is not ported.
+      // An account that nevertheless has it ON is refused, never signed in without the second factor.
+      if (r.mfa) throw mfaUnavailable();
+    } catch (err) {
+      await cleared;
+      throw err;
+    }
+    const [, session] = await Promise.all([cleared, CustomerAuthFlows.issueSession(c, user)]);
+    return session;
   },
 
   /** Rotate. `claims` come from the VERIFIED refresh JWT. Returns the new pair; the DO decided everything else. */

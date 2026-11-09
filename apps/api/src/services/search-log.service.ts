@@ -32,6 +32,7 @@ import logger from '../lib/logger';
 import { redis } from './redis.service';
 import { withSavepoint } from '../lib/savepoint';
 import { analyticsMoney } from '../lib/analytics-backend';
+import { storeHasNoDataHere } from '../lib/store-pg-gone';
 
 const dayMs = (day: string): number => Date.parse(`${day}T00:00:00Z`);
 
@@ -237,6 +238,8 @@ export async function purgeSearchLogAcrossStores(
       while (next < storeIds.length) {
         const storeId = storeIds[next++];
         try {
+          // a Postgres-flagged store on a Worker with no Postgres has no search log to purge (2026-11-09: qa-merchant-test)
+          if (await storeHasNoDataHere(storeId)) continue;
           purged += await runInStoreCtx(storeId, () => purgeSearchLog(storeId, opts.now));
         } catch (err) {
           failedStores += 1;

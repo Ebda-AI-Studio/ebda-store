@@ -31,6 +31,7 @@ const COLLECTIONS = [
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
 const USED = [
+  'spec-sheet', // T7 signature section
   'hero',
   'category-grid',
   'product-carousel',
@@ -71,7 +72,7 @@ export function buildSouqHome(base, ctx) {
         id: 'night-1',
         type: 'slide',
         settings: {
-          image: img('hero-night.webp'),
+          image: img('hero-night-2k.webp'),
           alt: 'A covered souq arcade at night, lit by rows of champagne lanterns',
           headline: 'The souq is lit',
           headlineAr: 'السوق منوّر',
@@ -160,6 +161,42 @@ export function buildSouqHome(base, ctx) {
   const newsletter = node('newsletter', 'newsletter', {});
   const story = node('brand-story', 'brand-story', {});
 
+  // T7 signature: the stage phone's own numbers (the catalogue's 6.7 inch, 256GB variant).
+  const signature = node(
+    'spec-sheet',
+    'signature',
+    {
+      kicker: 'Phone of the week',
+      kickerAr: 'موبايل الأسبوع',
+      title: 'Smartphone 6.7 inch',
+      titleAr: 'هاتف ذكي 6.7 بوصة',
+      subtitle: 'Three cameras and a battery that lasts the whole day.',
+      subtitleAr: 'تلات كاميرات وبطارية بتكمّل اليوم كله.',
+      image: img('smartphone.webp'),
+      alt: 'A 6.7 inch smartphone',
+      altAr: 'موبايل شاشته 6.7 بوصة',
+      ctaText: 'View the phone',
+      ctaTextAr: 'عرض الموبايل',
+      ctaHref: '/products/smartphone-6-7',
+    },
+    [
+      {
+        id: 'spec-1',
+        type: 'spec',
+        settings: { value: '6.7', label: 'inch screen', labelAr: 'بوصة الشاشة' },
+      },
+      {
+        id: 'spec-2',
+        type: 'spec',
+        settings: { value: '3', label: 'cameras', labelAr: 'كاميرات' },
+      },
+      {
+        id: 'spec-3',
+        type: 'spec',
+        settings: { value: '256', label: 'GB storage', labelAr: 'جيجا مساحة' },
+      },
+    ]
+  );
   const hiddenLegacy = base.sections
     .filter(n => !USED.includes(n.type))
     .filter(n => getSectionDefinition(n.type)?.legacyKey)
@@ -182,6 +219,7 @@ export function buildSouqHome(base, ctx) {
       trust,
       newsletter,
       story,
+      signature,
       ...hiddenLegacy,
     ],
   };

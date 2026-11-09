@@ -41,3 +41,66 @@ export async function finishStoreDeletion(
   );
   return { directory: false };
 }
+
+/**
+ * PDPL anonymisation of a DELETED DO store (Rulings FOLD-ERASURE-2, RETENTION-1): runs AFTER the delete committed, because it cannot
+ * be rolled back (a failed delete reopens the DO; anonymised rows would stay anonymised). Three independent steps, each retried and
+ * each a P1 alert when it cannot finish, none able to stop the others:
+ *   1. the StoreDO: buyer + merchant contact data anonymised, account / cart / consent data deleted, fiscal / VAT / payment rows KEPT
+ *   2. the platform D1 rows of the store (memberships, API keys, invitee addresses, card reference)
+ *   3. the platform payer fields (InstaPay receipts, manual-payment claims), anonymised not deleted
+ * Idempotent, so a retry or a second delete call converges.
+ */
+export async function anonymiseDeletedStore(
+  storeId: string,
+  deps: {
+    eraseDo?: (
+      storeId: string,
+      requestId: string
+    ) => Promise<{ refused?: unknown; remaining: number }>;
+    eraseD1?: (storeId: string) => Promise<void>;
+    erasePayments?: (storeId: string, requestId: string) => Promise<unknown>;
+    alert?: (title: string, body: string) => Promise<unknown> | unknown;
+    requestId?: string;
+  }
+): Promise<{ failed: string[] }> {
+  const alert =
+    deps.alert ??
+    ((title: string, body: string) =>
+      sendAlert({ level: 'p1', source: 'store.delete.anonymise', title, body }));
+  const requestId = deps.requestId ?? `store-delete-${storeId}`;
+  const failed: string[] = [];
+  const step = async (name: string, fn: () => Promise<void>) => {
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+      try {
+        await fn();
+        return;
+      } catch (err) {
+        logger.warn({ err, storeId, attempt }, `[STORE_DELETE] anonymise ${name} failed`);
+      }
+    }
+    failed.push(name);
+  };
+  if (deps.eraseDo) {
+    const eraseDo = deps.eraseDo;
+    await step('store-do', async () => {
+      const r = await eraseDo(storeId, requestId);
+      if (r.refused) throw new Error('refused: money in flight');
+      if (r.remaining > 0) throw new Error(`${r.remaining} row(s) remain`);
+    });
+  }
+  if (deps.eraseD1) {
+    const eraseD1 = deps.eraseD1;
+    await step('platform-d1', () => eraseD1(storeId));
+  }
+  if (deps.erasePayments) {
+    const erasePayments = deps.erasePayments;
+    await step('platform-payments', async () => void (await erasePayments(storeId, requestId)));
+  }
+  if (failed.length)
+    await alert(
+      'Deleted store still holds personal data',
+      `store ${storeId}: anonymisation did not finish for: ${failed.join(', ')}. Re-run the delete (idempotent) or anonymise by hand.`
+    );
+  return { failed };
+}

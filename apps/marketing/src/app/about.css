@@ -152,7 +152,13 @@ html[dir='rtl'] .ab-h2::after {
   padding: 0;
   display: grid;
   gap: 20px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  grid-template-columns: 1fr;
+}
+/* three categories: one column, then three equal columns (never a two-plus-one orphan row) */
+@media (min-width: 1100px) {
+  .svc-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 .svc {
   padding: 24px;
@@ -186,4 +192,31 @@ html[dir='rtl'] .ab-h2::after {
   font-size: 1.0625rem;
   line-height: 1.8;
   color: var(--muted);
+}
+
+/* the sub-items of a service category: quiet gold-ruled list under the benefit line */
+.svc-items {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+}
+.svc-items li {
+  position: relative;
+  padding-inline-start: 16px;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--fg);
+}
+.svc-items li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
 }

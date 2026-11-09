@@ -30,6 +30,10 @@ Inputs read the composed `--input` (never the decorative line), so a field bound
 
 Fix wave 1 (Ruling B3-13): Bloom's hero is `{ presentation:'framed', frame:'line', textAnchor:'bottom-start' }` (the photo fills the frame; copy stacks in ink below xl) and its grid is four across; Apothecary keeps the olive ground on the listing pages (`chrome.listing:'ground'`, photos on a paper matte); Clinic's order is chips, then the featured-active stage, then the routine, so a product photo is in the first screen. Tags are bilingual (`Tag.nameAr`, platform-commerce section 14).
 
+## Signature section (T7)
+
+`key-ingredients`: a photo beside the ingredients, one per line with what it does, in all three looks after the main grid. Fewer than two ingredients renders nothing; the preset holds none (Rulings T7-1, T7-2). Demo: jojoba, oats, green tea, shea.
+
 ## Chrome
 
 `apps/web/src/templates/jasmine/Header.tsx` wraps the shared base header (`templates/base/Header.tsx`), logo-forward (`chrome.header: { logoPlacement: 'start', search: 'icon' }` on every look): the store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'`). `PACK_STYLES.jasmine` is a rounded, photo-led card in the look's radius (`var(--radius)` only), one always-visible >= 44px quick add, with the shade dots and two fact chips from the shared card (Ruling B3-1: no card path was added). The `[data-pack='jasmine']` CSS sets the type voice only (no colour of its own, pinned by `jasmine-pack.test.tsx`).

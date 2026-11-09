@@ -143,3 +143,21 @@ describe('store edge cache', () => {
     expect([na, nb]).not.toContain(RENDER_NONCE);
   });
 });
+
+describe('Ruling STORE-EDGE-3: the preload Link header gets the fresh nonce too', () => {
+  it('a renewed copy carries no trace of the render nonce in CSP, body or Link', async () => {
+    const res = new Response(page(RENDER_NONCE), {
+      headers: {
+        'content-type': 'text/html',
+        'content-security-policy': buildStorefrontCsp(RENDER_NONCE),
+        link: `</_next/static/media/a.woff2>; rel=preload; as="font"; nonce="${RENDER_NONCE}", </x.css>; rel=preload; as="style"; nonce="${RENDER_NONCE}"`,
+      },
+    });
+    const out = renewNonce(res);
+    const fresh = nonceOfCsp(out.headers.get('content-security-policy'))!;
+    expect(fresh).not.toBe(RENDER_NONCE);
+    expect(out.headers.get('link')).not.toContain(RENDER_NONCE);
+    expect(out.headers.get('link')!.split(`nonce="${fresh}"`).length - 1).toBe(2);
+    expect(await out.text()).toBe(page(fresh));
+  });
+});

@@ -582,7 +582,7 @@ router.post(
       // — a new bundle must invalidate it the same way a new product does,
       // or it silently won't appear in the feed for up to the cache TTL.
       // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
-      // in the SAME outbound request — a separate invalidateStoreBundlesCache
+      // in the SAME outbound request — a separate bundles-only purge
       // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
       res.status(201).json({ success: true, data: { bundle } });
@@ -725,7 +725,7 @@ router.put(
       const bundle = await resolveBundle(await bundleDb(storeId), storeId, id);
       // See the POST handler above — the same feed-cache invalidation gap.
       // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
-      // in the SAME outbound request — a separate invalidateStoreBundlesCache
+      // in the SAME outbound request — a separate bundles-only purge
       // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
       res.json({ success: true, data: { bundle } });
@@ -771,7 +771,7 @@ router.delete(
       // a deactivated bundle must stop being purchasable there too, not just
       // in `resolveBundle`'s live-read callers.
       // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
-      // in the SAME outbound request — a separate invalidateStoreBundlesCache
+      // in the SAME outbound request — a separate bundles-only purge
       // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
 

@@ -48,17 +48,21 @@ describe('guard: no production read of STORE_DO_ENABLED_IDS outside the selector
           !/\.test\./.test(f) &&
           !/vitest[^/]*\.config\./.test(f)
       );
-    const offenders = files.filter(f => {
-      if (f === 'apps/api/src/lib/store-backend.ts') return false;
-      try {
-        return (
-          execFileSync('grep', ['-l', 'STORE_DO_ENABLED_IDS', f], { cwd: ROOT, encoding: 'utf8' })
-            .length > 0
-        );
-      } catch {
-        return false; // grep exits 1 on no match
-      }
-    });
+    // ONE `git grep` over the tracked tree (was one `grep` per file: ~3.3k processes timed out under full-suite load).
+    let hits: Set<string>;
+    try {
+      hits = new Set(
+        execFileSync('git', ['grep', '-l', 'STORE_DO_ENABLED_IDS', '--', 'apps', 'packages'], {
+          cwd: ROOT,
+          encoding: 'utf8',
+        })
+          .split('\n')
+          .filter(Boolean)
+      );
+    } catch {
+      hits = new Set(); // git grep exits 1 on no match
+    }
+    const offenders = files.filter(f => f !== 'apps/api/src/lib/store-backend.ts' && hits.has(f));
     expect(offenders).toEqual([]);
   });
 

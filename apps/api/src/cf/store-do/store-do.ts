@@ -63,6 +63,7 @@ import {
   type DoMoneyInFlight,
   ensureSearchIndex,
   purgeErasureLedger,
+  scrubUserFromStoreDo,
   MoneyError,
   runReads,
   runWrites,
@@ -875,6 +876,14 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     for (const t of storeTables(sqlx))
       tables[t] = sqlx.exec(`SELECT * FROM "${t}" ORDER BY ${exportOrder(sqlx, t)}`).toArray();
     return { tables };
+  }
+
+  /**
+   * User erasure of ACTOR ids (OFFBOARD-1, Ruling FOLD-ERASURE-1): every column the classification lists under `actorScrub` for the
+   * StoreDO that holds this user's id (created_by, approved_by, ...) is replaced by NULL or its tombstone. Rows stay. Idempotent.
+   */
+  scrubActor(userId: string): { rows: number } {
+    return scrubUserFromStoreDo(this.sync, userId);
   }
 
   /** READ-ONLY money-in-flight gate for the all-or-nothing merchant erasure preflight (Ruling NZ-D20). Writes and closes nothing. */

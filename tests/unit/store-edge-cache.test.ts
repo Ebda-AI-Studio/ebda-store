@@ -9,6 +9,9 @@ import {
   storeEdgeKey,
   storeVerdict,
   resetStoreVerdicts,
+  resetEpochMemo,
+  edgeAllowlistFromEnv,
+  EPOCH_MEMO_MS,
   type CacheLike,
   type R2Like,
   type StoreEdgeDeps,
@@ -79,6 +82,7 @@ beforeEach(() => {
   page = 'v1';
   waits.length = 0;
   resetStoreVerdicts();
+  resetEpochMemo();
 });
 
 describe('switch: nothing changes until a host is listed', () => {
@@ -272,8 +276,12 @@ describe('purge tag mapping and the resolver verdict', () => {
           status: 200,
         });
       }) as unknown as typeof fetch;
-    expect(await storeVerdict(HOST, 'https://api', f('active'))).toEqual({ ok: true, id: ID_A });
-    expect(await storeVerdict(HOST, 'https://api', f('suspended'))).toEqual({ ok: true, id: ID_A }); // remembered 60 s
+    expect(await storeVerdict(HOST, 'https://api', f('active'))).toEqual({
+      ok: true,
+      id: ID_A,
+      defaultLanguage: 'ar',
+    });
+    expect((await storeVerdict(HOST, 'https://api', f('suspended'))).ok).toBe(true); // remembered 60 s
     expect(calls).toBe(1);
     resetStoreVerdicts();
     expect((await storeVerdict(HOST, 'https://api', f('suspended'))).ok).toBe(false);
@@ -282,5 +290,273 @@ describe('purge tag mapping and the resolver verdict', () => {
       throw new Error('x');
     }) as unknown as typeof fetch;
     expect((await storeVerdict(HOST, 'https://api', boom)).ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// S2-REVIVE (Ruling STORE-EDGE-2): the layer on for every store, the first-visitor language cookie, tracking params,
+// coalescing, the epoch memo, the kill switch.
+// ---------------------------------------------------------------------------------------------------------------
+const ALL = parseAllowlist('all');
+const html = (body: string, headers: Record<string, string> = {}) =>
+  new Response(body, { status: 200, headers: { 'content-type': 'text/html', ...headers } });
+const LANG_AR =
+  'force-language=ar; Path=/; Expires=Tue, 09 Nov 2027 10:03:22 GMT; Max-Age=31536000; Secure; SameSite=lax';
+
+describe('switches: all, none, off', () => {
+  it('`all` keys every well-formed store host; `none`, empty and the OFF secret key nothing', () => {
+    expect(storeEdgeKey(req('https://any-store.ebda.app/'), ALL)).toBe(
+      'https://any-store.ebda.app/?__edge=store'
+    );
+    expect(storeEdgeKey(req('https://shop.example.com/ar'), ALL)).toBe(
+      'https://shop.example.com/ar?__edge=store'
+    );
+    expect(storeEdgeKey(req('https://localhost/'), ALL)).toBeNull();
+    expect(storeEdgeKey(req(`https://${HOST}/`), parseAllowlist('none'))).toBeNull();
+    expect(edgeAllowlistFromEnv({ STOREFRONT_HTML_EDGE_HOSTS: 'all' }).size).toBe(1);
+    expect(
+      edgeAllowlistFromEnv({ STOREFRONT_HTML_EDGE_HOSTS: 'all', STOREFRONT_HTML_EDGE_OFF: '1' })
+        .size
+    ).toBe(0);
+    expect(edgeAllowlistFromEnv({}).size).toBe(0);
+  });
+  it('`all` still stores nothing for a host the resolver does not vouch for (unknown / suspended / not a store)', async () => {
+    const d = { ...deps(ALL), verdict: async () => ({ ok: false }) };
+    await get('https://not-a-store.ebda.app/', {}, d);
+    expect(cache.m.size).toBe(0);
+  });
+});
+
+describe('cache key includes the store: no cross-tenant HTML', () => {
+  it("the same path on two stores never serves one store the other one's page", async () => {
+    page = 'store A page';
+    await get(`https://${HOST}/ar/products/abaya`, {}, deps(ALL));
+    page = 'store B page';
+    const b = await get(`https://${OTHER}/ar/products/abaya`, {}, deps(ALL));
+    expect([b.state, b.body]).toEqual(['MISS', 'store B page']);
+    const a = await get(`https://${HOST}/ar/products/abaya`, {}, deps(ALL));
+    expect([a.state, a.body]).toEqual(['HIT', 'store A page']);
+    expect([...cache.m.keys()].sort()).toEqual([
+      `https://${HOST}/ar/products/abaya?__edge=store`,
+      `https://${OTHER}/ar/products/abaya?__edge=store`,
+    ]);
+  });
+});
+
+describe('first visitor on a /ar|/en page (the viral path)', () => {
+  const langOrigin = async (r: Request) => {
+    renders++;
+    const hasAr = (r.headers.get('cookie') ?? '') === 'force-language=ar';
+    return html(page, hasAr ? {} : { 'set-cookie': LANG_AR });
+  };
+  const serve = async (url: string, headers: Record<string, string> = {}) => {
+    const res = await serveStoreEdge(req(url, headers), ctx, langOrigin, deps(ALL));
+    await Promise.all(waits.splice(0));
+    return res;
+  };
+  it('a cookie-less render is stored without its cookie and re-issues it per visitor', async () => {
+    const first = await serve(`https://${HOST}/ar`);
+    expect(first.headers.get('x-store-edge')).toBe('MISS');
+    expect(first.headers.get('set-cookie')).toContain('force-language=ar');
+    const stored = cache.m.get(`https://${HOST}/ar?__edge=store`);
+    expect(stored?.headers.get('set-cookie')).toBeNull();
+    const second = await serve(`https://${HOST}/ar`);
+    expect(second.headers.get('x-store-edge')).toBe('HIT');
+    expect(second.headers.get('set-cookie')).toMatch(
+      /^force-language=ar; Path=\/; Max-Age=31536000; Secure; SameSite=lax$/
+    );
+    const withCookie = await serve(`https://${HOST}/ar`, { cookie: 'force-language=ar' });
+    expect(withCookie.headers.get('x-store-edge')).toBe('HIT');
+    expect(withCookie.headers.get('set-cookie')).toBeNull();
+    const otherLang = await serve(`https://${HOST}/ar`, { cookie: 'force-language=en' });
+    expect(otherLang.headers.get('x-store-edge')).toBe('HIT');
+    expect(otherLang.headers.get('set-cookie')).toContain('force-language=ar');
+    expect(renders).toBe(1);
+  });
+  it('/en and /ar of one page are separate entries; the cookie is not part of a prefixed key', () => {
+    expect(storeEdgeKey(req(`https://${HOST}/en/faq`, { cookie: 'force-language=ar' }), ALL)).toBe(
+      `https://${HOST}/en/faq?__edge=store`
+    );
+    expect(storeEdgeKey(req(`https://${HOST}/faq`, { cookie: 'force-language=ar' }), ALL)).toBe(
+      `https://${HOST}/faq?__edge=store&__lang=ar`
+    );
+  });
+});
+
+describe('no Set-Cookie / private / personalised response is ever cached', () => {
+  it.each([
+    ['a session cookie', { 'set-cookie': 'sid=abc; Path=/; HttpOnly' }],
+    ['the language cookie plus another', { 'set-cookie': `${LANG_AR}, sid=abc; Path=/` }],
+    ['the OTHER language cookie on an /ar page', { 'set-cookie': LANG_AR.replace('=ar', '=en') }],
+  ])('a render that sets %s is served once and never stored', async (_n, headers) => {
+    const res = await serveStoreEdge(
+      req(`https://${HOST}/ar`),
+      ctx,
+      async () => html('private', headers as Record<string, string>),
+      deps(ALL)
+    );
+    await Promise.all(waits.splice(0));
+    expect(res.headers.get('x-store-edge')).toBeNull();
+    expect(cache.m.size).toBe(0);
+  });
+  it.each([
+    '/ar/checkout',
+    '/en/cart',
+    '/ar/account/orders',
+    '/en/auth/login',
+    '/ar/wishlist',
+    '/en/search',
+    '/ar/compare',
+    '/ar/review/ord_123',
+    '/en/unsubscribe',
+    '/sms-unsubscribe',
+    '/affiliate',
+    '/ar/q/x',
+  ])('%s bypasses with or without a language prefix', p => {
+    expect(storeEdgeKey(req(`https://${HOST}${p}`), ALL)).toBeNull();
+  });
+  it('a request with an auth or consent cookie, or Authorization, bypasses even on /ar', () => {
+    for (const headers of [
+      { cookie: 'force-language=ar; token=x' },
+      { cookie: 'force-cookie-consent=%7B%7D' },
+      { authorization: 'Bearer x' },
+    ])
+      expect(storeEdgeKey(req(`https://${HOST}/ar`, headers), ALL)).toBeNull();
+  });
+});
+
+describe('click-tracking parameters (social / ads links)', () => {
+  it('are dropped from the key and from the render on a /ar|/en page; any other param bypasses', async () => {
+    const url = `https://${HOST}/ar/products/abaya?utm_source=ig&fbclid=abc123&gclid=x`;
+    expect(storeEdgeKey(req(url), ALL)).toBe(`https://${HOST}/ar/products/abaya?__edge=store`);
+    let seen = '';
+    await serveStoreEdge(
+      req(url),
+      ctx,
+      async r => {
+        seen = r.url;
+        return html('p');
+      },
+      deps(ALL)
+    );
+    await Promise.all(waits.splice(0));
+    expect(seen).toBe(`https://${HOST}/ar/products/abaya`);
+    expect(storeEdgeKey(req(`https://${HOST}/ar/products?page=2&utm_source=ig`), ALL)).toBeNull();
+    expect(storeEdgeKey(req(`https://${HOST}/ar?look=x`), ALL)).toBeNull();
+    // Unprefixed: the locale redirect needs the original query, so it is left alone.
+    expect(storeEdgeKey(req(`https://${HOST}/?utm_source=ig`), ALL)).toBeNull();
+  });
+});
+
+describe('coalescing: a spike after a purge renders once per isolate', () => {
+  it('concurrent misses for one key share one render', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(r => (release = r));
+    const slow = async () => {
+      renders++;
+      await gate;
+      return html('one render');
+    };
+    const all = Array.from({ length: 5 }, () =>
+      serveStoreEdge(req(`https://${HOST}/ar`), ctx, slow, deps(ALL))
+    );
+    release();
+    const res = await Promise.all(all);
+    await Promise.all(waits.splice(0));
+    expect(renders).toBe(1);
+    expect(await Promise.all(res.map(r => r.text()))).toEqual(Array(5).fill('one render'));
+    expect(res.map(r => r.headers.get('x-store-edge')).sort()).toEqual([
+      'COALESCED',
+      'COALESCED',
+      'COALESCED',
+      'COALESCED',
+      'MISS',
+    ]);
+  });
+  it('waiters on a render that cannot be stored render for themselves (never share a private page)', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(r => (release = r));
+    const priv = async () => {
+      renders++;
+      await gate;
+      return html('mine', { 'set-cookie': 'sid=1' });
+    };
+    const all = Array.from({ length: 3 }, () =>
+      serveStoreEdge(req(`https://${HOST}/ar`), ctx, priv, deps(ALL))
+    );
+    release();
+    await Promise.all(all);
+    expect(renders).toBe(3);
+  });
+});
+
+describe('epoch memo (residual 3: another isolate may serve a pre-purge copy for <= 2 s)', () => {
+  it('a purge recorded by ANOTHER isolate is honoured once the memo expires; this isolate honours its own at once', async () => {
+    await get(`https://${HOST}/`, {}, deps(ALL));
+    clock += 5_000;
+    expect((await get(`https://${HOST}/`, {}, deps(ALL))).state).toBe('HIT'); // epochs now memoised
+    // another isolate's purge: written straight to R2, this isolate's memo not cleared
+    r2.m.set(`html-epoch/id/${ID_A}`, String(clock));
+    clock += 1_500;
+    expect((await get(`https://${HOST}/`, {}, deps(ALL))).state).toBe('HIT');
+    clock += EPOCH_MEMO_MS;
+    expect((await get(`https://${HOST}/`, {}, deps(ALL))).state).toBe('MISS');
+    clock += 5_000;
+    await get(`https://${HOST}/`, {}, deps(ALL));
+    clock += 5_000;
+    await bumpEpochs(r2, [`products:${ID_A}`], clock);
+    clock += 1_500;
+    expect((await get(`https://${HOST}/`, {}, deps(ALL))).state).toBe('MISS');
+  });
+});
+
+describe('Ruling STORE-EDGE-3: the demo layer and this layer share caches.default without colliding', () => {
+  it('a demo host: the demo layer hits from the second request on, both layers keep their own entry', async () => {
+    const { serveDemoEdge, resetDemoVerdicts } = await import('../../apps/web/demo-edge-cache');
+    resetDemoVerdicts();
+    const shared = new MapCache();
+    const demoHost = 'storedemo.ebda.app';
+    const storeDeps = { ...deps(ALL), cache: shared };
+    let n = 0;
+    const next = async () => (n++, html('demo page', { 'set-cookie': LANG_AR }));
+    const browse = async () => {
+      const c: Promise<unknown>[] = [];
+      const res = await serveDemoEdge(
+        req(`https://${demoHost}/ar`),
+        { waitUntil: p => void c.push(p) },
+        r => serveStoreEdge(r, { waitUntil: p => void c.push(p) }, next, storeDeps),
+        async () => true,
+        shared as never
+      );
+      await Promise.all(c);
+      return res;
+    };
+    const first = await browse();
+    const second = await browse();
+    const third = await browse();
+    expect(first.headers.get('x-demo-edge')).toBe('MISS');
+    expect(second.headers.get('x-demo-edge')).toBe('HIT');
+    expect(third.headers.get('x-demo-edge')).toBe('HIT');
+    expect(n).toBe(1);
+    expect([...shared.m.keys()].sort()).toEqual([
+      `https://${demoHost}/ar`,
+      `https://${demoHost}/ar?__edge=store`,
+    ]);
+  });
+});
+
+describe('Ruling STORE-EDGE-3: link previews and crawlers (Accept */* or none) are document requests', () => {
+  it.each([
+    ['*/*', true],
+    ['', true],
+    [null, true],
+    ['text/html,application/xhtml+xml', true],
+    ['application/json', false],
+    ['image/avif,image/webp,*/*', false],
+  ])('Accept %s -> eligible %s', (accept, ok) => {
+    const headers: Record<string, string> = {};
+    const r = new Request(`https://${HOST}/ar`, { headers });
+    if (accept !== null) r.headers.set('accept', accept as string);
+    expect(storeEdgeKey(r, ALL) !== null).toBe(ok);
   });
 });

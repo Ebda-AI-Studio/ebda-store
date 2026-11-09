@@ -5,8 +5,8 @@ import type { Locale } from '../lib/site';
 const MOTIFS = ['m8', 'mr', 'mq'] as const;
 
 /**
- * What the studio does: the seven services of BRAND.services as a clean grid (the studio home and About). Benefit lines
- * only. Products (Ebda Store, Ebda Chat) are a separate section.
+ * What the studio does: the three service categories of BRAND.services as a clean grid (the studio home and About), each
+ * with its named sub-items. Benefit lines only. Wording is pending a match to the registration papers (see BRAND.services). Products (Ebda Store, Ebda Chat) are a separate section.
  */
 export function ServicesGrid({ locale }: { locale: Locale }) {
   return (
@@ -15,6 +15,13 @@ export function ServicesGrid({ locale }: { locale: Locale }) {
         <li key={s.id} className={`svc svc-${MOTIFS[i % MOTIFS.length]}`} data-service={s.id}>
           <h3>{s.name}</h3>
           <p>{s.benefit}</p>
+          {s.items.length > 0 && (
+            <ul className="svc-items">
+              {s.items.map(i => (
+                <li key={i.id}>{i.name}</li>
+              ))}
+            </ul>
+          )}
         </li>
       ))}
     </ul>

@@ -1,4 +1,5 @@
 import { MoneyError, type SyncSql } from './sync-sql';
+import { backorderCancelAllocation } from './returns';
 
 /**
  * `cancelBackorder` on a StoreDO store (Ruling NZ-FEAT-1): the Postgres service's ONE transaction, as ONE `transactionSync`
@@ -48,7 +49,7 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
   if (!line) {
     // Already cancelled (by anyone, with any reason): answer what that cancel did, from its row and marker, writing nothing.
     const done = db.all(
-      `SELECT bl.order_item_id, oi.order_id FROM backorder_lines bl JOIN order_items oi ON oi.id = bl.order_item_id
+      `SELECT bl.order_item_id, bl.cancelled_at, bl.cancelled_reason, oi.order_id FROM backorder_lines bl JOIN order_items oi ON oi.id = bl.order_item_id
         WHERE bl.id = ? AND bl.store_id = ? AND bl.cancelled_at IS NOT NULL`,
       [lineId, storeId]
     )[0];
@@ -62,6 +63,8 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
       ? (JSON.parse(String(marker.metadata)) as {
           items?: Array<{ quantity?: number }>;
           stockRestored?: number;
+          refundAmount?: number;
+          notify?: boolean;
         })
       : null;
     return {
@@ -71,6 +74,11 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
       orderItemId: done.order_item_id as string,
       quantity: Number(meta?.items?.[0]?.quantity ?? 0),
       stockRestored: Number(meta?.stockRestored ?? 0),
+      // the FIRST cancel's figures, as it stored them (a marker written before these were stored reads as nothing owed)
+      cancelledAt: Number(done.cancelled_at),
+      cancelledReason: (done.cancelled_reason as string | null) ?? '',
+      refundAmount: Number(meta?.refundAmount ?? 0),
+      notify: meta?.notify === true,
     };
   }
   const now = Date.now();
@@ -105,6 +113,10 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
       orderItemId,
       quantity,
       stockRestored: 0,
+      cancelledAt: now,
+      cancelledReason: reason,
+      refundAmount: 0,
+      notify: false,
     };
 
   const refundKey = `backorder:${lineId}`;
@@ -140,6 +152,12 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
     }
   }
 
+  // what the cancel gives back, in this section, BEFORE the marker (excluded by key anyway): stored on the marker so a replay
+  // answers these exact figures
+  const { refundAmount, notify } = backorderCancelAllocation(db, storeId, orderId, refundKey, [
+    { orderItemId, quantity },
+  ]);
+
   // 4. the durable marker
   db.run(
     'INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
@@ -155,6 +173,8 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
         reason,
         items: [{ orderItemId, quantity }],
         stockRestored,
+        refundAmount,
+        notify,
       }),
       now,
     ]
@@ -166,5 +186,9 @@ export function backorderCancelOp(db: SyncSql, storeId: string, a: Record<string
     orderItemId,
     quantity,
     stockRestored,
+    cancelledAt: now,
+    cancelledReason: reason,
+    refundAmount,
+    notify,
   };
 }

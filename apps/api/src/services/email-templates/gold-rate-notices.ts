@@ -18,6 +18,9 @@ export interface GoldRateNoticeData {
   rateText?: string;
   /** The jump in percent, formatted by the caller (pending). */
   jumpText?: string;
+  /** The two feed values for a disagreement, formatted by the caller (disagree). */
+  primaryText?: string;
+  fallbackText?: string;
 }
 
 const button = (data: GoldRateNoticeData, label: string) => `
@@ -67,9 +70,27 @@ export const goldRatePendingTemplate = {
     <p>سعر عيار ${d.karat ?? 21} التلقائي في <strong>${escapeHtml(d.storeName)}</strong> اتحرّك ${escapeHtml(d.jumpText ?? '')} لحد ${escapeHtml(d.rateText ?? '')} للجرام. لسه مستني قرارك ومش متطبّق على الأسعار. أكّده أو ارفضه، والأسعار هتفضل زي ما هي لحد ما تقرّر.</p>${button(d, 'مراجعة')}`,
 };
 
-export type GoldRateNoticeKind = 'warning' | 'blocked' | 'pending';
+export const goldRateDisagreeTemplate = {
+  subject: {
+    en: () => 'The two gold rate sources disagree: you decide',
+    ar: () => 'مصدرين سعر الدهب مختلفين: القرار قرارك',
+  },
+  en: (d: GoldRateNoticeData) => `
+    <h2>The automatic gold rate needs your decision</h2>
+    <p>The two automatic sources for <strong>${escapeHtml(d.storeName)}</strong> differ by ${escapeHtml(d.jumpText ?? '')}:
+    ${escapeHtml(d.primaryText ?? '')} per gram (24k) against ${escapeHtml(d.fallbackText ?? '')}.
+    Nothing was applied and your current rate stays in force. Pick one of them, type your own rate, or keep the current rate.</p>${button(d, 'Decide')}`,
+  ar: (d: GoldRateNoticeData) => `
+    <h2>سعر الدهب التلقائي مستني قرارك</h2>
+    <p>المصدرين التلقائيين لـ <strong>${escapeHtml(d.storeName)}</strong> مختلفين ${escapeHtml(d.jumpText ?? '')}:
+    ${escapeHtml(d.primaryText ?? '')} للجرام (عيار 24) قصاد ${escapeHtml(d.fallbackText ?? '')}.
+    مفيش حاجة اتطبقت وسعرك الحالي لسه شغال. اختار واحد منهم، أو اكتب سعرك بنفسك، أو سيب السعر الحالي.</p>${button(d, 'قرّر')}`,
+};
+
+export type GoldRateNoticeKind = 'warning' | 'blocked' | 'pending' | 'disagree';
 export const GOLD_RATE_NOTICES = {
   warning: goldRateWarningTemplate,
   blocked: goldRateBlockedTemplate,
   pending: goldRatePendingTemplate,
+  disagree: goldRateDisagreeTemplate,
 } as const;

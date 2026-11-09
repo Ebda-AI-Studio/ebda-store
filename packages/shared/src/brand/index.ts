@@ -45,9 +45,9 @@ export const BRAND = {
    */
   office: {
     addressAr:
-      'مصر الجديدة، فرع الماظة — شارع الماظة الرئيسي عند تقاطعه مع شارع الثورة، عمارة بنك الإسكندرية، الدور الثامن، القاهرة',
+      'مصر الجديدة — شارع الماظة الرئيسي عند تقاطعه مع شارع الثورة، عمارة بنك الإسكندرية، الدور الثامن، القاهرة',
     addressEn:
-      'Almaza branch, Heliopolis (Masr El Gedida): Almaza Main St. at El Thawra St., Bank of Alexandria building, 8th floor, Cairo, Egypt',
+      'Heliopolis (Masr El Gedida): Almaza Main St. at El Thawra St., Bank of Alexandria building, 8th floor, Cairo, Egypt',
     mapUrl: 'https://maps.app.goo.gl/42gtfccR2egFvYHE7',
     meetingAr: 'الاجتماعات أونلاين على Google Meet، ولقاءات المكتب في القاهرة بميعاد سابق بس.',
     meetingEn: 'We meet online on Google Meet; in-person meetings in Cairo by appointment only.',
@@ -56,11 +56,28 @@ export const BRAND = {
     country: 'EG',
   },
   /**
-   * What the studio does (Ahmad, 2026-11-03): the seven services, one source for the studio home, About and the
-   * Organization JSON-LD. Benefit lines only: no prices, no claims we cannot back, no client names. Products (Ebda Store,
-   * Ebda Chat) are separate from services.
+   * What the studio does (Ahmad, 2026-11-09, STUDIO-CORE-1: Ebda is an AI and software company at the core): three
+   * service categories, each with named sub-items. ONE source for the studio home, About, the contact-form topics, llms.txt and the Organization JSON-LD
+   * (`knowsAbout` / `makesOffer`). Benefit lines only: no prices, no claims we cannot back, no client names.
+   * Products (Ebda Store, Ebda Chat) are separate from services.
+   * Marketing/advertising/media, home engineering, interior and exterior design, and events were REMOVED from ebda.app
+   * on purpose: they will move to separate subdomains or standalone sites (homes separately; marketing + media + events
+   * separately). Nothing is built or linked for them here yet.
+   *
+   * PENDING MATCH TO REGISTRATION PAPERS: Ahmad will share the company registration papers and every `ar` / `en`
+   * name below (category and item) must then match the registered activity wording EXACTLY. The wording is a
+   * one-file edit here; nothing else hard-codes a service name. A category `id` is also a contact-form topic id.
    */
   services: [
+    {
+      id: 'software',
+      ar: 'البرمجيات',
+      en: 'Software',
+      benefitAr: 'بنبني برامج كاملة على قد شغلك، من الفكرة لحد ما تشتغل على الموبايل والكمبيوتر.',
+      benefitEn:
+        'Full software development, from the idea to a working product on phone and desktop.',
+      items: [],
+    },
     {
       id: 'ai',
       ar: 'الذكاء الاصطناعي',
@@ -68,48 +85,29 @@ export const BRAND = {
       benefitAr: 'مساعد بيكتب ويرد ويرتّب معاك، من غير ما تحتاج تفهم تقنية.',
       benefitEn:
         'An assistant that writes, replies and organises with you, no technical know-how needed.',
-    },
-    {
-      id: 'software',
-      ar: 'البرمجيات',
-      en: 'Software',
-      benefitAr: 'متجر وشات جاهزين بالعربي، بيشتغلوا على الموبايل قبل الكمبيوتر.',
-      benefitEn: 'A store and a chat tool, ready in Arabic, built for the phone first.',
-    },
-    {
-      id: 'marketing',
-      ar: 'التسويق الرقمي',
-      en: 'Digital marketing',
-      benefitAr: 'أدوات تجيبلك العميل وترجّعه، وأرقام واضحة تعرف منها إيه اللي نفع.',
-      benefitEn: 'Tools that bring customers in and back again, with clear numbers on what worked.',
-    },
-    {
-      id: 'photography',
-      ar: 'التصوير',
-      en: 'Photography',
-      benefitAr: 'تصوير منتجاتك بشكل يبيع.',
-      benefitEn: 'Product photography that helps your products sell.',
+      items: [],
     },
     {
       id: 'training',
       ar: 'استشارات وتدريب',
       en: 'Consulting and training',
-      benefitAr: 'تدريب فريقك على أدوات الذكاء الاصطناعي.',
-      benefitEn: 'Training your team on AI tools, and advice on where to start.',
-    },
-    {
-      id: '3d',
-      ar: 'تصميم ثري دي',
-      en: '3D design',
-      benefitAr: 'تصميم ثري دي لمنتجاتك ومساحاتك.',
-      benefitEn: '3D design for your products and spaces.',
-    },
-    {
-      id: 'events',
-      ar: 'الفعاليات',
-      en: 'Events',
-      benefitAr: 'تنظيم فعاليات وإطلاقات.',
-      benefitEn: 'Organising events and launches.',
+      benefitAr:
+        'نساعد فريقك يستخدم الذكاء الاصطناعي والبرمجيات صح، بنصيحة تقنية وتدريب على الأدوات.',
+      benefitEn:
+        'We help your team use AI and software well, with technical advice and hands-on training.',
+      items: [
+        { id: 'ai-workshops', ar: 'ورش تبنّي الذكاء الاصطناعي', en: 'AI adoption workshops' },
+        {
+          id: 'team-training',
+          ar: 'تدريب الفرق على أدوات الذكاء الاصطناعي والأتمتة',
+          en: 'Training teams on AI tools and automation',
+        },
+        {
+          id: 'tech-advisory',
+          ar: 'استشارات تقنية ومعمارية',
+          en: 'Technical and architecture advisory',
+        },
+      ],
     },
   ],
   tagline: 'Your store, live today.',
@@ -202,6 +200,7 @@ export function serviceInfo(locale?: string | null) {
     id: s.id,
     name: ar ? s.ar : s.en,
     benefit: ar ? s.benefitAr : s.benefitEn,
+    items: s.items.map(i => ({ id: i.id, name: ar ? i.ar : i.en })),
   }));
 }
 
@@ -209,10 +208,15 @@ export function serviceInfo(locale?: string | null) {
 export function servicesJsonLd(locale?: string | null) {
   const list = serviceInfo(locale);
   return {
-    knowsAbout: list.map(s => s.name),
+    knowsAbout: list.flatMap(s => [s.name, ...s.items.map(i => i.name)]),
     makesOffer: list.map(s => ({
       '@type': 'Offer',
-      itemOffered: { '@type': 'Service', name: s.name, description: s.benefit },
+      itemOffered: {
+        '@type': 'Service',
+        name: s.name,
+        description: s.benefit,
+        ...(s.items.length ? { serviceType: s.items.map(i => i.name) } : {}),
+      },
     })),
   };
 }

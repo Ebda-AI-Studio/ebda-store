@@ -327,16 +327,20 @@ export async function authenticate(
     // jwt.verify decoded the header+payload; re-use jwt.decode here (no
     // re-verify cost) just to extract jti cleanly from the raw token.
     const decoded = jwt.decode(token) as { jti?: string } | null;
-    if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) {
-      return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
-    }
-
     // --- Revocation check 2: per-user token-version (bulk revocation) ---
     // Read tv from Redis cache; fall back to DB + repopulate cache on miss.
-    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(
-      payload.userId,
-      payload.role === 'customer' ? payload.storeId : null
-    );
+    // PERF-LATENCY: the two checks are independent reads on different AuthState shards, so they run in PARALLEL (one round
+    // trip, not two). Both still decide: a denied jti, an old tv or a blocked user refuses; either read failing refuses (catch).
+    const [jtiDenied, { tokenVersion: currentTv, blocked }] = await Promise.all([
+      decoded?.jti ? redis.isJtiDenied(decoded.jti) : Promise.resolve(false),
+      resolveTokenVersionAndStatus(
+        payload.userId,
+        payload.role === 'customer' ? payload.storeId : null
+      ),
+    ]);
+    if (jtiDenied) {
+      return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
+    }
     if ((payload.tv ?? 0) < currentTv) {
       return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
     }
@@ -449,12 +453,15 @@ export async function optionalAuthenticate(
 
   try {
     const decoded = jwt.decode(token) as { jti?: string } | null;
-    if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) return next();
-
-    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(
-      payload.userId,
-      payload.role === 'customer' ? payload.storeId : null
-    );
+    // In parallel, as in `authenticate` (PERF-LATENCY): independent reads, each still decides.
+    const [jtiDenied, { tokenVersion: currentTv, blocked }] = await Promise.all([
+      decoded?.jti ? redis.isJtiDenied(decoded.jti) : Promise.resolve(false),
+      resolveTokenVersionAndStatus(
+        payload.userId,
+        payload.role === 'customer' ? payload.storeId : null
+      ),
+    ]);
+    if (jtiDenied) return next();
     if ((payload.tv ?? 0) < currentTv) return next();
     // S3-1: same defense-in-depth status check as `authenticate` — a
     // suspended user must fall through to "continue as guest", never

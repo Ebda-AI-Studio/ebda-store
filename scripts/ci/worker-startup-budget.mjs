@@ -98,6 +98,29 @@ export function relativeProblems(prMs, baseMs, { ratio, slackMs }) {
       ];
 }
 
+/**
+ * Inputs that must never reach worker.js, each with the reason. Ruling BUNDLE-BUDGET-9: one `import { z } from 'zod'` put all 64
+ * zod locales (261 KB raw, ~42 KB gzip) in the Worker, because esbuild cannot tree-shake a re-exported namespace; the gzip budget
+ * caught it only once a few more KB tipped it over. This names the cause on the PR that brings it back, whatever imports it.
+ */
+export const BANNED_BUNDLE_INPUTS = [
+  {
+    re: /node_modules\/zod\/v4\/locales\/(?!en\.js$|index\.js$)[^/]+$/,
+    why: 'zod non-English locales (a value import of the `zod` root namespace; apps/api/src/cf/stubs/zod-root.ts, Ruling BUNDLE-BUDGET-9)',
+  },
+];
+
+/** Verdict on the esbuild metafile of the dry-run: one problem per banned input class present in worker.js. */
+export function bannedInputProblems(metafile) {
+  const out = Object.entries(metafile?.outputs ?? {}).find(([k]) => k.endsWith('worker.js'))?.[1];
+  if (!out) return ['bundle metafile has no worker.js output'];
+  const inputs = Object.keys(out.inputs ?? {});
+  return BANNED_BUNDLE_INPUTS.flatMap(({ re, why }) => {
+    const hits = inputs.filter(f => re.test(f));
+    return hits.length ? [`${hits.length} banned bundle input(s): ${why}; e.g. ${hits[0]}`] : [];
+  });
+}
+
 // Fake values only: just enough for config/index.ts to pass its NODE_ENV=production checks.
 const PROBE_BINDINGS = {
   NODE_ENV: 'production',
@@ -235,7 +258,17 @@ async function main() {
   try {
     const built = spawnSync(
       'npx',
-      ['wrangler', 'deploy', '--dry-run', '--config', config, '--outdir', outdir],
+      [
+        'wrangler',
+        'deploy',
+        '--dry-run',
+        '--config',
+        config,
+        '--outdir',
+        outdir,
+        '--metafile',
+        path.join(outdir, 'meta.json'),
+      ],
       {
         cwd: API,
         encoding: 'utf8',
@@ -244,6 +277,9 @@ async function main() {
     if (built.status !== 0)
       throw new Error(`wrangler dry-run failed:\n${built.stdout}\n${built.stderr}`);
     const bundle = path.join(outdir, 'worker.js');
+    const banned = bannedInputProblems(
+      JSON.parse(readFileSync(path.join(outdir, 'meta.json'), 'utf8'))
+    );
     const bytes = statSync(bundle).size;
     const gzip = gzipSync(readFileSync(bundle)).length;
     const cfg = readFileSync(path.join(API, config), 'utf8');
@@ -320,6 +356,7 @@ async function main() {
     }
     const problems = [
       ...budgetProblems(measured, budget, { skipCpu: !!base || baselineFailed }),
+      ...banned,
       ...(base
         ? relativeProblems(measured.startupCpuMs, record.baseline.startupCpuMs, budget.relative)
         : []),

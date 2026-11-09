@@ -3,7 +3,15 @@ import { scrubProviderVerifier } from './provider-verification.service';
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { forgotIdentityPassword, revokeIdentityIfManaged } from '../lib/identity-client';
+import {
+  eraseIdentityUser,
+  exportIdentityUser,
+  forgotIdentityPassword,
+  getAccountsBrief,
+  revokeIdentityIfManaged,
+} from '../lib/identity-client';
+import { hubOnD1, hubOwnedStores } from '../lib/platform-hub';
+import { eraseHubUserData, exportHubUserPlatform } from './platform/hub-user-data';
 import crypto from 'crypto';
 import {
   prisma,
@@ -476,14 +484,16 @@ export class AuthService {
         existingUser.email;
       const notifyStoreId = storeId ?? existingUser.storeId;
       if (notifyStoreId) {
-        void EmailService.sendDuplicateRegistrationNotice(
-          notifyStoreId,
-          {
-            email: existingUser.email,
-            name: recipientName,
-            storeName: storeName ?? undefined,
-          },
-          (existingUser.language as 'en' | 'ar' | undefined) ?? undefined
+        void deferAfterTenantCommit('auth.duplicate-registration-notice', () =>
+          EmailService.sendDuplicateRegistrationNotice(
+            notifyStoreId,
+            {
+              email: existingUser.email,
+              name: recipientName,
+              storeName: storeName ?? undefined,
+            },
+            (existingUser.language as 'en' | 'ar' | undefined) ?? undefined
+          )
         ).catch(err =>
           logger.error(
             { err, email: maskEmail(existingUser.email) },
@@ -725,13 +735,16 @@ export class AuthService {
     // Welcome email is a follow-up — fire-and-forget so SMTP latency can't
     // delay the verify-email API response.
     if (tokenUser.storeId) {
-      void EmailService.sendWelcome(
-        tokenUser.storeId,
-        {
-          email: tokenUser.email,
-          name: `${tokenUser.firstName} ${tokenUser.lastName}`.trim() || tokenUser.email,
-        },
-        (tokenUser.language as 'en' | 'ar' | undefined) ?? undefined
+      const welcomeStoreId = tokenUser.storeId;
+      void deferAfterTenantCommit('auth.welcome-after-verify', () =>
+        EmailService.sendWelcome(
+          welcomeStoreId,
+          {
+            email: tokenUser.email,
+            name: `${tokenUser.firstName} ${tokenUser.lastName}`.trim() || tokenUser.email,
+          },
+          (tokenUser.language as 'en' | 'ar' | undefined) ?? undefined
+        )
       ).catch(err =>
         logger.error(
           { err, userId: verificationToken.userId },
@@ -2208,6 +2221,7 @@ export class AuthService {
       ? await customerAuthRoute(hint, { write: true })
       : ({ kind: 'pg' } as const);
     if (doRoute.kind === 'do') return AuthService.eraseOnDo(doRoute.client, userId, opts);
+    if (await hubOnD1()) return AuthService.eraseHubUser(userId);
     const actorId = opts.actorId ?? 'system';
     const eraseUserSelect = {
       id: true,
@@ -2831,6 +2845,42 @@ export class AuthService {
    * erased by the DO's own `eraseShopper` section (Ruling CF-R6A-3), the auth rows by `eraseCustomer`; nothing touches
    * Postgres. Both are idempotent, so a retry after a failure in either converges.
    */
+  /**
+   * A merchant / staff account after Postgres: identity account, D1 platform rows and StoreDO actor ids (Ruling FOLD-ERASURE-1).
+   * Refuses what the admin delete route refuses: a platform administrator, and an owner who still owns stores.
+   */
+  private static async eraseHubUser(userId: string): Promise<EraseOutcome> {
+    const acct = (await getAccountsBrief([userId]))[0];
+    if (!acct) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    if (acct.role === 'super_admin')
+      throw new AppError(
+        409,
+        'OPERATOR_ONLY',
+        'Platform administrators are removed by the platform operator.'
+      );
+    const owned = (await hubOwnedStores([userId])).get(userId) ?? [];
+    if (owned.length > 0)
+      throw new AppError(
+        409,
+        'USER_OWNS_STORES',
+        `You still own ${owned.length} store(s). Delete or transfer them first.`
+      );
+    await eraseIdentityUser(userId);
+    await eraseHubUserData({ userId, email: acct.email });
+    return { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
+  }
+
+  /** Data portability for a merchant / staff account: the identity service's rows plus every platform-D1 row that is theirs. */
+  private static async exportHubUser(userId: string) {
+    const acct = (await getAccountsBrief([userId]))[0];
+    if (!acct) throw new AppError(404, 'NOT_FOUND', 'User not found');
+    const identity = await exportIdentityUser(userId);
+    return {
+      account: identity,
+      platform: await exportHubUserPlatform({ userId, email: acct.email }),
+    };
+  }
+
   private static async eraseOnDo(
     client: CustomerAuthClient,
     userId: string,
@@ -2876,13 +2926,15 @@ export class AuthService {
     // The stale Postgres copy of the same person goes too (queued + P1 if Postgres is unreachable).
     await scrubOrEnqueue(userId, storeId);
     if (doErase.receiptIds.length > 0)
-      void InstapayReceiptService.deleteImages(storeId, doErase.receiptIds).catch(err =>
+      void deferAfterTenantCommit('auth.erase.receipt-images', () =>
+        InstapayReceiptService.deleteImages(storeId, doErase.receiptIds)
+      ).catch(err =>
         logger.warn({ err, userId }, '[auth.eraseAccount] receipt image cleanup failed')
       );
     if (user.avatar)
-      void deleteR2ObjectIfOrphan(user.avatar, { ownerStoreId: storeId }).catch(err =>
-        logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
-      );
+      void deferAfterTenantCommit('auth.erase.avatar', () =>
+        deleteR2ObjectIfOrphan(user.avatar!, { ownerStoreId: storeId })
+      ).catch(err => logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed'));
     const eraseProvenBuyerKey = doErase.provenBuyerKey ?? undefined;
     void inngest
       .send({
@@ -2950,6 +3002,7 @@ export class AuthService {
   static async exportAccount(userId: string, storeHint?: string | null) {
     const exportRoute = await customerAuthRoute(storeHint, { write: false });
     if (exportRoute.kind === 'do') return AuthService.exportOnDo(exportRoute.client, userId);
+    if (await hubOnD1()) return AuthService.exportHubUser(userId);
     const user = await withUser(userId, tx =>
       tx.user.findUnique({
         where: { id: userId },
