@@ -5,8 +5,8 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
   waTerms: {
     title: 'Ebda Chat Terms of Service',
     meta: {
-      version: '1.0',
-      publishedAt: '2026-10-25',
+      version: '1.1',
+      publishedAt: '2026-11-09',
     },
     note: 'Clauses marked "Provisional, under legal review" have not been reviewed by counsel yet and may change.',
     sections: [
@@ -148,8 +148,8 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
   waPrivacy: {
     title: 'Ebda Chat Privacy Policy',
     meta: {
-      version: '1.0',
-      publishedAt: '2026-10-25',
+      version: '1.1',
+      publishedAt: '2026-11-09',
     },
     sections: [
       {
@@ -252,8 +252,8 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
   waDpa: {
     title: 'Ebda Chat Data Processing Agreement',
     meta: {
-      version: '1.0',
-      publishedAt: '2026-10-25',
+      version: '1.1',
+      publishedAt: '2026-11-09',
     },
     sections: [
       {

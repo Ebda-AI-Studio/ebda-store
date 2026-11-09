@@ -67,5 +67,5 @@ export function parse(file, lang) {
     (n, x) => n + x.p.filter(t => t.includes(PROVISIONAL[lang])).length,
     0
   );
-  return { title, sections, updated: meta.updated, provisional };
+  return { title, sections, updated: meta.updated, version: meta.version ?? '1.0', provisional };
 }
