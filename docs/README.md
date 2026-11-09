@@ -305,7 +305,6 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-11-02-neon-zero.md](plans/2026-11-02-neon-zero.md) - NEON-ZERO-1: the Ebda API with zero Postgres, Neon or Hyperdrive (inventory, scale rules, design note)
 - [plans/2026-11-03-editor-theme-spacing.md](plans/2026-11-03-editor-theme-spacing.md) - SP-1..3: simplified Theme panel (tiers, presets, density) and per-section, per-device spacing in the visual editor
 - [plans/2026-11-03-contact-form.md](plans/2026-11-03-contact-form.md) - CONTACT-FORM-1: studio service-enquiry form on the contact page
-- [rulings/STUDIO-CORE-1.md](rulings/STUDIO-CORE-1.md) - STUDIO-CORE-1: ebda.app services are software, AI, and AI/software consulting and training only
 - [plans/2026-11-03-storefront-premium-defaults.md](plans/2026-11-03-storefront-premium-defaults.md) - Storefront premium defaults (audit 2026-11-03)
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something
 - [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
