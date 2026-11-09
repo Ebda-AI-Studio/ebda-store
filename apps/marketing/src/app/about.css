@@ -152,7 +152,7 @@ html[dir='rtl'] .ab-h2::after {
   padding: 0;
   display: grid;
   gap: 20px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }
 .svc {
   padding: 24px;

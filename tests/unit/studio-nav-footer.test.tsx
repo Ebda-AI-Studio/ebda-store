@@ -529,9 +529,9 @@ describe('the founding date (BRAND.company.foundedOn)', () => {
   });
 });
 
-describe('services (BRAND.services): studio home and About render all seven, separate from the products', () => {
-  const ids = ['ai', 'software', 'design', 'homes', 'marketing', 'training', 'events'];
-  it('BRAND holds the seven, benefit lines only (no prices)', () => {
+describe('services (BRAND.services): studio home and About render all three, separate from the products', () => {
+  const ids = ['software', 'ai', 'training'];
+  it('BRAND holds the three, benefit lines only (no prices)', () => {
     expect(BRAND.services.map(s => s.id)).toEqual(ids);
     for (const s of BRAND.services) {
       expect(`${s.ar} ${s.en} ${s.benefitAr} ${s.benefitEn}`).not.toMatch(/EGP|جنيه|ج\.م|\d{2,}/);
@@ -546,7 +546,7 @@ describe('services (BRAND.services): studio home and About render all seven, sep
         ['home', home],
         ['about', about],
       ] as const) {
-        expect((html.match(/data-service="/g) ?? []).length, name).toBe(7);
+        expect((html.match(/data-service="/g) ?? []).length, name).toBe(3);
         for (const s of serviceInfo(lang)) {
           expect(html, `${name} ${s.id}`).toContain(s.name);
           expect(html, `${name} ${s.id}`).toContain(s.benefit);
@@ -569,7 +569,7 @@ describe('services (BRAND.services): studio home and About render all seven, sep
           serviceInfo(lang).flatMap(s => [s.name, ...s.items.map(i => i.name)])
         );
         const offers = org.makesOffer as { itemOffered: { '@type': string; name: string } }[];
-        expect(offers.map(o => o.itemOffered['@type'])).toEqual(Array(7).fill('Service'));
+        expect(offers.map(o => o.itemOffered['@type'])).toEqual(Array(3).fill('Service'));
         expect(JSON.stringify(offers)).not.toMatch(/price/i);
       }
     });

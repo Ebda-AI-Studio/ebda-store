@@ -6,7 +6,7 @@
 import { BRAND } from './brand';
 import { toAsciiDigits } from './ascii-digits';
 
-/** What the visitor needs: the two products' support, each of the seven studio services (ids from BRAND.services), other. */
+/** What the visitor needs: the two products' support, each of the three studio services (ids from BRAND.services), other. */
 export const CONTACT_TOPIC_IDS = [
   'store-support',
   'chat-support',
