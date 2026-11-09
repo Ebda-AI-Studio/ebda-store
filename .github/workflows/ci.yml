@@ -654,9 +654,11 @@ jobs:
       # the binding, so nothing else runs this path on workerd before production does. No database.
       # + the NEON-ZERO money path (PR 455, review I-1): checkout, signed gateway webhooks, refunds and payouts of a store on its
       # Durable Object with Postgres absent; a regression to a Prisma call or an unrouted reference fails the PR here.
+      # + the DO storefront with every listing branch of /public/products (P1 2026-11-09: sort=on_sale reached Postgres) and the
+      # weekly answer-engine scan of an AI-eligible DO store under production's marker set (no ai-usage marker).
       - name: Embedding provider + tenant isolation + money path on workerd (fake AI binding, no Postgres)
         timeout-minutes: 20
-        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/money-path.test.ts
+        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/money-path.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
 
   # G11 (Ruling INFRA-CF-1): the DB-less integration lane. The real StoreDO (SQLite), D1 and R2 bindings run on
   # LOCAL workerd (Miniflare via @cloudflare/vitest-pool-workers), no Postgres and no built bundle, so it

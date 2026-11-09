@@ -22,6 +22,7 @@
 import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
+import { postgresRemovedOnThisWorker } from '../../lib/postgres-present';
 
 export type PlatformFamily =
   | 'billing'
@@ -95,12 +96,14 @@ export interface MarkerD1 {
 
 const on = new Set<PlatformFamily>();
 const offUntil = new Map<PlatformFamily, number>();
+const missingMarkerAlerted = new Set<PlatformFamily>();
 
 /** Test seam. */
 export function resetCutoverCache(): void {
   on.clear();
   offUntil.clear();
   expiredFreezeAlerted.clear();
+  missingMarkerAlerted.clear();
 }
 
 const binding = () => (cfBindings() as { PLATFORM_DB?: MarkerD1 } | undefined)?.PLATFORM_DB;
@@ -242,6 +245,31 @@ const frozenError = (family: PlatformFamily) =>
   });
 
 /**
+ * NEON-ZERO N-17 (Ruling NZ-D23): on a Worker with no Postgres an unflipped family has only ONE possible home, D1. "Off" there
+ * is not "serve from Postgres", it is a Prisma call that throws POSTGRES_REMOVED on every use (P1 2026-11-09: `ai-usage` was never
+ * flipped in production, so every AI quota check, the storefront and the weekly answer-engine scan included, threw). Such a family is
+ * served by D1 and cached "on" for the isolate; a P1 names the missing marker once per isolate so the operator writes it.
+ * Node / tests / local dev keep the marker semantics unchanged (Postgres is present there).
+ */
+function servedByD1BecausePostgresIsGone(family: PlatformFamily): boolean {
+  if (!postgresRemovedOnThisWorker()) return false;
+  on.add(family);
+  if (!missingMarkerAlerted.has(family)) {
+    missingMarkerAlerted.add(family);
+    void sendAlert({
+      level: 'p1',
+      source: 'platform.cutover',
+      title: `Platform family ${family} has no cutover marker; served by D1 (no Postgres on this Worker)`,
+      body:
+        `system_settings has no ${cutoverKey(family)} row in ebda-platform, but this Worker has no Postgres, so ${family} is ` +
+        'served by D1. Write the marker (scripts/cf/cutover-platform-family.mjs) so the state on record matches what runs.',
+      context: { family, marker: cutoverKey(family) },
+    }).catch(() => undefined);
+  }
+  return true;
+}
+
+/**
  * READ path: cached "on" for good; "off" is cached for OFF_TTL_MS, but NEVER while a freeze row exists (the flip is
  * imminent: every read re-checks, so no isolate keeps reading Postgres for the cache's lifetime after the marker).
  */
@@ -255,6 +283,7 @@ export async function platformFamilyOnD1(family: PlatformFamily): Promise<boolea
     on.add(family);
     return true;
   }
+  if (servedByD1BecausePostgresIsGone(family)) return true;
   if (!frozen) offUntil.set(family, Date.now() + OFF_TTL_MS);
   return false;
 }
@@ -276,7 +305,7 @@ export async function platformFamilyOnD1ForWrite(family: PlatformFamily): Promis
     on.add(family);
     return true;
   }
-  return false;
+  return servedByD1BecausePostgresIsGone(family);
 }
 
 /**
@@ -294,7 +323,7 @@ export async function auditStoreLessOnD1(): Promise<boolean> {
     on.add('audit');
     return true;
   }
-  return frozen;
+  return frozen || servedByD1BecausePostgresIsGone('audit');
 }
 
 /** For a raw SQL write that bypasses the router (Postgres-only branch): throws when the family is frozen or moved. */
