@@ -25,6 +25,13 @@
 # admin/orders never carry cache bindings; they are asserted empty whatever
 # the variable says.
 #
+# Ruling EDGE-BUILD-1: the storefront's two HTML edge caches (apps/web/
+# demo-edge-cache.ts, store-edge-cache.ts) put the Worker version id in their
+# cache key, read from the CF_VERSION_METADATA binding. Without the binding
+# there is no id and both layers switch themselves off (fail closed: slow, not
+# broken) — a storefront that renders every page from scratch with a green
+# pipeline. So in BOTH modes the web config must carry the binding.
+#
 # Usage: OPENNEXT_CACHE=<true|false> bash scripts/assert-cf-cache-bindings.sh <web|admin|orders>
 set -euo pipefail
 
@@ -44,6 +51,11 @@ if [ "$APP" = "web" ]; then
       echo "::error::OPENNEXT_CACHE is '${OPENNEXT_CACHE:-<unset>}' — it must be exactly 'true' (R2 + DO tag cache) or 'false' (the documented empty-cache fallback). An unset or mistyped value used to deploy the empty cache silently, turning every revalidateTag into a no-op. Set the repo variable."
       exit 1 ;;
   esac
+fi
+
+if [ "$APP" = "web" ]; then
+  grep -qE '"version_metadata"[[:space:]]*:[[:space:]]*\{[[:space:]]*"binding"[[:space:]]*:[[:space:]]*"CF_VERSION_METADATA"' "$WRANGLER" \
+    || { echo "::error::generated apps/$APP/wrangler.jsonc has NO version_metadata binding named CF_VERSION_METADATA — the HTML edge caches key on the Worker version id (Ruling EDGE-BUILD-1) and switch OFF without it: every storefront page would render from scratch. Check scripts/cf-setup-local.sh"; exit 1; }
 fi
 
 if [ "$mode" = "cache" ]; then

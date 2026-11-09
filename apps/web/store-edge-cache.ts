@@ -1,5 +1,6 @@
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { renewNonce } from './csp-nonce-renew';
+import { buildScopedKey } from './edge-build-id';
 import {
   acceptsHtmlDocument,
   isStorableHtml,
@@ -58,6 +59,11 @@ export { urlLocaleOf };
  * pre-purge copy for up to 2 s (the isolate that took the purge forgets at once); (4) a render that starts right after a
  * purge reads the API, whose KV L1 is eventually consistent (<= 60 s, Ruling NZ-D1/EDGE-API-1 residual), so it can store a
  * copy that is one KV window old until the next purge or the TTL.
+ *
+ * BUILD (Ruling EDGE-BUILD-1, NEVER-stale): the HTML names `/_next/static` files that exist only in the Worker version
+ * that rendered it, and a deploy is not a store write, so no epoch moves. Every entry is therefore stored under that
+ * version's id ({@link buildScopedKey}; `deps.build`): a new version starts from an empty key space and never reads a
+ * copy an older build rendered. No version id = the layer does not cache.
  */
 export const STORE_EDGE_FRESH_S = 60;
 export const STORE_EDGE_STALE_S = 600;
@@ -93,6 +99,8 @@ export interface StoreEdgeDeps {
   allow: Set<string>;
   r2: R2Like | undefined;
   cache: CacheLike;
+  /** The Worker version id (`edgeBuildId(env)`), part of every key; null = this layer does not cache (EDGE-BUILD-1). */
+  build: string | null;
   verdict(host: string): Promise<StoreVerdict>;
   now(): number;
 }
@@ -126,7 +134,10 @@ export function edgeAllowlistFromEnv(env: {
   return parseAllowlist(env.STOREFRONT_HTML_EDGE_HOSTS);
 }
 
-/** The strict cache key for this request, or null when it must not touch the layer. */
+/**
+ * The strict cache key for this request, or null when it must not touch the layer. This is the request's part only:
+ * `serveStoreEdge` stores it under the running Worker version (Ruling EDGE-BUILD-1).
+ */
 export function storeEdgeKey(request: Request, allow: Set<string>): string | null {
   if (allow.size === 0 || request.method !== 'GET') return null;
   const url = new URL(request.url);
@@ -329,8 +340,9 @@ export async function serveStoreEdge(
   origin: Origin,
   deps: StoreEdgeDeps
 ): Promise<Response> {
-  const key = storeEdgeKey(request, deps.allow);
-  if (!key || !deps.r2) return origin(request);
+  const requestKey = deps.build ? storeEdgeKey(request, deps.allow) : null;
+  if (!requestKey || !deps.build || !deps.r2) return origin(request);
+  const key = buildScopedKey(requestKey, deps.build);
   const urlLocale = urlLocaleOf(new URL(request.url).pathname);
   try {
     const hit = await deps.cache.match(key);

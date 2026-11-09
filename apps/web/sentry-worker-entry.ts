@@ -49,6 +49,7 @@ import {
 import { companyHostRoute } from './company-host-route';
 import { edgeLocaleRedirect } from './locale-redirect-edge';
 import { DEMO_EDGE_API_URL, isDemoStoreHost, serveDemoEdge } from './demo-edge-cache';
+import { edgeBuildId } from './edge-build-id';
 import {
   bumpEpochs,
   edgeAllowlistFromEnv,
@@ -72,7 +73,20 @@ interface WorkerEnv {
   STOREFRONT_HTML_EDGE_OFF?: string;
   /** The OpenNext incremental-cache bucket; the purge epochs live under `html-epoch/`. */
   NEXT_INC_CACHE_R2_BUCKET?: R2Like;
+  /** The Worker version (wrangler `version_metadata`): `/health` reports its id, and both HTML edge caches key by it
+   * so a copy rendered by one build is never served by another (Ruling EDGE-BUILD-1). */
+  CF_VERSION_METADATA?: { id?: unknown } | null;
   [key: string]: unknown;
+}
+
+let warnedNoBuildId = false;
+/** Once per isolate: without a version id every storefront page renders live (slow, never wrong). */
+function warnNoBuildId(): void {
+  if (warnedNoBuildId) return;
+  warnedNoBuildId = true;
+  console.error(
+    'edge HTML cache OFF: CF_VERSION_METADATA.id is missing or malformed (Ruling EDGE-BUILD-1); check version_metadata in the generated wrangler.jsonc'
+  );
 }
 
 /**
@@ -147,6 +161,9 @@ const baseHandler = {
         caches?: { default?: Parameters<typeof serveStoreEdge>[3]['cache'] };
       }
     ).caches?.default;
+    // Cached HTML names this build's `/_next/static` files: both layers key by the Worker version (Ruling EDGE-BUILD-1).
+    const build = edgeBuildId(env);
+    if (!build) warnNoBuildId();
     return serveDemoEdge(
       request,
       waitCtx,
@@ -157,11 +174,13 @@ const baseHandler = {
           allow,
           r2: env.NEXT_INC_CACHE_R2_BUCKET,
           cache: edgeCache,
+          build,
           verdict: host => storeVerdict(host, DEMO_EDGE_API_URL),
           now: Date.now,
         });
       },
-      host => isDemoStoreHost(host, DEMO_EDGE_API_URL)
+      host => isDemoStoreHost(host, DEMO_EDGE_API_URL),
+      build
     );
   },
 };

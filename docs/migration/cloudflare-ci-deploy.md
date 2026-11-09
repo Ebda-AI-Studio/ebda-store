@@ -35,6 +35,9 @@ rollback, once `main` is fixed, redeploy with `gh workflow run cf-deploy.yml`
 must be exactly `true` or `false`; `scripts/assert-cf-cache-bindings.sh` fails the
 web deploy (and CI's `cf-build-check`) on an unset or mistyped value, which used to
 deploy the empty-cache config — a no-op `revalidateTag` — behind a green tick.
+The same script also fails when the generated web config has no `version_metadata`
+binding named `CF_VERSION_METADATA` (Ruling EDGE-BUILD-1): the storefront's two HTML
+edge caches key on the Worker version id and switch off without it.
 
 | App                        | Worker serves                                                                                        |
 | -------------------------- | ---------------------------------------------------------------------------------------------------- |

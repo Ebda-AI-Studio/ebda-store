@@ -29,10 +29,14 @@
  * CACHE CLASS: BOUNDED-stale. Fresh 300 s, then served stale while one request refreshes, up to
  * 86400 s. Residual: a demo catalogue/layout edit shows after <= 300 s. No NEVER-stale data
  * (price, stock, permissions) is decided from a demo page; checkout is refused.
+ * BUILD (Ruling EDGE-BUILD-1, NEVER-stale): the HTML names `/_next/static` files that exist only in the Worker version
+ * that rendered it, so every entry is stored under that version's id ({@link buildScopedKey}). A deploy is therefore a
+ * new, empty key space: no copy of an older build is ever read, stale window or not. No version id = no caching.
  */
 import { getLook } from '@ebda/shared';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
 import { renewNonce } from './csp-nonce-renew';
+import { buildScopedKey } from './edge-build-id';
 import {
   acceptsHtmlDocument,
   isStorableHtml,
@@ -60,7 +64,10 @@ export function canonicalDemoHost(url: URL): string | null {
   return null;
 }
 
-/** The strict cache key for this request, or null when it must not touch the demo edge cache. */
+/**
+ * The strict cache key for this request, or null when it must not touch the demo edge cache. This is the request's part
+ * only: `serveDemoEdge` stores it under the running Worker version (Ruling EDGE-BUILD-1).
+ */
 export function demoEdgeKey(request: Request): string | null {
   if (request.method !== 'GET') return null;
   const url = new URL(request.url);
@@ -187,16 +194,21 @@ function withEdgeHeaders(
 type EdgeCtx = { waitUntil(p: Promise<unknown>): void };
 type Origin = (request: Request) => Promise<Response>;
 
-/** Serve `request` through the demo edge cache; falls through to `origin` when not eligible. */
+/**
+ * Serve `request` through the demo edge cache; falls through to `origin` when not eligible. `build` is the Worker
+ * version id (`edgeBuildId(env)`); null means this isolate cannot tell which build it is, so nothing is cached.
+ */
 export async function serveDemoEdge(
   request: Request,
   ctx: EdgeCtx,
   origin: Origin,
   isDemoHost: (host: string) => Promise<boolean>,
+  build: string | null,
   cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
 ): Promise<Response> {
-  const key = demoEdgeKey(request);
-  if (!key) return origin(request);
+  const requestKey = build ? demoEdgeKey(request) : null;
+  if (!requestKey || !build) return origin(request);
+  const key = buildScopedKey(requestKey, build);
   const path = new URL(request.url).pathname;
 
   const store = async (res: Response) => {
