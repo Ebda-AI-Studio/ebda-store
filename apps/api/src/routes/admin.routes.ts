@@ -88,7 +88,8 @@ import {
 import { platformUserContext } from '../middleware/tenant-context';
 import { impersonationTargetD1 } from '../lib/impersonation-target';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
-import { eraseUserAccess, onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
+import { onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
+import { eraseHubUserData } from '../services/platform/hub-user-data';
 import { revokeUserMerchantKeysD1 } from '../services/platform/platform-d1';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
@@ -1697,13 +1698,14 @@ router.delete(
           return;
         }
         await eraseIdentityUser(id);
-        await eraseUserAccess(id, acct.email);
+        await eraseHubUserData({ userId: id, email: acct.email });
         await auditLog({
           action: 'user.deleted',
           userId: req.user!.userId,
           resourceType: 'user',
           resourceId: id,
-          details: { email: acct.email, role: acct.role },
+          // no e-mail address: the audit row outlives the erasure it records
+          details: { role: acct.role },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
@@ -1812,7 +1814,7 @@ router.delete(
       if (target.storeId === null && target.role !== 'customer') await eraseIdentityUser(id);
       // After the `access` cutover the Postgres FK cascade no longer reaches the membership rows (they live in D1): an erased
       // user would keep holding a staff seat. Idempotent and verified; a failure stops here, before the Postgres delete.
-      if (await onAccessD1()) await eraseUserAccess(id, target.email);
+      if (await onAccessD1()) await eraseHubUserData({ userId: id, email: target.email });
 
       // WA-CONSENT-1: withdraw the account's WhatsApp marketing consent before the hard delete.
       const doomed = await asPlatformOperator(req.user!.userId, () =>

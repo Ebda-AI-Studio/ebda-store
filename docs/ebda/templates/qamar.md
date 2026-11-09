@@ -49,6 +49,10 @@ Two look-level entrance moments, each once, <= 600 ms, ease-out-quint, and none 
 - Atelier press-logo strip: a new merchant has no press, and the taste bar forbids placeholders (B1-22).
 - Product-card control on Atelier: the photo is the card, the card is the link (B1-60, L-01).
 
+## Signature section (T7)
+
+`editorial-collage`: up to three photos laid on paper over paper (the first takes 62% at full height, the others sit on the inline end), one line and a button. In the Atelier and Vitrine mixes after the main grid; not in Lookbook, whose hero is already the collage (Rulings T7-1, T7-2). No photo = the title and button alone. Demo: the three look photos.
+
 ## The skin's files
 
 `apps/web/src/templates/qamar/` (Header, hero variants, `HeroVideo`, collage, band tiles, footer), the shared look-aware card/section code in `apps/web/src/templates/shared/` (`look-card.ts`, `section-bg.ts`, `footer-ink.ts`), the look tokens in `packages/shared/src/looks/`, the checkout/receipt styling in `apps/web/src/app/checkout/`. The "Shop this look" page is `apps/web/src/app/looks/[sectionId]/[blockId]/`.

@@ -37,7 +37,6 @@ import {
   invalidateCachedPrefix,
   invalidateStoreProductCaches,
   invalidateStoreCategoriesCaches,
-  invalidateStoreBundlesCache,
   bundlesCacheKey,
 } from '../../apps/api/src/lib/public-cache';
 
@@ -89,9 +88,9 @@ describe('invalidateStoreProductCaches() (A2 Redis-layer bust)', () => {
   });
 });
 
-describe('invalidateStoreBundlesCache() (#1565)', () => {
-  it("busts the store's public bundle-list Redis key", async () => {
-    await invalidateStoreBundlesCache('store123');
+describe('bundle-list cache (#1565): busted by the product invalidator, the only bundle invalidator', () => {
+  it("invalidateStoreProductCaches busts the store's public bundle-list Redis key", async () => {
+    await invalidateStoreProductCaches('store123');
     expect(redisMock.delete).toHaveBeenCalledWith(bundlesCacheKey('store123'));
     expect(bundlesCacheKey('store123')).toBe('public:bundles:v2:store123');
   });

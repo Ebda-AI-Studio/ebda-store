@@ -106,6 +106,8 @@ describe('wiring', () => {
     const raw = walk(SRC).filter(f => {
       const t = readFileSync(f, 'utf8');
       if (/wa-plan: new-store-not-linked/.test(t)) return false;
+      // cf/erasure/platform-subject.ts: PDPL erasure of a deleted store clears the card reference only; plan, status and period are untouched
+      if (/wa-plan: not-plan-state/.test(t)) return false;
       if (/wa-plan: observer notified/.test(t) && /notifyModelWrite\(/.test(t)) return false;
       return (
         /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(store_subscriptions|store_whatsapp_consents)"?/i.test(

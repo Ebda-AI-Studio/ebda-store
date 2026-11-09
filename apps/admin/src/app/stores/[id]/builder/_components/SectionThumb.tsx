@@ -94,6 +94,59 @@ export function SectionThumb({
         </g>
       ));
       break;
+    // T7 signature sections
+    case 'editorial-collage':
+      body = (
+        <>
+          {box(14, 6, 46, 48, GOLD, 0.35)}
+          {box(62, 8, 40, 26, GOLD, 0.55)}
+          {box(58, 36, 34, 20, GOLD, 0.45)}
+        </>
+      );
+      break;
+    case 'piece-window':
+      body = (
+        <>
+          <rect x={38} y={4} width={44} height={52} fill="none" stroke={GOLD} strokeWidth={1} />
+          {box(42, 8, 36, 44, GOLD, 0.35)}
+        </>
+      );
+      break;
+    case 'spec-sheet':
+      body = (
+        <>
+          {box(6, 8, 46, 44, GOLD, 0.3)}
+          {[0, 1, 2, 3].map(i => (
+            <g key={i}>
+              {box(58 + (i % 2) * 30, 10 + Math.floor(i / 2) * 22, 26, 8, INK, 0.5)}
+              {line(58 + (i % 2) * 30, 21 + Math.floor(i / 2) * 22, 18)}
+            </g>
+          ))}
+        </>
+      );
+      break;
+    case 'key-ingredients':
+      body = (
+        <>
+          {box(6, 6, 38, 48, GOLD, 0.3)}
+          {[0, 1, 2, 3].map(i => (
+            <g key={i}>
+              <circle cx={54} cy={13 + i * 12} r={2} fill={GOLD} />
+              {line(60, 12 + i * 12, 46)}
+            </g>
+          ))}
+        </>
+      );
+      break;
+    case 'kitchen-days':
+      body = [0, 1, 2, 3].map(i => (
+        <g key={i}>
+          {box(6 + i * 28, 12, 24, 36, INK, 0.08)}
+          {box(9 + i * 28, 17, 12, 3, GOLD)}
+          {line(9 + i * 28, 25, 18)}
+        </g>
+      ));
+      break;
     default:
       body = (
         <>

@@ -62,6 +62,7 @@ import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
+import { demoLayoutCacheKey } from '../lib/demo-layout-cache-key';
 import logger from '../lib/logger';
 import {
   deleteStoreClients,
@@ -80,7 +81,11 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
-import { finishStoreDeletion } from '../lib/store-delete-post-commit';
+import { anonymiseDeletedStore, finishStoreDeletion } from '../lib/store-delete-post-commit';
+import { cfBindings } from '../cf/bindings';
+import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
+import { paymentsErasurePort } from './billing/payments-erasure';
+import { storeDo } from '../lib/store-backend';
 import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
@@ -136,6 +141,9 @@ export async function bustStoreCaches(
   if (slug) bustCorsCache(storeHost(slug));
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCachedPrefix(`public:products:${storeId}:`);
+  // The demo showroom's layout response cache (a no-op key for a real store): every publish / rollback / layout PUT /
+  // look apply ends here, so a published home shows at once (Ruling DEMO-LAYOUT-PURGE-1).
+  await invalidateCached(demoLayoutCacheKey(storeId));
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
   // STOREFRONT_REVALIDATE_URL / REVALIDATE_SECRET env pair isn't configured) so
   // a merchant's edit shows on the live storefront within ~a second.
@@ -1169,6 +1177,30 @@ export class StoreService {
 
     // Ruling NZ-D14: lookups read D1 and a DO store keeps its data in the DO; neither is touched by the Postgres delete above.
     await finishStoreDeletion({ storeId, wasOnDo });
+
+    // PDPL (Ruling FOLD-ERASURE-2): a DO store's people are anonymised once the delete is committed (the DO stays, closed, for the
+    // legal retention period; fiscal / VAT / payment rows are kept, everything that identifies a person goes).
+    if (wasOnDo)
+      await anonymiseDeletedStore(storeId, {
+        eraseDo: async (id, requestId) =>
+          (
+            storeDo(id) as unknown as {
+              eraseSubject(
+                s: Record<string, unknown>
+              ): Promise<{ refused?: unknown; remaining: number }>;
+            }
+          ).eraseSubject({
+            kind: 'merchant',
+            requestId,
+            storeId: id,
+            ownerUserId: store.ownerId ?? '',
+          }),
+        eraseD1: async id => {
+          const d1 = (cfBindings() as { PLATFORM_DB?: D1Like } | undefined)?.PLATFORM_DB;
+          if (d1) await eraseStorePlatformData(d1, id);
+        },
+        erasePayments: (id, requestId) => paymentsErasurePort.scrub([id], requestId),
+      });
 
     // Invalidate store cache (best-effort, post-commit)
     try {

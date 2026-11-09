@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * The /contact enquiry form (Ruling CONTACT-FORM-1): renders in Arabic and English with labelled, required fields and the
- * seven BRAND services; shows per-field errors wired with aria-describedby and moves focus to the first one; posts JSON
+ * three BRAND services; shows per-field errors wired with aria-describedby and moves focus to the first one; posts JSON
  * with the honeypot and fill time; shows a role=status success; shows an error (never success) when the API fails; has a
  * real form action for the no-JavaScript post.
  */
@@ -30,15 +30,15 @@ function fill(c: HTMLElement, o: Partial<Record<string, string>> = {}) {
   set('name', o.name ?? 'منى');
   set('phone', o.phone ?? '01012345678');
   set('email', o.email ?? 'mona@example.com');
-  set('topic', o.topic ?? 'marketing');
-  set('message', o.message ?? 'محتاجة تصوير لأربعين منتج');
+  set('topic', o.topic ?? 'software');
+  set('message', o.message ?? 'محتاجة برنامج لإدارة المخزون');
   if (o.consent !== 'off') fireEvent.click(c.querySelector('[name="consent"]')!);
 }
 
 describe.each(['ar', 'en'] as const)('ContactForm (%s)', locale => {
   const f = COPY[locale].contactPage.form;
 
-  it('renders labelled, required fields, the seven services, the privacy link and a real form action', () => {
+  it('renders labelled, required fields, the three services, the privacy link and a real form action', () => {
     const { container } = render(<ContactForm locale={locale} />);
     const form = container.querySelector('form')!;
     expect(form.getAttribute('method')).toBe('post');
@@ -103,7 +103,7 @@ describe.each(['ar', 'en'] as const)('ContactForm (%s)', locale => {
     const sent = JSON.parse(init.body);
     expect(sent).toMatchObject({
       phone: '01012345678',
-      topic: 'marketing',
+      topic: 'software',
       consent: true,
       lang: locale,
       website: '',

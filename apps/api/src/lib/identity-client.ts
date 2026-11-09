@@ -93,6 +93,9 @@ export const setAccountRole = (
     call('setRole', r => r.setRole?.(userId, role, reason, ifCurrentRole))
   );
 export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
+/** PDPL export of the identity service's own rows for the user (profile, sessions, passkey labels; never a hash or key). */
+export const exportIdentityUser = (userId: string) =>
+  call('exportUser', r => r.exportUser?.(userId));
 /** Integrator clients (identity v1.3) die with their store. Idempotent, so a retry is safe. */
 export const deleteStoreClients = (storeId: string) =>
   call('deleteStoreClients', r => r.deleteStoreClients?.(storeId));

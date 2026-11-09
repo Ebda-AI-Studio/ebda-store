@@ -20,6 +20,12 @@ const B = (n: number) => BigInt(n);
 
 /** Above this the two sources are in disagreement and nothing is auto-applied. */
 export const CROSS_CHECK_BPS = 200;
+/**
+ * Above this the two sources are not "a choice between two prices", they are a platform fault (a broken
+ * feed or conversion): the merchant is NOT asked to pick, nothing is stored, the operator gets a P1
+ * (Ruling GOLD-DISAGREE-MERCHANT-1).
+ */
+export const DISAGREE_SANITY_BPS = 2000;
 export const FEED_TIMEOUT_MS = 8000;
 
 /**

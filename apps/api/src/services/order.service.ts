@@ -3649,11 +3649,11 @@ export class OrderService {
           await storeDb(storeId)
         ).order.findFirst({
           where: { id: orderId, storeId },
-          select: { id: true },
+          select: { id: true, currency: true },
         })
       : await prisma.order.findFirst({
           where: { id: orderId, storeId },
-          select: { id: true },
+          select: { id: true, currency: true },
         });
     if (!order) return;
 
@@ -3716,6 +3716,8 @@ export class OrderService {
         data: {
           orderId,
           storeId,
+          // the order's own currency (every amount in `partial` is in its minor units); consumers destructure what they use
+          currency: order.currency,
           restoreInventory,
           notify,
           partial: options.partial,

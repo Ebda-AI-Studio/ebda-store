@@ -265,3 +265,53 @@ describe('serveDemoEdge', () => {
     expect(cache.m.size).toBe(0);
   });
 });
+
+describe('first cookie-less visitor on a /ar|/en page (Ruling STORE-EDGE-2, measured 2.95 s uncached 2026-11-09)', () => {
+  it('the URL-locale language cookie no longer blocks storage; it is stripped and re-issued per visitor', async () => {
+    resetDemoVerdicts();
+    const cache = fakeCache();
+    let renders = 0;
+    const origin = async () => {
+      renders++;
+      return new Response('<html>ar</html>', {
+        headers: {
+          'content-type': 'text/html',
+          'set-cookie': 'force-language=ar; Path=/; Max-Age=31536000; Secure; SameSite=lax',
+        },
+      });
+    };
+    const c = ctx();
+    await serveDemoEdge(req(`${D}/ar`), c, origin, yes, cache);
+    await c.settle();
+    expect(cache.m.get(`${D}/ar`)?.headers.get('set-cookie')).toBeNull();
+    const hit = await serveDemoEdge(req(`${D}/ar`), ctx(), origin, yes, cache);
+    expect(hit.headers.get('x-demo-edge')).toBe('HIT');
+    expect(hit.headers.get('set-cookie')).toContain('force-language=ar');
+    const cookied = await serveDemoEdge(
+      req(`${D}/ar`, { cookie: 'force-language=ar' }),
+      ctx(),
+      origin,
+      yes,
+      cache
+    );
+    expect(cookied.headers.get('x-demo-edge')).toBe('HIT');
+    expect(cookied.headers.get('set-cookie')).toBeNull();
+    expect(renders).toBe(1);
+  });
+  it('a session cookie on an /ar page is still never stored', async () => {
+    const cache = fakeCache();
+    const c = ctx();
+    await serveDemoEdge(
+      req(`${D}/ar`),
+      c,
+      async () =>
+        new Response('x', {
+          headers: { 'content-type': 'text/html', 'set-cookie': 'sid=1; Path=/' },
+        }),
+      yes,
+      cache
+    );
+    await c.settle();
+    expect(cache.m.size).toBe(0);
+  });
+});

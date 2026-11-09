@@ -70,6 +70,7 @@ describe('demo home renders the superset through the look mix (Ruling B1-8)', ()
       'hero',
       'category-grid',
       'featured-collection',
+      'editorial-collage', // T7 signature
       'image-text',
       'product-carousel',
       'brand-story',
@@ -80,6 +81,7 @@ describe('demo home renders the superset through the look mix (Ruling B1-8)', ()
       'hero',
       'collection-list',
       'featured-collection',
+      'editorial-collage', // T7 signature
       'testimonials',
     ]);
     expect(v.sections.find(s => s.type === 'collection-list')!.settings.tileShape).toBe('band');

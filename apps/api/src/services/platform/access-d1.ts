@@ -23,6 +23,7 @@ import { prisma, withStore, type StoreStatus } from '@ebda/database';
 import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { platformFamilyOnD1 } from './cutover';
+import { erasePlatformSubject, type D1Like } from '../../cf/erasure/platform-subject';
 
 interface Stmt {
   bind(...v: unknown[]): Stmt & {
@@ -267,32 +268,15 @@ export async function acceptInviteWithinCap(input: {
 }
 
 /**
- * User erasure on the access family (idempotent, verified). The Postgres twin is the FK cascade `store_staff.user_id -> users`;
- * D1 has no FK to the identity-owned user, so the rows are removed here: memberships of the user, their pending invitations
- * (by address), and the actor columns on surviving invitations (erasure classification `d1:staff_invites`). One atomic batch,
- * then a read-back; anything left throws (503) so the caller does not report the erasure as done.
+ * User erasure on the platform D1 (idempotent, verified). The Postgres twin was the FK cascade `store_staff.user_id -> users`; D1 has
+ * no FK to the identity-owned user, so every row the erasure classification ties to the user is handled here by the classification-driven
+ * engine (cf/erasure/platform-subject.ts, Ruling FOLD-ERASURE-1): memberships, devices, legal acceptances and notice deliveries,
+ * API keys (deleted); actor ids on surviving audit / approval / invitation rows (replaced); invitations by address (revoked, address
+ * overwritten). One atomic batch, then a read-back; anything left throws (503) so the caller does not report the erasure as done.
  */
 export async function eraseUserAccess(userId: string, email: string | null): Promise<void> {
-  const d1 = raw();
-  const now = Date.now();
   try {
-    await d1.batch([
-      d1.prepare('DELETE FROM store_staff WHERE user_id = ?1').bind(userId),
-      d1
-        .prepare(
-          "UPDATE staff_invites SET status = 'revoked', decided_at = ?2 WHERE lower(email) = lower(?1) AND status = 'pending'"
-        )
-        .bind(email ?? '', now),
-      d1.prepare('UPDATE staff_invites SET invited_by = NULL WHERE invited_by = ?1').bind(userId),
-      d1.prepare('UPDATE staff_invites SET accepted_by = NULL WHERE accepted_by = ?1').bind(userId),
-    ]);
-    const left = await d1
-      .prepare(
-        'SELECT (SELECT count(*) FROM store_staff WHERE user_id = ?1) + (SELECT count(*) FROM staff_invites WHERE invited_by = ?1 OR accepted_by = ?1) AS n'
-      )
-      .bind(userId)
-      .first<{ n: number }>();
-    if (Number(left?.n ?? 0) !== 0) throw new Error('rows remain');
+    await erasePlatformSubject(raw() as unknown as D1Like, { userId, email });
   } catch {
     throw new AppError(
       503,

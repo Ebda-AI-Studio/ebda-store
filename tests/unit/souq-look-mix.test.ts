@@ -63,6 +63,7 @@ describe('the mixes, exactly as designed', () => {
       'category-grid',
       'product-carousel',
       'featured-collection',
+      'spec-sheet',
       'trust-strip',
       'newsletter',
     ]);
@@ -89,6 +90,7 @@ describe('the mixes, exactly as designed', () => {
       'product-carousel',
       'product-carousel',
       'featured-collection',
+      'spec-sheet',
       'trust-strip',
       'brand-story',
     ]);
@@ -122,6 +124,7 @@ describe('the mixes, exactly as designed', () => {
       'product-spotlight',
       'collection-list',
       'featured-collection',
+      'spec-sheet',
       'trust-strip',
     ]);
     expect(showroom.sections![0].design).toMatchObject({ layout: 'chips', paddingBottom: 'none' });

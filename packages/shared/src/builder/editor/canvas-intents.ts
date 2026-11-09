@@ -205,6 +205,12 @@ export const AI_FILL_SECTIONS: Readonly<Record<string, string>> = {
   'best-sellers': 'bestSellers',
   'featured-collection': 'featured',
   testimonials: 'testimonials',
+  // T7 signature sections: the same kicker + subtitle fill, grounded in the section's own title.
+  'editorial-collage': 'signature',
+  'piece-window': 'signature',
+  'spec-sheet': 'signature',
+  'key-ingredients': 'signature',
+  'kitchen-days': 'signature',
 };
 
 export interface AiFillRequest {

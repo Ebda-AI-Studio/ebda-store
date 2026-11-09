@@ -26,6 +26,7 @@ import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
 import { assertStoreOwns, assertStoreOwnsInTenantScope } from './assert-store-owns';
 import { AppError } from '../../middleware/error-handler';
+import { isP2002 } from '../../lib/prisma-errors';
 import { COUNTED_STATUSES_SQL } from './reports.service';
 import { storeDb, storeMoney, storeRepo, storeWriter } from '../../lib/repo-factory';
 import { runInStoreCtx } from '../../lib/jobs/store-db';
@@ -200,7 +201,19 @@ export async function importBankStatement(
           data: fresh.slice(i, i + CHUNK).map(r => buildBankTxCreateData(r, statementId, storeId)),
         }) as Promise<unknown>
       );
-    await w.$transaction(ops as never);
+    try {
+      await w.$transaction(ops as never);
+    } catch (err) {
+      // Two imports of overlapping files at once: both read "not imported yet", the second batch then hits the
+      // (store_id, row_hash) unique and the WHOLE batch rolls back (no statement, no rows). A conflict, not a server error.
+      if (isP2002(err))
+        throw new AppError(
+          409,
+          'BANK_IMPORT_CONFLICT',
+          'These bank lines are being imported by another upload right now. Refresh and try again.'
+        );
+      throw err;
+    }
     await runAutoMatch(statementId, storeId);
     // the Postgres loop counts every row (an upsert returns the existing one too)
     return { statementId, imported: rows.length, skipped, parseErrors };

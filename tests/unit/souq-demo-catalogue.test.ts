@@ -210,6 +210,7 @@ describe('souq demo catalogue: images and the home document', () => {
       'trust-strip',
       'newsletter',
       'brand-story',
+      'spec-sheet', // T7 signature section
     ]);
     // one hero, Night's stage and the curated row are tagged Night; the Showroom's three stages are
     // tagged Showroom, so Catalogue shows only deals and Night shows exactly one stage

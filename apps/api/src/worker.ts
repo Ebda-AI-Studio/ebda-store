@@ -36,6 +36,7 @@ import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
+import { instrumentBindings } from './lib/io-tally';
 import { dispatchedEvents, trackDispatches } from './lib/jobs/dispatch';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { parkIfFrozen, type ParkableBatch } from './cf/queue-freeze';
@@ -157,7 +158,8 @@ let embeddingConfigChecked = false;
 let whatsAppConfigChecked = false;
 
 function prepare(env: CfBindings): void {
-  setCfBindings(env);
+  // Remote bindings tallied per request for Server-Timing + the call-count budgets (lib/io-tally.ts); memoised per env.
+  setCfBindings(instrumentBindings(env));
   // Test only (workers-test route sweep): count every access to the Postgres client. Never set on a deployed Worker.
   if (env.DEV_STATS === '1') {
     trackPostgresReaches(true);

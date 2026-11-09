@@ -1,0 +1,10 @@
+/* TEAM */
+Studio: Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي)
+Site: https://ebda.app
+Contact: ahlan@ebda.app
+Location: Cairo, Egypt
+
+/* SITE */
+Languages: Arabic (primary), English
+Products: Ebda Store, Ebda Chat
+Standards: HTML5, CSS3, schema.org JSON-LD
