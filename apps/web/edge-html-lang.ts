@@ -14,6 +14,16 @@ const LANG_COOKIE_MAX_AGE = 31536000;
 
 export type UrlLocale = 'ar' | 'en' | null;
 
+/**
+ * A document request: `Accept` names text/html, is the any-type wildcard, or is absent (link-preview and social crawlers, curl, many bots;
+ * the viral first wave of a shared link). An RSC, prefetch or action request is refused by its own headers first, and
+ * only a `text/html` RESPONSE is ever stored, so a non-HTML answer cannot enter the cache this way (Ruling STORE-EDGE-3).
+ */
+export function acceptsHtmlDocument(accept: string | null): boolean {
+  if (accept === null || accept.trim() === '' || accept.trim() === '*/*') return true;
+  return accept.includes('text/html');
+}
+
 /** The `ar|en` a path starts with, or null. */
 export function urlLocaleOf(path: string): UrlLocale {
   const m = LOCALE_PREFIX.exec(path);
