@@ -816,6 +816,11 @@ export async function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promis
 export interface ScopeResolver {
   lazyForStore(storeId: string): Promise<boolean>;
   lazyForUser(): boolean | Promise<boolean>;
+  /**
+   * True when this store has NO data reachable from this runtime (a Postgres-flagged store on a Worker whose Postgres was
+   * removed): a cross-store sweep visits nothing there instead of failing the whole run on a store it can never read.
+   */
+  skipStore?(storeId: string): Promise<boolean>;
   directory?(opts: {
     includeDeleted: boolean;
     filter?: (s: StoreDirectoryEntry) => boolean;
@@ -825,6 +830,8 @@ let scopeResolver: ScopeResolver | undefined;
 export function setScopeResolver(r: ScopeResolver | undefined): void {
   scopeResolver = r;
 }
+const skipStoreNoData = async (storeId: string): Promise<boolean> =>
+  scopeResolver?.skipStore ? scopeResolver.skipStore(storeId) : false;
 const lazyForStore = async (storeId: string): Promise<boolean> =>
   scopeResolver ? scopeResolver.lazyForStore(storeId) : false;
 /** The per-store scope runner `acrossStores` uses (same decision as `withStore`). */
@@ -1022,6 +1029,7 @@ export async function acrossStores<T>(
       if (i >= storeIds.length) return;
       const storeId = storeIds[i];
       try {
+        if (await skipStoreNoData(storeId)) continue;
         out[i] = { storeId, value: await runInStoreTx(storeId, () => fn(storeId)) };
       } catch (err) {
         if (opts.onStoreError) opts.onStoreError(storeId, err);
