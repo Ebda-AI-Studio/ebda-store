@@ -80,9 +80,9 @@ describe('storedemo seed guard', () => {
   });
   it('the hero clip is only ever an https or relative URL (the hero video schema)', () => {
     expect(videoUrl('https://media.ebda.app/demo/qamar')).toBe(
-      'https://media.ebda.app/demo/qamar/hero.mp4'
+      'https://media.ebda.app/demo/qamar/hero-1080.mp4'
     );
-    expect(videoUrl('/__qamar-demo')).toBe('/__qamar-demo/hero.mp4');
+    expect(videoUrl('/__qamar-demo')).toBe('/__qamar-demo/hero-1080.mp4');
     expect(videoUrl('http://localhost:9000')).toBeNull();
   });
   it('describePlan names the Qamar catalogue and the archived placeholder families (C3)', () => {
