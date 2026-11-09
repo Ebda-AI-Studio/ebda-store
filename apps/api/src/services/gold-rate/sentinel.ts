@@ -41,3 +41,13 @@ export async function markSent(key: string): Promise<void> {
     throw new SentinelStoreUnavailableError(err);
   }
 }
+
+/** End a notice's episode so the next one (a new disagreement) may be sent again. */
+export async function clearSent(key: string): Promise<void> {
+  try {
+    await client().del(key);
+  } catch (err) {
+    if (err instanceof SentinelStoreUnavailableError) throw err;
+    throw new SentinelStoreUnavailableError(err);
+  }
+}

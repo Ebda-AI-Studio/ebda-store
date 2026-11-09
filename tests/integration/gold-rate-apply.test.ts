@@ -542,6 +542,61 @@ describe.skipIf(!hasDb)('gold-rate service, repricer and gate (ebda_app + tenant
     await put({ rates: [{ karat: 21, ratePerGram: cur }], confirm: true });
   });
 
+  it('7c2. GOLD-DISAGREE-MERCHANT-1: a feed DISAGREEMENT is pending with both values on getState; the owner confirming applies the chosen rate through the repricer, a store that does not decide keeps its confirmed rate', async () => {
+    const cur = (await rateRows()).find(r => r.karat === 21).rate_per_gram as number;
+    const primary = Math.round(cur * 1.01);
+    const fallback = Math.round(cur * 1.04);
+    const before = await getRows([fx.p21]);
+    const res = await runInStoreScope(fx.storeId, () =>
+      GoldRateService.applyRates(
+        fx.storeId,
+        { rates: [{ karat: 21, ratePerGram: primary }] },
+        {
+          feed: {
+            fetchedAt: new Date().toISOString(),
+            disagree: {
+              diffBps: 313,
+              primary24k: Math.round((primary * 24) / 21),
+              fallback24k: Math.round((fallback * 24) / 21),
+              fallbackRates: { 24: 1, 21: fallback, 18: 1 },
+            },
+          },
+          forcePending: true,
+        }
+      )
+    );
+    expect(res.applied).toHaveLength(0);
+    // undecided: price and current rate are exactly what they were
+    expect(await getRows([fx.p21])).toEqual(before);
+    expect((await rateRows()).find(r => r.karat === 21).rate_per_gram).toBe(cur);
+    const st = await request(app)
+      .get(`/api/v1/stores/${fx.storeId}/gold-rates`)
+      .set({ Authorization: `Bearer ${fx.ownerToken}` });
+    expect(st.status).toBe(200);
+    expect(st.body.data.disagreement).toMatchObject({
+      diffBps: 313,
+      fallbackRates: { 21: fallback },
+    });
+    // the owner picks the first source: applied through the repricer
+    const ok = await request(app)
+      .post(`/api/v1/stores/${fx.storeId}/gold-rates/${res.pending[0].id}/decision`)
+      .set({ Authorization: `Bearer ${fx.ownerToken}` })
+      .send({ decision: 'confirm' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    await awaitDeferredWork(5000);
+    expect((await rateRows()).find(r => r.karat === 21).rate_per_gram).toBe(primary);
+    const p = (
+      await owner.query(
+        `select price, gold_weight_mg, making_charge_value, gold_margin_bps from products where id = $1`,
+        [fx.p21]
+      )
+    ).rows[0];
+    expect(p.price).toBe(
+      priceOf(21, p.gold_weight_mg, 'per_gram', p.making_charge_value, primary, p.gold_margin_bps)
+    );
+    await put({ rates: [{ karat: 21, ratePerGram: cur }], confirm: true });
+  });
+
   it('7d. a rounding-step change reprices every gold row and purges; the bulk switch freezes prices, skips incomplete specs and purges', async () => {
     purged.length = 0;
     const body = {
