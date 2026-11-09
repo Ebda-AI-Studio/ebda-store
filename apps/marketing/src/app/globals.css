@@ -267,6 +267,31 @@ html[lang='en'] .wm-name {
   font-size: 0.8125rem;
   font-weight: 600;
 }
+.np-soon {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  min-height: 44px;
+  color: var(--muted);
+}
+.np-soon b,
+.np-soon > span {
+  font-weight: 600;
+  color: var(--muted);
+}
+.np-badge {
+  font-style: normal;
+  margin-inline-start: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-text, var(--fg));
+}
+.menu-group .np-soon {
+  padding: 8px 0;
+}
 /* nav-products:end */
 .nav-links {
   display: none;

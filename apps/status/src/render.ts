@@ -295,7 +295,13 @@ function socialHead(
   );
 }
 
-export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): string {
+export function renderStatusPage(
+  s: Snapshot,
+  lang: Lang,
+  origin: string,
+  /** The Services dropdown + coming-soon Products rows (SERVICES-IA-1): the Worker var EBDA_SERVICE_LINES=on. */
+  serviceLines = false
+): string {
   const t = T[lang];
   const home = lang === 'ar' ? '/' : '/en';
   const alt = lang === 'ar' ? '/en' : '/';
@@ -325,7 +331,7 @@ ${socialHead(t, lang, origin, home)}
 <a class="skip" href="#main">${esc(t.skip)}</a>
 <header class="site-header"><div class="wrap header-row">
 ${siteWordmarkHtml({ lang, href: home, siteLabel: t.site, markHtml: brandMarkSvg({ size: 28, cls: 'wm-mk' }) })}
-${siteNavHtml(lang, 'status')}
+${siteNavHtml(lang, 'status', serviceLines)}
 ${searchForm(lang)}
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>

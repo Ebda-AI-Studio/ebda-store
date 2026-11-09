@@ -1,5 +1,10 @@
 import { composeAlert, sendTelegram, type SendFetch } from './alert';
-import { BRAND, BRAND_MARKETING_URL, SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
+import {
+  BRAND,
+  BRAND_MARKETING_URL,
+  SITE_NAV_JS,
+  serviceLinesPublishedFromEnv,
+} from '../../../packages/shared/src/brand/index';
 import {
   pickStudioLang,
   renderStudioPage,
@@ -235,14 +240,22 @@ export default {
     }
     if (path === '/' || path === '/en') {
       const snap = await store(env).snapshot(Date.now());
-      return new Response(renderStatusPage(snap, path === '/' ? 'ar' : 'en', url.origin), {
-        headers: {
-          'content-type': 'text/html; charset=utf-8',
-          // no-transform: Cloudflare then does not inject its Web Analytics beacon, which this page's CSP (rightly) blocks
-          'cache-control': 'public, max-age=30, no-transform',
-          ...SECURITY_HEADERS,
-        },
-      });
+      return new Response(
+        renderStatusPage(
+          snap,
+          path === '/' ? 'ar' : 'en',
+          url.origin,
+          serviceLinesPublishedFromEnv({ EBDA_SERVICE_LINES: env.EBDA_SERVICE_LINES })
+        ),
+        {
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            // no-transform: Cloudflare then does not inject its Web Analytics beacon, which this page's CSP (rightly) blocks
+            'cache-control': 'public, max-age=30, no-transform',
+            ...SECURITY_HEADERS,
+          },
+        }
+      );
     }
     // A person who mistyped a status URL gets the studio's calm 404 (search + a map); API clients keep the JSON.
     if (!path.startsWith('/api/') && (req.headers.get('accept') ?? '').includes('text/html')) {

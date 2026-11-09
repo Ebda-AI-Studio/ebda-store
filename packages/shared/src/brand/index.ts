@@ -133,9 +133,27 @@ export const BRAND = {
    * (siteNavProducts lists only live ones); the marketing site shows them as "coming soon" only when the service lines are published.
    */
   comingProducts: [
-    { id: 'quote-studio', nameAr: 'ابدأ ستوديو للتسعير', nameEn: 'Ebda Quote Studio' },
-    { id: 'invite', nameAr: 'ابدأ إنفايت', nameEn: 'Ebda Invite' },
-    { id: 'ads', nameAr: 'ابدأ آدز', nameEn: 'Ebda Ads' },
+    {
+      id: 'quote-studio',
+      nameAr: 'ابدأ ستوديو للتسعير',
+      nameEn: 'Ebda Quote Studio',
+      shortAr: 'عروض أسعار تفاعلية لمكاتب التصميم',
+      shortEn: 'Live quotes for design offices',
+    },
+    {
+      id: 'invite',
+      nameAr: 'ابدأ إنفايت',
+      nameEn: 'Ebda Invite',
+      shortAr: 'دعوات وحضور الفعاليات',
+      shortEn: 'Invitations and event attendance',
+    },
+    {
+      id: 'ads',
+      nameAr: 'ابدأ آدز',
+      nameEn: 'Ebda Ads',
+      shortAr: 'إعلاناتك ومبيعاتك في مكان واحد',
+      shortEn: 'Your ads and sales in one place',
+    },
   ],
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',
@@ -590,6 +608,24 @@ export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
   ];
 }
 
+/** The release flag of the service lines (Ruling SERVICES-IA-1), read by the build of every site that renders the shared nav. */
+export const SERVICE_LINES_ENV = 'EBDA_SERVICE_LINES';
+/** True only for `on` / `1` / `true` (`off`, `preview` and unset are not published). */
+export function serviceLinesPublishedFromEnv(
+  env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
+): boolean {
+  return ['on', '1', 'true'].includes((env[SERVICE_LINES_ENV] ?? '').trim().toLowerCase());
+}
+
+/** The coming-soon software rows of the Products menu (names and one-line blurbs from BRAND.comingProducts). */
+export function siteNavComingSoon(lang: NavLang): { id: string; label: string; blurb: string }[] {
+  return BRAND.comingProducts.map(p => ({
+    id: p.id,
+    label: L(lang, p.nameAr, p.nameEn),
+    blurb: L(lang, p.shortAr, p.shortEn),
+  }));
+}
+
 export type SiteNavServiceId = 'core' | 'events' | 'marketing' | 'design' | 'all';
 export interface SiteNavService extends NavLink {
   id: SiteNavServiceId;
@@ -735,6 +771,8 @@ export const siteNavLabels = (lang: NavLang) => ({
   products: L(lang, 'المنتجات', 'Products'),
   resources: L(lang, 'المصادر', 'Resources'),
   studio: L(lang, 'الستوديو', 'Studio'),
+  services: L(lang, 'الخدمات', 'Services'),
+  comingSoon: L(lang, 'قريبًا', 'Coming soon'),
   menu: L(lang, 'القائمة', 'Menu'),
 });
 
@@ -949,7 +987,12 @@ export function siteNavIconSvg(id: SiteNavProductId, lang?: NavLang): string {
  * disclosures, About, Contact and the CTA, and the mobile menu grouped Products / Resources / Studio (below 1180px
  * it collapses into the menu button; wider, it is its own row under the wordmark, search and language switch).
  */
-export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
+export function siteNavHtml(
+  lang: NavLang,
+  active: NavSite | null,
+  /** Show the Services dropdown and the coming-soon Products rows (SERVICES-IA-1); defaults to the build flag EBDA_SERVICE_LINES=on. */
+  serviceLines: boolean = serviceLinesPublishedFromEnv()
+): string {
   const t = siteNavLabels(lang);
   const products = siteNavProducts(lang);
   const resources = siteNavResources(lang);
@@ -962,14 +1005,26 @@ export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
   // one card per product: icon tile, full name, one-sentence blurb (the marketing header renders the same pieces in React)
   const prod = (p: SiteNavProduct) =>
     `<li><a href="${esc(p.href)}"><span class="np-ico">${siteNavIconSvg(p.id, lang)}</span><span class="np-txt"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></span></a></li>`;
+  const soon = serviceLines ? siteNavComingSoon(lang) : [];
+  const soonRow = (p: { label: string; blurb: string }) =>
+    `<li class="np-soon"><span class="np-txt"><b>${esc(p.label)} <em class="np-badge">${esc(t.comingSoon)}</em></b><span>${esc(p.blurb)}</span></span></li>`;
+  const services = serviceLines ? siteNavServices(lang) : [];
+  const svc = (sv: SiteNavService) =>
+    `<li><a href="${esc(sv.href)}"><span class="np-txt"><b>${esc(sv.label)}</b><span>${esc(sv.blurb)}</span></span></a></li>`;
   const menu = (title: string, items: string) =>
     `<li class="nav-products"><details><summary>${esc(title)}</summary><ul>${items}</ul></details></li>`;
-  const group = (title: string, links: NavLink[]) =>
-    `<li class="menu-group"><p>${esc(title)}</p><ul>${links.map(li).join('')}</ul></li>`;
+  const group = (title: string, links: NavLink[], more: { label: string }[] = []) =>
+    `<li class="menu-group"><p>${esc(title)}</p><ul>${links.map(li).join('')}${more
+      .map(
+        p =>
+          `<li class="np-soon"><span>${esc(p.label)} <em class="np-badge">${esc(t.comingSoon)}</em></span></li>`
+      )
+      .join('')}</ul></li>`;
   return (
     `<nav class="top-nav" aria-label="${esc(t.nav)}">` +
     `<ul class="nav-links">` +
-    menu(t.products, products.map(prod).join('')) +
+    menu(t.products, products.map(prod).join('') + soon.map(soonRow).join('')) +
+    (services.length ? menu(t.services, services.map(svc).join('')) : '') +
     menu(t.resources, resources.map(li).join('')) +
     studio.map(li).join('') +
     `<li class="nav-end"></li>` +
@@ -977,7 +1032,7 @@ export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
     `<li>${a(cta, 'nav-cta')}</li>` +
     `</ul>` +
     `<details class="nav-menu"><summary><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>${esc(t.menu)}</span></summary>` +
-    `<ul>${group(t.products, products)}${group(t.resources, resources)}${group(t.studio, studio)}${group(login.label, login.items)}<li class="menu-cta">${a(cta, 'nav-cta')}</li></ul></details>` +
+    `<ul>${group(t.products, products, soon)}${services.length ? group(t.services, services) : ''}${group(t.resources, resources)}${group(t.studio, studio)}${group(login.label, login.items)}<li class="menu-cta">${a(cta, 'nav-cta')}</li></ul></details>` +
     `</nav>`
   );
 }
@@ -1020,6 +1075,10 @@ export const SITE_NAV_PANEL_CSS = `
 .np-txt b{font-weight:600;line-height:1.35}
 .np-txt span{color:var(--muted);font-size:.875rem;line-height:1.5}
 .menu-group>p{margin:0;padding:6px var(--np-inset,10px);color:var(--muted);font-size:.8125rem;font-weight:600}
+.np-soon{display:flex;align-items:center;padding:10px;min-height:44px;color:var(--muted)}
+.np-soon b,.np-soon>span{font-weight:600;color:var(--muted)}
+.np-badge{font-style:normal;margin-inline-start:6px;padding:1px 8px;border:1px solid var(--line-strong,var(--line));border-radius:999px;font-size:.75rem;font-weight:600;color:var(--accent-text,var(--fg))}
+.menu-group .np-soon{padding:8px 0}
 `.replace(/\n/g, '');
 
 /**
