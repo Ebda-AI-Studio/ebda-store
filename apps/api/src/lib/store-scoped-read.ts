@@ -63,8 +63,9 @@ export async function inDoStoreScope<T>(storeId: string, fn: () => Promise<T>): 
  */
 export async function runInStoreTenantContext<T>(
   storeId: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  userId?: string
 ): Promise<T> {
-  if ((await storeRepo(storeId)).backend === 'do') return runInStoreScope(storeId, fn);
-  return runInTenantContext(storeId, fn);
+  if ((await storeRepo(storeId)).backend === 'do') return runInStoreScope(storeId, fn, userId);
+  return runInTenantContext(storeId, fn, userId);
 }

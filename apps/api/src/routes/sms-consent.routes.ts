@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { customerRow, customerRows } from '../lib/customer-directory';
 import { z } from 'zod/v3';
 import { runInTenantContext, withUser } from '@ebda/database';
+import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { publicLimiter, writeLimiter } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
@@ -74,7 +75,7 @@ accountRouter.get('/', authenticate, async (req: Request, res: Response, next: N
     if (!ctx) return;
     const [available, consent] = await Promise.all([
       notificationDispatcher.isSmsMarketingAvailable(ctx.storeId),
-      runInTenantContext(
+      runInStoreTenantContext(
         ctx.storeId,
         () => SmsConsentService.getForCustomerKey(ctx.storeId, ctx.userId, ctx.phone),
         ctx.userId
@@ -112,7 +113,7 @@ accountRouter.put(
           });
           return;
         }
-        const ok = await runInTenantContext(
+        const ok = await runInStoreTenantContext(
           ctx.storeId,
           () =>
             SmsConsentService.recordGrant(ctx.storeId, {
@@ -134,7 +135,7 @@ accountRouter.put(
           return;
         }
       } else {
-        await runInTenantContext(
+        await runInStoreTenantContext(
           ctx.storeId,
           () =>
             SmsConsentService.revoke(
@@ -146,7 +147,7 @@ accountRouter.put(
         );
       }
 
-      const consent = await runInTenantContext(
+      const consent = await runInStoreTenantContext(
         ctx.storeId,
         () => SmsConsentService.getForCustomerKey(ctx.storeId, ctx.userId, ctx.phone),
         ctx.userId

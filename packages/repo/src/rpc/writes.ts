@@ -133,6 +133,9 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'ProductModel',
   'ProductModelBinding',
   'StoreWhatsAppLink',
+  // the shopper's WhatsApp / SMS marketing consents (storefront opt-in, account settings, unsubscribe link; P1 2026-11-09)
+  'StoreWhatsAppConsent',
+  'SmsMarketingConsent',
   'GoldRateSettings',
   // feature-gated admin subsystems a merchant turns on (Ruling NZ-FEAT-1): warehouse rows (never their stock: `warehouse_stock`
   // moves only in the stock ops), the affiliate programme config, affiliates, their audit events and click/referral rows

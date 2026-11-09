@@ -101,7 +101,7 @@
   "services/shipment-pickup.service.ts": 12,
   "services/shipping-carrier.service.ts": 8,
   "services/slug-redirect.service.ts": 1,
-  "services/sms-consent.service.ts": 2,
+  "services/sms-consent.service.ts": 1,
   "services/sms-queue.service.ts": 3,
   "services/store.service.ts": 8,
   "services/usage-aggregates.service.ts": 12,

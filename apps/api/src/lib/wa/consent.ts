@@ -7,8 +7,9 @@
  * erased with it. It is keyed by the suite buyer key, so it holds no raw phone.
  */
 import { customerRow, customerRows } from '../../lib/customer-directory';
-import { prisma, runInTenantContext } from '@ebda/database';
-import { storeDb } from '../../lib/repo-factory';
+import { notifyModelWrite, prisma, runInTenantContext } from '@ebda/database';
+import { storeDb, storeRepo, storeWriter } from '../../lib/repo-factory';
+import { runInStoreTenantContext } from '../../lib/store-scoped-read';
 import { readStoreDb } from '../jobs/store-db';
 import { buyerKeyFor, toE164 } from '@ebda/shared';
 import { suiteBuyerKeySecret } from './config';
@@ -37,11 +38,14 @@ export async function phoneOnOwnOrder(
   userId: string,
   phone: string,
   // The caller's transaction client when it is inside a tenant scope (erasure); the ambient client otherwise.
-  client: Pick<typeof prisma, 'order'> = prisma
+  client?: Pick<typeof prisma, 'order'>
 ): Promise<boolean> {
   const want = toE164(phone);
   if (!want) return false;
-  const orders = await client.order.findMany({
+  // No caller client: the store's own backend (a DO store's orders are on its Durable Object; NEON-ZERO class sweep,
+  // P1 2026-11-09: the GET/POST /public/cart/whatsapp-optin proof threw POSTGRES_REMOVED). Postgres: the scoped `prisma`.
+  const db = client ?? (await storeDb(storeId));
+  const orders = await db.order.findMany({
     where: { storeId, customerId: userId, status: 'delivered' },
     select: { shippingAddress: true },
     orderBy: { createdAt: 'desc' },
@@ -94,7 +98,7 @@ async function writeConsent(storeId: string, buyerKey: string, input: ConsentInp
   // another account's ownership and so make its erasure miss the row); only a proven grant by
   // another account rebinds the row. `undefined` = leave the column as it is.
   const owner: string | undefined = input.bindUserId;
-  await prisma.storeWhatsAppConsent.upsert({
+  const args = {
     where: { storeId_buyerKey: { storeId, buyerKey } },
     create: {
       storeId,
@@ -122,7 +126,16 @@ async function writeConsent(storeId: string, buyerKey: string, input: ConsentInp
           }
         : { granted: false, revokedAt: now, revokedSource: input.source }),
     },
-  });
+  } satisfies Parameters<typeof prisma.storeWhatsAppConsent.upsert>[0];
+  if ((await storeRepo(storeId)).backend === 'do') {
+    // A DO store's consent row lives on its Durable Object. The DO writer is not the Prisma client the database observer
+    // hangs off, so the write is announced here exactly like a D1-served write (services/platform/router.ts): no path changes
+    // consent without Ebda Chat hearing of it (consent-state.ts).
+    const result = await (await storeWriter(storeId)).storeWhatsAppConsent.upsert(args);
+    notifyModelWrite('StoreWhatsAppConsent', 'upsert', args, result);
+    return;
+  }
+  await prisma.storeWhatsAppConsent.upsert(args);
 }
 
 /**
@@ -180,7 +193,7 @@ export const WhatsAppConsentService = {
     buyerKey: string,
     input: ConsentInput
   ): Promise<{ granted: boolean }> {
-    await runInTenantContext(storeId, () => writeConsent(storeId, buyerKey, input));
+    await runInStoreTenantContext(storeId, () => writeConsent(storeId, buyerKey, input));
     return { granted: input.consent };
   },
 
@@ -202,8 +215,12 @@ export const WhatsAppConsentService = {
     // ONE tenant transaction: lock the account's consent, read the phone, check the proof, write. A
     // concurrent phone change (`updateProfile`) takes the same lock around its revoke + phone write, so
     // a grant can never land on a number that was just replaced.
-    return runInTenantContext(storeId, async () => {
-      await lockAccountConsent(userId);
+    // A store on its Durable Object has no Postgres transaction or advisory lock (NEON-ZERO): the bare store scope, and the
+    // DO serialises each write. Residual (Ruling NZ-WA-CONSENT-1 in the PR): a grant and a phone change of the same account on
+    // a DO store are no longer serialised by the lock; the phone change still revokes the old number after it lands.
+    const onDo = (await storeRepo(storeId)).backend === 'do';
+    return runInStoreTenantContext(storeId, async () => {
+      if (!onDo) await lockAccountConsent(userId);
       const cart = await (
         await storeDb(storeId)
       ).cart.findFirst({
@@ -230,7 +247,9 @@ export const WhatsAppConsentService = {
       if (!buyerKey) return { status: 'no_phone' as const };
       if (!proven) {
         if (input.consent) return { status: 'phone_unproven' as const };
-        const row = await prisma.storeWhatsAppConsent.findUnique({
+        const row = await (
+          await storeDb(storeId)
+        ).storeWhatsAppConsent.findUnique({
           where: { storeId_buyerKey: { storeId, buyerKey } },
           select: { userId: true },
         });
