@@ -504,6 +504,58 @@ function personalisationWrite(v: PersonalisationConfig | null | undefined) {
 /** Longest `sort=on_sale` row (a deals strip, not a catalogue page). */
 export const ON_SALE_MAX = 12;
 
+/**
+ * The `sort=on_sale` id order for a store on its Durable Object: the Postgres statement in `listPublic`, in TS over the DO
+ * rows. ON SALE = no variants and compare-at > price, or at least one ACTIVE variant with its own compare-at > its own
+ * price. Biggest relative drop first, then id. Filters (active, not deleted, public audience, category, ids) apply BEFORE
+ * the limit, exactly like the statement. `categoryId: null` = an unknown category slug (no products).
+ * Cost: one indexed read of the store's active public products (+ their variants) on the store's own DO, cold path only
+ * (the route caches the row 120 s under `public:products:<storeId>:`).
+ */
+async function onSaleIdsFromDo(
+  storeId: string,
+  opts: { categoryId?: string | null; ids?: string[]; limit: number }
+): Promise<string[]> {
+  if (opts.categoryId === null) return [];
+  const where: Prisma.ProductWhereInput = {
+    storeId,
+    status: 'active',
+    deletedAt: null,
+    audience: 'public',
+  };
+  if (opts.ids) where.id = { in: opts.ids };
+  if (opts.categoryId) where.categories = { some: { categoryId: opts.categoryId } };
+  const rows = await (
+    await storeDb(storeId)
+  ).product.findMany({
+    where,
+    select: {
+      id: true,
+      price: true,
+      compareAtPrice: true,
+      variants: { select: { price: true, compareAtPrice: true, isActive: true } },
+    },
+  });
+  const drop = (price: unknown, compareAt: unknown): number => {
+    const p = Number(price);
+    const c = compareAt == null ? NaN : Number(compareAt);
+    return Number.isFinite(c) && Number.isFinite(p) && c > p ? (c - p) / c : 0;
+  };
+  const ranked: Array<{ id: string; score: number }> = [];
+  for (const r of rows) {
+    const variants = r.variants ?? [];
+    const own = variants.length === 0 ? drop(r.price, r.compareAtPrice) : 0;
+    const best = variants.reduce(
+      (m, v) => (v.isActive ? Math.max(m, drop(v.price, v.compareAtPrice)) : m),
+      0
+    );
+    const score = Math.max(own, best);
+    if (score > 0) ranked.push({ id: r.id, score });
+  }
+  ranked.sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return ranked.slice(0, opts.limit).map(r => r.id);
+}
+
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
     const { status, category, search, featured, ids, withSalesQuantity } = options;
@@ -1859,43 +1911,53 @@ export class ProductService {
     let onSaleOrder: string[] | undefined;
     if (sort === 'on_sale') {
       const safeIds = ids?.slice(0, 50).filter(i => typeof i === 'string' && i.length > 0);
-      const categorySql = category
-        ? resolvedCategoryId
-          ? Prisma.sql`EXISTS (SELECT 1 FROM product_categories pc
+      if ((await storeRepo(storeId)).backend === 'do') {
+        // A store on its Durable Object has no Postgres (NEON-ZERO, Ruling NZ-D23): the raw statement below threw
+        // POSTGRES_REMOVED on every deals row (P1 2026-11-09). The same rule, filters and order, read from the DO.
+        onSaleOrder = await onSaleIdsFromDo(storeId, {
+          categoryId: category ? (resolvedCategoryId ?? null) : undefined,
+          ids: safeIds && safeIds.length > 0 ? safeIds : undefined,
+          limit,
+        });
+      } else {
+        const categorySql = category
+          ? resolvedCategoryId
+            ? Prisma.sql`EXISTS (SELECT 1 FROM product_categories pc
                                 WHERE pc.product_id = p.id AND pc.category_id = ${resolvedCategoryId})`
-          : Prisma.sql`FALSE` // an unknown category slug has no products
-        : Prisma.sql`TRUE`;
-      const idsSql =
-        safeIds && safeIds.length > 0
-          ? Prisma.sql`p.id = ANY(${safeIds}::text[])`
+            : Prisma.sql`FALSE` // an unknown category slug has no products
           : Prisma.sql`TRUE`;
-      const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT p.id
-          FROM products p
-         WHERE p.store_id = ${storeId}
-           AND p.status = 'active'
-           AND p.deleted_at IS NULL
-           AND p.audience = 'public'
-           AND ${categorySql}
-           AND ${idsSql}
-           AND (
-             (NOT EXISTS (SELECT 1 FROM product_variants v0 WHERE v0.product_id = p.id)
-               AND p.compare_at_price > p.price)
-             OR EXISTS (SELECT 1 FROM product_variants v1
-                         WHERE v1.product_id = p.id AND v1.is_active
-                           AND v1.compare_at_price > v1.price)
-           )
-         ORDER BY GREATEST(
-                    CASE WHEN NOT EXISTS (SELECT 1 FROM product_variants v2 WHERE v2.product_id = p.id)
-                              AND p.compare_at_price > p.price
-                         THEN (p.compare_at_price - p.price)::float8 / p.compare_at_price ELSE 0 END,
-                    COALESCE((SELECT MAX((v3.compare_at_price - v3.price)::float8 / v3.compare_at_price)
-                                FROM product_variants v3
-                               WHERE v3.product_id = p.id AND v3.is_active
-                                 AND v3.compare_at_price > v3.price), 0)
-                  ) DESC, p.id
-         LIMIT ${limit}`;
-      onSaleOrder = rows.map(r => r.id);
+        const idsSql =
+          safeIds && safeIds.length > 0
+            ? Prisma.sql`p.id = ANY(${safeIds}::text[])`
+            : Prisma.sql`TRUE`;
+        const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT p.id
+            FROM products p
+           WHERE p.store_id = ${storeId}
+             AND p.status = 'active'
+             AND p.deleted_at IS NULL
+             AND p.audience = 'public'
+             AND ${categorySql}
+             AND ${idsSql}
+             AND (
+               (NOT EXISTS (SELECT 1 FROM product_variants v0 WHERE v0.product_id = p.id)
+                 AND p.compare_at_price > p.price)
+               OR EXISTS (SELECT 1 FROM product_variants v1
+                           WHERE v1.product_id = p.id AND v1.is_active
+                             AND v1.compare_at_price > v1.price)
+             )
+           ORDER BY GREATEST(
+                      CASE WHEN NOT EXISTS (SELECT 1 FROM product_variants v2 WHERE v2.product_id = p.id)
+                                AND p.compare_at_price > p.price
+                           THEN (p.compare_at_price - p.price)::float8 / p.compare_at_price ELSE 0 END,
+                      COALESCE((SELECT MAX((v3.compare_at_price - v3.price)::float8 / v3.compare_at_price)
+                                  FROM product_variants v3
+                                 WHERE v3.product_id = p.id AND v3.is_active
+                                   AND v3.compare_at_price > v3.price), 0)
+                    ) DESC, p.id
+           LIMIT ${limit}`;
+        onSaleOrder = rows.map(r => r.id);
+      }
       where.id = { in: onSaleOrder };
     }
 

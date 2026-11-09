@@ -32,12 +32,12 @@ describe('smsSegments', () => {
 
 describe('promotional SMS length budget (issue 2426)', () => {
   // The appended text the dispatcher adds, at its fixed shape: label, a
-  // platform-path base and a 45-char token.
+  // platform-path base and a 68-char v3 token (consent id, store id, MAC).
   const base = 'https://ebda.app/some-store-slug';
-  const suffix = ` Stop offers: ${base}/sms-unsubscribe?t=${'x'.repeat(22)}.${'y'.repeat(22)}`;
+  const suffix = ` Stop offers: ${base}/sms-unsubscribe?t=${'x'.repeat(22)}.${'s'.repeat(22)}.${'y'.repeat(22)}`;
 
-  it('the opt-out suffix costs 78 characters plus the storefront base', () => {
-    expect(suffix.length).toBe(78 + base.length);
+  it('the opt-out suffix costs 101 characters plus the storefront base', () => {
+    expect(suffix.length).toBe(101 + base.length);
   });
 
   it.each([

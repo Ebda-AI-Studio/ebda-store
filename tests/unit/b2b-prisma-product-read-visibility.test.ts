@@ -63,9 +63,9 @@ const ALLOW: Record<string, { count: number; reason: string }> = {
       'merchant manual order (authenticated admin surface): the merchant may sell wholesale-only products; createOnDo: lead time (leadTimeDays only) of the ids of cart lines the create gate already refused if wholesale-only (Ruling CF-FINAL-1)',
   },
   'services/product.service.ts :: product.findMany': {
-    count: 7,
+    count: 8,
     reason:
-      'list + bulkUpdate (merchant) and listPublic x4 + advancedSearch (storefront: their `where` is built with audience, covered by b2b-storefront-visibility). The hybrid-ranked listPublic path adds two: an id-only read with the audited `where` (audience included) and the page read by ids that read already filtered, so a wholesale-only id can never reach it',
+      "list + bulkUpdate (merchant) and listPublic x4 + advancedSearch (storefront: their `where` is built with audience, covered by b2b-storefront-visibility). The hybrid-ranked listPublic path adds two: an id-only read with the audited `where` (audience included) and the page read by ids that read already filtered, so a wholesale-only id can never reach it. onSaleIdsFromDo (the DO twin of the sort=on_sale statement, P1 2026-11-09) adds one whose `where` carries `audience: 'public'` literally",
   },
   'services/product.service.ts :: product.count': {
     count: 4,

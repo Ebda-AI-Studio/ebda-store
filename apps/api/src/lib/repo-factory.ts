@@ -158,6 +158,9 @@ export type WritableModel =
   | 'productModel'
   | 'productModelBinding'
   | 'storeWhatsAppLink'
+  // marketing consents a shopper grants / withdraws on the storefront (NEON-ZERO class sweep, 2026-11-09)
+  | 'storeWhatsAppConsent'
+  | 'smsMarketingConsent'
   | 'goldRateSettings'
   | 'warehouse'
   | 'affiliateConfig'
