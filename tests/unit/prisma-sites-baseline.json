@@ -48,7 +48,7 @@
   "services/answer-engine/gsc-dashboard.service.ts": 1,
   "services/answer-engine/gsc-ingest.service.ts": 1,
   "services/answer-engine/registry.ts": 1,
-  "services/auth.service.ts": 15,
+  "services/auth.service.ts": 14,
   "services/barcode-scan.service.ts": 20,
   "services/barcode.service.ts": 2,
   "services/billing/account.service.ts": 6,

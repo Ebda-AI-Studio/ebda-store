@@ -20,3 +20,11 @@ subscriber without awaiting, so all N recipients missed. The cache now holds the
 asserts ONE store read for 25 concurrent recipients and fails against the value cache. Residual: for up to 120s after a store changes its custom
 domain, new opt-out links use the old domain. Cost if wrong: Arabic templates (UCS-2) would cost
 3–4 segments if a locale switch is ever added. That PR must re-run this budget against the Arabic text.
+
+**Amended 2026-11-09 (NEON-ZERO consent residue):** new links carry a v3 token of 68 characters (consent id, store id, MAC), so the
+appended text costs 101 characters plus the base (was 78). Reason: the unsubscribe endpoint read the consent row through a
+cross-store Postgres lookup (`getSmsConsentById`) that a Durable Object store does not have; the store id in the link, covered by
+the MAC, lets it read that store's Durable Object. `tests/unit/sms-segments.test.ts` still pins two segments for every English
+promotional template. Legacy 45-character v2 links still verify; they resolve through Postgres only, so on a Worker without
+Postgres an old v2 link answers INVALID_TOKEN (Cost if wrong: a guest holding a pre-2026-11-09 link must reply STOP or use the
+account page; no promotional SMS had been sent from a DO store before, so none is expected in an inbox).

@@ -54,7 +54,7 @@ import { SmsConsentService } from '@api/services/sms-consent.service';
 import { AuthService } from '@api/services/auth.service';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
-import { verifySmsOptOutToken, SMS_OPT_OUT_TOKEN_LENGTH } from '@api/lib/sms-consent';
+import { verifySmsOptOutToken, SMS_OPT_OUT_TOKEN_V3_LENGTH } from '@api/lib/sms-consent';
 import { storefrontOrigin } from '@ebda/shared';
 import { cartSessionId } from '../helpers/bundle-fixtures';
 
@@ -198,7 +198,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     const m = text.match(/\/sms-unsubscribe\?t=([A-Za-z0-9_.-]+)/);
     expect(m).not.toBeNull();
     // Issue 2426: the fixed-size suffix, on the platform-path base.
-    expect(m![1]).toHaveLength(SMS_OPT_OUT_TOKEN_LENGTH);
+    expect(m![1]).toHaveLength(SMS_OPT_OUT_TOKEN_V3_LENGTH);
     const slug = (await withRlsBypass(tx =>
       tx.store.findUnique({ where: { id: storeId }, select: { slug: true } })
     ))!.slug;

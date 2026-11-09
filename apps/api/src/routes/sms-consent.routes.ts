@@ -1,12 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { customerRow, customerRows } from '../lib/customer-directory';
 import { z } from 'zod/v3';
-import { runInTenantContext, withUser } from '@ebda/database';
+import { withUser } from '@ebda/database';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { publicLimiter, writeLimiter } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
-import { verifySmsOptOutToken } from '../lib/sms-consent';
+import { parseSmsOptOutToken } from '../lib/sms-consent';
 import { getSmsConsentById } from '../lib/definer';
 import { maskPhone } from '../lib/pii-mask';
 import { SmsConsentService } from '../services/sms-consent.service';
@@ -163,10 +164,16 @@ accountRouter.put(
 /** The consent row a token names (the store is on the row, not the token). */
 async function consentFromToken(req: Request) {
   const raw = typeof req.query.t === 'string' ? req.query.t : (req.body as { t?: unknown })?.t;
-  const consentId = verifySmsOptOutToken(raw);
-  if (!consentId) return null;
-  // A definer: the token names a consent row and the store is on the row.
-  return getSmsConsentById(consentId);
+  const parsed = parseSmsOptOutToken(raw);
+  if (!parsed) return null;
+  // v3 (every link sent since NEON-ZERO): the store id is in the MAC'd token, so the row is read from that store's own backend
+  // (its Durable Object; there is no cross-store id lookup there).
+  if (parsed.storeId)
+    return SmsConsentService.lookupForUnsubscribe(parsed.storeId, parsed.consentId);
+  // Legacy v2: a definer, the token names a consent row and the store is on the row. Postgres only; a Worker without it
+  // cannot resolve the store, so the link is answered as invalid (Ruling SMS-7 amendment) instead of a 500.
+  if (postgresRemovedOnThisWorker()) return null;
+  return getSmsConsentById(parsed.consentId);
 }
 
 publicRouter.get(
@@ -205,7 +212,7 @@ publicRouter.post(
         res.status(400).json({ success: false, error: { code: 'INVALID_TOKEN' } });
         return;
       }
-      await runInTenantContext(row.storeId, () =>
+      await runInStoreTenantContext(row.storeId, () =>
         SmsConsentService.revoke(row.storeId, { phone: row.phone }, 'unsubscribe')
       );
       logger.info({ storeId: row.storeId, consentId: row.id }, '[SMS-CONSENT] unsubscribed');

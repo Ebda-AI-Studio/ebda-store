@@ -159,6 +159,39 @@ export class SmsConsentService {
   }
 
   /**
+   * The consent row an unsubscribe link (v3 token, store id inside) names, read from THAT store's own backend. Null when the
+   * store has no such row (a forged or re-paired store segment finds nothing: consent ids are random uuids).
+   */
+  static async lookupForUnsubscribe(
+    storeId: string,
+    consentId: string
+  ): Promise<{
+    id: string;
+    storeId: string;
+    phone: string;
+    granted: boolean;
+    store: { name: string; nameAr: string | null };
+  } | null> {
+    const db = await storeDb(storeId);
+    const row = await db.smsMarketingConsent.findFirst({
+      where: { id: consentId, storeId },
+      select: { id: true, phone: true, granted: true },
+    });
+    if (!row) return null;
+    const store = await db.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, nameAr: true },
+    });
+    return {
+      id: row.id,
+      storeId,
+      phone: row.phone,
+      granted: row.granted,
+      store: { name: store?.name ?? '', nameAr: store?.nameAr ?? null },
+    };
+  }
+
+  /**
    * THE promotional-SMS gate's read: the granted consent row for this phone
    * in this store, or null. Background callers (abandoned-cart cron,
    * back-in-stock fan-out) have no tenant GUC, so this is a trusted,
