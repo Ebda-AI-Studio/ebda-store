@@ -48,7 +48,7 @@ export interface LoyaltyStats {
 }
 
 export const TIER_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
-  bronze: { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'bg-amber-500' },
+  bronze: { bg: 'bg-warning/10', text: 'text-warning-ink', icon: 'bg-warning' },
   silver: { bg: 'bg-muted', text: 'text-foreground', icon: 'bg-muted-foreground' },
   gold: { bg: 'bg-warning/10', text: 'text-warning-ink', icon: 'bg-warning' },
   platinum: { bg: 'bg-info/10', text: 'text-info-ink', icon: 'bg-info' },

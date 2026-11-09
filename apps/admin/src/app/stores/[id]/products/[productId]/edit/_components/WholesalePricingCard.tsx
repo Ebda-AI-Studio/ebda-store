@@ -14,6 +14,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { minorToDecimalString, type TierInput } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { wholesalePlanName } from '@/lib/plan-labels';
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../../../lib/api';
 import { useFeatures } from '../../../../../../../hooks/useFeatures';
 import { checkTierDraft, type DraftProblem } from './tier-draft';
@@ -48,6 +50,7 @@ interface Props {
 export function WholesalePricingCard(props: Props) {
   const { storeId, productId, priceMinor, costPriceMinor } = props;
   const t = useT('wholesale.pricing');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const { isEnabled, isLoading } = useFeatures();
   const entitled = !isLoading && isEnabled('b2b.wholesale');
 
@@ -186,7 +189,7 @@ export function WholesalePricingCard(props: Props) {
 
       {!entitled && !isLoading ? (
         <div role="note" className="mb-4 rounded-md border bg-muted px-3 py-2 text-sm">
-          {t('upgrade')}{' '}
+          {t('upgrade', { plan: wholesalePlanName(locale) })}{' '}
           <Link href={`/stores/${storeId}/billing`} className="font-medium text-primary underline">
             {t('upgradeLink')}
           </Link>

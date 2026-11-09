@@ -12,6 +12,7 @@ import { useCart } from '../../../contexts/CartContext';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import ResendVerification from '../../../components/ResendVerification';
 import {
   isPasskeyCancel,
   passkeyAutofillSupported,
@@ -42,6 +43,8 @@ export default function LoginClient() {
   const [canUsePasskey, setCanUsePasskey] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyError, setPasskeyError] = useState('');
+  // QA P2-8: the API named the account as not yet verified; offer the link again instead of a raw message.
+  const [unverified, setUnverified] = useState(false);
 
   const finishPasskeyLogin = async () => {
     await syncCartToBackend();
@@ -89,10 +92,20 @@ export default function LoginClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUnverified(false);
     await submit(async () => {
       const result = await api.login(formData.email, formData.password, store?.id);
 
       if (!result.success) {
+        if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
+          setUnverified(true);
+          throw new Error(
+            t(
+              'Your email is not verified yet. Open the link we sent you, or ask for a new one below.',
+              'بريدك لسه متأكدش. افتح الرابط اللي بعتناه ليك، أو اطلب رابط جديد من تحت.'
+            )
+          );
+        }
         throw new Error(result.error?.message || 'Failed to login');
       }
 
@@ -135,6 +148,12 @@ export default function LoginClient() {
                 className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink"
               >
                 {error}
+              </div>
+            )}
+
+            {unverified && (
+              <div className="mb-4">
+                <ResendVerification email={formData.email} />
               </div>
             )}
 

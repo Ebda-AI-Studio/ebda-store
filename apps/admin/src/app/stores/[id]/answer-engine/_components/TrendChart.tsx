@@ -40,7 +40,7 @@ export function TrendChart({ trend }: TrendChartProps) {
                 style={{ height: `${Math.max(height, 2)}%` }}
                 title={`${point.weekStart}: ${formatPercent(point.citedRate)} (${point.citedCount}/${point.totalChecks})`}
               />
-              <span className="text-[10px] text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
+              <span className="text-xs text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
                 {point.weekStart.slice(5)}
               </span>
             </div>

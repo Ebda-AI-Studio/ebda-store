@@ -428,11 +428,7 @@ export function Field({
     <div className="mb-1 flex items-center justify-between gap-2">
       <span className="text-xs font-semibold text-foreground">{label}</span>
       {overridden && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-[11px] text-primary hover:underline"
-        >
+        <button type="button" onClick={onReset} className="text-xs text-primary hover:underline">
           {t('resetViewport', { viewport: t(`viewport.${viewport}`) })}
         </button>
       )}
@@ -455,9 +451,7 @@ export function Field({
           <div className={def.localized ? 'grid grid-cols-1 gap-2 xl:grid-cols-2' : ''}>
             {keys.map(([key, dir, tag]) => (
               <label key={key} className="block">
-                {tag && (
-                  <span className="mb-0.5 block text-[11px] text-muted-foreground">{tag}</span>
-                )}
+                {tag && <span className="mb-0.5 block text-xs text-muted-foreground">{tag}</span>}
                 <Input
                   id={`${id}-${key}`}
                   dir={dir}
@@ -493,9 +487,7 @@ export function Field({
             placeholder={PATH_EXAMPLE}
             className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
           />
-          {bad && (
-            <span className="mt-1 block text-[11px] text-destructive-ink">{t('unsafeUrl')}</span>
-          )}
+          {bad && <span className="mt-1 block text-xs text-destructive-ink">{t('unsafeUrl')}</span>}
         </label>
       );
     }
@@ -689,7 +681,7 @@ function ImageField({
   const [open, setOpen] = useState(false);
   return (
     <div className="min-w-0">
-      {tag && <span className="mb-0.5 block text-[11px] text-muted-foreground">{tag}</span>}
+      {tag && <span className="mb-0.5 block text-xs text-muted-foreground">{tag}</span>}
       <div className="flex items-center gap-2">
         {value ? (
           <img

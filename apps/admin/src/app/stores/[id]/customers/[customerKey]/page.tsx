@@ -703,7 +703,7 @@ export default function CustomerDetailPage() {
                     className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive-ink"
                   >
                     {t('statusRefunded')} · {customer.refundedCount}
-                    <span className="text-[10px] text-destructive-ink">
+                    <span className="text-xs text-destructive-ink">
                       ({formatMajor(customer.totalRefunded)})
                     </span>
                   </span>

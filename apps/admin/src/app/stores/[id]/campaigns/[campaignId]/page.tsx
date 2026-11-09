@@ -101,7 +101,7 @@ interface FormState {
 const CAMPAIGN_STATUS_COLORS = {
   draft: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
   scheduled: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
-  sending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  sending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
   sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
   failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
@@ -111,7 +111,7 @@ const RECIPIENT_STATUS_COLORS = {
   queued: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
   sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
-  bounced: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  bounced: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
   unsubscribed: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 } as const;
 

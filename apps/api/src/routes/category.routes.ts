@@ -11,6 +11,7 @@ import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import { recordSlugRedirect } from '../services/slug-redirect.service';
 import logger from '../lib/logger';
+import { backfillDefaultCategoryNameAr } from '../lib/default-category-backfill';
 import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
@@ -192,6 +193,11 @@ router.get(
           },
         },
       });
+
+      // BE:F-5 / QA P2-5: lazy, idempotent repair of a pre-fix default category (no Arabic name).
+      if (await backfillDefaultCategoryNameAr(w, storeId, categories)) {
+        await invalidateCached(`public:categories:${storeId}`);
+      }
 
       res.json({
         success: true,

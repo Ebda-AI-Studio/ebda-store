@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { ZoneOverride, StoreTheme, ColorToken } from '@ebda/shared';
 import { ColorField } from './ColorField';
 import { useT } from '@/i18n/useT';
@@ -109,6 +109,8 @@ export function ZoneEditor({
 }: ZoneEditorProps) {
   const t = useT('zoneEditor');
   const hasValues = hasAnyValue(values);
+  // UX:C-3 - inline feedback instead of a native alert().
+  const [sizeRejected, setSizeRejected] = useState(false);
 
   // Build placeholder text for each field from the inherited zone values.
   const ph = (field: keyof ZoneOverride): string => {
@@ -117,6 +119,7 @@ export function ZoneEditor({
   };
 
   const handleSize = (field: 'fontSize' | 'letterSpacing' | 'lineHeight', raw: string) => {
+    if (field === 'fontSize') setSizeRejected(false);
     onChange({ [field]: normaliseSizeValue(raw) });
   };
 
@@ -204,12 +207,17 @@ export function ZoneEditor({
               const v = normaliseSizeValue(e.target.value);
               if (v && /text-\[/.test(v)) {
                 onChange({ fontSize: '' });
-                alert(t('arbitrarySizeNotAllowed'));
+                setSizeRejected(true);
               }
             }}
             placeholder={ph('fontSize') === t('inherit') ? t('fontSizeExample') : ph('fontSize')}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
+          {sizeRejected ? (
+            <span role="alert" className="whitespace-pre-line text-xs text-destructive-ink">
+              {t('arbitrarySizeNotAllowed')}
+            </span>
+          ) : null}
           <span className="text-xs text-muted-foreground/80">{t('fontSizeHint')}</span>
         </label>
 

@@ -180,7 +180,7 @@ export function PaymentLinkButton({
             type="button"
             onClick={() => setOpen(true)}
             disabled={disabled || isIssuing}
-            className="text-[11px] text-muted-foreground hover:text-foreground underline self-start"
+            className="text-xs text-muted-foreground hover:text-foreground underline self-start"
           >
             {t('issueNewLink')}
           </button>

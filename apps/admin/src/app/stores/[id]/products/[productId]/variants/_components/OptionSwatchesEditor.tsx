@@ -116,7 +116,7 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
                       }}
                     />
                     <div>
-                      <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground">
                         {t('colSwatchImage')}
                       </span>
                       <ImageUpload

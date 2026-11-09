@@ -48,14 +48,14 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
                   style={{ height: `${Math.max(clicksHeight, clicksHeight > 0 ? 2 : 0)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
+              <span className="text-xs text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
                 {point.date.slice(5)}
               </span>
             </div>
           );
         })}
       </div>
-      <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+      <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-2 rounded-sm bg-primary/20" /> {t('impressions')}
         </span>

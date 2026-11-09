@@ -15,6 +15,7 @@ import { LEGAL_DOC_TITLE, legalPolicyUrl, type LegalDocKey } from '@ebda/shared'
 import { STATIC_PLANS } from '../../components/billing/plans';
 import { isTrialPlanCode, storePlan, type PlanSelection } from '../../components/billing/types';
 import { storeSignupSlug } from '../../components/onboarding/signup-slug';
+import { planLabel, TRIAL_PLAN_CODE } from '@/lib/plan-labels';
 
 /** Every document the API records at signup is shown and linked here (LEGAL_DOC_KEYS, reading order). */
 const SIGNUP_LEGAL_DOCS: readonly LegalDocKey[] = [
@@ -201,6 +202,7 @@ export default function SignupPage() {
           {tPlan('chip', {
             plan: locale === 'ar' ? selectedPlanOption.nameAr : selectedPlanOption.nameEn,
             interval: tPlan(selectedPlan.interval),
+            trialPlan: planLabel(TRIAL_PLAN_CODE, locale),
           })}
         </p>
       )}

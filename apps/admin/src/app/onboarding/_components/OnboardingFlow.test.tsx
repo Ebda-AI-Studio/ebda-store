@@ -561,7 +561,7 @@ describe('onboarding error and navigation regressions', () => {
     );
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
-      'onboarding.flow.verifyGate.sendFailed'
+      'onboarding.flow.verifyGate.rateLimited'
     );
     expect(screen.queryByText('onboarding.flow.verifyGate.resent')).toBeNull();
   });

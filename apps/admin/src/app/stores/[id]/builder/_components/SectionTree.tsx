@@ -332,7 +332,7 @@ function Group({
   };
   return (
     <section aria-label={title} className="mb-4" data-testid={`tree-group-${list}`}>
-      <h2 className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

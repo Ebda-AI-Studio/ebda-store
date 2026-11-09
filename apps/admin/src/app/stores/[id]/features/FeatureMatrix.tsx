@@ -93,9 +93,8 @@ function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
       label: t('badges.grantedByOverride'),
     },
     override_off: {
-      color:
-        'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
-      dot: 'bg-amber-500',
+      color: 'bg-warning/10 text-warning-ink border-warning/40',
+      dot: 'bg-warning',
       label: t('badges.revokedByOverride'),
     },
     baseline_off: {

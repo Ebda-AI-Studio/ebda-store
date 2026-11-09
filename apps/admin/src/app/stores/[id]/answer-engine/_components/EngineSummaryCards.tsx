@@ -22,7 +22,7 @@ function EngineCard({ engine }: { engine: AnswerEngineSummaryEngine }) {
       </p>
       {engine.groundingUnavailable ? (
         <p
-          className="mt-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 px-2.5 py-1.5 text-xs leading-snug text-amber-800 dark:text-amber-400"
+          className="mt-3 rounded-lg bg-warning/10 border border-warning/40 px-2.5 py-1.5 text-xs leading-snug text-warning-ink"
           dir="auto"
         >
           {t('groundingUnavailable')}
@@ -30,7 +30,7 @@ function EngineCard({ engine }: { engine: AnswerEngineSummaryEngine }) {
       ) : (
         engine.groundedCaveat && (
           <p
-            className="mt-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 px-2.5 py-1.5 text-xs leading-snug text-amber-800 dark:text-amber-400"
+            className="mt-3 rounded-lg bg-warning/10 border border-warning/40 px-2.5 py-1.5 text-xs leading-snug text-warning-ink"
             dir="auto"
           >
             {t('groundedCaveat')}

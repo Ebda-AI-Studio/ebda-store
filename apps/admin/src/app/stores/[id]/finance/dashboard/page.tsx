@@ -124,7 +124,7 @@ export default function FinanceDashboardPage() {
         }
       })
       .catch(() => {
-        if (!stale) setDashboardErr('Failed to load finance dashboard');
+        if (!stale) setDashboardErr(t('loadFailedShort'));
       });
 
     // Sales stats from the canonical analytics endpoint. This is the same

@@ -8,6 +8,7 @@ import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet } from '../../../../lib/api';
+import { DataTable } from '../../../../components/mobile/DataTable';
 import { formatDate, formatPrice } from '../../../../lib/format';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
@@ -159,54 +160,59 @@ export default function WalletPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-muted/20">
-                    <tr>
-                      <th className="px-4 py-2 text-start text-xs font-medium text-muted-foreground">
-                        {t('colCustomer')}
-                      </th>
-                      <th className="hidden px-4 py-2 text-start text-xs font-medium text-muted-foreground md:table-cell">
-                        {t('colContact')}
-                      </th>
-                      <th className="px-4 py-2 text-end text-xs font-medium text-muted-foreground">
-                        {t('colBalance')}
-                      </th>
-                      <th className="hidden px-4 py-2 text-end text-xs font-medium text-muted-foreground sm:table-cell">
-                        {t('colUpdated')}
-                      </th>
-                      <th className="px-4 py-2" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {rows.map(row => (
-                      <tr key={row.id}>
-                        <td className="px-4 py-2 font-medium text-foreground">
+                <DataTable
+                  ariaLabel={t('colCustomer')}
+                  rows={rows}
+                  rowKey={row => row.id}
+                  columns={[
+                    {
+                      header: t('colCustomer'),
+                      primaryOnMobile: true,
+                      cell: row => (
+                        <span className="font-medium text-foreground">
                           {`${row.customer.firstName} ${row.customer.lastName}`.trim() || '—'}
-                        </td>
-                        <td
-                          className="hidden px-4 py-2 text-muted-foreground md:table-cell"
-                          dir="ltr"
-                        >
+                        </span>
+                      ),
+                    },
+                    {
+                      header: t('colContact'),
+                      cell: row => (
+                        <span className="text-muted-foreground" dir="ltr">
                           {row.customer.phone || row.customer.email || '—'}
-                        </td>
-                        <td className="px-4 py-2 text-end font-semibold text-foreground" dir="ltr">
+                        </span>
+                      ),
+                    },
+                    {
+                      header: t('colBalance'),
+                      alignEnd: true,
+                      cell: row => (
+                        <span className="font-semibold text-foreground" dir="ltr">
                           {money(row.balance)}
-                        </td>
-                        <td className="hidden px-4 py-2 text-end text-muted-foreground sm:table-cell">
-                          {formatDate(row.updatedAt)}
-                        </td>
-                        <td className="px-4 py-2 text-end">
-                          <Link
-                            href={`/stores/${storeId}/customers/${encodeURIComponent(row.customerId)}`}
-                            className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-                          >
-                            {t('view')}
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </span>
+                      ),
+                    },
+                    {
+                      header: t('colUpdated'),
+                      alignEnd: true,
+                      cell: row => (
+                        <span className="text-muted-foreground">{formatDate(row.updatedAt)}</span>
+                      ),
+                    },
+                    {
+                      header: '',
+                      mobileActions: true,
+                      alignEnd: true,
+                      cell: row => (
+                        <Link
+                          href={`/stores/${storeId}/customers/${encodeURIComponent(row.customerId)}`}
+                          className="inline-flex min-h-11 items-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                        >
+                          {t('view')}
+                        </Link>
+                      ),
+                    },
+                  ]}
+                />
                 {data.nextCursor && (
                   <div className="border-t p-3 text-center">
                     <Button

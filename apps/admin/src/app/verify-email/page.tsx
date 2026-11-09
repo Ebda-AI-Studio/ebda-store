@@ -14,7 +14,7 @@ type Phase =
   | { kind: 'form' }
   | { kind: 'verifying' }
   | { kind: 'success' }
-  | { kind: 'error'; reason: 'invalid' | 'expired' | 'missing' | 'generic' };
+  | { kind: 'error'; reason: 'invalid' | 'expired' | 'missing' | 'generic' | 'rateLimited' };
 
 export default function VerifyEmailPage() {
   const t = useT('onboarding.verify');
@@ -27,6 +27,7 @@ export default function VerifyEmailPage() {
   const [wrongPassword, setWrongPassword] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [resendError, setResendError] = useState<'rateLimited' | 'generic' | null>(null);
   // The token is single-use: React strict mode runs effects twice in dev, and
   // the second POST would answer "already used" over the first one's success.
   const started = useRef(false);
@@ -65,7 +66,7 @@ export default function VerifyEmailPage() {
       } else
         setPhase({
           kind: 'error',
-          reason: err instanceof AccountsError && err.status === 429 ? 'generic' : 'invalid',
+          reason: err instanceof AccountsError && err.status === 429 ? 'rateLimited' : 'invalid',
         });
     }
   }
@@ -79,9 +80,13 @@ export default function VerifyEmailPage() {
     if (!email.trim()) return;
     setResending(true);
     setResent(false);
-    await apiPost('/api/v1/auth/merchant/resend-verification', { email: email.trim() });
+    setResendError(null);
+    const { error } = await apiPost('/api/v1/auth/merchant/resend-verification', {
+      email: email.trim(),
+    });
     setResending(false);
-    setResent(true);
+    setResendError(error ? (error.status === 429 ? 'rateLimited' : 'generic') : null);
+    setResent(!error);
   }
 
   if (phase.kind === 'form') {
@@ -146,6 +151,11 @@ export default function VerifyEmailPage() {
         <Button type="submit" className="w-full" disabled={resending || !email.trim()}>
           {resending ? t('resending') : t('resend')}
         </Button>
+        {resendError && (
+          <p role="alert" className="text-center text-sm text-destructive-ink">
+            {t(resendError)}
+          </p>
+        )}
         {resent && (
           <p role="status" className="text-center text-sm text-muted-foreground">
             {t('resent')}

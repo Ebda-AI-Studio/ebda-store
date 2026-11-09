@@ -26,6 +26,8 @@ export interface HubTab {
   badgeKey?: 'wholesalePending';
   /** Draws a thin divider before this tab so a long strip reads as groups (audit 2.4 / M-2). */
   groupStart?: boolean;
+  /** A caption next to that divider ("للمحاسب"), so the group says who it is for. Only read with `groupStart`. */
+  groupLabel?: string;
 }
 
 interface Props {
@@ -76,6 +78,11 @@ export function HubTabs({ items }: Props) {
           <Fragment key={t.href}>
             {t.groupStart ? (
               <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
+            ) : null}
+            {t.groupStart && t.groupLabel ? (
+              <span className="shrink-0 ps-1 pe-0.5 text-xs font-medium text-muted-foreground">
+                {t.groupLabel}
+              </span>
             ) : null}
             <Link
               ref={active === t.href ? activeRef : undefined}

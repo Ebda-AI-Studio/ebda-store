@@ -54,10 +54,10 @@ function StatusChip({ tone, label }: { tone: 'green' | 'gray' | 'amber'; label: 
     tone === 'green'
       ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
       : tone === 'amber'
-        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+        ? 'bg-warning/10 text-warning-ink border-warning/40'
         : 'bg-muted text-muted-ink border-border';
   const dot =
-    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-muted-foreground';
+    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-warning' : 'bg-muted-foreground';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${chip}`}
@@ -92,11 +92,11 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
           accepted without one. A merchant reading "no key issued" and
           concluding "so nothing can write" would be wrong. */}
       {status.openWrites && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-300" dir="auto">
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4">
+          <p className="text-sm font-semibold text-warning-ink" dir="auto">
             {t('hatch.title')}
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-400" dir="auto">
+          <p className="mt-1 text-xs leading-relaxed text-warning-ink" dir="auto">
             {t('hatch.body')}
           </p>
         </div>

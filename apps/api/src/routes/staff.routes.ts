@@ -472,6 +472,7 @@ router.get(
 router.delete(
   '/invites/:inviteId',
   authenticate,
+  requireMfaEnrolled, // BE:S-11
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),
@@ -506,6 +507,7 @@ router.delete(
 router.delete(
   '/:userId',
   authenticate,
+  requireMfaEnrolled, // BE:S-11
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),

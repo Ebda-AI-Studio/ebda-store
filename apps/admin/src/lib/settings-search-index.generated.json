@@ -790,8 +790,8 @@
     "kind": "page",
     "route": "/seo",
     "access": "owner",
-    "en": "SEO Settings",
-    "ar": "إعدادات SEO",
+    "en": "Search appearance",
+    "ar": "ظهور في جوجل",
     "synEn": "google search engine meta title description keywords",
     "synAr": "سيو جوجل محركات البحث عنوان وصف",
     "feature": "seo"
@@ -875,7 +875,7 @@
     "route": "/tax",
     "access": "owner",
     "en": "Tax & VAT",
-    "ar": "الضرائب وضريبة القيمة المضافة",
+    "ar": "الضريبة",
     "synEn": "vat tax rate invoice",
     "synAr": "ضريبة القيمة المضافة معدل"
   },
@@ -1266,7 +1266,7 @@
     "synEn": "turn on vat charge tax collect tax",
     "synAr": "تفعيل الضريبة تحصيل ضريبة القيمة المضافة",
     "pageEn": "Tax & VAT",
-    "pageAr": "الضرائب وضريبة القيمة المضافة"
+    "pageAr": "الضريبة"
   },
   {
     "id": "tax.included",
@@ -1278,7 +1278,7 @@
     "synEn": "prices include tax tax inclusive vat included",
     "synAr": "الاسعار تشمل الضريبة شامل الضريبة",
     "pageEn": "Tax & VAT",
-    "pageAr": "الضرائب وضريبة القيمة المضافة"
+    "pageAr": "الضريبة"
   },
   {
     "id": "tax.rates",
@@ -1290,7 +1290,7 @@
     "synEn": "vat rate 14% add tax rate percentage",
     "synAr": "معدل الضريبة نسبة 14 اضافة ضريبة",
     "pageEn": "Tax & VAT",
-    "pageAr": "الضرائب وضريبة القيمة المضافة"
+    "pageAr": "الضريبة"
   },
   {
     "id": "tax.time-zone",
@@ -1302,7 +1302,7 @@
     "synEn": "time zone timezone cairo clock",
     "synAr": "المنطقة الزمنية توقيت القاهرة",
     "pageEn": "Tax & VAT",
-    "pageAr": "الضرائب وضريبة القيمة المضافة"
+    "pageAr": "الضريبة"
   },
   {
     "id": "tax.eta",
@@ -1315,7 +1315,7 @@
     "synAr": "الايصال الالكتروني مصلحة الضرائب رقم الجهاز",
     "feature": "eta_ereceipt",
     "pageEn": "Tax & VAT",
-    "pageAr": "الضرائب وضريبة القيمة المضافة"
+    "pageAr": "الضريبة"
   },
   {
     "id": "pwa.app-name",
@@ -1377,8 +1377,8 @@
     "synEn": "page title google title browser tab title",
     "synAr": "عنوان الصفحة عنوان جوجل عنوان الميتا",
     "feature": "seo",
-    "pageEn": "SEO Settings",
-    "pageAr": "إعدادات SEO"
+    "pageEn": "Search appearance",
+    "pageAr": "ظهور في جوجل"
   },
   {
     "id": "seo.aeo",
@@ -1390,8 +1390,8 @@
     "synEn": "ai search chatgpt answer engine optimization description",
     "synAr": "محركات الذكاء الاصطناعي تحسين الاجابة وصف",
     "feature": "seo",
-    "pageEn": "SEO Settings",
-    "pageAr": "إعدادات SEO"
+    "pageEn": "Search appearance",
+    "pageAr": "ظهور في جوجل"
   },
   {
     "id": "seo.faqs",

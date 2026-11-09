@@ -1,3 +1,4 @@
+import { planLabel as soldPlanLabel } from '@/lib/plan-labels';
 import { cardLabel, fmtDate, type UiLocale } from './format';
 import type { BillingInfo } from './types';
 
@@ -26,7 +27,10 @@ export function noticeText(
     case 'unpaid':
       return { title: t('unpaidTitle'), body: t('unpaidBody') };
     case 'overStoreLimit':
-      return { title: t('overLimitTitle'), body: t('overLimitBody') };
+      return {
+        title: t('overLimitTitle'),
+        body: t('overLimitBody', { plan: soldPlanLabel('business', locale) }),
+      };
     case 'overdue':
       return {
         title: t('overdueTitle'),

@@ -101,3 +101,30 @@ describe('verify-email page', () => {
     }
   );
 });
+
+describe('verify-email page, throttled (UX:S-5)', () => {
+  it('a 429 on verify names the rate limit', async () => {
+    visit(LINK);
+    const { AccountsError } = await import('../../lib/accounts');
+    accountsFetch.mockRejectedValue(new AccountsError(429, 'THROTTLED', 'x'));
+    renderPage();
+    fireEvent.change(await screen.findByLabelText('onboarding.verify.password'), {
+      target: { value: 'Str0ng!Passw0rd' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.verify.verifyButton' }));
+    expect(await screen.findByText('onboarding.verify.rateLimited')).toBeTruthy();
+  });
+
+  it('a 429 on resend says so instead of claiming the link was sent', async () => {
+    visit('');
+    apiPost.mockResolvedValue({ error: { code: 'RATE_LIMITED', status: 429, message: 'x' } });
+    renderPage();
+    await screen.findByText('onboarding.verify.missing');
+    fireEvent.change(screen.getByLabelText('onboarding.verify.email'), {
+      target: { value: 'a@b.test' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.verify.resend' }));
+    expect(await screen.findByText('onboarding.verify.rateLimited')).toBeTruthy();
+    expect(screen.queryByText('onboarding.verify.resent')).toBeNull();
+  });
+});

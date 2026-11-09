@@ -291,7 +291,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                             {excerpt}
                           </p>
                         )}
-                        <p className="mt-1 text-[11px] text-muted-foreground">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           /{post.slug} ·{' '}
                           {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
                             undefined,

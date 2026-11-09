@@ -104,3 +104,27 @@ describe('M-4 12px text floor ratchet', () => {
     expect(over).toEqual([]);
   });
 });
+
+// ---------- R-1 ----------
+describe('R-1 no direction glyphs inside messages', () => {
+  it('ar.json and en.json carry no ← or → (use ArrowStart / ArrowEnd, or a "›" path separator)', () => {
+    const offenders: string[] = [];
+    for (const lang of ['ar', 'en']) {
+      const msgs = JSON.parse(
+        readFileSync(join(SRC, `i18n/messages/${lang}.json`), 'utf8')
+      ) as Messages;
+      for (const [k, v] of Object.entries(flatten(msgs)))
+        if (/[←→]/.test(v)) offenders.push(`${lang}:${k}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ---------- C-7 ----------
+describe('C-7 no amber utility classes', () => {
+  it('warnings use the --warning brass tokens (bg-warning/10, text-warning-ink, border-warning/40)', () => {
+    const AMBER = /\b(?:bg|text|border|ring|from|to|via|fill|stroke|divide)-amber-\d/;
+    const offenders = files.filter(f => AMBER.test(f.src)).map(f => f.rel);
+    expect(offenders).toEqual([]);
+  });
+});

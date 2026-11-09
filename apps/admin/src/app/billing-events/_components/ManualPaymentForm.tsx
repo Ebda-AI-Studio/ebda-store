@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Button, Input, Modal, Select } from '@ebda/ui';
 import { minorToDecimalString, tryToMinor } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';
+import { useLocale } from 'next-intl';
+import { planLabel } from '@/lib/plan-labels';
 import { useT } from '../../../i18n/useT';
 
 export interface ManualPaymentPrefill {
@@ -63,7 +65,7 @@ export function ManualPaymentForm({
   onDone: (outcome: 'recorded' | 'duplicate') => void;
 }) {
   const t = useT('billingEvents.manual');
-  const tPlans = useT('billingEvents.plans');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const tCommon = useT('common');
   const today = dayString(new Date());
   const initialPlan = (PLAN_CODES as readonly string[]).includes(prefill.planCode)
@@ -183,7 +185,7 @@ export function ManualPaymentForm({
             label={t('plan')}
             value={planCode}
             onChange={e => setPlanCode(e.target.value)}
-            options={PLAN_CODES.map(c => ({ value: c, label: tPlans(c) }))}
+            options={PLAN_CODES.map(c => ({ value: c, label: planLabel(c, locale) }))}
           />
           <Select
             label={t('interval')}

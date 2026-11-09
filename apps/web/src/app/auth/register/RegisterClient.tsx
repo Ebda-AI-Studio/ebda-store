@@ -11,6 +11,7 @@ import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { demoRefusalText } from '../../../lib/demo-refusal';
+import { PENDING_VERIFICATION_EMAIL_KEY } from '../../../components/ResendVerification';
 
 export default function RegisterClient() {
   const { isLoading, error, setError, submit } = useAuthFormSubmit();
@@ -72,6 +73,11 @@ export default function RegisterClient() {
         // (real registration) or a "someone tried to register with this email"
         // notice (existing account). Either way the next action is in their
         // inbox, not here.
+        try {
+          sessionStorage.setItem(PENDING_VERIFICATION_EMAIL_KEY, formData.email);
+        } catch {
+          /* storage blocked: check-email asks for the address instead */
+        }
         router.push(storeUrl('/auth/check-email'));
       },
       t('Failed to register', 'فشل إنشاء الحساب')

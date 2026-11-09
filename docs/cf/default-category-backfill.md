@@ -14,3 +14,7 @@ await w.category.updateMany({
 ```
 
 Only the untouched default row matches (a merchant who renamed it, or set an Arabic name, is left alone); idempotent.
+
+## Lazy repair (2026-11-09)
+
+No script run is needed. `GET /stores/:storeId/categories` (the merchant list) calls `backfillDefaultCategoryNameAr` (`apps/api/src/lib/default-category-backfill.ts`), which runs the `updateMany` above only when the list contains the untouched default row, patches the response in place and clears `public:categories:<storeId>`. Once repaired the read writes nothing. The storefront list stays read-only; it shows the Arabic name after the merchant's first visit to the categories page.

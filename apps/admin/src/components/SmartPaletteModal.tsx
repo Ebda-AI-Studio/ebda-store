@@ -25,6 +25,7 @@ import { ColorField } from './ColorField';
 import { SectionPreview } from './SectionPreview';
 import { apiPost } from '../lib/api';
 import { useT } from '../i18n/useT';
+import { useConfirm } from '../hooks/useConfirm';
 
 /**
  * Brand-color updates the parent should persist to StoreTheme on apply.
@@ -120,6 +121,7 @@ export function SmartPaletteModal({
   storeTemplate,
 }: SmartPaletteModalProps) {
   const t = useT('components.smartPalette');
+  const askConfirm = useConfirm();
 
   // Layer A: template-derived defaults (lowest priority)
   const templateSeeds = getTemplatePresets(storeTemplate);
@@ -541,9 +543,17 @@ export function SmartPaletteModal({
           </button>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (!palette) return;
-              if (!confirm(t('applyConfirm'))) return;
+              if (
+                !(await askConfirm({
+                  object: t('applyConfirmObject'),
+                  consequence: t('applyConfirm'),
+                  confirmLabel: t('applyConfirmLabel'),
+                  tone: 'default',
+                }))
+              )
+                return;
 
               // Build theme updates: only when the merchant entered a raw hex
               // (not a token ref). Convert hex → HSL triplet to match the

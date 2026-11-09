@@ -36,8 +36,8 @@ const VARIANT_CLASSES: Record<AlertVariant, string> = {
 
 /**
  * Shared banner used across admin for DNS instructions, status messages,
- * and similar callouts. Replaces a handful of inline `border-amber-200
- * bg-amber-50 text-amber-800` blocks with a semantic `warning` variant
+ * and similar callouts. Replaces a handful of inline `border-warning/40
+ * bg-warning/10 text-warning-ink` blocks with a semantic `warning` variant
  * so dark mode + theme overrides stay consistent.
  */
 export function Alert({

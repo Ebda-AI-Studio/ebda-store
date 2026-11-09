@@ -16,6 +16,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StatsGrid } from './_components/StatsGrid';
 import { NeedsAction } from './_components/NeedsAction';
+import { NextStepSlot } from './_components/NextStepSlot';
 import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
@@ -103,18 +104,19 @@ export default function StoreDetailPage() {
     >
       <NeedsAction storeId={store.id} />
 
-      <GoldRateBanner storeId={store.id} />
-
-      <SetupGuideCard
-        storeId={store.id}
-        storeUrl={getStoreHref(store)}
-        storeName={store.name}
-        locale={resolveDefaultLanguage(
-          (store.settings as { defaultLanguage?: string } | undefined)?.defaultLanguage
-        )}
-      />
-
-      <OrderAlertsPromptCard storeId={store.id} />
+      {/* UX:D-5: one next step at a time: setup guide, else the order-alerts prompt, else the stale gold rate. */}
+      <NextStepSlot>
+        <SetupGuideCard
+          storeId={store.id}
+          storeUrl={getStoreHref(store)}
+          storeName={store.name}
+          locale={resolveDefaultLanguage(
+            (store.settings as { defaultLanguage?: string } | undefined)?.defaultLanguage
+          )}
+        />
+        <OrderAlertsPromptCard storeId={store.id} />
+        <GoldRateBanner storeId={store.id} />
+      </NextStepSlot>
 
       <StatsGrid storeId={store.id} />
 
