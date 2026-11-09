@@ -1,3 +1,4 @@
+import { resolveDefaultLanguage } from '@ebda/shared';
 import { renewNonce } from './csp-nonce-renew';
 import {
   acceptsHtmlDocument,
@@ -85,6 +86,8 @@ export interface StoreVerdict {
   ok: boolean;
   /** The store id from the resolver (epoch key). */
   id?: string;
+  /** `settings.defaultLanguage` resolved (unset = the region default), for the edge locale redirect. */
+  defaultLanguage?: 'ar' | 'en';
 }
 export interface StoreEdgeDeps {
   allow: Set<string>;
@@ -369,11 +372,22 @@ export async function storeVerdict(
     if (res.ok) {
       const store = (
         (await res.json()) as {
-          data?: { store?: { id?: unknown; status?: unknown; isDemo?: unknown } };
+          data?: {
+            store?: {
+              id?: unknown;
+              status?: unknown;
+              isDemo?: unknown;
+              settings?: { defaultLanguage?: unknown } | null;
+            };
+          };
         }
       )?.data?.store;
       if (store?.status === 'active' && typeof store.id === 'string' && store.id)
-        v = { ok: true, id: store.id };
+        v = {
+          ok: true,
+          id: store.id,
+          defaultLanguage: resolveDefaultLanguage(store.settings?.defaultLanguage),
+        };
     }
   } catch {
     v = { ok: false };
