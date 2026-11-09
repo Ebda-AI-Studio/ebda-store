@@ -120,6 +120,24 @@ ol {
 }
 
 /* header */
+/* ONE source of truth for the sticky chrome. --sticky-h is the combined height of the pinned header: the studio bar,
+   plus the product bar under it on a product page. This CSS is the no-JS fallback (measured: 65px bar, 49px product
+   bar); NavBehavior then writes the real rendered height onto <html> and keeps it current across breakpoints, font
+   loading and wrapping. Everything that pins under the header, or must land under it (story, TOC, anchor targets),
+   reads it: never a per-element magic number. */
+:root {
+  --hdr-h: 65px;
+  --pbar-h: 49px;
+  --sticky-h: var(--hdr-h);
+}
+:root:has(.product-bar) {
+  --sticky-h: calc(var(--hdr-h) + var(--pbar-h));
+}
+/* every anchor target (a section, a heading, any #id) lands directly under the sticky chrome: deep links on load,
+   clicks, smooth scroll and keyboard focus all honour it */
+[id] {
+  scroll-margin-top: var(--sticky-h);
+}
 .site-header {
   overflow-x: clip; /* the closed mobile menu must not widen the page (audit UI-1: 379px on a 360px phone) */
   position: sticky;
@@ -674,7 +692,6 @@ html[lang='ar'] .hero h1 {
 /* sections */
 .section {
   padding-block: clamp(48px, 6vw, 84px);
-  scroll-margin-top: 72px;
 }
 .section h2 {
   font-size: clamp(2rem, 5.2vw, 3.4rem);
@@ -810,9 +827,9 @@ html[lang='ar'] .hero-sub {
   }
   .story-sticky {
     position: sticky;
-    top: 0;
-    height: 100svh;
-    padding-block: 72px 24px;
+    top: var(--sticky-h); /* pins UNDER the header (and product bar), never beneath it */
+    height: calc(100svh - var(--sticky-h));
+    padding-block: 24px;
     display: flex;
     align-items: flex-start;
     overflow: hidden;
@@ -934,7 +951,7 @@ html[lang='ar'] .story h2 {
 }
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   .story-phone {
-    --w: min(300px, 62vw, calc((100svh - 260px) / 2.07));
+    --w: min(300px, 62vw, calc((100svh - var(--sticky-h) - 195px) / 2.07));
     --in: clamp(0, calc(var(--p) / 0.14), 1);
     transform: translateY(calc((1 - var(--in)) * 70px + var(--p) * -12px))
       rotateX(calc((1 - var(--in)) * 10deg)) scale(calc(0.94 + 0.06 * var(--in)));
@@ -1873,8 +1890,8 @@ html[lang='ar'] .legal-head h1 {
   }
   .legal-toc {
     position: sticky;
-    top: 96px;
-    max-height: calc(100svh - 128px);
+    top: calc(var(--sticky-h) + 16px);
+    max-height: calc(100svh - var(--sticky-h) - 32px);
     overflow: auto;
   }
 }
@@ -1906,7 +1923,6 @@ html[lang='ar'] .legal-head h1 {
   max-width: 68ch;
 }
 .legal-doc section {
-  scroll-margin-top: 88px;
   margin-bottom: 40px;
 }
 .legal-doc h2 {
@@ -3289,7 +3305,7 @@ body:has(.studio-home) {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: calc(100svh - 65px);
+  min-height: calc(100svh - var(--sticky-h));
   display: grid;
   align-items: end;
 }

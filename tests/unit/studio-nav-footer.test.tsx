@@ -530,7 +530,7 @@ describe('the founding date (BRAND.company.foundedOn)', () => {
 });
 
 describe('services (BRAND.services): studio home and About render all seven, separate from the products', () => {
-  const ids = ['ai', 'software', 'marketing', 'photography', 'training', '3d', 'events'];
+  const ids = ['ai', 'software', 'design', 'homes', 'marketing', 'training', 'events'];
   it('BRAND holds the seven, benefit lines only (no prices)', () => {
     expect(BRAND.services.map(s => s.id)).toEqual(ids);
     for (const s of BRAND.services) {
@@ -550,6 +550,7 @@ describe('services (BRAND.services): studio home and About render all seven, sep
         for (const s of serviceInfo(lang)) {
           expect(html, `${name} ${s.id}`).toContain(s.name);
           expect(html, `${name} ${s.id}`).toContain(s.benefit);
+          for (const i of s.items) expect(html, `${name} ${s.id}/${i.id}`).toContain(i.name);
         }
       }
       expect(home).toContain('id="products"');
@@ -564,11 +565,20 @@ describe('services (BRAND.services): studio home and About render all seven, sep
         .filter(n => n['@id'] === 'https://ebda.app/#organization');
       expect(orgs.length).toBe(3);
       for (const org of orgs) {
-        expect(org.knowsAbout).toEqual(serviceInfo(lang).map(s => s.name));
+        expect(org.knowsAbout).toEqual(
+          serviceInfo(lang).flatMap(s => [s.name, ...s.items.map(i => i.name)])
+        );
         const offers = org.makesOffer as { itemOffered: { '@type': string; name: string } }[];
         expect(offers.map(o => o.itemOffered['@type'])).toEqual(Array(7).fill('Service'));
         expect(JSON.stringify(offers)).not.toMatch(/price/i);
       }
     });
   }
+});
+
+describe('office (BRAND.office): the studio has one office, so no "branch" wording', () => {
+  it('no فرع / فروع / branch in any office string', () => {
+    const text = Object.values(BRAND.office).join(' ');
+    expect(text).not.toMatch(/فرع|فروع|branch/i);
+  });
 });
