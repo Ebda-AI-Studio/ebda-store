@@ -179,7 +179,7 @@ async function call(
   const res = await e.API.fetch(BASE + route, {
     method,
     headers: {
-      'x-forwarded-for': freshIp(),
+      'cf-connecting-ip': freshIp(),
       ...headers,
       ...(method === 'GET' || method === 'DELETE' ? {} : { 'content-type': 'application/json' }),
     },
