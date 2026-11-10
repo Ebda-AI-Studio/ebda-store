@@ -7,11 +7,12 @@ import { revalidateRequestSchema } from '@ebda/shared';
  * merchant saves theme / layout / branding so the change appears on the
  * storefront within ~a second instead of waiting out the data-cache TTL.
  *
- * The store-resolver fetches are tagged `store-domain:<domain>` and
- * `store-slug:<slug>`; this route purges those tags via `revalidateTag`, which
- * invalidates Next's shared data cache across all instances. The per-instance
- * in-memory `storeCache` (resolver) has a short TTL so it can't hold a change
- * for more than a few seconds even on the instance that didn't serve this call.
+ * The Worker entry (sentry-worker-entry.ts) bumps the per-store purge EPOCHS in R2
+ * for these tags after this route accepts them; the store resolver's caches
+ * (store-resolve-cache.ts, Ruling RESOLVE-BULLETPROOF-1) and the edge HTML cache
+ * check those epochs before every serve. `revalidateTag` here is kept for the
+ * other tagged fetches, but note OpenNext's tagCache is the default "dummy", so it
+ * does not invalidate Next's data cache by itself.
  *
  * Auth: a shared `REVALIDATE_SECRET` (also set on the API). If the secret is
  * unset on this deployment, the route refuses (503) rather than purging

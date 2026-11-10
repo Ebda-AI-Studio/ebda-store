@@ -110,12 +110,10 @@ import { startSignupTrial } from './billing/trial';
  * product/category caches for the same store. Cheap relative to the cost
  * of serving stale settings to a customer mid-purchase.
  *
- * NOTE: on a domain CHANGE, only the CURRENT `domain` value is known here
- * (callers pass `updatedStore.domain`, i.e. the NEW domain post-write) —
- * the old domain's `public:store:resolve:<oldDomain>` entry is left to
- * expire on its own 120s TTL rather than being explicitly busted. Bounded
- * staleness, not unbounded; see `docs/audits/2026-07-12-scaling-cliff-reel.md`
- * finding #1.
+ * On a slug / domain CHANGE the caller passes the OLD values in `previous`;
+ * the old address's resolve key, CORS trust and storefront tags are purged
+ * here too (Ruling RESOLVE-BULLETPROOF-1; it used to wait out the 120s TTL,
+ * `docs/audits/2026-07-12-scaling-cliff-reel.md` finding #1).
  */
 export async function bustStoreCaches(
   storeId: string,
@@ -150,7 +148,24 @@ export async function bustStoreCaches(
   // `layout:<storeId>` is the tag on every storefront fetch of the page-builder
   // layout (`GET /public/stores/:id/layout`); without it a layout save could not
   // reach the Next data cache and stayed stale for the 60s revalidate window.
-  revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`] });
+  // The OLD address must stop resolving at once too (domain ownership is NEVER-stale, Ruling RESOLVE-BULLETPROOF-1):
+  // its API resolve key, its CORS trust and its storefront tags (the storefront resolve cache and edge HTML are
+  // epoch-invalidated per host). Before this, a removed/changed domain was purged only by the 120s TTL.
+  const oldSlug = previous.slug && previous.slug !== slug ? previous.slug : null;
+  const oldDomain = previous.domain && previous.domain !== domain ? previous.domain : null;
+  const previousTags: string[] = [];
+  if (oldSlug) {
+    await invalidateCached(`public:store:${oldSlug}`);
+    await invalidateCached(`public:store:resolve:${storeHost(oldSlug)}`);
+    bustCorsCache(storeHost(oldSlug));
+    previousTags.push(`store-slug:${oldSlug}`, `store-domain:${storeHost(oldSlug)}`);
+  }
+  if (oldDomain) {
+    await invalidateCached(`public:store:resolve:${oldDomain}`);
+    bustCorsCache(oldDomain);
+    previousTags.push(`store-domain:${oldDomain.toLowerCase().replace(/^www\./, '')}`);
+  }
+  revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`, ...previousTags] });
   await invalidateStoreDirectory(storeId, slug, domain, previous);
 }
 

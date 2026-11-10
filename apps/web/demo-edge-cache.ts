@@ -34,6 +34,7 @@
  * new, empty key space: no copy of an older build is ever read, stale window or not. No version id = no caching.
  */
 import { getLook } from '@ebda/shared';
+import { retryableUnavailable } from './resolve-unavailable-edge';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
 import { renewNonce } from './csp-nonce-renew';
 import { buildScopedKey } from './edge-build-id';
@@ -142,6 +143,11 @@ export async function isDemoStoreHost(
     const res = await fetcher(`${apiUrl}/public/store/resolve`, {
       headers: { 'x-store-domain': host },
     });
+    // Ruling RESOLVE-BULLETPROOF-1: a 429/5xx is "could not ask", not "not a demo": keep the last verdict.
+    if (known && !res.ok && res.status !== 404) {
+      demoVerdict.set(host, { demo: known.demo, until: now + 300_000 });
+      return known.demo;
+    }
     if (res.ok) {
       const store = (
         (await res.json()) as { data?: { store?: { isDemo?: unknown; status?: unknown } } }
@@ -149,6 +155,10 @@ export async function isDemoStoreHost(
       demo = store?.isDemo === true && store?.status === 'active';
     }
   } catch {
+    if (known) {
+      demoVerdict.set(host, { demo: known.demo, until: now + 300_000 });
+      return known.demo;
+    }
     demo = false;
   }
   demoVerdict.set(host, { demo, until: now + 300_000 });
@@ -201,11 +211,13 @@ type Origin = (request: Request) => Promise<Response>;
 export async function serveDemoEdge(
   request: Request,
   ctx: EdgeCtx,
-  origin: Origin,
+  render: Origin,
   isDemoHost: (host: string) => Promise<boolean>,
   build: string | null,
   cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
 ): Promise<Response> {
+  // Ruling RESOLVE-BULLETPROOF-1: a store-unresolvable render leaves as 503 + Retry-After, never 500 (and never stored).
+  const origin = (r: Request) => render(r).then(retryableUnavailable);
   const requestKey = build ? demoEdgeKey(request) : null;
   if (!requestKey || !build) return origin(request);
   const key = buildScopedKey(requestKey, build);

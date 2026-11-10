@@ -381,6 +381,11 @@ export async function storeVerdict(
     const res = await fetcher(`${apiUrl}/public/store/resolve`, {
       headers: { 'x-store-domain': host },
     });
+    // Ruling RESOLVE-BULLETPROOF-1: a 429/5xx is "could not ask", not "not a store": keep the last verdict.
+    if (known && !res.ok && res.status !== 404) {
+      verdicts.set(host, { v: known.v, until: now + 60_000 });
+      return known.v;
+    }
     if (res.ok) {
       const store = (
         (await res.json()) as {
@@ -402,6 +407,10 @@ export async function storeVerdict(
         };
     }
   } catch {
+    if (known) {
+      verdicts.set(host, { v: known.v, until: now + 60_000 });
+      return known.v;
+    }
     v = { ok: false };
   }
   verdicts.set(host, { v, until: now + 60_000 });

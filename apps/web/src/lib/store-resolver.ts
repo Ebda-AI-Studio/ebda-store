@@ -19,6 +19,9 @@ import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import type { R2Like } from '../../store-edge-cache';
+import { clearResolveMemory, resolveResilient, type ResolveDeps } from './store-resolve-cache';
 import { applyDemoLook, DEMO_LOOK_HEADER } from './demo-look';
 
 // Re-exported so server callers have one import site for the resolver and the
@@ -247,16 +250,38 @@ const DEFAULT_STORE: ResolvedStore = {
   heroImage: null,
 };
 
-// Simple per-instance in-memory cache for store resolution — a hot-path
-// optimizer on top of Next's tagged data cache (the API purges that on save).
-const storeCache = new Map<string, { store: ResolvedStore; expires: number }>();
-// Short TTL (was 2 min). This per-instance in-memory layer is just a hot-path
-// optimizer on top of Next's tagged data cache. The API purges the data cache
-// on save via /api/revalidate (revalidateTag), so this small window is the only
-// residual staleness — keeping it low (8s) makes a merchant's theme/layout edit
-// appear on the storefront within a few seconds instead of up to 2 minutes.
-// In-memory (not Redis), so the <120s Redis-TTL-floor rule does not apply.
-const CACHE_TTL = 8 * 1000;
+// Resolution caching + stale-if-error live in store-resolve-cache.ts (Ruling RESOLVE-BULLETPROOF-1): per-isolate
+// memory of hits AND definitive misses, a durable R2 last-known-good shared by every isolate, both checked against the
+// per-store purge epochs before every serve (store status / domain ownership / plan are NEVER-stale).
+
+/** Normalised host: the key the purge epochs use (`host/<label>`, store-edge-cache.ts epochKeysForTag). */
+function hostKey(domain: string): string {
+  return domain.toLowerCase().replace(/^www\./, '');
+}
+
+/** The Worker bindings when running on Cloudflare; null under next dev/start and in tests (memory-only, short TTLs). */
+function resolveDeps(): ResolveDeps {
+  let r2: R2Like | null = null;
+  let waitUntil: (p: Promise<unknown>) => void = p => {
+    void p;
+  };
+  try {
+    const ctx = getCloudflareContext();
+    const bucket = (ctx.env as { NEXT_INC_CACHE_R2_BUCKET?: R2Like }).NEXT_INC_CACHE_R2_BUCKET;
+    if (bucket) r2 = bucket;
+    const c = ctx.ctx as { waitUntil?(p: Promise<unknown>): void } | undefined;
+    if (c?.waitUntil) waitUntil = p => c.waitUntil!(p);
+  } catch {
+    // not on Cloudflare
+  }
+  return {
+    r2,
+    now: Date.now,
+    sleep: ms => new Promise(r => setTimeout(r, ms)),
+    random: Math.random,
+    waitUntil,
+  };
+}
 
 /**
  * Get the store domain from request headers
@@ -358,9 +383,10 @@ async function fetchStoreByDomain(
       // Otherwise tagged so the API can purge THIS store's cached resolve on
       // save (POST /api/revalidate → revalidateTag). `revalidate` stays as a
       // slow fallback for stores that never get an explicit purge.
-      ...(builderToken
-        ? { cache: 'no-store' as const }
-        : { next: { revalidate: 15, tags: [`store-domain:${domain}`] } }),
+      // Never the Next data cache: OpenNext's tagCache is "dummy" here, so a `store-domain:<host>` purge could not
+      // reach it and a suspended store stayed resolvable for its TTL. store-resolve-cache.ts owns caching instead,
+      // epoch-invalidated (Ruling RESOLVE-BULLETPROOF-1). The builder canvas path was already uncached.
+      cache: 'no-store' as const,
       headers: {
         'Content-Type': 'application/json',
         'x-store-domain': domain,
@@ -526,24 +552,8 @@ async function resolveStoreByDomain(
   // cached public miss/hit must not stand in for the token-checked answer.
   if (builderToken) return fetchStoreByDomain(domain, builderToken);
 
-  // Check cache
-  const cached = storeCache.get(domain);
-  if (cached && cached.expires > Date.now()) {
-    return cached.store;
-  }
-
-  // Fetch from API
-  const store = await fetchStoreByDomain(domain);
-
-  if (store) {
-    // Cache the result
-    storeCache.set(domain, {
-      store,
-      expires: Date.now() + CACHE_TTL,
-    });
-  }
-
-  return store;
+  const key = hostKey(domain);
+  return resolveResilient(key, key, () => fetchStoreByDomain(domain), resolveDeps());
 }
 
 /**
@@ -552,7 +562,7 @@ async function resolveStoreByDomain(
 async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
   try {
     const response = await fetch(`${API_URL}/public/stores/${slug}`, {
-      next: { revalidate: 15, tags: [`store-slug:${slug}`] },
+      cache: 'no-store' as const, // see fetchStoreByDomain (Ruling RESOLVE-BULLETPROOF-1)
       headers: { 'Content-Type': 'application/json' },
     });
 
@@ -701,22 +711,13 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
 export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | null> {
   // A reserved or malformed slug is never a store: answer null without an API call.
   if (isReservedSlug(slug) || !validateStoreSlugFormat(slug).ok) return null;
-  const cacheKey = `slug:${slug}`;
-  const cached = storeCache.get(cacheKey);
-  if (cached && cached.expires > Date.now()) {
-    return cached.store;
-  }
-
-  const store = await fetchStoreBySlug(slug);
-
-  if (store) {
-    storeCache.set(cacheKey, {
-      store,
-      expires: Date.now() + CACHE_TTL,
-    });
-  }
-
-  return store;
+  // Epoch host = `<slug>.ebda.app`, what a `store-slug:<slug>` purge bumps (store-edge-cache.ts epochKeysForTag).
+  return resolveResilient(
+    `slug:${slug}`,
+    `${slug}.ebda.app`,
+    () => fetchStoreBySlug(slug),
+    resolveDeps()
+  );
 }
 
 /**
@@ -1016,9 +1017,5 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
  * Clear store cache (useful for updates)
  */
 export function clearStoreCache(domain?: string): void {
-  if (domain) {
-    storeCache.delete(domain);
-  } else {
-    storeCache.clear();
-  }
+  clearResolveMemory(domain ? hostKey(domain) : undefined);
 }
