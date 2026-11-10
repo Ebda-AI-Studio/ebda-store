@@ -232,6 +232,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [observability/slo.md](observability/slo.md) - Service Level Objectives (SLOs) — Ebda Store
 
+## ops - Operations
+
+- [ops/escalation.md](ops/escalation.md) - Escalation: who is contacted for P0/P1, payment and data incidents, channels, response targets
+
 ## perf - Performance
 
 - [perf/index-audit-2026-05.md](perf/index-audit-2026-05.md) - Index Audit — 2026-05-01

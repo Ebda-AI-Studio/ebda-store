@@ -1,5 +1,7 @@
 # Ebda Store - Production Deployment Guide
 
+> **2026-11-10 update:** the Railway API, Neon, the Axiom log drain and UptimeRobot named in older sections below are retired (Postgres retired 2026-11-05). Today: every app is a Cloudflare Worker, data is D1 + Durable Objects + R2, logs are Workers Logs + Logpush to R2 `ebda-logs` (section 7), availability is probed by status.ebda.app with Telegram alerts. Incident triage: `docs/INCIDENT.md`; escalation: `docs/ops/escalation.md`.
+
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 >
 > **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `ebda-web` / `ebda-admin` / `ebda-orders`, serving `store.ebda.app` / `store.ebda.app` / `orders.ebda.app`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
@@ -516,13 +518,13 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 # 2. Confirm API health
 curl https://api.ebda.app/health
 
-# 3. Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
+# 3. Check the external probes: https://status.ebda.app (every component green; an incident there pages Telegram)
 
 # 4. Trigger Sentry from the storefront (paste into browser console on demo-merchant.com):
 #    throw new Error("sentry-storefront-smoke-test");
 #    Issue should appear in Sentry dashboard within ~30s.
 
-# 5. Trigger PostHog event capture from the admin (paste into browser console):
+# 5. Trigger PostHog event capture from the admin (accept analytics in the cookie banner first: the admin PostHog is consent-gated; then paste into the browser console):
 #    window.posthog?.capture('admin_smoke_test', {at: new Date().toISOString()});
 #    Event lands in PostHog → Live Events within ~5s.
 ```
