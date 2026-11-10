@@ -76,16 +76,16 @@ export async function repairProductNames(
         where: { id: item.id, storeId },
         data: { name: item.after.name, nameAr: item.after.nameAr, aiFieldSources: sources },
       });
-      if (item.problem !== 'swapped') {
-        await sendEventAfterCommit(
-          'product.name-repair',
-          {
-            name: 'product.upserted' as any,
-            data: { storeId, productId: item.id, op: 'update', changedFields: ['nameAr'] },
-          },
-          { ifUnhookable: 'send' }
-        );
-      }
+      // product.upserted for every repaired row: the search index re-reads the names, and the autofill fills `name`
+      // (placeholder) or refreshes the AI's English from the merchant's Arabic (swapped).
+      await sendEventAfterCommit(
+        'product.name-repair',
+        {
+          name: 'product.upserted' as any,
+          data: { storeId, productId: item.id, op: 'update', changedFields: ['nameAr'] },
+        },
+        { ifUnhookable: 'send' }
+      );
     }
   }
   return { storeId, apply: opts.apply, scanned: rows.length, items };
