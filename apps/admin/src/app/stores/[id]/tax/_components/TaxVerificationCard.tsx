@@ -14,7 +14,7 @@ import {
   withNumerals,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
-import { apiDelete, apiFetch, apiGet, apiPost, apiPut } from '@/lib/api';
+import { apiDelete, apiFetch, apiGet, apiPost, apiPut, localizedApiMessage } from '@/lib/api';
 import { openProtectedDocument } from '@/lib/open-document';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -199,9 +199,18 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
       const res = await apiFetch(`${base}/documents`, { method: 'POST', body: form });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {
-          error?: { code?: string; message?: string };
+          error?: { code?: string; message?: string; details?: Record<string, unknown> };
         } | null;
-        failure = errorText(body?.error?.code, body?.error?.message);
+        // A raw fetch: the API's English text goes through the same map as apiRequest (Ruling ADMIN-ERR-1).
+        failure = errorText(
+          body?.error?.code,
+          localizedApiMessage(
+            body?.error?.code,
+            body?.error?.message || t('error'),
+            body?.error?.details,
+            res.status
+          )
+        );
       }
     } catch {
       failure = t('error');
