@@ -351,6 +351,10 @@ describe('scripts/ci-affected.mjs', () => {
     expect(run('apps/web/edge-build-id.ts').workers).toEqual(['web']);
     expect(run('apps/status/src/index.ts').workers).toEqual(['status']);
     expect(run('apps/accounts/src/app.ts').workers).toEqual(['accounts']);
+    // marketing (static export, cheap) dry-runs on any page-weight change, so its budget fails the PR that grows it
+    expect(run('apps/marketing/src/app/chrome.css').workers).toEqual(['marketing']);
+    expect(run('apps/marketing/src/components/LegalPage.tsx').workers).toEqual(['marketing']);
+    expect(run('scripts/ci/marketing-perf-budget.json').workers).toEqual(['marketing']);
     // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
     expect(run('apps/api/wrangler.jsonc').workers).toEqual(['api']);
     // root manifest / cf-* scripts hit every Worker app

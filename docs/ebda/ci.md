@@ -46,6 +46,11 @@ entry bundles: the two HTML edge caches, `edge-build-id.ts` and the rest of its
 relative imports), or the root manifest, lockfile and `cf-*` scripts. It costs about 9 billed minutes per Next app (OpenNext build), so it
 is not run for ordinary source edits. Apps without a wrangler config (apps/api
 today) are skipped, not failed.
+`apps/marketing` is the exception: a static export with no OpenNext build, it
+dry-runs on any change under its `src/`, `public/` or `scripts/`, or to
+`scripts/ci/marketing-perf-budget.{mjs,json}`, so its page-weight budget fails
+the PR that grows it.
+
 In the FULL lane (main push, nightly, dispatch) `worker-dry-run` always runs
 for `marketing` alone, so the marketing page-weight budget
 (`scripts/ci/marketing-perf-budget.mjs`) is measured on main and a red one
