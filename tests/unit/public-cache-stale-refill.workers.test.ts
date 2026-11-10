@@ -62,15 +62,30 @@ async function isolate() {
   } as unknown as Parameters<typeof bindings.setCfBindings>[0]);
   const { redis } = await import('@api/services/redis.service');
   await redis.connect();
-  const cache = await import('@api/lib/public-cache');
+  const raw = await import('@api/lib/public-cache');
+  // API-HANG-1: on Workers a fill's write-back runs in waitUntil; collect it so each assertion sees the settled KV.
+  const cache = {
+    ...raw,
+    getCached: ((...args: Parameters<typeof raw.getCached>) =>
+      bindings.runWithWaitUntil(
+        p => void background.push(p),
+        () => raw.getCached(...args)
+      )) as typeof raw.getCached,
+  };
   return { redis, cache };
 }
+
+const background: Array<Promise<unknown>> = [];
+const drain = async () => {
+  while (background.length) await Promise.all(background.splice(0));
+};
 
 beforeEach(() => {
   ns = new FakeAuthStateNamespace();
   kv = new FakeKv();
 });
 afterEach(async () => {
+  await drain();
   (await import('@api/cf/bindings')).clearCfBindings();
 });
 
@@ -100,6 +115,7 @@ describe('Workers (KV + AuthState DO): a pre-write fill cannot republish', () =>
     await cache.invalidateStoreProductCachesAfterOrder('s1');
     fill.release({ price: 100 });
     await fill.pending;
+    await drain();
     expect(kv.data.has('cache:public:product:s1:sku-1')).toBe(false);
     const fresh = await cache.getCached('public:product:s1:sku-1', 120, async () => ({
       price: 200,
@@ -114,12 +130,14 @@ describe('Workers (KV + AuthState DO): a pre-write fill cannot republish', () =>
     await b.cache.invalidateCachedPrefix('public:products:s1:');
     fill.release({ price: 100 });
     await fill.pending;
+    await drain();
     expect(kv.data.has('cache:public:products:s1:list')).toBe(false);
   });
 
   it('an untouched key still fills KV (no false suppression)', async () => {
     const { cache } = await isolate();
     await cache.getCached('public:products:s2:list', 120, async () => ({ price: 7 }));
+    await drain();
     expect(JSON.parse(kv.data.get('cache:public:products:s2:list') ?? 'null')).toEqual({
       price: 7,
     });
