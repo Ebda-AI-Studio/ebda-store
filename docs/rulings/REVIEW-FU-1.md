@@ -1,0 +1,5 @@
+# REVIEW-FU-1
+
+Ruling REVIEW-FU-1 - the 20 remaining `src.indexOf(a) < src.indexOf(b)` source-order assertions in 16 `tests/unit` files (listed in `docs/plans/2026-11-10-review-followups.md` and the PR that added this ruling) are listed, not rewritten, by the review fix-after PR: each needs its own behavioural harness (queues, refunds, erasure, the MCP limiter order), a separate change per area, and none was named by a review. The four review-named tests were rewritten to assert behaviour and each was shown red by a mutation. Cost if wrong: a change that keeps the text order but breaks the control flow passes one of those 20 tests until it is rewritten.
+
+Closed 2026-11-10 by REVIEW-FU-2.

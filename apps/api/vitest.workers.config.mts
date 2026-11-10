@@ -29,6 +29,8 @@ const apiVars = {
   TRUST_PROXY_HOPS: '1',
   // The dev-only POST /__dev/create-store route (src/worker.ts); never set in wrangler.jsonc.
   DEV_STATS: '1',
+  // merchant-signup.test.ts posts a signup right after minting the form token (the default floor is 3 s).
+  SIGNUP_MIN_FILL_MS: '0',
   // The cutover target state (Ruling NZ-PG-8): background jobs follow each store's D1 backend flag, so a cron run hides the DO
   // stores from a sweep that is not ported and their alarms own the ported ones. The cron-tick group asserts no job reaches Postgres.
   JOBS_ON_DO: '1',
@@ -115,6 +117,7 @@ export default defineConfig(async () => {
                   async revokeUser() {}
                   async setStatus() {}
                   async setRole() { return true; }
+                  async createUser(i) { return { id: i.id }; }
                   async inviteUser(i) { return { id: i.id, created: true }; }
                   async updateProfile(id, _i, _r, actor) {
                     // an id with this prefix is a super_admin: only that user may edit it (security tests of the admin user edit)

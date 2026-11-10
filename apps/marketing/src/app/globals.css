@@ -374,9 +374,15 @@ html[lang='en'] .wm-name {
   --np-inset: 2px;
 }
 .nav-menu .menu-login,
-.nav-menu .menu-lang,
-.nav-menu .menu-start {
+.nav-menu .menu-lang {
   display: none;
+}
+/* The Menu's start button (an <a> in the pinned pair) is hidden only where the bar shows its own: chrome.css shows it
+   (display:flex) up to 799px. The two ranges never overlap, so neither rule depends on which stylesheet loads last. */
+@media (min-width: 800px) {
+  .nav-menu .menu-start {
+    display: none;
+  }
 }
 .header-actions {
   display: flex;
@@ -531,9 +537,8 @@ html[lang='en'] .wm-name {
   .header-actions .header-start {
     display: none;
   }
-  .nav-menu .menu-start {
-    display: list-item;
-  }
+  /* No .menu-start rule here: it is an <a> now, not a list row (a list-item display would be wrong for it), and
+     chrome.css already shows it as flex at every width up to 799px. */
 }
 
 @media (max-width: 400px) {

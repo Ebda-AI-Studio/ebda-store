@@ -26,8 +26,12 @@ call() { curl -sS "${H[@]}" "$@"; }
 ok() { python3 -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else (print(json.dumps(d.get("errors")), file=sys.stderr) or 1))'; }
 
 # The Workers whose trace events are shipped (keep in sync with apps/*/wrangler.jsonc "logpush": true; a unit test
-# pins the config side, tests/unit/ops/worker-logs-config.test.ts).
-WORKERS='["ebda-api","ebda-web","ebda-admin","ebda-marketing","ebda-orders","ebda-accounts","ebda-help","ebda-docs","ebda-status"]'
+# pins the config side, tests/unit/ops/worker-logs-config.test.ts). Besides the nine here: ebda-wa (ebda-whatsapp repo) and
+# ebda-os-brain (ebda-foundation os/cloud/brain), both with "logpush": true in their own wrangler.jsonc. The asset-only Workers
+# (marketing, help, docs) log nothing while assets answer; they stay listed for their Worker paths.
+WORKERS='["ebda-api","ebda-web","ebda-admin","ebda-marketing","ebda-orders","ebda-accounts","ebda-help","ebda-docs","ebda-status","ebda-wa","ebda-os-brain"]'
+# CPUTimeMs + WallTimeMs (+ Entrypoint, EventType) give the reader (ebda-foundation os/ops/ebda-logs.mjs) p50/p95 per Worker; a job without them is updated.
+FIELDS='["Event","EventTimestampMs","Outcome","Exceptions","Logs","ScriptName","ScriptVersion","DispatchNamespace","CPUTimeMs","WallTimeMs","Entrypoint","EventType"]'
 
 # r2_state <bucket> <rule-id> <prefix> <maxAgeSeconds> -> prints one of: match | nomatch | nobucket | noauth
 r2_state() {
@@ -74,23 +78,23 @@ FILTER="$(python3 -c 'import json,sys; print(json.dumps({"where":{"key":"ScriptN
 JOB="$(call "$API/logpush/jobs" | python3 -c 'import sys,json; d=json.load(sys.stdin); j=[x for x in (d.get("result") or []) if x.get("name")=="ebda-workers-trace"]; print(json.dumps(j[0]) if j else "")')"
 if [ -n "$JOB" ]; then
   ID="$(echo "$JOB" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')"
-  if echo "$JOB" | python3 -c 'import sys,json; j=json.load(sys.stdin); want=set(json.loads(sys.argv[1])); got=set(((json.loads(j.get("filter") or "{}").get("where") or {}).get("value")) or []); sys.exit(0 if want==got and j.get("enabled") else 1)' "$WORKERS"; then
-    echo "  job $ID already ships exactly these Workers and is enabled: skipped"
+  if echo "$JOB" | python3 -c 'import sys,json; j=json.load(sys.stdin); want=set(json.loads(sys.argv[1])); got=set(((json.loads(j.get("filter") or "{}").get("where") or {}).get("value")) or []); f=set((j.get("output_options") or {}).get("field_names") or []); sys.exit(0 if want==got and set(json.loads(sys.argv[2]))==f and j.get("enabled") else 1)' "$WORKERS" "$FIELDS"; then
+    echo "  job $ID already ships exactly these Workers and fields and is enabled: skipped"
   else
-    call -X PUT "$API/logpush/jobs/$ID" -d "$(python3 -c 'import json,sys; print(json.dumps({"enabled":True,"filter":sys.argv[1]}))' "$FILTER")" | ok
-    echo "  job $ID filter updated"
+    call -X PUT "$API/logpush/jobs/$ID" -d "$(python3 -c 'import json,sys; j=json.loads(sys.argv[3]); oo=dict(j.get("output_options") or {}); oo["field_names"]=json.loads(sys.argv[2]); print(json.dumps({"enabled":True,"filter":sys.argv[1],"output_options":oo}))' "$FILTER" "$FIELDS" "$JOB")" | ok
+    echo "  job $ID filter + fields updated"
   fi
   echo "$JOB" | python3 -c 'import sys,json; j=json.load(sys.stdin); print("  last_complete:", j.get("last_complete"), "| last_error:", j.get("last_error"))'
   exit 0
 fi
 if [ -z "${LOGPUSH_R2_ACCESS_KEY_ID:-}" ] || [ -z "${LOGPUSH_R2_SECRET_ACCESS_KEY:-}" ]; then
   echo "  SKIPPED: set LOGPUSH_R2_ACCESS_KEY_ID / LOGPUSH_R2_SECRET_ACCESS_KEY (R2 token scoped to ebda-logs)"; exit 3; fi
-BODY="$(FILTER="$FILTER" ACC="$ACC" python3 - <<'PY'
+BODY="$(FILTER="$FILTER" FIELDS="$FIELDS" ACC="$ACC" python3 - <<'PY'
 import json,os
 print(json.dumps({
  "name":"ebda-workers-trace","dataset":"workers_trace_events","enabled":True,
  "destination_conf":"r2://ebda-logs/workers/{DATE}?account-id=%s&access-key-id=%s&secret-access-key=%s" % (os.environ["ACC"], os.environ["LOGPUSH_R2_ACCESS_KEY_ID"], os.environ["LOGPUSH_R2_SECRET_ACCESS_KEY"]),
- "output_options":{"field_names":["Event","EventTimestampMs","Outcome","Exceptions","Logs","ScriptName","ScriptVersion","DispatchNamespace"]},
+ "output_options":{"field_names":json.loads(os.environ["FIELDS"])},
  "filter":os.environ["FILTER"]}))
 PY
 )"
