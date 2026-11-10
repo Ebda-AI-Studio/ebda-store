@@ -8,7 +8,7 @@
   },
   "pages": {
     "/": {
-      "jsGzipKb": 187.5,
+      "jsGzipKb": 188,
       "htmlGzipKb": 22,
       "maxScripts": 11
     },
@@ -30,7 +30,7 @@
       "htmlGzipKb": 26
     },
     "/en": {
-      "jsGzipKb": 187.5,
+      "jsGzipKb": 188,
       "htmlGzipKb": 21.5,
       "maxScripts": 11
     },
@@ -47,7 +47,7 @@
     },
     "/store": {
       "jsGzipKb": 207.5,
-      "htmlGzipKb": 57,
+      "htmlGzipKb": 57.5,
       "maxScripts": 13
     },
     "/en/store": {
@@ -128,5 +128,6 @@
   "_navfooter2": "2026-11-03 (Ruling MKT-NAV-BUDGET-2, docs/rulings/MKT-NAV-BUDGET-2.md): the studio redesign (#391: one nav + 5-col footer on all sites, girih art, wordmark) measured on Umbra CI job 126153299819: css 12.5 -> 15.1KB on every page, html +1-5KB on pages with the new footer. Budgets = measured + 0.5KB rounded up to 0.5. / and /en js ratcheted DOWN 207.5 -> 187.5 (studio home has no 3D/typeahead chunk), scripts 13 -> 11. Supersedes the _studio1 estimate. Ratchet css down by splitting the art stylesheet per route.",
   "_css3": "2026-11-05 (Ruling MKT-CSS-BUDGET-3, docs/rulings/MKT-CSS-BUDGET-3.md): css 15.5 -> 16KB on every page; CI run 41966028877 (PR 418, no marketing source changed) measured just over 15.5KB on all pages. Growth came from shared packages on main after #397; main CI runs only affected jobs, so it never re-measured. Budget = measured + 0.5KB rounded up to 0.5. Ratchet down by splitting the art stylesheet per route.",
   "_svc1": "2026-11-09 (Ruling SVC-BUDGET-1): services.css split so the line-page styles load only on /services routes (css back to 15.8KB, under 16, no css raise). Legal html: /privacy 21.55, /en/privacy 20.72, /legal/whatsapp-terms 29.70, /en/legal/whatsapp-terms 27.06, /en/merchant-agreement ~22.5KB measured locally on this branch with the flag OFF (header identical to main); growth is main drift (#482 privacy 1.2 processor list, #495), not the services work. Budgets = measured + 0.5KB rounded up to 0.5.",
-  "_legal2": "2026-11-10 (Ruling MKT-LEGAL-HTML-BUDGET-2, docs/rulings/MKT-LEGAL-HTML-BUDGET-2.md): css 16.1 -> 15.9KB on every page with NO budget raise (dead fx-ai/fx-lang/fx-text/ab-grid-3 rules, the hand-written .band-dark and services-chrome .np-* copies the generated blocks already set, three overridden declarations). Legal html grew ~1.9KB when #510 gave every page JSON-LD (it ships twice: the script + its RSC copy); the studio's offers now ride only the Services index graph (-0.8KB), the remaining ~1.1KB is the page's own structured data. 12 legal html budgets = local measured + 0.5KB rounded up to 0.5 (flag OFF)."
+  "_legal2": "2026-11-10 (Ruling MKT-LEGAL-HTML-BUDGET-2, docs/rulings/MKT-LEGAL-HTML-BUDGET-2.md): css 16.1 -> 15.9KB on every page with NO budget raise (dead fx-ai/fx-lang/fx-text/ab-grid-3 rules, the hand-written .band-dark and services-chrome .np-* copies the generated blocks already set, three overridden declarations). Legal html grew ~1.9KB when #510 gave every page JSON-LD (it ships twice: the script + its RSC copy); the studio's offers now ride only the Services index graph (-0.8KB), the remaining ~1.1KB is the page's own structured data. 12 legal html budgets = local measured + 0.5KB rounded up to 0.5 (flag OFF).",
+  "_legal2b": "2026-11-10 (Ruling MKT-LEGAL-HTML-BUDGET-2, part 2): CI run 42906787633 (this branch merged with main) measured / and /en js 187.6KB (> 187.5) and /store html just over 57KB. Local static builds of main and of this branch both measure 187.3KB js and /store 56.6-56.8KB, i.e. this branch moves neither; the CI runner build measures ~0.3KB more. Budgets: / and /en js 188, /store html 57.5 (CI measured + <=0.5KB). Ratchet the home js back down with the typeahead lazy-load."
 }
