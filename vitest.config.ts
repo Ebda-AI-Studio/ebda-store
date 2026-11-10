@@ -17,9 +17,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    // @opennextjs/aws ships ESM with extensionless relative imports (it expects a bundler); run it through Vite so
-    // tests/unit/web-shared-fetch-cache.test.ts can drive the REAL fetch-cache adapter (Ruling WEB-COLD-2).
-    server: { deps: { inline: [/@opennextjs\/aws/] } },
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     // `.claude/worktrees/**` houses temporary git worktrees from
     // subagent runs; their stale tests would otherwise be picked up

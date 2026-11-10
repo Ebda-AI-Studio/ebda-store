@@ -12,8 +12,11 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 // The context is read per call, never at import time, so static imports are fine.
 import { createSharedFetchCache, sharedFetchSegment } from '../../apps/web/shared-fetch-cache';
 import doShardedTagCache from '@opennextjs/cloudflare/overrides/tag-cache/do-sharded-tag-cache';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-import Cache from '@opennextjs/aws/adapters/cache.js';
+import { build } from 'esbuild'; // pinned through wrangler (root devDependency), the bundler OpenNext itself uses
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const objects = new Map<string, { body: string; uploaded: Date }>();
 const bucket = {
@@ -143,7 +146,21 @@ describe('shared fetch cache (WEB-COLD-2)', () => {
 
 describe('a tag purge reaches an entry carried over from an older build (BOUNDED-stale, WEB-COLD-2)', () => {
   const g = globalThis as Record<string, unknown>;
-  beforeAll(() => {
+  // The REAL OpenNext fetch-cache adapter. @opennextjs/aws ships ESM with extensionless relative imports (it expects a
+  // bundler, as OpenNext bundles it into the Worker), so bundle it once here exactly like that and import the result.
+  let Cache: new () => { get(key: string, options: unknown): Promise<unknown> };
+  beforeAll(async () => {
+    const out = await build({
+      entryPoints: [require.resolve('@opennextjs/aws/adapters/cache.js')],
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      write: false,
+      logLevel: 'silent',
+    });
+    const file = path.join(mkdtempSync(path.join(tmpdir(), 'opennext-cache-')), 'cache.mjs');
+    writeFileSync(file, out.outputFiles[0].text);
+    Cache = (await import(pathToFileURL(file).href)).default;
     g.openNextConfig = {};
     g.nextVersion = '16.0.0';
     g.incrementalCache = createSharedFetchCache(CONTRACT_A);

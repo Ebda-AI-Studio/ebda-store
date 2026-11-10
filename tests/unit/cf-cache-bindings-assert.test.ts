@@ -18,7 +18,8 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 // @ts-expect-error plain .mjs script, no types
-import { CONTRACT_PATHS, contractVersion } from '../../scripts/ci/fetch-contract-version.mjs';
+import { contractVersion } from '../../scripts/ci/fetch-contract-version.mjs';
+import { seedFetchContract } from '../helpers/fetch-contract-fixture';
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = mkdtempSync(path.join(tmpdir(), 'cf-cache-assert-'));
@@ -34,13 +35,7 @@ writeFileSync(
 for (const app of ['web', 'admin', 'orders'])
   mkdirSync(path.join(scratch, 'apps', app), { recursive: true });
 // The web generator bakes the storefront's fetch-cache data-contract hash into the config (Ruling WEB-COLD-2).
-mkdirSync(path.join(scratch, 'scripts/ci'), { recursive: true });
-cpSync(
-  path.join(ROOT, 'scripts/ci/fetch-contract-version.mjs'),
-  path.join(scratch, 'scripts/ci/fetch-contract-version.mjs')
-);
-for (const p of CONTRACT_PATHS)
-  cpSync(path.join(ROOT, p), path.join(scratch, p), { recursive: true });
+seedFetchContract(scratch);
 
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 

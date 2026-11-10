@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BRAND } from '../../packages/shared/src/brand';
+import { seedFetchContract } from '../helpers/fetch-contract-fixture';
 
 describe('Ebda generated Cloudflare routes', () => {
   it.each(['false', 'true'])('uses Ebda routes after regeneration with cache=%s', cache => {
@@ -19,6 +20,7 @@ describe('Ebda generated Cloudflare routes', () => {
         cpSync(`scripts/${file}`, join(root, 'scripts', file));
       for (const app of ['web', 'admin', 'orders'])
         mkdirSync(join(root, 'apps', app), { recursive: true });
+      seedFetchContract(root); // the web cache config bakes the data-contract hash (Ruling WEB-COLD-2)
       execFileSync('bash', [join(root, 'scripts/cf-setup-local.sh')], {
         env: { ...process.env, CF_SETUP_SKIP_DEPS: '1', OPENNEXT_CACHE: cache },
       });
