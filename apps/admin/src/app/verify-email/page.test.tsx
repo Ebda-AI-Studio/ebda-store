@@ -76,6 +76,25 @@ describe('verify-email page', () => {
     });
   });
 
+  it('PRE-8: the password step says what to do when the link was opened on another device (reset also confirms)', async () => {
+    visit(LINK);
+    renderPage();
+    await screen.findByLabelText('onboarding.verify.password');
+    expect(screen.getByTestId('verify-password-hint').textContent).toBe(
+      'onboarding.verify.passwordHint'
+    );
+    expect(
+      screen.getByRole('link', { name: 'onboarding.verify.forgotPassword' }).getAttribute('href')
+    ).toBe('/forgot-password');
+  });
+
+  it('PRE-8: the hint copy exists in Arabic and English and points at the forgot-password link', async () => {
+    const ar = (await import('../../i18n/messages/ar.json')).default.onboarding.verify;
+    const en = (await import('../../i18n/messages/en.json')).default.onboarding.verify;
+    expect(ar.passwordHint).toContain(ar.forgotPassword);
+    expect(en.passwordHint).toContain(en.forgotPassword);
+  });
+
   it('a wrong password keeps the form with a message and offers forgot-password', async () => {
     visit(LINK);
     const { AccountsError } = await import('../../lib/accounts');

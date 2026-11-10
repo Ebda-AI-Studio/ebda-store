@@ -268,6 +268,24 @@ describe('x-hop-timing operator token', () => {
   });
 });
 
+describe('RL-SSR-IP-6: forwarded shopper address + its HMAC', () => {
+  it('are redacted wherever a request header map is recorded (any case)', () => {
+    const ev = scrubSentryEvent({
+      request: {
+        headers: {
+          'X-Ebda-Client-IP': '203.0.113.7',
+          'x-ebda-ssr-auth': 'f'.repeat(64),
+          accept: 'x',
+        },
+      },
+    });
+    const s = JSON.stringify(ev);
+    expect(s).not.toContain('203.0.113.7');
+    expect(s).not.toContain('f'.repeat(64));
+    expect((ev as any).request.headers.accept).toBe('x');
+  });
+});
+
 describe('SEC-8: secrets in the path', () => {
   const STORE = '0f8fad5b-d9cb-469f-a165-70867728950e';
   const TOKEN = ['not', 'a', 'secret', '0123456789', '0123456789'].join('-');
