@@ -1,90 +1,90 @@
 {
   "home": {
-    "hash": "4638ce1327091df9",
-    "date": "2026-11-09"
+    "hash": "68dc11f186b6f0db",
+    "date": "2026-11-10"
   },
   "store": {
-    "hash": "37736e5354bea849",
+    "hash": "7031ce7167a1200d",
     "date": "2026-11-10"
   },
   "features": {
-    "hash": "f061c6c74bb5dbcc",
-    "date": "2026-11-09"
+    "hash": "001bc202f09ea642",
+    "date": "2026-11-10"
   },
   "whatsapp": {
-    "hash": "221add3f9c2bc7a6",
-    "date": "2026-11-09"
+    "hash": "abf7b22c24c5f031",
+    "date": "2026-11-10"
   },
   "compare/zid": {
-    "hash": "5997d91cfd3abfcb",
-    "date": "2026-11-09"
+    "hash": "25cd50db94c8403b",
+    "date": "2026-11-10"
   },
   "compare/shopify": {
-    "hash": "df46273a1b9fb164",
-    "date": "2026-11-09"
+    "hash": "389231a28e73a99e",
+    "date": "2026-11-10"
   },
   "compare/wuilt": {
-    "hash": "a2b90acef403005b",
-    "date": "2026-11-09"
+    "hash": "dfc3162c3bbe77b6",
+    "date": "2026-11-10"
   },
   "compare/youcan": {
-    "hash": "39af7ed87ba70792",
-    "date": "2026-11-09"
+    "hash": "ec6941ceafb796d0",
+    "date": "2026-11-10"
   },
   "compare/easyorders": {
-    "hash": "162ff5b631c248f6",
-    "date": "2026-11-09"
+    "hash": "159ad32f337fd957",
+    "date": "2026-11-10"
   },
   "compare/expandcart": {
-    "hash": "1d1f62a2189ed4de",
-    "date": "2026-11-09"
+    "hash": "22cb93d414730c51",
+    "date": "2026-11-10"
   },
   "for/fashion": {
-    "hash": "19466e1cdf8dd154",
-    "date": "2026-11-09"
+    "hash": "8e4ba99ffad08d83",
+    "date": "2026-11-10"
   },
   "for/electronics": {
-    "hash": "cd4abc26667a4870",
-    "date": "2026-11-09"
+    "hash": "0aa502e3f73a3ec2",
+    "date": "2026-11-10"
   },
   "for/beauty": {
-    "hash": "3d5df7b7b7cff18a",
-    "date": "2026-11-09"
+    "hash": "ab244ac719bec88d",
+    "date": "2026-11-10"
   },
   "for/food": {
-    "hash": "f0152ba9283a5be7",
-    "date": "2026-11-09"
+    "hash": "7deaa2032d29d6ee",
+    "date": "2026-11-10"
   },
   "for/jewellery": {
-    "hash": "8b2f9308fa64c207",
-    "date": "2026-11-09"
+    "hash": "13b41f9d2430e340",
+    "date": "2026-11-10"
   },
   "services": {
-    "hash": "a19a5fe9b08562f5",
-    "date": "2026-11-09"
+    "hash": "3dd4f2d68ae49ef6",
+    "date": "2026-11-10"
   },
   "services/marketing": {
-    "hash": "c3f515f1ef5b0919",
+    "hash": "d148eb1429b1a0c8",
     "date": "2026-11-10"
   },
   "services/design": {
-    "hash": "9d2f957b8ef45681",
+    "hash": "99633c74625ec7c8",
     "date": "2026-11-10"
   },
   "services/events": {
-    "hash": "9d46a1837ec8e1d3",
+    "hash": "ab1371d149eda03d",
     "date": "2026-11-10"
   },
   "about": {
-    "hash": "5f716733acc20e7e",
-    "date": "2026-11-09"
+    "hash": "7b0f601976e0cabd",
+    "date": "2026-11-10"
   },
   "contact": {
-    "hash": "2061a827c550b19e",
+    "hash": "014b504887b23211",
     "date": "2026-11-10"
   },
   "credits": {
-    "hash": "4bf0a313098184fe",
+    "hash": "27b08b720ba76cce",
     "date": "2026-11-10"
   }
 }
