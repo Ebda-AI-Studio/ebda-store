@@ -7,8 +7,12 @@
  * room, on exactly the largest, riskiest PRs. `recoverTruncatedFindings`
  * salvages the complete finding objects instead of losing all of them.
  */
-import { readFileSync } from 'node:fs';
-import { describe, it, expect } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, it, expect, afterAll } from 'vitest';
 // @ts-expect-error - plain .mjs script, no types
 import { recoverTruncatedFindings } from '../../.github/scoped-audit/partial-json.mjs';
 import {
@@ -96,20 +100,71 @@ describe('a PARTIAL (truncated) audit is never reported as PASSED', () => {
     expect(auditExitCode({ blockingFindings: 1 })).toBe(1);
   });
 
-  it('audit.mjs threads the partial flag into the header and every gate exit', () => {
-    const src = readFileSync(
-      new URL('../../.github/scoped-audit/audit.mjs', import.meta.url),
-      'utf8'
+  // Behaviour, not source text: audit.mjs is a top-level script, so it is RUN as a child process
+  // against a recorded model response, with `fetch` replaced by an in-memory GitHub (a preload
+  // module). What is asserted is what a merge decision reads: the exit code and the verdict line
+  // the script writes to its step summary.
+  describe('audit.mjs end to end (child process, GitHub faked)', () => {
+    const AUDIT = fileURLToPath(new URL('../../.github/scoped-audit/audit.mjs', import.meta.url));
+    const dir = mkdtempSync(path.join(tmpdir(), 'scoped-audit-'));
+    const preload = path.join(dir, 'fake-github.mjs');
+    writeFileSync(
+      preload,
+      `globalThis.fetch = async (_url, init = {}) => {
+         const list = (init.method ?? 'GET') === 'GET';
+         const body = list ? [] : { id: 1, number: 1, html_url: 'https://example.test/1' };
+         return { ok: true, status: 200, headers: new Headers(), json: async () => body, text: async () => JSON.stringify(body) };
+       };`
     );
-    // Recovery sets the flag…
-    expect(src).toMatch(/recoverTruncatedFindings[\s\S]*partial = true;/);
-    // …the header and the exits read it…
-    expect(src).toMatch(
-      /Scoped Audit — \$\{auditVerdict\(\{ blockingFindings: blocking\.length, partial \}\)\}/
-    );
-    expect(src).toMatch(/process\.exit\(auditExitCode\(\{ blockingFindings: 0, partial \}\)\)/);
-    // …and no hard-coded green exit sits after the parse to bypass them.
-    const afterParse = src.slice(src.indexOf('let partial = false;'));
-    expect(afterParse).not.toMatch(/process\.exit\(0\)/);
+    const finding = (severity: string, n: number) =>
+      `{"severity":"${severity}","dimension":"security","file":"a.ts","line":${n},"title":"t${n}","detail":"d","fix":"f","blastRadius":"b"}`;
+
+    function runAudit(modelText: string) {
+      const out = path.join(dir, `out-${Math.random().toString(36).slice(2)}.json`);
+      const summary = path.join(dir, `summary-${Math.random().toString(36).slice(2)}.md`);
+      writeFileSync(out, JSON.stringify({ result: modelText }));
+      writeFileSync(summary, '');
+      const r = spawnSync(process.execPath, ['--import', preload, AUDIT], {
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: {
+          PATH: process.env.PATH ?? '',
+          GITHUB_TOKEN: 'x',
+          GITHUB_REPOSITORY: 'o/r',
+          GITHUB_EVENT_NAME: 'pull_request',
+          PR_NUMBER: '1',
+          HEAD_SHA: 'abcdef0123456789',
+          CLAUDE_OUTPUT: out,
+          GITHUB_STEP_SUMMARY: summary,
+        },
+      });
+      return { code: r.status, summary: readFileSync(summary, 'utf8') };
+    }
+
+    afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+    it('control: a complete, clean audit passes with exit 0', () => {
+      const r = runAudit('{"summary":"ok","findings":[]}');
+      expect(r.summary).toContain('Scoped Audit — PASSED');
+      expect(r.code).toBe(0);
+    });
+
+    it('a truncated response with nothing blocking is PARTIAL and exits red, never PASSED/0', () => {
+      const r = runAudit(
+        `{"summary":"big","findings":[${finding('P3', 1)},{"severity":"P2","dimen`
+      );
+      expect(r.summary).toContain('Scoped Audit — PARTIAL');
+      expect(r.summary).not.toContain('PASSED');
+      expect(r.code).toBe(nonRunExitCode());
+      expect(r.code).not.toBe(0);
+    });
+
+    it('a truncated response with a recovered P0 still BLOCKS with exit 1', () => {
+      const r = runAudit(
+        `{"summary":"big","findings":[${finding('P0', 1)},{"severity":"P2","dimen`
+      );
+      expect(r.summary).toContain('Scoped Audit — BLOCKED');
+      expect(r.code).toBe(1);
+    });
   });
 });

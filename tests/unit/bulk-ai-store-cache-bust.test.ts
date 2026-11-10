@@ -19,61 +19,70 @@
  * assertion below.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+import {
+  callEnclosingProperty,
+  callsTo,
+  code,
+  findFunction,
+  nodesOf,
+  parseFile,
+} from './helpers/ast-query';
 import { join } from 'node:path';
 
 const AEO_PATH = join(__dirname, '../../apps/api/src/lib/inngest/functions/bulk-ai-aeo.ts');
 const GEO_PATH = join(__dirname, '../../apps/api/src/lib/inngest/functions/bulk-ai-geo.ts');
 
-/** The body of the Inngest function declared with `id: '<functionId>'`, up to the next such declaration (or EOF). */
-function functionBody(source: string, functionId: string): string {
-  const marker = `id: '${functionId}'`;
-  const start = source.indexOf(marker);
-  expect(start, `could not find ${marker}`).toBeGreaterThanOrEqual(0);
-  const nextMarker = source.indexOf("id: '", start + marker.length);
-  return nextMarker === -1 ? source.slice(start) : source.slice(start, nextMarker);
+/**
+ * The Inngest function declared with `id: '<functionId>'`: the whole `inngest.createFunction(...)` call that
+ * carries that id (AST, so a comment mentioning a call, or the neighbouring function, can never satisfy it).
+ */
+function fn(sf: ts.SourceFile, functionId: string): ts.CallExpression {
+  return callEnclosingProperty(sf, 'id', functionId);
 }
+const busts = (call: ts.Node, callee: string) =>
+  callsTo(call, callee).filter(c => code(c.arguments[0]) === 'storeId');
 
 describe('bulk-ai-aeo.ts store-record sweeps bust the STORE cache, not the product cache', () => {
-  const source = readFileSync(AEO_PATH, 'utf8');
+  const source = parseFile(AEO_PATH);
 
   it('bulk-ai-faq-aeo (writes StoreFaq only)', () => {
-    const body = functionBody(source, 'bulk-ai-faq-aeo');
-    expect(body).toContain('bustStoreCachesById(storeId)');
-    expect(body).not.toContain('invalidateStoreProductCaches(storeId)');
+    const body = fn(source, 'bulk-ai-faq-aeo');
+    expect(busts(body, 'bustStoreCachesById')).toHaveLength(1);
+    expect(busts(body, 'invalidateStoreProductCaches')).toHaveLength(0);
   });
 
   it('bulk-ai-howto-aeo (writes StoreHowto only)', () => {
-    const body = functionBody(source, 'bulk-ai-howto-aeo');
-    expect(body).toContain('bustStoreCachesById(storeId)');
-    expect(body).not.toContain('invalidateStoreProductCaches(storeId)');
+    const body = fn(source, 'bulk-ai-howto-aeo');
+    expect(busts(body, 'bustStoreCachesById')).toHaveLength(1);
+    expect(busts(body, 'invalidateStoreProductCaches')).toHaveLength(0);
   });
 
   it('bulk-ai-meta-aeo (writes products/categories AND Store.metaDescriptionAeo — needs both)', () => {
-    const body = functionBody(source, 'bulk-ai-meta-aeo');
-    expect(body).toContain('bustStoreCachesById(storeId)');
-    expect(body).toContain('invalidateStoreProductCaches(storeId)');
+    const body = fn(source, 'bulk-ai-meta-aeo');
+    expect(busts(body, 'bustStoreCachesById')).toHaveLength(1);
+    expect(busts(body, 'invalidateStoreProductCaches')).toHaveLength(1);
   });
 });
 
 describe('bulk-ai-geo.ts store-record sweeps bust the STORE cache, not the product cache', () => {
-  const source = readFileSync(GEO_PATH, 'utf8');
+  const source = parseFile(GEO_PATH);
 
   it('bulk-ai-llms-txt (writes Store.llmsTxt only)', () => {
-    const body = functionBody(source, 'bulk-ai-llms-txt');
-    expect(body).toContain('bustStoreCachesById(storeId)');
-    expect(body).not.toContain('invalidateStoreProductCaches(storeId)');
+    const body = fn(source, 'bulk-ai-llms-txt');
+    expect(busts(body, 'bustStoreCachesById')).toHaveLength(1);
+    expect(busts(body, 'invalidateStoreProductCaches')).toHaveLength(0);
   });
 
   it('bulk-ai-brand-facts (writes Store.aboutJson only)', () => {
-    const body = functionBody(source, 'bulk-ai-brand-facts');
-    expect(body).toContain('bustStoreCachesById(storeId)');
-    expect(body).not.toContain('invalidateStoreProductCaches(storeId)');
+    const body = fn(source, 'bulk-ai-brand-facts');
+    expect(busts(body, 'bustStoreCachesById')).toHaveLength(1);
+    expect(busts(body, 'invalidateStoreProductCaches')).toHaveLength(0);
   });
 
   it('citation-copy (writes prisma.product.update — the one GEO sweep that was already correct)', () => {
-    const body = functionBody(source, 'bulk-ai-citation-copy');
-    expect(body).toContain('invalidateStoreProductCaches(storeId)');
+    const body = fn(source, 'bulk-ai-citation-copy');
+    expect(busts(body, 'invalidateStoreProductCaches')).toHaveLength(1);
   });
 });
 
@@ -85,10 +94,16 @@ describe('bulk-ai-geo.ts store-record sweeps bust the STORE cache, not the produ
  */
 describe('/llms.txt subscribes to the store purge tag (issue 2199)', () => {
   it('fetchStore tags its fetch store-slug:<slug>', () => {
-    const src = readFileSync(join(__dirname, '../../apps/web/src/app/llms.txt/route.ts'), 'utf8');
-    const start = src.indexOf('async function fetchStore(');
-    expect(start).toBeGreaterThan(-1);
-    const body = src.slice(start, src.indexOf('\n}\n', start));
-    expect(body).toContain('tags: [`store-slug:${slug}`]');
+    const sf = parseFile(join(__dirname, '../../apps/web/src/app/llms.txt/route.ts'));
+    const body = findFunction(sf, 'fetchStore');
+    const tags = nodesOf(body)
+      .filter(
+        (n): n is ts.PropertyAssignment =>
+          ts.isPropertyAssignment(n) &&
+          code(n.name) === 'tags' &&
+          ts.isArrayLiteralExpression(n.initializer)
+      )
+      .map(n => code(n.initializer));
+    expect(tags).toContain('[`store-slug:${slug}`]');
   });
 });

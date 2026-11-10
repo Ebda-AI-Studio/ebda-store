@@ -213,10 +213,19 @@ describe('source contract', () => {
     expect(svc).toMatch(/deferAfterTenantCommit\('page-builder\.publish\.purge'/);
   });
 
-  it('the public read never selects a draft', () => {
-    const pub = svc.slice(svc.indexOf('export async function getPublishedDefinition'));
-    const body = pub.slice(0, pub.indexOf('\n}\n'));
-    expect(body).toMatch(/status: 'published'/);
-    expect(body).not.toMatch(/'draft'/);
+  it('the public read never selects a draft', async () => {
+    // Behaviour: run the real reader against the fake revision table, which holds BOTH a draft
+    // and a published row; only the published row may come back.
+    const { getPublishedDefinition } = await import('@api/services/page-builder.service');
+    const publishedRow = { rev: 2, document: DOC };
+    m.rev.findFirst.mockReset();
+    m.rev.findFirst.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.status === 'published' ? publishedRow : draftRow)
+    );
+    const layout = resolveLayoutSettings({}, 'qamar');
+    const out = await getPublishedDefinition('store-1', layout, null);
+    expect(out.rev).toBe(2);
+    expect(m.rev.findFirst).toHaveBeenCalled();
+    for (const [arg] of m.rev.findFirst.mock.calls) expect(arg.where.status).toBe('published');
   });
 });
